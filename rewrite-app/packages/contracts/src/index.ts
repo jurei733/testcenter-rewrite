@@ -1841,6 +1841,7 @@ export const productionApiRoutes = {
     bootstrap: "/api/v1/admin/auth/bootstrap",
     signIn: "/api/v1/admin/auth/sign-in",
     signOut: "/api/v1/admin/auth/sign-out",
+    changeOwnPassword: "/api/v1/admin/auth/password",
     currentSession: "/api/v1/admin/auth/current-session",
     listSessions: "/api/v1/admin/auth/sessions",
     revokeSessions: "/api/v1/admin/auth/sessions:revoke",
@@ -2409,6 +2410,10 @@ export type AdminSignInRequest = {
   password: string;
 };
 
+export type ChangeAdminPasswordRequest = {
+  password: string;
+};
+
 export type AdminAccessWindowErrorDetails = {
   accessStatus: "scheduled" | "expired";
   accessAt: string;
@@ -2581,6 +2586,11 @@ export type GetAdminCurrentSessionResponse = {
 
 export type AdminSignOutResponse = {
   adminSession: PublicAdminSession;
+};
+
+export type ChangeAdminPasswordResponse = {
+  adminUser: PublicAdminUser;
+  revokedAdminSessionIds: string[];
 };
 
 export type AdminSessionDirectoryItem = {

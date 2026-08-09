@@ -857,6 +857,13 @@ export type AdminAuthPort = {
     adminSession: AdminSession;
     roleAssignments: AdminRoleAssignment[];
   }>;
+  changeOwnPassword(input: {
+    sessionToken: string;
+    password: string;
+  }): Promise<{
+    adminUser: AdminUser;
+    revokedAdminSessionIds: string[];
+  }>;
   listAdminSessions(input: {
     sessionToken: string;
     adminUserId?: string;
@@ -1031,6 +1038,7 @@ export const firstSliceUseCases = {
   revokeAdminSession: "RevokeAdminSession",
   revokeAdminSessions: "RevokeAdminSessions",
   adminSignOut: "AdminSignOut",
+  changeAdminPassword: "ChangeAdminPassword",
   listAdminUsers: "ListAdminUsers",
   createAdminUser: "CreateAdminUser",
   updateAdminUser: "UpdateAdminUser",
@@ -3329,7 +3337,8 @@ const listAdminRoleAssignmentsForUser = async (
 const requireActiveAdminSession = async (
   repository: FirstSliceRepository,
   sessionToken: string,
-  nowIso: string
+  nowIso: string,
+  options: { allowPasswordChangeRequired?: boolean } = {}
 ): Promise<{
   adminUser: AdminUser;
   adminSession: AdminSession;
@@ -3369,6 +3378,29 @@ const requireActiveAdminSession = async (
     repository,
     adminUser.adminUserId
   );
+
+  if (
+    adminUser.passwordChangeRequired &&
+    !options.allowPasswordChangeRequired &&
+    !roleAssignments.some(
+      roleAssignment => roleAssignment.role === "platform_admin"
+    ) &&
+    roleAssignments.some(
+      roleAssignment =>
+        roleAssignment.role === "tenant_admin" ||
+        roleAssignment.role === "workspace_admin"
+    )
+  ) {
+    throw new FirstSliceError(
+      403,
+      "admin_password_change_required",
+      "The administrator-set password must be changed before continuing.",
+      {
+        adminUserId: adminUser.adminUserId,
+        username: adminUser.username
+      }
+    );
+  }
 
   return { adminUser, adminSession, roleAssignments };
 };
@@ -20684,6 +20716,7 @@ export const createFirstSliceServices = (
           username,
           displayName,
           passwordHash: hashAdminPassword(password),
+          passwordChangeRequired: false,
           status: "active",
           customTexts: {},
           validFrom: null,
@@ -20876,7 +20909,9 @@ export const createFirstSliceServices = (
         };
       },
       async getCurrentSession(input) {
-        return requireActiveAdminSession(repository, input.sessionToken, now());
+        return requireActiveAdminSession(repository, input.sessionToken, now(), {
+          allowPasswordChangeRequired: true
+        });
       },
       async listAdminSessions(input) {
         const currentSession = await requireActiveAdminSession(
@@ -21074,7 +21109,8 @@ export const createFirstSliceServices = (
         const { adminUser, adminSession } = await requireActiveAdminSession(
           repository,
           input.sessionToken,
-          now()
+          now(),
+          { allowPasswordChangeRequired: true }
         );
         const revokedSession: AdminSession = {
           ...adminSession,
@@ -21093,6 +21129,54 @@ export const createFirstSliceServices = (
           }
         });
         return revokedSession;
+      },
+      async changeOwnPassword(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now(),
+          { allowPasswordChangeRequired: true }
+        );
+        const password = requireAdminPassword(input.password);
+        const updatedAdminUser: AdminUser = {
+          ...currentSession.adminUser,
+          passwordHash: hashAdminPassword(password),
+          passwordChangeRequired: false
+        };
+        await repository.saveAdminUser(updatedAdminUser);
+
+        const revokedAt = now();
+        const revokedAdminSessionIds: string[] = [];
+        for (const adminSession of await repository.listAdminSessions()) {
+          if (
+            adminSession.adminUserId !== updatedAdminUser.adminUserId ||
+            resolveAdminSessionStatus(adminSession, revokedAt) !== "active"
+          ) {
+            continue;
+          }
+          await repository.saveAdminSession({
+            ...adminSession,
+            revokedAt
+          });
+          revokedAdminSessionIds.push(adminSession.adminSessionId);
+        }
+
+        await recordAdminAuditEvent({
+          eventType: "admin_password_changed",
+          actorAdminUserId: updatedAdminUser.adminUserId,
+          subjectAdminUserId: updatedAdminUser.adminUserId,
+          summary: `Admin '${updatedAdminUser.username}' changed their password.`,
+          details: {
+            username: updatedAdminUser.username,
+            revokedSessionCount: revokedAdminSessionIds.length,
+            revokedAdminSessionIds
+          }
+        });
+
+        return {
+          adminUser: updatedAdminUser,
+          revokedAdminSessionIds
+        };
       }
     },
     adminDirectory: {
@@ -21194,6 +21278,7 @@ export const createFirstSliceServices = (
           username,
           displayName: normalizeAdminDisplayName(input.displayName, username),
           passwordHash: hashAdminPassword(password),
+          passwordChangeRequired: true,
           status: "active",
           customTexts: normalizeAdminCustomTexts(input.customTexts),
           ...accessWindow,
@@ -21426,7 +21511,11 @@ export const createFirstSliceServices = (
         const password = requireAdminPassword(input.password);
         const updatedAdminUser: AdminUser = {
           ...adminUser,
-          passwordHash: hashAdminPassword(password)
+          passwordHash: hashAdminPassword(password),
+          passwordChangeRequired:
+            adminUser.adminUserId === currentSession.adminUser.adminUserId
+              ? false
+              : true
         };
         await repository.saveAdminUser(updatedAdminUser);
 
@@ -21440,7 +21529,8 @@ export const createFirstSliceServices = (
           subjectAdminUserId: updatedAdminUser.adminUserId,
           summary: `Admin '${currentSession.adminUser.username}' reset password for '${updatedAdminUser.username}'.`,
           details: {
-            username: updatedAdminUser.username
+            username: updatedAdminUser.username,
+            passwordChangeRequired: updatedAdminUser.passwordChangeRequired
           }
         });
 

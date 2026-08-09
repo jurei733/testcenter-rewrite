@@ -124,6 +124,7 @@ const readStateFromFile = async (
         adminUserId,
         {
           ...adminUser,
+          passwordChangeRequired: adminUser.passwordChangeRequired ?? false,
           customTexts:
             adminUser.customTexts && typeof adminUser.customTexts === "object"
               ? adminUser.customTexts

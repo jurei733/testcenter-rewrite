@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 
 import type {
   AdminLoginAttempt,
+  AdminUser,
   OperationalLoginMigrationCandidate,
   Workspace
 } from "@testcenter-rewrite-app/domain";
@@ -141,6 +142,37 @@ describe("createFileFirstSliceRepository", () => {
           "workspace-operational"
         ),
         []
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("persists administrator-set password change requirements", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-admin-password-"));
+    const filePath = join(tempDirectory, "state.json");
+    const adminUser: AdminUser = {
+      adminUserId: "password-change-required",
+      username: "workspace.password.change",
+      displayName: "Workspace Password Change",
+      passwordHash: "stored-password-hash",
+      passwordChangeRequired: true,
+      status: "active",
+      customTexts: {},
+      validFrom: null,
+      validTo: null,
+      validForMinutes: null,
+      firstSignedInAt: null,
+      createdAt: "2026-08-09T00:00:00.000Z"
+    };
+
+    try {
+      await createFileFirstSliceRepository(filePath).saveAdminUser(adminUser);
+      assert.deepEqual(
+        await createFileFirstSliceRepository(filePath).getAdminUserById(
+          adminUser.adminUserId
+        ),
+        adminUser
       );
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });
@@ -298,6 +330,7 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(adminUser?.validForMinutes, null);
       assert.equal(adminUser?.firstSignedInAt, null);
       assert.deepEqual(adminUser?.customTexts, {});
+      assert.equal(adminUser?.passwordChangeRequired, false);
       const [roleAssignment] =
         await repository.listAdminRoleAssignmentsByUserId("admin-user-id");
       assert.equal(roleAssignment?.accessMode, "read_write");

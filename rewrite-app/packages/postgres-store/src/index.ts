@@ -65,6 +65,7 @@ const mapAdminUser = (row: Row | undefined): AdminUser | null =>
         username: String(row.username),
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
+        passwordChangeRequired: Boolean(row.password_change_required ?? false),
         status: row.status as AdminUser["status"],
         customTexts: (() => {
           try {
@@ -1190,6 +1191,14 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_expiry
         ON admin_login_attempts (expires_at);
     `
+  },
+  {
+    version: 40,
+    name: "add_admin_password_change_required",
+    sql: `
+      ALTER TABLE admin_users
+        ADD COLUMN IF NOT EXISTS password_change_required BOOLEAN NOT NULL DEFAULT FALSE;
+    `
   }
 ];
 
@@ -1411,7 +1420,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listAdminUsers() {
       return many(
-        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          ORDER BY created_at ASC`,
         [],
@@ -1420,7 +1429,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserById(adminUserId) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE admin_user_id = $1`,
         [adminUserId],
@@ -1429,7 +1438,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserByUsername(username) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE username = $1`,
         [username],
@@ -1469,12 +1478,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveAdminUser(adminUser) {
       await pool.query(
         `INSERT INTO admin_users (
-          admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
+          admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
         ON CONFLICT(admin_user_id) DO UPDATE SET
           username = EXCLUDED.username,
           display_name = EXCLUDED.display_name,
           password_hash = EXCLUDED.password_hash,
+          password_change_required = EXCLUDED.password_change_required,
           status = EXCLUDED.status,
           custom_texts_json = EXCLUDED.custom_texts_json,
           valid_from = EXCLUDED.valid_from,
@@ -1487,6 +1497,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           adminUser.username,
           adminUser.displayName,
           adminUser.passwordHash,
+          adminUser.passwordChangeRequired,
           adminUser.status,
           JSON.stringify(adminUser.customTexts),
           adminUser.validFrom,

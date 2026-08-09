@@ -249,6 +249,7 @@ test("SQLite preserves login-specific admin custom texts", async () => {
     username: "monitor.custom",
     displayName: "Monitor Custom",
     passwordHash: "stored-password-hash",
+    passwordChangeRequired: true,
     status: "active",
     customTexts: {
       gm_headline: "Scoped monitor",

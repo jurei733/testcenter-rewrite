@@ -218,6 +218,36 @@ const requestJson = async <T>(
   }
 ): Promise<JsonResponse<T>> => requestJsonAt<T>(baseUrl, path, init);
 
+const completeRequiredAdminPasswordChangeAt = async (
+  rootUrl: string,
+  sessionToken: string,
+  username: string,
+  password: string
+): Promise<string> => {
+  const changedPassword = await requestJsonAt<{
+    adminUser: { passwordChangeRequired: boolean };
+    revokedAdminSessionIds: string[];
+  }>(rootUrl, "/api/v1/admin/auth/password", {
+    method: "POST",
+    headers: { authorization: `Bearer ${sessionToken}` },
+    body: { password }
+  });
+  assert.equal(changedPassword.status, 200);
+  assert.equal(changedPassword.body.adminUser.passwordChangeRequired, false);
+  assert.equal(changedPassword.body.revokedAdminSessionIds.length > 0, true);
+
+  const signIn = await requestJsonAt<{
+    adminUser: { passwordChangeRequired: boolean };
+    sessionToken: string;
+  }>(rootUrl, "/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: { username, password }
+  });
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.adminUser.passwordChangeRequired, false);
+  return signIn.body.sessionToken;
+};
+
 const requestText = async (
   path: string,
   init?: {
@@ -1323,7 +1353,12 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
 
   const resetPassword = await requestJson<{
-    adminUser: { adminUserId: string; username: string; passwordHash?: string };
+    adminUser: {
+      adminUserId: string;
+      username: string;
+      passwordChangeRequired: boolean;
+      passwordHash?: string;
+    };
   }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/password`, {
     method: "POST",
     headers: {
@@ -1338,6 +1373,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     createdAdminUser.body.adminUser.adminUserId
   );
   assert.equal(resetPassword.body.adminUser.passwordHash, undefined);
+  assert.equal(resetPassword.body.adminUser.passwordChangeRequired, true);
 
   const oldPasswordSignIn = await requestJson<{ error: string }>(
     "/api/v1/admin/auth/sign-in",
@@ -1356,6 +1392,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   const resetPasswordSignIn = await requestJson<{
     sessionToken: string;
     adminSession: { adminSessionId: string };
+    adminUser: { passwordChangeRequired: boolean };
   }>(
     "/api/v1/admin/auth/sign-in",
     {
@@ -1369,6 +1406,53 @@ test("admin bootstrap and bearer session lifecycle", async () => {
 
   assert.equal(resetPasswordSignIn.status, 200);
   assert.ok(resetPasswordSignIn.body.sessionToken.length > 20);
+  assert.equal(resetPasswordSignIn.body.adminUser.passwordChangeRequired, true);
+
+  const blockedPasswordChangeRequiredDirectory = await requestJson<{
+    error: string;
+  }>("/api/v1/admin/users", {
+    headers: {
+      authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+    }
+  });
+  assert.equal(blockedPasswordChangeRequiredDirectory.status, 403);
+  assert.equal(
+    blockedPasswordChangeRequiredDirectory.body.error,
+    "admin_password_change_required"
+  );
+
+  const changedOwnPassword = await requestJson<{
+    adminUser: { passwordChangeRequired: boolean };
+    revokedAdminSessionIds: string[];
+  }>("/api/v1/admin/auth/password", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+    },
+    body: { password: "workspace-secret-final" }
+  });
+  assert.equal(changedOwnPassword.status, 200);
+  assert.equal(changedOwnPassword.body.adminUser.passwordChangeRequired, false);
+  assert.equal(
+    changedOwnPassword.body.revokedAdminSessionIds.includes(
+      resetPasswordSignIn.body.adminSession.adminSessionId
+    ),
+    true
+  );
+
+  const changedPasswordSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+    adminUser: { passwordChangeRequired: boolean };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "workspace.admin",
+      password: "workspace-secret-final"
+    }
+  });
+  assert.equal(changedPasswordSignIn.status, 200);
+  assert.equal(changedPasswordSignIn.body.adminUser.passwordChangeRequired, false);
 
   const selfDisable = await requestJson<{ error: string }>(
     `/api/v1/admin/users/${bootstrap.body.adminUser.adminUserId}`,
@@ -1408,7 +1492,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "/api/v1/admin/auth/current-session",
     {
       headers: {
-        authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+        authorization: `Bearer ${changedPasswordSignIn.body.sessionToken}`
       }
     }
   );
@@ -1429,7 +1513,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     disabledAdminRevokedSessions.body.items.some(
       item =>
         item.adminSession.adminSessionId ===
-          resetPasswordSignIn.body.adminSession.adminSessionId &&
+          changedPasswordSignIn.body.adminSession.adminSessionId &&
         item.status === "revoked"
     ),
     true
@@ -1441,7 +1525,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       method: "POST",
       body: {
         username: "workspace.admin",
-        password: "workspace-secret-reset"
+        password: "workspace-secret-final"
       }
     }
   );
@@ -1501,7 +1585,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
   assert.match(
     adminUsersCsvBody,
-    /^"adminUserId","username","displayName","status","validFrom","validTo","validForMinutes","firstSignedInAt","createdAt","roleAssignments"/
+    /^"adminUserId","username","displayName","status","passwordChangeRequired","validFrom","validTo","validForMinutes","firstSignedInAt","createdAt","roleAssignments"/
   );
   assert.match(adminUsersCsvBody, /"workspace\.admin"/);
   assert.match(adminUsersCsvBody, /"disabled"/);
@@ -1577,6 +1661,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(adminAuditEventTypes.has("admin_role_assigned"), true);
   assert.equal(adminAuditEventTypes.has("admin_role_revoked"), true);
   assert.equal(adminAuditEventTypes.has("admin_password_reset"), true);
+  assert.equal(adminAuditEventTypes.has("admin_password_changed"), true);
   assert.equal(adminAuditEventTypes.has("admin_user_updated"), true);
   assert.deepEqual(
     adminAuditEvents.body.items
@@ -1604,7 +1689,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         item.details["revokedSessionCount"] === 1 &&
         Array.isArray(item.details["revokedSessionIds"]) &&
         item.details["revokedSessionIds"].includes(
-          resetPasswordSignIn.body.adminSession.adminSessionId
+          changedPasswordSignIn.body.adminSession.adminSessionId
         )
     ),
     true
@@ -1967,12 +2052,18 @@ test("platform application settings are public, durable, validated, and audited"
     }
   );
   assert.equal(tenantAdminSignIn.status, 200);
+  const tenantAdminSessionToken = await completeRequiredAdminPasswordChangeAt(
+    baseUrl,
+    tenantAdminSignIn.body.sessionToken,
+    "settings.tenant.admin",
+    "settings-tenant-admin-final-secret"
+  );
   const tenantAdminUpdate = await requestJson<{ error: string }>(
     "/api/v1/admin/application-settings",
     {
       method: "PATCH",
       headers: {
-        authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+        authorization: `Bearer ${tenantAdminSessionToken}`
       },
       body: { appTitle: "Tenant title" }
     }
@@ -3787,8 +3878,16 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
         }
       }
     );
+    assert.equal(workspaceAdminSignIn.status, 200);
+    const workspaceAdminSessionToken =
+      await completeRequiredAdminPasswordChangeAt(
+        isolated.baseUrl,
+        workspaceAdminSignIn.body.sessionToken,
+        "workspace.required.admin",
+        "workspace-required-final-secret"
+      );
     const workspaceAdminHeaders = {
-      authorization: `Bearer ${workspaceAdminSignIn.body.sessionToken}`
+      authorization: `Bearer ${workspaceAdminSessionToken}`
     };
 
     const scopedWorkspaceRename = await requestJsonAt<{
@@ -3884,8 +3983,14 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     });
     assert.equal(readOnlySignIn.status, 200);
     assert.equal(readOnlySignIn.body.roleAssignments[0]?.accessMode, "read_only");
+    const readOnlySessionToken = await completeRequiredAdminPasswordChangeAt(
+      isolated.baseUrl,
+      readOnlySignIn.body.sessionToken,
+      "workspace.read.only",
+      "workspace-read-only-final-secret"
+    );
     const readOnlyHeaders = {
-      authorization: `Bearer ${readOnlySignIn.body.sessionToken}`
+      authorization: `Bearer ${readOnlySessionToken}`
     };
 
     const readOnlyOverview = await requestJsonAt<{
@@ -4424,13 +4529,20 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
         }
       }
     );
+    assert.equal(tenantAdminSignIn.status, 200);
+    const tenantAdminSessionToken = await completeRequiredAdminPasswordChangeAt(
+      isolated.baseUrl,
+      tenantAdminSignIn.body.sessionToken,
+      "tenant.required.admin",
+      "tenant-required-final-secret"
+    );
 
     const tenantCreatedWorkspace = await requestJsonAt<{
       workspace: { workspaceKey: string };
     }>(isolated.baseUrl, "/api/v1/tenants/auth-required-tenant/workspaces", {
       method: "POST",
       headers: {
-        authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+        authorization: `Bearer ${tenantAdminSessionToken}`
       },
       body: {
         workspaceKey: "tenant-admin-created",
@@ -4451,7 +4563,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       "/api/v1/tenants/auth-required-tenant/workspaces",
       {
         headers: {
-          authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+          authorization: `Bearer ${tenantAdminSessionToken}`
         }
       }
     );
@@ -4465,7 +4577,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
 
     const tenantAdminHeaders = {
-      authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+      authorization: `Bearer ${tenantAdminSessionToken}`
     };
     const delegatedStudyMonitor = await requestJsonAt<{
       adminUser: { adminUserId: string; username: string };

@@ -19,6 +19,7 @@ export type AdminAuditEventType =
   | "admin_user_updated"
   | "admin_user_deleted"
   | "admin_password_reset"
+  | "admin_password_changed"
   | "admin_role_assigned"
   | "admin_role_revoked"
   | "workspace_deleted"
@@ -233,6 +234,7 @@ export const adminAuditEventTypes = [
   "admin_user_updated",
   "admin_user_deleted",
   "admin_password_reset",
+  "admin_password_changed",
   "admin_role_assigned",
   "admin_role_revoked",
   "workspace_deleted",
@@ -399,6 +401,7 @@ export type AdminUser = {
   username: string;
   displayName: string;
   passwordHash: string;
+  passwordChangeRequired: boolean;
   status: AdminUserStatus;
   customTexts: Record<string, string>;
   validFrom: string | null;

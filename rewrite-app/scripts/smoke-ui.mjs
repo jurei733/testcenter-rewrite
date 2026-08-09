@@ -2321,6 +2321,7 @@ try {
   const generatedWorkspaceAdminUsername = `ui-workspace-admin-${Date.now()}`;
   const workspaceAdminPassword = "ui-workspace-admin-secret";
   const workspaceAdminResetPassword = "ui-workspace-admin-reset-secret";
+  const workspaceAdminFinalPassword = "ui-workspace-admin-final-secret";
   await fillAndCommit("#adminCreateUsername", generatedWorkspaceAdminUsername);
   await fillAndCommit("#adminCreateDisplayName", "UI Workspace Admin");
   await fillAndCommit("#adminCreatePassword", workspaceAdminPassword);
@@ -2618,10 +2619,27 @@ try {
   const resetWorkspaceAdminPasswordPayload =
     await resetWorkspaceAdminPasswordSignIn.json();
   assert.equal(
+    resetWorkspaceAdminPasswordPayload.adminUser.passwordChangeRequired,
+    true
+  );
+  assert.equal(
     resetWorkspaceAdminPasswordPayload.roleAssignments.find(
       roleAssignment => roleAssignment?.role === "workspace_admin"
     )?.accessMode,
     "read_only"
+  );
+  const blockedResetPasswordSession = await fetch(
+    `${baseUrl}/api/v1/admin/users`,
+    {
+      headers: {
+        authorization: `Bearer ${resetWorkspaceAdminPasswordPayload.sessionToken}`
+      }
+    }
+  );
+  assert.equal(blockedResetPasswordSession.status, 403);
+  assert.equal(
+    (await blockedResetPasswordSession.json()).error,
+    "admin_password_change_required"
   );
 
   logStep("read-only-workspace-admin");
@@ -2637,7 +2655,61 @@ try {
   await clickAction("Sign In");
   const readOnlyAdminSignInResponse = await readOnlyAdminSignInResponsePromise;
   assert.equal(readOnlyAdminSignInResponse.status(), 200);
+  await page.locator("#requiredAdminPasswordChangeDialog").waitFor();
   await waitForInputMinLength("#adminSessionToken", 20);
+  await fillAndCommit("#requiredAdminPassword", "short");
+  await fillAndCommit("#requiredAdminPasswordConfirmation", "different");
+  await expectButtonSelectorDisabled("#requiredAdminPasswordSubmitButton");
+  await fillAndCommit(
+    "#requiredAdminPassword",
+    workspaceAdminFinalPassword
+  );
+  await fillAndCommit(
+    "#requiredAdminPasswordConfirmation",
+    workspaceAdminFinalPassword
+  );
+  await expectButtonSelectorEnabled("#requiredAdminPasswordSubmitButton");
+  const requiredPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#requiredAdminPasswordSubmitButton").click();
+  const requiredPasswordChangeResponse =
+    await requiredPasswordChangeResponsePromise;
+  assert.equal(requiredPasswordChangeResponse.status(), 200);
+  await page
+    .locator("#requiredAdminPasswordChangeDialog")
+    .waitFor({ state: "detached" });
+  await expectInputValue("#adminSessionToken", "");
+  const revokedResetPasswordSession = await fetch(
+    `${baseUrl}/api/v1/admin/auth/current-session`,
+    {
+      headers: {
+        authorization: `Bearer ${resetWorkspaceAdminPasswordPayload.sessionToken}`
+      }
+    }
+  );
+  assert.equal(revokedResetPasswordSession.status, 401);
+
+  await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
+  await fillAndCommitUntilValue("#adminPassword", workspaceAdminFinalPassword);
+  const finalReadOnlyAdminSignInResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-in")
+  );
+  await clickAction("Sign In");
+  const finalReadOnlyAdminSignInResponse =
+    await finalReadOnlyAdminSignInResponsePromise;
+  assert.equal(finalReadOnlyAdminSignInResponse.status(), 200);
+  await waitForInputMinLength("#adminSessionToken", 20);
+  assert.equal(
+    await page.locator("#requiredAdminPasswordChangeDialog").count(),
+    0
+  );
+  logStep("admin-required-password-change");
+  stopAfter("admin-required-password-change");
   await page
     .locator("app-record-collection")
     .filter({ has: page.getByRole("heading", { name: "Operator Session" }) })

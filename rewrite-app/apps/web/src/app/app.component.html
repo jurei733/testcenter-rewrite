@@ -43,6 +43,67 @@
     <strong>Offline mode</strong>
     <span>The application shell is available, but signing in, loading test content, and saving require a connection.</span>
   </section>
+  <section
+    id="requiredAdminPasswordChangeDialog"
+    class="required-password-backdrop"
+    *ngIf="app.requiresAdminPasswordChange"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="requiredAdminPasswordChangeTitle"
+  >
+    <form class="required-password-card" (submit)="$event.preventDefault(); submitRequiredAdminPassword()">
+      <span class="eyebrow">Account security</span>
+      <h2 id="requiredAdminPasswordChangeTitle">Choose your own password</h2>
+      <p>An administrator set the current password. Change it before opening workspace administration.</p>
+      <label>
+        New password
+        <input
+          id="requiredAdminPassword"
+          name="requiredAdminPassword"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+          [value]="requiredAdminPassword"
+          (input)="updateRequiredAdminPassword($event)"
+        />
+      </label>
+      <label>
+        Confirm new password
+        <input
+          id="requiredAdminPasswordConfirmation"
+          name="requiredAdminPasswordConfirmation"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+          [value]="requiredAdminPasswordConfirmation"
+          (input)="updateRequiredAdminPasswordConfirmation($event)"
+        />
+      </label>
+      <p
+        id="requiredAdminPasswordError"
+        class="required-password-error"
+        *ngIf="requiredAdminPasswordError"
+        role="alert"
+      >{{ requiredAdminPasswordError }}</p>
+      <div class="actions">
+        <button
+          id="requiredAdminPasswordSubmitButton"
+          class="primary"
+          type="submit"
+          [disabled]="!canSubmitRequiredAdminPassword"
+        >Change password and sign out</button>
+        <button
+          id="requiredAdminPasswordSignOutButton"
+          class="ghost"
+          type="button"
+          [disabled]="app.activeRequestLabel() !== null"
+          (click)="signOutRequiredAdmin()"
+        >Sign out</button>
+      </div>
+    </form>
+  </section>
   <ng-container *ngIf="isParticipantView; else operatorShell">
     <header class="participant-topbar">
       <div class="application-brand">

@@ -17,6 +17,8 @@ import {
   type AdminSignInRequest,
   type AdminSignInResponse,
   type AdminSignOutResponse,
+  type ChangeAdminPasswordRequest,
+  type ChangeAdminPasswordResponse,
   type AdminAuditEventListQuery,
   type ApiErrorResponse,
   type ActivateContentReleaseRequest,
@@ -1289,6 +1291,7 @@ const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
       "username",
       "displayName",
       "status",
+      "passwordChangeRequired",
       "validFrom",
       "validTo",
       "validForMinutes",
@@ -1304,6 +1307,7 @@ const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
       item.adminUser.username,
       item.adminUser.displayName,
       item.adminUser.status,
+      item.adminUser.passwordChangeRequired,
       item.adminUser.validFrom,
       item.adminUser.validTo,
       item.adminUser.validForMinutes,
@@ -1355,6 +1359,7 @@ const toPublicAdminUser = (adminUser: AdminUser): PublicAdminUser => {
     adminUserId: adminUser.adminUserId,
     username: adminUser.username,
     displayName: adminUser.displayName,
+    passwordChangeRequired: adminUser.passwordChangeRequired,
     status: adminUser.status,
     customTexts: { ...adminUser.customTexts },
     validFrom: adminUser.validFrom,
@@ -2616,6 +2621,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "POST" && pathname === productionApiRoutes.admin.signOut) {
     return `POST ${productionApiRoutes.admin.signOut}`;
+  }
+
+  if (
+    method === "POST" &&
+    pathname === productionApiRoutes.admin.changeOwnPassword
+  ) {
+    return `POST ${productionApiRoutes.admin.changeOwnPassword}`;
   }
 
   if (method === "GET" && pathname === productionApiRoutes.admin.listAuditEvents) {
@@ -3962,6 +3974,26 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const adminSession = await services.adminAuth.signOut({ sessionToken });
         sendJson<AdminSignOutResponse>(response, 200, {
           adminSession: toPublicAdminSession(adminSession)
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.changeOwnPassword
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const body = await readRequestJsonBody<ChangeAdminPasswordRequest>();
+        const result = await services.adminAuth.changeOwnPassword({
+          sessionToken,
+          password: body.password
+        });
+        sendJson<ChangeAdminPasswordResponse>(response, 200, {
+          adminUser: toPublicAdminUser(result.adminUser),
+          revokedAdminSessionIds: result.revokedAdminSessionIds
         });
         return;
       }

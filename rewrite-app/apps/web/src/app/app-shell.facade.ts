@@ -8,6 +8,7 @@ import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { AdminPasswordChangeService } from "./admin-password-change.service";
 import type { LiveContextSection } from "./live-context.component";
 
 const localDemoParticipantLink = buildParticipantEntryUrl(
@@ -26,6 +27,7 @@ export class AppShellFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly adminPasswordChange = inject(AdminPasswordChangeService);
 
   readonly renderVersion = this.uiState.renderVersion;
   readonly responseMeta = this.uiState.responseMeta;
@@ -69,6 +71,18 @@ export class AppShellFacade {
 
   get isReadOnlyAdminSession(): boolean {
     return this.operatorAccess.isReadOnlyAdmin;
+  }
+
+  get requiresAdminPasswordChange(): boolean {
+    return this.operatorAccess.requiresPasswordChange;
+  }
+
+  async changeRequiredAdminPassword(password: string): Promise<void> {
+    await this.adminPasswordChange.changeRequiredPassword(password);
+  }
+
+  async signOutRequiredAdmin(): Promise<void> {
+    await this.adminPasswordChange.signOut();
   }
 
   get operatorAccessLabel(): string {

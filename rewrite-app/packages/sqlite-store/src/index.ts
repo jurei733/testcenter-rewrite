@@ -72,6 +72,7 @@ const mapAdminUser = (row: Record<string, unknown> | undefined): AdminUser | nul
         username: String(row.username),
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
+        passwordChangeRequired: Number(row.password_change_required ?? 0) === 1,
         status: row.status as AdminUser["status"],
         customTexts: (() => {
           try {
@@ -1264,6 +1265,14 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX idx_admin_login_attempts_expiry
         ON admin_login_attempts (expires_at);
     `
+  },
+  {
+    version: 46,
+    name: "add_admin_password_change_required",
+    sql: `
+      ALTER TABLE admin_users
+        ADD COLUMN password_change_required INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ];
 
@@ -1485,7 +1494,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminUsers() {
       const rows = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            ORDER BY created_at ASC`
         )
@@ -1495,7 +1504,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserById(adminUserId) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE admin_user_id = ?`
         )
@@ -1505,7 +1514,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserByUsername(username) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE username = ?`
         )
@@ -1551,12 +1560,13 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_users (
-            admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            admin_user_id, username, display_name, password_hash, password_change_required, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(admin_user_id) DO UPDATE SET
             username = excluded.username,
             display_name = excluded.display_name,
             password_hash = excluded.password_hash,
+            password_change_required = excluded.password_change_required,
             status = excluded.status,
             custom_texts_json = excluded.custom_texts_json,
             valid_from = excluded.valid_from,
@@ -1570,6 +1580,7 @@ export const createSqliteFirstSliceRepository = (
           adminUser.username,
           adminUser.displayName,
           adminUser.passwordHash,
+          adminUser.passwordChangeRequired ? 1 : 0,
           adminUser.status,
           JSON.stringify(adminUser.customTexts),
           adminUser.validFrom,

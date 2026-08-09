@@ -13,6 +13,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 type OperatorSessionView = {
   adminUser?: {
     customTexts?: Record<string, string>;
+    passwordChangeRequired?: boolean;
   };
   roleAssignments?: PublicAdminRoleAssignment[];
 };
@@ -57,6 +58,19 @@ export class RewriteAppOperatorAccessService {
   get isPlatformAdmin(): boolean {
     return this.roleAssignments.some(
       assignment => assignment.role === "platform_admin"
+    );
+  }
+
+  get requiresPasswordChange(): boolean {
+    if (!this.uiState.ops.adminSessionToken.trim() || this.isPlatformAdmin) {
+      return false;
+    }
+    const session = parseJsonDocument<OperatorSessionView>(
+      this.uiState.ops.adminSessionView
+    );
+    return (
+      session?.adminUser?.passwordChangeRequired === true &&
+      (this.mode === "admin" || this.mode === "admin_read_only")
     );
   }
 

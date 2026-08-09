@@ -358,6 +358,17 @@ audit retention, and return to the original workspace.
 | Durable storage | deployment stack | done | P0 | file, SQLite, Postgres, migrations, doctor/preflight |
 | CI and deployability | deployment scripts | done | P0 | static, unit, storage, browser, startup/shutdown, Docker and Compose gates. All six Angular feature surfaces now compile into guarded lazy chunks, reducing the raw initial shell from 901.74 kB to 523.90 kB; production budgets were tightened to warn at 600 kB and fail at 750 kB, while direct-entry and cross-feature browser paths remain executable |
 
+The platform/tenant/workspace-admin slice now also reproduces the original
+next-login password handoff. Admin-created tenant/workspace accounts and
+passwords reset by another administrator carry a durable change requirement
+across file, SQLite, and PostgreSQL storage. Their temporary session may only
+inspect itself, sign out, or set a compliant replacement password; every other
+admin/business route returns a stable `403 admin_password_change_required`.
+The non-dismissible Angular handoff clears the flag through the self-service
+route, revokes every active account session, records a dedicated audit event,
+and signs the browser out. API and protected Chromium/SQLite gates cover the
+complete flow.
+
 ## Exit criteria for “presentable with high parity”
 
 The application may be presented as high-parity only when:

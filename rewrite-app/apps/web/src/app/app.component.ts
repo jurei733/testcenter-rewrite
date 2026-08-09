@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
@@ -40,6 +40,10 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
   isOffline = !navigator.onLine;
+  requiredAdminPassword = "";
+  requiredAdminPasswordConfirmation = "";
+  requiredAdminPasswordError = "";
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly onlineListener = (): void => {
     this.isOffline = false;
@@ -82,6 +86,58 @@ export class AppComponent implements OnInit, OnDestroy {
     window.removeEventListener("online", this.onlineListener);
     window.removeEventListener("offline", this.offlineListener);
     this.app.destroy();
+  }
+
+  get canSubmitRequiredAdminPassword(): boolean {
+    return (
+      this.requiredAdminPassword.length >= 8 &&
+      this.requiredAdminPassword === this.requiredAdminPasswordConfirmation &&
+      this.app.activeRequestLabel() === null
+    );
+  }
+
+  async submitRequiredAdminPassword(): Promise<void> {
+    if (!this.canSubmitRequiredAdminPassword) {
+      this.requiredAdminPasswordError =
+        this.requiredAdminPassword.length < 8
+          ? "The new password must contain at least 8 characters."
+          : "The password confirmation does not match.";
+      return;
+    }
+    this.requiredAdminPasswordError = "";
+    try {
+      await this.app.changeRequiredAdminPassword(this.requiredAdminPassword);
+      this.requiredAdminPassword = "";
+      this.requiredAdminPasswordConfirmation = "";
+      this.changeDetector.detectChanges();
+    } catch {
+      this.requiredAdminPasswordError =
+        "The password could not be changed. Check the connection and try again.";
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  updateRequiredAdminPassword(event: Event): void {
+    this.requiredAdminPassword = (event.target as HTMLInputElement).value;
+    this.requiredAdminPasswordError = "";
+  }
+
+  updateRequiredAdminPasswordConfirmation(event: Event): void {
+    this.requiredAdminPasswordConfirmation = (
+      event.target as HTMLInputElement
+    ).value;
+    this.requiredAdminPasswordError = "";
+  }
+
+  async signOutRequiredAdmin(): Promise<void> {
+    try {
+      await this.app.signOutRequiredAdmin();
+    } finally {
+      this.requiredAdminPassword = "";
+      this.requiredAdminPasswordConfirmation = "";
+      this.requiredAdminPasswordError = "";
+      this.changeDetector.detectChanges();
+    }
   }
 
   private getInitialViewFromLocation(): AppView | null {
