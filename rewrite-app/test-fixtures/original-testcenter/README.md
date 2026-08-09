@@ -47,6 +47,14 @@ family and complete the official source-status propagation matrix. An
 and `INTENDED_INCOMPLETE`; the Participant gate selects a distinct persisted
 route for every official derived status and the final zero-code/zero-score
 result.
+The remaining eight official `test/coding/rules` schemes close that source
+tree completely at 18 schemes and 38 input/outcome pairs. They add
+`BASE_NO_VALUE`, a supplied Derived variable that must be recalculated,
+numeric/null matching, `INTENDED_INCOMPLETE` residual coding, `ELSE`, AND joins
+within one ruleset and across array-positioned rulesets, plus the boolean array
+variant. Their fixtures remain byte-for-byte identical to tag `3.6.0`, and the
+same 18-booklet Participant package executes every route in memory, file, and
+SQLite.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

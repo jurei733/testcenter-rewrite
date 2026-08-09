@@ -200,12 +200,15 @@ reproduces all three official code/score pairs. Eight persisted Booklet states,
 the unchanged `2 kg` raw Player response, and the exclusive matched route are
 gated across memory, file, and SQLite.
 
-Latest P0 rule-method closure: ten more official `@iqb/responses` 3.6.0
-families contribute 30 byte-exact scheme/input/outcome cases for matching,
-numeric ranges, booleans, nulls, empty strings, numeric zero, empty arrays, and
-Player-injected variables plus intended-incomplete status propagation. A single imported ten-booklet package executes `MATCH`, `MATCH_REGEX`,
+Latest P0 rule-tree closure: the complete official `@iqb/responses` 3.6.0
+`test/coding/rules` tree now contributes all 18 schemes and 38 byte-exact
+input/outcome cases for matching, numeric ranges, booleans, nulls, empty
+strings, numeric zero, empty arrays, Player-injected variables,
+intended-incomplete status propagation, omitted-value Base variables, and
+AND-connected rule/ruleset arrays. A single imported 18-booklet package executes `MATCH`, `MATCH_REGEX`,
 `NUMERIC_MATCH`, `NUMERIC_RANGE`, `NUMERIC_FULL_RANGE`, all four numeric
-one-sided comparisons, `IS_TRUE`, `IS_FALSE`, `IS_NULL`, and `IS_EMPTY`, plus
+one-sided comparisons, `IS_TRUE`, `IS_FALSE`, `IS_NULL`, `IS_EMPTY`, and
+`ELSE`, plus
 the original whitespace/case/displayed/empty preprocessing. The Participant
 gate distinguishes open from closed boundary behavior, residual zero coding,
 `INVALID`, `CODING_INCOMPLETE`, empty-array code 34, and derived `SUM_SCORE`;
@@ -215,7 +218,10 @@ their manual/external `CODING_COMPLETE`, `DISPLAYED`, `INVALID`, or
 The official 11-case propagation matrix additionally combines
 `INTENDED_INCOMPLETE` with every relevant second source status and proves the
 exact derived `DERIVE_PENDING`, `UNSET`, `INVALID`, `DERIVE_ERROR`,
-`CODING_ERROR`, or coded-complete-zero outcome. All 30 official raw inputs
+`CODING_ERROR`, or coded-complete-zero outcome. `BASE_NO_VALUE` is declared
+but deliberately absent from coded output; the remaining cases prove array
+position joins, ruleset-level AND, intended-incomplete code types, and
+recalculation of a supplied derived response. All 38 official raw inputs
 retain their envelopes and select exactly one
 persisted route across memory, file, and SQLite.
 

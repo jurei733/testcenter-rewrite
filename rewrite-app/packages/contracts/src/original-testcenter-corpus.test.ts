@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 19);
+  assert.equal(corpus.codingSchemePackages.length, 27);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1363,6 +1363,26 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       "rule-intended-incomplete-statuses",
       "intended-incomplete/case2",
       11
+    ],
+    ["rule-base-no-value", "base-no-value", 1],
+    [
+      "rule-base-derived-recoding",
+      "base-var-derived-var-same-id",
+      1
+    ],
+    [
+      "rule-intended-incomplete-coding",
+      "intended-incomplete/case1",
+      1
+    ],
+    ["rule-numeric-match", "numeric-match", 1],
+    ["rule-rules-and-joined", "rules-and-joined", 1],
+    ["rule-ruleset-else", "ruleset-true", 1],
+    ["rule-rulesets-and-joined", "rulesets-and-joined", 1],
+    [
+      "rule-rulesets-boolean-and-joined",
+      "rulesets-boolean-and-joined",
+      1
     ]
   ] as const;
   type RuleScheme = {
@@ -1441,6 +1461,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     )
   );
   assert.deepEqual([...ruleMethods].sort(), [
+    "ELSE",
     "IS_EMPTY",
     "IS_FALSE",
     "IS_NULL",
@@ -1600,6 +1621,54 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     outcomeTuples["rule-intended-incomplete-statuses"]?.[10]?.[2],
     ["d1", 0, "CODING_COMPLETE", 0, 0]
   );
+  assert.deepEqual(outcomeTuples["rule-base-no-value"]?.[0], [
+    ["text-field_1", "5", "CODING_COMPLETE", 0, 0]
+  ]);
+  assert.deepEqual(
+    outcomeTuples["rule-base-derived-recoding"]?.[0]?.[3],
+    ["d1", 4, "CODING_COMPLETE", 1, 1]
+  );
+  assert.deepEqual(
+    outcomeTuples["rule-intended-incomplete-coding"]?.[0]?.map(
+      variable => variable.slice(2)
+    ),
+    [
+      ["INVALID", 0, 0],
+      ["CODING_COMPLETE", 0, 0],
+      ["INTENDED_INCOMPLETE", 0, 0]
+    ]
+  );
+  assert.deepEqual(outcomeTuples["rule-numeric-match"]?.[0]?.[4], [
+    "d1",
+    3,
+    "CODING_COMPLETE",
+    0,
+    0
+  ]);
+  assert.deepEqual(
+    [
+      outcomeTuples["rule-rules-and-joined"]?.[0]?.map(
+        variable => variable.slice(2)
+      ),
+      outcomeTuples["rule-rulesets-and-joined"]?.[0]?.[0]?.slice(2),
+      outcomeTuples["rule-rulesets-boolean-and-joined"]?.[0]?.[0]?.slice(2)
+    ],
+    [
+      [
+        ["CODING_COMPLETE", 1, 1],
+        ["CODING_COMPLETE", 0, 0]
+      ],
+      ["CODING_COMPLETE", 1, 1],
+      ["CODING_COMPLETE", 0, 0]
+    ]
+  );
+  assert.deepEqual(outcomeTuples["rule-ruleset-else"]?.[0]?.[0], [
+    "05",
+    "05_3",
+    "CODING_COMPLETE",
+    1,
+    331
+  ]);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

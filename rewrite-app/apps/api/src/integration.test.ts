@@ -24342,7 +24342,27 @@ test("original Testcenter compatibility corpus executes official IQB rule method
     ["rule-zero-values", "zero", 1],
     ["rule-empty-array", "empty-array", 1],
     ["rule-injected-variables", "injected-vars", 4],
-    ["rule-intended-incomplete-statuses", "intended-incomplete", 11]
+    ["rule-intended-incomplete-statuses", "intended-incomplete", 11],
+    ["rule-base-no-value", "base-no-value", 1],
+    [
+      "rule-base-derived-recoding",
+      "base-var-derived-var-same-id",
+      1
+    ],
+    [
+      "rule-intended-incomplete-coding",
+      "intended-incomplete-case1",
+      1
+    ],
+    ["rule-numeric-match", "numeric-match", 1],
+    ["rule-rules-and-joined", "rules-and-joined", 1],
+    ["rule-ruleset-else", "ruleset-true", 1],
+    ["rule-rulesets-and-joined", "rulesets-and-joined", 1],
+    [
+      "rule-rulesets-boolean-and-joined",
+      "rulesets-boolean-and-joined",
+      1
+    ]
   ] as const;
   const families = familyDefinitions.map(([family, slug, caseCount]) => {
     const codingPackage = corpus.codingSchemePackages.find(
@@ -24381,6 +24401,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       assert.deepEqual(
         officialOutcome.map(variable => variable.id).sort(),
         scheme.variableCodings
+          .filter(variable => variable.sourceType !== "BASE_NO_VALUE")
           .map(variable => variable.alias ?? variable.id)
           .sort(),
         `${family} case ${testCase.caseId}`
@@ -24407,7 +24428,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
   });
   assert.equal(
     families.reduce((total, family) => total + family.cases.length, 0),
-    30
+    38
   );
 
   const escapeXmlAttribute = (value: string): string =>
@@ -24493,10 +24514,14 @@ test("original Testcenter compatibility corpus executes official IQB rule method
     },
     ...families.flatMap(family => {
       const baseVariables = family.scheme.variableCodings.filter(
-        variable => variable.sourceType === "BASE"
+        variable =>
+          variable.sourceType === "BASE" ||
+          variable.sourceType === "BASE_NO_VALUE"
       );
       const derivedVariables = family.scheme.variableCodings.filter(
-        variable => variable.sourceType !== "BASE"
+        variable =>
+          variable.sourceType !== "BASE" &&
+          variable.sourceType !== "BASE_NO_VALUE"
       );
       return [
         {
