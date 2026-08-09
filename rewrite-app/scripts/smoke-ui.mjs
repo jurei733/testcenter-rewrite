@@ -2488,6 +2488,23 @@ try {
     .filter({ hasText: "Hide hidden groups" })
     .filter({ hasText: "substring group:hidden" })
     .waitFor();
+  const attentionStates = [
+    "error",
+    "connection_lost",
+    "focus_lost",
+    "idle"
+  ];
+  await selectAndCommit("#monitorFilterDraftTarget", "state");
+  await page.locator("#monitorFilterDraftStates").selectOption(attentionStates);
+  await fillAndCommit("#monitorFilterDraftLabel", "Hide attention states");
+  await expectButtonSelectorEnabled("#addMonitorProfileFilterButton");
+  await page.locator("#addMonitorProfileFilterButton").click();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Profile Draft Filters" }) })
+    .filter({ hasText: "Hide attention states" })
+    .filter({ hasText: attentionStates.join(", ") })
+    .waitFor();
   await expectButtonSelectorEnabled("#saveMonitorProfileButton");
   await page.locator("#saveMonitorProfileButton").click();
   await page
@@ -2495,7 +2512,7 @@ try {
     .filter({ has: page.getByRole("heading", { name: "Monitor Profile Library" }) })
     .filter({ hasText: "Room overview" })
     .filter({ hasText: "small view" })
-    .filter({ hasText: "1 filter(s)" })
+    .filter({ hasText: "2 filter(s)" })
     .waitFor();
   const persistedProfileDraft = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
@@ -2503,6 +2520,11 @@ try {
   assert.equal(
     JSON.parse(persistedProfileDraft.adminRoleMonitorProfilesJson)[0]?.profileId,
     authoredMonitorProfileId
+  );
+  assert.deepEqual(
+    JSON.parse(persistedProfileDraft.adminRoleMonitorProfilesJson)[0]?.filters[1]
+      ?.value,
+    attentionStates
   );
   await clickAction("Assign Role");
   await pollJsonWithPredicate(
@@ -2529,6 +2551,13 @@ try {
                       filter?.target === "groupName" &&
                       filter?.type === "substring" &&
                       filter?.value === "group:hidden"
+                  ) &&
+                  profile?.filters?.some(
+                    filter =>
+                      filter?.target === "state" &&
+                      filter?.type === "equal" &&
+                      Array.isArray(filter?.value) &&
+                      JSON.stringify(filter.value) === JSON.stringify(attentionStates)
                   )
               )
           )

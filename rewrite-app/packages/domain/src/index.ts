@@ -462,7 +462,7 @@ export type AdminSessionStatus = "active" | "expired" | "revoked";
 
 export type MonitorViewProfileFilter = {
   target: string;
-  value: string;
+  value: string | string[];
   subValue: string | null;
   label: string;
   type: string;

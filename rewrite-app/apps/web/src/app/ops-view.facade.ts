@@ -185,6 +185,19 @@ export class OpsViewFacade {
     "bookletStates"
   ];
   readonly monitorProfileFilterTypeOptions = ["equal", "substring", "regex"];
+  readonly monitorProfileSuperStateOptions = [
+    "pending",
+    "locked",
+    "error",
+    "controller_terminated",
+    "connection_lost",
+    "paused",
+    "focus_lost",
+    "idle",
+    "connection_websocket",
+    "connection_polling",
+    "ok"
+  ];
 
   monitorProfileEditorTarget: "create" | "role" = "create";
   monitorProfileDraftSelectedId = "";
@@ -203,6 +216,7 @@ export class OpsViewFacade {
   monitorFilterDraftTarget = "groupName";
   monitorFilterDraftType = "equal";
   monitorFilterDraftValue = "";
+  monitorFilterDraftStates: string[] = [];
   monitorFilterDraftSubValue = "";
   monitorFilterDraftLabel = "";
   monitorFilterDraftNot = false;
@@ -580,17 +594,22 @@ export class OpsViewFacade {
   }
 
   get monitorProfileDraftFilterItems(): RecordCollectionItem[] {
-    return this.monitorProfileDraftFilters.map((filter, index) => ({
-      headline: filter.label || filter.target,
-      subline: `${filter.not ? "not " : ""}${filter.type} ${filter.subValue || filter.value}`,
-      badges: [filter.target, filter.type],
-      rows: [
-        { label: "Value", value: filter.value || "empty" },
-        { label: "Sub-value", value: filter.subValue || "none" }
-      ],
-      actionLabel: "Remove Filter",
-      actionPayload: { filterIndex: String(index) }
-    }));
+    return this.monitorProfileDraftFilters.map((filter, index) => {
+      const value = Array.isArray(filter.value)
+        ? filter.value.join(", ")
+        : filter.value;
+      return {
+        headline: filter.label || filter.target,
+        subline: `${filter.not ? "not " : ""}${filter.type} ${filter.subValue || value}`,
+        badges: [filter.target, filter.type],
+        rows: [
+          { label: "Value", value: value || "empty" },
+          { label: "Sub-value", value: filter.subValue || "none" }
+        ],
+        actionLabel: "Remove Filter",
+        actionPayload: { filterIndex: String(index) }
+      };
+    });
   }
 
   get canSaveMonitorProfile(): boolean {
@@ -606,7 +625,9 @@ export class OpsViewFacade {
   get canAddMonitorProfileFilter(): boolean {
     return (
       this.monitorFilterDraftTarget.trim() !== "" &&
-      this.monitorFilterDraftValue.trim() !== "" &&
+      (this.monitorFilterDraftTarget === "state"
+        ? this.monitorFilterDraftStates.length > 0
+        : this.monitorFilterDraftValue.trim() !== "") &&
       this.monitorProfileDraftFilters.length < 50
     );
   }
@@ -1578,14 +1599,24 @@ export class OpsViewFacade {
       ...this.monitorProfileDraftFilters,
       {
         target: this.monitorFilterDraftTarget.trim(),
-        value: this.monitorFilterDraftValue.trim(),
-        subValue: this.monitorFilterDraftSubValue.trim() || null,
+        value:
+          this.monitorFilterDraftTarget === "state"
+            ? [...this.monitorFilterDraftStates]
+            : this.monitorFilterDraftValue.trim(),
+        subValue:
+          this.monitorFilterDraftTarget === "state"
+            ? null
+            : this.monitorFilterDraftSubValue.trim() || null,
         label: this.monitorFilterDraftLabel.trim(),
-        type: this.monitorFilterDraftType.trim() || "equal",
+        type:
+          this.monitorFilterDraftTarget === "state"
+            ? "equal"
+            : this.monitorFilterDraftType.trim() || "equal",
         not: this.monitorFilterDraftNot
       }
     ];
     this.monitorFilterDraftValue = "";
+    this.monitorFilterDraftStates = [];
     this.monitorFilterDraftSubValue = "";
     this.monitorFilterDraftLabel = "";
     this.monitorFilterDraftNot = false;
@@ -1662,6 +1693,13 @@ export class OpsViewFacade {
     this.monitorProfileDraftPending = "no";
     this.monitorProfileDraftLocked = "no";
     this.monitorProfileDraftFilters = [];
+    this.monitorFilterDraftTarget = "groupName";
+    this.monitorFilterDraftType = "equal";
+    this.monitorFilterDraftValue = "";
+    this.monitorFilterDraftStates = [];
+    this.monitorFilterDraftSubValue = "";
+    this.monitorFilterDraftLabel = "";
+    this.monitorFilterDraftNot = false;
   }
 
   selectAdminAuditEvent(item: RecordCollectionItem): void {

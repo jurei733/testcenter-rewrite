@@ -4576,7 +4576,11 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
           profileId: string;
           label: string;
           settings: { view: string; unitColumn: string };
-          filters: Array<{ target: string; value: string; not: boolean }>;
+          filters: Array<{
+            target: string;
+            value: string | string[];
+            not: boolean;
+          }>;
         }>;
       }>;
     }>(isolated.baseUrl, "/api/v1/admin/users", {
@@ -4617,6 +4621,14 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
                     label: "Allowed group only",
                     type: "equal",
                     not: true
+                  },
+                  {
+                    target: "state",
+                    value: ["error", "connection_lost", "focus_lost", "idle"],
+                    subValue: null,
+                    label: "Hide attention states",
+                    type: "equal",
+                    not: false
                   }
                 ],
                 filtersEnabled: { pending: "yes", locked: "no" }
@@ -4641,6 +4653,10 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(
       groupMonitor.body.roleAssignments[0]?.monitorProfiles[0]?.settings.view,
       "small"
+    );
+    assert.deepEqual(
+      groupMonitor.body.roleAssignments[0]?.monitorProfiles[0]?.filters[1]?.value,
+      ["error", "connection_lost", "focus_lost", "idle"]
     );
 
     const invalidMonitorProfileEnum = await requestJsonAt<{ error: string }>(
@@ -4675,6 +4691,48 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(invalidMonitorProfileEnum.status, 400);
     assert.equal(
       invalidMonitorProfileEnum.body.error,
+      "admin_monitor_profiles_invalid"
+    );
+
+    const invalidMonitorProfileStateArray = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "invalid-monitor-profile-state-array",
+        displayName: "Invalid Monitor Profile State Array",
+        password: "invalid-monitor-profile-state-array-secret",
+        roleAssignments: [
+          {
+            role: "group_monitor",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace",
+            groupKey: "group:allowed",
+            monitorProfiles: [
+              {
+                profileId: "invalid-state-array",
+                settings: {},
+                filters: [
+                  {
+                    target: "state",
+                    value: ["error", "unknown"],
+                    subValue: null,
+                    label: "Invalid states",
+                    type: "equal",
+                    not: false
+                  }
+                ],
+                filtersEnabled: {}
+              }
+            ]
+          }
+        ]
+      }
+    });
+    assert.equal(invalidMonitorProfileStateArray.status, 400);
+    assert.equal(
+      invalidMonitorProfileStateArray.body.error,
       "admin_monitor_profiles_invalid"
     );
 
@@ -4713,7 +4771,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
     assert.equal(
       groupMonitorSignIn.body.roleAssignments[0]?.monitorProfiles[0]?.filters.length,
-      1
+      2
     );
 
     const groupMonitorOpenRuns = await requestJsonAt<{ items: unknown[] }>(

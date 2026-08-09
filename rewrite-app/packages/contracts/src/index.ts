@@ -2341,7 +2341,8 @@ const monitorProfileFilterExcludesRun = (
   filter: MonitorViewProfileFilter,
   currentTimestamp: number
 ): boolean => {
-  const expected = filter.subValue || filter.value;
+  const scalarValue = Array.isArray(filter.value) ? "" : filter.value;
+  const expected = filter.subValue || scalarValue;
   let subject: string;
   switch (filter.target) {
     case "groupName":
@@ -2378,17 +2379,19 @@ const monitorProfileFilterExcludesRun = (
       subject = resolveOpenMonitorRunSuperState(openRun, currentTimestamp);
       break;
     case "testState":
-      subject = openRun.testState[filter.value] ?? "";
+      subject = openRun.testState[scalarValue] ?? "";
       break;
     case "bookletStates":
-      subject = openRun.bookletStates[filter.value] ?? "";
+      subject = openRun.bookletStates[scalarValue] ?? "";
       break;
     default:
       return false;
   }
 
   let matches = false;
-  if (filter.type === "substring") {
+  if (Array.isArray(filter.value)) {
+    matches = filter.value.includes(subject);
+  } else if (filter.type === "substring") {
     matches = subject.includes(expected);
   } else if (filter.type === "regex") {
     try {

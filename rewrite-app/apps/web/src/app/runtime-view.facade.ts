@@ -204,11 +204,14 @@ export class RuntimeViewFacade {
     const filters = profile.filters.map(filter => {
       const targetKey = monitorFilterTargetTextKeys[filter.target];
       const typeKey = monitorFilterTypeTextKeys[filter.type];
+      const filterValue = Array.isArray(filter.value)
+        ? filter.value.join(", ")
+        : filter.value;
       const generatedLabel = [
         targetKey ? this.monitorText(targetKey) : filter.target,
         typeKey ? this.monitorText(typeKey) : filter.type,
         filter.not ? this.monitorText("gm_filter_not") : "",
-        filter.value,
+        filterValue,
         filter.subValue ?? ""
       ]
         .filter(Boolean)
@@ -1217,8 +1220,12 @@ export class RuntimeViewFacade {
                 value:
                   candidate.monitorProfiles.flatMap(profile =>
                     profile.filters.map(
-                      filter =>
-                        `${profile.profileId}: ${filter.label || filter.target} ${filter.not ? "not " : ""}${filter.type} ${filter.value}`
+                      filter => {
+                        const value = Array.isArray(filter.value)
+                          ? filter.value.join(", ")
+                          : filter.value;
+                        return `${profile.profileId}: ${filter.label || filter.target} ${filter.not ? "not " : ""}${filter.type} ${value}`;
+                      }
                     )
                   ).join(" | ") || "none"
               },

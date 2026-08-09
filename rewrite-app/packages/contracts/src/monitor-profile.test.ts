@@ -266,3 +266,35 @@ test("monitor profiles can filter the original idle super-state", () => {
     ["active-ui"]
   );
 });
+
+test("monitor profiles exclude every selected original super-state", () => {
+  const error = createOpenRun("error-ui", "running");
+  error.testState = { CONTROLLER: "ERROR" };
+  const idle = createOpenRun("idle-ui", "running");
+  idle.testState = { CONTROLLER: "RUNNING", CONNECTION: "POLLING" };
+  const active = createOpenRun("active-ui", "running");
+  active.updatedAt = "2026-08-01T00:00:00.001Z";
+  active.testState = { CONTROLLER: "RUNNING", CONNECTION: "POLLING" };
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "state",
+        value: ["error", "idle"],
+        subValue: null,
+        label: "Hide attention states",
+        type: "equal",
+        not: false
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile(
+      [error, idle, active],
+      profile,
+      Date.parse("2026-08-01T00:05:00.001Z")
+    ).map(run => run.loginKey),
+    ["active-ui"]
+  );
+});

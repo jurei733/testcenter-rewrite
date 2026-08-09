@@ -2977,6 +2977,62 @@ const normalizeMonitorProfileEnum = <const AllowedValues extends readonly string
   return normalized as AllowedValues[number];
 };
 
+const originalMonitorProfileSuperStates = [
+  "monitor_group",
+  "demo",
+  "pending",
+  "locked",
+  "error",
+  "controller_terminated",
+  "connection_lost",
+  "paused",
+  "focus_lost",
+  "idle",
+  "connection_websocket",
+  "connection_polling",
+  "ok"
+] as const;
+
+const normalizeMonitorProfileFilterValue = (
+  value: unknown,
+  target: string,
+  fieldName: string
+): string | string[] => {
+  if (!Array.isArray(value)) {
+    return normalizeMonitorProfileText(value, fieldName, 2_048);
+  }
+  if (target !== "state" || value.length === 0 || value.length > 13) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      `${fieldName} may only be a non-empty array of up to 13 values for state filters.`
+    );
+  }
+  const normalized = value.map((entry, stateIndex) => {
+    if (typeof entry !== "string") {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        `${fieldName}[${stateIndex}] must be an original monitor super-state.`
+      );
+    }
+    return normalizeMonitorProfileEnum(
+      entry,
+      `${fieldName}[${stateIndex}]`,
+      originalMonitorProfileSuperStates,
+      "ok"
+    );
+  });
+  if (new Set(normalized).size !== normalized.length) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      `${fieldName} must not contain duplicate states.`
+    );
+  }
+  return normalized;
+};
+
 const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
   if (value === undefined || value === null) {
     return [];
@@ -3054,39 +3110,54 @@ const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
           `monitorProfiles[${profileIndex}].filters[${filterIndex}].not must be boolean.`
         );
       }
+      const target = normalizeMonitorProfileEnum(
+        filter.target,
+        "filter.target",
+        [
+          "bookletLabel",
+          "personLabel",
+          "state",
+          "blockLabel",
+          "groupName",
+          "bookletId",
+          "unitId",
+          "unitLabel",
+          "blockId",
+          "testState",
+          "mode",
+          "bookletSpecies",
+          "bookletStates"
+        ],
+        "personLabel"
+      );
+      const filterValue = normalizeMonitorProfileFilterValue(
+        filter.value,
+        target,
+        "filter.value"
+      );
+      const subValue =
+        filter.subValue === undefined || filter.subValue === null
+          ? null
+          : normalizeMonitorProfileText(filter.subValue, "filter.subValue", 2_048);
+      const filterType = normalizeMonitorProfileEnum(
+        filter.type,
+        "filter.type",
+        ["equal", "substring", "regex"],
+        "equal"
+      );
+      if (Array.isArray(filterValue) && (subValue !== null || filterType !== "equal")) {
+        throw new FirstSliceError(
+          400,
+          "admin_monitor_profiles_invalid",
+          "State-array filters must use equal comparison without a subValue."
+        );
+      }
       return {
-        target: normalizeMonitorProfileEnum(
-          filter.target,
-          "filter.target",
-          [
-            "bookletLabel",
-            "personLabel",
-            "state",
-            "blockLabel",
-            "groupName",
-            "bookletId",
-            "unitId",
-            "unitLabel",
-            "blockId",
-            "testState",
-            "mode",
-            "bookletSpecies",
-            "bookletStates"
-          ],
-          "personLabel"
-        ),
-        value: normalizeMonitorProfileText(filter.value, "filter.value", 2_048),
-        subValue:
-          filter.subValue === undefined || filter.subValue === null
-            ? null
-            : normalizeMonitorProfileText(filter.subValue, "filter.subValue", 2_048),
+        target,
+        value: filterValue,
+        subValue,
         label: normalizeMonitorProfileText(filter.label, "filter.label", 256),
-        type: normalizeMonitorProfileEnum(
-          filter.type,
-          "filter.type",
-          ["equal", "substring", "regex"],
-          "equal"
-        ),
+        type: filterType,
         not: filter.not
       };
     });

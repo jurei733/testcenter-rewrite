@@ -570,19 +570,25 @@ import { SummaryCardsComponent } from "./summary-cards.component";
                     <option *ngFor="let option of view.monitorProfileFilterTargetOptions" [value]="option">{{ option }}</option>
                   </select>
                 </label>
-                <label>
+                <label *ngIf="view.monitorFilterDraftTarget !== 'state'">
                   Comparison
                   <select id="monitorFilterDraftType" name="monitorFilterDraftType" [(ngModel)]="view.monitorFilterDraftType">
                     <option *ngFor="let option of view.monitorProfileFilterTypeOptions" [value]="option">{{ option }}</option>
                   </select>
                 </label>
-                <label>
+                <label *ngIf="view.monitorFilterDraftTarget !== 'state'">
                   Value
                   <input id="monitorFilterDraftValue" name="monitorFilterDraftValue" placeholder="group:room-a" [(ngModel)]="view.monitorFilterDraftValue" />
                 </label>
-                <label>
+                <label *ngIf="view.monitorFilterDraftTarget !== 'state'">
                   Sub-value
                   <input id="monitorFilterDraftSubValue" name="monitorFilterDraftSubValue" placeholder="Optional expected value" [(ngModel)]="view.monitorFilterDraftSubValue" />
+                </label>
+                <label *ngIf="view.monitorFilterDraftTarget === 'state'">
+                  Super States
+                  <select id="monitorFilterDraftStates" name="monitorFilterDraftStates" multiple size="7" [(ngModel)]="view.monitorFilterDraftStates">
+                    <option *ngFor="let option of view.monitorProfileSuperStateOptions" [value]="option">{{ option }}</option>
+                  </select>
                 </label>
                 <label>
                   Filter Label
