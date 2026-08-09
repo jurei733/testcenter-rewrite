@@ -118,6 +118,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
         <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
         <p id="monitorColumnPresentation">{{ view.monitorColumnPresentation }}</p>
+        <section id="monitorRuntimeFilters" aria-labelledby="monitorRuntimeFiltersHeading">
+          <strong id="monitorRuntimeFiltersHeading">{{ view.monitorText("gm_menu_filter") }}</strong>
+          <div class="actions">
+            <button id="monitorPendingFilterButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorStatusFilterActive('pending')" (click)="view.toggleMonitorStatusFilter('pending')">{{ view.monitorText("gm_filter_pending") }}</button>
+            <button id="monitorLockedFilterButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorStatusFilterActive('locked')" (click)="view.toggleMonitorStatusFilter('locked')">{{ view.monitorText("gm_filter_locked") }}</button>
+            <button *ngFor="let filter of view.monitorProfileFilterOptions" class="ghost monitor-profile-filter" type="button" [attr.data-filter-index]="filter.index" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorProfileFilter(filter.index)">{{ filter.label }}</button>
+            <button id="monitorResetRuntimeFiltersButton" class="ghost" type="button" (click)="view.resetMonitorRuntimeFilters()">Reset to Profile</button>
+          </div>
+        </section>
         <label>
           Search participants
           <input id="monitorQuickFilter" name="monitorQuickFilter" type="search" [ngModel]="view.monitorQuickFilter" (ngModelChange)="view.setMonitorQuickFilter($event)" />

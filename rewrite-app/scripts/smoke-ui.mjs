@@ -11946,6 +11946,39 @@ try {
     .filter({ hasText: "UI Locked Sessions: —" })
     .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui" })
     .waitFor();
+  assert.equal(
+    await page.locator("#monitorPendingFilterButton").getAttribute("aria-pressed"),
+    "false"
+  );
+  assert.equal(
+    await page.locator("#monitorLockedFilterButton").getAttribute("aria-pressed"),
+    "false"
+  );
+  const importedMonitorFilterButton = page.locator(
+    '.monitor-profile-filter[data-filter-index="0"]'
+  );
+  assert.equal(
+    await importedMonitorFilterButton.getAttribute("aria-pressed"),
+    "true",
+    "Imported profile filters must start enabled like the Original monitor menu."
+  );
+  await importedMonitorFilterButton.click();
+  await page
+    .locator("#monitorProfilePresentation")
+    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui: —" })
+    .waitFor();
+  await page.locator("#monitorResetRuntimeFiltersButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.monitor-profile-filter[data-filter-index="0"]')
+        ?.getAttribute("aria-pressed") === "true"
+  );
+  assert.equal(
+    await importedMonitorFilterButton.getAttribute("aria-pressed"),
+    "true",
+    "Reset must restore the imported profile filter baseline."
+  );
   await page
     .locator("#monitorApplyScopeButton", { hasText: "UI Start Monitoring" })
     .waitFor();
@@ -11993,6 +12026,16 @@ try {
     .locator("#monitorBatchSelectionStatus")
     .filter({ hasText: "UI No Runs Selected" })
     .waitFor();
+  await scopedOpenRuns
+    .getByRole("button", { name: "Add to Batch" })
+    .first()
+    .click();
+  await page.locator("#monitorPendingFilterButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
+    .waitFor();
+  await page.locator("#monitorPendingFilterButton").click();
   assert.equal(
     await scopedOpenRuns.locator(".record-collection-grid").getAttribute("data-density"),
     "small",
@@ -12154,6 +12197,27 @@ try {
     .first()
     .click();
   await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
+  await page.locator("#monitorConsoleLockTestButton").click();
+  await waitForNotBusy("group-monitor-runtime-locked-filter-lock");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.locked === true
+  );
+  await page.locator("#monitorLockedFilterButton").click();
+  await scopedOpenRuns.getByText("No open runs are currently loaded.").waitFor();
+  assert.equal(
+    await page.locator("#monitorLockedFilterButton").getAttribute("aria-pressed"),
+    "true",
+    "The runtime locked filter must hide locked runs."
+  );
+  await page.locator("#monitorLockedFilterButton").click();
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  await page.locator("#monitorConsoleUnlockTestButton").click();
+  await waitForNotBusy("group-monitor-runtime-locked-filter-unlock");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.locked === false
+  );
   await page.locator("#monitorConsoleUnlockButton").click();
   await waitForNotBusy("group-monitor-unlock-navigation");
   await page

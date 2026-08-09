@@ -97,6 +97,15 @@ type MonitorDisplaySettings = Record<MonitorDisplayColumn, "show" | "hide"> & {
   bookletStatesColumns: string[];
 };
 
+type MonitorStatusFilter = "pending" | "locked";
+
+type MonitorFilterOverride = {
+  profileId: string;
+  enabledProfileFilterIndexes: Set<number>;
+  pending: boolean;
+  locked: boolean;
+};
+
 const monitorFilterTargetTextKeys: Readonly<
   Record<string, MonitorCustomTextKey>
 > = {
@@ -158,6 +167,7 @@ export class RuntimeViewFacade {
     profileId: string;
     settings: MonitorDisplaySettings;
   } | null = null;
+  private monitorFilterOverride: MonitorFilterOverride | null = null;
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
   > = [];
@@ -212,38 +222,23 @@ export class RuntimeViewFacade {
   get monitorProfilePresentation(): string {
     const profile = this.activeMonitorProfile;
     if (!profile) {
-      return `${this.monitorText("gm_settings_tooltip")}: ${this.monitorText("gm_view_full")}. ${this.monitorText("gm_menu_filter")}: ${this.monitorText("gm_selection_info_none")}`;
+      const statusFilters = ["pending", "locked"] as const;
+      const activeStatusFilters = statusFilters.filter(filter =>
+        this.monitorStatusFilterActive(filter)
+      );
+      return `${this.monitorText("gm_settings_tooltip")}: ${this.monitorText("gm_view_full")}. ${this.monitorText("gm_menu_filter")}: ${activeStatusFilters.length > 0 ? activeStatusFilters.map(filter => this.monitorText(filter === "pending" ? "gm_filter_pending" : "gm_filter_locked")).join(" | ") : this.monitorText("gm_selection_info_none")}`;
     }
     const viewKey = monitorViewTextKeys[profile.settings.view];
     const viewLabel = viewKey
       ? this.monitorText(viewKey)
       : profile.settings.view;
-    const filters = profile.filters.map(filter => {
-      const targetKey = monitorFilterTargetTextKeys[filter.target];
-      const typeKey = monitorFilterTypeTextKeys[filter.type];
-      const filterValue = Array.isArray(filter.value)
-        ? filter.value.join(", ")
-        : filter.value;
-      const generatedLabel = [
-        targetKey ? this.monitorText(targetKey) : filter.target,
-        typeKey ? this.monitorText(typeKey) : filter.type,
-        filter.not ? this.monitorText("gm_filter_not") : "",
-        filterValue,
-        filter.subValue ?? ""
-      ]
-        .filter(Boolean)
-        .join(" ");
-      const authoredLabel = filter.label.trim();
-      const resolvedAuthoredLabel = authoredLabel
-        ? this.effectiveMonitorCustomTexts[authoredLabel]?.trim() || authoredLabel
-        : "";
-      return resolvedAuthoredLabel && resolvedAuthoredLabel !== generatedLabel
-        ? `${resolvedAuthoredLabel} — ${generatedLabel}`
-        : generatedLabel;
-    });
+    const filters = profile.filters.map(
+      (filter, index) =>
+        `${this.monitorProfileFilterLabel(filter)}: ${this.monitorProfileFilterActive(index) ? "✓" : "—"}`
+    );
     const statusFilters = [
-      `${this.monitorText("gm_filter_pending")}: ${profile.filtersEnabled.pending === "yes" ? "✓" : "—"}`,
-      `${this.monitorText("gm_filter_locked")}: ${profile.filtersEnabled.locked === "yes" ? "✓" : "—"}`
+      `${this.monitorText("gm_filter_pending")}: ${this.monitorStatusFilterActive("pending") ? "✓" : "—"}`,
+      `${this.monitorText("gm_filter_locked")}: ${this.monitorStatusFilterActive("locked") ? "✓" : "—"}`
     ];
     return `${this.monitorText("gm_settings_tooltip")}: ${viewLabel}. ${this.monitorText("gm_menu_filter")}: ${[...statusFilters, ...filters].join(" | ")}`;
   }
@@ -274,6 +269,57 @@ export class RuntimeViewFacade {
 
   get monitorProfileDensity(): RecordCollectionDensity {
     return this.monitorDisplaySettings.view;
+  }
+
+  get monitorProfileFilterOptions(): Array<{
+    index: number;
+    label: string;
+    active: boolean;
+  }> {
+    return (this.activeMonitorProfile?.filters ?? []).map((filter, index) => ({
+      index,
+      label: this.monitorProfileFilterLabel(filter),
+      active: this.monitorProfileFilterActive(index)
+    }));
+  }
+
+  monitorProfileFilterActive(index: number): boolean {
+    const profile = this.activeMonitorProfile;
+    if (!profile?.filters[index]) {
+      return false;
+    }
+    return this.currentMonitorFilterState.enabledProfileFilterIndexes.has(index);
+  }
+
+  monitorStatusFilterActive(filter: MonitorStatusFilter): boolean {
+    return this.currentMonitorFilterState[filter];
+  }
+
+  toggleMonitorProfileFilter(index: number): void {
+    if (!this.activeMonitorProfile?.filters[index]) {
+      return;
+    }
+    const state = this.editableMonitorFilterState();
+    if (state.enabledProfileFilterIndexes.has(index)) {
+      state.enabledProfileFilterIndexes.delete(index);
+    } else {
+      state.enabledProfileFilterIndexes.add(index);
+    }
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  toggleMonitorStatusFilter(filter: MonitorStatusFilter): void {
+    const state = this.editableMonitorFilterState();
+    state[filter] = !state[filter];
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  resetMonitorRuntimeFilters(): void {
+    this.monitorFilterOverride = null;
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   get monitorBlockNavigationTargets(): NonNullable<
@@ -429,7 +475,7 @@ export class RuntimeViewFacade {
     );
     const profileRuns = filterOpenMonitorRunsByProfile(
       payload?.items ?? [],
-      this.activeMonitorProfile
+      this.effectiveMonitorProfile
     );
     const quickFilter = this.monitorQuickFilter.trim().toLocaleLowerCase();
     if (!quickFilter) {
@@ -448,6 +494,7 @@ export class RuntimeViewFacade {
     }
     this.runtime.monitorProfileId = profileId;
     this.monitorDisplayOverride = null;
+    this.monitorFilterOverride = null;
     this.monitorQuickFilter = "";
     this.monitorBatchSelection.clear();
     this.persistState();
@@ -3776,13 +3823,7 @@ export class RuntimeViewFacade {
   }
 
   selectAllVisibleMonitorRuns(): void {
-    const payload = parseJsonDocument<MonitorOpenRunsResponse>(
-      this.runtime.openRunsView
-    );
-    for (const openRun of filterOpenMonitorRunsByProfile(
-      payload?.items ?? [],
-      this.activeMonitorProfile
-    )) {
+    for (const openRun of this.visibleOpenMonitorRuns) {
       if (!openRun.bookletError) {
         this.monitorBatchSelection.add(openRun.testRunId);
       }
@@ -4687,6 +4728,90 @@ export class RuntimeViewFacade {
       bookletStatesColumns: profileSettings
         ? profileSettings.bookletStatesColumns.split(/[\W,]+/).filter(Boolean)
         : this.monitorAvailableBookletStateColumns
+    };
+  }
+
+  private monitorProfileFilterLabel(
+    filter: MonitorViewProfile["filters"][number]
+  ): string {
+    const targetKey = monitorFilterTargetTextKeys[filter.target];
+    const typeKey = monitorFilterTypeTextKeys[filter.type];
+    const filterValue = Array.isArray(filter.value)
+      ? filter.value.join(", ")
+      : filter.value;
+    const generatedLabel = [
+      targetKey ? this.monitorText(targetKey) : filter.target,
+      typeKey ? this.monitorText(typeKey) : filter.type,
+      filter.not ? this.monitorText("gm_filter_not") : "",
+      filterValue,
+      filter.subValue ?? ""
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const authoredLabel = filter.label.trim();
+    const resolvedAuthoredLabel = authoredLabel
+      ? this.effectiveMonitorCustomTexts[authoredLabel]?.trim() || authoredLabel
+      : "";
+    return resolvedAuthoredLabel && resolvedAuthoredLabel !== generatedLabel
+      ? `${resolvedAuthoredLabel} — ${generatedLabel}`
+      : generatedLabel;
+  }
+
+  private get currentMonitorFilterState(): MonitorFilterOverride {
+    const profileId = this.activeMonitorProfileId || "__default__";
+    if (this.monitorFilterOverride?.profileId === profileId) {
+      return this.monitorFilterOverride;
+    }
+    const profile = this.activeMonitorProfile;
+    return {
+      profileId,
+      enabledProfileFilterIndexes: new Set(
+        profile?.filters.map((_filter, index) => index) ?? []
+      ),
+      pending: profile?.filtersEnabled.pending === "yes",
+      locked: profile?.filtersEnabled.locked === "yes"
+    };
+  }
+
+  private editableMonitorFilterState(): MonitorFilterOverride {
+    const profileId = this.activeMonitorProfileId || "__default__";
+    if (this.monitorFilterOverride?.profileId !== profileId) {
+      const state = this.currentMonitorFilterState;
+      this.monitorFilterOverride = {
+        ...state,
+        enabledProfileFilterIndexes: new Set(
+          state.enabledProfileFilterIndexes
+        )
+      };
+    }
+    return this.monitorFilterOverride;
+  }
+
+  private get effectiveMonitorProfile(): MonitorViewProfile | null {
+    const profile = this.activeMonitorProfile;
+    const state = this.currentMonitorFilterState;
+    if (!profile && !state.pending && !state.locked) {
+      return null;
+    }
+    return {
+      profileId: profile?.profileId ?? "__runtime__",
+      label: profile?.label ?? "Runtime filters",
+      settings: profile?.settings ?? {
+        blockColumn: "hide",
+        unitColumn: "show",
+        view: "full",
+        groupColumn: "hide",
+        bookletColumn: "show",
+        bookletStatesColumns: "",
+        autoselectNextBlock: "no"
+      },
+      filters: (profile?.filters ?? []).filter((_filter, index) =>
+        state.enabledProfileFilterIndexes.has(index)
+      ),
+      filtersEnabled: {
+        pending: state.pending ? "yes" : "no",
+        locked: state.locked ? "yes" : "no"
+      }
     };
   }
 
