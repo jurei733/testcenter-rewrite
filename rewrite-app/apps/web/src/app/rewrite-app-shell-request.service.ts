@@ -35,7 +35,11 @@ export class RewriteAppShellRequestService {
     method: string,
     path: string,
     body?: unknown,
-    options: { quiet?: boolean; headers?: Record<string, string> } = {}
+    options: {
+      quiet?: boolean;
+      headers?: Record<string, string>;
+      onSuccess?: (payload: T, statusCode: number) => void;
+    } = {}
   ): Promise<T> {
     if (!options.quiet) {
       beginForegroundShellRequest(this.createRequestStateHost(), label);
@@ -56,6 +60,7 @@ export class RewriteAppShellRequestService {
           payload
         );
       }
+      options.onSuccess?.(payload, statusCode);
       return payload;
     } catch (error) {
       if (!options.quiet) {

@@ -19,8 +19,14 @@ export class RewriteAppShellRuntimeHostsService {
 
   createRuntimeActionsHost(refreshCrossViewStateAfterRuntimeChange: () => Promise<void>) {
     return createRuntimeActionsStateHost({
-      request: <T>(label: string, method: string, path: string, body?: unknown) =>
-        this.requestState.request<T>(label, method, path, body),
+      request: <T>(
+        label: string,
+        method: string,
+        path: string,
+        body?: unknown,
+        onSuccess?: (payload: T) => void
+      ) =>
+        this.requestState.request<T>(label, method, path, body, { onSuccess }),
       workspaceState: this.workspaceState,
       runtimeState: this.runtimeState,
       createRuntimePresentationHost: () =>

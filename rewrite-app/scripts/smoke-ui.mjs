@@ -8552,6 +8552,11 @@ try {
       "    <CustomText key=\"gm_selection_info_none\">UI No Runs Selected</CustomText>",
       "    <CustomText key=\"gm_control_goto_tooltip\">UI Pick a Section</CustomText>",
       "    <CustomText key=\"gm_control_unlock_tooltip\">UI Authorize Test</CustomText>",
+      "    <CustomText key=\"gm_control_unlock_success_warning\">UI Restart Clients After Release</CustomText>",
+      "    <CustomText key=\"gm_codetoenter_unlock_tooltip\">UI Section Opened</CustomText>",
+      "    <CustomText key=\"gm_filter_pending\">UI Pending Sessions</CustomText>",
+      "    <CustomText key=\"gm_filter_locked\">UI Locked Sessions</CustomText>",
+      "    <CustomText key=\"gm_selection_text\">UI Start Monitoring</CustomText>",
       "    <CustomText key=\"gm_show_monitor\">UI Groups In Scope</CustomText>",
       "    <CustomText key=\"gm_show_test\">UI Open Monitor Tests</CustomText>",
       "    <CustomText key=\"gm_menu_cols\">UI Columns</CustomText>",
@@ -8614,7 +8619,7 @@ try {
     "All sessions (all)",
     "all: small view; block hide",
     "all: Current participant not substring student-ui",
-    "34 imported override(s)"
+    "39 imported override(s)"
   ]) {
     assert.ok(
       operationalLoginCandidateText.includes(expectedText),
@@ -8645,7 +8650,7 @@ try {
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
   await page.getByText("1 imported monitor profile(s)").waitFor();
-  await page.getByText("34 login-specific custom text(s)").waitFor();
+  await page.getByText("39 login-specific custom text(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -10018,7 +10023,12 @@ try {
     .locator("#monitorProfilePresentation")
     .filter({ hasText: "UI Layout: UI Compact" })
     .filter({ hasText: "UI Hidden Sessions" })
+    .filter({ hasText: "UI Pending Sessions: —" })
+    .filter({ hasText: "UI Locked Sessions: —" })
     .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui" })
+    .waitFor();
+  await page
+    .locator("#monitorApplyScopeButton", { hasText: "UI Start Monitoring" })
     .waitFor();
   await page
     .locator("#openRunFiltersHeadline")
@@ -10128,6 +10138,18 @@ try {
     .first()
     .click();
   await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
+  await page.locator("#monitorConsoleUnlockButton").click();
+  await waitForNotBusy("group-monitor-unlock-navigation");
+  await page
+    .locator("#monitorCommandNotice", { hasText: "UI Section Opened" })
+    .waitFor();
+  await page.locator("#monitorConsoleUnlockTestButton").click();
+  await waitForNotBusy("group-monitor-unlock-test");
+  await page
+    .locator("#monitorCommandNotice.warning", {
+      hasText: "UI Restart Clients After Release"
+    })
+    .waitFor();
   await page.locator("#monitorConsolePauseButton").click();
   await waitForNotBusy("group-monitor-pause");
   await pollJsonWithPredicate(
@@ -10173,7 +10195,8 @@ try {
       payload?.currentRunState?.testRun?.currentUnitKey ===
       "unit-participant-route"
   );
-  await clickAction("Load Monitor Scope");
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-reload-scope");
   await expectInputValue("#openRunUnitFilter", "");
   await expectInputValue("#monitorTargetUnitKey", "unit-paused");
   await page

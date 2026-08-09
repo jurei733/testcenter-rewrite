@@ -124,6 +124,8 @@ export interface ShellRuntimeState {
   currentUnitKey: string;
   monitorTargetUnitKey: string;
   monitorTimeSeconds: string;
+  monitorCommandNotice: string;
+  monitorCommandNoticeKind: "info" | "warning";
   currentUnitResponse: string;
   reviewId: string;
   reviewerId: string;
@@ -356,6 +358,8 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     currentUnitKey: "unit-1",
     monitorTargetUnitKey: "unit-1",
     monitorTimeSeconds: "300",
+    monitorCommandNotice: "",
+    monitorCommandNoticeKind: "info",
     currentUnitResponse: "",
     reviewId: "",
     reviewerId: "operator-ui",

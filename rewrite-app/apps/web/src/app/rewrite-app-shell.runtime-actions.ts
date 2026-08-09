@@ -36,7 +36,8 @@ export interface ShellRuntimeActionsHost {
     label: string,
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    onSuccess?: (payload: T) => void
   ): Promise<T>;
   getParticipantSignInPath(): string;
   getParticipantLaunchPath(): string;
@@ -262,7 +263,8 @@ export async function issueMonitorRunCommandAction(
     | "unlock_navigation"
     | "lock_navigation"
     | "set_testlet_time",
-  options?: { remainingSeconds?: number }
+  options?: { remainingSeconds?: number },
+  onAccepted?: (result: IssueMonitorRunCommandResponse) => void
 ): Promise<IssueMonitorRunCommandResponse> {
   const requestLabel = {
     pause: "Monitor Pause Run",
@@ -295,7 +297,8 @@ export async function issueMonitorRunCommandAction(
               remainingSeconds: Number(host.getMonitorTimeSeconds())
             }
           : {})
-    } satisfies IssueMonitorRunCommandRequest
+    } satisfies IssueMonitorRunCommandRequest,
+    onAccepted
   );
 
   if (commandType === "pause") {
@@ -348,7 +351,8 @@ export async function issueMonitorRunCommandsAction(
     | "unlock_navigation"
     | "lock_navigation"
     | "set_testlet_time",
-  options?: { remainingSeconds?: number }
+  options?: { remainingSeconds?: number },
+  onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
 ): Promise<IssueMonitorRunCommandsResponse> {
   const payload = await host.request<IssueMonitorRunCommandsResponse>(
     `Monitor ${commandType} ${testRunIds.length} Runs`,
@@ -371,7 +375,8 @@ export async function issueMonitorRunCommandsAction(
               remainingSeconds: Number(host.getMonitorTimeSeconds())
             }
           : {})
-    } satisfies IssueMonitorRunCommandsRequest
+    } satisfies IssueMonitorRunCommandsRequest,
+    onAccepted
   );
   await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;

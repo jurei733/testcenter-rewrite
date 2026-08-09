@@ -119,8 +119,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
         <p id="monitorColumnPresentation">{{ view.monitorColumnPresentation }}</p>
         <p id="monitorTargetTimerStatus" *ngIf="view.monitorSelectedTargetTimerText">{{ view.monitorSelectedTargetTimerText }}</p>
+        <p
+          id="monitorCommandNotice"
+          role="status"
+          aria-live="polite"
+          [class.warning]="view.runtime.monitorCommandNoticeKind === 'warning'"
+          *ngIf="view.runtime.monitorCommandNotice"
+        >{{ view.runtime.monitorCommandNotice }}</p>
         <div class="actions">
-          <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
+          <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">{{ view.monitorText("gm_selection_text") }}</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
           <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">{{ view.monitorText("gm_control_pause") }}</button>
           <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">{{ view.monitorText("gm_control_resume") }}</button>

@@ -125,14 +125,16 @@ export class RewriteAppRuntimeService {
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time",
-    options?: { remainingSeconds?: number }
+    options?: { remainingSeconds?: number },
+    onAccepted?: (result: IssueMonitorRunCommandResponse) => void
   ): Promise<IssueMonitorRunCommandResponse> {
     const result = await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       ),
       commandType,
-      options
+      options,
+      onAccepted
     );
     const activityTitle = {
       pause: "Monitor Pause Issued",
@@ -164,7 +166,8 @@ export class RewriteAppRuntimeService {
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time",
-    options?: { remainingSeconds?: number }
+    options?: { remainingSeconds?: number },
+    onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
   ): Promise<IssueMonitorRunCommandsResponse> {
     const result = await issueMonitorRunCommandsAction(
       this.hosts.createRuntimeActionsHost(() =>
@@ -172,7 +175,8 @@ export class RewriteAppRuntimeService {
       ),
       testRunIds,
       commandType,
-      options
+      options,
+      onAccepted
     );
     this.feedback.rememberActivity(
       "Monitor Batch Command Issued",

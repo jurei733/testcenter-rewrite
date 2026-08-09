@@ -210,7 +210,11 @@ export class RuntimeViewFacade {
         ? `${resolvedAuthoredLabel} — ${generatedLabel}`
         : generatedLabel;
     });
-    return `${this.monitorText("gm_settings_tooltip")}: ${viewLabel}. ${this.monitorText("gm_menu_filter")}: ${filters.join(" | ") || this.monitorText("gm_selection_info_none")}`;
+    const statusFilters = [
+      `${this.monitorText("gm_filter_pending")}: ${profile.filtersEnabled.pending === "yes" ? "✓" : "—"}`,
+      `${this.monitorText("gm_filter_locked")}: ${profile.filtersEnabled.locked === "yes" ? "✓" : "—"}`
+    ];
+    return `${this.monitorText("gm_settings_tooltip")}: ${viewLabel}. ${this.monitorText("gm_menu_filter")}: ${[...statusFilters, ...filters].join(" | ")}`;
   }
 
   get activeMonitorProfile(): MonitorViewProfile | null {
@@ -3473,8 +3477,14 @@ export class RuntimeViewFacade {
     if (!this.canUseMonitorRunActions) {
       return;
     }
+    this.runtime.monitorCommandNotice = "";
     this.viewState.onActionAsync(() =>
-      this.runtimeService.issueMonitorRunCommand("unlock_test")
+      this.runtimeService.issueMonitorRunCommand("unlock_test", undefined, () => {
+        this.runtime.monitorCommandNoticeKind = "warning";
+        this.runtime.monitorCommandNotice = this.monitorText(
+          "gm_control_unlock_success_warning"
+        );
+      })
     );
   }
 
@@ -3482,8 +3492,18 @@ export class RuntimeViewFacade {
     if (!this.canUseMonitorRunActions) {
       return;
     }
+    this.runtime.monitorCommandNotice = "";
     this.viewState.onActionAsync(() =>
-      this.runtimeService.issueMonitorRunCommand("unlock_navigation")
+      this.runtimeService.issueMonitorRunCommand(
+        "unlock_navigation",
+        undefined,
+        () => {
+          this.runtime.monitorCommandNoticeKind = "info";
+          this.runtime.monitorCommandNotice = this.monitorText(
+            "gm_codetoenter_unlock_tooltip"
+          );
+        }
+      )
     );
   }
 
@@ -3577,6 +3597,9 @@ export class RuntimeViewFacade {
     if (commandType === "goto") {
       this.clearMonitorUnitFilterBeforeGoto();
     }
+    if (commandType === "unlock_test" || commandType === "unlock_navigation") {
+      this.runtime.monitorCommandNotice = "";
+    }
 
     this.viewState.onActionAsync(async () => {
       const result = await this.runtimeService.issueMonitorRunCommands(
@@ -3584,7 +3607,26 @@ export class RuntimeViewFacade {
         commandType,
         restoration
           ? { remainingSeconds: restoration.remainingSeconds }
-          : undefined
+          : undefined,
+        acceptedResult => {
+          if (
+            acceptedResult.succeededCount > 0 &&
+            commandType === "unlock_test"
+          ) {
+            this.runtime.monitorCommandNoticeKind = "warning";
+            this.runtime.monitorCommandNotice = this.monitorText(
+              "gm_control_unlock_success_warning"
+            );
+          } else if (
+            acceptedResult.succeededCount > 0 &&
+            commandType === "unlock_navigation"
+          ) {
+            this.runtime.monitorCommandNoticeKind = "info";
+            this.runtime.monitorCommandNotice = this.monitorText(
+              "gm_codetoenter_unlock_tooltip"
+            );
+          }
+        }
       );
       for (const command of result.commands) {
         this.monitorBatchSelection.delete(command.testRun.testRunId);

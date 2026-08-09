@@ -5,7 +5,13 @@ import type { RuntimePresentationHost } from "./rewrite-app-shell.runtime";
 import type { ShellRuntimeState, ShellWorkspaceState } from "./rewrite-app-shell.state";
 
 export function createRuntimeActionsStateHost(args: {
-  request<T>(label: string, method: string, path: string, body?: unknown): Promise<T>;
+  request<T>(
+    label: string,
+    method: string,
+    path: string,
+    body?: unknown,
+    onSuccess?: (payload: T) => void
+  ): Promise<T>;
   workspaceState: ShellWorkspaceState;
   runtimeState: ShellRuntimeState;
   createRuntimePresentationHost(): RuntimePresentationHost;
