@@ -5916,6 +5916,7 @@ try {
   const veronaTestletCode = "open-verona";
   const veronaLoginKey = "student-verona-smoke";
   const veronaAdvisoryLoginKey = "student-verona-advisory";
+  const veronaSimulationLoginKey = "student-verona-simulation";
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
   const expectedVeronaResourceRange = expectedVeronaResourceContent.slice(5, 20);
@@ -6223,6 +6224,13 @@ try {
             bookletKey: veronaBookletKey,
             displayName: "Verona Advisory Participant",
             executionMode: "run-trial"
+          },
+          {
+            loginKey: veronaSimulationLoginKey,
+            groupKey: "group:verona-smoke",
+            bookletKey: veronaBookletKey,
+            displayName: "Verona Simulation Participant",
+            executionMode: "run-simulation"
           }
         ]
       }
@@ -7145,6 +7153,68 @@ try {
     .locator("#participantRouteStatus")
     .filter({ hasText: "completed" })
     .waitFor({ timeout: 15_000 });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: veronaSimulationLoginKey,
+      bookletKey: veronaBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-simulation" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  const simulationVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await simulationVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await simulationVeronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
+  const simulationRunId = (
+    await page.locator("#participantRouteRunId").textContent()
+  )?.trim();
+  assert.ok(simulationRunId, "Simulation smoke expected a run id.");
+  const ephemeralSimulationAnswer = "Ephemeral simulation response";
+  await simulationVeronaFrame
+    .locator("#playerAnswer")
+    .fill(ephemeralSimulationAnswer);
+  await expectButtonSelectorEnabled("#participantRouteCompleteButton");
+  page.once("dialog", dialog => dialog.accept());
+  await page.locator("#participantRouteCompleteButton").click();
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "completed" })
+    .waitFor({ timeout: 15_000 });
+  const completedSimulationState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        (await page.locator("#participantRouteSessionLabel").textContent())?.trim() ?? ""
+      )}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.deepEqual(completedSimulationState.currentRunState?.testRun?.unitResponses, {});
+  const simulationLogs = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${encodeURIComponent(
+        simulationRunId
+      )}`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.deepEqual(simulationLogs.items, []);
+  assert.equal(
+    await page.evaluate(answer =>
+      Object.values(localStorage).some(value => value.includes(answer)),
+      ephemeralSimulationAnswer
+    ),
+    false,
+    "Simulation responses must not survive in local storage."
+  );
   stopAfter("participant-test-mode-navigation-advisory");
 
   logStep("participant-original-verona-player");

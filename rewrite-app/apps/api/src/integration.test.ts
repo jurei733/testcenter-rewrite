@@ -31185,6 +31185,81 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     "response_incomplete",
     "testlet_code_required"
   ]);
+  const unlockedSimulation = await requestJson<{
+    testRun: { unlockedTestletKeys: string[]; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${simulation.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(unlockedSimulation.status, 200);
+  assert.deepEqual(unlockedSimulation.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
+  ]);
+  assert.equal(unlockedSimulation.body.testRun.currentUnitKey, "UNIT.INTRO");
+  const transientSimulationResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      dataParts: {
+        responses: JSON.stringify([
+          {
+            id: "decision",
+            status: "VALUE_CHANGED",
+            value: "alternate"
+          }
+        ])
+      },
+      presentationProgress: "complete",
+      responseProgress: "complete"
+    }
+  });
+  const transientSimulationNavigation = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+      bookletStates?: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${simulation.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.PROTECTED",
+      responseUnitKey: "UNIT.INTRO",
+      unitResponse: transientSimulationResponse,
+      transientUnitResponses: {
+        "UNIT.INTRO": transientSimulationResponse
+      },
+      status: "running"
+    }
+  });
+  assert.equal(transientSimulationNavigation.status, 200);
+  assert.equal(
+    transientSimulationNavigation.body.testRun.currentUnitKey,
+    "UNIT.PROTECTED"
+  );
+  assert.deepEqual(transientSimulationNavigation.body.testRun.unitResponses, {});
+  assert.deepEqual(transientSimulationNavigation.body.testRun.bookletStates, {
+    route: "alternate"
+  });
+  const simulationLogs = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${simulation.testRunId}`
+  );
+  assert.deepEqual(simulationLogs.body.items, []);
+  const reopenedSimulation = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      bookletStates?: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${simulation.participantSessionId}/resume`, {
+    method: "POST"
+  });
+  assert.equal(reopenedSimulation.status, 200);
+  assert.equal(reopenedSimulation.body.testRun.testRunId, simulation.testRunId);
+  assert.equal(reopenedSimulation.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.deepEqual(reopenedSimulation.body.testRun.bookletStates, {
+    route: "basic"
+  });
 
   const hotReturnFirst = await requestJson<{
     participantSession: { participantSessionId: string; executionMode?: string };

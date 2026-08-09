@@ -333,6 +333,7 @@ export class ParticipantViewFacade {
     unitKey: string;
     response: string;
   } | null = null;
+  private readonly ephemeralUnitResponses = new Map<string, Map<string, string>>();
   private queuedVeronaLogs: Array<{
     testRunId: string;
     unitKey: string | null;
@@ -653,6 +654,15 @@ export class ParticipantViewFacade {
       currentState.currentUnit.content?.trim() ||
       `Respond to ${unitLabel}.`;
     const unitKey = currentState.currentUnit.unitKey ?? "";
+    const currentDraft = this.runtime.currentUnitResponse;
+    const backwardDeniedReasons = this.effectiveNavigationDeniedReasons(
+      currentState.navigation.backwardDeniedReasons,
+      currentDraft
+    );
+    const forwardDeniedReasons = this.effectiveNavigationDeniedReasons(
+      currentState.navigation.forwardDeniedReasons,
+      currentDraft
+    );
     const bookletUnits = currentState.bookletUnits ?? [];
     const unitIndex = bookletUnits.findIndex(unit => unit.unitKey === unitKey);
     const previousUnitKey = currentState.navigation.previousUnitKey;
@@ -696,8 +706,8 @@ export class ParticipantViewFacade {
           !isCurrent &&
           !unit.isLocked &&
           (index < unitIndex
-            ? currentState.navigation.backwardDeniedReasons.length === 0
-            : currentState.navigation.forwardDeniedReasons.length === 0)
+            ? backwardDeniedReasons.length === 0
+            : forwardDeniedReasons.length === 0)
       };
     });
     const answeredUnitCount = unitItems.filter(unit => unit.hasResponse).length;
@@ -707,9 +717,8 @@ export class ParticipantViewFacade {
       totalUnitCount > 0 ? Math.round((answeredUnitCount / totalUnitCount) * 100) : 0;
     const isComplete = currentState.testRun.status === "completed";
     const savedUnitResponse = unitKey
-      ? currentState.testRun.unitResponses[unitKey] ?? ""
+      ? this.effectiveUnitResponse(currentState, unitKey)
       : "";
-    const currentDraft = this.runtime.currentUnitResponse;
     const hasUnsavedResponse =
       executionMode.saveResponses &&
       currentState.testRun.status !== "completed" &&
@@ -887,10 +896,18 @@ export class ParticipantViewFacade {
       showUnitNavigationList: Boolean(policy.navigation.unitListEnabled),
       showPreviousUnitControl: policy.navigation.unitControls === "both",
       showNextUnitControl: policy.navigation.unitControls !== "hidden",
-      canGoPreviousUnit: canNavigateUnits && currentState.navigation.canGoPrevious,
-      canGoNextUnit: canNavigateUnits && currentState.navigation.canGoNext,
+      canGoPreviousUnit:
+        canNavigateUnits && previousUnitKey != null && backwardDeniedReasons.length === 0,
+      canGoNextUnit:
+        canNavigateUnits && nextUnitKey != null && forwardDeniedReasons.length === 0,
       canResumeRun: availableActions.includes("resume"),
-      canComplete: availableActions.includes("complete"),
+      canComplete:
+        availableActions.includes("complete") ||
+        (!executionMode.saveResponses &&
+          canNavigateUnits &&
+          nextUnitKey == null &&
+          currentState.navigation.nextTestletGate == null &&
+          forwardDeniedReasons.length === 0),
       canReview: availableActions.includes("review"),
       canClearSession: !this.pendingVeronaSave,
       saveProgressLabel:
@@ -1154,12 +1171,12 @@ export class ParticipantViewFacade {
           currentState.testRun.testRunId &&
         this.optimisticVeronaResponse.unitKey === unitKey
           ? this.optimisticVeronaResponse.response
-          : currentState.testRun.unitResponses[unitKey] ?? "",
+          : this.effectiveUnitResponse(currentState, unitKey),
       unitNumber: Math.max(unitIndex + 1, 1),
       unitCount: currentState.bookletUnits.length,
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
-      canComplete: currentState.navigation.canPlayerEnd,
+      canComplete: this.player.canComplete,
       canNavigateUnits:
         currentState.testRun.status === "running" &&
         currentState.availableActions.includes("save_progress"),
@@ -1734,7 +1751,23 @@ export class ParticipantViewFacade {
 
     if (currentState.currentUnit.unitKey === unitKey) {
       this.runtime.currentUnitResponse = change.response;
-      this.persistState();
+      if (currentState.executionMode.saveResponses) {
+        this.persistState();
+      }
+    }
+    if (!currentState.executionMode.saveResponses) {
+      this.rememberEphemeralUnitResponse(
+        currentState.testRun.testRunId,
+        unitKey,
+        change.response
+      );
+      this.optimisticVeronaResponse = {
+        testRunId: currentState.testRun.testRunId,
+        unitKey,
+        response: change.response
+      };
+      this.veronaSaveStatus = "not_saved";
+      return;
     }
     const queuedEntries = this.queuedVeronaLogs
       .filter(
@@ -1782,7 +1815,8 @@ export class ParticipantViewFacade {
       change.testRunId !== currentState.testRun.testRunId ||
       !unitKey ||
       !currentState.bookletUnits.some(unit => unit.unitKey === unitKey) ||
-      change.entries.length === 0
+      change.entries.length === 0 ||
+      !currentState.executionMode.saveResponses
     ) {
       return;
     }
@@ -1799,7 +1833,8 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       entries.length === 0 ||
-      !currentState.availableActions.includes("save_progress")
+      !currentState.availableActions.includes("save_progress") ||
+      !currentState.executionMode.saveResponses
     ) {
       return;
     }
@@ -2152,6 +2187,7 @@ export class ParticipantViewFacade {
     this.adaptiveStateChangePending = "";
     this.pendingVeronaSave = null;
     this.optimisticVeronaResponse = null;
+    this.ephemeralUnitResponses.clear();
     this.currentRunState = null;
     this.resetTimerLifecyclePresentation();
     this.queuedVeronaLogs = [];
@@ -2277,6 +2313,15 @@ export class ParticipantViewFacade {
       { quiet: options.quiet ?? false }
     );
 
+    this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
+    if (
+      ["run-demo", "run-review", "run-simulation"].includes(
+        payload.testRun.executionMode ?? ""
+      )
+    ) {
+      this.optimisticVeronaResponse = null;
+      this.runtime.currentUnitResponse = "";
+    }
     this.syncRun(payload.testRun);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
@@ -2292,9 +2337,16 @@ export class ParticipantViewFacade {
     unitResponse?: string | null,
     confirmTestletTimeLeave = false,
     confirmTestletLeaveLock = false,
-    refreshCurrentState = true
+    refreshCurrentState = true,
+    responseUnitKey?: string | null
   ): Promise<void> {
     const testRunId = this.runtime.testRunId.trim();
+    const currentState = this.readCurrentRunState();
+    const transientUnitResponses =
+      currentState?.testRun.testRunId === testRunId &&
+      !currentState.executionMode.saveResponses
+        ? this.ephemeralUnitResponseRecord(testRunId)
+        : undefined;
     const matchingLogBatches = currentUnitKey
       ? this.queuedVeronaLogs.filter(
           batch =>
@@ -2314,6 +2366,8 @@ export class ParticipantViewFacade {
       }),
       {
         currentUnitKey,
+        responseUnitKey,
+        transientUnitResponses,
         status,
         unitResponse,
         confirmTestletTimeLeave,
@@ -2574,9 +2628,13 @@ export class ParticipantViewFacade {
       await this.saveProgressInternal(
         "running",
         targetUnitKey,
-        undefined,
+        currentState?.executionMode.saveResponses
+          ? undefined
+          : settledVeronaResponse?.response ?? this.runtime.currentUnitResponse,
         confirmTestletTimeLeave,
-        confirmTestletLeaveLock
+        confirmTestletLeaveLock,
+        true,
+        currentState?.executionMode.saveResponses ? undefined : currentUnitKey
       );
     } finally {
       this.veronaForegroundSaveSettlement = false;
@@ -2634,6 +2692,8 @@ export class ParticipantViewFacade {
     confirmTestletTimeLeave = false,
     confirmTestletLeaveLock = false
   ): Promise<void> {
+    const saveResponses =
+      this.readCurrentRunState()?.executionMode.saveResponses ?? true;
     const settledVeronaResponse =
       await this.settleVeronaAutoSaveBeforeForegroundAction();
     const activeTimerBeforeComplete =
@@ -2651,12 +2711,24 @@ export class ParticipantViewFacade {
         testRunId: this.runtime.testRunId.trim()
       }),
       {
+        responseUnitKey: saveResponses
+          ? undefined
+          : this.runtime.currentUnitKey.trim() || undefined,
+        unitResponse: saveResponses ? undefined : this.runtime.currentUnitResponse,
+        transientUnitResponses: saveResponses
+          ? undefined
+          : this.ephemeralUnitResponseRecord(this.runtime.testRunId.trim()),
         confirmTestletTimeLeave,
         confirmTestletLeaveLock
       } satisfies CompleteTestRunRequest
     );
 
     this.syncRun(payload.testRun);
+    if (!saveResponses) {
+      this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
+      this.optimisticVeronaResponse = null;
+      this.runtime.currentUnitResponse = "";
+    }
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView
@@ -3239,7 +3311,7 @@ export class ParticipantViewFacade {
         : null;
     this.runtime.currentUnitResponse =
       optimisticResponse ??
-      (unitKey ? currentState.testRun.unitResponses[unitKey] ?? "" : "");
+      (unitKey ? this.effectiveUnitResponse(currentState, unitKey) : "");
   }
 
   private restorePersistentVeronaSave(
@@ -3356,9 +3428,56 @@ export class ParticipantViewFacade {
     currentState: ParticipantCurrentRunStateResponse["currentRunState"],
     unitKey: string
   ): boolean {
-    return Object.prototype.hasOwnProperty.call(
-      currentState.testRun.unitResponses,
-      unitKey
+    return (
+      this.ephemeralUnitResponses
+        .get(currentState.testRun.testRunId)
+        ?.has(unitKey) === true ||
+      Object.prototype.hasOwnProperty.call(
+        currentState.testRun.unitResponses,
+        unitKey
+      )
+    );
+  }
+
+  private effectiveUnitResponse(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"],
+    unitKey: string
+  ): string {
+    return (
+      this.ephemeralUnitResponses
+        .get(currentState.testRun.testRunId)
+        ?.get(unitKey) ?? currentState.testRun.unitResponses[unitKey] ?? ""
+    );
+  }
+
+  private rememberEphemeralUnitResponse(
+    testRunId: string,
+    unitKey: string,
+    response: string
+  ): void {
+    const responses = this.ephemeralUnitResponses.get(testRunId) ?? new Map();
+    responses.set(unitKey, response);
+    this.ephemeralUnitResponses.set(testRunId, responses);
+  }
+
+  private ephemeralUnitResponseRecord(testRunId: string): Record<string, string> {
+    return Object.fromEntries(this.ephemeralUnitResponses.get(testRunId) ?? []);
+  }
+
+  private effectiveNavigationDeniedReasons(
+    deniedReasons: readonly string[],
+    response: string
+  ): string[] {
+    const parsed = parseVeronaUnitResponse(response);
+    const presentationComplete =
+      parsed == null || parsed.unitState.presentationProgress === "complete";
+    const responseComplete = parsed
+      ? parsed.unitState.responseProgress === "complete"
+      : response.trim().length > 0;
+    return deniedReasons.filter(
+      reason =>
+        !(reason === "presentation_incomplete" && presentationComplete) &&
+        !(reason === "response_incomplete" && responseComplete)
     );
   }
 

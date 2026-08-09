@@ -7555,6 +7555,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           deliveryId: body.deliveryId,
           currentUnitKey: body.currentUnitKey,
           responseUnitKey: body.responseUnitKey,
+          transientUnitResponses: body.transientUnitResponses,
           status: body.status,
           unitResponse: body.unitResponse,
           confirmTestletTimeLeave: body.confirmTestletTimeLeave,
@@ -7754,6 +7755,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<CompleteTestRunRequest>();
         const testRun = await services.participantRuntime.completeRun({
           testRunId,
+          responseUnitKey: body?.responseUnitKey,
+          unitResponse: body?.unitResponse,
+          transientUnitResponses: body?.transientUnitResponses,
           confirmTestletTimeLeave: body?.confirmTestletTimeLeave,
           confirmTestletLeaveLock: body?.confirmTestletLeaveLock
         });

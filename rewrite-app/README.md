@@ -36,6 +36,12 @@ states resolve through it. The Verona host also exposes accessible queued,
 indeterminate-loading, and exact 100%-loaded milestones through the original
 per-login loading texts; it does not invent byte percentages because the Player
 HTML and Unit definition already arrive in the participant current-state payload.
+Demo, Review, and Simulation responses stay in the active browser view only:
+they can satisfy Verona completeness locks, drive transient adaptive routing,
+and authorize navigation or completion in the same request, but never enter the
+response store, Player-log store, save outbox, or Local Storage. Re-entry resets
+the automatic path and current Unit while retaining explicit adaptive choices
+and separately stored Review comments.
 
 Platform administrators can configure the original-style instance application
 title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded

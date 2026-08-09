@@ -2596,6 +2596,8 @@ export type SaveTestRunProgressRequest = {
   currentUnitKey?: string | null;
   /** Unit receiving `unitResponse`; defaults to `currentUnitKey` for compatibility. */
   responseUnitKey?: string | null;
+  /** In-memory response context for non-saving execution modes only. */
+  transientUnitResponses?: Record<string, string>;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
   confirmTestletTimeLeave?: boolean;
@@ -2657,6 +2659,9 @@ export type UnlockParticipantTestletRequest = {
 };
 
 export type CompleteTestRunRequest = {
+  responseUnitKey?: string | null;
+  unitResponse?: string | null;
+  transientUnitResponses?: Record<string, string>;
   confirmTestletTimeLeave?: boolean;
   confirmTestletLeaveLock?: boolean;
 };

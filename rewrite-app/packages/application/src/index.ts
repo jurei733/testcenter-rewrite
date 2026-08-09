@@ -683,6 +683,7 @@ export type ParticipantRuntimePort = {
     deliveryId?: string;
     currentUnitKey?: string | null;
     responseUnitKey?: string | null;
+    transientUnitResponses?: Record<string, string>;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
     confirmTestletTimeLeave?: boolean;
@@ -744,6 +745,9 @@ export type ParticipantRuntimePort = {
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
   completeRun(input: {
     testRunId: string;
+    responseUnitKey?: string | null;
+    unitResponse?: string | null;
+    transientUnitResponses?: Record<string, string>;
     confirmTestletTimeLeave?: boolean;
     confirmTestletLeaveLock?: boolean;
   }): Promise<TestRun>;
@@ -1903,6 +1907,34 @@ const normalizeOptionalUnitResponse = (value: unknown): string | null => {
   }
 
   return value;
+};
+
+const normalizeTransientUnitResponses = (
+  value: unknown
+): Record<string, string> => {
+  if (value === undefined || value === null) {
+    return {};
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new FirstSliceError(
+      400,
+      "transient_unit_responses_invalid",
+      "transientUnitResponses must be an object when provided."
+    );
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([unitKey, response]) => {
+      const normalizedUnitKey = unitKey.trim();
+      if (!normalizedUnitKey || typeof response !== "string") {
+        throw new FirstSliceError(
+          400,
+          "transient_unit_responses_invalid",
+          "Every transient response must use a non-empty Unit key and string value."
+        );
+      }
+      return [normalizedUnitKey, response];
+    })
+  );
 };
 
 const normalizeAdminRole = (value: unknown): AdminRole => {
@@ -27277,14 +27309,23 @@ export const createFirstSliceServices = (
             const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
               candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
             );
+            const resetEvaluationRun = withEvaluatedBookletStates(booklet, {
+              ...normalizedExistingRun,
+              unitResponses: {}
+            });
             const firstVisibleUnit = resolveVisibleBookletUnits(
               booklet,
-              normalizedExistingRun
+              resetEvaluationRun
             )[0];
             const resetCurrentUnitKey = firstVisibleUnit?.unitKey ?? null;
-            if (normalizedExistingRun.currentUnitKey !== resetCurrentUnitKey) {
+            if (
+              normalizedExistingRun.currentUnitKey !== resetCurrentUnitKey ||
+              Object.keys(normalizedExistingRun.unitResponses).length > 0 ||
+              JSON.stringify(normalizedExistingRun.bookletStates ?? {}) !==
+                JSON.stringify(resetEvaluationRun.bookletStates ?? {})
+            ) {
               normalizedExistingRun = {
-                ...normalizedExistingRun,
+                ...resetEvaluationRun,
                 currentUnitKey: resetCurrentUnitKey,
                 updatedAt: now()
               };
@@ -27435,6 +27476,43 @@ export const createFirstSliceServices = (
             responseUnitKey
           );
         }
+        const transientUnitResponses = normalizeTransientUnitResponses(
+          input.transientUnitResponses
+        );
+        if (
+          executionMode.saveResponses &&
+          Object.keys(transientUnitResponses).length > 0
+        ) {
+          throw new FirstSliceError(
+            400,
+            "transient_unit_responses_not_allowed",
+            "transientUnitResponses are only accepted for non-saving execution modes."
+          );
+        }
+        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            transientUnitKey
+          );
+        }
+        const hasTransientEvaluation =
+          Object.keys(transientUnitResponses).length > 0 ||
+          Boolean(responseUnitKey && nextUnitResponse != null);
+        const transientEvaluationResponses = {
+          ...testRun.unitResponses,
+          ...transientUnitResponses,
+          ...(responseUnitKey && nextUnitResponse != null
+            ? { [responseUnitKey]: nextUnitResponse }
+            : {})
+        };
+        const transientEvaluationRun =
+          hasTransientEvaluation
+            ? withEvaluatedBookletStates(booklet, {
+                ...testRun,
+                unitResponses: transientEvaluationResponses
+              })
+            : testRun;
         let navigationTestRun = testRun;
         let activatedLeaveLock: ReturnType<
           typeof resolveCurrentLeaveLock
@@ -27447,7 +27525,7 @@ export const createFirstSliceServices = (
           );
           requireBookletNavigationAllowed({
             contentRelease,
-            testRun,
+            testRun: transientEvaluationRun,
             targetUnitKey: nextCurrentUnitKey,
             confirmTestletTimeLeave: input.confirmTestletTimeLeave,
             confirmTestletLeaveLock: input.confirmTestletLeaveLock
@@ -27502,13 +27580,22 @@ export const createFirstSliceServices = (
           timestamp
         );
 
-        const updatedRun = withEvaluatedBookletStates(booklet, {
+        const evaluatedUpdatedRun = withEvaluatedBookletStates(booklet, {
           ...statusAdjustedRun,
           status: nextStatus,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
           updatedAt: timestamp
         });
+        const updatedRun =
+          !executionMode.saveResponses &&
+          hasTransientEvaluation &&
+          transientEvaluationRun.bookletStates
+            ? {
+                ...evaluatedUpdatedRun,
+                bookletStates: transientEvaluationRun.bookletStates
+              }
+            : evaluatedUpdatedRun;
         const logTimestamp = Date.parse(timestamp);
         const runtimeLogBatches: Array<{
           unitKey?: string | null;
@@ -27964,8 +28051,57 @@ export const createFirstSliceServices = (
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
+        const responseUnitKey =
+          input.responseUnitKey === undefined
+            ? testRun.currentUnitKey
+            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        if (responseUnitKey) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            responseUnitKey
+          );
+        }
+        const transientUnitResponses = normalizeTransientUnitResponses(
+          input.transientUnitResponses
+        );
+        if (
+          executionMode.saveResponses &&
+          Object.keys(transientUnitResponses).length > 0
+        ) {
+          throw new FirstSliceError(
+            400,
+            "transient_unit_responses_not_allowed",
+            "transientUnitResponses are only accepted for non-saving execution modes."
+          );
+        }
+        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            transientUnitKey
+          );
+        }
+        const hasTransientEvaluation =
+          !executionMode.saveResponses &&
+          (Object.keys(transientUnitResponses).length > 0 ||
+            Boolean(responseUnitKey && unitResponse != null));
+        const completionEvaluationRun =
+          hasTransientEvaluation
+            ? withEvaluatedBookletStates(booklet, {
+                ...testRun,
+                unitResponses: {
+                  ...testRun.unitResponses,
+                  ...transientUnitResponses,
+                  ...(responseUnitKey && unitResponse != null
+                    ? { [responseUnitKey]: unitResponse }
+                    : {})
+                }
+              })
+            : testRun;
         const leavingTimedTestlet = executionMode.forceTimeRestrictions
-          ? resolveLeavingTimedTestlet(booklet, testRun, null)
+          ? resolveLeavingTimedTestlet(booklet, completionEvaluationRun, null)
           : null;
         const leavePolicy =
           leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
@@ -27986,7 +28122,7 @@ export const createFirstSliceServices = (
           );
         }
         const leavingLock = executionMode.forceNaviRestrictions
-          ? resolveCurrentLeaveLock(booklet, testRun, null)
+          ? resolveCurrentLeaveLock(booklet, completionEvaluationRun, null)
           : null;
         if (
           leavingLock?.confirm &&
@@ -28009,11 +28145,11 @@ export const createFirstSliceServices = (
           (leavePolicy === "allowed" ||
             (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
             ? cancelTestletTimerAfterLeave(
-                testRun,
+                completionEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
-            : testRun;
+            : completionEvaluationRun;
         const completionBaseRun = leavingLock
           ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
           : timeAdjustedCompletionRun;
@@ -28052,6 +28188,13 @@ export const createFirstSliceServices = (
           updatedAt: timestamp,
           completedAt: lockOnTermination ? null : timestamp
         };
+        if (!executionMode.saveResponses) {
+          completedRun.unitResponses = testRun.unitResponses;
+          completedRun.bookletStates = withEvaluatedBookletStates(booklet, {
+            ...completedRun,
+            unitResponses: testRun.unitResponses
+          }).bookletStates;
+        }
         await repository.saveTestRun(completedRun);
         if (executionMode.saveResponses) {
           const completedStateEntries: ParticipantTestLogEntryInput[] = [];
