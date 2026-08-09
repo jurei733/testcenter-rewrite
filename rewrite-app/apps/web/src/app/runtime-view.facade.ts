@@ -186,6 +186,7 @@ export class RuntimeViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly monitorBatchSelection = new Set<string>();
+  monitorAutoSelectAll = false;
   monitorControlsVisible = true;
   monitorBookletListExpanded = true;
   monitorQuickFilter = "";
@@ -2378,6 +2379,11 @@ export class RuntimeViewFacade {
 
   get openRunItems(): RecordCollectionItem[] {
     const displaySettings = this.monitorDisplaySettings;
+    const autoSelectedRunIds = this.monitorAutoSelectAllActive
+      ? new Set(
+          this.commandSafeVisibleMonitorRuns.map(openRun => openRun.testRunId)
+        )
+      : null;
     return (
       this.visibleOpenMonitorRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
@@ -2393,9 +2399,9 @@ export class RuntimeViewFacade {
               this.formatMonitorMinutes(activeTimer.durationSeconds / 60)
             ])
           : null;
-        const batchSelected = this.monitorBatchSelection.has(
-          openRun.testRunId
-        );
+        const batchSelected = autoSelectedRunIds
+          ? autoSelectedRunIds.has(openRun.testRunId)
+          : this.monitorBatchSelection.has(openRun.testRunId);
         const bookletStates = Object.entries(openRun.bookletStates).map(
           ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
         );
@@ -2540,7 +2546,7 @@ export class RuntimeViewFacade {
             bookletSpecies: openRun.bookletSpecies ?? "",
             displayName: displayName ?? ""
           },
-          actions: openRun.bookletError
+          actions: openRun.bookletError || this.monitorAutoSelectAllActive
             ? []
             : [
                 {
@@ -2751,11 +2757,27 @@ export class RuntimeViewFacade {
   }
 
   get monitorBatchRunIds(): string[] {
+    if (this.monitorAutoSelectAllActive) {
+      return this.commandSafeVisibleMonitorRuns.map(openRun => openRun.testRunId);
+    }
     return [...this.monitorBatchSelection];
   }
 
   get monitorBatchCount(): number {
-    return this.monitorBatchSelection.size;
+    return this.monitorBatchRunIds.length;
+  }
+
+  get monitorAutoSelectAllAvailable(): boolean {
+    const bookletSpecies = new Set(
+      this.commandSafeVisibleMonitorRuns.map(
+        openRun => openRun.bookletSpecies ?? openRun.bookletKey
+      )
+    );
+    return bookletSpecies.size <= 1;
+  }
+
+  get monitorAutoSelectAllActive(): boolean {
+    return this.monitorAutoSelectAll && this.monitorAutoSelectAllAvailable;
   }
 
   get monitorBatchSelectionText(): string {
@@ -2765,8 +2787,9 @@ export class RuntimeViewFacade {
     if (this.monitorBatchCount === 0) {
       return this.monitorText("gm_selection_info_none");
     }
+    const selectedRunIds = new Set(this.monitorBatchRunIds);
     const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
-      this.monitorBatchSelection.has(openRun.testRunId)
+      selectedRunIds.has(openRun.testRunId)
     );
     const bookletCount = new Set(
       selectedRuns.map(openRun => openRun.bookletAssignmentKey)
@@ -2787,9 +2810,10 @@ export class RuntimeViewFacade {
     if (!this.isMonitorOnlySession || this.monitorBatchCount < 2) {
       return "";
     }
+    const selectedRunIds = new Set(this.monitorBatchRunIds);
     const bookletSpecies = new Set(
       this.visibleOpenMonitorRuns
-        .filter(openRun => this.monitorBatchSelection.has(openRun.testRunId))
+        .filter(openRun => selectedRunIds.has(openRun.testRunId))
         .map(openRun => openRun.bookletSpecies ?? openRun.bookletKey)
     );
     return bookletSpecies.size > 1
@@ -2798,8 +2822,9 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatch(): boolean {
+    const selectedRunIds = new Set(this.monitorBatchRunIds);
     const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
-      this.monitorBatchSelection.has(openRun.testRunId)
+      selectedRunIds.has(openRun.testRunId)
     );
     return (
       this.canIssueMonitorCommands &&
@@ -2811,8 +2836,9 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatchGoto(): boolean {
+    const selectedRunIds = new Set(this.monitorBatchRunIds);
     const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
-      this.monitorBatchSelection.has(openRun.testRunId)
+      selectedRunIds.has(openRun.testRunId)
     );
     const restoration = this.monitorGotoRestoration(selectedRuns);
     return (
@@ -3897,6 +3923,9 @@ export class RuntimeViewFacade {
   }
 
   selectAllVisibleMonitorRuns(): void {
+    if (this.monitorAutoSelectAllActive) {
+      return;
+    }
     for (const openRun of this.visibleOpenMonitorRuns) {
       if (!openRun.bookletError) {
         this.monitorBatchSelection.add(openRun.testRunId);
@@ -3906,6 +3935,9 @@ export class RuntimeViewFacade {
   }
 
   invertVisibleMonitorRunSelection(): void {
+    if (this.monitorAutoSelectAllActive) {
+      return;
+    }
     const nextSelection = this.visibleOpenMonitorRuns
       .filter(openRun => !openRun.bookletError)
       .filter(openRun => !this.monitorBatchSelection.has(openRun.testRunId))
@@ -3918,6 +3950,18 @@ export class RuntimeViewFacade {
   }
 
   clearMonitorBatchSelection(): void {
+    if (this.monitorAutoSelectAllActive) {
+      return;
+    }
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  toggleMonitorAutoSelectAll(): void {
+    if (!this.monitorAutoSelectAll && !this.monitorAutoSelectAllAvailable) {
+      return;
+    }
+    this.monitorAutoSelectAll = !this.monitorAutoSelectAll;
     this.monitorBatchSelection.clear();
     this.uiState.renderVersion.update(version => version + 1);
   }
@@ -4453,6 +4497,9 @@ export class RuntimeViewFacade {
       return;
     }
     if (item.actionPayload?.monitorBatchCommand === "toggle") {
+      if (this.monitorAutoSelectAllActive) {
+        return;
+      }
       if (this.monitorBatchSelection.has(testRunId)) {
         this.monitorBatchSelection.delete(testRunId);
       } else {
@@ -4815,6 +4862,10 @@ export class RuntimeViewFacade {
         ? profileSettings.bookletStatesColumns.split(/[\W,]+/).filter(Boolean)
         : this.monitorAvailableBookletStateColumns
     };
+  }
+
+  private get commandSafeVisibleMonitorRuns(): OpenMonitorRun[] {
+    return this.visibleOpenMonitorRuns.filter(openRun => !openRun.bookletError);
   }
 
   private sortMonitorRuns(openRuns: OpenMonitorRun[]): OpenMonitorRun[] {

@@ -871,9 +871,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <li *ngFor="let testRunId of view.monitorBatchRunIds"><code>{{ testRunId }}</code></li>
         </ul>
         <div class="actions">
-          <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.selectAllVisibleMonitorRuns()">{{ view.isMonitorOnlySession ? view.monitorText("gm_auto_checkall") : "Select All Visible" }}</button>
-          <button id="invertVisibleMonitorRunSelectionButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.invertVisibleMonitorRunSelection()">Invert Visible Selection</button>
-          <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
+          <button *ngIf="view.isMonitorOnlySession" id="monitorAutoSelectAllButton" class="ghost" type="button" [disabled]="!view.monitorAutoSelectAllAvailable" [attr.aria-pressed]="view.monitorAutoSelectAllActive" [attr.title]="view.monitorAutoSelectAllAvailable ? view.monitorText('gm_auto_checkall') : view.monitorText('gm_multiple_booklet_species_warning')" (click)="view.toggleMonitorAutoSelectAll()">{{ view.monitorText("gm_auto_checkall") }}</button>
+          <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope || view.monitorAutoSelectAllActive" (click)="view.selectAllVisibleMonitorRuns()">Select All Visible</button>
+          <button id="invertVisibleMonitorRunSelectionButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope || view.monitorAutoSelectAllActive" (click)="view.invertVisibleMonitorRunSelection()">Invert Visible Selection</button>
+          <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0 || view.monitorAutoSelectAllActive" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
           <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
           <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>
           <button id="monitorBatchGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchGoto" (click)="view.issueMonitorBatchCommand('goto')">Go To Target Unit</button>

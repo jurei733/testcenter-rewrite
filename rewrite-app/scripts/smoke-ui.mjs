@@ -12204,6 +12204,32 @@ try {
     .filter({ hasText: participantBookletKey })
     .filter({ hasText: "1 active run" })
     .waitFor();
+  logStep("group-monitor-auto-select-all");
+  assert.equal(
+    await page.locator("#monitorAutoSelectAllButton").getAttribute("aria-pressed"),
+    "false"
+  );
+  await expectButtonSelectorEnabled("#monitorAutoSelectAllButton");
+  await page.locator("#monitorAutoSelectAllButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI Alle 1 run / 1 booklet selected" })
+    .waitFor();
+  assert.equal(
+    await scopedOpenRuns.getByRole("button", { name: "Add to Batch" }).count(),
+    0,
+    "Automatic selection must replace per-run manual selection controls."
+  );
+  assert.equal(
+    await page.locator("#invertVisibleMonitorRunSelectionButton").isDisabled(),
+    true,
+    "Automatic selection must keep manual inversion inactive."
+  );
+  await page.locator("#monitorAutoSelectAllButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
+    .waitFor();
   await scopedOpenRuns
     .getByRole("button", { name: "Add to Batch" })
     .first()
