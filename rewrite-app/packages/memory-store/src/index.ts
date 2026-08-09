@@ -8,6 +8,7 @@ import type {
   AttachmentFile,
   ContentRelease,
   ImportJob,
+  OperationalLoginMigrationCandidate,
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -38,6 +39,10 @@ type InMemoryFirstSliceState = {
   contentReleases: Map<string, ContentRelease>;
   participantSessions: Map<string, ParticipantSession>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
+  operationalLoginMigrationCandidates: Map<
+    string,
+    OperationalLoginMigrationCandidate[]
+  >;
   participantRosterPasswordHashes: Map<string, string>;
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
@@ -62,6 +67,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   contentReleases: new Map(),
   participantSessions: new Map(),
   participantRosterEntries: new Map(),
+  operationalLoginMigrationCandidates: new Map(),
   participantRosterPasswordHashes: new Map(),
   participantLoginAttempts: new Map(),
   testRuns: new Map(),
@@ -252,6 +258,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
           state.participantRosterPasswordHashes.delete(key);
         }
       }
+      state.operationalLoginMigrationCandidates.delete(
+        `${input.tenantId}::${input.workspaceId}`
+      );
       state.workspacesByScope.delete(scopeKey);
       const remainingWorkspaceWithSameKey = Array.from(
         state.workspacesByScope.values()
@@ -400,6 +409,26 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return Array.from(state.participantRosterEntries.values()).filter(
         entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
+      );
+    },
+    async listOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId
+    ) {
+      return (
+        state.operationalLoginMigrationCandidates.get(
+          `${tenantId}::${workspaceId}`
+        ) ?? []
+      );
+    },
+    async replaceOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId,
+      candidates
+    ) {
+      state.operationalLoginMigrationCandidates.set(
+        `${tenantId}::${workspaceId}`,
+        candidates
       );
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {

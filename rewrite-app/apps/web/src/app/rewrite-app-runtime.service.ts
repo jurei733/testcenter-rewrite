@@ -189,13 +189,19 @@ export class RewriteAppRuntimeService {
     if (!this.hasWorkspaceScope()) {
       return;
     }
-    const refresh = () =>
-      refreshRuntimeReadsAction(
+    const refresh = async () => {
+      const runtimeRefresh = refreshRuntimeReadsAction(
         this.hosts.createRuntimeReadsHost(),
         this.getParticipantSessionId(),
         quiet,
         { monitorOnly: this.operatorAccess.isMonitorOnly }
       );
+      if (this.operatorAccess.isMonitorOnly) {
+        await runtimeRefresh;
+        return;
+      }
+      await Promise.all([runtimeRefresh, this.loadParticipantRoster(true)]);
+    };
     if (!this.operatorAccess.isMonitorOnly) {
       await refresh();
       return;
@@ -300,10 +306,17 @@ export class RewriteAppRuntimeService {
       this.hosts.createRuntimeReadsHost(),
       quiet
     );
+    this.runtimeState.operationalLoginCandidatesView = JSON.stringify(
+      { items: payload.operationalLoginCandidates },
+      null,
+      2
+    );
     if (!quiet) {
+      const operationalCandidateCount =
+        payload.operationalLoginCandidates.length;
       this.feedback.rememberActivity(
         "Participant Roster Loaded",
-        `${payload.items.length} saved roster entr${payload.items.length === 1 ? "y" : "ies"} loaded.`
+        `${payload.items.length} saved roster entr${payload.items.length === 1 ? "y" : "ies"} and ${operationalCandidateCount} operational login candidate${operationalCandidateCount === 1 ? "" : "s"} loaded.`
       );
     }
   }

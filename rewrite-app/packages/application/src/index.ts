@@ -411,7 +411,10 @@ export type WorkspaceAdminReadPort = {
   listParticipantRoster(input: {
     tenantKey: string;
     workspaceKey: string;
-  }): Promise<WorkspaceParticipantRosterItem[]>;
+  }): Promise<{
+    items: WorkspaceParticipantRosterItem[];
+    operationalLoginCandidates: OriginalTestcenterOperationalLoginCandidate[];
+  }>;
   exportParticipantRosterCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1226,6 +1229,15 @@ export type FirstSliceRepository = {
     tenantId: string,
     workspaceId: string
   ): Promise<ParticipantRosterEntry[]>;
+  listOperationalLoginMigrationCandidatesByWorkspace(
+    tenantId: string,
+    workspaceId: string
+  ): Promise<OriginalTestcenterOperationalLoginCandidate[]>;
+  replaceOperationalLoginMigrationCandidatesByWorkspace(
+    tenantId: string,
+    workspaceId: string,
+    candidates: OriginalTestcenterOperationalLoginCandidate[]
+  ): Promise<void>;
   getParticipantRosterPasswordHash(
     tenantId: string,
     workspaceId: string,
@@ -23066,6 +23078,12 @@ export const createFirstSliceServices = (
           }
         }
 
+        await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId,
+          operationalLoginCandidates
+        );
+
         if (
           parsedEntries.length > 0 ||
           operationalLoginCandidates.length > 0
@@ -23115,14 +23133,21 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        return buildParticipantRosterReadItems(
-          entries,
-          await getActiveWorkspaceRelease(
+        const [activeRelease, operationalLoginCandidates] = await Promise.all([
+          getActiveWorkspaceRelease(
             repository,
             workspace.tenantId,
             workspace.workspaceId
+          ),
+          repository.listOperationalLoginMigrationCandidatesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
           )
-        );
+        ]);
+        return {
+          items: buildParticipantRosterReadItems(entries, activeRelease),
+          operationalLoginCandidates
+        };
       },
       async exportParticipantRosterCsv(input) {
         const workspace = await requireWorkspace(

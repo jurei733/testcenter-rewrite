@@ -476,6 +476,20 @@ export type MonitorViewProfile = {
   };
 };
 
+export type OperationalLoginMigrationCandidate = {
+  loginKey: string;
+  loginMode: "monitor-group" | "monitor-study" | "sys-check-login";
+  groupKey: string | null;
+  passwordRequired: boolean;
+  profileIds: string[];
+  monitorProfiles: MonitorViewProfile[];
+  customTexts: Record<string, string>;
+  unresolvedProfileIds: string[];
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
+};
+
 export type AdminRoleAssignment = {
   roleAssignmentId: string;
   adminUserId: string;

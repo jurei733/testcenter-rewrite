@@ -12,6 +12,7 @@ import type {
   ContentReleaseRuntimeSnapshot,
   ImportJob,
   ImportJobDiagnostic,
+  OperationalLoginMigrationCandidate,
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -1151,6 +1152,19 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS intro_html TEXT NOT NULL DEFAULT '';
       ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS legal_notice_html TEXT NOT NULL DEFAULT '';
     `
+  },
+  {
+    version: 38,
+    name: "add_operational_login_migration_candidates",
+    sql: `
+      CREATE TABLE IF NOT EXISTS operational_login_migration_candidates (
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        candidates_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, workspace_id)
+      );
+    `
   }
 ];
 
@@ -1696,6 +1710,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         const deletedRosterEntryCount = await deleteScoped(
           "participant_roster_entries"
         );
+        await deleteScoped("operational_login_migration_candidates");
         const deletedLoginAttemptCount = await deleteScoped(
           "participant_login_attempts"
         );
@@ -2075,6 +2090,36 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
         mapParticipantRosterEntry
+      );
+    },
+    async listOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId
+    ) {
+      const result = await pool.query<{ candidates_json: unknown }>(
+        `SELECT candidates_json
+         FROM operational_login_migration_candidates
+         WHERE tenant_id = $1 AND workspace_id = $2`,
+        [tenantId, workspaceId]
+      );
+      const candidates = result.rows[0]?.candidates_json;
+      return Array.isArray(candidates)
+        ? (candidates as OperationalLoginMigrationCandidate[])
+        : [];
+    },
+    async replaceOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId,
+      candidates
+    ) {
+      await pool.query(
+        `INSERT INTO operational_login_migration_candidates (
+          tenant_id, workspace_id, candidates_json, updated_at
+        ) VALUES ($1, $2, $3::jsonb, $4)
+        ON CONFLICT (tenant_id, workspace_id) DO UPDATE SET
+          candidates_json = EXCLUDED.candidates_json,
+          updated_at = EXCLUDED.updated_at`,
+        [tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString()]
       );
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {

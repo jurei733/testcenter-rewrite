@@ -19,6 +19,7 @@ import type {
   MonitorViewProfile,
   MonitorViewProfileFilter,
   OpenMonitorRun,
+  OperationalLoginMigrationCandidate,
   ParticipantExecutionMode,
   ParticipantRuntimeBooklet,
   ParticipantTestLogEntryInput,
@@ -107,25 +108,14 @@ export const originalTestcenterOperationalLoginModes = [
 ] as const;
 
 export type OriginalTestcenterOperationalLoginMode =
-  (typeof originalTestcenterOperationalLoginModes)[number];
+  OperationalLoginMigrationCandidate["loginMode"];
 
 export type OriginalTestcenterMonitorProfileFilter = MonitorViewProfileFilter;
 
 export type OriginalTestcenterMonitorProfile = MonitorViewProfile;
 
-export type OriginalTestcenterOperationalLoginCandidate = {
-  loginKey: string;
-  loginMode: OriginalTestcenterOperationalLoginMode;
-  groupKey: string | null;
-  passwordRequired: boolean;
-  profileIds: string[];
-  monitorProfiles: OriginalTestcenterMonitorProfile[];
-  customTexts: Record<string, string>;
-  unresolvedProfileIds: string[];
-  validFrom?: string | null;
-  validTo?: string | null;
-  validForMinutes?: number | null;
-};
+export type OriginalTestcenterOperationalLoginCandidate =
+  OperationalLoginMigrationCandidate;
 
 export type OriginalTestcenterMonitorRoleDraft = {
   role: Extract<AdminRole, "group_monitor" | "study_monitor">;
@@ -2798,6 +2788,7 @@ export type ImportParticipantRosterResponse = {
 
 export type ListParticipantRosterResponse = {
   items: WorkspaceParticipantRosterItem[];
+  operationalLoginCandidates: OriginalTestcenterOperationalLoginCandidate[];
 };
 
 export type ListDetailedResponsesResponse = {

@@ -5946,11 +5946,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const items = await services.workspaceAdminRead.listParticipantRoster({
+        const payload = await services.workspaceAdminRead.listParticipantRoster({
           tenantKey,
           workspaceKey
         });
-        sendJson<ListParticipantRosterResponse>(response, 200, { items });
+        sendJson<ListParticipantRosterResponse>(response, 200, payload);
         return;
       }
 

@@ -4053,6 +4053,17 @@ try {
     ),
     true
   );
+  await page.evaluate(() => {
+    const storageKey = "testcenter-rewrite-app-shell";
+    const snapshot = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}");
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...snapshot,
+        operationalLoginCandidatesView: JSON.stringify({ items: [] })
+      })
+    );
+  });
   await page.reload({ waitUntil: "domcontentloaded" });
   await operationalOnlyCandidateCard.waitFor();
   await operationalOnlyCandidateCard

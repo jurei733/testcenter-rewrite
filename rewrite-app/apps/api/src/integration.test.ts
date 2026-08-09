@@ -28479,11 +28479,26 @@ test("workspace participant roster accepts operational-only Testtakers as migrat
     false
   );
 
-  const savedRoster = await requestJson<{ items: unknown[] }>(
+  const savedRoster = await requestJson<{
+    items: unknown[];
+    operationalLoginCandidates: typeof importResult.body.operationalLoginCandidates;
+  }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
   );
   assert.equal(savedRoster.status, 200);
   assert.deepEqual(savedRoster.body.items, []);
+  assert.deepEqual(
+    savedRoster.body.operationalLoginCandidates,
+    importResult.body.operationalLoginCandidates
+  );
+  assert.equal(
+    JSON.stringify(savedRoster.body).includes("source-study-secret"),
+    false
+  );
+  assert.equal(
+    JSON.stringify(savedRoster.body).includes("source-system-secret"),
+    false
+  );
 
   const activityEvents = await requestJson<{
     items: Array<{
@@ -28514,6 +28529,27 @@ test("workspace participant roster accepts operational-only Testtakers as migrat
     migrationOnly: true,
     operationalLoginCandidateCount: 2
   });
+
+  const participantOnlyImport = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          "loginKey,groupKey,displayName",
+          "replacement-participant,replacement-group,Replacement Participant"
+        ].join("\n")
+      }
+    }
+  );
+  assert.equal(participantOnlyImport.status, 201);
+  const replacedCandidateSet = await requestJson<{
+    operationalLoginCandidates: unknown[];
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
+  );
+  assert.equal(replacedCandidateSet.status, 200);
+  assert.deepEqual(replacedCandidateSet.body.operationalLoginCandidates, []);
 });
 
 test("workspace participant roster can be imported, updated, and listed", async () => {

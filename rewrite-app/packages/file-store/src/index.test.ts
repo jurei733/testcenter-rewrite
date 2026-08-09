@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import type { Workspace } from "@testcenter-rewrite-app/domain";
+import type {
+  OperationalLoginMigrationCandidate,
+  Workspace
+} from "@testcenter-rewrite-app/domain";
 
 import { createFileFirstSliceRepository } from "./index.js";
 
@@ -87,6 +90,56 @@ describe("createFileFirstSliceRepository", () => {
           attachmentFile.attachmentFileId
         ),
         null
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("persists and replaces operational login migration candidates", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-operational-"));
+    const filePath = join(tempDirectory, "state.json");
+    const candidate: OperationalLoginMigrationCandidate = {
+      loginKey: "system-check-migration",
+      loginMode: "sys-check-login",
+      groupKey: "group:operations",
+      passwordRequired: true,
+      profileIds: [],
+      monitorProfiles: [],
+      customTexts: { systemcheck_intro: "Imported check" },
+      unresolvedProfileIds: [],
+      validForMinutes: 30
+    };
+
+    try {
+      await createFileFirstSliceRepository(
+        filePath
+      ).replaceOperationalLoginMigrationCandidatesByWorkspace(
+        "tenant-operational",
+        "workspace-operational",
+        [candidate]
+      );
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.deepEqual(
+        await restarted.listOperationalLoginMigrationCandidatesByWorkspace(
+          "tenant-operational",
+          "workspace-operational"
+        ),
+        [candidate]
+      );
+      await restarted.replaceOperationalLoginMigrationCandidatesByWorkspace(
+        "tenant-operational",
+        "workspace-operational",
+        []
+      );
+      assert.deepEqual(
+        await createFileFirstSliceRepository(
+          filePath
+        ).listOperationalLoginMigrationCandidatesByWorkspace(
+          "tenant-operational",
+          "workspace-operational"
+        ),
+        []
       );
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });

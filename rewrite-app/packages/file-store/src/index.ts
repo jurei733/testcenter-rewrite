@@ -12,6 +12,7 @@ import type {
   AttachmentFile,
   ContentRelease,
   ImportJob,
+  OperationalLoginMigrationCandidate,
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -41,6 +42,10 @@ type PersistedFirstSliceState = {
   contentReleases: Record<string, ContentRelease>;
   participantSessions: Record<string, ParticipantSession>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
+  operationalLoginMigrationCandidates: Record<
+    string,
+    OperationalLoginMigrationCandidate[]
+  >;
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
@@ -64,6 +69,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   contentReleases: {},
   participantSessions: {},
   participantRosterEntries: {},
+  operationalLoginMigrationCandidates: {},
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
@@ -452,6 +458,9 @@ export const createFileFirstSliceRepository = (
             delete state.participantRosterPasswordHashes[key];
           }
         }
+        delete state.operationalLoginMigrationCandidates[
+          `${input.tenantId}::${input.workspaceId}`
+        ];
         delete state.workspacesByScope[scopeKey];
         const remainingWorkspaceWithSameKey = Object.values(
           state.workspacesByScope
@@ -620,6 +629,28 @@ export const createFileFirstSliceRepository = (
       return Object.values(state.participantRosterEntries).filter(
         entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
       );
+    },
+    async listOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId
+    ) {
+      const state = await getState();
+      return (
+        state.operationalLoginMigrationCandidates[
+          `${tenantId}::${workspaceId}`
+        ] ?? []
+      );
+    },
+    async replaceOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId,
+      candidates
+    ) {
+      await mutate(state => {
+        state.operationalLoginMigrationCandidates[
+          `${tenantId}::${workspaceId}`
+        ] = candidates;
+      });
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const state = await getState();

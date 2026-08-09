@@ -8,6 +8,7 @@ import test from "node:test";
 import type {
   AdminRoleAssignment,
   AdminUser,
+  OperationalLoginMigrationCandidate,
   TestRun,
   Workspace
 } from "@testcenter-rewrite-app/domain";
@@ -97,6 +98,56 @@ test("SQLite preserves whole-test locks through every run lookup", async () => {
       ?.locked,
     true
   );
+});
+
+test("SQLite persists and replaces operational login migration candidates", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-operational-"));
+  const databasePath = join(tempDirectory, "operational.sqlite");
+  const candidate: OperationalLoginMigrationCandidate = {
+    loginKey: "study-monitor-migration",
+    loginMode: "monitor-study",
+    groupKey: "group:operations",
+    passwordRequired: true,
+    profileIds: [],
+    monitorProfiles: [],
+    customTexts: { gm_headline: "Imported monitor" },
+    unresolvedProfileIds: [],
+    validForMinutes: 45
+  };
+
+  try {
+    await createSqliteFirstSliceRepository(
+      databasePath
+    ).replaceOperationalLoginMigrationCandidatesByWorkspace(
+      "tenant-operational",
+      "workspace-operational",
+      [candidate]
+    );
+    const restarted = createSqliteFirstSliceRepository(databasePath);
+    assert.deepEqual(
+      await restarted.listOperationalLoginMigrationCandidatesByWorkspace(
+        "tenant-operational",
+        "workspace-operational"
+      ),
+      [candidate]
+    );
+    await restarted.replaceOperationalLoginMigrationCandidatesByWorkspace(
+      "tenant-operational",
+      "workspace-operational",
+      []
+    );
+    assert.deepEqual(
+      await createSqliteFirstSliceRepository(
+        databasePath
+      ).listOperationalLoginMigrationCandidatesByWorkspace(
+        "tenant-operational",
+        "workspace-operational"
+      ),
+      []
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
 });
 
 test("SQLite preserves workspace-admin access modes", async () => {

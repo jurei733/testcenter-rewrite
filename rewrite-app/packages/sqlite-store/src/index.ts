@@ -14,6 +14,7 @@ import type {
   ContentReleaseRuntimeSnapshot,
   ImportJob,
   ImportJobDiagnostic,
+  OperationalLoginMigrationCandidate,
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -1223,6 +1224,19 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE application_settings ADD COLUMN intro_html TEXT NOT NULL DEFAULT '';
       ALTER TABLE application_settings ADD COLUMN legal_notice_html TEXT NOT NULL DEFAULT '';
     `
+  },
+  {
+    version: 44,
+    name: "add_operational_login_migration_candidates",
+    sql: `
+      CREATE TABLE operational_login_migration_candidates (
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        candidates_json TEXT NOT NULL DEFAULT '[]',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, workspace_id)
+      );
+    `
   }
 ];
 
@@ -1825,6 +1839,7 @@ export const createSqliteFirstSliceRepository = (
           deletedTestRunCount: deleteScoped("test_runs"),
           deletedTestLogCount: deleteScoped("participant_test_logs")
         };
+        deleteScoped("operational_login_migration_candidates");
         counts.deletedWorkspaceCount = Number(
           database
             .prepare(
@@ -2232,6 +2247,47 @@ export const createSqliteFirstSliceRepository = (
       return rows
         .map(row => mapParticipantRosterEntry(row))
         .filter(Boolean) as ParticipantRosterEntry[];
+    },
+    async listOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId
+    ) {
+      const row = database
+        .prepare(
+          `SELECT candidates_json
+           FROM operational_login_migration_candidates
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .get(tenantId, workspaceId) as
+        | { candidates_json?: unknown }
+        | undefined;
+      if (row?.candidates_json == null) {
+        return [];
+      }
+      try {
+        const candidates = JSON.parse(String(row.candidates_json)) as unknown;
+        return Array.isArray(candidates)
+          ? (candidates as OperationalLoginMigrationCandidate[])
+          : [];
+      } catch {
+        return [];
+      }
+    },
+    async replaceOperationalLoginMigrationCandidatesByWorkspace(
+      tenantId,
+      workspaceId,
+      candidates
+    ) {
+      database
+        .prepare(
+          `INSERT INTO operational_login_migration_candidates (
+            tenant_id, workspace_id, candidates_json, updated_at
+          ) VALUES (?, ?, ?, ?)
+          ON CONFLICT(tenant_id, workspace_id) DO UPDATE SET
+            candidates_json = excluded.candidates_json,
+            updated_at = excluded.updated_at`
+        )
+        .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString());
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const row = database
