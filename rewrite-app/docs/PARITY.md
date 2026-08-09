@@ -200,10 +200,10 @@ reproduces all three official code/score pairs. Eight persisted Booklet states,
 the unchanged `2 kg` raw Player response, and the exclusive matched route are
 gated across memory, file, and SQLite.
 
-Latest P0 rule-method closure: nine more official `@iqb/responses` 3.6.0
-families contribute 19 byte-exact scheme/input/outcome cases for matching,
+Latest P0 rule-method closure: ten more official `@iqb/responses` 3.6.0
+families contribute 30 byte-exact scheme/input/outcome cases for matching,
 numeric ranges, booleans, nulls, empty strings, numeric zero, empty arrays, and
-Player-injected variables. A single imported nine-booklet package executes `MATCH`, `MATCH_REGEX`,
+Player-injected variables plus intended-incomplete status propagation. A single imported ten-booklet package executes `MATCH`, `MATCH_REGEX`,
 `NUMERIC_MATCH`, `NUMERIC_RANGE`, `NUMERIC_FULL_RANGE`, all four numeric
 one-sided comparisons, `IS_TRUE`, `IS_FALSE`, `IS_NULL`, and `IS_EMPTY`, plus
 the original whitespace/case/displayed/empty preprocessing. The Participant
@@ -212,7 +212,11 @@ gate distinguishes open from closed boundary behavior, residual zero coding,
 it also preserves actually supplied non-Base responses instead of replacing
 their manual/external `CODING_COMPLETE`, `DISPLAYED`, `INVALID`, or
 `CODING_ERROR` status and signed code/score values with an initialized `UNSET`.
-All 19 official raw inputs retain their envelopes and select exactly one
+The official 11-case propagation matrix additionally combines
+`INTENDED_INCOMPLETE` with every relevant second source status and proves the
+exact derived `DERIVE_PENDING`, `UNSET`, `INVALID`, `DERIVE_ERROR`,
+`CODING_ERROR`, or coded-complete-zero outcome. All 30 official raw inputs
+retain their envelopes and select exactly one
 persisted route across memory, file, and SQLite.
 
 ## Capability matrix

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "b1",
+    "status": "INTENDED_INCOMPLETE",
+    "value": "d"
+  },
+  {
+    "id": "b2",
+    "status": "CODING_ERROR",
+    "value": "d"
+  }
+]

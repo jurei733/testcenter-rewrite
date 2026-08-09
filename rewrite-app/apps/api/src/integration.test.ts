@@ -24306,7 +24306,7 @@ test("original Testcenter compatibility corpus executes official IQB regex fragm
   );
 });
 
-test("original Testcenter compatibility corpus executes official IQB rule methods", async () => {
+test("original Testcenter compatibility corpus executes official IQB rule methods and status propagation", async () => {
   type CodingCase = {
     inputFixture: string;
     outcomeFixture: string;
@@ -24341,7 +24341,8 @@ test("original Testcenter compatibility corpus executes official IQB rule method
     ["rule-empty-values", "empty", 1],
     ["rule-zero-values", "zero", 1],
     ["rule-empty-array", "empty-array", 1],
-    ["rule-injected-variables", "injected-vars", 4]
+    ["rule-injected-variables", "injected-vars", 4],
+    ["rule-intended-incomplete-statuses", "intended-incomplete", 11]
   ] as const;
   const families = familyDefinitions.map(([family, slug, caseCount]) => {
     const codingPackage = corpus.codingSchemePackages.find(
@@ -24406,7 +24407,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
   });
   assert.equal(
     families.reduce((total, family) => total + family.cases.length, 0),
-    19
+    30
   );
 
   const escapeXmlAttribute = (value: string): string =>

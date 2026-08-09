@@ -39,6 +39,14 @@ family. They preserve a Player-supplied non-Base `d1` response across
 `CODING_COMPLETE`, `DISPLAYED`, `INVALID`, and `CODING_ERROR`, including zero
 and negative code/score values, while the three Base values still normalize to
 `NO_CODING` through the official server-side coder.
+The eleven byte-exact `rules/intended-incomplete/case2` cases add the tenth
+family and complete the official source-status propagation matrix. An
+`INTENDED_INCOMPLETE` Base response is combined in turn with
+`CODING_INCOMPLETE`, `DERIVE_PENDING`, `UNSET`, `NOT_REACHED`, `DISPLAYED`,
+`PARTLY_DISPLAYED`, `DERIVE_ERROR`, `NO_CODING`, `INVALID`, `CODING_ERROR`,
+and `INTENDED_INCOMPLETE`; the Participant gate selects a distinct persisted
+route for every official derived status and the final zero-code/zero-score
+result.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

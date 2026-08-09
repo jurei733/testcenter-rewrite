@@ -951,6 +951,147 @@
           }
         }
       ]
+    },
+    {
+      "family": "rule-intended-incomplete-statuses",
+      "schemeFixture": "schemes/responses-3.6.0-rules-intended-incomplete.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/intended-incomplete/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/intended-incomplete/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/01_outcome.json",
+      "schemeSha256": "0495ac3e36947f7b8b98c161dba5829b2d884dcc5310a59143db34118433220f",
+      "inputSha256": "ddbf24abdbfac78cf1a887f2e3337afd40d68ea63a1823768e5f695c1cafcdd6",
+      "outcomeSha256": "fa67f3a21e80a3b20b69baad7ba02caa74e02ba5646a8fdc1c73d84c227398ec",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-intended-incomplete-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/02_outcome.json",
+          "inputSha256": "d1ba22fcc9a3980781cc2f5b6c45889f319844c38fb94c772c65c5f467844f44",
+          "outcomeSha256": "e3edcac85d8aead0c7d7a5efa966898b72b7dbafea7229e7fadf2bd5ea5ffc8a",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/03_outcome.json",
+          "inputSha256": "63750e5c00a78b69f1228a153b0fb9d6d1a870a5ee1e7cfb2e5292444d3e5e71",
+          "outcomeSha256": "b473ef6dbe380916741ecbc1585b9866c7950be9c5e92010bfccedc67eb98eb1",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/04_outcome.json",
+          "inputSha256": "352678ebb588aa7f6c27b462418655b640892f2e3a4298266e813602ca070c20",
+          "outcomeSha256": "cc494f99f50d324d51c3b9170bc322c0b357abbd8244530c511ee3c4a23e7f98",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case04"
+          }
+        },
+        {
+          "caseId": "05",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case5-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case5-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/05_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/05_outcome.json",
+          "inputSha256": "7c2c31addfcc6d50155620844825e103ed4ed65c546b38c7c01d11aa02f445fa",
+          "outcomeSha256": "49bf60b1292f46f933aa76d8aec026ee4ef6100360649cc847952841f087b5d8",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case05"
+          }
+        },
+        {
+          "caseId": "06",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case6-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case6-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/06_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/06_outcome.json",
+          "inputSha256": "ba8983132fa61d5448ac19be0606c92b2d46c940c028bcdc2d1cf0a2278bfda3",
+          "outcomeSha256": "0e50ad9d92bde5e0f78a41f5d6f2cae3269631cd0df10464bea5f2855eed617d",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case06"
+          }
+        },
+        {
+          "caseId": "07",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case7-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case7-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/07_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/07_outcome.json",
+          "inputSha256": "d502d5f1e46b505067c365c1872171f554b9a7c9f442305a2a3395cecbeda1db",
+          "outcomeSha256": "59236746cde14b690cf6a68fecc14ba3a61e9412835bfe6ca86197e6aa6b2b28",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case07"
+          }
+        },
+        {
+          "caseId": "08",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case8-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case8-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/08_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/08_outcome.json",
+          "inputSha256": "22db018af6eff7bb7dd6ea95a3384f460217c78ec04dcb8e4d46b491b92ccc54",
+          "outcomeSha256": "ab448e08f3aaafa88a8af3b3561295c050a47f4dd71a457a51d21c67e10bcdfd",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case08"
+          }
+        },
+        {
+          "caseId": "09",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case9-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case9-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/09_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/09_outcome.json",
+          "inputSha256": "2f568e49514edf42b8b5ff5ec3bb7df5b1c1c17988c5db9183cef4d374deec93",
+          "outcomeSha256": "6cfbf115578513a9e42d6264ad6c19fa7aaa323213da5fdd69877f40a6b4b58c",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case09"
+          }
+        },
+        {
+          "caseId": "10",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case10-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case10-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/10_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/10_outcome.json",
+          "inputSha256": "c340c7c63425b32d6a94287cf661e853c90a1731aad9ee88baa1fde192006697",
+          "outcomeSha256": "d11c3692a769529babc7905896151b2e249d1b4d3a496a78f0c648dcc9a4ccd2",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case10"
+          }
+        },
+        {
+          "caseId": "11",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case11-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case11-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/11_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/11_outcome.json",
+          "inputSha256": "56cb87b3bb481917e4b46863f8d2135427c04cde1127be60e9d08a5706bd0244",
+          "outcomeSha256": "df0dec873ca6adeab3da97369758a4195b78a878e37ad053980d78d9763c2842",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case11"
+          }
+        }
+      ]
     }
   ],
   "bookletConfigPackages": [

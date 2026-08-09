@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 18);
+  assert.equal(corpus.codingSchemePackages.length, 19);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1358,7 +1358,12 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     ["rule-empty-values", "empty", 1],
     ["rule-zero-values", "zero", 1],
     ["rule-empty-array", "empty-array", 1],
-    ["rule-injected-variables", "injected-vars", 4]
+    ["rule-injected-variables", "injected-vars", 4],
+    [
+      "rule-intended-incomplete-statuses",
+      "intended-incomplete/case2",
+      11
+    ]
   ] as const;
   type RuleScheme = {
     version?: string;
@@ -1572,6 +1577,28 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       ["d1", "", "INVALID", -98, 0],
       ["d1", "", "CODING_ERROR", -97, 0]
     ]
+  );
+  assert.deepEqual(
+    outcomeTuples["rule-intended-incomplete-statuses"]?.map(outcome =>
+      outcome.map(variable => variable[2])
+    ),
+    [
+      ["INTENDED_INCOMPLETE", "CODING_INCOMPLETE", "DERIVE_PENDING"],
+      ["INTENDED_INCOMPLETE", "DERIVE_PENDING", "DERIVE_PENDING"],
+      ["INTENDED_INCOMPLETE", "UNSET", "UNSET"],
+      ["INTENDED_INCOMPLETE", "NOT_REACHED", "INVALID"],
+      ["INTENDED_INCOMPLETE", "DISPLAYED", "INVALID"],
+      ["INTENDED_INCOMPLETE", "PARTLY_DISPLAYED", "INVALID"],
+      ["INTENDED_INCOMPLETE", "DERIVE_ERROR", "DERIVE_ERROR"],
+      ["INTENDED_INCOMPLETE", "NO_CODING", "DERIVE_ERROR"],
+      ["INTENDED_INCOMPLETE", "INVALID", "INVALID"],
+      ["INTENDED_INCOMPLETE", "CODING_ERROR", "CODING_ERROR"],
+      ["INTENDED_INCOMPLETE", "INTENDED_INCOMPLETE", "CODING_COMPLETE"]
+    ]
+  );
+  assert.deepEqual(
+    outcomeTuples["rule-intended-incomplete-statuses"]?.[10]?.[2],
+    ["d1", 0, "CODING_COMPLETE", 0, 0]
   );
 });
 
