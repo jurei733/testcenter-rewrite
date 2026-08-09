@@ -15573,10 +15573,22 @@ const resolveAdaptiveVariables = (
   booklet: ContentReleaseBookletEntry,
   testRun: TestRun
 ): Map<string, Map<string, AdaptiveResponseVariable>> => {
-  const variablesByUnitKey = new Map<
-    string,
-    Map<string, AdaptiveResponseVariable>
-  >();
+  const trackedVariablesByUnitKey = collectAdaptiveVariableKeys(booklet);
+  const variablesByUnitKey = new Map(
+    [...trackedVariablesByUnitKey].map(([unitKey, variableKeys]) => [
+      unitKey,
+      new Map(
+        [...variableKeys].map(variableKey => [
+          variableKey,
+          {
+            id: variableKey,
+            status: "UNSET",
+            value: null
+          } satisfies AdaptiveResponseVariable
+        ])
+      )
+    ])
+  );
   for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
     const parsedResponse = parseVeronaUnitResponse(response);
     if (
@@ -15586,7 +15598,7 @@ const resolveAdaptiveVariables = (
     ) {
       continue;
     }
-    const variables = new Map<string, AdaptiveResponseVariable>();
+    const variables = variablesByUnitKey.get(unitKey) ?? new Map();
     for (const dataPart of Object.values(
       parsedResponse.unitState.dataParts ?? {}
     )) {
@@ -15621,7 +15633,6 @@ const resolveAdaptiveVariables = (
     variablesByUnitKey.set(unitKey, variables);
   }
 
-  const trackedVariablesByUnitKey = collectAdaptiveVariableKeys(booklet);
   for (const unitEntry of booklet.unitEntries) {
     const trackedVariableKeys = trackedVariablesByUnitKey.get(unitEntry.unitKey);
     if (!unitEntry.codingScheme || !trackedVariableKeys?.size) {

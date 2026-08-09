@@ -20986,8 +20986,10 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   });
   assert.equal(resume.status, 200);
   assert.equal(resume.body.testRun.currentUnitKey, "decision-unit");
+  // The original Testloader registers tracked variables as UNSET/null. Numeric
+  // Value comparisons convert that null to zero, so 0 > -1 selects advanced.
   assert.deepEqual(resume.body.testRun.bookletStates, {
-    level: "beginner",
+    level: "advanced",
     quality: "basic",
     numeric: "low"
   });
@@ -21003,22 +21005,22 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
 
   const initialState = await readState();
   assert.deepEqual(initialState.body.currentRunState.testRun.bookletStates, {
-    level: "beginner",
+    level: "advanced",
     quality: "basic",
     numeric: "low"
   });
   assert.deepEqual(
     initialState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
-    ["decision-unit", "beginner-unit", "finish-unit"]
+    ["decision-unit", "advanced-unit", "finish-unit"]
   );
   assert.deepEqual(
     initialState.body.currentRunState.adaptiveStates.map(state => [
       state.stateKey,
       state.optionKey
     ]),
-    [["level", "beginner"], ["quality", "basic"], ["numeric", "low"]]
+    [["level", "advanced"], ["quality", "basic"], ["numeric", "low"]]
   );
-  assert.equal(initialState.body.currentRunState.navigation.nextUnitKey, "beginner-unit");
+  assert.equal(initialState.body.currentRunState.navigation.nextUnitKey, "advanced-unit");
 
   const hiddenJump = await requestJson<{
     error: string;
@@ -21617,6 +21619,24 @@ test("original coding schemes derive adaptive variables server-side", async () =
               </Option>
               <Option id="pending" label="Before coding complete"/>
             </State>
+            <State id="initial-status" label="Initial response status">
+              <Option id="unset" label="Not answered">
+                <If><Status of="var1" from="decision-unit"/><Is equal="UNSET"/></If>
+              </Option>
+              <Option id="answered" label="Answered"/>
+            </State>
+            <State id="initial-value" label="Initial response value">
+              <Option id="null" label="No value">
+                <If><Value of="var1" from="decision-unit"/><Is equal="null"/></If>
+              </Option>
+              <Option id="answered" label="Has value"/>
+            </State>
+            <State id="initial-score" label="Initial score fallback">
+              <Option id="fallback" label="Fallback score">
+                <If><Score of="var1" from="decision-unit" or="17"/><Is equal="17"/></If>
+              </Option>
+              <Option id="scored" label="Coded score"/>
+            </State>
           </States>
           <Units>
             <Unit id="UNIT.DECISION" alias="decision-unit" label="Decision Unit"/>
@@ -21724,7 +21744,10 @@ test("original coding schemes derive adaptive variables server-side", async () =
   assert.deepEqual(resume.body.testRun.bookletStates, {
     route: "basic",
     "coding-status": "pending",
-    "coding-rank": "pending"
+    "coding-rank": "pending",
+    "initial-status": "unset",
+    "initial-value": "null",
+    "initial-score": "fallback"
   });
 
   const rawPlayerResponse = JSON.stringify({
@@ -21756,7 +21779,10 @@ test("original coding schemes derive adaptive variables server-side", async () =
   assert.deepEqual(saveResult.body.testRun.bookletStates, {
     route: "professional",
     "coding-status": "complete",
-    "coding-rank": "complete"
+    "coding-rank": "complete",
+    "initial-status": "answered",
+    "initial-value": "answered",
+    "initial-score": "scored"
   });
 
   const currentState = await requestJson<{
@@ -21807,6 +21833,45 @@ test("original coding schemes derive adaptive variables server-side", async () =
       options: [
         { optionKey: "complete", displayLabel: "Past coding errors" },
         { optionKey: "pending", displayLabel: "Before coding complete" }
+      ]
+    },
+    {
+      stateKey: "initial-status",
+      displayLabel: "Initial response status",
+      optionKey: "answered",
+      optionLabel: "Answered",
+      automaticOptionKey: "answered",
+      automaticOptionLabel: "Answered",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "unset", displayLabel: "Not answered" },
+        { optionKey: "answered", displayLabel: "Answered" }
+      ]
+    },
+    {
+      stateKey: "initial-value",
+      displayLabel: "Initial response value",
+      optionKey: "answered",
+      optionLabel: "Has value",
+      automaticOptionKey: "answered",
+      automaticOptionLabel: "Has value",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "null", displayLabel: "No value" },
+        { optionKey: "answered", displayLabel: "Has value" }
+      ]
+    },
+    {
+      stateKey: "initial-score",
+      displayLabel: "Initial score fallback",
+      optionKey: "scored",
+      optionLabel: "Coded score",
+      automaticOptionKey: "scored",
+      automaticOptionLabel: "Coded score",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "fallback", displayLabel: "Fallback score" },
+        { optionKey: "scored", displayLabel: "Coded score" }
       ]
     }
   ]);
