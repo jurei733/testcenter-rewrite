@@ -2058,6 +2058,36 @@ const normalizeOptionalSourceDocument = (
   return value.trim() === "" ? null : value;
 };
 
+const decodePercentEncodedDataUrlPayload = (payload: string): Buffer | null => {
+  const chunks: Buffer[] = [];
+  let literalStart = 0;
+  let cursor = 0;
+  while (cursor < payload.length) {
+    if (payload[cursor] !== "%") {
+      cursor += 1;
+      continue;
+    }
+    if (literalStart < cursor) {
+      chunks.push(Buffer.from(payload.slice(literalStart, cursor), "utf8"));
+    }
+    const encodedBytes: number[] = [];
+    while (payload[cursor] === "%") {
+      const hexByte = payload.slice(cursor + 1, cursor + 3);
+      if (!/^[0-9a-f]{2}$/i.test(hexByte)) {
+        return null;
+      }
+      encodedBytes.push(Number.parseInt(hexByte, 16));
+      cursor += 3;
+    }
+    chunks.push(Buffer.from(encodedBytes));
+    literalStart = cursor;
+  }
+  if (literalStart < payload.length) {
+    chunks.push(Buffer.from(payload.slice(literalStart), "utf8"));
+  }
+  return Buffer.concat(chunks);
+};
+
 const decodePersistedSourceDocument = (
   sourcePackage: SourcePackage
 ): { mediaType: string; bytes: Buffer } | null => {
@@ -2095,20 +2125,14 @@ const decodePersistedSourceDocument = (
     };
   }
 
-  try {
-    return {
-      mediaType,
-      bytes: Buffer.from(decodeURIComponent(payload), "utf8")
-    };
-  } catch {
-    return null;
-  }
+  const bytes = decodePercentEncodedDataUrlPayload(payload);
+  return bytes ? { mediaType, bytes } : null;
 };
 
 const stripTextByteOrderMark = (value: string): string =>
   value.startsWith("\uFEFF") ? value.slice(1) : value;
 
-const decodeSourceTextBytes = (bytes: Buffer): string => {
+const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
   if (
     bytes.length >= 3 &&
     bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
@@ -2145,33 +2169,36 @@ const decodeSourceTextBytes = (bytes: Buffer): string => {
     return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
   }
 
-  const declaredEncoding = bytes
-    .subarray(0, 1024)
-    .toString("latin1")
-    .match(/<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i)?.[1]
+  const declaredEncoding =
+    bytes
+      .subarray(0, 1024)
+      .toString("latin1")
+      .match(/<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i)
+      ?.[1] ?? mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
+  const normalizedEncoding = declaredEncoding
     ?.toLowerCase()
     .replace(/_/g, "-");
-  if (declaredEncoding) {
+  if (normalizedEncoding) {
     if (
       ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
-        declaredEncoding
+        normalizedEncoding
       )
     ) {
       return bytes.toString("latin1");
     }
     if (
-      ["windows-1252", "windows1252", "cp1252"].includes(declaredEncoding)
+      ["windows-1252", "windows1252", "cp1252"].includes(normalizedEncoding)
     ) {
       return new TextDecoder("windows-1252").decode(bytes);
     }
     if (
       ["utf-16", "utf-16le", "utf16", "utf16le"].includes(
-        declaredEncoding
+        normalizedEncoding
       )
     ) {
       return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
     }
-    if (["utf-16be", "utf16be"].includes(declaredEncoding)) {
+    if (["utf-16be", "utf16be"].includes(normalizedEncoding)) {
       return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
     }
   }
@@ -2193,7 +2220,9 @@ const readPersistedSourceText = (
     decodedDocument === undefined
       ? decodePersistedSourceDocument(sourcePackage)
       : decodedDocument;
-  return sourceBytes ? decodeSourceTextBytes(sourceBytes.bytes) : null;
+  return sourceBytes
+    ? decodeSourceTextBytes(sourceBytes.bytes, sourceBytes.mediaType)
+    : null;
 };
 
 const encodeUnicodeSourceTextForAssembly = (sourceDocument: string): Buffer =>

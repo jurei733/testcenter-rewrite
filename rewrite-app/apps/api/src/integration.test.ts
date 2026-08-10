@@ -12356,6 +12356,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const windows1252BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="Windows-1252"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preis \u0080</Label>");
+  const percentEncodedLatin1Booklet = Array.from(
+    Buffer.from(latin1BookletXml, "latin1"),
+    byte => `%${byte.toString(16).padStart(2, "0")}`
+  ).join("");
+  const charsetLatin1BookletXml = latin1BookletXml.replace(
+    /^<\?xml[^>]*>\s*/i,
+    ""
+  );
   for (const encodedCase of [
     {
       fileName: "utf-16le-original-booklet.xml",
@@ -12386,6 +12394,19 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "decoded-iso-8859-1-original-booklet.xml",
       sourceDocument: latin1BookletXml,
+      displayLabel: "Prüfung für München"
+    },
+    {
+      fileName: "percent-encoded-iso-8859-1-original-booklet.xml",
+      sourceDocument: `data:application/xml,${percentEncodedLatin1Booklet}`,
+      displayLabel: "Prüfung für München"
+    },
+    {
+      fileName: "charset-iso-8859-1-original-booklet.xml",
+      sourceDocument: `data:application/xml;charset=ISO-8859-1;base64,${Buffer.from(
+        charsetLatin1BookletXml,
+        "latin1"
+      ).toString("base64")}`,
       displayLabel: "Prüfung für München"
     }
   ]) {
