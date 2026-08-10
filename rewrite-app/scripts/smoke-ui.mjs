@@ -654,6 +654,33 @@ try {
         }
       });
     });
+  const waitForAppConfirmation = async (
+    expectedTitlePattern,
+    expectedMessagePattern
+  ) => {
+    const backdrop = page.locator("#globalConfirmationBackdrop");
+    await backdrop.waitFor({ timeout: 15_000 });
+    assert.match(
+      (await page.locator("#globalConfirmationTitle").textContent()) ?? "",
+      expectedTitlePattern
+    );
+    assert.match(
+      (await page.locator("#globalConfirmationMessage").textContent()) ?? "",
+      expectedMessagePattern
+    );
+    return backdrop;
+  };
+  const acceptAppConfirmation = async (
+    expectedTitlePattern,
+    expectedMessagePattern
+  ) => {
+    const backdrop = await waitForAppConfirmation(
+      expectedTitlePattern,
+      expectedMessagePattern
+    );
+    await page.locator("#globalConfirmationConfirmButton").click();
+    await backdrop.waitFor({ state: "detached" });
+  };
   const clickContentFilterApply = async () => {
     const requestCountBeforeClick = totalApiRequestCount;
     await clickAction("Apply Content Filters");
@@ -1535,7 +1562,8 @@ try {
   const revokeAdminSessionTargetId = await page
     .locator("#adminSessionRevokeTargetId")
     .inputValue();
-  const revokeAdminSessionDialog = acceptNextDialog(
+  const revokeAdminSessionDialog = acceptAppConfirmation(
+    /Revoke admin session\?/,
     new RegExp(`Revoke admin session '${revokeAdminSessionTargetId}'\\?`)
   );
   await clickAction("Revoke Selected Session");
@@ -2647,7 +2675,8 @@ try {
   await expectInputValue("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
   await expectButtonSelectorEnabled("#adminRevokeRoleButton");
   logStep("revoke-tenant-admin-role");
-  const revokeAdminRoleDialog = acceptNextDialog(
+  const revokeAdminRoleDialog = acceptAppConfirmation(
+    /Revoke role assignment\?/,
     new RegExp(
       `Revoke role assignment '${tenantRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
     )
@@ -2780,7 +2809,8 @@ try {
   await expectButtonSelectorDisabled("#adminRevokeRoleButton");
   await fillAndCommit("#adminPlatformRoleConfirmationPassword", adminPassword);
   await expectButtonSelectorEnabled("#adminRevokeRoleButton");
-  const revokePlatformRoleDialog = acceptNextDialog(
+  const revokePlatformRoleDialog = acceptAppConfirmation(
+    /Revoke role assignment\?/,
     new RegExp(
       `Revoke role assignment '${platformRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
     )
@@ -2839,7 +2869,64 @@ try {
   );
   await expectButtonSelectorEnabled("#adminResetPasswordButton");
   logStep("reset-workspace-admin-password");
-  const resetAdminPasswordDialog = acceptNextDialog(
+  const cancelledResetAdminPasswordDialog = waitForAppConfirmation(
+    /Reset account password\?/,
+    new RegExp(`Reset password for admin user '${workspaceAdminUserId}'\\?`)
+  );
+  const cancelledResetAdminPasswordRequest = page
+    .waitForRequest(
+      request =>
+        request.method() === "POST" &&
+        request.url().endsWith(
+          `/api/v1/admin/users/${workspaceAdminUserId}/password`
+        ),
+      { timeout: 750 }
+    )
+    .then(() => true)
+    .catch(() => false);
+  await page.locator("#adminResetPasswordButton").click();
+  const cancelledResetAdminPasswordBackdrop =
+    await cancelledResetAdminPasswordDialog;
+  assert.equal(
+    await page
+      .locator("#globalConfirmationCancelButton")
+      .evaluate(element => element === document.activeElement),
+    true,
+    "The safe confirmation action must receive initial focus."
+  );
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(
+    await page
+      .locator("#globalConfirmationConfirmButton")
+      .evaluate(element => element === document.activeElement),
+    true,
+    "Backward tab navigation must remain inside the confirmation dialog."
+  );
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await page
+      .locator("#globalConfirmationCancelButton")
+      .evaluate(element => element === document.activeElement),
+    true,
+    "Forward tab navigation must remain inside the confirmation dialog."
+  );
+  await page.keyboard.press("Escape");
+  await cancelledResetAdminPasswordBackdrop.waitFor({ state: "detached" });
+  await page.waitForFunction(
+    () => document.activeElement?.id === "adminResetPasswordButton"
+  );
+  assert.equal(
+    await cancelledResetAdminPasswordRequest,
+    false,
+    "Cancelling the confirmation must not submit the password reset."
+  );
+  await expectInputValue("#adminResetPassword", workspaceAdminResetPassword);
+  await expectInputValue(
+    "#adminResetPasswordConfirmation",
+    workspaceAdminResetPassword
+  );
+  const resetAdminPasswordDialog = acceptAppConfirmation(
+    /Reset account password\?/,
     new RegExp(`Reset password for admin user '${workspaceAdminUserId}'\\?`)
   );
   await clickAction("Reset Password");
@@ -3239,7 +3326,8 @@ try {
   );
   await expectButtonSelectorEnabled("#adminUpdateDisplayNameButton");
   logStep("admin-user-display-name");
-  const updateAdminDisplayNameDialog = acceptNextDialog(
+  const updateAdminDisplayNameDialog = acceptAppConfirmation(
+    /Change display name\?/,
     new RegExp(
       `Change admin user '.+' display name to '${delegatedWorkspaceAdminRenamedDisplayName}'\\?`
     )
@@ -3315,7 +3403,8 @@ try {
   await fillAndCommit("#adminAccessWindowValidForMinutes", "45");
   await expectButtonSelectorEnabled("#adminUpdateAccessWindowButton");
   logStep("admin-user-access-window");
-  const scheduleAdminAccessDialog = acceptNextDialog(
+  const scheduleAdminAccessDialog = acceptAppConfirmation(
+    /Update access window\?/,
     new RegExp(
       `Update admin user '${delegatedDisplayNameTargetUserId}' access window\\? Active sessions outside the new boundary will be ended\\.`
     )
@@ -3412,7 +3501,8 @@ try {
   await fillAndCommit("#adminAccessWindowValidTo", "");
   await fillAndCommit("#adminAccessWindowValidForMinutes", "");
   await expectButtonSelectorEnabled("#adminUpdateAccessWindowButton");
-  const clearAdminAccessDialog = acceptNextDialog(
+  const clearAdminAccessDialog = acceptAppConfirmation(
+    /Update access window\?/,
     new RegExp(
       `Update admin user '${delegatedDisplayNameTargetUserId}' access window\\? Active sessions outside the new boundary will be ended\\.`
     )
@@ -3459,7 +3549,8 @@ try {
   );
   await expectButtonSelectorEnabled("#adminUpdateCustomTextsButton");
   logStep("admin-user-custom-texts");
-  const updateAdminCustomTextsDialog = acceptNextDialog(
+  const updateAdminCustomTextsDialog = acceptAppConfirmation(
+    /Replace login-specific texts\?/,
     new RegExp(
       `Replace admin user '${delegatedDisplayNameTargetUserId}' login-specific custom texts with 2 entries\\?`
     )
@@ -3697,7 +3788,8 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#adminBatchRevokeSessionsButton");
   logStep("admin-session-bulk-revoke");
-  const revokeAdminSessionBatchDialog = acceptNextDialog(
+  const revokeAdminSessionBatchDialog = acceptAppConfirmation(
+    /Revoke selected sessions\?/,
     /Revoke 2 selected admin session\(s\)\? The current session is excluded and every target remains subject to the server delegation boundary\./
   );
   await page.locator("#adminBatchRevokeSessionsButton").click();
@@ -3766,7 +3858,8 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#adminBatchResetPasswordsButton");
   logStep("admin-user-bulk-password");
-  const resetAdminBatchPasswordDialog = acceptNextDialog(
+  const resetAdminBatchPasswordDialog = acceptAppConfirmation(
+    /Generate new account passwords\?/,
     /Generate and set a unique password for 2 selected admin user\(s\)\? Existing passwords will stop working immediately; active sessions are unchanged\./
   );
   await page.locator("#adminBatchResetPasswordsButton").click();
@@ -3877,7 +3970,8 @@ try {
     .filter({ hasText: "system_check" })
     .waitFor();
   logStep("admin-user-bulk-role");
-  const assignAdminBatchRoleDialog = acceptNextDialog(
+  const assignAdminBatchRoleDialog = acceptAppConfirmation(
+    /Assign role to selected accounts\?/,
     /Assign 'system_check' to 2 selected admin user\(s\)\? Each account remains subject to the server delegation boundary\./
   );
   await page.locator("#adminBatchAssignRoleButton").click();
@@ -3919,7 +4013,8 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#adminBatchStatusButton");
   logStep("admin-user-bulk-status");
-  const updateAdminBatchStatusDialog = acceptNextDialog(
+  const updateAdminBatchStatusDialog = acceptAppConfirmation(
+    /Change selected account status\?/,
     /Change 2 selected admin user\(s\) to 'disabled'\? Each account remains subject to the server delegation boundary\./
   );
   await page.locator("#adminBatchStatusButton").click();
@@ -4132,7 +4227,8 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#adminBatchDeleteButton");
   logStep("admin-user-bulk-delete");
-  const deleteAdminBatchDialog = acceptNextDialog(
+  const deleteAdminBatchDialog = acceptAppConfirmation(
+    /Permanently delete selected accounts\?/,
     /Permanently delete 2 selected admin user\(s\)\? Their sessions and role assignments will be removed; audit evidence will be retained\. This cannot be undone\./
   );
   await page.locator("#adminBatchDeleteButton").click();

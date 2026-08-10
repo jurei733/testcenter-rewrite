@@ -9,6 +9,7 @@ import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
+import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
 import { LiveContextComponent } from "./live-context.component";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -32,6 +33,7 @@ const routeViews: AppView[] = [
     RouterLinkActive,
     SummaryCardsComponent,
     ActivityFeedComponent,
+    ConfirmationDialogComponent,
     LiveContextComponent
   ],
   templateUrl: "./app.component.html",

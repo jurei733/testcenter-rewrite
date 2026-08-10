@@ -36,6 +36,7 @@ import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import {
   parseJsonDocument,
   readNumberValue,
@@ -142,6 +143,7 @@ export class OpsViewFacade {
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly confirmation = inject(ConfirmationDialogService);
   readonly applicationSettings = inject(ApplicationSettingsService);
 
   readonly ops = this.uiState.ops;
@@ -1068,17 +1070,20 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
-  confirmRevokeAdminSession(): void {
+  async confirmRevokeAdminSession(): Promise<void> {
     const adminSessionId = this.ops.adminSessionRevokeTargetId.trim();
     if (!this.canRevokeAdminSession || !adminSessionId) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Revoke admin session '${adminSessionId}'?`
-    );
-    if (confirmed) {
-      this.revokeAdminSession();
+    const confirmed = await this.confirmation.confirm({
+      title: "Revoke admin session?",
+      message: `Revoke admin session '${adminSessionId}'?`,
+      confirmLabel: "Revoke session"
+    });
+    if (!confirmed || !this.canRevokeAdminSession) {
+      return;
     }
+    this.revokeAdminSession();
   }
 
   private revokeAdminSession(): void {
@@ -1088,14 +1093,16 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.revokeAdminSession());
   }
 
-  confirmRevokeAdminSessionBatch(): void {
+  async confirmRevokeAdminSessionBatch(): Promise<void> {
     if (!this.canRevokeAdminSessionBatch) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Revoke ${this.adminSessionBatchCount} selected admin session(s)? The current session is excluded and every target remains subject to the server delegation boundary.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Revoke selected sessions?",
+      message: `Revoke ${this.adminSessionBatchCount} selected admin session(s)? The current session is excluded and every target remains subject to the server delegation boundary.`,
+      confirmLabel: "Revoke sessions"
+    });
+    if (!confirmed || !this.canRevokeAdminSessionBatch) {
       return;
     }
 
@@ -1184,18 +1191,21 @@ export class OpsViewFacade {
     });
   }
 
-  confirmRevokeAdminRole(): void {
+  async confirmRevokeAdminRole(): Promise<void> {
     const adminUserId = this.ops.adminRevokeTargetUserId.trim();
     const roleAssignmentId = this.ops.adminRevokeRoleAssignmentId.trim();
     if (!this.canRevokeAdminRole || !adminUserId || !roleAssignmentId) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Revoke role assignment '${roleAssignmentId}' from admin user '${adminUserId}'?`
-    );
-    if (confirmed) {
-      this.revokeAdminRole();
+    const confirmed = await this.confirmation.confirm({
+      title: "Revoke role assignment?",
+      message: `Revoke role assignment '${roleAssignmentId}' from admin user '${adminUserId}'?`,
+      confirmLabel: "Revoke role"
+    });
+    if (!confirmed || !this.canRevokeAdminRole) {
+      return;
     }
+    this.revokeAdminRole();
   }
 
   private revokeAdminRole(): void {
@@ -1214,18 +1224,22 @@ export class OpsViewFacade {
     });
   }
 
-  confirmUpdateAdminUserStatus(): void {
+  async confirmUpdateAdminUserStatus(): Promise<void> {
     const adminUserId = this.ops.adminStatusTargetUserId.trim();
     const status = this.ops.adminStatusValue;
     if (!this.canUpdateAdminUserStatus || !adminUserId) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Change admin user '${adminUserId}' status to '${status}'?`
-    );
-    if (confirmed) {
-      this.updateAdminUserStatus();
+    const confirmed = await this.confirmation.confirm({
+      title: "Change account status?",
+      message: `Change admin user '${adminUserId}' status to '${status}'?`,
+      confirmLabel: "Change status",
+      tone: status === "disabled" ? "danger" : "primary"
+    });
+    if (!confirmed || !this.canUpdateAdminUserStatus) {
+      return;
     }
+    this.updateAdminUserStatus();
   }
 
   private updateAdminUserStatus(): void {
@@ -1235,16 +1249,19 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.updateAdminUserStatus());
   }
 
-  confirmUpdateAdminUserDisplayName(): void {
+  async confirmUpdateAdminUserDisplayName(): Promise<void> {
     const adminUserId = this.adminDisplayNameTargetUserId.trim();
     const displayName = this.adminDisplayNameUpdateDraft.trim();
     if (!this.canUpdateAdminUserDisplayName || !adminUserId || !displayName) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Change admin user '${adminUserId}' display name to '${displayName}'?`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Change display name?",
+      message: `Change admin user '${adminUserId}' display name to '${displayName}'?`,
+      confirmLabel: "Change display name",
+      tone: "primary"
+    });
+    if (!confirmed || !this.canUpdateAdminUserDisplayName) {
       return;
     }
     this.viewState.onActionAsync(async () => {
@@ -1253,7 +1270,7 @@ export class OpsViewFacade {
     });
   }
 
-  confirmUpdateAdminUserAccessWindow(): void {
+  async confirmUpdateAdminUserAccessWindow(): Promise<void> {
     const adminUserId = this.adminAccessWindowTargetUserId.trim();
     if (!this.canUpdateAdminUserAccessWindow || !adminUserId) {
       return;
@@ -1265,10 +1282,12 @@ export class OpsViewFacade {
     const validForMinutes = String(
       this.adminAccessWindowValidForMinutesDraft ?? ""
     ).trim();
-    const confirmed = globalThis.window?.confirm(
-      `Update admin user '${adminUserId}' access window? Active sessions outside the new boundary will be ended.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Update access window?",
+      message: `Update admin user '${adminUserId}' access window? Active sessions outside the new boundary will be ended.`,
+      confirmLabel: "Update access window"
+    });
+    if (!confirmed || !this.canUpdateAdminUserAccessWindow) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -1281,17 +1300,20 @@ export class OpsViewFacade {
     );
   }
 
-  confirmUpdateAdminUserCustomTexts(): void {
+  async confirmUpdateAdminUserCustomTexts(): Promise<void> {
     const adminUserId = this.adminCustomTextsTargetUserId.trim();
     const customTexts = this.normalizedAdminCustomTextsUpdate;
     if (!this.canUpdateAdminUserCustomTexts || !adminUserId || !customTexts) {
       return;
     }
     const entryCount = Object.keys(customTexts).length;
-    const confirmed = globalThis.window?.confirm(
-      `Replace admin user '${adminUserId}' login-specific custom texts with ${entryCount} entr${entryCount === 1 ? "y" : "ies"}?`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Replace login-specific texts?",
+      message: `Replace admin user '${adminUserId}' login-specific custom texts with ${entryCount} entr${entryCount === 1 ? "y" : "ies"}?`,
+      confirmLabel: "Replace custom texts",
+      tone: "primary"
+    });
+    if (!confirmed || !this.canUpdateAdminUserCustomTexts) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -1299,15 +1321,18 @@ export class OpsViewFacade {
     );
   }
 
-  confirmUpdateAdminUserBatchStatus(): void {
+  async confirmUpdateAdminUserBatchStatus(): Promise<void> {
     if (!this.canUpdateAdminUserBatchStatus) {
       return;
     }
     const status = this.ops.adminStatusValue;
-    const confirmed = globalThis.window?.confirm(
-      `Change ${this.adminUserBatchCount} selected admin user(s) to '${status}'? Each account remains subject to the server delegation boundary.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Change selected account status?",
+      message: `Change ${this.adminUserBatchCount} selected admin user(s) to '${status}'? Each account remains subject to the server delegation boundary.`,
+      confirmLabel: "Change statuses",
+      tone: status === "disabled" ? "danger" : "primary"
+    });
+    if (!confirmed || !this.canUpdateAdminUserBatchStatus) {
       return;
     }
 
@@ -1327,15 +1352,17 @@ export class OpsViewFacade {
     });
   }
 
-  confirmAssignAdminUserBatchRole(): void {
+  async confirmAssignAdminUserBatchRole(): Promise<void> {
     if (!this.canAssignAdminUserBatchRole) {
       return;
     }
     const role = this.ops.adminRoleRole;
-    const confirmed = globalThis.window?.confirm(
-      `Assign '${role}' to ${this.adminUserBatchCount} selected admin user(s)? Each account remains subject to the server delegation boundary.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Assign role to selected accounts?",
+      message: `Assign '${role}' to ${this.adminUserBatchCount} selected admin user(s)? Each account remains subject to the server delegation boundary.`,
+      confirmLabel: "Assign role"
+    });
+    if (!confirmed || !this.canAssignAdminUserBatchRole) {
       return;
     }
 
@@ -1359,14 +1386,16 @@ export class OpsViewFacade {
     });
   }
 
-  confirmDeleteAdminUserBatch(): void {
+  async confirmDeleteAdminUserBatch(): Promise<void> {
     if (!this.canDeleteAdminUserBatch) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Permanently delete ${this.adminUserBatchCount} selected admin user(s)? Their sessions and role assignments will be removed; audit evidence will be retained. This cannot be undone.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Permanently delete selected accounts?",
+      message: `Permanently delete ${this.adminUserBatchCount} selected admin user(s)? Their sessions and role assignments will be removed; audit evidence will be retained. This cannot be undone.`,
+      confirmLabel: "Delete accounts"
+    });
+    if (!confirmed || !this.canDeleteAdminUserBatch) {
       return;
     }
 
@@ -1391,14 +1420,16 @@ export class OpsViewFacade {
     this.adminUserDeletionBatchResult = null;
   }
 
-  confirmResetAdminUserBatchPasswords(): void {
+  async confirmResetAdminUserBatchPasswords(): Promise<void> {
     if (!this.canResetAdminUserBatchPasswords) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Generate and set a unique password for ${this.adminUserBatchCount} selected admin user(s)? Existing passwords will stop working immediately; active sessions are unchanged.`
-    );
-    if (!confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Generate new account passwords?",
+      message: `Generate and set a unique password for ${this.adminUserBatchCount} selected admin user(s)? Existing passwords will stop working immediately; active sessions are unchanged.`,
+      confirmLabel: "Generate passwords"
+    });
+    if (!confirmed || !this.canResetAdminUserBatchPasswords) {
       return;
     }
 
@@ -1463,17 +1494,20 @@ export class OpsViewFacade {
       : null;
   }
 
-  confirmResetAdminUserPassword(): void {
+  async confirmResetAdminUserPassword(): Promise<void> {
     const adminUserId = this.ops.adminResetTargetUserId.trim();
     if (!this.canResetAdminUserPassword || !adminUserId) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Reset password for admin user '${adminUserId}'?`
-    );
-    if (confirmed) {
-      this.resetAdminUserPassword();
+    const confirmed = await this.confirmation.confirm({
+      title: "Reset account password?",
+      message: `Reset password for admin user '${adminUserId}'?`,
+      confirmLabel: "Reset password"
+    });
+    if (!confirmed || !this.canResetAdminUserPassword) {
+      return;
     }
+    this.resetAdminUserPassword();
   }
 
   private resetAdminUserPassword(): void {
@@ -1724,15 +1758,17 @@ export class OpsViewFacade {
     this.resetMonitorProfileDraft();
   }
 
-  handleMonitorProfileAction(item: RecordCollectionItem): void {
+  async handleMonitorProfileAction(item: RecordCollectionItem): Promise<void> {
     const profileId = item.actionPayload?.profileId;
     if (!profileId) {
       return;
     }
     if (item.actionPayload?.monitorProfileAction === "delete") {
-      const confirmed = globalThis.window?.confirm(
-        `Delete monitor profile '${profileId}' from this draft? The role is only changed after you create the account or update the role scope.`
-      );
+      const confirmed = await this.confirmation.confirm({
+        title: "Delete monitor profile from draft?",
+        message: `Delete monitor profile '${profileId}' from this draft? The role is only changed after you create the account or update the role scope.`,
+        confirmLabel: "Delete profile"
+      });
       if (!confirmed) {
         return;
       }
