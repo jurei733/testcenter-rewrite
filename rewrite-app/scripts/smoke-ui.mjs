@@ -11068,8 +11068,10 @@ try {
   const participantGroupKey = "group:student-ui";
   const groupMonitorUsername = "entry-group-monitor";
   const groupMonitorPassword = "ui-migrated-group-monitor-secret";
+  const groupMonitorFinalPassword = "ui-migrated-group-monitor-final-secret";
   const systemCheckUsername = "entry-system-check";
   const systemCheckPassword = "ui-migrated-system-check-secret";
+  const systemCheckFinalPassword = "ui-migrated-system-check-final-secret";
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -11279,6 +11281,31 @@ try {
       45 * 60_000
   );
   await waitForInputMinLength("#adminSessionToken", 20);
+  await page.locator("#requiredAdminPasswordChangeDialog").waitFor();
+  await fillAndCommit(
+    "#requiredAdminPassword",
+    groupMonitorFinalPassword
+  );
+  await fillAndCommit(
+    "#requiredAdminPasswordConfirmation",
+    groupMonitorFinalPassword
+  );
+  await expectButtonSelectorEnabled("#requiredAdminPasswordSubmitButton");
+  const groupMonitorPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#requiredAdminPasswordSubmitButton").click();
+  assert.equal((await groupMonitorPasswordChangeResponsePromise).status(), 200);
+  await page
+    .locator("#requiredAdminPasswordChangeDialog")
+    .waitFor({ state: "detached" });
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommit("#adminUsername", groupMonitorUsername);
+  await fillAndCommit("#adminPassword", groupMonitorFinalPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#monitorOperatorConsole").waitFor();
@@ -11350,6 +11377,31 @@ try {
   assert.equal(await page.locator("#loadSystemChecksButton").count(), 0);
   await fillAndCommit("#systemCheckUsername", systemCheckUsername);
   await fillAndCommit("#systemCheckPassword", systemCheckPassword);
+  await page.locator("#systemCheckSignInButton").click();
+  await page
+    .locator("#systemCheckSignedInUser")
+    .filter({ hasText: systemCheckUsername })
+    .waitFor();
+  await page.locator("#requiredAdminPasswordChangeDialog").waitFor();
+  await fillAndCommit("#requiredAdminPassword", systemCheckFinalPassword);
+  await fillAndCommit(
+    "#requiredAdminPasswordConfirmation",
+    systemCheckFinalPassword
+  );
+  await expectButtonSelectorEnabled("#requiredAdminPasswordSubmitButton");
+  const systemCheckPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#requiredAdminPasswordSubmitButton").click();
+  assert.equal((await systemCheckPasswordChangeResponsePromise).status(), 200);
+  await page
+    .locator("#requiredAdminPasswordChangeDialog")
+    .waitFor({ state: "detached" });
+  await page.locator("#systemCheckSignInButton").waitFor();
+  await fillAndCommit("#systemCheckUsername", systemCheckUsername);
+  await fillAndCommit("#systemCheckPassword", systemCheckFinalPassword);
   await page.locator("#systemCheckSignInButton").click();
   await page
     .locator("#systemCheckSignedInUser")
@@ -12535,7 +12587,7 @@ try {
   await clickAction("Sign Out");
   await expectInputValue("#adminSessionToken", "");
   await fillAndCommit("#adminUsername", groupMonitorUsername);
-  await fillAndCommit("#adminPassword", groupMonitorPassword);
+  await fillAndCommit("#adminPassword", groupMonitorFinalPassword);
   const groupMonitorSignInResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "POST" &&
@@ -13298,6 +13350,8 @@ try {
       payload.items.length === 1 &&
       payload.items[0]?.testRunId === pausedTestRunId
   );
+  await fillAndCommitUntilValue("#openRunLoginFilter", participantLoginKey);
+  await expectInputValue("#openRunLoginFilter", participantLoginKey);
   logStep("export-open-runs-csv");
   const openRunsDownloadPromise = page
     .waitForEvent("download", { timeout: 5_000 })
@@ -15072,9 +15126,10 @@ try {
         item =>
           item?.activityEvent?.actorId === "operator-ui" &&
           item.activityEvent.subjectId === pausedTestRunId &&
-          item.activityEvent.details?.commandType === "complete" &&
+          item.activityEvent.details?.commandType === "complete_and_lock" &&
           item.activityEvent.details?.previousStatus === "running" &&
           item.activityEvent.details?.nextStatus === "completed" &&
+          item.activityEvent.details?.locked === true &&
           item.activityEvent.details?.participantSessionId === participantSessionId &&
           item.activityEvent.details?.loginKey === participantLoginKey &&
           item.activityEvent.details?.groupKey === participantGroupKey &&

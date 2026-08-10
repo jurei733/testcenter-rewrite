@@ -1168,6 +1168,11 @@ export class ParticipantViewFacade {
     const unitIndex = currentState.bookletUnits.findIndex(
       unit => unit.unitKey === unitKey
     );
+    const playerEndPolicy = currentState.booklet.policy.navigation.playerEnd;
+    const playerEndAllowed =
+      playerEndPolicy === "always" ||
+      (playerEndPolicy === "last_unit" &&
+        currentState.navigation.nextUnitKey == null);
     return {
       playerKey: player.playerKey,
       playerHtml: player.html,
@@ -1188,7 +1193,7 @@ export class ParticipantViewFacade {
       unitCount: currentState.bookletUnits.length,
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
-      canComplete: this.player.canComplete,
+      canComplete: this.player.canComplete && playerEndAllowed,
       canNavigateUnits:
         currentState.testRun.status === "running" &&
         currentState.availableActions.includes("save_progress"),
