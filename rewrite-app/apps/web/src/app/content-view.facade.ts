@@ -38,6 +38,7 @@ import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class ContentViewFacade {
@@ -49,6 +50,7 @@ export class ContentViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
+  private readonly confirmation = inject(ConfirmationDialogService);
   private readonly router = inject(Router);
 
   readonly content = this.uiState.content;
@@ -2302,14 +2304,17 @@ export class ContentViewFacade {
     this.sourcePackageBatchDeletionReport = null;
   }
 
-  confirmDeleteSourcePackageBatch(): void {
+  async confirmDeleteSourcePackageBatch(): Promise<void> {
     if (!this.canDeleteSourcePackageBatch) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Delete ${this.deletionSourcePackages.size} selected workspace file(s) and their unused derivatives? Files that are still referenced will remain and be reported separately.`
-    );
-    if (!confirmed) {
+    const selectedCount = this.deletionSourcePackages.size;
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete selected workspace files?",
+      message: `Delete ${selectedCount} selected workspace file(s) and their unused derivatives? Files that are still referenced will remain and be reported separately.`,
+      confirmLabel: "Delete files"
+    });
+    if (!confirmed || !this.canDeleteSourcePackageBatch) {
       return;
     }
     const items = [...this.deletionSourcePackages].map(
@@ -2348,7 +2353,7 @@ export class ContentViewFacade {
     this.viewState.onActionAsync(() => this.contentService.createImportJob());
   }
 
-  confirmActivateContentRelease(): void {
+  async confirmActivateContentRelease(): Promise<void> {
     const releaseId = this.content.contentReleaseId.trim();
     if (!this.canActivateContentRelease) {
       return;
@@ -2357,10 +2362,12 @@ export class ContentViewFacade {
       this.activateContentRelease();
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Force activate release '${releaseId || "selected release"}' and supersede open participant runs?`
-    );
-    if (confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Force activate release?",
+      message: `Force activate release '${releaseId || "selected release"}' and supersede open participant runs?`,
+      confirmLabel: "Force activate"
+    });
+    if (confirmed && this.canActivateContentRelease) {
       this.activateContentRelease();
     }
   }
@@ -2429,14 +2436,18 @@ export class ContentViewFacade {
     );
   }
 
-  confirmReplaceSourcePackage(): void {
+  async confirmReplaceSourcePackage(): Promise<void> {
     if (!this.canReplaceSelectedSourcePackage) {
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Import '${this.content.sourceFileName.trim()}' as a new version? The prior package remains.`
-    );
-    if (confirmed) {
+    const sourceFileName = this.content.sourceFileName.trim();
+    const confirmed = await this.confirmation.confirm({
+      title: "Import a new package version?",
+      message: `Import '${sourceFileName}' as a new version? The prior package remains.`,
+      confirmLabel: "Import new version",
+      tone: "primary"
+    });
+    if (confirmed && this.canReplaceSelectedSourcePackage) {
       this.viewState.onActionAsync(() => this.contentService.replaceSourcePackage());
     }
   }
@@ -2452,12 +2463,17 @@ export class ContentViewFacade {
         return;
       }
       const fileName = readiness.deletionReadiness.sourcePackage.fileName;
-      const confirmation = globalThis.window?.prompt(
-        `Delete '${fileName}' and its unused derivatives? Type the exact file name.`,
-        ""
-      );
-      if (confirmation !== null && confirmation !== undefined) {
-        await this.contentService.deleteSourcePackage(confirmation);
+      const confirmed = await this.confirmation.confirm({
+        title: "Delete workspace file?",
+        message: `Delete '${fileName}' and its unused derivatives? This action cannot be undone.`,
+        confirmLabel: "Delete file",
+        verification: {
+          label: "Exact file name",
+          expectedValue: fileName
+        }
+      });
+      if (confirmed && this.canDeleteSelectedSourcePackage) {
+        await this.contentService.deleteSourcePackage(fileName);
       }
     });
   }

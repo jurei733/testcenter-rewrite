@@ -31,6 +31,26 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
         <span class="eyebrow">Confirm action</span>
         <h2 id="globalConfirmationTitle">{{ dialog.title }}</h2>
         <p id="globalConfirmationMessage">{{ dialog.message }}</p>
+        <label
+          *ngIf="dialog.verification as verification"
+          class="confirmation-verification"
+          for="globalConfirmationVerificationInput"
+        >
+          <span>{{ verification.label }}</span>
+          <input
+            #verificationInput
+            id="globalConfirmationVerificationInput"
+            type="text"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            [value]="verificationValue"
+            (input)="updateVerification($event)"
+          />
+          <small>
+            Type <code>{{ verification.expectedValue }}</code> to continue.
+          </small>
+        </label>
         <div class="actions">
           <button
             #cancelButton
@@ -45,6 +65,7 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
             type="button"
             [class.primary]="dialog.tone === 'primary'"
             [class.danger]="dialog.tone === 'danger'"
+            [disabled]="!canConfirm(dialog)"
             (click)="confirmation.resolve(true)"
           >{{ dialog.confirmLabel }}</button>
         </div>
@@ -82,6 +103,29 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
     .confirmation-dialog p {
       color: var(--muted);
       line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .confirmation-verification {
+      display: grid;
+      gap: 8px;
+      font-weight: 700;
+    }
+
+    .confirmation-verification input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .confirmation-verification small {
+      color: var(--muted);
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .confirmation-verification code {
+      color: var(--text);
+      overflow-wrap: anywhere;
     }
   `
 })
@@ -89,6 +133,11 @@ export class ConfirmationDialogComponent
   implements AfterViewChecked, OnDestroy
 {
   readonly confirmation = inject(ConfirmationDialogService);
+
+  verificationValue = "";
+
+  @ViewChild("verificationInput")
+  private verificationInput?: ElementRef<HTMLInputElement>;
 
   @ViewChild("cancelButton")
   private cancelButton?: ElementRef<HTMLButtonElement>;
@@ -108,7 +157,12 @@ export class ConfirmationDialogComponent
       return;
     }
     this.focusedRequestId = requestId;
-    this.cancelButton?.nativeElement.focus();
+    this.verificationValue = "";
+    if (this.confirmation.dialog()?.verification) {
+      this.verificationInput?.nativeElement.focus();
+    } else {
+      this.cancelButton?.nativeElement.focus();
+    }
   }
 
   ngOnDestroy(): void {
@@ -125,20 +179,41 @@ export class ConfirmationDialogComponent
       return;
     }
 
-    const cancelButton = this.cancelButton?.nativeElement;
-    const confirmButton = this.confirmButton?.nativeElement;
-    if (!cancelButton || !confirmButton) {
+    const focusableElements = [
+      this.verificationInput?.nativeElement,
+      this.cancelButton?.nativeElement,
+      this.confirmButton?.nativeElement
+    ].filter(
+      (element): element is HTMLInputElement | HTMLButtonElement =>
+        element !== undefined && !element.disabled
+    );
+    if (focusableElements.length === 0) {
       return;
     }
-    if (event.shiftKey && globalThis.document.activeElement === cancelButton) {
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements.at(-1);
+    if (event.shiftKey && globalThis.document.activeElement === firstElement) {
       event.preventDefault();
-      confirmButton.focus();
+      lastElement?.focus();
     } else if (
       !event.shiftKey &&
-      globalThis.document.activeElement === confirmButton
+      globalThis.document.activeElement === lastElement
     ) {
       event.preventDefault();
-      cancelButton.focus();
+      firstElement?.focus();
     }
+  }
+
+  updateVerification(event: Event): void {
+    this.verificationValue = (event.target as HTMLInputElement).value;
+  }
+
+  canConfirm(dialog: {
+    verification: { expectedValue: string } | null;
+  }): boolean {
+    return (
+      dialog.verification === null ||
+      this.verificationValue === dialog.verification.expectedValue
+    );
   }
 }

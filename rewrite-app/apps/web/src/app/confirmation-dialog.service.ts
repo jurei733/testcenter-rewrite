@@ -2,16 +2,28 @@ import { Injectable, signal } from "@angular/core";
 
 export type ConfirmationDialogTone = "primary" | "danger";
 
+export type ConfirmationDialogVerification = {
+  label: string;
+  expectedValue: string;
+};
+
 export type ConfirmationDialogRequest = {
   title: string;
   message: string;
   confirmLabel: string;
   cancelLabel?: string;
   tone?: ConfirmationDialogTone;
+  verification?: ConfirmationDialogVerification;
 };
 
-export type ActiveConfirmationDialog = Required<ConfirmationDialogRequest> & {
+export type ActiveConfirmationDialog = {
   requestId: number;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone: ConfirmationDialogTone;
+  verification: ConfirmationDialogVerification | null;
 };
 
 @Injectable({ providedIn: "root" })
@@ -37,7 +49,8 @@ export class ConfirmationDialogService {
         message: request.message,
         confirmLabel: request.confirmLabel,
         cancelLabel: request.cancelLabel ?? "Cancel",
-        tone: request.tone ?? "danger"
+        tone: request.tone ?? "danger",
+        verification: request.verification ?? null
       });
     });
   }

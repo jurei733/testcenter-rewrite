@@ -35,6 +35,7 @@ import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.s
 import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 type SystemCheckStep =
@@ -384,6 +385,7 @@ export class SystemCheckViewComponent implements OnInit {
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   tenantKey = this.uiState.workspace.tenantKey;
   workspaceKey = this.uiState.workspace.workspaceKey;
@@ -999,15 +1001,23 @@ export class SystemCheckViewComponent implements OnInit {
 
   async deleteOperatorReports(): Promise<void> {
     if (!this.hasAdminSession || this.selectedOperatorCheckIds.length === 0) return;
-    const confirmation = globalThis.window?.prompt(
-      `Delete all reports for ${this.selectedOperatorCheckIds.join(", ")}? Enter workspace key '${this.workspaceKey}' to confirm.`
-    );
-    if (confirmation == null) return;
+    const selectedCheckIds = [...this.selectedOperatorCheckIds];
+    const workspaceKey = this.workspaceKey.trim();
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete system-check reports?",
+      message: `Delete all reports for ${selectedCheckIds.join(", ")}? This cannot be undone.`,
+      confirmLabel: "Delete reports",
+      verification: {
+        label: "Exact workspace key",
+        expectedValue: workspaceKey
+      }
+    });
+    if (!confirmed || !this.hasAdminSession || selectedCheckIds.length === 0) return;
     await this.run(async () => {
       const { payload } = await this.api.send<DeleteSystemCheckReportsResponse>(
         "DELETE",
         this.workspaceRoute(productionApiRoutes.workspace.deleteSystemCheckReports),
-        { checkIds: this.selectedOperatorCheckIds, confirmation },
+        { checkIds: selectedCheckIds, confirmation: workspaceKey },
         this.adminHeaders
       );
       const deletedCount = payload.deletion.deletedCount;

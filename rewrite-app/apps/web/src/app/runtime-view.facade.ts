@@ -53,6 +53,7 @@ import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.ser
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import {
   buildParticipantEntryUrl,
   participantSessionLinkRows
@@ -192,6 +193,7 @@ export class RuntimeViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly confirmation = inject(ConfirmationDialogService);
   private readonly monitorBatchSelection = new Set<string>();
   private readonly monitorCustomFilters: MonitorCustomFilter[] = [];
   private monitorCustomFilterSequence = 0;
@@ -4040,15 +4042,17 @@ export class RuntimeViewFacade {
     );
   }
 
-  finishAllMonitorRuns(): void {
+  async finishAllMonitorRuns(): Promise<void> {
     if (!this.canFinishAllMonitorRuns) {
       return;
     }
-    if (
-      !globalThis.confirm(
-        "Testdurchführung Beenden\n\nAchtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung."
-      )
-    ) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Testdurchführung Beenden",
+      message:
+        "Achtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung.",
+      confirmLabel: "Tests beenden"
+    });
+    if (!confirmed || !this.canFinishAllMonitorRuns) {
       return;
     }
     this.clearAllMonitorFiltersForFinish();
@@ -4065,7 +4069,7 @@ export class RuntimeViewFacade {
     );
   }
 
-  issueMonitorGoto(): void {
+  async issueMonitorGoto(): Promise<void> {
     if (!this.canIssueMonitorGoto) {
       return;
     }
@@ -4073,11 +4077,17 @@ export class RuntimeViewFacade {
     const restoration = this.monitorGotoRestoration(
       this.selectedOpenMonitorRun ? [this.selectedOpenMonitorRun] : []
     );
-    if (
-      restoration &&
-      !globalThis.confirm(this.monitorGotoRestorationConfirmation(restoration))
-    ) {
-      return;
+    if (restoration) {
+      const confirmed = await this.confirmation.confirm({
+        title: this.monitorText(
+          "gm_control_goto_unlock_blocks_confirm_headline"
+        ),
+        message: this.monitorGotoRestorationMessage(restoration),
+        confirmLabel: this.monitorText("gm_control_goto")
+      });
+      if (!confirmed || !this.canIssueMonitorGoto) {
+        return;
+      }
     }
     this.clearMonitorUnitFilterBeforeGoto();
     this.viewState.onActionAsync(async () => {
@@ -4200,7 +4210,7 @@ export class RuntimeViewFacade {
     this.uiState.renderVersion.update(version => version + 1);
   }
 
-  issueMonitorBatchCommand(
+  async issueMonitorBatchCommand(
     commandType:
       | "pause"
       | "resume"
@@ -4212,7 +4222,7 @@ export class RuntimeViewFacade {
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time"
-  ): void {
+  ): Promise<void> {
     const testRunIds = this.monitorBatchRunIds;
     const openRuns =
       parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView)
@@ -4246,10 +4256,23 @@ export class RuntimeViewFacade {
           ? ` for unit ${this.runtime.monitorTargetUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
           : "";
     const commandConfirmation = `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`;
-    const confirmation = restoration
-      ? `${this.monitorGotoRestorationConfirmation(restoration)}\n\n${commandConfirmation}`
-      : commandConfirmation;
-    if (!globalThis.confirm(confirmation)) {
+    const confirmed = await this.confirmation.confirm({
+      title: restoration
+        ? this.monitorText("gm_control_goto_unlock_blocks_confirm_headline")
+        : "Issue monitor command?",
+      message: restoration
+        ? `${this.monitorGotoRestorationMessage(restoration)}\n\n${commandConfirmation}`
+        : commandConfirmation,
+      confirmLabel: "Issue command",
+      tone: commandType === "complete_and_lock" ? "danger" : "primary"
+    });
+    const canStillIssueCommand =
+      commandType === "goto"
+        ? this.canIssueMonitorBatchGoto
+        : commandType === "set_testlet_time"
+          ? this.canIssueMonitorBatchTime
+          : this.canIssueMonitorBatch;
+    if (!confirmed || !canStillIssueCommand) {
       return;
     }
     if (commandType === "goto") {
@@ -4469,16 +4492,18 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.updateReview());
   }
 
-  confirmDeleteReview(): void {
+  async confirmDeleteReview(): Promise<void> {
     const reviewId = this.runtime.reviewId.trim();
     if (!reviewId) {
       this.deleteReview();
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Delete review '${reviewId}' from this workspace?`
-    );
-    if (confirmed) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete review?",
+      message: `Delete review '${reviewId}' from this workspace?`,
+      confirmLabel: "Delete review"
+    });
+    if (confirmed && this.canUseSelectedReviewActions) {
       this.deleteReview();
     }
   }
@@ -4497,15 +4522,21 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.exportReviewsCsv());
   }
 
-  confirmDeleteGroupResults(): void {
+  async confirmDeleteGroupResults(): Promise<void> {
     const groupKey = this.runtime.groupKey.trim();
     if (!groupKey) {
       return;
     }
-    const confirmedGroupKey = globalThis.window?.prompt(
-      `Type '${groupKey}' to delete all collected test runs for this group.`
-    );
-    if (confirmedGroupKey === groupKey) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete group results?",
+      message: `Delete all collected test runs for group '${groupKey}'? This cannot be undone.`,
+      confirmLabel: "Delete results",
+      verification: {
+        label: "Exact group key",
+        expectedValue: groupKey
+      }
+    });
+    if (confirmed && this.canDeleteGroupResultsAction) {
       this.deleteGroupResults();
     }
   }
@@ -4606,22 +4637,29 @@ export class RuntimeViewFacade {
     );
   }
 
-  confirmDeleteSelectedGroupResults(): void {
+  async confirmDeleteSelectedGroupResults(): Promise<void> {
     if (!this.canUseSelectedResultGroups) {
       return;
     }
     const workspaceKey = this.workspace.workspaceKey.trim();
-    const confirmation = globalThis.window?.prompt(
-      `Type '${workspaceKey}' to delete all responses, reviews, and logs for ${this.selectedResultGroupCount} selected group(s).`
-    );
-    if (confirmation !== workspaceKey) {
+    const selectedCount = this.selectedResultGroupCount;
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete selected group results?",
+      message: `Delete all responses, reviews, and logs for ${selectedCount} selected group(s)? This cannot be undone.`,
+      confirmLabel: "Delete results",
+      verification: {
+        label: "Exact workspace key",
+        expectedValue: workspaceKey
+      }
+    });
+    if (!confirmed || !this.canUseSelectedResultGroups) {
       return;
     }
     const groupKeys = this.selectedResultGroupKeys;
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.deleteSelectedGroupResults(
         groupKeys,
-        confirmation
+        workspaceKey
       );
       this.resultGroupSelection.clear();
       this.uiState.renderVersion.update(version => version + 1);
@@ -5332,14 +5370,14 @@ export class RuntimeViewFacade {
     };
   }
 
-  private monitorGotoRestorationConfirmation(restoration: {
+  private monitorGotoRestorationMessage(restoration: {
     affectedCount: number;
     remainingSeconds: number;
   }): string {
     const restoredMinutes = this.formatMonitorMinutes(
       restoration.remainingSeconds / 60
     );
-    return `${this.monitorText("gm_control_goto_unlock_blocks_confirm_headline")}\n\n${this.monitorText("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
+    return `${this.monitorText("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
   }
 
   private clearMonitorUnitFilterBeforeGoto(): void {

@@ -42,6 +42,7 @@ import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.s
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class WorkspaceViewFacade {
@@ -52,6 +53,7 @@ export class WorkspaceViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   readonly workspace = this.uiState.workspace;
   workspaceDisplayNameDraft = "";
@@ -2384,21 +2386,26 @@ export class WorkspaceViewFacade {
     });
   }
 
-  confirmDeleteWorkspace(): void {
+  async confirmDeleteWorkspace(): Promise<void> {
     if (!this.canDeleteWorkspace) {
       return;
     }
     const tenantKey = this.workspace.tenantKey.trim();
     const workspaceKey = this.workspace.workspaceKey.trim();
-    const confirmation = globalThis.window?.prompt(
-      `Permanently delete '${tenantKey}/${workspaceKey}' and all content, sessions, results, reports, attachments, and scoped role assignments? Type the exact workspace key.`,
-      ""
-    );
-    if (confirmation !== workspaceKey) {
+    const confirmed = await this.confirmation.confirm({
+      title: "Permanently delete workspace?",
+      message: `Permanently delete '${tenantKey}/${workspaceKey}' and all content, sessions, results, reports, attachments, and scoped role assignments? This cannot be undone.`,
+      confirmLabel: "Delete workspace",
+      verification: {
+        label: "Exact workspace key",
+        expectedValue: workspaceKey
+      }
+    });
+    if (!confirmed || !this.canDeleteWorkspace) {
       return;
     }
     this.viewState.onActionAsync(async () => {
-      await this.workspaceService.deleteWorkspace(confirmation);
+      await this.workspaceService.deleteWorkspace(workspaceKey);
       this.workspace.workspaceKey = "";
       this.workspaceDisplayNameDraft = "";
       this.workspace.workspaceOverviewView = 'Use "Refresh Workspace Overview".';

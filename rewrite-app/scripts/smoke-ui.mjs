@@ -642,18 +642,6 @@ try {
       { timeout: 15_000 }
     );
   };
-  const acceptNextDialog = (expectedMessagePattern, promptText) =>
-    new Promise((resolvePromise, reject) => {
-      page.once("dialog", async dialog => {
-        try {
-          assert.match(dialog.message(), expectedMessagePattern);
-          await dialog.accept(promptText);
-          resolvePromise(undefined);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
   const waitForAppConfirmation = async (
     expectedTitlePattern,
     expectedMessagePattern
@@ -678,6 +666,23 @@ try {
       expectedTitlePattern,
       expectedMessagePattern
     );
+    await page.locator("#globalConfirmationConfirmButton").click();
+    await backdrop.waitFor({ state: "detached" });
+  };
+  const acceptVerifiedAppConfirmation = async (
+    expectedTitlePattern,
+    expectedMessagePattern,
+    verificationText
+  ) => {
+    const backdrop = await waitForAppConfirmation(
+      expectedTitlePattern,
+      expectedMessagePattern
+    );
+    const verificationInput = page.locator(
+      "#globalConfirmationVerificationInput"
+    );
+    await verificationInput.fill(verificationText);
+    await expectButtonSelectorEnabled("#globalConfirmationConfirmButton");
     await page.locator("#globalConfirmationConfirmButton").click();
     await backdrop.waitFor({ state: "detached" });
   };
@@ -2013,13 +2018,14 @@ try {
     await page
       .getByLabel("Select reports for SYSCHECK.SAMPLE", { exact: true })
       .check();
-    page.once("dialog", async dialog => {
-      assert.equal(dialog.type(), "prompt");
-      assert.match(dialog.message(), /Delete all reports for SYSCHECK\.SAMPLE/);
-      await dialog.accept(systemCheckWorkspaceKey);
-    });
     await expectButtonSelectorEnabled("#deleteSystemCheckReportsButton");
+    const deleteSampleReportsDialog = acceptVerifiedAppConfirmation(
+      /Delete system-check reports\?/,
+      /Delete all reports for SYSCHECK\.SAMPLE\? This cannot be undone\./,
+      systemCheckWorkspaceKey
+    );
     await page.locator("#deleteSystemCheckReportsButton").click();
+    await deleteSampleReportsDialog;
     await page
       .locator("#systemCheckReportOperatorStatus")
       .filter({ hasText: "2 report(s) deleted." })
@@ -2112,13 +2118,14 @@ try {
     await page
       .getByLabel("Select reports for syscheck-2", { exact: true })
       .check();
-    page.once("dialog", async dialog => {
-      assert.equal(dialog.type(), "prompt");
-      assert.match(dialog.message(), /Delete all reports for syscheck-2/);
-      await dialog.accept(systemCheckWorkspaceKey);
-    });
     await expectButtonSelectorEnabled("#deleteSystemCheckReportsButton");
+    const deleteSecondCheckReportsDialog = acceptVerifiedAppConfirmation(
+      /Delete system-check reports\?/,
+      /Delete all reports for syscheck-2\? This cannot be undone\./,
+      systemCheckWorkspaceKey
+    );
     await page.locator("#deleteSystemCheckReportsButton").click();
+    await deleteSecondCheckReportsDialog;
     await page
       .locator("#systemCheckReportOperatorStatus")
       .filter({ hasText: "2 report(s) deleted." })
@@ -2302,9 +2309,50 @@ try {
       disposableWorkspaceKey
     );
     await expectButtonSelectorEnabled("#deleteWorkspaceButton");
-    const deleteDialog = acceptNextDialog(
+    await page.locator("#deleteWorkspaceButton").click();
+    const cancelledDeleteWorkspaceBackdrop = await waitForAppConfirmation(
+      /Permanently delete workspace\?/,
       new RegExp(
-        `Permanently delete '${tenantKey}/${disposableWorkspaceKey}'.+Type the exact workspace key\\.`
+        `Permanently delete '${tenantKey}/${disposableWorkspaceKey}'.+This cannot be undone\\.`
+      )
+    );
+    const workspaceVerificationInput = page.locator(
+      "#globalConfirmationVerificationInput"
+    );
+    assert.equal(
+      await workspaceVerificationInput.evaluate(
+        element => element === document.activeElement
+      ),
+      true,
+      "Exact-text confirmations must focus the verification field."
+    );
+    await workspaceVerificationInput.fill(`${disposableWorkspaceKey}-wrong`);
+    await expectButtonSelectorDisabled("#globalConfirmationConfirmButton");
+    const cancelledWorkspaceDeleteRequest = page
+      .waitForRequest(
+        request =>
+          request.method() === "DELETE" &&
+          request.url().endsWith(
+            `/tenants/${tenantKey}/workspaces/${disposableWorkspaceKey}`
+          ),
+        { timeout: 750 }
+      )
+      .then(() => true)
+      .catch(() => false);
+    await page.keyboard.press("Escape");
+    await cancelledDeleteWorkspaceBackdrop.waitFor({ state: "detached" });
+    await page.waitForFunction(
+      () => document.activeElement?.id === "deleteWorkspaceButton"
+    );
+    assert.equal(
+      await cancelledWorkspaceDeleteRequest,
+      false,
+      "Cancelling an exact-text confirmation must not delete the workspace."
+    );
+    const deleteDialog = acceptVerifiedAppConfirmation(
+      /Permanently delete workspace\?/,
+      new RegExp(
+        `Permanently delete '${tenantKey}/${disposableWorkspaceKey}'.+This cannot be undone\\.`
       ),
       disposableWorkspaceKey
     );
@@ -4565,11 +4613,13 @@ try {
     .filter({ hasText: "Deletion is safe" })
     .filter({ hasText: "0 import(s), 0 unused release(s)" })
     .waitFor({ timeout: 15_000 });
-  page.once("dialog", async dialog => {
-    assert.equal(dialog.type(), "prompt");
-    await dialog.accept(uploadedZipSourceFileName);
-  });
+  const deleteUploadedZipDialog = acceptVerifiedAppConfirmation(
+    /Delete workspace file\?/,
+    new RegExp(`Delete '${uploadedZipSourceFileName}'.+cannot be undone\\.`),
+    uploadedZipSourceFileName
+  );
   await page.locator("#deleteSourcePackageButton").click();
+  await deleteUploadedZipDialog;
   await expectInputValue("#sourcePackageId", "");
 
   logStep("replace-and-delete-source-package");
@@ -4601,11 +4651,14 @@ try {
     .locator("#sourceDocumentFile")
     .setInputFiles(lifecycleReplacementPath);
   await expectButtonSelectorEnabled("#replaceSourcePackageButton");
-  page.once("dialog", async dialog => {
-    assert.equal(dialog.type(), "confirm");
-    await dialog.accept();
-  });
+  const replaceSourcePackageDialog = acceptAppConfirmation(
+    /Import a new package version\?/,
+    new RegExp(
+      `Import '${lifecycleReplacementFileName}' as a new version\\? The prior package remains\\.`
+    )
+  );
   await page.locator("#replaceSourcePackageButton").click();
+  await replaceSourcePackageDialog;
   await page.waitForFunction(
     oldSourcePackageId => {
       const sourcePackageId = document.querySelector("#sourcePackageId");
@@ -4636,18 +4689,22 @@ try {
     .filter({ hasText: lifecycleReplacementFileName })
     .filter({ hasText: "1 import(s), 1 unused release(s)" })
     .waitFor({ timeout: 15_000 });
-  page.once("dialog", async dialog => {
-    assert.equal(dialog.type(), "prompt");
-    await dialog.accept(lifecycleReplacementFileName);
-  });
+  const deleteReplacementSourcePackageDialog = acceptVerifiedAppConfirmation(
+    /Delete workspace file\?/,
+    new RegExp(`Delete '${lifecycleReplacementFileName}'.+cannot be undone\\.`),
+    lifecycleReplacementFileName
+  );
   await page.locator("#deleteSourcePackageButton").click();
+  await deleteReplacementSourcePackageDialog;
   await expectInputValue("#sourcePackageId", "");
   await fillAndCommit("#sourcePackageId", lifecycleOldSourcePackageId);
-  page.once("dialog", async dialog => {
-    assert.equal(dialog.type(), "prompt");
-    await dialog.accept(lifecycleOldFileName);
-  });
+  const deleteOldSourcePackageDialog = acceptVerifiedAppConfirmation(
+    /Delete workspace file\?/,
+    new RegExp(`Delete '${lifecycleOldFileName}'.+cannot be undone\\.`),
+    lifecycleOldFileName
+  );
   await page.locator("#deleteSourcePackageButton").click();
+  await deleteOldSourcePackageDialog;
   await expectInputValue("#sourcePackageId", "");
   await fillAndCommit("#sourcePackageId", "");
   await fillAndCommit("#importJobId", "");
@@ -4837,7 +4894,8 @@ try {
     .filter({ hasText: "2 file(s) selected" })
     .waitFor();
   await expectButtonSelectorEnabled("#deleteSourcePackageBatchButton");
-  const deleteSourcePackageBatchDialog = acceptNextDialog(
+  const deleteSourcePackageBatchDialog = acceptAppConfirmation(
+    /Delete selected workspace files\?/,
     /Delete 2 selected workspace file\(s\) and their unused derivatives\? Files that are still referenced will remain and be reported separately\./
   );
   await page.locator("#deleteSourcePackageBatchButton").click();
@@ -5394,11 +5452,19 @@ try {
           item?.comment === "Updated whole-test review comment"
       )
   );
-  page.once("dialog", dialog => dialog.accept());
   await page
     .locator(`.participant-review-item[data-review-id="${participantReviewId}"]`)
     .getByRole("button", { name: "Delete" })
     .click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Delete comment?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({ hasText: "Delete this participant comment permanently?" })
+    .waitFor();
+  await page.locator("#participantConfirmationContinueButton").click();
   await page.locator("#participantRouteReviewEmpty").waitFor({ timeout: 15_000 });
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/test-runs/${participantReviewRunId}/reviews`,
@@ -12333,16 +12399,17 @@ try {
     .filter({ hasText: "1 selected run" })
     .filter({ hasText: pausedTestRunId })
     .waitFor();
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /pause.*1 selected run/i);
-    await dialog.accept();
-  });
+  const bulkPauseDialog = acceptAppConfirmation(
+    /Issue monitor command\?/,
+    /pause.*1 selected run/i
+  );
   const bulkPauseResponsePromise = page.waitForResponse(
     response =>
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
   await page.locator("#monitorBatchPauseButton").click();
+  await bulkPauseDialog;
   const bulkPauseResponse = await bulkPauseResponsePromise;
   assert.equal(bulkPauseResponse.status(), 200);
   const bulkPausePayload = await bulkPauseResponse.json();
@@ -12356,16 +12423,17 @@ try {
   await openRunStudentCard
     .getByRole("button", { name: "Add to Batch" })
     .click();
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /lock_test.*1 selected run/i);
-    await dialog.accept();
-  });
+  const bulkLockDialog = acceptAppConfirmation(
+    /Issue monitor command\?/,
+    /lock_test.*1 selected run/i
+  );
   const bulkLockResponsePromise = page.waitForResponse(
     response =>
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
   await page.locator("#monitorBatchLockTestButton").click();
+  await bulkLockDialog;
   const bulkLockResponse = await bulkLockResponsePromise;
   assert.equal(bulkLockResponse.status(), 200);
   assert.equal((await bulkLockResponse.json()).commands[0]?.testRun?.locked, true);
@@ -12378,16 +12446,17 @@ try {
   await openRunStudentCard
     .getByRole("button", { name: "Add to Batch" })
     .click();
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /unlock_test.*1 selected run/i);
-    await dialog.accept();
-  });
+  const bulkUnlockDialog = acceptAppConfirmation(
+    /Issue monitor command\?/,
+    /unlock_test.*1 selected run/i
+  );
   const bulkUnlockResponsePromise = page.waitForResponse(
     response =>
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
   await page.locator("#monitorBatchUnlockTestButton").click();
+  await bulkUnlockDialog;
   const bulkUnlockResponse = await bulkUnlockResponsePromise;
   assert.equal(bulkUnlockResponse.status(), 200);
   assert.equal((await bulkUnlockResponse.json()).commands[0]?.testRun?.locked, false);
@@ -12404,16 +12473,17 @@ try {
     .filter({ hasText: "1 selected run" })
     .filter({ hasText: pausedTestRunId })
     .waitFor();
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /resume.*1 selected run/i);
-    await dialog.accept();
-  });
+  const bulkResumeDialog = acceptAppConfirmation(
+    /Issue monitor command\?/,
+    /resume.*1 selected run/i
+  );
   const bulkResumeResponsePromise = page.waitForResponse(
     response =>
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
   await page.locator("#monitorBatchResumeButton").click();
+  await bulkResumeDialog;
   const bulkResumeResponse = await bulkResumeResponsePromise;
   assert.equal(bulkResumeResponse.status(), 200);
   const bulkResumePayload = await bulkResumeResponse.json();
@@ -12699,12 +12769,12 @@ try {
       })
     });
   });
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /Testdurchführung Beenden/);
-    assert.match(dialog.message(), /sämtliche Tests dieser Sitzung/);
-    await dialog.accept();
-  });
+  const finishAllDialog = acceptAppConfirmation(
+    /Testdurchführung Beenden/,
+    /sämtliche Tests dieser Sitzung/
+  );
   await page.locator("#monitorConsoleCompleteButton").click();
+  await finishAllDialog;
   await waitForNotBusy("group-monitor-finish-all-command");
   assert.deepEqual(finishAllRequestBody, {
     scope: "all_unlocked_open_runs",
@@ -13066,8 +13136,9 @@ try {
     .filter({ hasText: "UI Timer Closed" })
     .waitFor();
   await fillAndCommit("#monitorConsoleTimeSeconds", "120");
-  const acceptTimedGotoRestoration = acceptNextDialog(
-    /UI Reopen Timed Section[\s\S]*UI Restore time before jumping\.[\s\S]*UI Timer 2 minutes/
+  const acceptTimedGotoRestoration = acceptAppConfirmation(
+    /UI Reopen Timed Section/,
+    /UI Restore time before jumping\.[\s\S]*UI Timer 2 minutes/
   );
   const nextBlockGotoResponsePromise = page.waitForResponse(
     response =>
@@ -15017,7 +15088,8 @@ try {
   await fillAndCommit("#contentReleaseId", retriedContentReleaseId);
   await page.locator("#forceActivation").check({ force: true });
   await page.locator("#forceActivation").dispatchEvent("change");
-  const forceActivationDialog = acceptNextDialog(
+  const forceActivationDialog = acceptAppConfirmation(
+    /Force activate release\?/,
     new RegExp(
       `Force activate release '${retriedContentReleaseId}' and supersede open participant runs\\?`
     )
@@ -15382,18 +15454,11 @@ try {
     ]);
     assert.match(download.suggestedFilename(), filenamePattern);
   }
-  const deleteGroupResultsDialog = new Promise((resolvePromise, reject) => {
-    page.once("dialog", async dialog => {
-      try {
-        assert.match(dialog.message(), /1 selected group/);
-        assert.match(dialog.message(), new RegExp(workspaceKey));
-        await dialog.accept(workspaceKey);
-        resolvePromise(undefined);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
+  const deleteGroupResultsDialog = acceptVerifiedAppConfirmation(
+    /Delete selected group results\?/,
+    /Delete all responses, reviews, and logs for 1 selected group\(s\)\? This cannot be undone\./,
+    workspaceKey
+  );
   await page.locator("#deleteSelectedGroupResultsButton").click();
   await deleteGroupResultsDialog;
   await pollJsonWithPredicate(

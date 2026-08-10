@@ -1639,14 +1639,17 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() => this.saveReviewInternal());
   }
 
-  deleteReview(review: WorkspaceReview): void {
+  async deleteReview(review: WorkspaceReview): Promise<void> {
     if (!this.player.canReview) {
       return;
     }
-    const accepted = globalThis.confirm?.(
-      "Delete this participant comment permanently?"
-    );
-    if (accepted === false) {
+    const accepted = await this.requestConfirmation({
+      title: "Delete comment?",
+      message: "Delete this participant comment permanently?",
+      cancelLabel: "Keep comment",
+      confirmLabel: "Delete comment"
+    });
+    if (!accepted || !this.player.canReview) {
       return;
     }
     this.viewState.onActionAsync(() =>
