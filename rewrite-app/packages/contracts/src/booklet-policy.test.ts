@@ -4,8 +4,18 @@ import test from "node:test";
 import {
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
+  isBookletPlayerEndAllowed,
   readBookletConfigValues
 } from "./booklet-policy.js";
+
+test("player-end policy is evaluated consistently for current unit position", () => {
+  assert.equal(isBookletPlayerEndAllowed("never", false), false);
+  assert.equal(isBookletPlayerEndAllowed("never", true), false);
+  assert.equal(isBookletPlayerEndAllowed("last_unit", false), false);
+  assert.equal(isBookletPlayerEndAllowed("last_unit", true), true);
+  assert.equal(isBookletPlayerEndAllowed("always", false), true);
+  assert.equal(isBookletPlayerEndAllowed("always", true), true);
+});
 
 test("booklet policy compiler maps original Testcenter config and defaults", () => {
   const defaults = compileBookletRuntimePolicy({});

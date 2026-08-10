@@ -28,6 +28,7 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import {
   type ParticipantCustomTextKey,
+  isBookletPlayerEndAllowed,
   mergeParticipantCustomTextScopes,
   parseVeronaUnitResponse,
   projectTestcenterLoadEnvironment,
@@ -1168,11 +1169,10 @@ export class ParticipantViewFacade {
     const unitIndex = currentState.bookletUnits.findIndex(
       unit => unit.unitKey === unitKey
     );
-    const playerEndPolicy = currentState.booklet.policy.navigation.playerEnd;
-    const playerEndAllowed =
-      playerEndPolicy === "always" ||
-      (playerEndPolicy === "last_unit" &&
-        currentState.navigation.nextUnitKey == null);
+    const playerEndAllowed = isBookletPlayerEndAllowed(
+      currentState.booklet.policy.navigation.playerEnd,
+      unitIndex >= 0 && unitIndex === currentState.bookletUnits.length - 1
+    );
     return {
       playerKey: player.playerKey,
       playerHtml: player.html,

@@ -19,6 +19,7 @@ import {
   adminPasswordPolicy,
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
+  isBookletPlayerEndAllowed,
   isSupportedVeronaPlayerApiVersion,
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText,
@@ -18064,8 +18065,7 @@ const resolveBookletNavigationState = (
       !isLeavingForbiddenTimedTestlet(booklet, testRun, null));
   const canPlayerEnd =
     canComplete &&
-    (policy.navigation.playerEnd === "always" ||
-      (policy.navigation.playerEnd === "last_unit" && isLastUnit));
+    isBookletPlayerEndAllowed(policy.navigation.playerEnd, isLastUnit);
 
   return {
     previousUnitKey,

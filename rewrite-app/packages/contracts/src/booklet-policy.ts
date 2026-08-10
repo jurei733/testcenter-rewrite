@@ -113,6 +113,12 @@ const compilePlayerEnd = (value: string): BookletPlayerEndPolicy => {
   }
 };
 
+export const isBookletPlayerEndAllowed = (
+  policy: BookletPlayerEndPolicy,
+  isLastUnit: boolean
+): boolean =>
+  policy === "always" || (policy === "last_unit" && isLastUnit);
+
 const compileLegacyUnitNavigation = (value: string): {
   controls: BookletUnitNavigationControls;
   label: BookletUnitNavigationLabel;
