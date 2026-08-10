@@ -694,6 +694,37 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </div>
         </div>
       </article>
+      <section
+        *ngIf="view.confirmationDialog() as confirmation"
+        id="participantConfirmationBackdrop"
+        class="participant-confirmation-backdrop"
+      >
+        <article
+          class="participant-confirmation-dialog"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="participantConfirmationTitle"
+          aria-describedby="participantConfirmationMessage"
+        >
+          <h2 id="participantConfirmationTitle">{{ confirmation.title }}</h2>
+          <p id="participantConfirmationMessage">{{ confirmation.message }}</p>
+          <div class="actions">
+            <button
+              id="participantConfirmationStayButton"
+              class="secondary"
+              type="button"
+              autofocus
+              (click)="view.resolveConfirmation(false)"
+            >{{ confirmation.cancelLabel }}</button>
+            <button
+              id="participantConfirmationContinueButton"
+              class="ghost"
+              type="button"
+              (click)="view.resolveConfirmation(true)"
+            >{{ confirmation.confirmLabel }}</button>
+          </div>
+        </article>
+      </section>
     </div>
   `
 })

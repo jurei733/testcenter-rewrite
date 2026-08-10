@@ -235,6 +235,13 @@ type SettledVeronaResponse = Pick<
   "testRunId" | "unitKey" | "response"
 >;
 
+type ParticipantConfirmationDialog = {
+  title: string;
+  message: string;
+  cancelLabel: string;
+  confirmLabel: string;
+};
+
 const VERONA_FOREGROUND_STATE_GRACE_MS = 200;
 
 @Injectable({ providedIn: "root" })
@@ -348,6 +355,10 @@ export class ParticipantViewFacade {
     title: string;
     message: string;
   } | null>(null);
+  readonly confirmationDialog = signal<ParticipantConfirmationDialog | null>(
+    null
+  );
+  private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
@@ -415,6 +426,7 @@ export class ParticipantViewFacade {
     this.queuePendingVeronaSaveForBackgroundDelivery();
     this.clearVeronaSaveBuffer();
     this.clearNavigationAdvisory();
+    this.resolveConfirmation(false);
   }
 
   persistState(): void {
@@ -1974,46 +1986,15 @@ export class ParticipantViewFacade {
     if (!player.canComplete) {
       return;
     }
-
-    const confirmTestletTimeLeave =
-      player.testletTimer?.leave === "confirm";
-    if (
-      confirmTestletTimeLeave &&
-      !globalThis.window?.confirm(
-        this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
-        )
-      )
-    ) {
-      return;
-    }
-    const confirmTestletLeaveLock =
-      player.leaveLock?.confirm === true;
-    if (
-      confirmTestletLeaveLock &&
-      !globalThis.window?.confirm(
-        this.leaveLockConfirmationText(player.leaveLock)
-      )
-    ) {
-      return;
-    }
-    if (
-      !player.isComplete &&
-      player.completionReadinessState !== "ready" &&
-      !globalThis.window?.confirm(
-        `Complete this test with ${player.completionReadinessLabel.toLowerCase()}?`
-      )
-    ) {
-      return;
-    }
     this.presentNavigationAdvisory("forward");
-    this.viewState.onActionAsync(() =>
-      this.completeRunInternal(
-        confirmTestletTimeLeave,
-        confirmTestletLeaveLock
-      )
-    );
+    this.viewState.onActionAsync(() => this.completeRunWithConfirmation());
+  }
+
+  resolveConfirmation(confirmed: boolean): void {
+    const resolve = this.confirmationResolver;
+    this.confirmationResolver = null;
+    this.confirmationDialog.set(null);
+    resolve?.(confirmed);
   }
 
   clearSession(): void {
@@ -2058,6 +2039,74 @@ export class ParticipantViewFacade {
           "booklet_warningLeaveTextPrompt-testlet",
           `${leaveLock.detail} Continue?`
         );
+  }
+
+  private leaveLockConfirmationTitle(
+    leaveLock: ParticipantPlayerState["leaveLock"]
+  ): string {
+    return leaveLock?.scope === "unit"
+      ? this.customText("booklet_warningLeaveTitle-unit", "Leave task?")
+      : this.customText("booklet_warningLeaveTitle-testlet", "Leave section?");
+  }
+
+  private requestConfirmation(
+    dialog: ParticipantConfirmationDialog
+  ): Promise<boolean> {
+    this.resolveConfirmation(false);
+    this.confirmationDialog.set(dialog);
+    return new Promise(resolve => {
+      this.confirmationResolver = resolve;
+    });
+  }
+
+  private async completeRunWithConfirmation(): Promise<void> {
+    const player = this.player;
+    const confirmTestletTimeLeave = player.testletTimer?.leave === "confirm";
+    if (
+      confirmTestletTimeLeave &&
+      !(await this.requestConfirmation({
+        title: this.customText(
+          "booklet_warningLeaveTimerBlockTitle",
+          "Leave timed block?"
+        ),
+        message: this.customText(
+          "booklet_warningLeaveTimerBlockTextPrompt",
+          `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
+        ),
+        cancelLabel: "Stay here",
+        confirmLabel: "Leave anyway"
+      }))
+    ) {
+      return;
+    }
+    const confirmTestletLeaveLock = player.leaveLock?.confirm === true;
+    if (
+      confirmTestletLeaveLock &&
+      !(await this.requestConfirmation({
+        title: this.leaveLockConfirmationTitle(player.leaveLock),
+        message: this.leaveLockConfirmationText(player.leaveLock),
+        cancelLabel: "Stay here",
+        confirmLabel: "Leave anyway"
+      }))
+    ) {
+      return;
+    }
+    if (
+      !player.isComplete &&
+      player.completionReadinessState !== "ready" &&
+      !(await this.requestConfirmation({
+        title: "Complete test?",
+        message: `Complete this test with ${player.completionReadinessLabel.toLowerCase()}?`,
+        cancelLabel: "Continue working",
+        confirmLabel: "Complete test"
+      }))
+    ) {
+      return;
+    }
+    await this.completeRunInternal(
+      confirmTestletTimeLeave,
+      confirmTestletLeaveLock
+    );
   }
 
   async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
@@ -2587,12 +2636,18 @@ export class ParticipantViewFacade {
         leavesActiveTimedBlock && activeTimer.leave === "confirm";
       if (
         confirmTestletTimeLeave &&
-        !globalThis.window?.confirm(
-          this.customText(
+        !(await this.requestConfirmation({
+          title: this.customText(
+            "booklet_warningLeaveTimerBlockTitle",
+            "Leave timed block?"
+          ),
+          message: this.customText(
             "booklet_warningLeaveTimerBlockTextPrompt",
             `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
-          )
-        )
+          ),
+          cancelLabel: "Stay here",
+          confirmLabel: "Leave anyway"
+        }))
       ) {
         return;
       }
@@ -2605,9 +2660,12 @@ export class ParticipantViewFacade {
         leavesLockScope && activeLeaveLock?.confirm === true;
       if (
         confirmTestletLeaveLock &&
-        !globalThis.window?.confirm(
-          this.leaveLockConfirmationText(activeLeaveLock)
-        )
+        !(await this.requestConfirmation({
+          title: this.leaveLockConfirmationTitle(activeLeaveLock),
+          message: this.leaveLockConfirmationText(activeLeaveLock),
+          cancelLabel: "Stay here",
+          confirmLabel: "Leave anyway"
+        }))
       ) {
         return;
       }
@@ -2796,15 +2854,25 @@ export class ParticipantViewFacade {
         }
       : this.optimisticVeronaResponse;
     this.clearVeronaSaveBuffer();
-    const activeSave = this.veronaSaveDrainPromise;
-    if (activeSave) {
-      await activeSave;
-    }
-    if (this.pendingVeronaSave) {
-      this.scheduleVeronaSaveDrain(0);
-      const forcedSave = this.veronaSaveDrainPromise;
-      if (forcedSave) {
-        await forcedSave;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const activeSave = this.veronaSaveDrainPromise;
+      if (activeSave) {
+        await activeSave;
+      }
+      if (this.pendingVeronaSave) {
+        this.scheduleVeronaSaveDrain(0);
+        const forcedSave = this.veronaSaveDrainPromise;
+        if (forcedSave) {
+          await forcedSave;
+        }
+      }
+      if (!this.pendingVeronaSave) {
+        return unsettledResponse;
+      }
+      if (attempt < 2) {
+        await new Promise<void>(resolve => {
+          globalThis.setTimeout(resolve, 50);
+        });
       }
     }
     if (this.pendingVeronaSave) {

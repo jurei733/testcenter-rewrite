@@ -6347,7 +6347,12 @@ try {
             groupKey: "group:verona-smoke",
             bookletKey: veronaBookletKey,
             displayName: "Verona Simulation Participant",
-            executionMode: "run-simulation"
+            executionMode: "run-simulation",
+            customTexts: {
+              "booklet_warningLeaveTitle-unit": "Leave simulation task?",
+              "booklet_warningLeaveTextPrompt-unit":
+                "This simulation task will close after leaving."
+            }
           }
         ]
       }
@@ -7245,18 +7250,13 @@ try {
   );
   const advisoryVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await advisoryVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(1_500);
   await page
     .locator("#participantRouteExecutionMode")
     .filter({ hasText: "run-trial" })
     .waitFor();
   await expectButtonSelectorEnabled("#participantRouteCompleteButton");
-  const acceptAdvisoryCompletionDialog = dialog => dialog.accept();
-  page.on("dialog", acceptAdvisoryCompletionDialog);
-  try {
-    await page.locator("#participantRouteCompleteButton").click();
-  } finally {
-    page.off("dialog", acceptAdvisoryCompletionDialog);
-  }
+  await page.locator("#participantRouteCompleteButton").click();
   await page
     .locator("#participantRouteNavigationNoticeTitle")
     .filter({ hasText: "Test mode: navigation remains available" })
@@ -7266,6 +7266,16 @@ try {
     .filter({ hasText: "In an enforced test, this action would be blocked." })
     .filter({ hasText: "Complete the required response" })
     .waitFor();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave task?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({ hasText: "cannot be opened again" })
+    .waitFor();
+  await page.waitForTimeout(250);
+  await page.locator("#participantConfirmationContinueButton").click();
   await page
     .locator("#participantRouteStatus")
     .filter({ hasText: "completed" })
@@ -7372,8 +7382,32 @@ try {
     .locator("#playerAnswer")
     .fill(ephemeralSimulationAnswer);
   await expectButtonSelectorEnabled("#participantRouteCompleteButton");
-  page.once("dialog", dialog => dialog.accept());
   await page.locator("#participantRouteCompleteButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave simulation task?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({ hasText: "This simulation task will close after leaving." })
+    .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page.locator("#participantConfirmationBackdrop").waitFor({
+    state: "detached"
+  });
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "running" })
+    .waitFor();
+  await page.locator("#participantRouteCompleteButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave simulation task?" })
+    .waitFor();
+  await page.waitForTimeout(250);
+  await page.locator("#participantConfirmationContinueButton").click();
+  logStep("participant-custom-leave-confirmation");
+  stopAfter("participant-custom-leave-confirmation");
   await page
     .locator("#participantRouteStatus")
     .filter({ hasText: "completed" })

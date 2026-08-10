@@ -640,6 +640,7 @@ npm run smoke:ui:content
 npm run smoke:ui:json-roster
 npm run smoke:ui:participant-entry
 npm run smoke:ui:participant-code
+npm run smoke:ui:participant-confirmation
 npm run smoke:ui:activation-roster-warnings
 npm run smoke:ui:review-readiness
 npm run smoke:ui:monitor-review
@@ -677,6 +678,8 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - diagnostics and config reads
 
 The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment, and STARS 0.6.19 choice-interaction Players, and the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph. It gates type-faithful API-2 and API-6 response restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice.
+
+The named `smoke:ui:participant-confirmation` slice gates the Participant Player's labelled in-app leave confirmation against a Trial default prompt and an imported Simulation override. It verifies the safe cancel path, explicit destructive continuation, and completion after the Player's latest response has settled.
 
 The STARS corpus pins the byte-exact metadata-2.0/API-6 Player from a fixed official Testbed commit and a radio-button definition from the matching 0.6.19 source tag. Its production SQLite/Chromium gate imports and launches the unmodified assets, persists the `iqb-standard@1.1` JSON-string `responses` data part, and restores the selected option after a new Participant navigation.
 
