@@ -3047,6 +3047,33 @@ try {
   );
   await clickAction("Sign In");
   await waitForInputMinLength("#adminSessionToken", 20);
+  await page.locator("#operatorAccountSummary").click();
+  assert.equal(
+    (await page.locator("#operatorAccountUsername").textContent())?.trim(),
+    workspaceAdminUsername
+  );
+  assert.equal(
+    (await page.locator("#operatorAccountDisplayName").textContent())?.trim(),
+    "UI Workspace Admin"
+  );
+  assert.match(
+    (await page.locator("#operatorAccountAccessLabel").textContent()) ?? "",
+    /administrator/i
+  );
+  assert.match(
+    (await page.locator(".operator-account-role").allTextContents()).join(" "),
+    /workspace administrator/i
+  );
+  assert.notEqual(
+    (await page.locator("#operatorAccountSessionExpiresAt").textContent())?.trim(),
+    "unknown"
+  );
+  assert.notEqual(
+    (await page.locator("#operatorAccountVersion").textContent())?.trim(),
+    ""
+  );
+  await page.locator("#operatorAccountSummary").click();
+  logStep("admin-account-panel");
   const globalSignOutResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "POST" &&

@@ -157,8 +157,76 @@
   font-weight: 700;
 }
 
-.account-security-link {
+.operator-account-menu {
+  position: relative;
   margin-left: auto;
+}
+
+.operator-account-menu > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.operator-account-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.operator-account-menu[open] > summary {
+  background: var(--ink);
+  color: white;
+}
+
+.operator-account-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(420px, calc(100vw - 40px));
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 20px 54px rgba(8, 22, 25, 0.24);
+}
+
+.operator-account-panel h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+
+.operator-account-panel dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.operator-account-panel dl > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.35fr) minmax(0, 1fr);
+  gap: 4px 12px;
+}
+
+.operator-account-panel dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.operator-account-panel dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.operator-account-scope {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.account-security-link {
   cursor: pointer;
   font: inherit;
 }

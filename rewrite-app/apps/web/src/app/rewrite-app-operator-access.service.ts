@@ -13,27 +13,56 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 type OperatorSessionView = {
   adminUser?: {
     customTexts?: Record<string, string>;
+    displayName?: string;
     passwordChangeRequired?: boolean;
+    username?: string;
+  };
+  adminSession?: {
+    expiresAt?: string;
   };
   roleAssignments?: PublicAdminRoleAssignment[];
+};
+
+export type OperatorAccountAccessItem = {
+  role: string;
+  scope: string;
 };
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppOperatorAccessService {
   private readonly uiState = inject(RewriteAppUiStateService);
 
-  get roleAssignments(): PublicAdminRoleAssignment[] {
-    const session = parseJsonDocument<OperatorSessionView>(
+  private get session(): OperatorSessionView | null {
+    return parseJsonDocument<OperatorSessionView>(
       this.uiState.ops.adminSessionView
     );
-    return session?.roleAssignments ?? [];
+  }
+
+  get roleAssignments(): PublicAdminRoleAssignment[] {
+    return this.session?.roleAssignments ?? [];
   }
 
   get customTexts(): Record<string, string> {
-    const session = parseJsonDocument<OperatorSessionView>(
-      this.uiState.ops.adminSessionView
-    );
-    return session?.adminUser?.customTexts ?? {};
+    return this.session?.adminUser?.customTexts ?? {};
+  }
+
+  get username(): string {
+    return this.session?.adminUser?.username?.trim() || "Operator";
+  }
+
+  get displayName(): string {
+    return this.session?.adminUser?.displayName?.trim() || this.username;
+  }
+
+  get sessionExpiresAt(): string {
+    return this.session?.adminSession?.expiresAt?.trim() || "unknown";
+  }
+
+  get accountAccessItems(): OperatorAccountAccessItem[] {
+    return this.roleAssignments.map(assignment => ({
+      role: this.formatRole(assignment),
+      scope: this.formatScope(assignment)
+    }));
   }
 
   get mode(): OperatorAccessMode | "signed_out" {
@@ -65,10 +94,7 @@ export class RewriteAppOperatorAccessService {
     if (!this.uiState.ops.adminSessionToken.trim()) {
       return false;
     }
-    const session = parseJsonDocument<OperatorSessionView>(
-      this.uiState.ops.adminSessionView
-    );
-    return session?.adminUser?.passwordChangeRequired === true;
+    return this.session?.adminUser?.passwordChangeRequired === true;
   }
 
   get canReadWorkspaceDirectory(): boolean {
@@ -136,5 +162,41 @@ export class RewriteAppOperatorAccessService {
       default:
         return "Signed out";
     }
+  }
+
+  private formatRole(assignment: PublicAdminRoleAssignment): string {
+    switch (assignment.role) {
+      case "platform_admin":
+        return "Platform administrator";
+      case "tenant_admin":
+        return "Tenant administrator";
+      case "workspace_admin":
+        return assignment.accessMode === "read_only"
+          ? "Workspace administrator (read-only)"
+          : "Workspace administrator";
+      case "study_monitor":
+        return "Study monitor";
+      case "group_monitor":
+        return "Group monitor";
+      case "system_check":
+        return "System check";
+    }
+  }
+
+  private formatScope(assignment: PublicAdminRoleAssignment): string {
+    if (assignment.role === "platform_admin") {
+      return "All tenants and workspaces";
+    }
+    const parts: string[] = [];
+    if (assignment.tenantId) {
+      parts.push(`Tenant ${assignment.tenantId}`);
+    }
+    if (assignment.workspaceId) {
+      parts.push(`Workspace ${assignment.workspaceId}`);
+    }
+    if (assignment.groupKey) {
+      parts.push(`Group ${assignment.groupKey}`);
+    }
+    return parts.join(" · ") || "Unscoped";
   }
 }

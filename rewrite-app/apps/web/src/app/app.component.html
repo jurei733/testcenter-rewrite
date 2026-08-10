@@ -351,6 +351,50 @@
       >
         {{ view.label }}
       </a>
+      <details
+        id="operatorAccountMenu"
+        class="operator-account-menu"
+        *ngIf="app.hasAdminSession"
+      >
+        <summary
+          id="operatorAccountSummary"
+          class="nav-link"
+          aria-label="Open operator account information"
+        >Account · {{ app.operatorAccountUsername }}</summary>
+        <section class="operator-account-panel" aria-label="Operator account information">
+          <h2>User information</h2>
+          <dl>
+            <div>
+              <dt>Username</dt>
+              <dd id="operatorAccountUsername">{{ app.operatorAccountUsername }}</dd>
+            </div>
+            <div>
+              <dt>Display name</dt>
+              <dd id="operatorAccountDisplayName">{{ app.operatorAccountDisplayName }}</dd>
+            </div>
+            <div>
+              <dt>Access</dt>
+              <dd id="operatorAccountAccessLabel">{{ app.operatorAccessLabel }}</dd>
+            </div>
+            <div
+              class="operator-account-permission"
+              *ngFor="let access of app.operatorAccountAccessItems"
+            >
+              <dt>Permission</dt>
+              <dd class="operator-account-role">{{ access.role }}</dd>
+              <dd class="operator-account-scope">{{ access.scope }}</dd>
+            </div>
+            <div>
+              <dt>Session expires</dt>
+              <dd id="operatorAccountSessionExpiresAt">{{ app.operatorAccountSessionExpiresAt }}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd id="operatorAccountVersion">{{ app.ops.buildRef }}</dd>
+            </div>
+          </dl>
+        </section>
+      </details>
       <button
         id="ownAdminPasswordOpenButton"
         class="nav-link account-security-link"

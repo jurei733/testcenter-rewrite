@@ -107,6 +107,22 @@ export class AppShellFacade {
     return this.operatorAccess.label;
   }
 
+  get operatorAccountUsername(): string {
+    return this.operatorAccess.username;
+  }
+
+  get operatorAccountDisplayName(): string {
+    return this.operatorAccess.displayName;
+  }
+
+  get operatorAccountSessionExpiresAt(): string {
+    return this.operatorAccess.sessionExpiresAt;
+  }
+
+  get operatorAccountAccessItems() {
+    return this.operatorAccess.accountAccessItems;
+  }
+
   get activeView(): AppView {
     return this.uiState.activeView;
   }
