@@ -37,7 +37,7 @@ type ZipFixtureEntry = {
   usesUtf8FileName?: boolean;
   unicodePathExtra?: string;
   unicodePathChecksum?: number;
-  content: string;
+  content: string | Buffer;
   compressionMethod?: ZipCompressionMethod;
   compressedContent?: Buffer;
   uncompressedSize?: number;
@@ -84,7 +84,9 @@ const createZipBase64 = (
     const compressionMethod =
       entry.compressionMethod ?? options.compressionMethod ?? 0;
     const fileName = entry.fileNameBytes ?? Buffer.from(entry.fileName, "utf8");
-    const uncompressedContent = Buffer.from(entry.content, "utf8");
+    const uncompressedContent = Buffer.isBuffer(entry.content)
+      ? entry.content
+      : Buffer.from(entry.content, "utf8");
     const content =
       entry.compressedContent ??
       (compressionMethod === 8
@@ -12337,6 +12339,102 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, corpus.booklets[0].fixture),
     "utf8"
   );
+  const utf16BookletXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="UTF-16"'
+  );
+  const utf16BigEndianBookletBytes = Buffer.from(
+    utf16BookletXml,
+    "utf16le"
+  ).swap16();
+  const latin1BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-1"')
+    .replace(
+      "<Label>Sample booklet</Label>",
+      "<Label>Prüfung für München</Label>"
+    );
+  const windows1252BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="Windows-1252"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Preis \u0080</Label>");
+  for (const encodedCase of [
+    {
+      fileName: "utf-16le-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from(utf16BookletXml, "utf16le")
+      ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "utf-16be-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0xfe, 0xff]),
+        utf16BigEndianBookletBytes
+      ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "iso-8859-1-original-booklet.xml",
+      bytes: Buffer.from(latin1BookletXml, "latin1"),
+      displayLabel: "Prüfung für München"
+    },
+    {
+      fileName: "windows-1252-original-booklet.xml",
+      bytes: Buffer.from(windows1252BookletXml, "latin1"),
+      displayLabel: "Preis €"
+    },
+    {
+      fileName: "decoded-iso-8859-1-original-booklet.xml",
+      sourceDocument: latin1BookletXml,
+      displayLabel: "Prüfung für München"
+    }
+  ]) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      encodedCase.fileName
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: encodedCase.fileName,
+        mediaType: "application/xml",
+        sourceDocument:
+          "sourceDocument" in encodedCase
+            ? encodedCase.sourceDocument
+            : `data:application/xml;base64,${encodedCase.bytes.toString("base64")}`
+      }
+    });
+    assert.equal(sourcePackage.status, 201, encodedCase.fileName);
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{ bookletKey: string; displayLabel: string }>;
+        };
+      } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201, encodedCase.fileName);
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${encodedCase.fileName}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(
+      importResult.body.importJob.diagnostics,
+      [],
+      encodedCase.fileName
+    );
+    assert.equal(
+      importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]
+        ?.displayLabel,
+      encodedCase.displayLabel,
+      encodedCase.fileName
+    );
+  }
   for (const malformedCase of [
     {
       fileName: "malformed-original-booklet.xml",
@@ -20058,7 +20156,7 @@ test("source document import sniffs manifest text from package media types", asy
   );
 });
 
-test("source document import extracts IMS manifest from base64 ZIP packages", async () => {
+test("source document import extracts encoded IMS manifest from base64 ZIP packages", async () => {
   const tenantKey = "integration-tenant-zip-manifest";
   const workspaceKey = "integration-workspace-zip-manifest";
 
@@ -20078,24 +20176,29 @@ test("source document import extracts IMS manifest from base64 ZIP packages", as
     },
     {
       fileName: "export/imsmanifest.xml",
-      content: `
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
-          <organizations default="ORG-ZIP">
-            <organization identifier="ORG-ZIP">
-              <item identifierref="RES-ZIP-BOOKLET">
-                <title>ZIP Booklet</title>
-                <item identifierref="RES-ZIP-UNIT">
-                  <title>ZIP Unit</title>
+      content: Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from(
+          `<?xml version="1.0" encoding="UTF-16"?>
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <organizations default="ORG-ZIP">
+              <organization identifier="ORG-ZIP">
+                <item identifierref="RES-ZIP-BOOKLET">
+                  <title>ZIP Booklet</title>
+                  <item identifierref="RES-ZIP-UNIT">
+                    <title>ZIP Unit</title>
+                  </item>
                 </item>
-              </item>
-            </organization>
-          </organizations>
-          <resources>
-            <resource identifier="RES-ZIP-BOOKLET" href="booklets/zip-booklet.xml" />
-            <resource identifier="RES-ZIP-UNIT" href="items/zip-unit.xml" />
-          </resources>
-        </manifest>
-      `
+              </organization>
+            </organizations>
+            <resources>
+              <resource identifier="RES-ZIP-BOOKLET" href="booklets/zip-booklet.xml" />
+              <resource identifier="RES-ZIP-UNIT" href="items/zip-unit.xml" />
+            </resources>
+          </manifest>`,
+          "utf16le"
+        )
+      ])
     }
   ]);
 

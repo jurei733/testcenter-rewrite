@@ -5,6 +5,7 @@ import {
   scryptSync,
   timingSafeEqual
 } from "node:crypto";
+import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import { DOMParser } from "@xmldom/xmldom";
@@ -2104,6 +2105,106 @@ const decodePersistedSourceDocument = (
   }
 };
 
+const stripTextByteOrderMark = (value: string): string =>
+  value.startsWith("\uFEFF") ? value.slice(1) : value;
+
+const decodeSourceTextBytes = (bytes: Buffer): string => {
+  if (
+    bytes.length >= 3 &&
+    bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
+  ) {
+    return bytes.subarray(3).toString("utf8");
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return stripTextByteOrderMark(
+      new TextDecoder("utf-16le").decode(bytes.subarray(2))
+    );
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return stripTextByteOrderMark(
+      new TextDecoder("utf-16be").decode(bytes.subarray(2))
+    );
+  }
+
+  const startsAsUtf16LittleEndian =
+    bytes.length >= 4 &&
+    bytes[0] === 0x3c &&
+    bytes[1] === 0x00 &&
+    bytes[2] !== 0x00 &&
+    bytes[3] === 0x00;
+  if (startsAsUtf16LittleEndian) {
+    return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
+  }
+  const startsAsUtf16BigEndian =
+    bytes.length >= 4 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x3c &&
+    bytes[2] === 0x00 &&
+    bytes[3] !== 0x00;
+  if (startsAsUtf16BigEndian) {
+    return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
+  }
+
+  const declaredEncoding = bytes
+    .subarray(0, 1024)
+    .toString("latin1")
+    .match(/<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i)?.[1]
+    ?.toLowerCase()
+    .replace(/_/g, "-");
+  if (declaredEncoding) {
+    if (
+      ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
+        declaredEncoding
+      )
+    ) {
+      return bytes.toString("latin1");
+    }
+    if (
+      ["windows-1252", "windows1252", "cp1252"].includes(declaredEncoding)
+    ) {
+      return new TextDecoder("windows-1252").decode(bytes);
+    }
+    if (
+      ["utf-16", "utf-16le", "utf16", "utf16le"].includes(
+        declaredEncoding
+      )
+    ) {
+      return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
+    }
+    if (["utf-16be", "utf16be"].includes(declaredEncoding)) {
+      return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
+    }
+  }
+
+  return stripTextByteOrderMark(bytes.toString("utf8"));
+};
+
+const readPersistedSourceText = (
+  sourcePackage: SourcePackage,
+  decodedDocument?: { mediaType: string; bytes: Buffer } | null
+): string | null => {
+  if (sourcePackage.sourceDocument === null) {
+    return null;
+  }
+  if (!/^data:/i.test(sourcePackage.sourceDocument)) {
+    return sourcePackage.sourceDocument;
+  }
+  const sourceBytes =
+    decodedDocument === undefined
+      ? decodePersistedSourceDocument(sourcePackage)
+      : decodedDocument;
+  return sourceBytes ? decodeSourceTextBytes(sourceBytes.bytes) : null;
+};
+
+const encodeUnicodeSourceTextForAssembly = (sourceDocument: string): Buffer =>
+  Buffer.from(
+    sourceDocument.replace(
+      /(<\?xml\b[^>]*\bencoding\s*=\s*)(["'])[^"']+\2/i,
+      "$1$2utf-8$2"
+    ),
+    "utf8"
+  );
+
 type TestcenterXmlFileIdentity = {
   fileType: "Booklet" | "Unit" | "SysCheck" | "Testtakers";
   id: string;
@@ -2236,16 +2337,10 @@ const readStandaloneTestcenterXmlFileIdentity = (
   if (!persistedDocument) {
     return null;
   }
-  const isDataUrl = /^data:/i.test(persistedDocument);
-  const decodedDocument = isDataUrl
-    ? decodePersistedSourceDocument(sourcePackage)
-    : null;
-  if (isDataUrl && !decodedDocument) {
+  const sourceDocument = readPersistedSourceText(sourcePackage);
+  if (sourceDocument === null) {
     return null;
   }
-  const sourceDocument = decodedDocument
-    ? decodedDocument.bytes.toString("utf8")
-    : persistedDocument;
   return readTestcenterXmlFileIdentity(sourceDocument);
 };
 
@@ -2287,11 +2382,10 @@ const readStandaloneVeronaPlayerResourceId = (
   ) {
     return null;
   }
-  const persistedDocument = sourcePackage.sourceDocument;
-  const decodedDocument = decodePersistedSourceDocument(sourcePackage);
-  const playerHtml = decodedDocument
-    ? decodedDocument.bytes.toString("utf8")
-    : persistedDocument;
+  const playerHtml = readPersistedSourceText(sourcePackage);
+  if (playerHtml === null) {
+    return null;
+  }
   return readVeronaPlayerResourceId(playerHtml, sourcePackage.fileName);
 };
 
@@ -2322,10 +2416,8 @@ const classifyWorkspaceSourcePackage = (
     return "SysCheck";
   }
 
-  const documentText = decodedDocument?.bytes
-    .subarray(0, 64 * 1024)
-    .toString("utf8")
-    .replace(/^\uFEFF/, "")
+  const documentText = readPersistedSourceText(sourcePackage, decodedDocument)
+    ?.slice(0, 64 * 1024)
     .trimStart();
   const looksLikeXml =
     normalizedMediaType.includes("xml") ||
@@ -12867,8 +12959,10 @@ const readZipEntryText = (
   zipBuffer: Buffer,
   entry: ZipEntry,
   maxOutputBytes = MAX_EXTRACTED_RESOURCE_BYTES
-): string | null =>
-  readZipEntryBuffer(zipBuffer, entry, maxOutputBytes)?.toString("utf8") ?? null;
+): string | null => {
+  const bytes = readZipEntryBuffer(zipBuffer, entry, maxOutputBytes);
+  return bytes ? decodeSourceTextBytes(bytes) : null;
+};
 
 const normalizeZipEntryPath = (path: string): string => {
   const segments: string[] = [];
@@ -13399,7 +13493,7 @@ const collectAssemblyResourceIdentifiers = (
   const baseName = fileName.split("/").at(-1) ?? fileName;
   const stem = baseName.replace(/\.(?:html?|xml|json)$/i, "");
   const identifiers = new Set([fileName, baseName, stem].filter(Boolean));
-  const text = entry.bytes.toString("utf8");
+  const text = decodeSourceTextBytes(entry.bytes);
   if (/^\s*(?:<\?xml[^>]*>\s*)?<(?:Booklet|Unit|SysCheck)\b/i.test(text)) {
     const metadataId = text.match(
       /<Metadata\b[^>]*>[\s\S]*?<Id\b[^>]*>([^<]+)<\/Id>/i
@@ -13498,7 +13592,9 @@ const assembleSourcePackageArchive = (
     return {
       sourcePackageId: sourcePackage.sourcePackageId,
       fileName: normalizeSourcePackageAssemblyPath(sourcePackage.fileName),
-      bytes: decodedDocument.bytes
+      bytes: /^data:/i.test(sourcePackage.sourceDocument ?? "")
+        ? decodedDocument.bytes
+        : encodeUnicodeSourceTextForAssembly(sourcePackage.sourceDocument ?? "")
     };
   });
   const duplicateFileNames = members.filter(
@@ -13551,7 +13647,10 @@ const collectLooseSourcePackageDependencyReferences = (
     return [];
   }
 
-  const sourceDocument = decodedDocument.bytes.toString("utf8");
+  const sourceDocument = readPersistedSourceText(sourcePackage, decodedDocument);
+  if (sourceDocument === null) {
+    return [];
+  }
   if (
     !sourceDocument.trimStart().startsWith("<") ||
     /<!DOCTYPE\b/i.test(sourceDocument)
@@ -13670,7 +13769,9 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       const assemblyEntry: SourcePackageAssemblyEntry = {
         sourcePackageId: sourcePackage.sourcePackageId,
         fileName: sourcePackage.fileName.trim().replace(/\\/g, "/"),
-        bytes: decodedDocument.bytes
+        bytes: /^data:/i.test(sourcePackage.sourceDocument ?? "")
+          ? decodedDocument.bytes
+          : encodeUnicodeSourceTextForAssembly(sourcePackage.sourceDocument ?? "")
       };
       const normalizedFileName = normalizeZipEntryPath(
         assemblyEntry.fileName
@@ -15101,7 +15202,7 @@ const createManifestlessZipAssemblyManifest = (
       bytes &&
       /\.xml$/i.test(entry.fileName) &&
       /^\uFEFF?\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?(?:Booklet|SysCheck)\b/i.test(
-        bytes.toString("utf8")
+        decodeSourceTextBytes(bytes)
       )
     ) {
       hasTestcenterRuntimeRoot = true;
@@ -16177,12 +16278,15 @@ const deriveRuntimeSnapshotFromSourceDocument = (
 
   const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
   const normalizedFileName = sourcePackage.fileName.toLowerCase();
-  const sourceDocumentText = sourcePackage.sourceDocument.trimStart();
+  const looksLikeZipPackage =
+    normalizedMediaType.includes("zip") || normalizedFileName.endsWith(".zip");
+  const decodedSourceDocument = looksLikeZipPackage
+    ? sourcePackage.sourceDocument
+    : readPersistedSourceText(sourcePackage) ?? sourcePackage.sourceDocument;
+  const sourceDocumentText = decodedSourceDocument.trimStart();
   const looksLikeJsonDocument =
     sourceDocumentText.startsWith("{") || sourceDocumentText.startsWith("[");
   const looksLikeXmlDocument = sourceDocumentText.startsWith("<");
-  const looksLikeZipPackage =
-    normalizedMediaType.includes("zip") || normalizedFileName.endsWith(".zip");
 
   if (
     normalizedMediaType.includes("json") ||
@@ -16192,7 +16296,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     try {
       return {
         runtimeSnapshot: normalizeParsedJsonContentStructure(
-          JSON.parse(sourcePackage.sourceDocument)
+          JSON.parse(decodedSourceDocument)
         ),
         diagnostics: []
       };
@@ -16217,14 +16321,14 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     looksLikeXmlDocument
   ) {
     const diagnostics = validateTestcenterXmlSourceDocument(
-      sourcePackage.sourceDocument,
+      decodedSourceDocument,
       sourcePackage.fileName
     );
     if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
       return { runtimeSnapshot: null, diagnostics };
     }
     return {
-      runtimeSnapshot: normalizeParsedXmlContentStructure(sourcePackage.sourceDocument),
+      runtimeSnapshot: normalizeParsedXmlContentStructure(decodedSourceDocument),
       diagnostics
     };
   }
