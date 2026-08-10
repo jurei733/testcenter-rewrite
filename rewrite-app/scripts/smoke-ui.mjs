@@ -3047,6 +3047,23 @@ try {
   );
   await clickAction("Sign In");
   await waitForInputMinLength("#adminSessionToken", 20);
+  const globalSignOutResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-out")
+  );
+  await page.locator("#globalAdminSignOutButton").click();
+  assert.equal((await globalSignOutResponsePromise).status(), 200);
+  await expectInputValue("#adminSessionToken", "");
+  assert.equal(await page.locator("#globalAdminSignOutButton").count(), 0);
+  await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
+  await fillAndCommitUntilValue(
+    "#adminPassword",
+    workspaceAdminVoluntaryPassword
+  );
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  logStep("admin-global-sign-out");
   logStep("admin-voluntary-password-change");
   stopAfter("admin-voluntary-password-change");
   logStep("admin-required-password-change");

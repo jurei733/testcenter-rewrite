@@ -359,6 +359,14 @@
         [disabled]="app.activeRequestLabel() !== null"
         (click)="openOwnAdminPasswordDialog()"
       >Change password</button>
+      <button
+        id="globalAdminSignOutButton"
+        class="nav-link"
+        type="button"
+        *ngIf="app.hasAdminSession"
+        [disabled]="app.activeRequestLabel() !== null"
+        (click)="signOutAdmin()"
+      >Sign out</button>
     </nav>
 
     <section class="workspace app-layout">

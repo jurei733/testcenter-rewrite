@@ -152,6 +152,16 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  async signOutAdmin(): Promise<void> {
+    try {
+      await this.app.signOutAdmin();
+    } finally {
+      this.ownAdminPasswordDialogOpen = false;
+      this.clearOwnAdminPasswordDialog();
+      this.changeDetector.detectChanges();
+    }
+  }
+
   get canSubmitOwnAdminPassword(): boolean {
     return (
       this.currentAdminPassword.length > 0 &&

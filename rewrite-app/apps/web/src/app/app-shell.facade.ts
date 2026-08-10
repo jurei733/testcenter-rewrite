@@ -99,6 +99,10 @@ export class AppShellFacade {
     await this.adminPasswordChange.signOut();
   }
 
+  async signOutAdmin(): Promise<void> {
+    await this.adminPasswordChange.signOut();
+  }
+
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
   }
