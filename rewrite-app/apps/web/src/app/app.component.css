@@ -157,6 +157,12 @@
   font-weight: 700;
 }
 
+.account-security-link {
+  margin-left: auto;
+  cursor: pointer;
+  font: inherit;
+}
+
 @media (max-width: 720px) {
   .participant-topbar {
     display: grid;

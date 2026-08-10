@@ -875,6 +875,7 @@ export type AdminAuthPort = {
   }>;
   changeOwnPassword(input: {
     sessionToken: string;
+    currentPassword?: string;
     password: string;
   }): Promise<{
     adminUser: AdminUser;
@@ -22449,6 +22450,23 @@ export const createFirstSliceServices = (
           now(),
           { allowPasswordChangeRequired: true }
         );
+        if (!currentSession.adminUser.passwordChangeRequired) {
+          if (
+            typeof input.currentPassword !== "string" ||
+            input.currentPassword === "" ||
+            input.currentPassword.length > adminPasswordPolicy.maximumLength ||
+            !verifyAdminPassword(
+              input.currentPassword,
+              currentSession.adminUser.passwordHash
+            )
+          ) {
+            throw new FirstSliceError(
+              403,
+              "admin_current_password_invalid",
+              "The current administrator password is invalid."
+            );
+          }
+        }
         const password = requireAdminPassword(input.password);
         const updatedAdminUser: AdminUser = {
           ...currentSession.adminUser,

@@ -4160,6 +4160,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const body = await readRequestJsonBody<ChangeAdminPasswordRequest>();
         const result = await services.adminAuth.changeOwnPassword({
           sessionToken,
+          currentPassword: body.currentPassword,
           password: body.password
         });
         sendJson<ChangeAdminPasswordResponse>(response, 200, {

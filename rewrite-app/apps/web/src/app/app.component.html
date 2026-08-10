@@ -106,6 +106,82 @@
       </div>
     </form>
   </section>
+  <section
+    id="ownAdminPasswordChangeDialog"
+    class="required-password-backdrop"
+    *ngIf="ownAdminPasswordDialogOpen"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ownAdminPasswordChangeTitle"
+  >
+    <form class="required-password-card" (submit)="$event.preventDefault(); submitOwnAdminPassword()">
+      <span class="eyebrow">Account security</span>
+      <h2 id="ownAdminPasswordChangeTitle">Change your password</h2>
+      <p>Enter the current password and choose a new one. All active sessions will be signed out after the change.</p>
+      <label>
+        Current password
+        <input
+          id="currentAdminPassword"
+          name="currentAdminPassword"
+          type="password"
+          autocomplete="current-password"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          required
+          [value]="currentAdminPassword"
+          (input)="updateCurrentAdminPassword($event)"
+        />
+      </label>
+      <label>
+        New password
+        <input
+          id="ownAdminPassword"
+          name="ownAdminPassword"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          required
+          [value]="ownAdminPassword"
+          (input)="updateOwnAdminPassword($event)"
+        />
+      </label>
+      <label>
+        Confirm new password
+        <input
+          id="ownAdminPasswordConfirmation"
+          name="ownAdminPasswordConfirmation"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          required
+          [value]="ownAdminPasswordConfirmation"
+          (input)="updateOwnAdminPasswordConfirmation($event)"
+        />
+      </label>
+      <p
+        id="ownAdminPasswordError"
+        class="required-password-error"
+        *ngIf="ownAdminPasswordError"
+        role="alert"
+      >{{ ownAdminPasswordError }}</p>
+      <div class="actions">
+        <button
+          id="ownAdminPasswordSubmitButton"
+          class="primary"
+          type="submit"
+          [disabled]="!canSubmitOwnAdminPassword"
+        >Change password and sign out</button>
+        <button
+          id="ownAdminPasswordCancelButton"
+          class="ghost"
+          type="button"
+          [disabled]="app.activeRequestLabel() !== null"
+          (click)="closeOwnAdminPasswordDialog()"
+        >Cancel</button>
+      </div>
+    </form>
+  </section>
   <ng-container *ngIf="isParticipantView; else operatorShell">
     <header class="participant-topbar">
       <div class="application-brand">
@@ -275,6 +351,14 @@
       >
         {{ view.label }}
       </a>
+      <button
+        id="ownAdminPasswordOpenButton"
+        class="nav-link account-security-link"
+        type="button"
+        *ngIf="app.hasAdminSession"
+        [disabled]="app.activeRequestLabel() !== null"
+        (click)="openOwnAdminPasswordDialog()"
+      >Change password</button>
     </nav>
 
     <section class="workspace app-layout">

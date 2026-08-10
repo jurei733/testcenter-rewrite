@@ -62,16 +62,13 @@ export class RewriteAppOperatorAccessService {
   }
 
   get requiresPasswordChange(): boolean {
-    if (!this.uiState.ops.adminSessionToken.trim() || this.isPlatformAdmin) {
+    if (!this.uiState.ops.adminSessionToken.trim()) {
       return false;
     }
     const session = parseJsonDocument<OperatorSessionView>(
       this.uiState.ops.adminSessionView
     );
-    return (
-      session?.adminUser?.passwordChangeRequired === true &&
-      (this.mode === "admin" || this.mode === "admin_read_only")
-    );
+    return session?.adminUser?.passwordChangeRequired === true;
   }
 
   get canReadWorkspaceDirectory(): boolean {

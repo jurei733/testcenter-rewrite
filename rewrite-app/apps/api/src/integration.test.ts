@@ -1808,6 +1808,79 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(changedPasswordSignIn.status, 200);
   assert.equal(changedPasswordSignIn.body.adminUser.passwordChangeRequired, false);
 
+  for (const currentPassword of [undefined, "workspace-secret-wrong"]) {
+    const rejectedVoluntaryPasswordChange = await requestJson<{ error: string }>(
+      "/api/v1/admin/auth/password",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${changedPasswordSignIn.body.sessionToken}`
+        },
+        body: {
+          ...(currentPassword === undefined ? {} : { currentPassword }),
+          password: "workspace-secret-voluntary"
+        }
+      }
+    );
+    assert.equal(rejectedVoluntaryPasswordChange.status, 403);
+    assert.equal(
+      rejectedVoluntaryPasswordChange.body.error,
+      "admin_current_password_invalid"
+    );
+  }
+
+  const voluntaryPasswordChange = await requestJson<{
+    adminUser: { passwordChangeRequired: boolean };
+    revokedAdminSessionIds: string[];
+  }>("/api/v1/admin/auth/password", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${changedPasswordSignIn.body.sessionToken}`
+    },
+    body: {
+      currentPassword: "workspace-secret-final",
+      password: "workspace-secret-voluntary"
+    }
+  });
+  assert.equal(voluntaryPasswordChange.status, 200);
+  assert.equal(voluntaryPasswordChange.body.adminUser.passwordChangeRequired, false);
+  assert.equal(
+    voluntaryPasswordChange.body.revokedAdminSessionIds.includes(
+      changedPasswordSignIn.body.adminSession.adminSessionId
+    ),
+    true
+  );
+
+  const rejectedPreviousVoluntaryPassword = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "workspace.admin",
+        password: "workspace-secret-final"
+      }
+    }
+  );
+  assert.equal(rejectedPreviousVoluntaryPassword.status, 401);
+  assert.equal(
+    rejectedPreviousVoluntaryPassword.body.error,
+    "admin_credentials_invalid"
+  );
+
+  const voluntaryPasswordSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+    adminUser: { passwordChangeRequired: boolean };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "workspace.admin",
+      password: "workspace-secret-voluntary"
+    }
+  });
+  assert.equal(voluntaryPasswordSignIn.status, 200);
+  assert.equal(voluntaryPasswordSignIn.body.adminUser.passwordChangeRequired, false);
+
   const scheduledAdminUser = await requestJson<{
     adminUser: {
       validFrom: string | null;
@@ -1894,7 +1967,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     method: "POST",
     body: {
       username: "workspace.admin",
-      password: "workspace-secret-final"
+      password: "workspace-secret-voluntary"
     }
   });
   assert.equal(accessWindowRestoredSignIn.status, 200);
@@ -1974,7 +2047,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       method: "POST",
       body: {
         username: "workspace.admin",
-        password: "workspace-secret-final"
+        password: "workspace-secret-voluntary"
       }
     }
   );
@@ -2212,7 +2285,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         item.details["revokedSessionCount"] === 1 &&
         Array.isArray(item.details["revokedSessionIds"]) &&
         item.details["revokedSessionIds"].includes(
-          changedPasswordSignIn.body.adminSession.adminSessionId
+          voluntaryPasswordSignIn.body.adminSession.adminSessionId
         )
     ),
     true

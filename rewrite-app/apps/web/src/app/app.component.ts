@@ -45,6 +45,11 @@ export class AppComponent implements OnInit, OnDestroy {
   requiredAdminPassword = "";
   requiredAdminPasswordConfirmation = "";
   requiredAdminPasswordError = "";
+  ownAdminPasswordDialogOpen = false;
+  currentAdminPassword = "";
+  ownAdminPassword = "";
+  ownAdminPasswordConfirmation = "";
+  ownAdminPasswordError = "";
   readonly adminPasswordMinimumLength = adminPasswordPolicy.minimumLength;
   readonly adminPasswordMaximumLength = adminPasswordPolicy.maximumLength;
   private readonly changeDetector = inject(ChangeDetectorRef);
@@ -145,6 +150,82 @@ export class AppComponent implements OnInit, OnDestroy {
       this.requiredAdminPasswordError = "";
       this.changeDetector.detectChanges();
     }
+  }
+
+  get canSubmitOwnAdminPassword(): boolean {
+    return (
+      this.currentAdminPassword.length > 0 &&
+      this.currentAdminPassword.length <= adminPasswordPolicy.maximumLength &&
+      this.ownAdminPassword.length >= adminPasswordPolicy.minimumLength &&
+      this.ownAdminPassword.length <= adminPasswordPolicy.maximumLength &&
+      this.ownAdminPassword === this.ownAdminPasswordConfirmation &&
+      this.app.activeRequestLabel() === null
+    );
+  }
+
+  openOwnAdminPasswordDialog(): void {
+    this.clearOwnAdminPasswordDialog();
+    this.ownAdminPasswordDialogOpen = true;
+  }
+
+  closeOwnAdminPasswordDialog(): void {
+    if (this.app.activeRequestLabel() !== null) {
+      return;
+    }
+    this.ownAdminPasswordDialogOpen = false;
+    this.clearOwnAdminPasswordDialog();
+  }
+
+  updateCurrentAdminPassword(event: Event): void {
+    this.currentAdminPassword = (event.target as HTMLInputElement).value;
+    this.ownAdminPasswordError = "";
+  }
+
+  updateOwnAdminPassword(event: Event): void {
+    this.ownAdminPassword = (event.target as HTMLInputElement).value;
+    this.ownAdminPasswordError = "";
+  }
+
+  updateOwnAdminPasswordConfirmation(event: Event): void {
+    this.ownAdminPasswordConfirmation = (event.target as HTMLInputElement).value;
+    this.ownAdminPasswordError = "";
+  }
+
+  async submitOwnAdminPassword(): Promise<void> {
+    if (!this.canSubmitOwnAdminPassword) {
+      this.ownAdminPasswordError =
+        this.currentAdminPassword.length === 0
+          ? "Enter the current password."
+          : this.currentAdminPassword.length > adminPasswordPolicy.maximumLength
+            ? "The current password is invalid."
+            : this.ownAdminPassword.length < adminPasswordPolicy.minimumLength
+              ? `The new password must contain at least ${adminPasswordPolicy.minimumLength} characters.`
+              : this.ownAdminPassword.length > adminPasswordPolicy.maximumLength
+                ? `The new password must contain no more than ${adminPasswordPolicy.maximumLength} characters.`
+                : "The password confirmation does not match.";
+      return;
+    }
+    this.ownAdminPasswordError = "";
+    try {
+      await this.app.changeOwnAdminPassword(
+        this.currentAdminPassword,
+        this.ownAdminPassword
+      );
+      this.ownAdminPasswordDialogOpen = false;
+      this.clearOwnAdminPasswordDialog();
+    } catch {
+      this.ownAdminPasswordError =
+        "The password could not be changed. Check the current password and try again.";
+    } finally {
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  private clearOwnAdminPasswordDialog(): void {
+    this.currentAdminPassword = "";
+    this.ownAdminPassword = "";
+    this.ownAdminPasswordConfirmation = "";
+    this.ownAdminPasswordError = "";
   }
 
   private getInitialViewFromLocation(): AppView | null {

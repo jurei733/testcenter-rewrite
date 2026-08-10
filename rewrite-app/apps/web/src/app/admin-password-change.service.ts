@@ -20,7 +20,10 @@ export class AdminPasswordChangeService {
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly uiState = inject(RewriteAppUiStateService);
 
-  async changeRequiredPassword(password: string): Promise<void> {
+  async changePassword(input: {
+    password: string;
+    currentPassword?: string;
+  }): Promise<void> {
     const sessionToken = this.uiState.ops.adminSessionToken.trim();
     if (!sessionToken) {
       return;
@@ -29,7 +32,12 @@ export class AdminPasswordChangeService {
       "Change Admin Password",
       "POST",
       productionApiRoutes.admin.changeOwnPassword,
-      { password } satisfies ChangeAdminPasswordRequest,
+      {
+        password: input.password,
+        ...(input.currentPassword === undefined
+          ? {}
+          : { currentPassword: input.currentPassword })
+      } satisfies ChangeAdminPasswordRequest,
       { headers: { authorization: `Bearer ${sessionToken}` } }
     );
 
@@ -40,7 +48,7 @@ export class AdminPasswordChangeService {
     this.uiState.ops.adminSessionToken = "";
     this.feedback.rememberActivity(
       "Admin Password Changed",
-      `${payload.adminUser.username} changed the administrator-set password and ${payload.revokedAdminSessionIds.length} active session(s) were revoked.`
+      `${payload.adminUser.username} changed their password and ${payload.revokedAdminSessionIds.length} active session(s) were revoked.`
     );
     this.persistence.persistShellState();
   }

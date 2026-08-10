@@ -77,8 +77,22 @@ export class AppShellFacade {
     return this.operatorAccess.requiresPasswordChange;
   }
 
+  get hasAdminSession(): boolean {
+    return this.ops.adminSessionToken.trim() !== "";
+  }
+
   async changeRequiredAdminPassword(password: string): Promise<void> {
-    await this.adminPasswordChange.changeRequiredPassword(password);
+    await this.adminPasswordChange.changePassword({ password });
+  }
+
+  async changeOwnAdminPassword(
+    currentPassword: string,
+    password: string
+  ): Promise<void> {
+    await this.adminPasswordChange.changePassword({
+      currentPassword,
+      password
+    });
   }
 
   async signOutRequiredAdmin(): Promise<void> {

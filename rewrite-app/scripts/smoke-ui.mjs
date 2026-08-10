@@ -2379,6 +2379,8 @@ try {
   const workspaceAdminPassword = "ui-workspace-admin-secret";
   const workspaceAdminResetPassword = "ui-workspace-admin-reset-secret";
   const workspaceAdminFinalPassword = "ui-workspace-admin-final-secret";
+  const workspaceAdminVoluntaryPassword =
+    "ui-workspace-admin-voluntary-secret";
   await fillAndCommit("#adminCreateUsername", generatedWorkspaceAdminUsername);
   await fillAndCommit("#adminCreateDisplayName", "UI Workspace Admin");
   await fillAndCommit("#adminCreatePassword", workspaceAdminPassword);
@@ -2976,6 +2978,77 @@ try {
     await page.locator("#requiredAdminPasswordChangeDialog").count(),
     0
   );
+  await page.locator("#ownAdminPasswordOpenButton").click();
+  await page.locator("#ownAdminPasswordChangeDialog").waitFor();
+  assert.equal(
+    await page.locator("#currentAdminPassword").getAttribute("maxlength"),
+    "60"
+  );
+  assert.equal(
+    await page.locator("#ownAdminPassword").getAttribute("minlength"),
+    "8"
+  );
+  assert.equal(
+    await page.locator("#ownAdminPasswordConfirmation").getAttribute("maxlength"),
+    "60"
+  );
+  await fillAndCommit("#currentAdminPassword", "wrong-current-password");
+  await fillAndCommit("#ownAdminPassword", workspaceAdminVoluntaryPassword);
+  await fillAndCommit(
+    "#ownAdminPasswordConfirmation",
+    workspaceAdminVoluntaryPassword
+  );
+  await expectButtonSelectorEnabled("#ownAdminPasswordSubmitButton");
+  const rejectedOwnPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#ownAdminPasswordSubmitButton").click();
+  const rejectedOwnPasswordChangeResponse =
+    await rejectedOwnPasswordChangeResponsePromise;
+  assert.equal(rejectedOwnPasswordChangeResponse.status(), 403);
+  await page
+    .locator("#ownAdminPasswordError")
+    .filter({ hasText: "Check the current password" })
+    .waitFor();
+  await fillAndCommit(
+    "#currentAdminPassword",
+    workspaceAdminFinalPassword
+  );
+  const ownPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#ownAdminPasswordSubmitButton").click();
+  const ownPasswordChangeResponse = await ownPasswordChangeResponsePromise;
+  assert.equal(ownPasswordChangeResponse.status(), 200);
+  await page
+    .locator("#ownAdminPasswordChangeDialog")
+    .waitFor({ state: "detached" });
+  await expectInputValue("#adminSessionToken", "");
+  const rejectedPreChangePasswordSignIn = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: workspaceAdminUsername,
+        password: workspaceAdminFinalPassword
+      })
+    }
+  );
+  assert.equal(rejectedPreChangePasswordSignIn.status, 401);
+  await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
+  await fillAndCommitUntilValue(
+    "#adminPassword",
+    workspaceAdminVoluntaryPassword
+  );
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  logStep("admin-voluntary-password-change");
+  stopAfter("admin-voluntary-password-change");
   logStep("admin-required-password-change");
   stopAfter("admin-required-password-change");
   await page
@@ -3530,7 +3603,7 @@ try {
   };
   const workspaceAdminBatchSession = await createBatchAdminSession(
     workspaceAdminUsername,
-    workspaceAdminFinalPassword
+    workspaceAdminVoluntaryPassword
   );
   const delegatedAdminBatchSession = await createBatchAdminSession(
     delegatedWorkspaceAdminUsername,

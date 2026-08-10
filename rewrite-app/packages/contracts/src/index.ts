@@ -2509,6 +2509,7 @@ export const adminPasswordPolicy = {
 } as const;
 
 export type ChangeAdminPasswordRequest = {
+  currentPassword?: string;
   password: string;
 };
 
