@@ -4584,6 +4584,72 @@ try {
     .getByRole("button", { name: "Select Related File" })
     .first()
     .waitFor({ timeout: 20_000 });
+  logStep("loose-upload-partial-report");
+  const survivingLooseUploadFileName = `ui-loose-survivor-${Date.now()}.html`;
+  await page.locator("#sourcePackageAssemblyFiles").setInputFiles([
+    {
+      name: "Booklet2.xml",
+      mimeType: "application/xml",
+      buffer: await readFile(
+        resolve("test-fixtures/original-testcenter/booklets/Booklet2.xml")
+      )
+    },
+    {
+      name: survivingLooseUploadFileName,
+      mimeType: "text/html",
+      buffer: Buffer.from("<!doctype html><html><body>survivor</body></html>")
+    }
+  ]);
+  const looseUploadReport = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Loose File Upload Report" })
+    });
+  await looseUploadReport
+    .locator("article.record-card")
+    .filter({ has: page.getByRole("heading", { name: "2 loose file(s) processed" }) })
+    .filter({ hasText: "1 uploaded, 1 rejected" })
+    .filter({ hasText: "workspace refreshed" })
+    .waitFor({ timeout: 20_000 });
+  await looseUploadReport
+    .locator("article.record-card")
+    .filter({ has: page.getByRole("heading", { name: "Booklet2.xml" }) })
+    .filter({ hasText: "source_package_file_name_duplicate" })
+    .filter({ hasText: "HTTP 409" })
+    .filter({ hasText: "Create a replacement" })
+    .waitFor();
+  await looseUploadReport
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", { name: survivingLooseUploadFileName })
+    })
+    .filter({ hasText: "uploaded" })
+    .filter({ hasText: "Selected for reviewed package assembly" })
+    .waitFor();
+  await page
+    .locator("#sourcePackageAssemblySelection")
+    .filter({ hasText: "1 file(s) selected" })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(survivingLooseUploadFileName)}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      payload.filteredCount === 1 &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.sourcePackage?.fileName === survivingLooseUploadFileName &&
+          item?.sourcePackage?.status === "uploaded" &&
+          item?.fileType === "Resource"
+      )
+  );
+  await page.locator("#clearSourcePackageAssemblyButton").click();
+  await page
+    .locator("#sourcePackageAssemblySelection")
+    .filter({ hasText: "0 file(s) selected" })
+    .waitFor();
+  stopAfter("loose-upload-partial-report");
   logStep("load-zip-source-document-file");
   const uploadedZipSourceFileName = `ui-smoke-source-${Date.now()}.zip`;
   const uploadedZipSourcePath = resolve(".data", uploadedZipSourceFileName);

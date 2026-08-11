@@ -55,6 +55,30 @@ const describeParticipantRosterImport = (
     ? ` Roster: ${summary.importedCount} imported, ${summary.updatedCount} updated, ${summary.operationalLoginCandidateCount} operational candidate(s) from ${summary.sourceFileNames.length} file(s).`
     : "";
 
+export const MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT = 200;
+
+export type LooseSourcePackageUploadInput = {
+  fileName: string;
+  mediaType: string;
+  loadSourceDocument: () => Promise<
+    NonNullable<CreateSourcePackageRequest["sourceDocument"]>
+  >;
+};
+
+export type LooseSourcePackageUploadIssue = {
+  fileName: string;
+  error: string;
+  message: string;
+  statusCode?: number;
+};
+
+export type LooseSourcePackageUploadReport = {
+  requestedCount: number;
+  uploaded: CreateSourcePackageResponse[];
+  rejected: LooseSourcePackageUploadIssue[];
+  refreshError?: LooseSourcePackageUploadIssue;
+};
+
 @Injectable({ providedIn: "root" })
 export class RewriteAppContentService {
   private readonly api = inject(RewriteAppApiService);
@@ -110,8 +134,8 @@ export class RewriteAppContentService {
   }
 
   async uploadLooseSourcePackages(
-    files: CreateSourcePackageRequest[]
-  ): Promise<CreateSourcePackageResponse[]> {
+    files: LooseSourcePackageUploadInput[]
+  ): Promise<LooseSourcePackageUploadReport> {
     const route = resolveRoutePath(
       productionApiRoutes.workspace.createSourcePackage,
       {
@@ -119,26 +143,54 @@ export class RewriteAppContentService {
         workspaceKey: this.uiState.workspace.workspaceKey.trim()
       }
     );
-    const uploads: CreateSourcePackageResponse[] = [];
+    const uploaded: CreateSourcePackageResponse[] = [];
+    const rejected: LooseSourcePackageUploadIssue[] = files
+      .slice(MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT)
+      .map(file => ({
+        fileName: file.fileName,
+        error: "source_package_upload_batch_limit_exceeded",
+        message: `Only the first ${MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT} selected files can be uploaded in one operation.`
+      }));
+    let refreshError: LooseSourcePackageUploadIssue | undefined;
     try {
-      for (const file of files) {
-        uploads.push(
-          await this.requestState.request<CreateSourcePackageResponse>(
-            `Upload ${file.fileName}`,
-            "POST",
-            route,
-            file
-          )
-        );
+      for (const file of files.slice(0, MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT)) {
+        try {
+          uploaded.push(
+            await this.requestState.request<CreateSourcePackageResponse>(
+              `Upload ${file.fileName}`,
+              "POST",
+              route,
+              {
+                fileName: file.fileName,
+                mediaType: file.mediaType,
+                sourceDocument: await file.loadSourceDocument()
+              } satisfies CreateSourcePackageRequest
+            )
+          );
+        } catch (error) {
+          rejected.push(this.toLooseSourcePackageUploadIssue(file.fileName, error));
+        }
       }
     } finally {
-      await this.refreshContentReads(true);
+      try {
+        await this.refreshContentReads(true);
+      } catch (error) {
+        refreshError = this.toLooseSourcePackageUploadIssue(
+          "Workspace file refresh",
+          error
+        );
+      }
     }
     this.feedback.rememberActivity(
-      "Loose Source Files Uploaded",
-      `${uploads.length} file(s) are ready for package assembly.`
+      "Loose Source File Upload Finished",
+      `${uploaded.length}/${files.length} file(s) uploaded; ${rejected.length} rejected.${refreshError ? " Workspace refresh failed; retry the content read." : ""}`
     );
-    return uploads;
+    return {
+      requestedCount: files.length,
+      uploaded,
+      rejected,
+      ...(refreshError ? { refreshError } : {})
+    };
   }
 
   async createImportJob(): Promise<void> {
@@ -473,5 +525,26 @@ export class RewriteAppContentService {
       this.uiState.workspace.tenantKey.trim() !== "" &&
       this.uiState.workspace.workspaceKey.trim() !== ""
     );
+  }
+
+  private toLooseSourcePackageUploadIssue(
+    fileName: string,
+    error: unknown
+  ): LooseSourcePackageUploadIssue {
+    if (this.requestState.isApiError(error)) {
+      return {
+        fileName,
+        error: error.error,
+        message: error.message,
+        ...(error.statusCode === undefined
+          ? {}
+          : { statusCode: error.statusCode })
+      };
+    }
+    return {
+      fileName,
+      error: "unexpected_error",
+      message: error instanceof Error ? error.message : String(error)
+    };
   }
 }

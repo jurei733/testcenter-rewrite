@@ -32,7 +32,10 @@ import {
   participantSessionLinkRows as buildParticipantSessionLinkRows
 } from "./participant-session-links";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { RewriteAppContentService } from "./rewrite-app-content.service";
+import {
+  RewriteAppContentService,
+  type LooseSourcePackageUploadReport
+} from "./rewrite-app-content.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
@@ -63,6 +66,7 @@ export class ContentViewFacade {
   private readonly deletionSourcePackages = new Map<string, string>();
   sourcePackageBatchDeletionReport: DeleteSourcePackagesResponse["report"] | null =
     null;
+  looseSourcePackageUploadReport: LooseSourcePackageUploadReport | null = null;
 
   private readonly participantSessionLinkRows = (
     participantSessionId?: string | null,
@@ -242,24 +246,27 @@ export class ContentViewFacade {
       return;
     }
     this.viewState.onActionAsync(async () => {
-      const sourcePackages = await this.contentService.uploadLooseSourcePackages(
-        await Promise.all(
-          files.map(async file => ({
-            fileName: file.name,
-            mediaType: this.inferMediaTypeFromFile(file),
-            sourceDocument: this.isZipSourceFile(file)
-              ? await this.readFileAsDataUrl(file)
-              : await file.text()
-          }))
-        )
+      const report = await this.contentService.uploadLooseSourcePackages(
+        files.map(file => ({
+          fileName: file.name,
+          mediaType: this.inferMediaTypeFromFile(file),
+          loadSourceDocument: () =>
+            this.isZipSourceFile(file)
+              ? this.readFileAsDataUrl(file)
+              : file.text()
+        }))
       );
-      for (const upload of sourcePackages) {
+      this.looseSourcePackageUploadReport = report;
+      for (const upload of report.uploaded) {
         this.assemblySourcePackageIds.add(
           upload.sourcePackage.sourcePackageId
         );
       }
-      if (files.length > 1 && this.assemblyFileName === "assembled-source-package.zip") {
-        this.assemblyFileName = `${files[0]!.name.replace(/\.[^.]+$/, "")}-bundle.zip`;
+      if (
+        report.uploaded.length > 1 &&
+        this.assemblyFileName === "assembled-source-package.zip"
+      ) {
+        this.assemblyFileName = `${report.uploaded[0]!.sourcePackage.fileName.replace(/\.[^.]+$/, "")}-bundle.zip`;
       }
     });
   }
@@ -765,6 +772,64 @@ export class ContentViewFacade {
         { label: "Warning Files", value: String(summary.warningFileCount) }
       ]
     }];
+  }
+
+  get looseSourcePackageUploadItems(): RecordCollectionItem[] {
+    const report = this.looseSourcePackageUploadReport;
+    if (!report) {
+      return [];
+    }
+
+    const items: RecordCollectionItem[] = [{
+      headline: `${report.requestedCount} loose file(s) processed`,
+      subline: `${report.uploaded.length} uploaded, ${report.rejected.length} rejected`,
+      badges: [
+        `${report.uploaded.length} uploaded`,
+        `${report.rejected.length} rejected`,
+        report.refreshError ? "refresh failed" : "workspace refreshed"
+      ],
+      rows: [
+        { label: "Requested", value: String(report.requestedCount) },
+        { label: "Uploaded", value: String(report.uploaded.length) },
+        { label: "Rejected", value: String(report.rejected.length) }
+      ]
+    }];
+    items.push(
+      ...report.uploaded.map(upload => ({
+        headline: upload.sourcePackage.fileName,
+        subline: upload.sourcePackage.sourcePackageId,
+        badges: ["uploaded", upload.sourcePackage.status],
+        rows: [
+          { label: "Media Type", value: upload.sourcePackage.mediaType },
+          {
+            label: "Assembly",
+            value: this.assemblySourcePackageIds.has(
+              upload.sourcePackage.sourcePackageId
+            )
+              ? "Selected for reviewed package assembly"
+              : "Available for reviewed package assembly"
+          }
+        ]
+      })),
+      ...report.rejected.map(issue => ({
+        headline: issue.fileName,
+        subline: issue.error,
+        badges: ["rejected", ...(issue.statusCode ? [`HTTP ${issue.statusCode}`] : [])],
+        rows: [{ label: "Reason", value: issue.message }]
+      }))
+    );
+    if (report.refreshError) {
+      items.push({
+        headline: report.refreshError.fileName,
+        subline: report.refreshError.error,
+        badges: ["refresh failed"],
+        rows: [
+          { label: "Recovery", value: "Use Refresh Content Reads to retry." },
+          { label: "Reason", value: report.refreshError.message }
+        ]
+      });
+    }
+    return items;
   }
 
   get sourcePackageBatchDeletionItems(): RecordCollectionItem[] {

@@ -233,7 +233,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Loose File Assembly</h2>
-        <p>Upload related booklet or system-check, unit, coding-scheme, player, resource, and manifest files together. Importing the booklet or system check captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
+        <p>Upload up to 200 related booklet or system-check, unit, coding-scheme, player, resource, and manifest files together. Every file is processed independently, so accepted files remain available when another file is rejected. Importing the booklet or system check captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
         <div class="form-grid full">
           <label>
             Upload Loose Files
@@ -253,6 +253,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="clearSourcePackageAssemblyButton" class="ghost" type="button" [disabled]="view.assemblySelectionLabel === '0 file(s) selected'" (click)="view.clearAssemblySelection()">Clear Selection</button>
         </div>
       </article>
+
+      <app-record-collection
+        title="Loose File Upload Report"
+        subtitle="Best-effort outcome for each selected file; accepted files remain available for assembly when another file is rejected."
+        [items]="view.looseSourcePackageUploadItems"
+        emptyState="Select loose files to inspect their individual upload outcomes."
+      ></app-record-collection>
 
       <app-record-collection
         title="Assembly Candidates"
