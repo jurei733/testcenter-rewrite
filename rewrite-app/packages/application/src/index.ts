@@ -8723,6 +8723,18 @@ const parseTestcenterSchemaVersion = (
   };
 };
 
+const latestSupportedOriginalTestcenterSchemaVersion = {
+  major: 17,
+  minor: 6
+} as const;
+
+const isUnsupportedFutureTestcenterSchemaVersion = (
+  version: { major: number; minor: number }
+): boolean =>
+  version.major > latestSupportedOriginalTestcenterSchemaVersion.major ||
+  (version.major === latestSupportedOriginalTestcenterSchemaVersion.major &&
+    version.minor > latestSupportedOriginalTestcenterSchemaVersion.minor);
+
 const validateUniqueTestcenterXmlValues = (
   values: Array<{ value: string; label: string }>,
   code: string,
@@ -9053,6 +9065,18 @@ const validateTestcenterXmlSourceDocument = (
       createImportDiagnostic(
         "testcenter_xml_schema_reference_invalid",
         `Original Testcenter XML '${sourceFileName}' references schema '${schemaLocation}', which does not match '${canonicalRootName}'.`
+      )
+    );
+  }
+  const declaredSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
+  if (
+    declaredSchemaVersion &&
+    isUnsupportedFutureTestcenterSchemaVersion(declaredSchemaVersion)
+  ) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_schema_version_unsupported",
+        `Original Testcenter ${canonicalRootName} '${sourceFileName}' declares schema ${declaredSchemaVersion.major}.${declaredSchemaVersion.minor}, but this rewrite supports schemas only through ${latestSupportedOriginalTestcenterSchemaVersion.major}.${latestSupportedOriginalTestcenterSchemaVersion.minor}.`
       )
     );
   }

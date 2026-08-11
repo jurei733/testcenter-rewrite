@@ -12451,6 +12451,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   for (const encodedCase of [
     {
+      fileName: "supported-schema-patch-original-booklet.xml",
+      sourceDocument: validBookletXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/17.6.99/definitions/"
+      ),
+      displayLabel: "Sample booklet"
+    },
+    {
       fileName: "utf-16le-original-booklet.xml",
       bytes: Buffer.concat([
         Buffer.from([0xff, 0xfe]),
@@ -12718,6 +12726,30 @@ test("original Testcenter compatibility corpus imports representative booklets",
     diagnosticCode: string;
     forbiddenDiagnosticCode?: string;
   }> = [
+    {
+      fileName: "booklet-future-schema.xml",
+      sourceDocument: validBookletXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/18.0.0/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "unit-future-minor-schema.xml",
+      sourceDocument: validUnitXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/17.7.0/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "syscheck-future-schema.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/99.0.0/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
     {
       fileName: "booklet-legacy-schema-file-name.xml",
       sourceDocument: validBookletXml
@@ -13891,6 +13923,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_element_namespace_invalid"
     },
     {
+      fileName: "future-schema-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/17.7.0/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
       fileName: "legacy-schema-file-name-dependency.zip",
       entryFileName: "export/booklets/Booklet_error.xml",
       entryDocument: validBookletXml
@@ -14002,6 +14043,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
     true
   );
   const invalidRosterFacetCases = [
+    {
+      label: "future Testtakers schema version",
+      rosterText: validRosterXml.replace(
+        /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
+        "/18.0.0/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
     {
       label: "legacy Testtakers schema file name",
       rosterText: validRosterXml
