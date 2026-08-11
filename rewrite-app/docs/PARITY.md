@@ -519,12 +519,13 @@ path. The complete graph and failure path run across memory, file, and SQLite.
 Latest production-frontend closure: the Angular root shell no longer imports
 the Workspace, Content, Runtime, and Ops lifecycle before a feature route is
 opened. Shared browser/session state is hydrated immediately, while feature
-refresh, monitor streaming, and the associated services remain behind the
-existing lazy-route boundary. The optimized production initial bundle falls
-from 563.85 kB to 443.49 kB raw and from 127.62 kB to 109.74 kB estimated
-transfer size. A tightened 450-kB warning and 470-kB error budget now turns a
-material regression back into a build signal; direct routes, offline
-Participant startup, and cross-feature navigation remain browser-gated.
+refresh, monitor streaming, and the Workspace, Content, Runtime, and Ops
+services resolve on demand instead of forming one shared eager feature chunk.
+The optimized production initial bundle falls from 563.85 kB to 444.22 kB raw
+and from 127.62 kB to 111.94 kB estimated transfer size. A tightened 450-kB
+warning and 470-kB error budget now turns a material regression back into a
+build signal; direct routes, offline Participant startup, Runtime SSE, and
+cross-feature navigation remain browser-gated.
 
 ## Capability matrix
 

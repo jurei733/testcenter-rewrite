@@ -1,35 +1,46 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { ApplicationRef, Injectable, Injector, inject } from "@angular/core";
 
-import { RewriteAppContentService } from "./rewrite-app-content.service";
-import { MonitorEventStreamService } from "./monitor-event-stream.service";
-import { RewriteAppOpsService } from "./rewrite-app-ops.service";
-import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
+import type { MonitorEventStreamService } from "./monitor-event-stream.service";
 import { RewriteAppShellLifecycleService } from "./rewrite-app-shell-lifecycle.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppViewStateService {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly applicationRef = inject(ApplicationRef);
+  private readonly injector = inject(Injector);
   private readonly lifecycle = inject(RewriteAppShellLifecycleService);
-  private readonly monitorEvents = inject(MonitorEventStreamService);
-  private readonly workspaceService = inject(RewriteAppWorkspaceService);
-  private readonly contentService = inject(RewriteAppContentService);
-  private readonly runtimeService = inject(RewriteAppRuntimeService);
-  private readonly opsService = inject(RewriteAppOpsService);
+  private monitorEvents: MonitorEventStreamService | null = null;
   private initialized = false;
 
   private readonly workspaceState = this.uiState.workspace;
-  private readonly refreshWorkspaceOverview = (quiet?: boolean) =>
-    this.workspaceService.refreshWorkspaceOverview(quiet);
-  private readonly refreshContentReads = (quiet?: boolean) =>
-    this.contentService.refreshContentReads(quiet);
-  private readonly refreshRuntimeReads = (quiet?: boolean) =>
-    this.runtimeService.refreshRuntimeReads(quiet);
-  private readonly refreshOperationalDiagnostics = (quiet?: boolean) =>
-    this.opsService.refreshOperationalDiagnostics(quiet);
+  private readonly refreshWorkspaceOverview = async (quiet?: boolean) => {
+    const { RewriteAppWorkspaceService } = await import(
+      "./rewrite-app-workspace.service"
+    );
+    return this.injector
+      .get(RewriteAppWorkspaceService)
+      .refreshWorkspaceOverview(quiet);
+  };
+  private readonly refreshContentReads = async (quiet?: boolean) => {
+    const { RewriteAppContentService } = await import(
+      "./rewrite-app-content.service"
+    );
+    return this.injector.get(RewriteAppContentService).refreshContentReads(quiet);
+  };
+  private readonly refreshRuntimeReads = async (quiet?: boolean) => {
+    const { RewriteAppRuntimeService } = await import(
+      "./rewrite-app-runtime.service"
+    );
+    return this.injector.get(RewriteAppRuntimeService).refreshRuntimeReads(quiet);
+  };
+  private readonly refreshOperationalDiagnostics = async (quiet?: boolean) => {
+    const { RewriteAppOpsService } = await import("./rewrite-app-ops.service");
+    return this.injector
+      .get(RewriteAppOpsService)
+      .refreshOperationalDiagnostics(quiet);
+  };
 
   get activeView(): AppView {
     return this.uiState.activeView;
@@ -58,7 +69,7 @@ export class RewriteAppViewStateService {
       this.refreshOperationalDiagnostics
     );
     this.syncMonitorEventStream();
-    void this.opsService.refreshOperationalDiagnostics(true);
+    void this.refreshOperationalDiagnostics(true);
   }
 
   destroy(): void {
@@ -66,7 +77,7 @@ export class RewriteAppViewStateService {
       return;
     }
     this.initialized = false;
-    this.monitorEvents.stop("Application shell closed.");
+    this.monitorEvents?.stop("Application shell closed.");
     this.lifecycle.clearAutoRefresh(
       this.refreshWorkspaceOverview,
       this.refreshContentReads,
@@ -122,7 +133,11 @@ export class RewriteAppViewStateService {
     if (this.activeView !== "runtime") {
       return;
     }
-    this.monitorEvents.restart(() => this.runtimeService.refreshRuntimeReads(true));
+    void this.getMonitorEvents().then(monitorEvents => {
+      if (this.initialized && this.activeView === "runtime") {
+        monitorEvents.restart(() => this.refreshRuntimeReads(true));
+      }
+    });
   }
 
   onActionAsync(action: () => Promise<unknown>): void {
@@ -144,9 +159,24 @@ export class RewriteAppViewStateService {
 
   private syncMonitorEventStream(): void {
     if (this.activeView === "runtime") {
-      this.monitorEvents.start(() => this.runtimeService.refreshRuntimeReads(true));
+      void this.getMonitorEvents().then(monitorEvents => {
+        if (this.initialized && this.activeView === "runtime") {
+          monitorEvents.start(() => this.refreshRuntimeReads(true));
+        }
+      });
       return;
     }
-    this.monitorEvents.stop();
+    this.monitorEvents?.stop();
+  }
+
+  private async getMonitorEvents(): Promise<MonitorEventStreamService> {
+    if (this.monitorEvents) {
+      return this.monitorEvents;
+    }
+    const { MonitorEventStreamService } = await import(
+      "./monitor-event-stream.service"
+    );
+    this.monitorEvents = this.injector.get(MonitorEventStreamService);
+    return this.monitorEvents;
   }
 }
