@@ -2295,9 +2295,15 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
     return new TextDecoder("windows-1252").decode(bytes);
   }
   if (
-    ["utf-16", "utf-16le", "utf16", "utf16le"].includes(
-      normalizedEncoding
-    )
+    [
+      "utf-16",
+      "utf-16le",
+      "utf16",
+      "utf16le",
+      "ucs-2",
+      "ucs2",
+      "iso-10646-ucs-2"
+    ].includes(normalizedEncoding)
   ) {
     return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
   }
@@ -2305,9 +2311,15 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
     return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
   }
   if (
-    ["utf-32", "utf-32le", "utf32", "utf32le"].includes(
-      normalizedEncoding
-    )
+    [
+      "utf-32",
+      "utf-32le",
+      "utf32",
+      "utf32le",
+      "ucs-4",
+      "ucs4",
+      "iso-10646-ucs-4"
+    ].includes(normalizedEncoding)
   ) {
     return decodeUtf32Bytes(bytes, "little-endian");
   }
@@ -6995,21 +7007,45 @@ const isXmlEncodingCompatibleWithDetectedBytes = (
     case "utf-8":
       return ["utf-8", "utf8"].includes(normalizedDeclaredEncoding);
     case "utf-16le":
-      return ["utf-16", "utf16", "utf-16le", "utf16le"].includes(
-        normalizedDeclaredEncoding
-      );
+      return [
+        "utf-16",
+        "utf16",
+        "utf-16le",
+        "utf16le",
+        "ucs-2",
+        "ucs2",
+        "iso-10646-ucs-2"
+      ].includes(normalizedDeclaredEncoding);
     case "utf-16be":
-      return ["utf-16", "utf16", "utf-16be", "utf16be"].includes(
-        normalizedDeclaredEncoding
-      );
+      return [
+        "utf-16",
+        "utf16",
+        "utf-16be",
+        "utf16be",
+        "ucs-2",
+        "ucs2",
+        "iso-10646-ucs-2"
+      ].includes(normalizedDeclaredEncoding);
     case "utf-32le":
-      return ["utf-32", "utf32", "utf-32le", "utf32le"].includes(
-        normalizedDeclaredEncoding
-      );
+      return [
+        "utf-32",
+        "utf32",
+        "utf-32le",
+        "utf32le",
+        "ucs-4",
+        "ucs4",
+        "iso-10646-ucs-4"
+      ].includes(normalizedDeclaredEncoding);
     case "utf-32be":
-      return ["utf-32", "utf32", "utf-32be", "utf32be"].includes(
-        normalizedDeclaredEncoding
-      );
+      return [
+        "utf-32",
+        "utf32",
+        "utf-32be",
+        "utf32be",
+        "ucs-4",
+        "ucs4",
+        "iso-10646-ucs-4"
+      ].includes(normalizedDeclaredEncoding);
   }
 };
 

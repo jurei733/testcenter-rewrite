@@ -13009,6 +13009,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="UTF-32"'
   );
+  const ucs2BookletXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="ISO-10646-UCS-2"'
+  );
+  const ucs2BigEndianBookletBytes = Buffer.from(
+    ucs2BookletXml,
+    "utf16le"
+  ).swap16();
+  const ucs4BookletXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="ISO-10646-UCS-4"'
+  );
   const latin1BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-1"')
     .replace(
@@ -13073,6 +13085,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "utf-32le-signature-original-booklet.xml",
       bytes: encodeUtf32(utf32BookletXml, "little-endian"),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "ucs-2be-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0xfe, 0xff]),
+        ucs2BigEndianBookletBytes
+      ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "ucs-4le-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0xff, 0xfe, 0x00, 0x00]),
+        encodeUtf32(ucs4BookletXml, "little-endian")
+      ]),
       displayLabel: "Sample booklet"
     },
     {
@@ -21787,7 +21815,7 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
       content: Buffer.concat([
         Buffer.from([0x00, 0x00, 0xfe, 0xff]),
         encodeUtf32(
-          `<?xml version="1.0" encoding="UTF-32"?>
+          `<?xml version="1.0" encoding="ISO-10646-UCS-4"?>
           <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
             <organizations default="ORG-ZIP">
               <organization identifier="ORG-ZIP">
