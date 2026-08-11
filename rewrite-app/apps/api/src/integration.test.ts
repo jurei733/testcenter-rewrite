@@ -13344,6 +13344,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "booklets/Booklet_sameBookletID.xml"),
     "utf8"
   );
+  const maximumUnicodeVariableId = "🧪".repeat(50);
   const schemaValidUnorderedBookletXml = validBookletXml.replace(
     /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
     "$2$1"
@@ -14175,6 +14176,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_variable_id_invalid"
     },
     {
+      fileName: "unit-17-variable-id-too-many-unicode-characters.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        `id="${maximumUnicodeVariableId}🧪" type="string"`
+      ),
+      diagnosticCode: "testcenter_xml_variable_id_invalid"
+    },
+    {
       fileName: "unit-14-variable-id-not-xml-id.xml",
       sourceDocument: validUnitXml
         .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
@@ -14403,7 +14412,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     unicodeFacetWorkspaceKey,
     validUnitXml.replace(
       'id="var1" type="string"',
-      `id="var1" type="string" format="${unicodeVariableFormat}"`
+      `id="${maximumUnicodeVariableId}" type="string" format="${unicodeVariableFormat}"`
     )
   );
   const unicodeBookletSourceDocument = validAdaptiveBookletXml

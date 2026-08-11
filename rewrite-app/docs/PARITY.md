@@ -327,6 +327,9 @@ ASCII word class.
 The same gate uses the Original backend's semicolon-separated multi-state
 syntax, while comma-separated migrated inputs remain compatible; the
 surrounding lowercase-letter/hyphen constraints remain unchanged.
+Unit `Variable/@id` length facets now likewise count Unicode code points like
+XML Schema instead of UTF-16 code units; the executable boundary accepts 50
+astral characters and rejects 51.
 
 Latest P0 adaptive-condition XSD closure: the 17.6 Booklet schema requires
 `of` and `from` only for `Score`; `Value`, `Code`, and `Status` deliberately

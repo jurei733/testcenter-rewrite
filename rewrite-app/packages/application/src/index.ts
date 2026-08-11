@@ -10425,7 +10425,7 @@ const validateTestcenterXmlSourceDocument = (
       );
       if (
         !variableId.trim() ||
-        variableId.length > maximumVariableIdLength ||
+        [...variableId].length > maximumVariableIdLength ||
         (usesPre15UnitSchema && !isTestcenterXmlId(variableId))
       ) {
         diagnostics.push(
