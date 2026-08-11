@@ -11732,6 +11732,190 @@ try {
     return controller;
   };
 
+  const demoController = await openOriginalTestController(
+    "Test_Ctrl-1",
+    "Cy-Bklt_TC-1"
+  );
+  assert.ok(demoController.testRunId);
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-demo" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTimerLifecycleMessage")
+    .filter({ hasText: "started" })
+    .waitFor();
+  await demoController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .check();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await demoController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await demoController.frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .isChecked(),
+    true
+  );
+  const reopenedDemoController = await openOriginalTestController(
+    "Test_Ctrl-1",
+    "Cy-Bklt_TC-1"
+  );
+  assert.equal(
+    reopenedDemoController.participantSessionId,
+    demoController.participantSessionId
+  );
+  assert.equal(reopenedDemoController.testRunId, demoController.testRunId);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-100" })
+    .waitFor();
+  const resetDemoState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${reopenedDemoController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-100" &&
+      Object.keys(payload.currentRunState.testRun.unitResponses ?? {}).length ===
+        0 &&
+      Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
+  );
+  assert.equal(resetDemoState.currentRunState.executionMode.saveResponses, false);
+  await page.locator("#participantRouteNextUnitButton").click();
+  await reopenedDemoController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await reopenedDemoController.frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .isChecked(),
+    false
+  );
+
+  const reviewController = await openOriginalTestController(
+    "Test_Ctrl-2",
+    "Cy-Bklt_TC-2"
+  );
+  assert.ok(reviewController.testRunId);
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-review" })
+    .waitFor();
+  await page.locator("#participantRouteUnitRail").waitFor();
+  await page.locator("#participantRouteReviewPanel").waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteTestletTimerValue").waitFor();
+  await reviewController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .check();
+  await page.locator("#participantRouteReviewReviewer").fill("tobias");
+  await page
+    .locator("#participantRouteReviewPriority")
+    .selectOption({ label: "Critical / urgent" });
+  await page.locator("#participantRouteReviewCategory-tech").check();
+  await page.locator("#participantRouteReviewTargetUnit").click();
+  await page
+    .locator("#participantRouteReviewComment")
+    .fill("its a new comment");
+  await page.locator("#participantRouteReviewSaveButton").click();
+  await page
+    .locator("#participantRouteReviewFeedback")
+    .filter({ hasText: "Comment saved" })
+    .waitFor({ timeout: 15_000 });
+  const officialReviewPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/test-runs/${reviewController.testRunId}/reviews`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.reviewerId === "tobias" &&
+          item?.unitKey === "CY-Unit.Sample-101" &&
+          item?.priority === 1 &&
+          item?.categories?.join(" ") === "tech" &&
+          item?.comment === "its a new comment"
+      )
+  );
+  const officialReviewId = officialReviewPayload.items.find(
+    item => item?.comment === "its a new comment"
+  )?.reviewId;
+  assert.ok(officialReviewId);
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await reviewController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await reviewController.frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .isChecked(),
+    true
+  );
+  const reopenedReviewController = await openOriginalTestController(
+    "Test_Ctrl-2",
+    "Cy-Bklt_TC-2"
+  );
+  assert.equal(
+    reopenedReviewController.participantSessionId,
+    reviewController.participantSessionId
+  );
+  assert.equal(reopenedReviewController.testRunId, reviewController.testRunId);
+  await page
+    .locator(`.participant-review-item[data-review-id="${officialReviewId}"]`)
+    .filter({ hasText: "its a new comment" })
+    .waitFor({ timeout: 15_000 });
+  const resetReviewState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${reopenedReviewController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-100" &&
+      Object.keys(payload.currentRunState.testRun.unitResponses ?? {}).length ===
+        0 &&
+      Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
+  );
+  assert.equal(resetReviewState.currentRunState.executionMode.saveResponses, false);
+  await page.locator("#participantRouteNextUnitButton").click();
+  await reopenedReviewController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await reopenedReviewController.frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .isChecked(),
+    false
+  );
+  const officialReviewLogs = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/test-logs?testRunId=${encodeURIComponent(
+        reviewController.testRunId
+      )}`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.deepEqual(officialReviewLogs.items, []);
+
   const protectedController = await openOriginalTestController(
     "Test_Ctrl-3",
     "Cy-Bklt_TC-3"
