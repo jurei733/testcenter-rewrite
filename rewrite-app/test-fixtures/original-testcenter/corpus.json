@@ -134,6 +134,66 @@
       "policy": { "unitControls": "both", "headerContent": "block" }
     },
     {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_5.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_5.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "86e456809329070abd2822c790c1ca49a2caa451bc82873552869f084353830d",
+      "bookletKey": "Cy-Bklt_BkltConfig-5",
+      "displayLabel": "Bklt-config-5",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_6.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_6.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "07af88a78f46d498198f674865c53309abf628786bb4a45ab895d2326820a6b3",
+      "bookletKey": "Cy-Bklt_BkltConfig-6",
+      "displayLabel": "Bklt-config-6",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "forward" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_7.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_7.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "624d847f429ad505b0b3cfe286435c3f7389ccb3c60ee0858ee58060e93b0262",
+      "bookletKey": "Cy-Bklt_BkltConfig-7",
+      "displayLabel": "Bklt-config-7",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "always" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_8.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_8.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "7f89aa788176a7178ea57d18ce6d2b70c7d22724af1c384c3154a2e084db69bd",
+      "bookletKey": "Cy-Bklt_BkltConfig-8",
+      "displayLabel": "Bklt-config-8",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_9.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_9.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c521b904692cf1b4a8e57567de858e2d6c27fc801d9279aa65bfdcabf602378d",
+      "bookletKey": "Cy-Bklt_BkltConfig-9",
+      "displayLabel": "Bklt-config-9",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "forward" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_10.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_10.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "2ad294179d54b3e05b6ac79e353066d1eecb3bcb7d6693bdd456ed00ca1cc913",
+      "bookletKey": "Cy-Bklt_BkltConfig-10",
+      "displayLabel": "Bklt-config-10",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "always" }
+    },
+    {
       "fixture": "booklets/system-test/CY_Bklt_BkltConfig_15.xml",
       "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_15.xml",
       "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",

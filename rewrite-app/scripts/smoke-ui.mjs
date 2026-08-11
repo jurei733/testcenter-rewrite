@@ -10644,6 +10644,13 @@ try {
       fixture: "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
       bookletKey: "Cy-Bklt_BkltConfig-4"
     },
+    ...Array.from({ length: 6 }, (_, index) => {
+      const number = index + 5;
+      return {
+        fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
+        bookletKey: `Cy-Bklt_BkltConfig-${number}`
+      };
+    }),
     ...[15, 16].map(number => ({
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
