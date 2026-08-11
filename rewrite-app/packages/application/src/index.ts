@@ -11567,6 +11567,16 @@ const collectXmlManifestResources = (
     "xml:base",
     "base"
   );
+  const resourcesAttributes = parseXmlAttributes(
+    sourceDocument.match(
+      /<((?:[a-zA-Z_][\w.-]*:)?resources)\b([^>]*?)(?:\/>|>)/i
+    )?.[2] ?? ""
+  );
+  const resourcesBasePath = readXmlAttribute(
+    resourcesAttributes,
+    "xml:base",
+    "base"
+  );
 
   for (const resourceMatch of sourceDocument.matchAll(
     xmlManifestResourcePattern
@@ -11621,6 +11631,7 @@ const collectXmlManifestResources = (
         identifier;
     const key = resolveXmlManifestPath(
       manifestBasePath,
+      resourcesBasePath,
       resourceBasePath,
       fileBasePath,
       rawHref
