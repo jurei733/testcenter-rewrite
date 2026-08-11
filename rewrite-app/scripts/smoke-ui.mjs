@@ -12011,6 +12011,137 @@ try {
     Object.keys(flushedControllerResponse.unitState?.dataParts ?? {}).length > 0
   );
 
+  const resumedProtectedController = await openOriginalTestController(
+    "Test_Ctrl-3",
+    "Cy-Bklt_TC-3"
+  );
+  assert.equal(
+    resumedProtectedController.participantSessionId,
+    protectedController.participantSessionId
+  );
+  assert.equal(
+    resumedProtectedController.testRunId,
+    protectedController.testRunId
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await resumedProtectedController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await resumedProtectedController.frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .isChecked(),
+    true
+  );
+
+  const hotRestartController = await openOriginalTestController(
+    "Test_Ctrl-7",
+    "Cy-Bklt_TC-4"
+  );
+  assert.ok(hotRestartController.testRunId);
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-hot-restart" })
+    .waitFor();
+  await hotRestartController.frame
+    .getByText("Testung Controller: Startseite", { exact: true })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletGateLabel")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await hotRestartController.frame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .check();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  const savedHotRestartState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${hotRestartController.participantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          "CY-Unit.Sample-101"
+        ];
+      if (typeof response !== "string" || response.trim() === "") {
+        return false;
+      }
+      try {
+        return (
+          Object.keys(JSON.parse(response).unitState?.dataParts ?? {}).length > 0
+        );
+      } catch {
+        return false;
+      }
+    }
+  );
+  assert.equal(
+    savedHotRestartState.currentRunState.testRun.currentUnitKey,
+    "CY-Unit.Sample-102"
+  );
+  const restartedController = await openOriginalTestController(
+    "Test_Ctrl-7",
+    "Cy-Bklt_TC-4"
+  );
+  assert.notEqual(
+    restartedController.participantSessionId,
+    hotRestartController.participantSessionId
+  );
+  assert.notEqual(restartedController.testRunId, hotRestartController.testRunId);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-100" })
+    .waitFor({ timeout: 15_000 });
+  const cleanHotRestartState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${restartedController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-100" &&
+      Object.keys(payload.currentRunState.testRun.unitResponses ?? {}).length ===
+        0 &&
+      Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
+  );
+  assert.equal(
+    cleanHotRestartState.currentRunState.executionMode.alwaysNewSession,
+    true
+  );
+  const retainedHotRestartState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${hotRestartController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.testRunId ===
+        hotRestartController.testRunId &&
+      typeof payload.currentRunState.testRun.unitResponses?.[
+        "CY-Unit.Sample-101"
+      ] === "string"
+  );
+  assert.equal(
+    retainedHotRestartState.currentRunState.testRun.currentUnitKey,
+    "CY-Unit.Sample-102"
+  );
+  const retainedHotRestartCsvResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/exports/responses.csv?testRunId=${encodeURIComponent(
+      hotRestartController.testRunId
+    )}&unitKey=${encodeURIComponent("CY-Unit.Sample-101")}&limit=1`,
+    { method: "GET" }
+  );
+  const retainedHotRestartCsv = await retainedHotRestartCsvResponse.text();
+  assert.match(retainedHotRestartCsv, /Test_Ctrl-7/);
+  assert.match(retainedHotRestartCsv, /"hot-restart"/);
+  assert.match(retainedHotRestartCsv, /CY-Unit\.Sample-101/);
+  assert.match(retainedHotRestartCsv, /radio1/);
+
   const completionController = await openOriginalTestController(
     "Test_Ctrl-23",
     "Cy-Bklt_TC-14"
