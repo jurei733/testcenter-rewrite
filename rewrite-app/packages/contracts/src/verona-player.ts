@@ -349,13 +349,36 @@ export const mergeVeronaUnitResponse = (
   }
 ): string => {
   const previous = parseVeronaUnitResponse(previousValue);
+  const previousUnitState = previous?.unitState ?? {};
+  const updatedUnitState = asRecord(update.unitState);
+  const previousDataParts = previousUnitState.dataParts;
+  const updatedDataParts = normalizeDataParts(updatedUnitState?.dataParts);
+  const mergedUnitState = updatedUnitState
+    ? {
+        ...previousUnitState,
+        ...updatedUnitState
+      }
+    : previousUnitState;
+  if (updatedUnitState && (previousDataParts || updatedDataParts)) {
+    mergedUnitState.dataParts = {
+      ...(previousDataParts ?? {}),
+      ...(updatedDataParts ?? {})
+    };
+  } else if (
+    updatedUnitState &&
+    Object.prototype.hasOwnProperty.call(updatedUnitState, "dataParts")
+  ) {
+    delete mergedUnitState.dataParts;
+  }
+  const updatedDataPartValueTypes = inferDataPartValueTypes(update.unitState);
   return serializeVeronaUnitResponse({
-    unitState:
-      update.unitState === undefined ? previous?.unitState : update.unitState,
-    dataPartValueTypes:
-      update.unitState === undefined
-        ? previous?.dataPartValueTypes
-        : inferDataPartValueTypes(update.unitState),
+    unitState: mergedUnitState,
+    dataPartValueTypes: updatedDataPartValueTypes
+      ? {
+          ...(previous?.dataPartValueTypes ?? {}),
+          ...updatedDataPartValueTypes
+        }
+      : previous?.dataPartValueTypes,
     playerState:
       update.playerState === undefined
         ? previous?.playerState

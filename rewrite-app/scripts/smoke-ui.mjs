@@ -6233,28 +6233,41 @@ try {
       <script>
         let sessionId = "";
         let currentPage = "page-1";
-        const sendState = (includeLog = true) => parent.postMessage({
-          type: "vopStateChangedNotification",
-          sessionId,
-          unitState: {
-            dataParts: { answer: document.querySelector("#playerAnswer").value },
-            presentationProgress: "complete",
-            responseProgress: document.querySelector("#playerAnswer").value ? "complete" : "none",
-            unitStateDataType: "verona-smoke@1"
-          },
-          playerState: {
-            currentPage,
-            validPages: [
-              { id: "page-1", label: "Introduction" },
-              { id: "page-2", label: "Review" }
-            ]
-          },
-          ...(includeLog ? { log: [{
-            key: "PLAYER_STATE_CHANGED",
-            timeStamp: Date.now(),
-            content: document.querySelector("#playerAnswer").value
-          }] } : {})
-        }, "*");
+        const sendState = (includeLog = true) => {
+          const answer = document.querySelector("#playerAnswer").value;
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            unitState: {
+              dataParts: { answer },
+              unitStateDataType: "verona-smoke@1"
+            },
+            ...(includeLog ? { log: [{
+              key: "PLAYER_STATE_CHANGED",
+              timeStamp: Date.now(),
+              content: answer
+            }] } : {})
+          }, "*");
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            unitState: {
+              presentationProgress: "complete",
+              responseProgress: answer ? "complete" : "none"
+            }
+          }, "*");
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            playerState: {
+              currentPage,
+              validPages: [
+                { id: "page-1", label: "Introduction" },
+                { id: "page-2", label: "Review" }
+              ]
+            }
+          }, "*");
+        };
         addEventListener("message", event => {
           if (event.data?.type === "vopPageNavigationCommand") {
             currentPage = String(event.data.target || "");
@@ -6983,7 +6996,7 @@ try {
         item => item.testLog?.logContent
       )
     ),
-    new Set(["complete"])
+    new Set(["", "complete"])
   );
   const veronaResponseProgressLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
@@ -6998,7 +7011,7 @@ try {
     new Set(
       veronaResponseProgressLogs.items.map(item => item.testLog?.logContent)
     ),
-    new Set(["none", "complete"])
+    new Set(["", "none", "complete"])
   );
   const veronaLoadCompleteLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(

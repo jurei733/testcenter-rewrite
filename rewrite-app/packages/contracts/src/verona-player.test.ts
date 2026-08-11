@@ -145,6 +145,53 @@ test("Verona response envelopes merge separately reported unit and player state"
   });
 });
 
+test("Verona response envelopes merge partial unit-state reports without losing answers", () => {
+  const initialResponse = serializeVeronaUnitResponse({
+    unitState: {
+      dataParts: {
+        answer: { value: 42 },
+        untouched: "plain text"
+      },
+      presentationProgress: "some",
+      responseProgress: "some",
+      unitStateDataType: "example@1"
+    }
+  });
+  const progressResponse = mergeVeronaUnitResponse(initialResponse, {
+    unitState: {
+      presentationProgress: "complete"
+    }
+  });
+  const dataPartResponse = mergeVeronaUnitResponse(progressResponse, {
+    unitState: {
+      dataParts: {
+        answer: "updated",
+        added: { selected: true }
+      }
+    }
+  });
+
+  assert.deepEqual(parseVeronaUnitResponse(dataPartResponse), {
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      dataParts: {
+        answer: "updated",
+        untouched: "plain text",
+        added: '{"selected":true}'
+      },
+      presentationProgress: "complete",
+      responseProgress: "some",
+      unitStateDataType: "example@1"
+    },
+    dataPartValueTypes: {
+      answer: "string",
+      untouched: "string",
+      added: "json"
+    }
+  });
+});
+
 test("Verona page state projects the original host-side page logs", () => {
   const timeStamp = 1_786_278_400_000;
 
