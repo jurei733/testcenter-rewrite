@@ -65,11 +65,13 @@ const readExpectedSqliteSchemaVersion = async () => {
     new URL("../packages/sqlite-store/src/index.ts", import.meta.url),
     "utf8"
   );
-  const match = /SQLITE_FIRST_SLICE_SCHEMA_VERSION\s*=\s*(\d+)/.exec(source);
-  if (!match) {
+  const migrationVersions = [
+    ...source.matchAll(/^\s+version:\s*(\d+),\s*$/gm)
+  ].map(match => Number.parseInt(match[1], 10));
+  if (migrationVersions.length === 0) {
     throw new Error("Could not resolve expected SQLite schema version.");
   }
-  return Number.parseInt(match[1], 10);
+  return Math.max(...migrationVersions);
 };
 
 const pollJson = async url => {
@@ -203,7 +205,7 @@ try {
   expectHeader(
     appResponse,
     "permissions-policy",
-    "camera=(), geolocation=(), microphone=()"
+    "camera=(self), geolocation=(), microphone=()"
   );
   if (!appHtml.includes("<app-root></app-root>")) {
     throw new Error("Expected /app HTML to contain the Angular root marker.");

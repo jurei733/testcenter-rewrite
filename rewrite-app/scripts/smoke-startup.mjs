@@ -114,7 +114,7 @@ const expectSecurityHeaders = (label, response) => {
     ["x-content-type-options", "nosniff"],
     ["referrer-policy", "no-referrer"],
     ["x-frame-options", "SAMEORIGIN"],
-    ["permissions-policy", "camera=(), geolocation=(), microphone=()"]
+    ["permissions-policy", "camera=(self), geolocation=(), microphone=()"]
   ]) {
     const actualValue = response.headers.get(header);
     if (actualValue !== expectedValue) {
