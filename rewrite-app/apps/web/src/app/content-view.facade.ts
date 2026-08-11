@@ -663,6 +663,9 @@ export class ContentViewFacade {
         [{
           label: "Sort",
           value: `${this.content.sourcePackageSortBy || "fileName"} ${this.content.sourcePackageSortDirection || "asc"}`
+        }, {
+          label: "Matched Records",
+          value: String(payload.filteredCount)
         }]
       ),
       ...payload.items.map(item => ({
@@ -728,6 +731,42 @@ export class ContentViewFacade {
     ];
   }
 
+  get sourcePackageHealthItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListSourcePackagesResponse>(
+      this.content.sourcePackagesView
+    );
+    if (!payload) {
+      return [];
+    }
+
+    const summary = payload.workspaceSummary;
+    const headline =
+      summary.totalCount === 0
+        ? "Workspace contains no files"
+        : summary.invalidCount > 0
+          ? "Workspace files need attention"
+          : summary.pendingCount > 0
+            ? "Workspace files await validation"
+            : "All workspace files are valid";
+    return [{
+      headline,
+      subline: `${summary.totalCount} workspace file(s), independent of filters and limit`,
+      badges: [
+        `${summary.validCount} valid`,
+        `${summary.pendingCount} pending`,
+        `${summary.invalidCount} invalid`,
+        `${summary.warningFileCount} with warnings`
+      ],
+      rows: [
+        { label: "Total", value: String(summary.totalCount) },
+        { label: "Valid", value: String(summary.validCount) },
+        { label: "Pending", value: String(summary.pendingCount) },
+        { label: "Invalid", value: String(summary.invalidCount) },
+        { label: "Warning Files", value: String(summary.warningFileCount) }
+      ]
+    }];
+  }
+
   get sourcePackageBatchDeletionItems(): RecordCollectionItem[] {
     const report = this.sourcePackageBatchDeletionReport;
     if (!report) {
@@ -784,32 +823,39 @@ export class ContentViewFacade {
       return [];
     }
 
-    return workspaceFileTypes.flatMap(fileType => {
-      const matches = payload.items.filter(item => item.fileType === fileType);
-      if (matches.length === 0) {
+    return payload.workspaceSummary.fileTypes.flatMap(typeSummary => {
+      if (typeSummary.totalCount === 0) {
         return [];
       }
+      const matches = payload.items.filter(
+        item => item.fileType === typeSummary.fileType
+      );
       const previewNames = matches
         .slice(0, 5)
         .map(item => item.sourcePackage.fileName);
       return [{
-        headline: fileType,
-        subline: `${matches.length} ${matches.length === 1 ? "file" : "files"}`,
+        headline: typeSummary.fileType,
+        subline: `${typeSummary.totalCount} ${typeSummary.totalCount === 1 ? "file" : "files"}`,
         badges: [
-          `${matches.filter(item => item.sourcePackage.status === "accepted").length} accepted`,
-          `${matches.filter(item => !item.canDelete).length} protected`
+          `${typeSummary.validCount} valid`,
+          `${typeSummary.pendingCount} pending`,
+          `${typeSummary.invalidCount} invalid`,
+          `${typeSummary.warningFileCount} with warnings`
         ],
         rows: [
           {
-            label: "Files",
-            value: `${previewNames.join(", ")}${
-              matches.length > previewNames.length ? ", …" : ""
-            }`
+            label: "Current Window",
+            value: previewNames.length > 0
+              ? `${previewNames.join(", ")}${
+                  matches.length > previewNames.length ? ", …" : ""
+                }`
+              : "No matching file in the current filtered window"
           }
         ],
-        selected: this.content.sourcePackageFileTypeFilter === fileType,
+        selected:
+          this.content.sourcePackageFileTypeFilter === typeSummary.fileType,
         actionLabel: "Filter This Type",
-        actionPayload: { fileType }
+        actionPayload: { fileType: typeSummary.fileType }
       } satisfies RecordCollectionItem];
     });
   }

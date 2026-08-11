@@ -10,7 +10,10 @@ import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { CodingScheme } from "@iqb/responses";
 import type { Response as IqbResponse } from "@iqb/responses";
-import { adminPasswordPolicy } from "@testcenter-rewrite-app/contracts";
+import {
+  adminPasswordPolicy,
+  type ListSourcePackagesResponse
+} from "@testcenter-rewrite-app/contracts";
 
 import { createProductionApiServer } from "./index.js";
 
@@ -9798,6 +9801,7 @@ test("workspace files are classified by original Testcenter type", async () => {
     ["delivery.zip", "application/zip", "data:application/zip;base64,UEs=", "Package"]
   ] as const;
 
+  const sourcePackageIds = new Map<string, string>();
   for (const [fileName, mediaType, sourceDocument] of fixtures) {
     const upload = await requestJson<{ sourcePackage: { sourcePackageId: string } }>(
       `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
@@ -9807,15 +9811,21 @@ test("workspace files are classified by original Testcenter type", async () => {
       }
     );
     assert.equal(upload.status, 201);
+    sourcePackageIds.set(fileName, upload.body.sourcePackage.sourcePackageId);
   }
 
-  const files = await requestJson<{
-    items: Array<{
-      sourcePackage: { sourcePackageId: string; fileName: string };
-      fileType: string;
-      fileSizeBytes: number | null;
-    }>;
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
+  const failedImport = await requestJson<{
+    importJob: { status: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackageIds.get("booklet.xml") }
+  });
+  assert.equal(failedImport.status, 201);
+  assert.equal(failedImport.body.importJob.status, "failed");
+
+  const files = await requestJson<ListSourcePackagesResponse>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`
+  );
   assert.equal(files.status, 200);
   assert.deepEqual(
     Object.fromEntries(
@@ -9823,35 +9833,62 @@ test("workspace files are classified by original Testcenter type", async () => {
     ),
     Object.fromEntries(fixtures.map(([fileName, , , fileType]) => [fileName, fileType]))
   );
+  assert.equal(files.body.filteredCount, fixtures.length);
+  assert.deepEqual(
+    {
+      totalCount: files.body.workspaceSummary.totalCount,
+      validCount: files.body.workspaceSummary.validCount,
+      pendingCount: files.body.workspaceSummary.pendingCount,
+      invalidCount: files.body.workspaceSummary.invalidCount,
+      warningFileCount: files.body.workspaceSummary.warningFileCount
+    },
+    {
+      totalCount: fixtures.length,
+      validCount: 0,
+      pendingCount: fixtures.length - 1,
+      invalidCount: 1,
+      warningFileCount: 0
+    }
+  );
+  assert.deepEqual(
+    files.body.workspaceSummary.fileTypes.map(summary => ({
+      fileType: summary.fileType,
+      totalCount: summary.totalCount,
+      pendingCount: summary.pendingCount,
+      invalidCount: summary.invalidCount
+    })),
+    [
+      { fileType: "Testtakers", totalCount: 1, pendingCount: 1, invalidCount: 0 },
+      { fileType: "Booklet", totalCount: 1, pendingCount: 0, invalidCount: 1 },
+      { fileType: "SysCheck", totalCount: 1, pendingCount: 1, invalidCount: 0 },
+      { fileType: "Unit", totalCount: 1, pendingCount: 1, invalidCount: 0 },
+      { fileType: "Resource", totalCount: 1, pendingCount: 1, invalidCount: 0 },
+      { fileType: "Package", totalCount: 1, pendingCount: 1, invalidCount: 0 }
+    ]
+  );
 
-  const booklets = await requestJson<{
-    items: Array<{ sourcePackage: { fileName: string }; fileType: string }>;
-  }>(
+  const booklets = await requestJson<ListSourcePackagesResponse>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileType=Booklet`
   );
   assert.equal(booklets.status, 200);
+  assert.equal(booklets.body.filteredCount, 1);
+  assert.equal(booklets.body.workspaceSummary.totalCount, fixtures.length);
   assert.deepEqual(
     booklets.body.items.map(item => [item.sourcePackage.fileName, item.fileType]),
     [["booklet.xml", "Booklet"]]
   );
 
-  const filesByName = await requestJson<{
-    items: Array<{ sourcePackage: { fileName: string } }>;
-  }>(
+  const filesByName = await requestJson<ListSourcePackagesResponse>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortBy=fileName&sortDirection=asc&limit=3`
   );
   assert.equal(filesByName.status, 200);
+  assert.equal(filesByName.body.filteredCount, fixtures.length);
   assert.deepEqual(
     filesByName.body.items.map(item => item.sourcePackage.fileName),
     ["booklet.xml", "delivery.zip", "participants.xml"]
   );
 
-  const filesBySize = await requestJson<{
-    items: Array<{
-      sourcePackage: { fileName: string };
-      fileSizeBytes: number | null;
-    }>;
-  }>(
+  const filesBySize = await requestJson<ListSourcePackagesResponse>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortBy=fileSize&sortDirection=desc&limit=2`
   );
   assert.equal(filesBySize.status, 200);

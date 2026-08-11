@@ -1648,6 +1648,30 @@ export type WorkspaceSourcePackageListItem = {
   blockingDependencyCount: number;
 };
 
+export type WorkspaceSourcePackageStatusSummary = {
+  totalCount: number;
+  validCount: number;
+  pendingCount: number;
+  invalidCount: number;
+  warningFileCount: number;
+};
+
+export type WorkspaceSourcePackageTypeSummary =
+  WorkspaceSourcePackageStatusSummary & {
+    fileType: WorkspaceFileType;
+  };
+
+export type WorkspaceSourcePackageListSummary =
+  WorkspaceSourcePackageStatusSummary & {
+    fileTypes: WorkspaceSourcePackageTypeSummary[];
+  };
+
+export type WorkspaceSourcePackageListResult = {
+  items: WorkspaceSourcePackageListItem[];
+  filteredCount: number;
+  workspaceSummary: WorkspaceSourcePackageListSummary;
+};
+
 export type WorkspaceFileDependencyNodeType =
   | "source_package"
   | "booklet"

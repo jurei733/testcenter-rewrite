@@ -5538,12 +5538,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const items = await services.workspaceAdminRead.listSourcePackages({
+        const result = await services.workspaceAdminRead.listSourcePackages({
           tenantKey,
           workspaceKey,
           ...query
         });
-        sendJson<ListSourcePackagesResponse>(response, 200, { items });
+        sendJson<ListSourcePackagesResponse>(response, 200, result);
         return;
       }
 

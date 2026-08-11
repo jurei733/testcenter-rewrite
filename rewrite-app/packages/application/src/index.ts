@@ -40,7 +40,8 @@ import {
   defaultParticipantExecutionMode,
   monitorRunCommandTypes,
   participantExecutionModeDefinitions,
-  participantExecutionModes
+  participantExecutionModes,
+  workspaceFileTypes
 } from "@testcenter-rewrite-app/domain";
 import type {
   AdminLoginAttempt,
@@ -131,6 +132,8 @@ import type {
   WorkspaceDeletion,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
+  WorkspaceSourcePackageListResult,
+  WorkspaceSourcePackageListSummary,
   WorkspaceFileDependencyEdge,
   WorkspaceFileDependencyNode,
   WorkspaceFileType,
@@ -372,7 +375,7 @@ export type WorkspaceAdminReadPort = {
     sortBy?: "fileName" | "fileSize" | "uploadedAt";
     sortDirection?: "asc" | "desc";
     limit?: number;
-  }): Promise<WorkspaceSourcePackageListItem[]>;
+  }): Promise<WorkspaceSourcePackageListResult>;
   exportSourcePackagesCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -24727,8 +24730,8 @@ export const createFirstSliceServices = (
         const sortDirection = input.sortDirection ?? "desc";
         const direction = sortDirection === "asc" ? 1 : -1;
 
-        return sourcePackages
-          .map<WorkspaceSourcePackageListItem>(sourcePackage => {
+        const allItems = sourcePackages.map<WorkspaceSourcePackageListItem>(
+          sourcePackage => {
             const sourcePackageImportJobs = importJobs
               .filter(
                 importJob => importJob.sourcePackageId === sourcePackage.sourcePackageId
@@ -24767,16 +24770,47 @@ export const createFirstSliceServices = (
               blockingDependencyCount:
                 deletionReadiness.blockingDependencies.length
             };
-          })
-          .filter(
-            item =>
-              (!input.status || item.sourcePackage.status === input.status) &&
-              (!input.fileType || item.fileType === input.fileType) &&
-              (!input.mediaType || item.sourcePackage.mediaType === input.mediaType) &&
-              (!input.fileName || item.sourcePackage.fileName === input.fileName) &&
-              (!input.latestImportStatus ||
-                item.latestImportJob?.status === input.latestImportStatus)
-          )
+          }
+        );
+        const summarizeItems = (
+          items: WorkspaceSourcePackageListItem[]
+        ): Omit<WorkspaceSourcePackageListSummary, "fileTypes"> => ({
+          totalCount: items.length,
+          validCount: items.filter(
+            item => item.sourcePackage.status === "accepted"
+          ).length,
+          pendingCount: items.filter(
+            item => item.sourcePackage.status === "uploaded"
+          ).length,
+          invalidCount: items.filter(
+            item => item.sourcePackage.status === "rejected"
+          ).length,
+          warningFileCount: items.filter(item =>
+            item.latestImportJob?.diagnostics.some(
+              diagnostic => diagnostic.severity === "warning"
+            )
+          ).length
+        });
+        const workspaceSummary: WorkspaceSourcePackageListSummary = {
+          ...summarizeItems(allItems),
+          fileTypes: workspaceFileTypes.map(fileType => ({
+            fileType,
+            ...summarizeItems(
+              allItems.filter(item => item.fileType === fileType)
+            )
+          }))
+        };
+        const filteredItems = allItems.filter(
+          item =>
+            (!input.status || item.sourcePackage.status === input.status) &&
+            (!input.fileType || item.fileType === input.fileType) &&
+            (!input.mediaType || item.sourcePackage.mediaType === input.mediaType) &&
+            (!input.fileName || item.sourcePackage.fileName === input.fileName) &&
+            (!input.latestImportStatus ||
+              item.latestImportJob?.status === input.latestImportStatus)
+        );
+
+        const items = filteredItems
           .sort((left, right) => {
             let comparison = 0;
             if (sortBy === "fileName") {
@@ -24801,9 +24835,15 @@ export const createFirstSliceServices = (
             );
           })
           .slice(0, limit);
+
+        return {
+          items,
+          filteredCount: filteredItems.length,
+          workspaceSummary
+        };
       },
       async exportSourcePackagesCsv(input) {
-        const items = await this.listSourcePackages(input);
+        const { items } = await this.listSourcePackages(input);
 
         return formatSourcePackagesCsv({
           tenantKey: input.tenantKey,

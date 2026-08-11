@@ -62,6 +62,7 @@ import type {
   WorkspaceSourcePackageDeletion,
   WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageListItem,
+  WorkspaceSourcePackageListSummary,
   WorkspaceSystemCheck,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorGroupDetail,
@@ -2905,6 +2906,8 @@ export type ReplaceSourcePackageResponse = {
 
 export type ListSourcePackagesResponse = {
   items: WorkspaceSourcePackageListItem[];
+  filteredCount: number;
+  workspaceSummary: WorkspaceSourcePackageListSummary;
 };
 
 export type GetSourcePackageResponse = {

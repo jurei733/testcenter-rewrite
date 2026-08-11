@@ -15379,16 +15379,73 @@ try {
   await fillAndCommit("#contentReleaseImportJobFilter", completedRetryImportJobId);
   await fillAndCommit("#contentReleaseSourcePackageFilter", failedSourcePackageId);
   await fillAndCommit("#contentReleaseLimit", "1");
-  const sortedSourcePackageRequest = page.waitForRequest(request => {
-    const url = new URL(request.url());
+  const sortedSourcePackageResponse = page.waitForResponse(response => {
+    const url = new URL(response.url());
     return (
       url.pathname.endsWith("/source-packages") &&
       url.searchParams.get("sortBy") === "fileSize" &&
-      url.searchParams.get("sortDirection") === "desc"
+      url.searchParams.get("sortDirection") === "desc" &&
+      response.status() === 200
     );
   });
   await clickContentFilterApply();
-  await sortedSourcePackageRequest;
+  const sortedSourcePackagePayload = await (
+    await sortedSourcePackageResponse
+  ).json();
+  assert.equal(sortedSourcePackagePayload.filteredCount, 1);
+  assert.ok(sortedSourcePackagePayload.workspaceSummary.totalCount > 1);
+  assert.equal(
+    sortedSourcePackagePayload.workspaceSummary.validCount +
+      sortedSourcePackagePayload.workspaceSummary.pendingCount +
+      sortedSourcePackagePayload.workspaceSummary.invalidCount,
+    sortedSourcePackagePayload.workspaceSummary.totalCount
+  );
+  assert.equal(
+    sortedSourcePackagePayload.workspaceSummary.fileTypes.reduce(
+      (count, summary) => count + summary.totalCount,
+      0
+    ),
+    sortedSourcePackagePayload.workspaceSummary.totalCount
+  );
+  const sourcePackageHealthCard = page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Workspace File Health" }) })
+    .locator(".record-card");
+  await sourcePackageHealthCard
+    .filter({
+      hasText: `${sortedSourcePackagePayload.workspaceSummary.totalCount} workspace file(s), independent of filters and limit`
+    })
+    .filter({
+      hasText: `${sortedSourcePackagePayload.workspaceSummary.validCount} valid`
+    })
+    .filter({
+      hasText: `${sortedSourcePackagePayload.workspaceSummary.pendingCount} pending`
+    })
+    .filter({
+      hasText: `${sortedSourcePackagePayload.workspaceSummary.invalidCount} invalid`
+    })
+    .filter({
+      hasText: `${sortedSourcePackagePayload.workspaceSummary.warningFileCount} with warnings`
+    })
+    .waitFor();
+  const nonMatchingTypeSummary =
+    sortedSourcePackagePayload.workspaceSummary.fileTypes.find(
+      summary => summary.fileType !== "Resource" && summary.totalCount > 0
+    );
+  assert.ok(
+    nonMatchingTypeSummary,
+    "UI smoke expected a workspace file type outside the filtered Resource window."
+  );
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Workspace Files By Type" }) })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: nonMatchingTypeSummary.fileType })
+    })
+    .filter({ hasText: `${nonMatchingTypeSummary.totalCount} file` })
+    .filter({ hasText: "No matching file in the current filtered window" })
+    .waitFor();
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
@@ -15401,6 +15458,7 @@ try {
     .filter({ hasText: "status, file type, media type, file name, latest import" })
     .filter({ hasText: "Sort" })
     .filter({ hasText: "fileSize desc" })
+    .filter({ hasText: "Matched Records" })
     .waitFor();
   await page
     .locator("article.card")

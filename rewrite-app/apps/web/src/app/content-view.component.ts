@@ -187,11 +187,18 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Workspace File Health"
+        subtitle="Complete workspace validity, independent of the current filters, sort order, and read limit."
+        [items]="view.sourcePackageHealthItems"
+        emptyState="Refresh content reads to inspect workspace file validity."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Workspace Files By Type"
-        subtitle="Original Testcenter categories plus immutable package bundles."
+        subtitle="Complete Original Testcenter category counts plus immutable package bundles; file previews follow the current read window."
         [items]="view.sourcePackageFileTypeItems"
         (itemAction)="view.filterSourcePackagesByFileType($event)"
-        emptyState="No typed workspace files in the current read window."
+        emptyState="No typed workspace files in this workspace."
       ></app-record-collection>
 
       <app-record-collection
