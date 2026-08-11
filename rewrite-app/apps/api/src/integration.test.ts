@@ -461,7 +461,8 @@ const uploadMinimalOriginalUnitDependencies = async (
 
 const uploadOriginalAdaptiveUnitDependencies = async (
   tenantKey: string,
-  workspaceKey: string
+  workspaceKey: string,
+  unitSourceDocument?: string
 ): Promise<void> => {
   for (const dependency of [
     {
@@ -487,10 +488,13 @@ const uploadOriginalAdaptiveUnitDependencies = async (
         body: {
           fileName: dependency.fileName,
           mediaType: dependency.mediaType,
-          sourceDocument: readFileSync(
-            resolve(originalTestcenterCorpusRoot, dependency.fixture),
-            "utf8"
-          )
+          sourceDocument:
+            dependency.fileName === "Unit2.xml" && unitSourceDocument
+              ? unitSourceDocument
+              : readFileSync(
+                  resolve(originalTestcenterCorpusRoot, dependency.fixture),
+                  "utf8"
+                )
         }
       }
     );
@@ -14387,6 +14391,117 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   assert.deepEqual(unorderedBookletImport.body.importJob.diagnostics, []);
   assert.ok(unorderedBookletImport.body.stagedContentRelease);
+
+  const unicodeFacetWorkspaceKey = await createValidationWorkspace(
+    "unicode-schema-decimal-digits"
+  );
+  const unicodeStateKey = "level١";
+  const unicodeOptionKey = "advanced٢";
+  const unicodeVariableFormat = "custom-٣";
+  await uploadOriginalAdaptiveUnitDependencies(
+    tenantKey,
+    unicodeFacetWorkspaceKey,
+    validUnitXml.replace(
+      'id="var1" type="string"',
+      `id="var1" type="string" format="${unicodeVariableFormat}"`
+    )
+  );
+  const unicodeBookletSourceDocument = validAdaptiveBookletXml
+    .replace('id="level"', `id="${unicodeStateKey}"`)
+    .replaceAll('if="level"', `if="${unicodeStateKey}"`)
+    .replace('id="advanced"', `id="${unicodeOptionKey}"`)
+    .replaceAll('is="advanced"', `is="${unicodeOptionKey}"`);
+  const unicodeBookletPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unicodeFacetWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet-unicode-schema-digits.xml",
+        mediaType: "application/xml",
+        sourceDocument: unicodeBookletSourceDocument
+      }
+    }
+  );
+  assert.equal(unicodeBookletPackage.status, 201);
+  const unicodeBookletImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      contentReleaseId: string;
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          bookletKey: string;
+          stateEntries?: Array<{
+            stateKey: string;
+            options: Array<{ optionKey: string }>;
+          }>;
+        }>;
+      };
+    } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unicodeFacetWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId: unicodeBookletPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    unicodeBookletImport.body.importJob.status,
+    "completed",
+    JSON.stringify(unicodeBookletImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(unicodeBookletImport.body.importJob.diagnostics, []);
+  const unicodeContentRelease = unicodeBookletImport.body.stagedContentRelease;
+  assert.ok(unicodeContentRelease);
+  const unicodeState = unicodeContentRelease.runtimeSnapshot.bookletEntries[0]
+    ?.stateEntries?.find(state => state.stateKey === unicodeStateKey);
+  assert.ok(unicodeState);
+  assert.ok(
+    unicodeState.options.some(option => option.optionKey === unicodeOptionKey)
+  );
+  const unicodeActivation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unicodeFacetWorkspaceKey}/content-releases/${unicodeContentRelease.contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(unicodeActivation.status, 200);
+  const unicodeRosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      bookletStatePresets?: Record<string, Record<string, string>>;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unicodeFacetWorkspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          '<?xml version="1.0" encoding="utf-8"?>',
+          '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Testtakers.xsd">',
+          "  <Metadata />",
+          '  <Group id="unicode-digits" label="Unicode digits">',
+          '    <Login mode="run-hot-return" name="unicode-digit-participant">',
+          `      <Booklet state="${unicodeStateKey}:${unicodeOptionKey}">BOOKLET.SAMPLE-2</Booklet>`,
+          "    </Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  assert.equal(unicodeRosterImport.status, 201);
+  assert.deepEqual(
+    unicodeRosterImport.body.items.find(
+      item => item.loginKey === "unicode-digit-participant"
+    )?.bookletStatePresets,
+    {
+      "BOOKLET.SAMPLE-2": {
+        [unicodeStateKey]: unicodeOptionKey
+      }
+    }
+  );
 
   const emptyAdaptiveExpressionFileName =
     "booklet-valid-empty-adaptive-expression.xml";

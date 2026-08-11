@@ -315,6 +315,13 @@ through loose dependency assembly and nested ZIP validation before staging,
 while the ordered inner Metadata, config, restriction, and adaptive structures
 remain strict.
 
+Latest P0 XML Schema regex closure: the manual compatibility validator now
+matches XML Schema's Unicode-aware `\d` character class instead of JavaScript's
+ASCII-only escape. Unicode decimal digits therefore survive schema-valid
+Booklet State/Option IDs, Unit variable formats, `Show` references, and
+Testtakers state presets as one executable import, activation, and roster flow;
+the surrounding lowercase-letter/hyphen constraints remain unchanged.
+
 Latest P0 adaptive-condition XSD closure: the 17.6 Booklet schema requires
 `of` and `from` only for `Score`; `Value`, `Code`, and `Status` deliberately
 permit either or both references to be absent. Those schema-valid sources now

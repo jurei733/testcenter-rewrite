@@ -8969,7 +8969,12 @@ const testcenterXmlIdPattern =
 const isTestcenterXmlId = (value: string): boolean =>
   testcenterXmlIdPattern.test(value);
 
-const testcenterBookletStateIdPattern = /^[a-z\d-]+$/;
+// XML Schema regular expressions define \d as the complete Unicode decimal
+// digit category, unlike JavaScript's ASCII-only \d escape.
+const testcenterXmlSchemaStateIdPattern = /^[a-z\p{Nd}-]+$/u;
+const testcenterXmlSchemaVariableFormatPattern = /^[a-z\p{Nd}-]*$/u;
+const testcenterXmlSchemaStatePresetPattern =
+  /^[a-z\p{Nd}-]+:[a-z\p{Nd}-]+(?:\s*,\s*[a-z\p{Nd}-]+:[a-z\p{Nd}-]+)*$/u;
 
 const testcenterBookletVariableSourceNames = [
   "Code",
@@ -9601,7 +9606,7 @@ const validateTestcenterXmlSourceDocument = (
         );
       } else if (
         rawStateKey !== stateKey ||
-        !testcenterBookletStateIdPattern.test(stateKey)
+        !testcenterXmlSchemaStateIdPattern.test(stateKey)
       ) {
         diagnostics.push(
           createImportDiagnostic(
@@ -9655,7 +9660,7 @@ const validateTestcenterXmlSourceDocument = (
         }
         if (
           rawOptionKey !== optionKey ||
-          !testcenterBookletStateIdPattern.test(optionKey)
+          !testcenterXmlSchemaStateIdPattern.test(optionKey)
         ) {
           diagnostics.push(
             createImportDiagnostic(
@@ -10416,7 +10421,10 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       const format = variable.getAttribute("format");
-      if (format !== null && !/^[a-z\d-]*$/.test(format)) {
+      if (
+        format !== null &&
+        !testcenterXmlSchemaVariableFormatPattern.test(format)
+      ) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_variable_format_invalid",
@@ -11485,9 +11493,7 @@ const validateTestcenterXmlSourceDocument = (
         }
         if (
           state !== null &&
-          !/^[a-z\d-]+:[a-z\d-]+(?:\s*,\s*[a-z\d-]+:[a-z\d-]+)*$/.test(
-            state.trim()
-          )
+          !testcenterXmlSchemaStatePresetPattern.test(state.trim())
         ) {
           diagnostics.push(
             createImportDiagnostic(
