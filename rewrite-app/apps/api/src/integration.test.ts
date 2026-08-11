@@ -13340,7 +13340,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "booklets/Booklet_sameBookletID.xml"),
     "utf8"
   );
-  const invalidBookletRootSequenceXml = validBookletXml.replace(
+  const schemaValidUnorderedBookletXml = validBookletXml.replace(
     /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
     "$2$1"
   );
@@ -13564,11 +13564,6 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "  <Unexpected />\n\n  <Units>"
       ),
       diagnosticCode: "testcenter_xml_booklet_child_invalid"
-    },
-    {
-      fileName: "booklet-invalid-root-sequence.xml",
-      sourceDocument: invalidBookletRootSequenceXml,
-      diagnosticCode: "testcenter_xml_booklet_sequence_invalid"
     },
     {
       fileName: "booklet-duplicate-metadata-label.xml",
@@ -14349,6 +14344,50 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
+  const unorderedBookletFileName = "booklet-valid-unordered-root.xml";
+  const unorderedBookletWorkspaceKey = await createValidationWorkspace(
+    unorderedBookletFileName
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    unorderedBookletWorkspaceKey,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
+  );
+  const unorderedBookletPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unorderedBookletWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: unorderedBookletFileName,
+        mediaType: "application/xml",
+        sourceDocument: schemaValidUnorderedBookletXml
+      }
+    }
+  );
+  assert.equal(unorderedBookletPackage.status, 201);
+  const unorderedBookletImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${unorderedBookletWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          unorderedBookletPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    unorderedBookletImport.body.importJob.status,
+    "completed",
+    JSON.stringify(unorderedBookletImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(unorderedBookletImport.body.importJob.diagnostics, []);
+  assert.ok(unorderedBookletImport.body.stagedContentRelease);
+
   const emptyAdaptiveExpressionFileName =
     "booklet-valid-empty-adaptive-expression.xml";
   const emptyAdaptiveExpressionWorkspaceKey = await createValidationWorkspace(
@@ -14932,12 +14971,6 @@ test("original Testcenter compatibility corpus imports representative booklets",
         'key="logPolicy"'
       ),
       diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
-    },
-    {
-      fileName: "invalid-booklet-root-sequence-dependency.zip",
-      entryFileName: "export/booklets/Booklet_error.xml",
-      entryDocument: invalidBookletRootSequenceXml,
-      diagnosticCode: "testcenter_xml_booklet_sequence_invalid"
     },
     {
       fileName: "invalid-status-aggregate-dependency.zip",
