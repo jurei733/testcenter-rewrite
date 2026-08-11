@@ -19593,6 +19593,10 @@ test("original Testcenter compatibility corpus imports and starts the current ST
       bookletKey: string | null;
       executionMode?: string;
       passwordRequired: boolean;
+      viewSettings?: {
+        theme?: string;
+        codeInput?: { type: string; length?: number };
+      };
       validationWarnings: Array<{ code: string }>;
     }>;
   }>(`${workspaceUrl}/participant-roster`, {
@@ -19610,6 +19614,9 @@ test("original Testcenter compatibility corpus imports and starts the current ST
         item.groupKey === stars.roster.groupKey &&
         item.bookletKey === stars.booklet.bookletKey &&
         item.passwordRequired &&
+        item.viewSettings?.theme === "Primar" &&
+        item.viewSettings.codeInput?.type === "keypad-symbols-alt" &&
+        item.viewSettings.codeInput.length === 3 &&
         item.validationWarnings.length === 0
     )
   );
@@ -19618,6 +19625,12 @@ test("original Testcenter compatibility corpus imports and starts the current ST
     participantSession: {
       participantSessionId: string;
       executionMode?: string;
+    };
+    participantRosterEntry: {
+      viewSettings?: {
+        theme?: string;
+        codeInput?: { type: string; length?: number };
+      };
     };
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
@@ -19630,6 +19643,10 @@ test("original Testcenter compatibility corpus imports and starts the current ST
   });
   assert.equal(signIn.status, 200);
   assert.equal(signIn.body.participantSession.executionMode, "run-hot-return");
+  assert.deepEqual(signIn.body.participantRosterEntry.viewSettings, {
+    theme: "Primar",
+    codeInput: { type: "keypad-symbols-alt", length: 3 }
+  });
   const participantSessionId =
     signIn.body.participantSession.participantSessionId;
   const resume = await requestJson<{

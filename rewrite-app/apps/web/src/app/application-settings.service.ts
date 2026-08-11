@@ -19,6 +19,7 @@ const MAX_TIMER_DELAY_MS = 2_147_000_000;
 export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
+  private participantThemeOverride: ApplicationSettings["themeName"] | null = null;
 
   readonly settings = signal<ApplicationSettings>({
     ...defaultApplicationSettings
@@ -62,12 +63,30 @@ export class ApplicationSettingsService {
     }
   }
 
+  applyParticipantTheme(theme?: string | null): void {
+    this.participantThemeOverride =
+      theme === "Primar" || theme === "Sekundar" || theme === "Erwachsene"
+        ? theme
+        : null;
+    this.syncDocumentTheme();
+  }
+
+  clearParticipantTheme(): void {
+    this.participantThemeOverride = null;
+    this.syncDocumentTheme();
+  }
+
   private apply(settings: ApplicationSettings): void {
     this.settings.set(settings);
     this.loaded.set(true);
     document.title = settings.appTitle;
-    document.documentElement.dataset["applicationTheme"] = settings.themeName;
+    this.syncDocumentTheme();
     this.scheduleWarningExpiration();
+  }
+
+  private syncDocumentTheme(): void {
+    document.documentElement.dataset["applicationTheme"] =
+      this.participantThemeOverride ?? this.settings().themeName;
   }
 
   private scheduleWarningExpiration(): void {

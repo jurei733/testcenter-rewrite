@@ -10,6 +10,7 @@ import type {
   AdminRoleAssignment,
   AdminUser,
   OperationalLoginMigrationCandidate,
+  ParticipantRosterEntry,
   TestRun,
   Workspace
 } from "@testcenter-rewrite-app/domain";
@@ -119,6 +120,49 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
       ?.pauseSource,
     "monitor"
   );
+});
+
+test("SQLite persists participant view settings across repository restarts", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-participant-view-"));
+  const databasePath = join(tempDirectory, "participant-view.sqlite");
+  const rosterEntry: ParticipantRosterEntry = {
+    participantRosterEntryId: "roster-view-settings",
+    tenantId: "tenant-view-settings",
+    workspaceId: "workspace-view-settings",
+    loginKey: "participant-view-settings",
+    executionMode: "run-hot-return",
+    groupKey: "group:view-settings",
+    bookletKey: "booklet:view-settings",
+    displayName: "View Settings Participant",
+    passwordRequired: false,
+    validFrom: null,
+    validTo: null,
+    validForMinutes: null,
+    customTexts: {},
+    viewSettings: {
+      theme: "Sekundar",
+      codeInput: { type: "keypad-symbols-alt", length: 3 }
+    },
+    importedAt: "2026-08-12T00:00:00.000Z"
+  };
+
+  try {
+    await createSqliteFirstSliceRepository(databasePath).saveParticipantRosterEntry(
+      rosterEntry,
+      null
+    );
+    assert.deepEqual(
+      await createSqliteFirstSliceRepository(
+        databasePath
+      ).listParticipantRosterEntriesByWorkspace(
+        rosterEntry.tenantId,
+        rosterEntry.workspaceId
+      ),
+      [rosterEntry]
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
 });
 
 test("SQLite persists and replaces operational login migration candidates", async () => {
@@ -311,6 +355,9 @@ test("SQLite adds current defaults to legacy application settings", async () => 
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
+      CREATE TABLE participant_roster_entries (
+        participant_roster_entry_id TEXT PRIMARY KEY
+      );
       CREATE TABLE application_settings (
         settings_key TEXT PRIMARY KEY,
         app_title TEXT NOT NULL,
@@ -395,6 +442,9 @@ test("SQLite upgrades legacy admin roles to read-write access", async () => {
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
       CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
+      CREATE TABLE participant_roster_entries (
+        participant_roster_entry_id TEXT PRIMARY KEY
+      );
       CREATE TABLE admin_role_assignments (
         role_assignment_id TEXT PRIMARY KEY,
         admin_user_id TEXT NOT NULL,

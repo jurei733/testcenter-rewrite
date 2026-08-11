@@ -469,7 +469,8 @@ pinned at its introducing Testcenter commit with Player 0.6.40, Unit,
 Voud/Vomd definition, 28-alias Booklet, and four-account roster. Import accepts
 the package's current `https://w3id.org/iqb/spec/unit-xml/...` schema URL and
 validates the nested 18.0 `ViewSettings` structure. API coverage starts the real
-hot-return account against all 28 aliases; production SQLite/Chromium coverage
+hot-return account against all 28 aliases and preserves its participant theme
+and alternative-symbol keypad settings; production SQLite/Chromium coverage
 persists `iqb-standard@2.0` responses, follows the Player's continue request
 from alias `1` to `2`, and restores the second selected option after reload.
 The older STARS 0.6.19 pair remains an independent-family gate.
@@ -732,8 +733,11 @@ generation-aware compatibility profile. Current 18.0 Testtakers
 `ViewSettings` validate `theme`, structured `codeInput` type/length, and
 `monitorBookletVisibility` children, while the 17.6 visibility attribute stays
 compatible. Unknown children, repeated singleton settings, invalid keypad
-types, and undersized lengths fail before roster migration. Theme/keypad
-application in the participant UI remains separate follow-up work.
+types, and undersized lengths fail before roster migration. Participant settings
+now persist through file, SQLite, and PostgreSQL stores: Angular applies and
+clears the per-login theme override and renders Original-style numeric, symbol,
+or alternative-symbol keypads at both the second-login-code and `CodeToEnter`
+block gates, auto-submitting at the configured length.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |

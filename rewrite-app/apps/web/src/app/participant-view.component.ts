@@ -112,10 +112,44 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             Password
             <input id="participantPassword" name="participantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
           </label>
-          <label *ngIf="view.participantCodeRequired">
-            {{ view.customText('login_codeInputTitle', 'Participant Code') }}
-            <input id="participantCode" name="participantCode" autocomplete="one-time-code" [(ngModel)]="view.runtime.participantCode" />
-          </label>
+          <div *ngIf="view.participantCodeRequired" class="participant-code-control">
+            <span>{{ view.customText('login_codeInputTitle', 'Participant Code') }}</span>
+            <input
+              *ngIf="!view.usesParticipantCodeKeypad"
+              id="participantCode"
+              name="participantCode"
+              autocomplete="one-time-code"
+              [(ngModel)]="view.runtime.participantCode"
+            />
+            <section
+              *ngIf="view.usesParticipantCodeKeypad"
+              id="participantCodeKeypad"
+              class="participant-code-keypad"
+              role="group"
+              [attr.aria-label]="view.customText('login_codeInputTitle', 'Participant Code')"
+            >
+              <div class="participant-code-slots" aria-live="polite">
+                <span *ngFor="let slot of view.participantCodeSlots" [class.is-filled]="slot < view.runtime.participantCode.length">●</span>
+              </div>
+              <div class="participant-code-keypad-grid">
+                <button
+                  *ngFor="let option of view.participantCodeKeypadOptions"
+                  type="button"
+                  [id]="'participantCodeKeypadValue-' + option.value"
+                  [attr.aria-label]="option.label"
+                  (click)="view.selectParticipantCodeKeypadValue(option.value)"
+                >{{ option.symbol }}</button>
+                <button
+                  id="participantCodeKeypadDelete"
+                  type="button"
+                  class="participant-code-keypad-delete"
+                  aria-label="Delete last code value"
+                  [disabled]="!view.runtime.participantCode"
+                  (click)="view.removeParticipantCodeKeypadValue()"
+                >⌫</button>
+              </div>
+            </section>
+          </div>
           <label>
             Group Key
             <input id="participantRouteGroupKey" name="participantRouteGroupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
@@ -723,7 +757,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', gate.prompt || 'Enter the block code supplied by the test supervisor.') }}</p>
               <small id="participantRouteTestletGateWarning">{{ view.customText('booklet_codeToEnterWarning', 'Letters are entered in uppercase automatically.') }}</small>
             </div>
-            <label>
+            <label *ngIf="!view.usesParticipantCodeKeypad">
               Block Code
               <input
                 id="participantRouteTestletUnlockCode"
@@ -735,6 +769,34 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (keyup.enter)="view.unlockNextTestlet()"
               />
             </label>
+            <section
+              *ngIf="view.usesParticipantCodeKeypad"
+              id="participantRouteTestletUnlockKeypad"
+              class="participant-code-keypad"
+              role="group"
+              aria-label="Block Code"
+            >
+              <div class="participant-code-slots" aria-live="polite">
+                <span *ngFor="let slot of view.participantCodeSlots" [class.is-filled]="slot < view.testletUnlockCode.length">●</span>
+              </div>
+              <div class="participant-code-keypad-grid">
+                <button
+                  *ngFor="let option of view.participantCodeKeypadOptions"
+                  type="button"
+                  [id]="'participantRouteTestletUnlockKeypadValue-' + option.value"
+                  [attr.aria-label]="option.label"
+                  (click)="view.selectTestletUnlockCodeKeypadValue(option.value)"
+                >{{ option.symbol }}</button>
+                <button
+                  id="participantRouteTestletUnlockKeypadDelete"
+                  type="button"
+                  class="participant-code-keypad-delete"
+                  aria-label="Delete last block code value"
+                  [disabled]="!view.testletUnlockCode"
+                  (click)="view.removeTestletUnlockCodeKeypadValue()"
+                >⌫</button>
+              </div>
+            </section>
             <button
               id="participantRouteTestletUnlockButton"
               class="primary"

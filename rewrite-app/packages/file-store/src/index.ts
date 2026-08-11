@@ -375,6 +375,12 @@ const readStateFromFile = async (
             entry.customTexts && typeof entry.customTexts === "object"
               ? entry.customTexts
               : {},
+          viewSettings:
+            entry.viewSettings &&
+            typeof entry.viewSettings === "object" &&
+            !Array.isArray(entry.viewSettings)
+              ? entry.viewSettings
+              : {},
           bookletKey:
             entry.bookletKey ??
             (Array.isArray(entry.bookletKeys) &&

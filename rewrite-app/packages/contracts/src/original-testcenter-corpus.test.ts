@@ -1036,6 +1036,12 @@ test("original Testcenter compatibility corpus pins the current STARS system-tes
         participant.password === "123"
     )
   );
+  for (const participant of participants) {
+    assert.deepEqual(participant.viewSettings, {
+      theme: "Primar",
+      codeInput: { type: "keypad-symbols-alt", length: 3 }
+    });
+  }
 });
 
 test("original Testcenter compatibility corpus pins official IQB coding fixtures", () => {

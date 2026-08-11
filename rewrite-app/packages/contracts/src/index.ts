@@ -1,4 +1,7 @@
-import { participantExecutionModes as supportedParticipantExecutionModes } from "@testcenter-rewrite-app/domain";
+import {
+  participantCodeInputTypes,
+  participantExecutionModes as supportedParticipantExecutionModes
+} from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
   AdminAuditEventType,
@@ -20,8 +23,10 @@ import type {
   MonitorViewProfileFilter,
   OpenMonitorRun,
   OperationalLoginMigrationCandidate,
+  ParticipantCodeInputType,
   ParticipantExecutionMode,
   ParticipantRuntimeBooklet,
+  ParticipantViewSettings,
   ParticipantTestLogEntryInput,
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
@@ -102,6 +107,7 @@ export type ParsedParticipantRosterEntry = {
   validTo?: string | null;
   validForMinutes?: number | null;
   customTexts?: Record<string, string>;
+  viewSettings?: ParticipantViewSettings;
 };
 
 export const originalTestcenterOperationalLoginModes = [
@@ -466,6 +472,57 @@ const readXmlChildTexts = (
     )
     .filter((value): value is string => Boolean(value));
 
+const normalizeParticipantCodeInputType = (
+  value: string | null | undefined
+): ParticipantCodeInputType | null => {
+  const normalized = normalizeRosterTextValue(value);
+  return normalized &&
+    (participantCodeInputTypes as readonly string[]).includes(normalized)
+    ? (normalized as ParticipantCodeInputType)
+    : null;
+};
+
+const readXmlParticipantViewSettings = (
+  content: string
+): ParticipantViewSettings | undefined => {
+  const match = content.match(
+    /<(?:[a-zA-Z_][\w.-]*:)?viewsettings\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:[a-zA-Z_][\w.-]*:)?viewsettings>)/i
+  );
+  if (!match) {
+    return undefined;
+  }
+  const viewSettingsContent = match[1] ?? "";
+  const theme = normalizeRosterTextValue(
+    readXmlChildText(viewSettingsContent, "theme")
+  );
+  const codeInputContent = viewSettingsContent.match(
+    /<(?:[a-zA-Z_][\w.-]*:)?codeinput\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z_][\w.-]*:)?codeinput>/i
+  )?.[1];
+  const codeInputType = codeInputContent
+    ? normalizeParticipantCodeInputType(
+        readXmlChildText(codeInputContent, "type")
+      )
+    : null;
+  const lengthValue = codeInputContent
+    ? normalizeRosterTextValue(readXmlChildText(codeInputContent, "length"))
+    : null;
+  const length =
+    lengthValue && /^\d+$/.test(lengthValue) && Number(lengthValue) >= 3
+      ? Number(lengthValue)
+      : undefined;
+  return {
+    ...(theme ? { theme } : {}),
+    ...(codeInputType
+      ? {
+          codeInput: {
+            type: codeInputType,
+            ...(length === undefined ? {} : { length })
+          }
+        }
+      : {})
+  };
+};
+
 const parseBookletStatePreset = (
   value: string | undefined
 ): Record<string, string> => {
@@ -657,6 +714,23 @@ const mergeParsedParticipantRosterEntries = (
               ...(entry.customTexts ?? {})
             }
           }
+        : {}),
+      ...((existingEntry.viewSettings || entry.viewSettings)
+        ? {
+            viewSettings: {
+              ...(existingEntry.viewSettings ?? {}),
+              ...(entry.viewSettings ?? {}),
+              ...((existingEntry.viewSettings?.codeInput ||
+                entry.viewSettings?.codeInput)
+                ? {
+                    codeInput: {
+                      ...(existingEntry.viewSettings?.codeInput ?? {}),
+                      ...(entry.viewSettings?.codeInput ?? {})
+                    } as NonNullable<ParticipantViewSettings["codeInput"]>
+                  }
+                : {})
+            }
+          }
         : {})
     });
   }
@@ -781,6 +855,44 @@ const readJsonRosterString = (
   }
 
   return null;
+};
+
+const readJsonParticipantViewSettings = (
+  value: Record<string, unknown>
+): ParticipantViewSettings | undefined => {
+  const viewSettings = asRosterObject(
+    value.viewSettings ?? value.ViewSettings ?? value["view-settings"]
+  );
+  if (!viewSettings) {
+    return undefined;
+  }
+  const theme = readJsonRosterString(viewSettings, "theme", "themeName");
+  const codeInput = asRosterObject(
+    viewSettings.codeInput ?? viewSettings.CodeInput ?? viewSettings["code-input"]
+  );
+  const codeInputType = codeInput
+    ? normalizeParticipantCodeInputType(
+        readJsonRosterString(codeInput, "type", "inputType")
+      )
+    : null;
+  const lengthValue = codeInput
+    ? readJsonRosterString(codeInput, "length", "size")
+    : null;
+  const length =
+    lengthValue && /^\d+$/.test(lengthValue) && Number(lengthValue) >= 3
+      ? Number(lengthValue)
+      : undefined;
+  return {
+    ...(theme ? { theme } : {}),
+    ...(codeInputType
+      ? {
+          codeInput: {
+            type: codeInputType,
+            ...(length === undefined ? {} : { length })
+          }
+        }
+      : {})
+  };
 };
 
 const readJsonRosterEntries = (...values: unknown[]): unknown[] => {
@@ -988,6 +1100,7 @@ const parseParticipantRosterJsonValue = (
       ...context.customTexts,
       ...readJsonRosterCustomTexts(objectValue)
     };
+    const viewSettings = readJsonParticipantViewSettings(objectValue);
 
     if (loginKey) {
       if (!isParticipantRosterMode(mode)) {
@@ -1024,7 +1137,8 @@ const parseParticipantRosterJsonValue = (
         ...(validFrom ? { validFrom } : {}),
         ...(validTo ? { validTo } : {}),
         ...(validForMinutes ? { validForMinutes } : {}),
-        ...(Object.keys(customTexts).length > 0 ? { customTexts } : {})
+        ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
+        ...(viewSettings ? { viewSettings } : {})
       });
       return;
     }
@@ -1470,6 +1584,7 @@ const parseParticipantRosterXmlText = (
         "accessKey"
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
+    const viewSettings = readXmlParticipantViewSettings(content);
 
     entries.push({
       loginKey,
@@ -1492,6 +1607,7 @@ const parseParticipantRosterXmlText = (
       displayName,
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
+      ...(viewSettings ? { viewSettings } : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
@@ -1597,6 +1713,7 @@ const parseParticipantRosterXmlText = (
         "accessKey"
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
+    const viewSettings = readXmlParticipantViewSettings(content);
 
     entries.push({
       loginKey,
@@ -1619,6 +1736,7 @@ const parseParticipantRosterXmlText = (
       displayName,
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
+      ...(viewSettings ? { viewSettings } : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }

@@ -164,6 +164,10 @@ describe("parseParticipantRosterText", () => {
           "    <Login mode=\"run-hot-return\" name=\"test\" pw=\"user123\">",
           "      <Booklet codes=\"xxx yyy\">BOOKLET.SAMPLE-1</Booklet>",
           "      <Booklet>BOOKLET.SAMPLE-2</Booklet>",
+          "      <ViewSettings>",
+          "        <theme>Sekundar</theme>",
+          "        <codeInput><type>keypad-symbols-alt</type><length>3</length></codeInput>",
+          "      </ViewSettings>",
           "    </Login>",
           "    <Login mode=\"monitor-group\" name=\"test-group-monitor\" pw=\"user123\" />",
           "    <Login mode=\"monitor-study\" name=\"test-study-monitor\" pw=\"user123\" />",
@@ -193,6 +197,10 @@ describe("parseParticipantRosterText", () => {
               statePreset: {}
             }
           ],
+          viewSettings: {
+            theme: "Sekundar",
+            codeInput: { type: "keypad-symbols-alt", length: 3 }
+          },
           displayName: null,
           password: "user123"
         },

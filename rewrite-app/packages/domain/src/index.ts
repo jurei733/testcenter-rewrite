@@ -347,6 +347,24 @@ export type WorkspaceDirectoryItem = Workspace & {
   latestFileModificationAt: string | null;
 };
 
+export const participantCodeInputTypes = [
+  "text-field",
+  "keypad-symbols",
+  "keypad-symbols-alt",
+  "keypad-numbers"
+] as const;
+
+export type ParticipantCodeInputType =
+  (typeof participantCodeInputTypes)[number];
+
+export type ParticipantViewSettings = {
+  theme?: string;
+  codeInput?: {
+    type: ParticipantCodeInputType;
+    length?: number;
+  };
+};
+
 export type ParticipantRosterEntry = {
   participantRosterEntryId: string;
   tenantId: string;
@@ -364,6 +382,7 @@ export type ParticipantRosterEntry = {
   validTo?: string | null;
   validForMinutes?: number | null;
   customTexts?: Record<string, string>;
+  viewSettings?: ParticipantViewSettings;
   importedAt: string;
 };
 

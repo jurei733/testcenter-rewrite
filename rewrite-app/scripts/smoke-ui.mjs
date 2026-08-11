@@ -6016,7 +6016,11 @@ try {
           "  </CustomTexts>",
           `  <Group id="${codedParticipantGroupKey}">`,
           `    <Login mode="run-hot-return" name="${codedParticipantLoginKey}">`,
-          "      <Booklet codes=\"alpha beta\">booklet:starter</Booklet>",
+          "      <Booklet codes=\"123 456\">booklet:starter</Booklet>",
+          "      <ViewSettings>",
+          "        <theme>Sekundar</theme>",
+          "        <codeInput><type>keypad-symbols-alt</type><length>3</length></codeInput>",
+          "      </ViewSettings>",
           "    </Login>",
           "  </Group>",
           "</Testtakers>"
@@ -6026,30 +6030,50 @@ try {
   );
   await page.locator("#participantRouteClearSessionButton").click();
   await expectInputValue("#participantRouteSessionId", "");
+  const applicationThemeBeforeCodedParticipant = await page.evaluate(
+    () => document.documentElement.dataset.applicationTheme
+  );
   await fillAndCommitUntilValue("#participantLoginKey", codedParticipantLoginKey);
   await fillAndCommitUntilValue("#participantRouteGroupKey", codedParticipantGroupKey);
   await fillAndCommitUntilValue("#participantPassword", "");
   await page.locator("#participantRouteSignInButton").click();
   await page.locator("#participantCodePrompt").waitFor({ timeout: 15_000 });
-  await page.locator("#participantCode").waitFor({ timeout: 15_000 });
+  await page.locator("#participantCodeKeypad").waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantCode").count(),
+    0,
+    "The imported keypad view must replace the participant text code field."
+  );
+  assert.equal(
+    await page.evaluate(() => document.documentElement.dataset.applicationTheme),
+    "Sekundar",
+    "The participant roster theme must override the application theme during entry."
+  );
   await page
-    .locator("label")
+    .locator(".participant-code-control")
     .filter({ hasText: "Project Access Code" })
-    .filter({ has: page.locator("#participantCode") })
+    .filter({ has: page.locator("#participantCodeKeypad") })
     .waitFor();
   await page
     .locator("#participantCodePrompt")
     .filter({ hasText: "Ask the project supervisor for your access code." })
     .waitFor();
   await expectInputValue("#participantRouteSessionId", "");
-  await fillAndCommitUntilValue("#participantCode", "wrong");
-  await page.locator("#participantRouteSignInButton").click();
+  await page.locator("#participantCodeKeypadValue-1").click();
+  await page.locator("#participantCodeKeypadValue-1").click();
+  await page.locator("#participantCodeKeypadValue-1").click();
   await page
     .locator("#participantEntryIssueCode")
     .filter({ hasText: "participant_code_invalid" })
     .waitFor({ timeout: 15_000 });
-  await fillAndCommitUntilValue("#participantCode", "alpha");
-  await page.locator("#participantRouteSignInButton").click();
+  assert.equal(
+    await page.locator("#participantCodeKeypad .participant-code-slots .is-filled").count(),
+    0,
+    "An invalid keypad code should clear before the retry."
+  );
+  await page.locator("#participantCodeKeypadValue-1").click();
+  await page.locator("#participantCodeKeypadValue-2").click();
+  await page.locator("#participantCodeKeypadValue-3").click();
   const codedParticipantSessionsPayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`,
     payload =>
@@ -6059,7 +6083,7 @@ try {
       payload.items.some(
         item =>
           item?.participantSession?.loginKey === codedParticipantLoginKey &&
-          item?.participantSession?.participantCode === "alpha"
+          item?.participantSession?.participantCode === "123"
       )
   );
   const codedParticipantSessionId =
@@ -6084,9 +6108,9 @@ try {
     .filter({ hasText: "Choose the available project test." })
     .waitFor();
   assert.equal(
-    await page.locator("#participantCode").count(),
+    await page.locator("#participantCodeKeypad").count(),
     0,
-    "Participant code input should close after a successful code challenge."
+    "Participant code keypad should close after a successful code challenge."
   );
   const persistedAfterParticipantCode = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
@@ -6095,6 +6119,13 @@ try {
     Object.hasOwn(persistedAfterParticipantCode, "participantCode"),
     false,
     "Participant codes should not be persisted in shell localStorage."
+  );
+  await page.locator("#participantRouteClearSessionButton").click();
+  await expectInputValue("#participantRouteSessionId", "");
+  assert.equal(
+    await page.evaluate(() => document.documentElement.dataset.applicationTheme),
+    applicationThemeBeforeCodedParticipant,
+    "Leaving the participant session should restore the application theme."
   );
   stopAfter("participant-entry-second-code");
 

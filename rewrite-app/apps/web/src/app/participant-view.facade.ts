@@ -37,11 +37,14 @@ import {
   resolveParticipantCustomText,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
-import type {
-  ParticipantRosterEntry,
-  ParticipantRuntimeBooklet,
-  ParticipantTestLogEntryInput,
-  WorkspaceReview
+import {
+  participantCodeInputTypes,
+  type ParticipantCodeInputType,
+  type ParticipantRosterEntry,
+  type ParticipantViewSettings,
+  type ParticipantRuntimeBooklet,
+  type ParticipantTestLogEntryInput,
+  type WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
@@ -291,6 +294,7 @@ export class ParticipantViewFacade {
   }
 
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  participantViewSettings: ParticipantViewSettings = {};
   private participantRosterCustomTexts: Record<string, string> = {};
   private participantBookletCustomTexts: Record<string, string> = {};
   private participantCustomTexts: Record<string, string> = {};
@@ -1707,6 +1711,91 @@ export class ParticipantViewFacade {
     );
   }
 
+  get participantCodeInputType(): ParticipantCodeInputType {
+    const inputType = this.participantViewSettings.codeInput?.type;
+    return inputType && participantCodeInputTypes.includes(inputType)
+      ? inputType
+      : "text-field";
+  }
+
+  get participantCodeInputLength(): number {
+    const length = this.participantViewSettings.codeInput?.length;
+    return Number.isSafeInteger(length) && Number(length) >= 3
+      ? Number(length)
+      : 5;
+  }
+
+  get usesParticipantCodeKeypad(): boolean {
+    return this.participantCodeInputType !== "text-field";
+  }
+
+  get participantCodeKeypadOptions(): ReadonlyArray<{
+    value: string;
+    symbol: string;
+    label: string;
+  }> {
+    if (this.participantCodeInputType === "keypad-symbols") {
+      return [
+        ["1", "★", "Star"],
+        ["2", "♥", "Heart"],
+        ["3", "■", "Square"],
+        ["4", "◐", "Moon"],
+        ["5", "☺", "Smile"],
+        ["6", "☁", "Cloud"],
+        ["7", "✿", "Flower"],
+        ["8", "☀", "Sun"],
+        ["9", "▲", "Triangle"]
+      ].map(([value, symbol, label]) => ({ value, symbol, label }));
+    }
+    if (this.participantCodeInputType === "keypad-symbols-alt") {
+      return [
+        ["1", "🍎", "Apple"],
+        ["2", "🏠", "House"],
+        ["3", "☕", "Cup"],
+        ["4", "☀", "Sun"],
+        ["5", "📖", "Book"],
+        ["6", "👁", "Eye"]
+      ].map(([value, symbol, label]) => ({ value, symbol, label }));
+    }
+    return Array.from({ length: 9 }, (_, index) => ({
+      value: String(index + 1),
+      symbol: String(index + 1),
+      label: String(index + 1)
+    }));
+  }
+
+  get participantCodeSlots(): readonly number[] {
+    return Array.from({ length: this.participantCodeInputLength }, (_, index) => index);
+  }
+
+  selectParticipantCodeKeypadValue(value: string): void {
+    if (this.runtime.participantCode.length >= this.participantCodeInputLength) {
+      return;
+    }
+    this.runtime.participantCode += value;
+    if (this.runtime.participantCode.length === this.participantCodeInputLength) {
+      this.signIn();
+    }
+  }
+
+  removeParticipantCodeKeypadValue(): void {
+    this.runtime.participantCode = this.runtime.participantCode.slice(0, -1);
+  }
+
+  selectTestletUnlockCodeKeypadValue(value: string): void {
+    if (this.testletUnlockCode.length >= this.participantCodeInputLength) {
+      return;
+    }
+    this.testletUnlockCode += value;
+    if (this.testletUnlockCode.length === this.participantCodeInputLength) {
+      this.unlockNextTestlet();
+    }
+  }
+
+  removeTestletUnlockCodeKeypadValue(): void {
+    this.testletUnlockCode = this.testletUnlockCode.slice(0, -1);
+  }
+
   get canStartOrResume(): boolean {
     if (this.hasControllerError) {
       return false;
@@ -1766,6 +1855,7 @@ export class ParticipantViewFacade {
   resetParticipantCodeChallenge(): void {
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
+    this.setParticipantViewSettings({});
   }
 
   refreshCurrentState(): void {
@@ -2435,6 +2525,7 @@ export class ParticipantViewFacade {
     this.participantCodeRequired = false;
     this.setParticipantRosterCustomTexts({});
     this.setParticipantBookletCustomTexts({});
+    this.setParticipantViewSettings({});
     this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
@@ -2484,8 +2575,18 @@ export class ParticipantViewFacade {
         ));
       }
     }
+    if (details && typeof details === "object" && "viewSettings" in details) {
+      this.setParticipantViewSettings(
+        this.normalizeParticipantViewSettings(
+          (details as { viewSettings?: unknown }).viewSettings
+        )
+      );
+    }
     if (error.error === "participant_code_invalid") {
       this.participantCodeRequired = true;
+      if (this.usesParticipantCodeKeypad) {
+        this.runtime.participantCode = "";
+      }
       return false;
     }
     if (error.error !== "participant_code_required") {
@@ -2901,17 +3002,25 @@ export class ParticipantViewFacade {
     testletKey: string;
   }): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
-    const payload = await this.requestState.request<UnlockParticipantTestletResponse>(
-      "Participant Unlock Block",
-      "POST",
-      resolveRoutePath(productionApiRoutes.participant.unlockTestlet, {
-        testRunId: this.runtime.testRunId.trim(),
-        testletKey: gate.testletKey
-      }),
-      {
-        code: this.testletUnlockCode
-      } satisfies UnlockParticipantTestletRequest
-    );
+    let payload: UnlockParticipantTestletResponse;
+    try {
+      payload = await this.requestState.request<UnlockParticipantTestletResponse>(
+        "Participant Unlock Block",
+        "POST",
+        resolveRoutePath(productionApiRoutes.participant.unlockTestlet, {
+          testRunId: this.runtime.testRunId.trim(),
+          testletKey: gate.testletKey
+        }),
+        {
+          code: this.testletUnlockCode
+        } satisfies UnlockParticipantTestletRequest
+      );
+    } catch (error) {
+      if (this.usesParticipantCodeKeypad) {
+        this.testletUnlockCode = "";
+      }
+      throw error;
+    }
     this.testletUnlockCode = "";
     this.syncRun(payload.testRun);
     this.persistState();
@@ -3575,12 +3684,53 @@ export class ParticipantViewFacade {
   private syncParticipantRosterEntry(
     participantRosterEntry: Pick<
       ParticipantRosterEntry,
-      "displayName" | "customTexts"
+      "displayName" | "customTexts" | "viewSettings"
     > | null
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
     this.setParticipantRosterCustomTexts(participantRosterEntry?.customTexts ?? {});
+    this.setParticipantViewSettings(participantRosterEntry?.viewSettings ?? {});
+  }
+
+  private normalizeParticipantViewSettings(value: unknown): ParticipantViewSettings {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+    const candidate = value as {
+      theme?: unknown;
+      codeInput?: { type?: unknown; length?: unknown };
+    };
+    const theme =
+      candidate.theme === "Primar" ||
+      candidate.theme === "Sekundar" ||
+      candidate.theme === "Erwachsene"
+        ? candidate.theme
+        : undefined;
+    const type = participantCodeInputTypes.find(
+      inputType => inputType === candidate.codeInput?.type
+    );
+    const length = candidate.codeInput?.length;
+    return {
+      ...(theme ? { theme } : {}),
+      ...(type
+        ? {
+            codeInput: {
+              type,
+              ...(Number.isSafeInteger(length) && Number(length) >= 3
+                ? { length: Number(length) }
+                : {})
+            }
+          }
+        : {})
+    };
+  }
+
+  private setParticipantViewSettings(settings: ParticipantViewSettings): void {
+    this.participantViewSettings = this.normalizeParticipantViewSettings(settings);
+    this.applicationSettings.applyParticipantTheme(
+      this.participantViewSettings.theme
+    );
   }
 
   private syncRuntimeBooklets(booklets: ParticipantRuntimeBooklet[]): void {
