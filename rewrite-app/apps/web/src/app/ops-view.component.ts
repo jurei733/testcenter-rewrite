@@ -1,9 +1,14 @@
 import { CommonModule } from "@angular/common";
-import { Component, inject } from "@angular/core";
+import { Component, DestroyRef, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 
+import {
+  AdministrationNavComponent,
+  type AdministrationSection
+} from "./administration-nav.component";
 import { JsonPanelComponent } from "./json-panel.component";
 import { OpsViewFacade } from "./ops-view.facade";
 import { RecordCollectionComponent } from "./record-collection.component";
@@ -15,6 +20,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
   imports: [
     CommonModule,
     FormsModule,
+    AdministrationNavComponent,
     JsonPanelComponent,
     SummaryCardsComponent,
     RecordCollectionComponent
@@ -87,7 +93,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <ng-container *ngIf="view.canUseAdminManagement">
 
-      <article id="applicationSettingsCard" class="card" *ngIf="view.canManageApplicationSettings">
+      <app-administration-nav
+        *ngIf="view.canManageApplicationSettings"
+        [activeSection]="activeAdminSection"
+        (sectionSelected)="selectAdminSection($event)"
+      ></app-administration-nav>
+
+      <article id="applicationSettingsCard" class="card" *ngIf="view.canManageApplicationSettings && activeAdminSection === 'settings'">
         <div class="section-heading">
           <div>
             <span class="eyebrow">Instance configuration</span>
@@ -237,6 +249,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <ng-container *ngIf="activeAdminSection === 'users'">
       <article class="card">
         <h2>Admin Session Filters</h2>
         <p>Narrow persisted admin bearer sessions by user, lifecycle status, or a bounded result limit.</p>
@@ -918,6 +931,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <pre id="adminAuditExportPreview">{{ view.ops.adminAuditExportView }}</pre>
       </article>
       </ng-container>
+      </ng-container>
 
       <article class="card">
         <h2>Operational Snapshot</h2>
@@ -1049,9 +1063,17 @@ export class OpsViewComponent implements OnInit {
   readonly view = inject(OpsViewFacade);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  activeAdminSection: AdministrationSection = "users";
 
   ngOnInit(): void {
     this.view.init();
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => {
+        this.activeAdminSection =
+          params.get("adminSection") === "settings" ? "settings" : "users";
+      });
     if (this.route.snapshot.queryParamMap.get("demoAdmin") === "sign-in") {
       this.view.signInLocalDemoAdmin();
       void this.router.navigate([], {
@@ -1061,5 +1083,9 @@ export class OpsViewComponent implements OnInit {
         replaceUrl: true
       });
     }
+  }
+
+  selectAdminSection(section: AdministrationSection): void {
+    this.activeAdminSection = section;
   }
 }

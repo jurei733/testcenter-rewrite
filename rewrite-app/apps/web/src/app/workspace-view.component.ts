@@ -3,6 +3,7 @@ import { Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
+import { AdministrationNavComponent } from "./administration-nav.component";
 import { JsonPanelComponent } from "./json-panel.component";
 import { RecordCollectionComponent } from "./record-collection.component";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -14,15 +15,21 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
   imports: [
     CommonModule,
     FormsModule,
+    AdministrationNavComponent,
     JsonPanelComponent,
     SummaryCardsComponent,
     RecordCollectionComponent
   ],
   template: `
     <div class="stack">
+      <app-administration-nav
+        *ngIf="view.canCreateTenant"
+        activeSection="workspaces"
+      ></app-administration-nav>
+
       <article class="card">
         <h2>Scope</h2>
-        <p>Keep tenant and workspace context pinned while you work through the first vertical slice.</p>
+        <p>Keep tenant and workspace context pinned while you manage workspaces, content, and runtime operations.</p>
         <div class="form-grid">
           <label>
             Tenant Key

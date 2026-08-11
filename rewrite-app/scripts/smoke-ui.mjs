@@ -1118,6 +1118,28 @@ try {
     .filter({ hasText: "platform_admin" })
     .waitFor();
   logStep("application-settings");
+  await page.locator("#administrationUsersTab").waitFor();
+  assert.equal(
+    await page.locator("#administrationUsersTab").getAttribute("aria-current"),
+    "page"
+  );
+  assert.equal(await page.locator("#applicationSettingsCard").count(), 0);
+  await page.locator("#administrationSettingsTab").click();
+  await page.waitForURL(/\/app\/ops\?adminSection=settings$/);
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#administrationSettingsTab")
+        ?.getAttribute("aria-current") === "page"
+  );
+  assert.equal(
+    await page.locator("#administrationSettingsTab").getAttribute("aria-current"),
+    "page"
+  );
+  assert.equal(
+    await page.getByRole("heading", { name: "Admin User Management" }).count(),
+    0
+  );
   await page.locator("#applicationSettingsCard").waitFor();
   await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
   await page.locator("#applicationCustomTextsEditor summary").click();
@@ -1481,6 +1503,37 @@ try {
     (await monitorGlobalTextResponse.json()).applicationSettings.customTexts
       .gm_menu_filter,
     "UI Global Hidden Sessions"
+  );
+  logStep("superadmin-navigation");
+  await page.locator("#administrationWorkspacesTab").click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await page.locator("#administrationWorkspacesTab").waitFor();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#administrationWorkspacesTab")
+        ?.getAttribute("aria-current") === "page"
+  );
+  assert.equal(
+    await page
+      .locator("#administrationWorkspacesTab")
+      .getAttribute("aria-current"),
+    "page"
+  );
+  await page.getByRole("heading", { name: "Workspace Setup" }).waitFor();
+  await page.locator("#administrationUsersTab").click();
+  await page.waitForURL(/\/app\/ops\?adminSection=users$/);
+  await page.getByRole("heading", { name: "Admin User Management" }).waitFor();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#administrationUsersTab")
+        ?.getAttribute("aria-current") === "page"
+  );
+  assert.equal(await page.locator("#applicationSettingsCard").count(), 0);
+  assert.equal(
+    await page.locator("#administrationUsersTab").getAttribute("aria-current"),
+    "page"
   );
   stopAfter("application-settings");
   logStep("admin-sessions");
