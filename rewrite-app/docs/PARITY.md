@@ -197,6 +197,16 @@ coverage plus a real SQLite/Chromium gate exercise the vertical slice, and the
 original multipart wire contract is accepted by the same protected upload
 endpoint.
 
+Latest P0 attachment-import compatibility closure: Unit validation now matches
+the original XSD instead of rejecting every `attachment` Variable outside the
+implemented capture path. Schema-valid BaseVariables and DerivedVariables with
+`image`, `audio`, `ggb-file`, custom lowercase-hyphen formats, or no optional
+format import successfully. Only BaseVariables with `format="capture-image"`
+are projected into the current image inventory, so compatibility no longer
+pretends that the remaining attachment workflows are operational. ZIP/API
+coverage proves that supported capture slots still hydrate while the other
+valid declarations no longer block the complete package.
+
 Latest P2 attachment QR-page closure: the protected API and Angular Attachment
 Manager can generate either the selected attachment page or a role-scoped PDF
 for the complete visible inventory. Each attachment receives its own A4 page

@@ -10162,11 +10162,6 @@ const validateTestcenterXmlSourceDocument = (
     const variables = variableContainers.flatMap(container =>
       xmlChildrenNamed(container, "Variable")
     );
-    const baseAttachmentVariables = new Set(
-      xmlChildrenNamed(root, "BaseVariables").flatMap(container =>
-        xmlChildrenNamed(container, "Variable")
-      )
-    );
     const variableTypes = new Set([
       "string",
       "integer",
@@ -10221,17 +10216,6 @@ const validateTestcenterXmlSourceDocument = (
           createImportDiagnostic(
             "testcenter_xml_variable_format_invalid",
             `Original Testcenter unit '${sourceFileName}' contains invalid Variable format '${format}' for '${variableId || "unknown"}'.`
-          )
-        );
-      }
-      if (
-        variableType === "attachment" &&
-        (format !== "capture-image" || !baseAttachmentVariables.has(variable))
-      ) {
-        diagnostics.push(
-          createImportDiagnostic(
-            "testcenter_xml_attachment_variable_invalid",
-            `Original Testcenter unit '${sourceFileName}' attachment Variable '${variableId || "unknown"}' must be a BaseVariable with format 'capture-image'.`
           )
         );
       }

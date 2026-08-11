@@ -3399,7 +3399,7 @@ test("participant custom texts retain global-login-booklet precedence inputs", a
   assert.equal(resetSettings.status, 200);
 });
 
-test("attachment manager imports capture requests and enforces monitor scope", async () => {
+test("attachment manager accepts schema-valid variables, imports capture requests, and enforces monitor scope", async () => {
   const tenantKey = "attachment-tenant";
   const workspaceKey = "attachment-workspace";
   let platformSignIn = await requestJson<{ sessionToken: string }>(
@@ -3462,6 +3462,7 @@ test("attachment manager imports capture requests and enforces monitor scope", a
           <resources>
             <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
             <resource identifier="${unitKey}" href="units/Unit.xml" />
+            <resource identifier="attachment-player" href="players/Player.html" />
           </resources>
         </manifest>
       `
@@ -3478,13 +3479,29 @@ test("attachment manager imports capture requests and enforces monitor scope", a
     {
       fileName: "export/units/Unit.xml",
       content: `
-        <Unit>
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://www.iqb.hu-berlin.de/testcenter/17.6/definitions/vo_Unit.xsd">
           <Metadata><Id>${unitKey}</Id><Label>Photo Unit</Label></Metadata>
+          <Definition player="attachment-player"><![CDATA[<p>Photo Unit</p>]]></Definition>
           <BaseVariables>
             <Variable id="participant-photo" type="attachment" format="capture-image" />
+            <Variable id="reference-image" type="attachment" format="image" />
+            <Variable id="spoken-answer" type="attachment" format="audio" />
+            <Variable id="geogebra-file" type="attachment" format="ggb-file" />
+            <Variable id="custom-file" type="attachment" format="scanner-pdf" />
+            <Variable id="untyped-file" type="attachment" />
           </BaseVariables>
+          <DerivedVariables>
+            <Variable id="derived-photo" type="attachment" format="capture-image" />
+          </DerivedVariables>
         </Unit>
       `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2(
+        { id: "attachment-player" }
+      )}</script><main>Attachment Player</main>`
     }
   ]);
   const sourcePackage = await requestJson<{
@@ -3500,6 +3517,10 @@ test("attachment manager imports capture requests and enforces monitor scope", a
   });
   assert.equal(sourcePackage.status, 201);
   const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
     stagedContentRelease: {
       contentReleaseId: string;
       runtimeSnapshot: {
@@ -3512,15 +3533,22 @@ test("attachment manager imports capture requests and enforces monitor scope", a
           }>;
         }>;
       };
-    };
+    } | null;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
     method: "POST",
     headers: { authorization },
     body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
   });
   assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const stagedContentRelease = importResult.body.stagedContentRelease;
+  assert.ok(stagedContentRelease);
   assert.deepEqual(
-    importResult.body.stagedContentRelease.runtimeSnapshot.bookletEntries[0]
+    stagedContentRelease.runtimeSnapshot.bookletEntries[0]
       ?.unitEntries[0]?.requestedAttachments,
     [
       {
@@ -3530,7 +3558,7 @@ test("attachment manager imports capture requests and enforces monitor scope", a
     ]
   );
   const activation = await requestJson(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${stagedContentRelease.contentReleaseId}/activate`,
     {
       method: "POST",
       headers: { authorization },
