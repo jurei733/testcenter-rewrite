@@ -9305,6 +9305,23 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
     }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        [
+          ...customTextContainers.flatMap(container =>
+            xmlChildrenNamed(container, "CustomText")
+          ),
+          ...bookletConfigContainers.flatMap(container =>
+            xmlChildrenNamed(container, "Config")
+          )
+        ].map(element => ({
+          value: element.getAttribute("key")?.trim() ?? "",
+          label: "Booklet schema ID"
+        })),
+        "testcenter_xml_booklet_schema_id_duplicate",
+        sourceFileName
+      )
+    );
 
     const statesContainers = xmlChildrenNamed(root, "States");
     if (statesContainers.length > 1) {

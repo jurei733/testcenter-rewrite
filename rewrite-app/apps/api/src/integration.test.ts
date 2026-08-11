@@ -12907,6 +12907,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_booklet_config_key_invalid"
     },
     {
+      fileName: "booklet-duplicate-config-schema-id.xml",
+      sourceDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="logPolicy"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
+      fileName: "booklet-cross-section-schema-id.xml",
+      sourceDocument: validBookletXml.replace(
+        "  <BookletConfig>",
+        '  <CustomTexts><CustomText key="logPolicy">Collision</CustomText></CustomTexts>\n\n  <BookletConfig>'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
       fileName: "booklet-nested-config-content.xml",
       sourceDocument: validBookletXml.replace(
         '<Config key="pagingMode">',
@@ -13930,6 +13946,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "/17.7.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "duplicate-schema-id-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="logPolicy"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
     },
     {
       fileName: "legacy-schema-file-name-dependency.zip",
