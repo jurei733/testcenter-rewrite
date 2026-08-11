@@ -1435,6 +1435,30 @@ const localDateTimeToIso = (
     : null;
 };
 
+const unicodeDecimalDigitPattern = /^\p{Nd}$/u;
+
+const normalizeXmlSchemaDecimalDigits = (value: string): string =>
+  [...value]
+    .map(character => {
+      if (!unicodeDecimalDigitPattern.test(character)) {
+        return character;
+      }
+
+      const codePoint = character.codePointAt(0);
+      if (codePoint === undefined) {
+        return character;
+      }
+      let precedingDecimalDigits = 0;
+      for (let candidate = codePoint - 1; candidate >= 0; candidate -= 1) {
+        if (!unicodeDecimalDigitPattern.test(String.fromCodePoint(candidate))) {
+          break;
+        }
+        precedingDecimalDigits += 1;
+      }
+      return String(precedingDecimalDigits % 10);
+    })
+    .join("");
+
 export const normalizeParticipantAccessBoundary = (
   value: string | null | undefined,
   timeZone = DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE
@@ -1448,7 +1472,7 @@ export const normalizeParticipantAccessBoundary = (
     return Number.isFinite(timestampMs) ? new Date(timestampMs).toISOString() : null;
   }
 
-  const originalMatch = normalizedValue.match(
+  const originalMatch = normalizeXmlSchemaDecimalDigits(normalizedValue).match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\D+(\d{1,2}):(\d{2})$/
   );
   const localIsoMatch = normalizedValue.match(
@@ -11367,7 +11391,9 @@ const validateTestcenterXmlSourceDocument = (
         }
         const normalized = normalizeParticipantAccessBoundary(value);
         if (
-          !/^\d{1,2}\/\d{1,2}\/\d{2,4}\W\d{1,2}:\d{2}$/.test(value) ||
+          !/^\p{Nd}{1,2}\/\p{Nd}{1,2}\/\p{Nd}{2,4}[\p{P}\p{Z}\p{C}]\p{Nd}{1,2}:\p{Nd}{2}$/u.test(
+            value
+          ) ||
           !normalized
         ) {
           diagnostics.push(

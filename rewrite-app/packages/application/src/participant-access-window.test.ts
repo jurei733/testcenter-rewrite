@@ -17,6 +17,14 @@ describe("participant access windows", () => {
       "2020-01-01T11:00:00.000Z"
     );
     assert.equal(
+      normalizeParticipantAccessBoundary("١/٦/٢٠٢٣ ١٠:٠٠", "Europe/Berlin"),
+      "2023-06-01T08:00:00.000Z"
+    );
+    assert.equal(
+      normalizeParticipantAccessBoundary("𝟙/𝟞/𝟚𝟘𝟚𝟛_𝟙𝟘:𝟘𝟘", "Europe/Berlin"),
+      "2023-06-01T08:00:00.000Z"
+    );
+    assert.equal(
       normalizeParticipantAccessBoundary("2026-01-01T08:00:00Z"),
       "2026-01-01T08:00:00.000Z"
     );

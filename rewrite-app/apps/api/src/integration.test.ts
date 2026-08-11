@@ -14471,6 +14471,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
     items: Array<{
       loginKey: string;
       bookletStatePresets?: Record<string, Record<string, string>>;
+      validFrom?: string | null;
+      validTo?: string | null;
     }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${unicodeFacetWorkspaceKey}/participant-roster`,
@@ -14481,7 +14483,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
           '<?xml version="1.0" encoding="utf-8"?>',
           '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Testtakers.xsd">',
           "  <Metadata />",
-          '  <Group id="unicode-digits" label="Unicode digits">',
+          '  <Group id="unicode-digits" label="Unicode digits" validFrom="١/١/٢٠٣٠_٠:٠٠" validTo="٣١/١/٢٠٣٠ ٢٣:٥٩">',
           '    <Login mode="run-hot-return" name="unicode-digit-participant">',
           `      <Booklet state="${unicodeStateKey}:${unicodeOptionKey};bonus:yes">BOOKLET.SAMPLE-2</Booklet>`,
           "    </Login>",
@@ -14492,10 +14494,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
     }
   );
   assert.equal(unicodeRosterImport.status, 201);
+  const unicodeRosterEntry = unicodeRosterImport.body.items.find(
+    item => item.loginKey === "unicode-digit-participant"
+  );
+  assert.equal(unicodeRosterEntry?.validFrom, "2029-12-31T23:00:00.000Z");
+  assert.equal(unicodeRosterEntry?.validTo, "2030-01-31T22:59:00.000Z");
   assert.deepEqual(
-    unicodeRosterImport.body.items.find(
-      item => item.loginKey === "unicode-digit-participant"
-    )?.bookletStatePresets,
+    unicodeRosterEntry?.bookletStatePresets,
     {
       "BOOKLET.SAMPLE-2": {
         [unicodeStateKey]: unicodeOptionKey,
@@ -15450,6 +15455,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       rosterText: validRosterXml.replace(
         'validFrom="1/3/2020 10:00"',
         'validFrom="31/2/2020 10:00"'
+      ),
+      diagnosticCode: "testcenter_xml_group_access_boundary_invalid"
+    },
+    {
+      label: "invalid XML Schema access-boundary separator",
+      rosterText: validRosterXml.replace(
+        'validFrom="1/3/2020 10:00"',
+        'validFrom="1/3/2020€10:00"'
       ),
       diagnosticCode: "testcenter_xml_group_access_boundary_invalid"
     },

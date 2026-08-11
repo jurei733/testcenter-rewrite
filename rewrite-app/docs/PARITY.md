@@ -319,7 +319,11 @@ Latest P0 XML Schema regex closure: the manual compatibility validator now
 matches XML Schema's Unicode-aware `\d` character class instead of JavaScript's
 ASCII-only escape. Unicode decimal digits therefore survive schema-valid
 Booklet State/Option IDs, Unit variable formats, `Show` references, and
-Testtakers state presets as one executable import, activation, and roster flow.
+Testtakers state presets and access-window timestamps as one executable import,
+activation, and roster flow. Timestamp digits are canonically persisted while
+retaining the existing timezone and calendar validation; their separator now
+also follows XML Schema's Unicode `\W` categories rather than JavaScript's
+ASCII word class.
 The same gate uses the Original backend's semicolon-separated multi-state
 syntax, while comma-separated migrated inputs remain compatible; the
 surrounding lowercase-letter/hyphen constraints remain unchanged.
