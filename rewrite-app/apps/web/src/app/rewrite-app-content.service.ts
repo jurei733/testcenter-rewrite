@@ -72,8 +72,16 @@ export type LooseSourcePackageUploadIssue = {
   statusCode?: number;
 };
 
+export type LooseSourcePackageUploadPhase =
+  | "uploading"
+  | "refreshing"
+  | "completed";
+
 export type LooseSourcePackageUploadReport = {
   requestedCount: number;
+  processedCount: number;
+  phase: LooseSourcePackageUploadPhase;
+  currentFileName?: string;
   uploaded: CreateSourcePackageResponse[];
   rejected: LooseSourcePackageUploadIssue[];
   refreshError?: LooseSourcePackageUploadIssue;
@@ -134,7 +142,8 @@ export class RewriteAppContentService {
   }
 
   async uploadLooseSourcePackages(
-    files: LooseSourcePackageUploadInput[]
+    files: LooseSourcePackageUploadInput[],
+    onProgress?: (report: LooseSourcePackageUploadReport) => void
   ): Promise<LooseSourcePackageUploadReport> {
     const route = resolveRoutePath(
       productionApiRoutes.workspace.createSourcePackage,
@@ -144,16 +153,40 @@ export class RewriteAppContentService {
       }
     );
     const uploaded: CreateSourcePackageResponse[] = [];
+    const uploadQueue = files.slice(0, MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT);
     const rejected: LooseSourcePackageUploadIssue[] = files
-      .slice(MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT)
+      .slice(uploadQueue.length)
       .map(file => ({
         fileName: file.fileName,
         error: "source_package_upload_batch_limit_exceeded",
         message: `Only the first ${MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT} selected files can be uploaded in one operation.`
       }));
     let refreshError: LooseSourcePackageUploadIssue | undefined;
+    const createReport = (
+      phase: LooseSourcePackageUploadPhase,
+      currentFileName?: string
+    ): LooseSourcePackageUploadReport => ({
+      requestedCount: files.length,
+      processedCount: uploaded.length + rejected.length,
+      phase,
+      ...(currentFileName ? { currentFileName } : {}),
+      uploaded: [...uploaded],
+      rejected: [...rejected],
+      ...(refreshError ? { refreshError } : {})
+    });
+    const publishProgress = (
+      phase: LooseSourcePackageUploadPhase,
+      currentFileName?: string
+    ): void => {
+      try {
+        onProgress?.(createReport(phase, currentFileName));
+      } catch {
+        // UI progress rendering must not interrupt the best-effort upload.
+      }
+    };
+    publishProgress("uploading", uploadQueue[0]?.fileName);
     try {
-      for (const file of files.slice(0, MAX_LOOSE_SOURCE_PACKAGE_UPLOAD_COUNT)) {
+      for (const [index, file] of uploadQueue.entries()) {
         try {
           uploaded.push(
             await this.requestState.request<CreateSourcePackageResponse>(
@@ -170,8 +203,10 @@ export class RewriteAppContentService {
         } catch (error) {
           rejected.push(this.toLooseSourcePackageUploadIssue(file.fileName, error));
         }
+        publishProgress("uploading", uploadQueue[index + 1]?.fileName);
       }
     } finally {
+      publishProgress("refreshing");
       try {
         await this.refreshContentReads(true);
       } catch (error) {
@@ -181,16 +216,13 @@ export class RewriteAppContentService {
         );
       }
     }
+    const report = createReport("completed");
+    publishProgress("completed");
     this.feedback.rememberActivity(
       "Loose Source File Upload Finished",
       `${uploaded.length}/${files.length} file(s) uploaded; ${rejected.length} rejected.${refreshError ? " Workspace refresh failed; retry the content read." : ""}`
     );
-    return {
-      requestedCount: files.length,
-      uploaded,
-      rejected,
-      ...(refreshError ? { refreshError } : {})
-    };
+    return report;
   }
 
   async createImportJob(): Promise<void> {

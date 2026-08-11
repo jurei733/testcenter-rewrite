@@ -237,8 +237,32 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="form-grid full">
           <label>
             Upload Loose Files
-            <input id="sourcePackageAssemblyFiles" name="sourcePackageAssemblyFiles" type="file" multiple [disabled]="!view.canUseWorkspaceScope" (change)="view.loadLooseSourceFiles($event)" />
+            <input id="sourcePackageAssemblyFiles" name="sourcePackageAssemblyFiles" type="file" multiple [disabled]="!view.canUploadLooseSourceFiles" (change)="view.loadLooseSourceFiles($event)" />
           </label>
+          <div
+            id="looseSourcePackageUploadProgress"
+            class="loose-upload-live-progress"
+            role="status"
+            aria-live="polite"
+            *ngIf="view.isLooseSourcePackageUploadActive"
+          >
+            <header>
+              <strong>{{ view.looseSourcePackageUploadProgressLabel }}</strong>
+              <span>{{ view.looseSourcePackageUploadProgressPercent }}%</span>
+            </header>
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-label="Loose file upload progress"
+              [attr.aria-valuemin]="0"
+              [attr.aria-valuemax]="view.looseSourcePackageUploadReport?.requestedCount ?? 0"
+              [attr.aria-valuenow]="view.looseSourcePackageUploadReport?.processedCount ?? 0"
+              [attr.aria-valuetext]="view.looseSourcePackageUploadProgressLabel"
+            >
+              <span [style.width.%]="view.looseSourcePackageUploadProgressPercent"></span>
+            </div>
+            <p>{{ view.looseSourcePackageUploadProgressStatus }}</p>
+          </div>
           <label>
             Assembled Package Name
             <input id="sourcePackageAssemblyFileName" name="sourcePackageAssemblyFileName" placeholder="assembled-source-package.zip" [(ngModel)]="view.assemblyFileName" />

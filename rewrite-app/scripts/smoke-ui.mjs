@@ -4590,6 +4590,28 @@ try {
   const survivingLooseUploadFileName = `ui-loose-survivor-${Date.now()}.voud`;
   const survivingBinaryUploadFileName = `ui-loose-binary-${Date.now()}.bin`;
   const survivingBinaryUpload = Buffer.from([0x00, 0xff, 0x80, 0x41, 0x0a]);
+  const looseSourcePackageUploadRoute =
+    `**/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`;
+  let releaseHeldLooseUpload = () => {};
+  let markHeldLooseUploadObserved = () => {};
+  const heldLooseUploadRelease = new Promise(resolve => {
+    releaseHeldLooseUpload = resolve;
+  });
+  const heldLooseUploadObserved = new Promise(resolve => {
+    markHeldLooseUploadObserved = resolve;
+  });
+  const holdFinalLooseUpload = async route => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      const payload = request.postDataJSON();
+      if (payload?.fileName === survivingBinaryUploadFileName) {
+        markHeldLooseUploadObserved();
+        await heldLooseUploadRelease;
+      }
+    }
+    await route.continue();
+  };
+  await page.route(looseSourcePackageUploadRoute, holdFinalLooseUpload);
   await looseUploadInput.setInputFiles([
     {
       name: "Booklet2.xml",
@@ -4613,6 +4635,22 @@ try {
       buffer: survivingBinaryUpload
     }
   ]);
+  await heldLooseUploadObserved;
+  const liveLooseUploadProgress = page.locator(
+    "#looseSourcePackageUploadProgress"
+  );
+  await liveLooseUploadProgress
+    .filter({ hasText: "2 of 3 loose file(s) processed" })
+    .filter({ hasText: `Uploading ${survivingBinaryUploadFileName}` })
+    .waitFor({ timeout: 20_000 });
+  assert.equal(
+    await liveLooseUploadProgress
+      .getByRole("progressbar", { name: "Loose file upload progress" })
+      .getAttribute("aria-valuenow"),
+    "2"
+  );
+  assert.equal(await looseUploadInput.isDisabled(), true);
+  releaseHeldLooseUpload();
   const looseUploadReport = page
     .locator("app-record-collection")
     .filter({
@@ -4624,6 +4662,8 @@ try {
     .filter({ hasText: "2 uploaded, 1 rejected" })
     .filter({ hasText: "workspace refreshed" })
     .waitFor({ timeout: 20_000 });
+  await page.unroute(looseSourcePackageUploadRoute, holdFinalLooseUpload);
+  assert.equal(await looseUploadInput.isEnabled(), true);
   await looseUploadReport
     .locator("article.record-card")
     .filter({ has: page.getByRole("heading", { name: "Booklet2.xml" }) })

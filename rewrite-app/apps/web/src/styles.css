@@ -2471,6 +2471,34 @@ pre {
   transition: width 180ms ease;
 }
 
+.loose-upload-live-progress {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 92, 84, 0.22);
+  border-radius: var(--radius-lg);
+  background: rgba(31, 92, 84, 0.06);
+}
+
+.loose-upload-live-progress header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.loose-upload-live-progress header span,
+.loose-upload-live-progress p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.loose-upload-live-progress p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .unit-rail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

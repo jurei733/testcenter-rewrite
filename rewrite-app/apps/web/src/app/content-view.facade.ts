@@ -117,6 +117,52 @@ export class ContentViewFacade {
     );
   }
 
+  get canUploadLooseSourceFiles(): boolean {
+    return (
+      this.canWriteWorkspace &&
+      this.isWorkspaceScopeComplete() &&
+      !this.isLooseSourcePackageUploadActive
+    );
+  }
+
+  get isLooseSourcePackageUploadActive(): boolean {
+    return (
+      this.looseSourcePackageUploadReport !== null &&
+      this.looseSourcePackageUploadReport.phase !== "completed"
+    );
+  }
+
+  get looseSourcePackageUploadProgressPercent(): number {
+    const report = this.looseSourcePackageUploadReport;
+    return report && report.requestedCount > 0
+      ? Math.round((report.processedCount / report.requestedCount) * 100)
+      : 0;
+  }
+
+  get looseSourcePackageUploadProgressLabel(): string {
+    const report = this.looseSourcePackageUploadReport;
+    if (!report) {
+      return "No loose file upload is active";
+    }
+    return `${report.processedCount} of ${report.requestedCount} loose file(s) processed`;
+  }
+
+  get looseSourcePackageUploadProgressStatus(): string {
+    const report = this.looseSourcePackageUploadReport;
+    if (!report) {
+      return "";
+    }
+    if (report.phase === "refreshing") {
+      return "Refreshing the complete workspace file inventory";
+    }
+    if (report.phase === "completed") {
+      return "Loose file upload completed";
+    }
+    return report.currentFileName
+      ? `Uploading ${report.currentFileName}`
+      : "Preparing the next loose file";
+  }
+
   get assemblySelectionLabel(): string {
     return `${this.assemblySourcePackageIds.size} file(s) selected`;
   }
@@ -242,7 +288,7 @@ export class ContentViewFacade {
     }
     const files = Array.from(input.files ?? []);
     input.value = "";
-    if (files.length === 0 || !this.isWorkspaceScopeComplete()) {
+    if (files.length === 0 || !this.canUploadLooseSourceFiles) {
       return;
     }
     this.viewState.onActionAsync(async () => {
@@ -251,20 +297,10 @@ export class ContentViewFacade {
           fileName: file.name,
           mediaType: this.inferMediaTypeFromFile(file),
           loadSourceDocument: () => this.readFileAsDataUrl(file)
-        }))
+        })),
+        progress => this.applyLooseSourcePackageUploadProgress(progress)
       );
-      this.looseSourcePackageUploadReport = report;
-      for (const upload of report.uploaded) {
-        this.assemblySourcePackageIds.add(
-          upload.sourcePackage.sourcePackageId
-        );
-      }
-      if (
-        report.uploaded.length > 1 &&
-        this.assemblyFileName === "assembled-source-package.zip"
-      ) {
-        this.assemblyFileName = `${report.uploaded[0]!.sourcePackage.fileName.replace(/\.[^.]+$/, "")}-bundle.zip`;
-      }
+      this.applyLooseSourcePackageUploadProgress(report);
     });
   }
 
@@ -777,18 +813,29 @@ export class ContentViewFacade {
       return [];
     }
 
+    const completed = report.phase === "completed";
     const items: RecordCollectionItem[] = [{
-      headline: `${report.requestedCount} loose file(s) processed`,
-      subline: `${report.uploaded.length} uploaded, ${report.rejected.length} rejected`,
+      headline: completed
+        ? `${report.requestedCount} loose file(s) processed`
+        : `${report.processedCount} of ${report.requestedCount} loose file(s) processed`,
+      subline: completed
+        ? `${report.uploaded.length} uploaded, ${report.rejected.length} rejected`
+        : this.looseSourcePackageUploadProgressStatus,
       badges: [
         `${report.uploaded.length} uploaded`,
         `${report.rejected.length} rejected`,
-        report.refreshError ? "refresh failed" : "workspace refreshed"
+        ...(completed
+          ? [report.refreshError ? "refresh failed" : "workspace refreshed"]
+          : [report.phase])
       ],
       rows: [
         { label: "Requested", value: String(report.requestedCount) },
+        { label: "Processed", value: String(report.processedCount) },
         { label: "Uploaded", value: String(report.uploaded.length) },
-        { label: "Rejected", value: String(report.rejected.length) }
+        { label: "Rejected", value: String(report.rejected.length) },
+        ...(report.currentFileName
+          ? [{ label: "Current File", value: report.currentFileName }]
+          : [])
       ]
     }];
     items.push(
@@ -2735,6 +2782,23 @@ export class ContentViewFacade {
         ...additionalRows
       ]
     };
+  }
+
+  private applyLooseSourcePackageUploadProgress(
+    report: LooseSourcePackageUploadReport
+  ): void {
+    this.looseSourcePackageUploadReport = report;
+    for (const upload of report.uploaded) {
+      this.assemblySourcePackageIds.add(upload.sourcePackage.sourcePackageId);
+    }
+    if (
+      report.uploaded.length > 1 &&
+      this.assemblyFileName === "assembled-source-package.zip"
+    ) {
+      this.assemblyFileName = `${report.uploaded[0]!.sourcePackage.fileName.replace(/\.[^.]+$/, "")}-bundle.zip`;
+    }
+    this.uiState.renderVersion.update(version => version + 1);
+    this.applicationRef.tick();
   }
 
   private inferMediaTypeFromFile(file: File): string {
