@@ -862,6 +862,11 @@ export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
 export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
 export type BookletUnitNavigationLabel = "hidden" | "index" | "label";
 export type BookletPageNavigationLabel = "hidden" | "index" | "label" | "list";
+export type BookletGlobalNavigationMode =
+  | "hidden"
+  | "dynamic"
+  | "units"
+  | "pages";
 export type BookletNavigationDeniedReason =
   | "presentation_incomplete"
   | "response_incomplete"
@@ -887,6 +892,10 @@ export type BookletRuntimePolicy = {
     unitLabel?: BookletUnitNavigationLabel;
     /** Optional so runtime snapshots created before the legacy FULL Unit bar remain readable. */
     unitListEnabled?: boolean;
+    /** Optional so runtime snapshots created before separate global navigation buttons remain readable. */
+    backwardButton?: BookletGlobalNavigationMode;
+    /** Optional so runtime snapshots created before separate global navigation buttons remain readable. */
+    forwardButton?: BookletGlobalNavigationMode;
     playerEnd: BookletPlayerEndPolicy;
   };
   player: {

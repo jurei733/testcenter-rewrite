@@ -6723,6 +6723,8 @@ try {
             <Config key="logPolicy">debug</Config>
             <Config key="navbar_page_label">LABEL</Config>
             <Config key="navbar_page_controls_hidden">FALSE</Config>
+            <Config key="navbar_backward_button">DYNAMIC</Config>
+            <Config key="navbar_forward_button">DYNAMIC</Config>
             <Config key="restore_current_page_on_return">ON</Config>
             <Config key="toolbar_show_reload_button">TRUE</Config>
             <Config key="unit_show_time_left">ON</Config>
@@ -7120,7 +7122,9 @@ try {
   );
   await expectButtonSelectorDisabled("#participantVeronaPreviousPageButton");
   await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
-  await page.locator("#participantVeronaNextPageButton").click();
+  await expectButtonSelectorDisabled("#participantVeronaGlobalBackwardButton");
+  await expectButtonSelectorEnabled("#participantVeronaGlobalForwardButton");
+  await page.locator("#participantVeronaGlobalForwardButton").click();
   await veronaFrame
     .locator("#playerCurrentPage")
     .filter({ hasText: "page-2" })
@@ -7131,7 +7135,9 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#participantVeronaPreviousPageButton");
   await expectButtonSelectorDisabled("#participantVeronaNextPageButton");
-  await page.locator("#participantVeronaPreviousPageButton").click();
+  await expectButtonSelectorEnabled("#participantVeronaGlobalBackwardButton");
+  await expectButtonSelectorDisabled("#participantVeronaGlobalForwardButton");
+  await page.locator("#participantVeronaGlobalBackwardButton").click();
   await veronaFrame
     .locator("#playerCurrentPage")
     .filter({ hasText: "page-1" })
@@ -10637,7 +10643,14 @@ try {
     {
       fixture: "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
       bookletKey: "Cy-Bklt_BkltConfig-4"
-    }
+    },
+    ...Array.from({ length: 8 }, (_, index) => {
+      const number = index + 19;
+      return {
+        fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
+        bookletKey: `Cy-Bklt_BkltConfig-${number}`
+      };
+    })
   ];
   const bookletConfigUnitFixtures = [
     {
@@ -10942,6 +10955,42 @@ try {
     await configOneBrowser.playerFrame.locator("#end-unit").isEnabled(),
     true
   );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: Array.from({ length: 8 }, (_, index) => {
+          const number = index + 19;
+          return {
+            loginKey: `Bklt_Config-${number}`,
+            password: "123",
+            groupKey: "bklt-config-navigation",
+            bookletKey: `Cy-Bklt_BkltConfig-${number}`,
+            executionMode: "run-hot-restart"
+          };
+        })
+      }
+    }
+  );
+  await openOriginalBookletConfig(
+    "Bklt_Config-23",
+    "Cy-Bklt_BkltConfig-23"
+  );
+  assert.equal(
+    await page.locator("#participantVeronaGlobalForwardButton").count(),
+    0,
+    "HIDDEN must omit the separate global forward button."
+  );
+  await openOriginalBookletConfig(
+    "Bklt_Config-25",
+    "Cy-Bklt_BkltConfig-25"
+  );
+  await expectButtonSelectorEnabled("#participantVeronaGlobalForwardButton");
+  await page.locator("#participantVeronaGlobalForwardButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "cpy" })
+    .waitFor({ timeout: 15_000 });
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");

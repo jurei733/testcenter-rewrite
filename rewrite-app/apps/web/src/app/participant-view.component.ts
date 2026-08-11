@@ -487,6 +487,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
               [pageNavigationLabelMode]="verona.pageNavigationLabelMode"
               [pageNavigationControlsHidden]="verona.pageNavigationControlsHidden"
+              [globalBackwardButtonMode]="verona.globalBackwardButtonMode"
+              [globalForwardButtonMode]="verona.globalForwardButtonMode"
               [saveStatus]="view.veronaSaveStatus"
               [loadingLabel]="view.veronaLoadingLabel"
               [loadingTitle]="view.veronaLoadingTitle"

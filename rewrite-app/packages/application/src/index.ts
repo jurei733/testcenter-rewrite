@@ -8847,7 +8847,7 @@ const parseTestcenterSchemaVersion = (
   schemaLocation: string
 ): { major: number; minor: number } | null => {
   const match = schemaLocation.match(
-    /(?:^|\/)(\d+)\.(\d+)(?:\.\d+)?\/definitions\//i
+    /(?:^|\/)(\d+)\.(\d+)(?:\.\d+)?(?:\/definitions\/|(?:[?#].*)?$)/i
   );
   if (!match) {
     return null;
@@ -8859,8 +8859,8 @@ const parseTestcenterSchemaVersion = (
 };
 
 const latestSupportedOriginalTestcenterSchemaVersion = {
-  major: 17,
-  minor: 6
+  major: 18,
+  minor: 0
 } as const;
 
 const isUnsupportedFutureTestcenterSchemaVersion = (
@@ -9201,12 +9201,21 @@ const validateTestcenterXmlSourceDocument = (
       )
     );
   }
-  if (
-    schemaLocation &&
-    !new RegExp(
+  const w3idSchemaSlug = {
+    Booklet: "testcenter-booklet-xml",
+    Unit: "testcenter-unit-xml",
+    Testtakers: "testcenter-testtaker-xml",
+    SysCheck: "testcenter-syscheck-xml"
+  }[canonicalRootName];
+  const isSupportedSchemaReference =
+    new RegExp(
       `(?:^|/)definitions/v?o?_?${canonicalRootName}\\.xsd(?:[?#].*)?$`
-    ).test(schemaLocation)
-  ) {
+    ).test(schemaLocation) ||
+    new RegExp(
+      `^https://w3id\\.org/iqb/spec/${w3idSchemaSlug}/\\d+\\.\\d+(?:\\.\\d+)?(?:[?#].*)?$`,
+      "i"
+    ).test(schemaLocation);
+  if (schemaLocation && !isSupportedSchemaReference) {
     diagnostics.push(
       createImportDiagnostic(
         "testcenter_xml_schema_reference_invalid",

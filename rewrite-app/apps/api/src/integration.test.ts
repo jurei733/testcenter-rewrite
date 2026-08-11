@@ -12020,6 +12020,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
   type BookletExpectation = {
     fixture: string;
     sourcePath: string;
+    sourceCommit?: string;
+    sha256?: string;
     bookletKey: string;
     displayLabel: string;
     unitKeys: string[];
@@ -12043,6 +12045,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
       unitControls?: string;
       unitLabel?: string;
       unitListEnabled?: boolean;
+      backwardButton?: string;
+      forwardButton?: string;
       playerEnd?: string;
       requirePresentationComplete?: string;
       requireResponseComplete?: string;
@@ -12129,6 +12133,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
 
   const releaseIdsByBookletKey = new Map<string, string>();
   for (const expectation of [...corpus.booklets, ...corpus.systemBooklets]) {
+    const fixtureContent = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.fixture),
+      "utf8"
+    );
+    if (expectation.sha256) {
+      assert.equal(
+        createHash("sha256").update(fixtureContent).digest("hex"),
+        expectation.sha256,
+        expectation.sourcePath
+      );
+      assert.match(expectation.sourceCommit ?? "", /^[a-f0-9]{40}$/);
+    }
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
     }>(
@@ -12138,10 +12154,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
         body: {
           fileName: expectation.fixture.split("/").at(-1),
           mediaType: "application/xml",
-          sourceDocument: readFileSync(
-            resolve(originalTestcenterCorpusRoot, expectation.fixture),
-            "utf8"
-          )
+          sourceDocument: fixtureContent
         }
       }
     );
@@ -12186,6 +12199,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
                   unitControls: string;
                   unitLabel: string;
                   unitListEnabled: boolean;
+                  backwardButton?: string;
+                  forwardButton?: string;
                   playerEnd: string;
                 };
                 player: {
@@ -12381,6 +12396,20 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.navigation.unitListEnabled,
         expectation.policy.unitListEnabled
+      );
+    }
+    if (expectation.policy.backwardButton) {
+      assert.equal(
+        booklet.policy.navigation.backwardButton,
+        expectation.policy.backwardButton,
+        expectation.sourcePath
+      );
+    }
+    if (expectation.policy.forwardButton) {
+      assert.equal(
+        booklet.policy.navigation.forwardButton,
+        expectation.policy.forwardButton,
+        expectation.sourcePath
       );
     }
     if (expectation.policy.playerEnd) {
@@ -13117,6 +13146,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "units/Unit2.xml"),
     "utf8"
   );
+  const validW3idBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/system-test/CY_Bklt_BkltConfig_19.xml"
+    ),
+    "utf8"
+  );
   const validSystemCheckXml = readFileSync(
     resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
     "utf8"
@@ -13139,15 +13175,31 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "booklet-future-schema.xml",
       sourceDocument: validBookletXml.replace(
         /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
-        "/18.0.0/definitions/"
+        "/19.0.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "booklet-future-w3id-schema.xml",
+      sourceDocument: validW3idBookletXml.replace(
+        "/testcenter-booklet-xml/18.0",
+        "/testcenter-booklet-xml/18.1"
+      ),
+      diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "booklet-wrong-w3id-schema.xml",
+      sourceDocument: validW3idBookletXml.replace(
+        "/testcenter-booklet-xml/",
+        "/testcenter-unit-xml/"
+      ),
+      diagnosticCode: "testcenter_xml_schema_reference_invalid"
     },
     {
       fileName: "unit-future-minor-schema.xml",
       sourceDocument: validUnitXml.replace(
         /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
-        "/17.7.0/definitions/"
+        "/18.1.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
     },
@@ -14640,7 +14692,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       entryFileName: "export/booklets/Booklet_error.xml",
       entryDocument: validBookletXml.replace(
         /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
-        "/17.7.0/definitions/"
+        "/18.1.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
     },
@@ -14778,7 +14830,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       label: "future Testtakers schema version",
       rosterText: validRosterXml.replace(
         /\/\d+\.\d+(?:\.\d+)?\/definitions\//,
-        "/18.0.0/definitions/"
+        "/19.0.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
     },
@@ -16195,6 +16247,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       unitControls: string;
       unitLabel: string;
       unitListEnabled: boolean;
+      backwardButton: string;
+      forwardButton: string;
       playerEnd: string;
     };
     player: {
@@ -16268,6 +16322,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         unitControls: "both",
         unitLabel: "label",
         unitListEnabled: false,
+        backwardButton: "hidden",
+        forwardButton: "hidden",
         playerEnd: "always"
       },
       player: {
@@ -16298,6 +16354,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         unitControls: "hidden",
         unitLabel: "hidden",
         unitListEnabled: false,
+        backwardButton: "hidden",
+        forwardButton: "hidden",
         playerEnd: "never"
       },
       player: {
@@ -16328,6 +16386,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         unitControls: "both",
         unitLabel: "label",
         unitListEnabled: false,
+        backwardButton: "hidden",
+        forwardButton: "hidden",
         playerEnd: "last_unit"
       },
       player: {
@@ -16358,6 +16418,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         unitControls: "both",
         unitLabel: "label",
         unitListEnabled: false,
+        backwardButton: "hidden",
+        forwardButton: "hidden",
         playerEnd: "always"
       },
       player: {

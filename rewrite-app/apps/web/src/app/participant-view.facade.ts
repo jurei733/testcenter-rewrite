@@ -193,6 +193,8 @@ export type ParticipantVeronaPlayerState = {
   restoreCurrentPageOnReturn: boolean;
   pageNavigationLabelMode: "hidden" | "index" | "label" | "list";
   pageNavigationControlsHidden: boolean;
+  globalBackwardButtonMode: "hidden" | "dynamic" | "units" | "pages";
+  globalForwardButtonMode: "hidden" | "dynamic" | "units" | "pages";
 };
 
 type ParticipantEntryIssue = {
@@ -1357,7 +1359,11 @@ export class ParticipantViewFacade {
       pageNavigationLabelMode:
         currentState.booklet.policy.player.pageNavigation?.labelMode ?? "index",
       pageNavigationControlsHidden:
-        currentState.booklet.policy.player.pageNavigation?.controlsHidden ?? false
+        currentState.booklet.policy.player.pageNavigation?.controlsHidden ?? false,
+      globalBackwardButtonMode:
+        currentState.booklet.policy.navigation.backwardButton ?? "hidden",
+      globalForwardButtonMode:
+        currentState.booklet.policy.navigation.forwardButton ?? "hidden"
     };
   }
 

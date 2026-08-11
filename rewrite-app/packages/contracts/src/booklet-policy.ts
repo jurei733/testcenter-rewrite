@@ -173,6 +173,21 @@ const compilePageNavigationLabel = (
   }
 };
 
+const compileGlobalNavigationMode = (
+  value: string
+): "hidden" | "dynamic" | "units" | "pages" => {
+  switch (value.trim().toUpperCase()) {
+    case "DYNAMIC":
+      return "dynamic";
+    case "UNITS":
+      return "units";
+    case "PAGES":
+      return "pages";
+    default:
+      return "hidden";
+  }
+};
+
 const warningMinutes = (value: string): number[] =>
   [...new Set(
     value
@@ -236,6 +251,10 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
           : legacyUnitNavigation.label,
       unitListEnabled:
         modernUnitLabel === undefined && legacyUnitNavigation.listEnabled,
+      backwardButton: compileGlobalNavigationMode(
+        read("navbar_backward_button")
+      ),
+      forwardButton: compileGlobalNavigationMode(read("navbar_forward_button")),
       playerEnd: compilePlayerEnd(playerEnd)
     },
     player: {

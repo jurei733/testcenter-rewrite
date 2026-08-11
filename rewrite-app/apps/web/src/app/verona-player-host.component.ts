@@ -116,11 +116,23 @@ type RetiredVeronaFrame = {
       </section>
       <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
       <nav
-        *ngIf="pageNavigationLabelMode !== 'hidden' && pages.length > 0"
+        *ngIf="showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton"
         class="verona-player-page-navigation"
         id="participantVeronaPageNavigation"
-        aria-label="Page navigation"
+        aria-label="Test navigation"
       >
+        <button
+          *ngIf="showGlobalBackwardButton"
+          id="participantVeronaGlobalBackwardButton"
+          type="button"
+          class="secondary verona-player-global-navigation"
+          aria-label="Back"
+          [disabled]="!canGoPrevious && !hasPreviousPage"
+          (click)="goGlobalBackward()"
+        >
+          ← Back
+        </button>
+        <ng-container *ngIf="showPageNavigation">
         <button
           *ngIf="!pageNavigationControlsHidden"
           id="participantVeronaPreviousPageButton"
@@ -161,6 +173,18 @@ type RetiredVeronaFrame = {
           (click)="goToRelativePage(1)"
         >
           →
+        </button>
+        </ng-container>
+        <button
+          *ngIf="showGlobalForwardButton"
+          id="participantVeronaGlobalForwardButton"
+          type="button"
+          class="secondary verona-player-global-navigation"
+          aria-label="Continue"
+          [disabled]="!canGoNext && !hasNextPage"
+          (click)="goGlobalForward()"
+        >
+          Continue →
         </button>
       </nav>
       <section
@@ -234,6 +258,16 @@ export class VeronaPlayerHostComponent
   @Input() pageNavigationLabelMode: "hidden" | "index" | "label" | "list" =
     "index";
   @Input() pageNavigationControlsHidden = false;
+  @Input() globalBackwardButtonMode:
+    | "hidden"
+    | "dynamic"
+    | "units"
+    | "pages" = "hidden";
+  @Input() globalForwardButtonMode:
+    | "hidden"
+    | "dynamic"
+    | "units"
+    | "pages" = "hidden";
   @Input() saveStatus = "not_saved";
   @Input() loadingLabel = "Please wait";
   @Input() loadingTitle = "Unit is loading";
@@ -324,6 +358,55 @@ export class VeronaPlayerHostComponent
     return this.currentPageIndex >= 0
       ? `Page ${this.currentPageIndex + 1}/${this.pages.length}`
       : `Page –/${this.pages.length}`;
+  }
+
+  get showGlobalBackwardButton(): boolean {
+    return this.globalBackwardButtonMode !== "hidden";
+  }
+
+  get showGlobalForwardButton(): boolean {
+    return this.globalForwardButtonMode !== "hidden";
+  }
+
+  get showPageNavigation(): boolean {
+    return this.pageNavigationLabelMode !== "hidden" && this.pages.length > 0;
+  }
+
+  get hasPreviousPage(): boolean {
+    return this.currentPageIndex > 0;
+  }
+
+  get hasNextPage(): boolean {
+    return (
+      this.currentPageIndex >= 0 &&
+      this.currentPageIndex < this.pages.length - 1
+    );
+  }
+
+  goGlobalBackward(): void {
+    if (
+      this.globalBackwardButtonMode === "units" ||
+      (this.globalBackwardButtonMode === "dynamic" && !this.hasPreviousPage)
+    ) {
+      this.navigationRequest.emit("previous");
+      return;
+    }
+    if (this.globalBackwardButtonMode !== "hidden") {
+      this.goToRelativePage(-1);
+    }
+  }
+
+  goGlobalForward(): void {
+    if (
+      this.globalForwardButtonMode === "units" ||
+      (this.globalForwardButtonMode === "dynamic" && !this.hasNextPage)
+    ) {
+      this.navigationRequest.emit("next");
+      return;
+    }
+    if (this.globalForwardButtonMode !== "hidden") {
+      this.goToRelativePage(1);
+    }
   }
 
   ngAfterViewInit(): void {

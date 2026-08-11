@@ -134,6 +134,87 @@
       "policy": { "unitControls": "both", "headerContent": "block" }
     },
     {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_19.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_19.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c5814b1b6ef51d90f7e86248d27235e824615653465c90e211e819fecb1538c1",
+      "bookletKey": "Cy-Bklt_BkltConfig-19",
+      "displayLabel": "Bklt-config-19",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_20.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_20.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "da6d2d656347e04856c8fe0ed28ae5c4557a05799945f690eaad1589dac74d02",
+      "bookletKey": "Cy-Bklt_BkltConfig-20",
+      "displayLabel": "Bklt-config-20",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "dynamic" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_21.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_21.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "79600eaf4945e3d500154c9bf1231a1e3e4d413085e3cc7e4eaeabf316017151",
+      "bookletKey": "Cy-Bklt_BkltConfig-21",
+      "displayLabel": "Bklt-config-21",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "units" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_22.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_22.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c2ea9be37ce6180fb297e536a7ffd511ac8443ae474702943f538bfd491bff87",
+      "bookletKey": "Cy-Bklt_BkltConfig-22",
+      "displayLabel": "Bklt-config-22",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "pages" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_23.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_23.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "07a0483b4871e6f23fef182a692e7c8963ab84d6322052d2f2728e41d6e3faa6",
+      "bookletKey": "Cy-Bklt_BkltConfig-23",
+      "displayLabel": "Bklt-config-23",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_24.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_24.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "fe23302961eb4489c60039f9976e49006ca13f3ba2f624e6dbdb0baa211b6a0b",
+      "bookletKey": "Cy-Bklt_BkltConfig-24",
+      "displayLabel": "Bklt-config-24",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "dynamic" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_25.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_25.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "83b3d3f7cab3b087ec33558fc440a467d1e34d1c749cde7e8f340b02944e1ce2",
+      "bookletKey": "Cy-Bklt_BkltConfig-25",
+      "displayLabel": "Bklt-config-25",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "units" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_26.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_26.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "de00f405cdb040500a32b1590a71bbdb62db830e57cf026c980f95859c751dcb",
+      "bookletKey": "Cy-Bklt_BkltConfig-26",
+      "displayLabel": "Bklt-config-26",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "pages" }
+    },
+
+    {
       "fixture": "booklets/system-test/CY_Bklt_TC-1.xml",
       "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-1.xml",
       "bookletKey": "Cy-Bklt_TC-1",

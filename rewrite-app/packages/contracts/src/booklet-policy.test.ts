@@ -25,6 +25,8 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.navigation.unitControls, "both");
   assert.equal(defaults.navigation.unitLabel, "index");
   assert.equal(defaults.navigation.unitListEnabled, false);
+  assert.equal(defaults.navigation.backwardButton, "hidden");
+  assert.equal(defaults.navigation.forwardButton, "hidden");
   assert.equal(defaults.player.loadingMode, "lazy");
   assert.equal(defaults.timing.showTimeLeft, false);
   assert.equal(defaults.display.reloadButton, false);
@@ -51,6 +53,8 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     force_response_complete: "ALWAYS",
     browserBehaviour: "preventNav",
     navbar_unit_label: "LABEL",
+    navbar_backward_button: "DYNAMIC",
+    navbar_forward_button: "PAGES",
     unit_menu: "FULL",
     unit_navibuttons: "FORWARD_ONLY",
     allow_player_to_terminate_test: "LAST_UNIT",
@@ -75,6 +79,8 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.navigation.unitControls, "forward_only");
   assert.equal(policy.navigation.unitLabel, "label");
   assert.equal(policy.navigation.unitListEnabled, false);
+  assert.equal(policy.navigation.backwardButton, "dynamic");
+  assert.equal(policy.navigation.forwardButton, "pages");
   assert.equal(policy.navigation.playerEnd, "last_unit");
   assert.equal(policy.player.loadingMode, "eager");
   assert.equal(
@@ -158,6 +164,21 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(transitionalPolicy.navigation.unitControls, "hidden");
   assert.equal(transitionalPolicy.navigation.unitLabel, "label");
   assert.equal(transitionalPolicy.navigation.unitListEnabled, false);
+
+  for (const [sourceValue, expectedMode] of [
+    ["HIDDEN", "hidden"],
+    ["DYNAMIC", "dynamic"],
+    ["UNITS", "units"],
+    ["PAGES", "pages"],
+    ["unsupported", "hidden"]
+  ] as const) {
+    const globalNavigationPolicy = compileBookletRuntimePolicy({
+      navbar_backward_button: sourceValue,
+      navbar_forward_button: sourceValue.toLowerCase()
+    });
+    assert.equal(globalNavigationPolicy.navigation.backwardButton, expectedMode);
+    assert.equal(globalNavigationPolicy.navigation.forwardButton, expectedMode);
+  }
 });
 
 test("booklet config arrays and completeness rules are normalized", () => {
