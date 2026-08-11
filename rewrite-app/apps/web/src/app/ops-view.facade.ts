@@ -8,6 +8,7 @@ import type {
   ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
+  ListWorkspacesResponse,
   RevokeAdminSessionsResponse,
   GetRuntimeConfigResponse,
   GetRuntimeDiagnosticsResponse
@@ -53,6 +54,7 @@ import {
 } from "./rewrite-app-ops.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
 type RuntimeMetricsPayload = {
   runtime: {
@@ -143,10 +145,12 @@ export class OpsViewFacade {
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly confirmation = inject(ConfirmationDialogService);
   readonly applicationSettings = inject(ApplicationSettingsService);
 
   readonly ops = this.uiState.ops;
+  readonly workspace = this.uiState.workspace;
   private readonly allAdminRoleOptions: AdminRole[] = [
     "system_check",
     "group_monitor",
@@ -238,6 +242,8 @@ export class OpsViewFacade {
   adminAccessWindowValidForMinutesDraft = "";
   adminCustomTextsTargetUserId = "";
   adminCustomTextsUpdateDraft = "{}";
+  private workspaceAdminMatrixTenantKey = "";
+  private workspaceAdminMatrixWorkspaceKey = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -1136,6 +1142,28 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminUsers());
   }
 
+  get canRefreshWorkspaceAdminAccessMatrix(): boolean {
+    return (
+      this.canUseAdminSession &&
+      !!this.workspace.tenantKey.trim() &&
+      !!this.workspace.workspaceKey.trim()
+    );
+  }
+
+  refreshWorkspaceAdminAccessMatrix(): void {
+    if (!this.canRefreshWorkspaceAdminAccessMatrix) {
+      return;
+    }
+    const tenantKey = this.workspace.tenantKey.trim();
+    const workspaceKey = this.workspace.workspaceKey.trim();
+    this.viewState.onActionAsync(async () => {
+      await this.workspaceService.refreshWorkspaceDirectory();
+      await this.opsService.refreshAdminUsers();
+      this.workspaceAdminMatrixTenantKey = tenantKey;
+      this.workspaceAdminMatrixWorkspaceKey = workspaceKey;
+    });
+  }
+
   exportAdminUsersCsv(): void {
     if (!this.canUseAdminSession) {
       return;
@@ -1723,6 +1751,38 @@ export class OpsViewFacade {
       this.ops.adminStatusValue = status;
     }
     this.persistState();
+  }
+
+  runWorkspaceAdminAccessAction(item: RecordCollectionItem): void {
+    const command = item.actionPayload?.workspaceAdminAccessCommand;
+    const adminUserId = item.actionPayload?.adminUserId?.trim();
+    const roleAssignmentId = item.actionPayload?.roleAssignmentId?.trim();
+    if (!adminUserId) {
+      return;
+    }
+
+    if (command === "revoke") {
+      if (!roleAssignmentId) {
+        return;
+      }
+      this.ops.adminRevokeTargetUserId = adminUserId;
+      this.ops.adminRevokeRoleAssignmentId = roleAssignmentId;
+      this.persistState();
+      void this.confirmRevokeAdminRole();
+      return;
+    }
+
+    if (command !== "read_only" && command !== "read_write") {
+      return;
+    }
+    this.ops.adminRoleTargetUserId = adminUserId;
+    this.ops.adminRoleRole = "workspace_admin";
+    this.ops.adminRoleAccessMode = command;
+    this.ops.adminRoleTenantKey = this.workspaceAdminMatrixTenantKey;
+    this.ops.adminRoleWorkspaceKey = this.workspaceAdminMatrixWorkspaceKey;
+    this.ops.adminRoleGroupKey = "";
+    this.persistState();
+    this.assignAdminRole();
   }
 
   setMonitorProfileEditorTarget(target: "create" | "role"): void {
@@ -2442,6 +2502,163 @@ export class OpsViewFacade {
           adminUserId: item.adminUser.adminUserId
         }
       }))
+    ];
+  }
+
+  get workspaceAdminAccessMatrixItems(): RecordCollectionItem[] {
+    const adminUsers = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    const workspaces = parseJsonDocument<ListWorkspacesResponse>(
+      this.workspace.workspacesView
+    );
+    const tenantKey = this.workspaceAdminMatrixTenantKey;
+    const workspaceKey = this.workspaceAdminMatrixWorkspaceKey;
+    if (
+      tenantKey !== this.workspace.tenantKey.trim() ||
+      workspaceKey !== this.workspace.workspaceKey.trim()
+    ) {
+      return [];
+    }
+    const workspace = workspaces?.items.find(
+      candidate => candidate.workspaceKey === workspaceKey
+    );
+    if (!adminUsers || !workspace) {
+      return [];
+    }
+
+    const userItems: RecordCollectionItem[] = adminUsers.items.map(item => {
+      const platformAssignment = item.roleAssignments.find(
+        roleAssignment => roleAssignment.role === "platform_admin"
+      );
+      const tenantAssignment = item.roleAssignments.find(
+        roleAssignment =>
+          roleAssignment.role === "tenant_admin" &&
+          roleAssignment.tenantId === workspace.tenantId
+      );
+      const workspaceAssignment = item.roleAssignments.find(
+        roleAssignment =>
+          roleAssignment.role === "workspace_admin" &&
+          roleAssignment.workspaceId === workspace.workspaceId
+      );
+      const inheritedAssignment = platformAssignment ?? tenantAssignment;
+      const accessMode = inheritedAssignment
+        ? "read_write"
+        : workspaceAssignment?.accessMode ?? "none";
+      const inheritedLabel = platformAssignment
+        ? "platform admin"
+        : tenantAssignment
+          ? "tenant admin"
+          : "";
+      const isCurrentUser =
+        item.adminUser.adminUserId === this.currentAdminUserId;
+      const actions = inheritedAssignment
+        ? []
+        : workspaceAssignment
+          ? [
+              ...(isCurrentUser
+                ? []
+                : [
+                    {
+                      label: "Revoke Access",
+                      payload: {
+                        workspaceAdminAccessCommand: "revoke",
+                        adminUserId: item.adminUser.adminUserId,
+                        roleAssignmentId: workspaceAssignment.roleAssignmentId
+                      }
+                    }
+                  ])
+            ]
+          : [
+              {
+                label: "Grant Read Write",
+                payload: {
+                  workspaceAdminAccessCommand: "read_write",
+                  adminUserId: item.adminUser.adminUserId
+                }
+              }
+            ];
+      return {
+        headline: item.adminUser.username,
+        subline: item.adminUser.displayName,
+        badges: [
+          item.adminUser.status,
+          accessMode === "none" ? "no access" : accessMode,
+          ...(inheritedLabel ? [`inherited ${inheritedLabel}`] : []),
+          ...(isCurrentUser ? ["current session"] : [])
+        ],
+        rows: [
+          { label: "Admin User ID", value: item.adminUser.adminUserId },
+          {
+            label: "Effective Access",
+            value:
+              accessMode === "read_write"
+                ? "Read and write (RW)"
+                : accessMode === "read_only"
+                  ? "Read only (RO)"
+                  : "No workspace access"
+          },
+          {
+            label: "Access Source",
+            value: inheritedLabel || (workspaceAssignment ? "workspace role" : "none")
+          },
+          {
+            label: "Role Assignment ID",
+            value:
+              inheritedAssignment?.roleAssignmentId ??
+              workspaceAssignment?.roleAssignmentId ??
+              "none"
+          }
+        ],
+        ...(inheritedAssignment
+          ? {}
+          : {
+              actionLabel:
+                accessMode === "read_only"
+                  ? "Set Read Write"
+                  : accessMode === "read_write"
+                    ? "Set Read Only"
+                    : "Grant Read Only",
+              actionPayload: {
+                workspaceAdminAccessCommand:
+                  accessMode === "read_only" ? "read_write" : "read_only",
+                adminUserId: item.adminUser.adminUserId,
+                roleAssignmentId: workspaceAssignment?.roleAssignmentId ?? ""
+              },
+              actions
+            })
+      };
+    });
+
+    return [
+      {
+        headline: workspace.displayName,
+        subline: `${tenantKey} / ${workspaceKey}`,
+        badges: [workspace.status, `${userItems.length} account(s)`],
+        rows: [
+          { label: "Workspace ID", value: workspace.workspaceId },
+          { label: "Tenant ID", value: workspace.tenantId },
+          {
+            label: "Read Write",
+            value: String(
+              userItems.filter(item => item.badges.includes("read_write")).length
+            )
+          },
+          {
+            label: "Read Only",
+            value: String(
+              userItems.filter(item => item.badges.includes("read_only")).length
+            )
+          },
+          {
+            label: "No Access",
+            value: String(
+              userItems.filter(item => item.badges.includes("no access")).length
+            )
+          }
+        ]
+      },
+      ...userItems
     ];
   }
 

@@ -2510,6 +2510,74 @@ try {
     .filter({ hasText: "workspace_admin" })
     .filter({ hasText: "read_only" })
     .waitFor();
+  await expectInputValue("#workspaceAdminMatrixTenantKey", tenantKey);
+  await expectInputValue("#workspaceAdminMatrixWorkspaceKey", workspaceKey);
+  await page.locator("#refreshWorkspaceAdminAccessMatrixButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace Admin Access",
+        exact: true
+      })
+    })
+    .locator(".record-card")
+    .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: "Read only (RO)" })
+    .filter({ hasText: "workspace role" })
+    .waitFor();
+  logStep("workspace-admin-access-matrix-read-write");
+  await clickCardAction(
+    "Workspace Admin Access",
+    "Set Read Write",
+    workspaceAdminUsername
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_write"
+          )
+      )
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace Admin Access",
+        exact: true
+      })
+    })
+    .locator(".record-card")
+    .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: "Read and write (RW)" })
+    .waitFor();
+  logStep("workspace-admin-access-matrix-read-only");
+  await clickCardAction(
+    "Workspace Admin Access",
+    "Set Read Only",
+    workspaceAdminUsername
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_only"
+          )
+      )
+  );
 
   await fillAndCommit("#adminRoleTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminRoleRole", "tenant_admin");

@@ -765,6 +765,38 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Sign in with an administrative delegation role, then refresh admin users."
       ></app-record-collection>
 
+      <article id="workspaceAdminAccessMatrixCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Original Superadmin parity</span>
+            <h2>Workspace Admin Access Matrix</h2>
+          </div>
+          <span class="status-pill">RO / RW</span>
+        </div>
+        <p>Review every visible account against one workspace. Platform and tenant access is shown as inherited; direct workspace roles can be granted, changed, or revoked through the existing server delegation boundary.</p>
+        <div class="form-grid">
+          <label>
+            Tenant Key
+            <input id="workspaceAdminMatrixTenantKey" name="workspaceAdminMatrixTenantKey" [(ngModel)]="view.workspace.tenantKey" (change)="view.persistState()" />
+          </label>
+          <label>
+            Workspace Key
+            <input id="workspaceAdminMatrixWorkspaceKey" name="workspaceAdminMatrixWorkspaceKey" [(ngModel)]="view.workspace.workspaceKey" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshWorkspaceAdminAccessMatrixButton" class="primary" type="button" [disabled]="!view.canRefreshWorkspaceAdminAccessMatrix" (click)="view.refreshWorkspaceAdminAccessMatrix()">Refresh Access Matrix</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Workspace Admin Access"
+        subtitle="Workspace-centred administrator access with effective inherited and direct RO/RW roles."
+        [items]="view.workspaceAdminAccessMatrixItems"
+        (itemAction)="view.runWorkspaceAdminAccessAction($event)"
+        emptyState="Enter a tenant and workspace key, then refresh the access matrix."
+      ></app-record-collection>
+
       <article id="adminUserBatchStatusCard" class="card">
         <div class="section-heading">
           <div>
