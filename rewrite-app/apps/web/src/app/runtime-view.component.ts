@@ -969,6 +969,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         [items]="view.openRunItems"
         [density]="view.monitorProfileDensity"
         (itemAction)="view.selectTestRun($event)"
+        (progressActionPreview)="view.previewOpenRunProgressAction($event)"
         emptyState="No open runs are currently loaded."
       ></app-record-collection>
 

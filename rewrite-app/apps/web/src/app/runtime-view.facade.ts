@@ -39,6 +39,7 @@ import type {
 import type {
   RecordCollectionDensity,
   RecordCollectionItem,
+  RecordCollectionProgressPreview,
   RecordCollectionRow
 } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
@@ -234,6 +235,10 @@ export class RuntimeViewFacade {
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
   > = [];
+  private markedMonitorBlock: {
+    blockKey: string;
+    bookletSpecies: string;
+  } | null = null;
   private readonly resultGroupSelection = new Set<string>();
   private resultGroupSelectionScope = "";
 
@@ -2683,6 +2688,11 @@ export class RuntimeViewFacade {
               compactLabel: `${index + 1}/${openRun.unitPath?.length ?? 0}`,
               current: unit.current,
               complete: unit.answered,
+              marked:
+                cohortSelectable &&
+                this.markedMonitorBlock?.blockKey === unit.blockKey &&
+                this.markedMonitorBlock.bookletSpecies ===
+                  (openRun.bookletSpecies ?? openRun.bookletKey),
               selected:
                 batchSelected &&
                 selectedTargetBlockKey !== null &&
@@ -5093,6 +5103,19 @@ export class RuntimeViewFacade {
       }
       await this.runtimeService.refreshRuntimeReads(true);
     });
+  }
+
+  previewOpenRunProgressAction(
+    actionPayload: RecordCollectionProgressPreview
+  ): void {
+    if (actionPayload?.monitorBatchCommand !== "select-block") {
+      this.markedMonitorBlock = null;
+      return;
+    }
+    const blockKey = actionPayload.blockKey?.trim();
+    const bookletSpecies = actionPayload.bookletSpecies?.trim();
+    this.markedMonitorBlock =
+      blockKey && bookletSpecies ? { blockKey, bookletSpecies } : null;
   }
 
   private selectNextMonitorBlockAfterGoto(

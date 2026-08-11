@@ -13771,6 +13771,44 @@ try {
       name: `Select ${speciesReferenceTarget.blockLabel} for monitor jump`
     })
     .first();
+  await betaOneBlockTargetButton.hover();
+  assert.equal(
+    await speciesMonitorRunCards
+      .filter({ hasText: `${participantLoginKey}-species-beta` })
+      .locator('[data-target-marked="true"]')
+      .count(),
+    2,
+    "Hovering a block target must preview the matching target across its visible species cohort."
+  );
+  assert.equal(
+    await speciesMonitorRunCards
+      .filter({ hasText: `${participantLoginKey}-species-two` })
+      .locator('[data-target-marked="true"]')
+      .count(),
+    0,
+    "Block previews must not cross Booklet-species boundaries."
+  );
+  await page.locator("#monitorSortControlsHeading").hover();
+  assert.equal(
+    await speciesMonitorRunCards.locator('[data-target-marked="true"]').count(),
+    0,
+    "Leaving a block target must clear the cohort preview."
+  );
+  await betaOneBlockTargetButton.focus();
+  assert.equal(
+    await speciesMonitorRunCards
+      .filter({ hasText: `${participantLoginKey}-species-beta` })
+      .locator('[data-target-marked="true"]')
+      .count(),
+    2,
+    "Keyboard focus must expose the same cohort preview as pointer hover."
+  );
+  await page.locator("#monitorSortKey").focus();
+  assert.equal(
+    await speciesMonitorRunCards.locator('[data-target-marked="true"]').count(),
+    0,
+    "Moving keyboard focus away must clear the cohort preview."
+  );
   await betaOneBlockTargetButton.click();
   await page
     .locator("#monitorBatchSelectionStatus")

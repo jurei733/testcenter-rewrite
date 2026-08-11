@@ -1154,6 +1154,13 @@ pre {
   box-shadow: 0 0 0 3px rgba(255, 128, 0, 0.26);
 }
 
+.record-card-progress-step.is-target-marked:not(.is-target-selected) {
+  border-color: rgba(196, 82, 47, 0.62);
+  background: rgba(255, 128, 0, 0.1);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(255, 128, 0, 0.16);
+}
+
 .record-card-progress-step.has-action {
   padding: 0;
 }

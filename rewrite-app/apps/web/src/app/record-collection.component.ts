@@ -24,10 +24,13 @@ export type RecordCollectionProgressStep = {
   compactLabel: string;
   current?: boolean;
   complete?: boolean;
+  marked?: boolean;
   selected?: boolean;
   actionLabel?: string;
   actionPayload?: Record<string, string>;
 };
+
+export type RecordCollectionProgressPreview = Record<string, string> | null;
 
 export type RecordCollectionItem = {
   headline: string;
@@ -75,7 +78,7 @@ export type RecordCollectionItem = {
           [attr.data-presentation-state]="item.presentationState ?? null"
           [attr.aria-current]="item.selected ? 'true' : null"
           [attr.aria-label]="item.headline + ': ' + item.subline"
-          *ngFor="let item of items"
+          *ngFor="let item of items; trackBy: trackItem"
         >
           <div class="record-card-header">
             <div>
@@ -98,9 +101,10 @@ export type RecordCollectionItem = {
           >
             <li
               class="record-card-progress-step"
-              *ngFor="let step of item.progressSteps"
+              *ngFor="let step of item.progressSteps; trackBy: trackProgressStep"
               [class.is-current]="step.current"
               [class.is-complete]="step.complete"
+              [class.is-target-marked]="step.marked"
               [class.is-target-selected]="step.selected"
               [class.has-action]="step.actionPayload"
               [attr.data-progress-key]="step.key"
@@ -114,6 +118,11 @@ export type RecordCollectionItem = {
                 type="button"
                 [attr.aria-label]="step.actionLabel ?? step.label"
                 [attr.aria-pressed]="step.selected ? 'true' : 'false'"
+                [attr.data-target-marked]="step.marked ? 'true' : null"
+                (mouseenter)="emitProgressPreview(step)"
+                (mouseleave)="clearProgressPreview($event)"
+                (focus)="emitProgressPreview(step)"
+                (blur)="clearProgressPreview($event)"
                 (click)="emitProgressAction(item, step)"
               >
                 <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
@@ -210,10 +219,16 @@ export class RecordCollectionComponent implements OnDestroy {
   @Input() emptyState = "No items yet.";
   @Input() density: RecordCollectionDensity = "full";
   @Output() readonly itemAction = new EventEmitter<RecordCollectionItem>();
+  @Output() readonly progressActionPreview =
+    new EventEmitter<RecordCollectionProgressPreview>();
   private copiedRowKey = "";
+  private hasProgressPreview = false;
   private copyResetHandle?: ReturnType<typeof globalThis.setTimeout>;
 
   ngOnDestroy(): void {
+    if (this.hasProgressPreview) {
+      this.progressActionPreview.emit(null);
+    }
     if (this.copyResetHandle) {
       globalThis.clearTimeout(this.copyResetHandle);
     }
@@ -244,6 +259,46 @@ export class RecordCollectionComponent implements OnDestroy {
       actionLabel: step.actionLabel ?? step.label,
       actionPayload: step.actionPayload
     });
+  }
+
+  emitProgressPreview(step: RecordCollectionProgressStep): void {
+    if (step.actionPayload) {
+      this.hasProgressPreview = true;
+      this.progressActionPreview.emit(step.actionPayload);
+    }
+  }
+
+  clearProgressPreview(event: Event): void {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      this.hasProgressPreview = false;
+      this.progressActionPreview.emit(null);
+      return;
+    }
+    if (
+      (event.type === "mouseleave" && target === globalThis.document?.activeElement) ||
+      (event.type === "blur" && target.matches(":hover"))
+    ) {
+      return;
+    }
+    this.hasProgressPreview = false;
+    this.progressActionPreview.emit(null);
+  }
+
+  trackItem(index: number, item: RecordCollectionItem): string {
+    return [
+      index,
+      item.headline,
+      item.subline,
+      JSON.stringify(item.actionPayload ?? {})
+    ].join("\u0000");
+  }
+
+  trackProgressStep(
+    index: number,
+    step: RecordCollectionProgressStep
+  ): string {
+    return `${index}\u0000${step.key}`;
   }
 
   async copyRowValue(row: RecordCollectionRow): Promise<void> {
