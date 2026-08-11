@@ -12376,6 +12376,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const windows1252BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="Windows-1252"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preis \u0080</Label>");
+  const iso885915BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-15"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Preis ¤</Label>");
   const percentEncodedLatin1Booklet = Array.from(
     Buffer.from(latin1BookletXml, "latin1"),
     byte => `%${byte.toString(16).padStart(2, "0")}`
@@ -12430,6 +12433,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "windows-1252-original-booklet.xml",
       bytes: Buffer.from(windows1252BookletXml, "latin1"),
+      displayLabel: "Preis €"
+    },
+    {
+      fileName: "iso-8859-15-original-booklet.xml",
+      bytes: Buffer.from(iso885915BookletXml, "latin1"),
       displayLabel: "Preis €"
     },
     {
@@ -12509,33 +12517,47 @@ test("original Testcenter compatibility corpus imports representative booklets",
     Buffer.from([0x00, 0x00, 0xfe, 0xff]),
     encodeUtf32(utf32EncodingMismatchXml, "big-endian")
   ]);
-  for (const encodingMismatchCase of [
+  const unsupportedEncodingXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="x-testcenter-unknown"'
+  );
+  for (const encodingDiagnosticCase of [
     {
       fileName: "utf-16le-declared-utf-8-original-booklet.xml",
-      sourceDocument: `data:application/xml;base64,${utf16EncodingMismatchBytes.toString("base64")}`
+      sourceDocument: `data:application/xml;base64,${utf16EncodingMismatchBytes.toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_mismatch"
     },
     {
       fileName: "utf-32be-declared-utf-16-original-booklet.xml",
       sourceDocument: `data:application/xml,${Array.from(
         utf32EncodingMismatchBytes,
         byte => `%${byte.toString(16).padStart(2, "0")}`
-      ).join("")}`
+      ).join("")}`,
+      diagnosticCode: "source_document_xml_encoding_mismatch"
+    },
+    {
+      fileName: "unsupported-encoding-original-booklet.xml",
+      sourceDocument: `data:application/xml;base64,${Buffer.from(
+        unsupportedEncodingXml,
+        "utf8"
+      ).toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_unsupported"
     }
   ]) {
     const validationWorkspaceKey = await createValidationWorkspace(
-      encodingMismatchCase.fileName
+      encodingDiagnosticCase.fileName
     );
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
     }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
       method: "POST",
       body: {
-        fileName: encodingMismatchCase.fileName,
+        fileName: encodingDiagnosticCase.fileName,
         mediaType: "application/xml",
-        sourceDocument: encodingMismatchCase.sourceDocument
+        sourceDocument: encodingDiagnosticCase.sourceDocument
       }
     });
-    assert.equal(sourcePackage.status, 201, encodingMismatchCase.fileName);
+    assert.equal(sourcePackage.status, 201, encodingDiagnosticCase.fileName);
     const importResult = await requestJson<{
       importJob: {
         status: string;
@@ -12546,19 +12568,19 @@ test("original Testcenter compatibility corpus imports representative booklets",
       method: "POST",
       body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
     });
-    assert.equal(importResult.status, 201, encodingMismatchCase.fileName);
+    assert.equal(importResult.status, 201, encodingDiagnosticCase.fileName);
     assert.equal(
       importResult.body.importJob.status,
       "failed",
-      encodingMismatchCase.fileName
+      encodingDiagnosticCase.fileName
     );
     assert.ok(
       importResult.body.importJob.diagnostics.some(
         diagnostic =>
-          diagnostic.code === "source_document_xml_encoding_mismatch" &&
-          diagnostic.message.includes("declares XML encoding")
+          diagnostic.code === encodingDiagnosticCase.diagnosticCode &&
+          diagnostic.message.includes(encodingDiagnosticCase.fileName)
       ),
-      encodingMismatchCase.fileName
+      encodingDiagnosticCase.fileName
     );
     assert.equal(importResult.body.stagedContentRelease, null);
   }

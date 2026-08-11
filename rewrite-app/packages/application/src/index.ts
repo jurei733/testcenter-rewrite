@@ -2231,6 +2231,9 @@ const readDeclaredXmlEncoding = (sourceDocument: string): string | null =>
     /<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i
   )?.[1] ?? null;
 
+const normalizeSourceTextEncodingName = (value: string): string =>
+  value.toLowerCase().replace(/_/g, "-");
+
 const decodeUtf32Bytes = (
   bytes: Buffer,
   byteOrder: "little-endian" | "big-endian"
@@ -2264,6 +2267,59 @@ const decodeUtf32Bytes = (
   return decodedChunks.join("");
 };
 
+const decodeSourceTextBytesWithDeclaredEncoding = (
+  bytes: Buffer,
+  declaredEncoding: string
+): string | null => {
+  const normalizedEncoding = normalizeSourceTextEncodingName(declaredEncoding);
+  if (
+    ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
+      normalizedEncoding
+    )
+  ) {
+    return bytes.toString("latin1");
+  }
+  if (
+    ["windows-1252", "windows1252", "cp1252"].includes(normalizedEncoding)
+  ) {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+  if (
+    ["utf-16", "utf-16le", "utf16", "utf16le"].includes(
+      normalizedEncoding
+    )
+  ) {
+    return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
+  }
+  if (["utf-16be", "utf16be"].includes(normalizedEncoding)) {
+    return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
+  }
+  if (
+    ["utf-32", "utf-32le", "utf32", "utf32le"].includes(
+      normalizedEncoding
+    )
+  ) {
+    return decodeUtf32Bytes(bytes, "little-endian");
+  }
+  if (["utf-32be", "utf32be"].includes(normalizedEncoding)) {
+    return decodeUtf32Bytes(bytes, "big-endian");
+  }
+
+  try {
+    return stripTextByteOrderMark(
+      new TextDecoder(normalizedEncoding).decode(bytes)
+    );
+  } catch {
+    return null;
+  }
+};
+
+const isSupportedSourceTextEncoding = (declaredEncoding: string): boolean =>
+  decodeSourceTextBytesWithDeclaredEncoding(
+    Buffer.alloc(0),
+    declaredEncoding
+  ) !== null;
+
 const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
   const detectedEncoding = detectSourceTextByteEncoding(bytes);
   if (detectedEncoding) {
@@ -2289,41 +2345,13 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
   const declaredEncoding =
     readDeclaredXmlEncoding(bytes.subarray(0, 1024).toString("latin1")) ??
     mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
-  const normalizedEncoding = declaredEncoding
-    ?.toLowerCase()
-    .replace(/_/g, "-");
-  if (normalizedEncoding) {
-    if (
-      ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
-        normalizedEncoding
-      )
-    ) {
-      return bytes.toString("latin1");
-    }
-    if (
-      ["windows-1252", "windows1252", "cp1252"].includes(normalizedEncoding)
-    ) {
-      return new TextDecoder("windows-1252").decode(bytes);
-    }
-    if (
-      ["utf-16", "utf-16le", "utf16", "utf16le"].includes(
-        normalizedEncoding
-      )
-    ) {
-      return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
-    }
-    if (["utf-16be", "utf16be"].includes(normalizedEncoding)) {
-      return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
-    }
-    if (
-      ["utf-32", "utf-32le", "utf32", "utf32le"].includes(
-        normalizedEncoding
-      )
-    ) {
-      return decodeUtf32Bytes(bytes, "little-endian");
-    }
-    if (["utf-32be", "utf32be"].includes(normalizedEncoding)) {
-      return decodeUtf32Bytes(bytes, "big-endian");
+  if (declaredEncoding) {
+    const decodedSourceDocument = decodeSourceTextBytesWithDeclaredEncoding(
+      bytes,
+      declaredEncoding
+    );
+    if (decodedSourceDocument !== null) {
+      return decodedSourceDocument;
     }
   }
 
@@ -6824,14 +6852,12 @@ const createImportDiagnostic = (
   message
 });
 
-const normalizeXmlEncodingName = (value: string): string =>
-  value.toLowerCase().replace(/_/g, "-");
-
 const isXmlEncodingCompatibleWithDetectedBytes = (
   declaredEncoding: string,
   detectedEncoding: SourceTextByteEncoding
 ): boolean => {
-  const normalizedDeclaredEncoding = normalizeXmlEncodingName(declaredEncoding);
+  const normalizedDeclaredEncoding =
+    normalizeSourceTextEncodingName(declaredEncoding);
   switch (detectedEncoding) {
     case "utf-8":
       return ["utf-8", "utf8"].includes(normalizedDeclaredEncoding);
@@ -6861,13 +6887,22 @@ const validateXmlEncodingDeclaration = (
 ): ImportJobDiagnostic[] => {
   const detectedEncoding = detectSourceTextByteEncoding(bytes)?.encoding;
   const declaredEncoding = readDeclaredXmlEncoding(decodedSourceDocument);
+  if (!declaredEncoding) {
+    return [];
+  }
+
+  if (!isSupportedSourceTextEncoding(declaredEncoding)) {
+    return [
+      createImportDiagnostic(
+        "source_document_xml_encoding_unsupported",
+        `Source package '${sourceFileName}' declares unsupported XML encoding '${declaredEncoding}'.`
+      )
+    ];
+  }
+
   if (
     !detectedEncoding ||
-    !declaredEncoding ||
-    isXmlEncodingCompatibleWithDetectedBytes(
-      declaredEncoding,
-      detectedEncoding
-    )
+    isXmlEncodingCompatibleWithDetectedBytes(declaredEncoding, detectedEncoding)
   ) {
     return [];
   }
@@ -16501,6 +16536,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
   const decodedPersistedDocument = looksLikeZipPackage
     ? null
     : decodePersistedSourceDocument(sourcePackage);
+  const hasEncodedSourceBytes = /^data:/i.test(sourcePackage.sourceDocument);
   const decodedSourceDocument = looksLikeZipPackage
     ? sourcePackage.sourceDocument
     : readPersistedSourceText(sourcePackage, decodedPersistedDocument) ??
@@ -16543,7 +16579,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     looksLikeXmlDocument
   ) {
     const diagnostics = [
-      ...(decodedPersistedDocument
+      ...(decodedPersistedDocument && hasEncodedSourceBytes
         ? validateXmlEncodingDeclaration(
             decodedPersistedDocument.bytes,
             decodedSourceDocument,
