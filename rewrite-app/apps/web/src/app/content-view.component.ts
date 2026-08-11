@@ -237,7 +237,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="form-grid full">
           <label>
             Upload Loose Files
-            <input id="sourcePackageAssemblyFiles" name="sourcePackageAssemblyFiles" type="file" multiple accept=".xml,.json,.html,.htm,.imsmanifest,.manifest,.zip,application/xml,text/xml,application/json,text/html,application/zip,application/x-zip-compressed" [disabled]="!view.canUseWorkspaceScope" (change)="view.loadLooseSourceFiles($event)" />
+            <input id="sourcePackageAssemblyFiles" name="sourcePackageAssemblyFiles" type="file" multiple [disabled]="!view.canUseWorkspaceScope" (change)="view.loadLooseSourceFiles($event)" />
           </label>
           <label>
             Assembled Package Name

@@ -250,10 +250,7 @@ export class ContentViewFacade {
         files.map(file => ({
           fileName: file.name,
           mediaType: this.inferMediaTypeFromFile(file),
-          loadSourceDocument: () =>
-            this.isZipSourceFile(file)
-              ? this.readFileAsDataUrl(file)
-              : file.text()
+          loadSourceDocument: () => this.readFileAsDataUrl(file)
         }))
       );
       this.looseSourcePackageUploadReport = report;
@@ -2745,7 +2742,11 @@ export class ContentViewFacade {
     if (this.isZipSourceFile(file)) {
       return "application/zip";
     }
-    if (normalizedName.endsWith(".json")) {
+    if (
+      normalizedName.endsWith(".json") ||
+      normalizedName.endsWith(".voud") ||
+      normalizedName.endsWith(".vomd")
+    ) {
       return "application/json";
     }
     if (
@@ -2755,7 +2756,13 @@ export class ContentViewFacade {
     ) {
       return "application/xml";
     }
-    return file.type || this.content.sourceMediaType.trim() || "text/plain";
+    if (
+      normalizedName.endsWith(".html") ||
+      normalizedName.endsWith(".htm")
+    ) {
+      return "text/html";
+    }
+    return file.type || "application/octet-stream";
   }
 
   private isZipSourceFile(file: File): boolean {

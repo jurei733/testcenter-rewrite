@@ -4585,8 +4585,12 @@ try {
     .first()
     .waitFor({ timeout: 20_000 });
   logStep("loose-upload-partial-report");
-  const survivingLooseUploadFileName = `ui-loose-survivor-${Date.now()}.html`;
-  await page.locator("#sourcePackageAssemblyFiles").setInputFiles([
+  const looseUploadInput = page.locator("#sourcePackageAssemblyFiles");
+  assert.equal(await looseUploadInput.getAttribute("accept"), null);
+  const survivingLooseUploadFileName = `ui-loose-survivor-${Date.now()}.voud`;
+  const survivingBinaryUploadFileName = `ui-loose-binary-${Date.now()}.bin`;
+  const survivingBinaryUpload = Buffer.from([0x00, 0xff, 0x80, 0x41, 0x0a]);
+  await looseUploadInput.setInputFiles([
     {
       name: "Booklet2.xml",
       mimeType: "application/xml",
@@ -4596,8 +4600,17 @@ try {
     },
     {
       name: survivingLooseUploadFileName,
-      mimeType: "text/html",
-      buffer: Buffer.from("<!doctype html><html><body>survivor</body></html>")
+      mimeType: "",
+      buffer: await readFile(
+        resolve(
+          "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample1.voud"
+        )
+      )
+    },
+    {
+      name: survivingBinaryUploadFileName,
+      mimeType: "",
+      buffer: survivingBinaryUpload
     }
   ]);
   const looseUploadReport = page
@@ -4607,8 +4620,8 @@ try {
     });
   await looseUploadReport
     .locator("article.record-card")
-    .filter({ has: page.getByRole("heading", { name: "2 loose file(s) processed" }) })
-    .filter({ hasText: "1 uploaded, 1 rejected" })
+    .filter({ has: page.getByRole("heading", { name: "3 loose file(s) processed" }) })
+    .filter({ hasText: "2 uploaded, 1 rejected" })
     .filter({ hasText: "workspace refreshed" })
     .waitFor({ timeout: 20_000 });
   await looseUploadReport
@@ -4624,11 +4637,21 @@ try {
       has: page.getByRole("heading", { name: survivingLooseUploadFileName })
     })
     .filter({ hasText: "uploaded" })
+    .filter({ hasText: "application/json" })
+    .filter({ hasText: "Selected for reviewed package assembly" })
+    .waitFor();
+  await looseUploadReport
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", { name: survivingBinaryUploadFileName })
+    })
+    .filter({ hasText: "uploaded" })
+    .filter({ hasText: "application/octet-stream" })
     .filter({ hasText: "Selected for reviewed package assembly" })
     .waitFor();
   await page
     .locator("#sourcePackageAssemblySelection")
-    .filter({ hasText: "1 file(s) selected" })
+    .filter({ hasText: "2 file(s) selected" })
     .waitFor();
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(survivingLooseUploadFileName)}`,
@@ -4641,8 +4664,37 @@ try {
         item =>
           item?.sourcePackage?.fileName === survivingLooseUploadFileName &&
           item?.sourcePackage?.status === "uploaded" &&
+          item?.sourcePackage?.mediaType === "application/json" &&
           item?.fileType === "Resource"
       )
+  );
+  const binaryUploadList = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(survivingBinaryUploadFileName)}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      payload.filteredCount === 1 &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.sourcePackage?.fileName === survivingBinaryUploadFileName &&
+          item?.sourcePackage?.status === "uploaded" &&
+          item?.sourcePackage?.mediaType === "application/octet-stream" &&
+          item?.fileType === "Resource"
+      )
+  );
+  const binarySourcePackageId = binaryUploadList.items.find(
+    item => item?.sourcePackage?.fileName === survivingBinaryUploadFileName
+  )?.sourcePackage?.sourcePackageId;
+  assert.ok(binarySourcePackageId);
+  const binaryDownloadResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${binarySourcePackageId}/download`,
+    createSmokeFetchInit()
+  );
+  assert.equal(binaryDownloadResponse.status, 200);
+  assert.deepEqual(
+    Buffer.from(await binaryDownloadResponse.arrayBuffer()),
+    survivingBinaryUpload
   );
   await page.locator("#clearSourcePackageAssemblyButton").click();
   await page
