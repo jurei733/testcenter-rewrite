@@ -295,6 +295,16 @@ numeric precision loss, including exact Gregorian leap-year validation, while
 forbidden leading-zero forms such as `02026-…` fail with the existing stable
 `testcenter_xml_unit_last_change_invalid` diagnostic.
 
+Latest P0 display-label XSD closure: the compatibility profile now
+distinguishes a missing required label element or attribute from an authored
+empty `xs:string` value. Matching the Original Booklet, Unit, SysCheck, and
+Testtakers schemas, empty `Metadata/Label`, Booklet `Unit/@label`, and
+Testtakers `Group/@label` values import without weakening identity,
+cardinality, or structural checks. Runtime normalization preserves the authored
+empty Booklet and Unit labels instead of silently replacing them with generated
+text. The storage-parameterized Original corpus gate exercises all four XML
+document types.
+
 Latest P0 Booklet-schema closure: the importer now validates the complete
 `Units`/nested-`Testlet` tree and the ordered `Restrictions` surface before
 normalization. Unknown container, Unit, Testlet, `CodeToEnter`, `TimeMax`,

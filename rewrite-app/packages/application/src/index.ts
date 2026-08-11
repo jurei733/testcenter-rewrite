@@ -7139,8 +7139,12 @@ const normalizeManifestUriPathToken = (value: unknown): string => {
 const normalizeManifestLabel = (
   value: unknown,
   fallbackPrefix: string,
-  key: string
+  key: string,
+  preserveExplicitEmpty = false
 ): string => {
+  if (preserveExplicitEmpty && typeof value === "string") {
+    return value.trim();
+  }
   const label = normalizeManifestToken(value);
   return label || toDisplayLabel(fallbackPrefix, key) || key;
 };
@@ -7209,7 +7213,8 @@ const normalizeUnitAttachmentRequests = (
 };
 
 const normalizeSourcePackageUnitEntry = (
-  unitEntry: SourcePackageUnitEntry
+  unitEntry: SourcePackageUnitEntry,
+  preserveExplicitEmptyLabel = false
 ): SourcePackageUnitEntry | null => {
   const unitKey = normalizeManifestToken(unitEntry.unitKey);
   if (!unitKey) {
@@ -7236,7 +7241,8 @@ const normalizeSourcePackageUnitEntry = (
     displayLabel: normalizeManifestLabel(
       unitEntry.displayLabel,
       "Unit",
-      unitKey
+      unitKey,
+      preserveExplicitEmptyLabel
     ),
     ...(shortLabel ? { shortLabel } : {}),
     ...(Array.isArray(unitEntry.testletPath) && unitEntry.testletPath.length > 0
@@ -7257,7 +7263,8 @@ const normalizeSourcePackageUnitEntry = (
 };
 
 const normalizeContentStructure = (
-  contentStructure: SourcePackageContentStructure
+  contentStructure: SourcePackageContentStructure,
+  preserveExplicitEmptyLabels = false
 ): ContentReleaseRuntimeSnapshot | null => {
   const systemCheckEntriesById = new Map<string, SourcePackageSystemCheckEntry>();
   for (const entry of contentStructure.systemCheckEntries ?? []) {
@@ -7315,14 +7322,18 @@ const normalizeContentStructure = (
       }];
     });
     const unitEntry = entry.unitEntry
-      ? normalizeSourcePackageUnitEntry(entry.unitEntry)
+      ? normalizeSourcePackageUnitEntry(
+          entry.unitEntry,
+          preserveExplicitEmptyLabels
+        )
       : null;
     systemCheckEntriesById.set(checkId.toUpperCase(), {
       checkId,
       displayLabel: normalizeManifestLabel(
         entry.displayLabel,
         "System Check",
-        checkId
+        checkId,
+        preserveExplicitEmptyLabels
       ),
       ...(normalizeUnitContent(entry.description)
         ? { description: normalizeUnitContent(entry.description) }
@@ -7375,7 +7386,8 @@ const normalizeContentStructure = (
         displayLabel: normalizeManifestLabel(
           bookletEntry.displayLabel,
           "Booklet",
-          bookletKey
+          bookletKey,
+          preserveExplicitEmptyLabels
         ),
         unitEntries: []
       };
@@ -7656,7 +7668,10 @@ const normalizeContentStructure = (
       ? bookletEntry.unitEntries
       : [];
     for (const unitEntry of rawUnitEntries) {
-      const normalizedUnitEntry = normalizeSourcePackageUnitEntry(unitEntry);
+      const normalizedUnitEntry = normalizeSourcePackageUnitEntry(
+        unitEntry,
+        preserveExplicitEmptyLabels
+      );
       if (!normalizedUnitEntry || unitKeys.has(normalizedUnitEntry.unitKey)) {
         continue;
       }
@@ -8735,6 +8750,32 @@ const readXmlChildText = (
   return undefined;
 };
 
+const readXmlChildTextPreservingEmpty = (
+  content: string,
+  ...candidateTagNames: string[]
+): string | undefined => {
+  for (const tagName of candidateTagNames) {
+    const pairedMatch = content.match(
+      new RegExp(
+        `<((?:[a-zA-Z_][\\w.-]*:)?${tagName})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`,
+        "i"
+      )
+    );
+    if (pairedMatch?.[2] !== undefined) {
+      return decodeXmlTextContent(pairedMatch[2]);
+    }
+    if (
+      new RegExp(
+        `<(?:[a-zA-Z_][\\w.-]*:)?${tagName}\\b[^>]*/>`,
+        "i"
+      ).test(content)
+    ) {
+      return "";
+    }
+  }
+  return undefined;
+};
+
 const xmlElementLocalName = (element: XmlElement): string =>
   element.localName || element.nodeName.split(":").at(-1) || element.nodeName;
 
@@ -9425,7 +9466,7 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
-    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+    if (metadata && xmlChildrenNamed(metadata, "Label").length === 0) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_metadata_label_missing",
@@ -10022,7 +10063,7 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
-      if (!unit.getAttribute("label")?.trim()) {
+      if (unit.getAttribute("label") === null) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_unit_label_missing",
@@ -10146,7 +10187,7 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
-    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+    if (metadata && xmlChildrenNamed(metadata, "Label").length === 0) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_metadata_label_missing",
@@ -10654,7 +10695,7 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
-    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+    if (metadata && xmlChildrenNamed(metadata, "Label").length === 0) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_metadata_label_missing",
@@ -11375,7 +11416,7 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
-      if (!group.getAttribute("label")?.trim()) {
+      if (group.getAttribute("label") === null) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_group_label_missing",
@@ -12645,29 +12686,31 @@ const collectXmlBookletEntries = (
           readXmlChildText(unitContent, "labelshort", "labelShort") ??
           ""
       ).trim();
+      const authoredDisplayLabel =
+        readXmlAttribute(
+          unitAttributes,
+          "displayLabel",
+          "label",
+          "title",
+          "name",
+          "displayName"
+        ) ??
+        readXmlChildTextPreservingEmpty(
+          unitContent,
+          "title",
+          "label",
+          "name",
+          "displayName"
+        );
       unitEntries.push({
         unitKey,
         ...(originalUnitId && originalUnitId !== unitKey
           ? { originalUnitId }
           : {}),
-        displayLabel: String(
-          readXmlAttribute(
-            unitAttributes,
-            "displayLabel",
-            "label",
-            "title",
-            "name",
-            "displayName"
-          ) ??
-            readXmlChildText(
-              unitContent,
-              "title",
-              "label",
-              "name",
-              "displayName"
-            ) ??
-            shortLabel
-        ).trim(),
+        displayLabel:
+          authoredDisplayLabel === undefined
+            ? shortLabel || toDisplayLabel("Unit", unitKey) || unitKey
+            : authoredDisplayLabel.trim(),
         ...(shortLabel ? { shortLabel } : {}),
         ...(description ? { description } : {}),
         ...(content ? { content } : {})
@@ -12710,26 +12753,28 @@ const collectXmlBookletEntries = (
           ""
       ).trim();
     const hierarchy = hierarchies.get(bookletKey);
+    const authoredDisplayLabel =
+      readXmlAttribute(
+        bookletAttributes,
+        "displayLabel",
+        "label",
+        "title",
+        "name",
+        "displayName"
+      ) ??
+      readXmlChildTextPreservingEmpty(
+        bookletMatch[3] ?? "",
+        "title",
+        "label",
+        "name",
+        "displayName"
+      );
     bookletEntries.push({
       bookletKey,
-      displayLabel: String(
-        readXmlAttribute(
-          bookletAttributes,
-          "displayLabel",
-          "label",
-          "title",
-          "name",
-          "displayName"
-        ) ??
-          readXmlChildText(
-            bookletMatch[3] ?? "",
-            "title",
-            "label",
-            "name",
-            "displayName"
-          ) ??
-          ""
-      ).trim(),
+      displayLabel:
+        authoredDisplayLabel === undefined
+          ? toDisplayLabel("Booklet", bookletKey) || bookletKey
+          : authoredDisplayLabel.trim(),
       ...(hierarchy && Object.keys(hierarchy.customTexts).length > 0
         ? { customTexts: hierarchy.customTexts }
         : {}),
@@ -12926,10 +12971,10 @@ const parseSystemCheckSourceDocument = (
   );
   const unitKey = readAttribute(config, "unit");
   const saveKey = readAttribute(config, "savekey");
+  const labelElement = xmlChildrenNamed(metadata ?? root, "Label")[0];
   return [{
     checkId,
-    displayLabel:
-      xmlElementText(xmlChildrenNamed(metadata ?? root, "Label")[0]) || checkId,
+    displayLabel: labelElement ? xmlElementText(labelElement) : checkId,
     ...(xmlElementText(xmlChildrenNamed(metadata ?? root, "Description")[0])
       ? {
           description: xmlElementText(
@@ -12953,7 +12998,10 @@ const normalizeParsedXmlContentStructure = (
 ): ContentReleaseRuntimeSnapshot | null => {
   const systemCheckEntries = parseSystemCheckSourceDocument(sourceDocument);
   if (systemCheckEntries.length > 0) {
-    return normalizeContentStructure({ bookletEntries: [], systemCheckEntries });
+    return normalizeContentStructure(
+      { bookletEntries: [], systemCheckEntries },
+      true
+    );
   }
   const explicitBookletEntries = collectXmlBookletEntries(
     sourceDocument,
@@ -12965,12 +13013,15 @@ const normalizeParsedXmlContentStructure = (
   );
 
   if (explicitBookletEntries.length > 0) {
-    return normalizeContentStructure({
-      bookletEntries: [
-        ...explicitBookletEntries,
-        ...assessmentTestBookletEntries
-      ]
-    });
+    return normalizeContentStructure(
+      {
+        bookletEntries: [
+          ...explicitBookletEntries,
+          ...assessmentTestBookletEntries
+        ]
+      },
+      true
+    );
   }
 
   const sectionBookletEntries = collectXmlBookletEntries(
@@ -12979,34 +13030,43 @@ const normalizeParsedXmlContentStructure = (
   );
 
   if (sectionBookletEntries.length > 0) {
-    return normalizeContentStructure({ bookletEntries: sectionBookletEntries });
+    return normalizeContentStructure(
+      { bookletEntries: sectionBookletEntries },
+      true
+    );
   }
 
   if (assessmentTestBookletEntries.length > 0) {
-    return normalizeContentStructure({
-      bookletEntries: assessmentTestBookletEntries
-    });
+    return normalizeContentStructure(
+      { bookletEntries: assessmentTestBookletEntries },
+      true
+    );
   }
 
   const organizationBookletEntries =
     collectXmlOrganizationBookletEntries(sourceDocument);
   if (organizationBookletEntries.length > 0) {
-    return normalizeContentStructure({
-      bookletEntries: organizationBookletEntries
-    });
+    return normalizeContentStructure(
+      { bookletEntries: organizationBookletEntries },
+      true
+    );
   }
 
   const dependencyBookletEntries =
     collectXmlResourceDependencyBookletEntries(sourceDocument);
   if (dependencyBookletEntries.length > 0) {
-    return normalizeContentStructure({
-      bookletEntries: dependencyBookletEntries
-    });
+    return normalizeContentStructure(
+      { bookletEntries: dependencyBookletEntries },
+      true
+    );
   }
 
-  return normalizeContentStructure({
-    bookletEntries: collectXmlBookletEntries(sourceDocument, "test")
-  });
+  return normalizeContentStructure(
+    {
+      bookletEntries: collectXmlBookletEntries(sourceDocument, "test")
+    },
+    true
+  );
 };
 
 type ZipEntry = {
@@ -15668,23 +15728,26 @@ const parseStandaloneZipUnitEntry = (
   const content = extractZipUnitContent(sourceDocument);
   const requestedAttachments =
     extractZipUnitAttachmentRequests(sourceDocument);
-  return normalizeSourcePackageUnitEntry({
-    unitKey,
-    displayLabel:
-      xmlElementText(xmlChildrenNamed(metadata ?? root, "Label")[0]) || unitKey,
-    ...(description ? { description } : {}),
-    ...(content ? { content } : {}),
-    ...(unitDefinition.playerKey
-      ? { playerKey: unitDefinition.playerKey }
-      : {}),
-    ...(unitDefinition.unitDefinition
-      ? { unitDefinition: unitDefinition.unitDefinition }
-      : {}),
-    ...(unitDefinition.unitDefinitionType
-      ? { unitDefinitionType: unitDefinition.unitDefinitionType }
-      : {}),
-    ...(requestedAttachments.length > 0 ? { requestedAttachments } : {})
-  });
+  const labelElement = xmlChildrenNamed(metadata ?? root, "Label")[0];
+  return normalizeSourcePackageUnitEntry(
+    {
+      unitKey,
+      displayLabel: labelElement ? xmlElementText(labelElement) : unitKey,
+      ...(description ? { description } : {}),
+      ...(content ? { content } : {}),
+      ...(unitDefinition.playerKey
+        ? { playerKey: unitDefinition.playerKey }
+        : {}),
+      ...(unitDefinition.unitDefinition
+        ? { unitDefinition: unitDefinition.unitDefinition }
+        : {}),
+      ...(unitDefinition.unitDefinitionType
+        ? { unitDefinitionType: unitDefinition.unitDefinitionType }
+        : {}),
+      ...(requestedAttachments.length > 0 ? { requestedAttachments } : {})
+    },
+    true
+  );
 };
 
 const hydrateZipUnitEntry = (input: {
@@ -17197,7 +17260,13 @@ const buildRuntimeSnapshot = (
   diagnostics: ImportJobDiagnostic[];
 } => {
   if (hasStructuredContent(sourcePackage.contentStructure)) {
-    const normalized = normalizeContentStructure(sourcePackage.contentStructure);
+    const preservesAuthoredEmptyXmlLabels =
+      typeof sourcePackage.sourceDocument === "string" &&
+      !sourcePackage.mediaType.toLowerCase().includes("json");
+    const normalized = normalizeContentStructure(
+      sourcePackage.contentStructure,
+      preservesAuthoredEmptyXmlLabels
+    );
     if (normalized) {
       return {
         runtimeSnapshot: normalized,

@@ -13349,6 +13349,142 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
     "$2$1"
   );
+  const emptyLabelWorkspaceKey = await createValidationWorkspace(
+    "schema-valid-empty-display-labels"
+  );
+  await uploadOriginalAdaptiveUnitDependencies(
+    tenantKey,
+    emptyLabelWorkspaceKey,
+    validUnitXml.replace("<Label>A sample unit</Label>", "<Label />")
+  );
+  const emptyLabelBookletPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptyLabelWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet-empty-display-labels.xml",
+        mediaType: "application/xml",
+        sourceDocument: validAdaptiveBookletXml
+          .replace("<Label>Adaptive Booklet</Label>", "<Label />")
+          .replace('label="Decision Unit"', 'label=""')
+      }
+    }
+  );
+  assert.equal(emptyLabelBookletPackage.status, 201);
+  const emptyLabelBookletImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          displayLabel: string;
+          unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+        }>;
+      };
+    } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptyLabelWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          emptyLabelBookletPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    emptyLabelBookletImport.body.importJob.status,
+    "completed",
+    JSON.stringify(emptyLabelBookletImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(emptyLabelBookletImport.body.importJob.diagnostics, []);
+  const emptyLabelBooklet =
+    emptyLabelBookletImport.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0];
+  assert.equal(emptyLabelBooklet?.displayLabel, "");
+  assert.equal(
+    emptyLabelBooklet?.unitEntries.find(
+      unit => unit.unitKey === "decision-unit"
+    )?.displayLabel,
+    ""
+  );
+
+  const emptySystemCheckLabelWorkspaceKey = await createValidationWorkspace(
+    "schema-valid-empty-system-check-label"
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    emptySystemCheckLabelWorkspaceKey,
+    ["UNIT.SAMPLE"]
+  );
+  const emptySystemCheckLabelPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptySystemCheckLabelWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "syscheck-empty-display-label.xml",
+        mediaType: "application/xml",
+        sourceDocument: validSystemCheckXml.replace(
+          "<Label>System-Check Beispiel</Label>",
+          "<Label />"
+        )
+      }
+    }
+  );
+  assert.equal(emptySystemCheckLabelPackage.status, 201);
+  const emptySystemCheckLabelImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptySystemCheckLabelWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          emptySystemCheckLabelPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    emptySystemCheckLabelImport.body.importJob.status,
+    "completed",
+    JSON.stringify(emptySystemCheckLabelImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(emptySystemCheckLabelImport.body.importJob.diagnostics, []);
+
+  const emptyRosterGroupLabel = await requestJson<{
+    importedCount: number;
+    operationalLoginCandidates: Array<{ loginKey: string; groupKey: string }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptySystemCheckLabelWorkspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          '<?xml version="1.0" encoding="utf-8"?>',
+          '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Testtakers.xsd">',
+          "  <Metadata />",
+          '  <Group id="empty-label-group" label="">',
+          '    <Login mode="monitor-group" name="empty-label-monitor" />',
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  assert.equal(emptyRosterGroupLabel.status, 201);
+  assert.equal(emptyRosterGroupLabel.body.importedCount, 0);
+  assert.equal(emptyRosterGroupLabel.body.operationalLoginCandidates.length, 1);
+  assert.equal(
+    emptyRosterGroupLabel.body.operationalLoginCandidates[0]?.loginKey,
+    "empty-label-monitor"
+  );
+  assert.equal(
+    emptyRosterGroupLabel.body.operationalLoginCandidates[0]?.groupKey,
+    "empty-label-group"
+  );
   const invalidAdaptiveStatusAggregateXml = validAdaptiveBookletXml
     .replace(
       '<Value of="var3" from="decision-unit" />',
