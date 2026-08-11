@@ -12040,6 +12040,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
     policy?: {
       logPolicy?: string;
       pagingMode?: string;
+      pageLabel?: string;
+      pageControlsHidden?: boolean;
       headerHidden?: boolean;
       headerContent?: string;
       unitMenuEnabled?: boolean;
@@ -12208,6 +12210,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
                   logPolicy: string;
                   pagingMode: string;
                   restoreCurrentPageOnReturn: boolean;
+                  pageNavigation: {
+                    labelMode: string;
+                    controlsHidden: boolean;
+                  };
                 };
                 completion: { lockOnTermination: boolean };
                 display: {
@@ -12445,6 +12451,20 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.player.restoreCurrentPageOnReturn,
         expectation.policy.restoreCurrentPageOnReturn
+      );
+    }
+    if (expectation.policy.pageLabel !== undefined) {
+      assert.equal(
+        booklet.policy.player.pageNavigation.labelMode,
+        expectation.policy.pageLabel,
+        expectation.sourcePath
+      );
+    }
+    if (expectation.policy.pageControlsHidden !== undefined) {
+      assert.equal(
+        booklet.policy.player.pageNavigation.controlsHidden,
+        expectation.policy.pageControlsHidden,
+        expectation.sourcePath
       );
     }
     if (expectation.policy.lockOnTermination !== undefined) {

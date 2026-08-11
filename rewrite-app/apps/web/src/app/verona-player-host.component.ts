@@ -145,6 +145,7 @@ type RetiredVeronaFrame = {
           ←
         </button>
         <div
+          *ngIf="showPageNavigationLabel"
           class="verona-player-page-label"
           id="participantVeronaPageLabel"
           aria-live="polite"
@@ -369,6 +370,13 @@ export class VeronaPlayerHostComponent
   }
 
   get showPageNavigation(): boolean {
+    return (
+      this.pages.length > 0 &&
+      (this.showPageNavigationLabel || !this.pageNavigationControlsHidden)
+    );
+  }
+
+  get showPageNavigationLabel(): boolean {
     return this.pageNavigationLabelMode !== "hidden" && this.pages.length > 0;
   }
 

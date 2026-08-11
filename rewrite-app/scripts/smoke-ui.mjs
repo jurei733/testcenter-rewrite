@@ -10665,7 +10665,7 @@ try {
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
     })),
-    ...Array.from({ length: 15 }, (_, index) => {
+    ...Array.from({ length: 21 }, (_, index) => {
       const number = index + 19;
       return {
         fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
@@ -10986,7 +10986,7 @@ try {
           16,
           17,
           18,
-          ...Array.from({ length: 15 }, (_, index) => index + 19)
+          ...Array.from({ length: 21 }, (_, index) => index + 19)
         ].map(number => {
           return {
             loginKey: `Bklt_Config-${number}`,
@@ -11238,7 +11238,67 @@ try {
     await page.locator("#participantRoutePreviousUnitButton").count(),
     0
   );
-  assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
+  assert.equal(
+    await page.locator("#participantRouteNextUnitButton").count(),
+    0
+  );
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-34",
+    "Cy-Bklt_BkltConfig-34"
+  );
+  await page
+    .locator("#participantVeronaPageLabel")
+    .filter({ hasText: "Page 1/2" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-35",
+    "Cy-Bklt_BkltConfig-35"
+  );
+  await page
+    .locator("#participantVeronaPageLabel")
+    .filter({ hasText: "Aufgabe1: Fieldset1" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-36",
+    "Cy-Bklt_BkltConfig-36"
+  );
+  const pageListItems = page.locator(
+    "#participantVeronaPageLabel .verona-player-page-list > span"
+  );
+  await pageListItems.first().waitFor();
+  assert.equal(await pageListItems.count(), 2);
+  assert.equal(await pageListItems.first().getAttribute("aria-current"), "page");
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-37",
+    "Cy-Bklt_BkltConfig-37"
+  );
+  assert.equal(await page.locator("#participantVeronaPageLabel").count(), 0);
+  await expectButtonSelectorDisabled("#participantVeronaPreviousPageButton");
+  await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-38",
+    "Cy-Bklt_BkltConfig-38"
+  );
+  await expectButtonSelectorDisabled("#participantVeronaPreviousPageButton");
+  await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-39",
+    "Cy-Bklt_BkltConfig-39"
+  );
+  assert.equal(
+    await page.locator("#participantVeronaPreviousPageButton").count(),
+    0
+  );
+  assert.equal(
+    await page.locator("#participantVeronaNextPageButton").count(),
+    0
+  );
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");
