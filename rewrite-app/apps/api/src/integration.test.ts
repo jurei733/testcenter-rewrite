@@ -13664,6 +13664,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_condition_number_invalid"
     },
     {
+      fileName: "booklet-invalid-condition-positive-infinity.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Is greaterThan="99" />',
+        '<Is greaterThan="+INF" />'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_number_invalid"
+    },
+    {
       fileName: "booklet-invalid-condition-sum.xml",
       sourceDocument: validAdaptiveBookletXml
         .replace('<Value of="var4" from="decision-unit" />', "")
@@ -13932,6 +13940,48 @@ test("original Testcenter compatibility corpus imports representative booklets",
       );
     }
     assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  for (const floatLexeme of ["INF", "-INF", "NaN"]) {
+    const fileName = `booklet-valid-float-${floatLexeme.toLowerCase()}.xml`;
+    const validationWorkspaceKey = await createValidationWorkspace(fileName);
+    const sourceDocument = validAdaptiveBookletXml.replace(
+      '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
+      `<If><Score of="derived_var" from="decision-unit" or="${floatLexeme}" /><Is greaterThan="${floatLexeme}" /></If>`
+    );
+    assert.ok(sourceDocument.includes(`or="${floatLexeme}"`), fileName);
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName,
+          mediaType: "application/xml",
+          sourceDocument
+        }
+      }
+    );
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: {
+          sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${fileName}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(importResult.body.importJob.diagnostics, [], fileName);
+    assert.ok(importResult.body.stagedContentRelease, fileName);
   }
 
   const unicodeMetadataIdWorkspaceKey = await createValidationWorkspace(

@@ -8744,6 +8744,12 @@ const isTestcenterXmlNumber = (value: string): boolean =>
     value.trim()
   );
 
+// XML Schema float/double add these exact spellings to the decimal and
+// scientific lexical forms. A leading plus is deliberately not permitted.
+const isTestcenterXmlFloat = (value: string): boolean =>
+  isTestcenterXmlNumber(value) ||
+  ["INF", "-INF", "NaN"].includes(value.trim());
+
 const isPositiveTestcenterXmlNumber = (value: string): boolean =>
   isTestcenterXmlNumber(value) && Number(value) > 0;
 
@@ -8963,7 +8969,7 @@ const validateTestcenterBookletCondition = (
       );
     }
     const defaultValue = variableSource.getAttribute("or");
-    if (defaultValue !== null && !isTestcenterXmlNumber(defaultValue)) {
+    if (defaultValue !== null && !isTestcenterXmlFloat(defaultValue)) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_state_condition_number_invalid",
@@ -9066,7 +9072,7 @@ const validateTestcenterBookletCondition = (
       const comparisonValue = expressionElement.getAttribute(comparisonName);
       if (
         comparisonValue !== null &&
-        !isTestcenterXmlNumber(comparisonValue)
+        !isTestcenterXmlFloat(comparisonValue)
       ) {
         diagnostics.push(
           createImportDiagnostic(
