@@ -13755,14 +13755,6 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_condition_unit_reference_invalid"
     },
     {
-      fileName: "booklet-invalid-condition-expression.xml",
-      sourceDocument: validAdaptiveBookletXml.replace(
-        '<Is greaterThan="99" />',
-        "<Is />"
-      ),
-      diagnosticCode: "testcenter_xml_state_condition_expression_invalid"
-    },
-    {
       fileName: "booklet-invalid-condition-number.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<Is greaterThan="99" />',
@@ -14048,6 +14040,72 @@ test("original Testcenter compatibility corpus imports representative booklets",
     }
     assert.equal(importResult.body.stagedContentRelease, null);
   }
+
+  const emptyAdaptiveExpressionFileName =
+    "booklet-valid-empty-adaptive-expression.xml";
+  const emptyAdaptiveExpressionWorkspaceKey = await createValidationWorkspace(
+    emptyAdaptiveExpressionFileName
+  );
+  const emptyAdaptiveExpressionSourceDocument = validAdaptiveBookletXml.replace(
+    '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
+    '<If><Value of="derived_var" from="decision-unit" /><Is /></If>'
+  );
+  const emptyAdaptiveExpressionPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptyAdaptiveExpressionWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: emptyAdaptiveExpressionFileName,
+        mediaType: "application/xml",
+        sourceDocument: emptyAdaptiveExpressionSourceDocument
+      }
+    }
+  );
+  const emptyAdaptiveExpressionImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          stateEntries?: Array<{
+            stateKey: string;
+            options: Array<{
+              optionKey: string;
+              conditions: unknown[];
+            }>;
+          }>;
+        }>;
+      };
+    } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${emptyAdaptiveExpressionWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          emptyAdaptiveExpressionPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    emptyAdaptiveExpressionImport.body.importJob.status,
+    "completed",
+    JSON.stringify(emptyAdaptiveExpressionImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(
+    emptyAdaptiveExpressionImport.body.importJob.diagnostics,
+    []
+  );
+  const emptyAdaptiveExpressionOption =
+    emptyAdaptiveExpressionImport.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0]?.stateEntries?.find(state => state.stateKey === "level")
+      ?.options.find(option => option.optionKey === "advanced");
+  assert.deepEqual(
+    emptyAdaptiveExpressionOption?.conditions,
+    [],
+    "The Original parser drops an Is expression that declares no comparison."
+  );
 
   for (const optionalVariableReferenceCase of [
     {

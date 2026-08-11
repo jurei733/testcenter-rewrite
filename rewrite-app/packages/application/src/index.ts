@@ -9064,17 +9064,8 @@ const validateTestcenterBookletCondition = (
         )
       );
     }
-    const presentComparisons = comparisonNames.filter(
-      comparisonName => expressionElement.getAttribute(comparisonName) !== null
-    );
-    if (presentComparisons.length === 0) {
-      diagnostics.push(
-        createImportDiagnostic(
-          "testcenter_xml_state_condition_expression_invalid",
-          `Original Testcenter booklet '${sourceFileName}' contains an Is expression without a comparison for ${context}.`
-        )
-      );
-    }
+    // The XSD permits an attribute-free Is element, and the Original parser
+    // deliberately turns it into zero executable comparisons.
     for (const comparisonName of ["greaterThan", "lowerThan"] as const) {
       const comparisonValue = expressionElement.getAttribute(comparisonName);
       if (
