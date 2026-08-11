@@ -118,6 +118,7 @@ type MonitorStatusFilter = "pending" | "locked";
 type MonitorSortDirection = "asc" | "desc";
 
 type MonitorSortKey =
+  | "selection"
   | "state"
   | "group"
   | "participant"
@@ -693,6 +694,7 @@ export class RuntimeViewFacade {
   get monitorSortOptions(): Array<{ key: MonitorSortKey; label: string }> {
     const settings = this.monitorDisplaySettings;
     return [
+      { key: "selection", label: "Selection" },
       { key: "state", label: "Status" },
       ...(settings.groupColumn === "show"
         ? [{ key: "group" as const, label: this.monitorText("gm_col_groupName") }]
@@ -5370,6 +5372,8 @@ export class RuntimeViewFacade {
     const direction = this.monitorSortDirection === "asc" ? 1 : -1;
     const valueFor = (openRun: OpenMonitorRun): string | number => {
       switch (this.monitorSortKey) {
+        case "selection":
+          return this.monitorBatchSelection.has(openRun.testRunId) ? 0 : 1;
         case "state":
           return monitorSuperStateSortOrder.indexOf(
             resolveOpenMonitorRunSuperState(openRun)

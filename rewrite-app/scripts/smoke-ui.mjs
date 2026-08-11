@@ -13780,6 +13780,41 @@ try {
     ]),
     "Species-cohort selection must replace the batch with every visible run of the chosen species."
   );
+  await selectAndCommit("#monitorSortKey", "selection");
+  const speciesLoginOrder = [
+    `${participantLoginKey}-species-beta-one`,
+    `${participantLoginKey}-species-beta-two`,
+    `${participantLoginKey}-species-two`
+  ];
+  const sortedSpeciesLogins = async () =>
+    speciesMonitorRunCards.evaluateAll((cards, loginKeys) =>
+      cards.map(card =>
+        loginKeys.find(loginKey => card.textContent?.includes(loginKey))
+      ),
+      speciesLoginOrder
+    );
+  assert.deepEqual(
+    await sortedSpeciesLogins(),
+    speciesLoginOrder,
+    "Ascending Original-style selection sorting must place checked runs first and preserve their stable order."
+  );
+  await page.locator("#monitorSortDirectionButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#monitorSortDirectionButton")
+        ?.getAttribute("data-direction") === "desc"
+  );
+  assert.deepEqual(
+    await sortedSpeciesLogins(),
+    [
+      `${participantLoginKey}-species-two`,
+      `${participantLoginKey}-species-beta-one`,
+      `${participantLoginKey}-species-beta-two`
+    ],
+    "Descending selection sorting must place checked runs last without disturbing ties."
+  );
+  await page.locator("#monitorResetSortButton").click();
   await selectAndCommit(
     "#monitorTargetUnitKey",
     speciesReferenceTarget.targetUnitKey
