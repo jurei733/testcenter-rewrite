@@ -11681,6 +11681,56 @@ try {
       .filter({ hasText: "CY-Unit.Sample-101" })
       .waitFor({ timeout: 15_000 });
   };
+  const enterOriginalControllerTimedTestlet = async ({
+    loginKey,
+    executionMode,
+    forceTimeRestrictions,
+    requiresCode
+  }) => {
+    const controller = await openOriginalTestController(
+      loginKey,
+      "Cy-Bklt_TC-5"
+    );
+    assert.ok(controller.testRunId);
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: "CY-Unit.Sample-100" })
+      .waitFor();
+    if (requiresCode) {
+      await page
+        .locator("#participantRouteTestletGateLabel")
+        .filter({ hasText: "Aufgabenblock" })
+        .waitFor();
+      await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+      await page.locator("#participantRouteTestletUnlockButton").click();
+    } else {
+      assert.equal(
+        await page.locator("#participantRouteTestletGateLabel").count(),
+        0
+      );
+      await page.locator("#participantRouteNextUnitButton").click();
+    }
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: "CY-Unit.Sample-101" })
+      .waitFor({ timeout: 15_000 });
+    await page.locator("#participantRouteTestletTimer").waitFor();
+    await page
+      .locator("#participantRouteTimerLifecycleMessage")
+      .filter({ hasText: "started" })
+      .waitFor();
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
+      payload =>
+        payload?.currentRunState?.executionMode?.mode === executionMode &&
+        payload.currentRunState.executionMode.forceTimeRestrictions ===
+          forceTimeRestrictions &&
+        payload.currentRunState.testRun?.testletTimers?.Tslt1?.status ===
+          "running" &&
+        payload.currentRunState.testRun.testletTimers.Tslt1.durationSeconds === 12
+    );
+    return controller;
+  };
 
   const protectedController = await openOriginalTestController(
     "Test_Ctrl-3",
@@ -11885,6 +11935,109 @@ try {
     secondUnitKey: "unit2",
     policy: "always"
   });
+
+  const hotReturnTimedController =
+    await enterOriginalControllerTimedTestlet({
+      loginKey: "Test_Ctrl-10",
+      executionMode: "run-hot-return",
+      forceTimeRestrictions: true,
+      requiresCode: true
+    });
+  const hotRestartTimedController =
+    await enterOriginalControllerTimedTestlet({
+      loginKey: "Test_Ctrl-12",
+      executionMode: "run-hot-restart",
+      forceTimeRestrictions: true,
+      requiresCode: true
+    });
+  const demoTimedController = await enterOriginalControllerTimedTestlet({
+    loginKey: "Test_Ctrl-13",
+    executionMode: "run-demo",
+    forceTimeRestrictions: false,
+    requiresCode: false
+  });
+  const reviewTimedController = await enterOriginalControllerTimedTestlet({
+    loginKey: "Test_Ctrl-14",
+    executionMode: "run-review",
+    forceTimeRestrictions: false,
+    requiresCode: false
+  });
+  await page
+    .locator("#participantRouteTimerLifecycleMessage")
+    .filter({ hasText: "ended" })
+    .waitFor({ timeout: 20_000 });
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteTestletTimer").count(), 0);
+  const reviewExpiredState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${reviewTimedController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-101" &&
+      payload.currentRunState.testRun.testletTimers?.Tslt1?.status === "expired"
+  );
+  assert.equal(
+    reviewExpiredState.currentRunState.executionMode.forceTimeRestrictions,
+    false
+  );
+  for (const controller of [
+    hotReturnTimedController,
+    hotRestartTimedController
+  ]) {
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
+      payload =>
+        payload?.currentRunState?.testRun?.currentUnitKey ===
+          "CY-Unit.Sample-104" &&
+        payload.currentRunState.testRun.testletTimers?.Tslt1?.status === "expired"
+    );
+  }
+  const demoExpiredState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${demoTimedController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-101" &&
+      payload.currentRunState.testRun.testletTimers?.Tslt1?.status === "expired"
+  );
+  assert.equal(
+    demoExpiredState.currentRunState.executionMode.forceTimeRestrictions,
+    false
+  );
+  await expectButtonSelectorEnabled("#participantRoutePreviousUnitButton");
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-100" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  const demoExpiredNavigationResponse = await fetch(
+    `${baseUrl}/api/v1/participant/test-runs/${demoTimedController.testRunId}/save-progress`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        currentUnitKey: "CY-Unit.Sample-104",
+        status: "running"
+      })
+    }
+  );
+  assert.equal(demoExpiredNavigationResponse.status, 200);
+  const demoExpiredNavigationPayload =
+    await demoExpiredNavigationResponse.json();
+  assert.equal(
+    demoExpiredNavigationPayload.testRun?.currentUnitKey,
+    "CY-Unit.Sample-104"
+  );
+  assert.equal(
+    demoExpiredNavigationPayload.testRun?.testletTimers?.Tslt1?.status,
+    "expired"
+  );
 
   const confirmLeaveController = await openOriginalTestController(
     "Test_Ctrl-15",

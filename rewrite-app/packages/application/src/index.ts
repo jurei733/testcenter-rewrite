@@ -17973,7 +17973,8 @@ const remainingSecondsForTimer = (
 const reconcileExpiredTestletTimers = (
   contentRelease: ContentRelease,
   testRun: TestRun,
-  timestamp: string
+  timestamp: string,
+  enforceExpiryNavigation: boolean
 ): { testRun: TestRun; expiredTestletKeys: string[] } => {
   if (testRun.status !== "running") {
     return { testRun, expiredTestletKeys: [] };
@@ -18020,7 +18021,7 @@ const reconcileExpiredTestletTimers = (
       testletKey
     )
   );
-  if (activeExpiredTestletKey) {
+  if (activeExpiredTestletKey && enforceExpiryNavigation) {
     const lastTimedUnitIndex = booklet.unitEntries.reduce(
       (lastIndex, unit, index) =>
         unitBelongsToTestlet(booklet, unit, activeExpiredTestletKey)
@@ -21064,16 +21065,14 @@ export const createFirstSliceServices = (
     timestamp: string;
   }): Promise<TestRun> => {
     const normalizedRun = normalizeTestRun(input.testRun);
-    if (
-      !resolveParticipantExecutionMode(normalizedRun.executionMode)
-        .forceTimeRestrictions
-    ) {
-      return normalizedRun;
-    }
+    const executionMode = resolveParticipantExecutionMode(
+      normalizedRun.executionMode
+    );
     const reconciled = reconcileExpiredTestletTimers(
       input.contentRelease,
       normalizedRun,
-      input.timestamp
+      input.timestamp,
+      executionMode.forceTimeRestrictions
     );
     const activated = activateCurrentTestletTimer(
       input.contentRelease,
@@ -21089,7 +21088,7 @@ export const createFirstSliceServices = (
       await repository.saveTestRun(effectiveRun);
     }
     if (
-      resolveParticipantExecutionMode(effectiveRun.executionMode).saveResponses &&
+      executionMode.saveResponses &&
       (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)
     ) {
       const timerStateEntries: ParticipantTestLogEntryInput[] = [];
