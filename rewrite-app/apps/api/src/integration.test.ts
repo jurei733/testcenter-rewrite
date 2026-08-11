@@ -13731,10 +13731,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_condition_structure_invalid"
     },
     {
-      fileName: "booklet-invalid-condition-variable-reference.xml",
+      fileName: "booklet-invalid-score-variable-reference.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<Value of="derived_var" from="decision-unit" />',
-        '<Value from="decision-unit" />'
+        '<Score from="decision-unit" />'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_variable_reference_invalid"
+    },
+    {
+      fileName: "booklet-invalid-score-unit-reference.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Value of="derived_var" from="decision-unit" />',
+        '<Score of="derived_var" />'
       ),
       diagnosticCode: "testcenter_xml_state_condition_variable_reference_invalid"
     },
@@ -14039,6 +14047,137 @@ test("original Testcenter compatibility corpus imports representative booklets",
       );
     }
     assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  for (const optionalVariableReferenceCase of [
+    {
+      fileName: "booklet-value-without-of.xml",
+      sourceElement: '<Value from="decision-unit" />',
+      expectedSource: {
+        type: "Value",
+        variableKey: "",
+        unitKey: "decision-unit",
+        defaultValue: "0"
+      }
+    },
+    {
+      fileName: "booklet-value-without-from.xml",
+      sourceElement: '<Value of="derived_var" />',
+      expectedSource: {
+        type: "Value",
+        variableKey: "derived_var",
+        unitKey: "",
+        defaultValue: "0"
+      }
+    },
+    {
+      fileName: "booklet-value-without-reference.xml",
+      sourceElement: "<Value />",
+      expectedSource: {
+        type: "Value",
+        variableKey: "",
+        unitKey: "",
+        defaultValue: "0"
+      }
+    },
+    {
+      fileName: "booklet-code-without-reference.xml",
+      sourceElement: "<Code />",
+      expectedSource: {
+        type: "Code",
+        variableKey: "",
+        unitKey: "",
+        defaultValue: "0"
+      }
+    },
+    {
+      fileName: "booklet-status-without-reference.xml",
+      sourceElement: "<Status />",
+      expectedSource: {
+        type: "Status",
+        variableKey: "",
+        unitKey: "",
+        defaultValue: "0"
+      }
+    },
+    {
+      fileName: "booklet-score-with-empty-references.xml",
+      sourceElement: '<Score of="" from="" />',
+      expectedSource: {
+        type: "Score",
+        variableKey: "",
+        unitKey: "",
+        defaultValue: "0"
+      }
+    }
+  ] as const) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      optionalVariableReferenceCase.fileName
+    );
+    const sourceDocument = validAdaptiveBookletXml.replace(
+      '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
+      `<If>${optionalVariableReferenceCase.sourceElement}<Is greaterThan="99" /></If>`
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: optionalVariableReferenceCase.fileName,
+          mediaType: "application/xml",
+          sourceDocument
+        }
+      }
+    );
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            stateEntries?: Array<{
+              stateKey: string;
+              options: Array<{
+                optionKey: string;
+                conditions: Array<{
+                  source: {
+                    type: string;
+                    variableKey: string;
+                    unitKey: string;
+                    defaultValue: string;
+                  };
+                }>;
+              }>;
+            }>;
+          }>;
+        };
+      } | null;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+      }
+    );
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${optionalVariableReferenceCase.fileName}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(
+      importResult.body.importJob.diagnostics,
+      [],
+      optionalVariableReferenceCase.fileName
+    );
+    const advancedOption = importResult.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0]?.stateEntries?.find(state => state.stateKey === "level")
+      ?.options.find(option => option.optionKey === "advanced");
+    assert.deepEqual(
+      advancedOption?.conditions[0]?.source,
+      optionalVariableReferenceCase.expectedSource,
+      optionalVariableReferenceCase.fileName
+    );
   }
 
   for (const floatLexeme of ["INF", "-INF", "NaN"]) {

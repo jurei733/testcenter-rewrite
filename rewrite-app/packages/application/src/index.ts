@@ -7343,9 +7343,7 @@ const normalizeContentStructure = (
       return (type === "Code" ||
         type === "Value" ||
         type === "Status" ||
-        type === "Score") &&
-        variableKey &&
-        unitKey
+        type === "Score")
         ? {
             type,
             variableKey,
@@ -8965,13 +8963,15 @@ const validateTestcenterBookletCondition = (
         )
       );
     }
-    const variableKey = variableSource.getAttribute("of")?.trim() ?? "";
-    const unitKey = variableSource.getAttribute("from")?.trim() ?? "";
-    if (!variableKey || !unitKey) {
+    if (
+      sourceName === "Score" &&
+      (variableSource.getAttribute("of") === null ||
+        variableSource.getAttribute("from") === null)
+    ) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_state_condition_variable_reference_invalid",
-          `Original Testcenter booklet '${sourceFileName}' contains a ${xmlElementLocalName(variableSource)} source without both 'of' and 'from' for ${context}.`
+          `Original Testcenter booklet '${sourceFileName}' contains a Score source without both 'of' and 'from' for ${context}.`
         )
       );
     }
@@ -12138,9 +12138,6 @@ const collectXmlBookletHierarchies = (
       }
       const variableKey = sourceElement.getAttribute("of")?.trim() || "";
       const unitKey = sourceElement.getAttribute("from")?.trim() || "";
-      if (!variableKey || !unitKey) {
-        return null;
-      }
       return {
         type,
         variableKey,

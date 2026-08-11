@@ -282,6 +282,18 @@ schema position. Validation follows the declared generation: 14.x/15.0
 positive fractional duration, and the adaptive restriction extensions
 introduced by that schema.
 
+Latest P0 adaptive-condition XSD closure: the 17.6 Booklet schema requires
+`of` and `from` only for `Score`; `Value`, `Code`, and `Status` deliberately
+permit either or both references to be absent. Those schema-valid sources now
+import and remain present in the runtime snapshot with the Original parser's
+empty-string/default-`0` representation, so they evaluate as unresolved rather
+than disappearing and accidentally turning their Option into a fallback.
+Missing `Score` references remain a stable validation error. The executable
+compatibility matrix covers missing `of`, missing `from`, and a fully empty
+source across `Value`, plus reference-free `Code`/`Status` and both required
+`Score` attributes. Present-but-empty `Score` strings remain valid and are
+preserved, matching `xs:string` and the Original parser.
+
 Latest P0 root-restriction closure: the original `Units` element is now
 retained as the synthetic root Testlet `[0]` at runtime. Its global
 `DenyNavigationOnIncomplete` values form the inherited completion baseline,
