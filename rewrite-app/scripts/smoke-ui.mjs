@@ -6592,6 +6592,7 @@ try {
               booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
               booklet_unitLoading: "Project player loaded",
               booklet_errormessage: "The project player could not be loaded.",
+              booklet_reload: "Restart project player",
               booklet_msgTimerStarted: "Project timer started: ",
               booklet_msgTimeOver: "Project time is over.",
               booklet_msgTimerCancelled: "Project timer was cancelled.",
@@ -7157,11 +7158,17 @@ try {
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey
     )}&testRunId=${encodeURIComponent(veronaTestRunId)}&logKey=CONNECTION`,
-    payload => Array.isArray(payload?.items) && payload.items.length === 1
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(item => item.testLog?.logContent === "POLLING")
   );
-  assert.equal(veronaConnectionLogs.items[0]?.testLog?.unitKey, null);
-  assert.equal(veronaConnectionLogs.items[0]?.testLog?.originalUnitId, null);
-  assert.equal(veronaConnectionLogs.items[0]?.testLog?.logContent, "POLLING");
+  assert.ok(
+    veronaConnectionLogs.items.every(
+      item =>
+        item.testLog?.unitKey === null &&
+        item.testLog?.originalUnitId === null
+    )
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey
@@ -7433,9 +7440,50 @@ try {
       button.click();
     });
   await page
-    .locator("#participantVeronaPlayerError")
-    .filter({ hasText: "runtime-error: Synthetic player failure" })
-    .waitFor();
+    .locator("#participantRouteControllerErrorState")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteControllerErrorDetail").textContent(),
+    "runtime-error: Synthetic player failure"
+  );
+  assert.equal(
+    await page.locator("#participantRouteStatus").textContent(),
+    "error"
+  );
+  assert.equal(
+    await page.locator("#participantEntryStatus").textContent(),
+    "error"
+  );
+  assert.equal(
+    await page.locator("#participantRouteControllerErrorText").textContent(),
+    "The project player could not be loaded."
+  );
+  assert.equal(
+    (await page.locator("#participantRouteControllerReloadButton").textContent())
+      ?.trim(),
+    "Restart project player"
+  );
+  for (const selector of [
+    "app-verona-player-host",
+    "#participantVeronaPlayerFrame",
+    "#participantRouteUnitKey",
+    "#participantRouteUnitResponse",
+    "#participantRouteReviewPanel",
+    "#participantRouteTestletTimer",
+    "#participantRouteCompleteButton",
+    "#participantVeronaReloadPlayerButton",
+    "#participantConnectionState"
+  ]) {
+    assert.equal(
+      await page.locator(selector).count(),
+      0,
+      `Controller error must remove ${selector} from the participant unit surface.`
+    );
+  }
+  await expectButtonSelectorDisabled("#participantRouteSignInButton");
+  await expectButtonSelectorDisabled("#participantRouteStartOrResumeButton");
+  await expectButtonSelectorDisabled("#participantRouteRefreshCurrentStateButton");
+  await expectButtonSelectorDisabled("#participantRouteClearSessionButton");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey
@@ -7467,17 +7515,25 @@ try {
       item => item.testLog?.logContent === "ERROR"
     )?.testLog?.timestamp;
   assert.ok(Number.isSafeInteger(veronaControllerErrorTimestamp));
-  await page.locator("#participantVeronaReloadPlayerButton").click();
-  const unloadRecoveredVeronaFrame = page.frameLocator(
+  await page.locator("#participantRouteControllerReloadButton").click();
+  const controllerRecoveredVeronaFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
   );
-  await unloadRecoveredVeronaFrame
+  await controllerRecoveredVeronaFrame
     .locator("#playerAnswer")
     .waitFor({ timeout: 15_000 });
-  await unloadRecoveredVeronaFrame
+  await controllerRecoveredVeronaFrame
     .locator("#playerDefinition")
     .filter({ hasText: "Smoke unit definition" })
     .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteControllerErrorState").count(),
+    0
+  );
+  assert.equal(
+    await page.locator("#participantRouteStatus").textContent(),
+    "running"
+  );
   const recoveredVeronaControllerLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${encodeURIComponent(
       veronaTestRunId
@@ -7499,8 +7555,8 @@ try {
     "Repeated notifications from one failed Player frame must persist one controller error."
   );
   assert.equal(
-    await unloadRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
-    "Saved during player unload"
+    await controllerRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
+    backgroundSyncedResponse
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
@@ -7510,24 +7566,11 @@ try {
       if (typeof response !== "string") return false;
       try {
         return JSON.parse(response).unitState?.dataParts?.answer ===
-          "Saved during player unload";
+          backgroundSyncedResponse;
       } catch {
         return false;
       }
     }
-  );
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
-      veronaLoginKey
-    )}&logKey=${encodeURIComponent("Runtime Error: unload-runtime-error")}&unitKey=${encodeURIComponent(veronaUnitKey)}`,
-    payload =>
-      Array.isArray(payload?.items) &&
-      payload.items.some(
-        item =>
-          item.testLog?.logKey === "Runtime Error: unload-runtime-error" &&
-          item.testLog?.logContent === "Synthetic unload failure" &&
-          item.testLog?.unitKey === veronaUnitKey
-      )
   );
   stopAfter("participant-verona-background-sync");
 

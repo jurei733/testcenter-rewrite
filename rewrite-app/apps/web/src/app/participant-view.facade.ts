@@ -66,6 +66,7 @@ import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.servi
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import type {
+  VeronaControllerError,
   VeronaLogChange,
   VeronaResponseChange
 } from "./verona-player-host.component";
@@ -279,6 +280,7 @@ export class ParticipantViewFacade {
   get showParticipantConnectionState(): boolean {
     return (
       !!this.runtime.participantSessionId.trim() &&
+      !this.hasControllerError &&
       this.readCurrentRunState()?.testRun.status !== "completed" &&
       this.participantConnectionState.status !== "idle"
     );
@@ -327,6 +329,9 @@ export class ParticipantViewFacade {
   readonly timerTick = signal(Date.now());
   readonly fullscreenActive = signal(false);
   readonly fullscreenStatus = signal("");
+  private readonly activeControllerError = signal<VeronaControllerError | null>(
+    null
+  );
   private copiedSessionEntryLink = "";
   private fullscreenPromptDismissedRunId = "";
   private fullscreenStatusRunId = "";
@@ -766,6 +771,7 @@ export class ParticipantViewFacade {
     const progressPercent =
       totalUnitCount > 0 ? Math.round((answeredUnitCount / totalUnitCount) * 100) : 0;
     const isComplete = currentState.testRun.status === "completed";
+    const hasControllerError = this.hasControllerError;
     const savedUnitResponse = unitKey
       ? this.effectiveUnitResponse(currentState, unitKey)
       : "";
@@ -929,37 +935,48 @@ export class ParticipantViewFacade {
       isComplete,
       previousUnitKey,
       nextUnitKey,
-      runStatus: currentState.testRun.status,
+      runStatus: hasControllerError ? "error" : currentState.testRun.status,
       runId: currentState.testRun.testRunId,
-      nextStepLabel: this.getNextStepLabel(currentState.testRun.status),
-      nextStepDetail: this.getNextStepDetail({
-        availableActions,
-        isComplete,
-        missingResponseLabel:
-          missingUnitCount === 0
-            ? "All units have a saved response."
-            : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
-      }),
-      actions: availableActions,
-      canSaveProgress: availableActions.includes("save_progress"),
-      showUnitMenu: policy.navigation.unitMenuEnabled,
-      showUnitNavigationList: Boolean(policy.navigation.unitListEnabled),
-      showPreviousUnitControl: policy.navigation.unitControls === "both",
-      showNextUnitControl: policy.navigation.unitControls !== "hidden",
+      nextStepLabel: hasControllerError
+        ? "Reload test"
+        : this.getNextStepLabel(currentState.testRun.status),
+      nextStepDetail: hasControllerError
+        ? "Reload the page to restart the test player. Ask the test supervisor for help if the problem continues."
+        : this.getNextStepDetail({
+            availableActions,
+            isComplete,
+            missingResponseLabel:
+              missingUnitCount === 0
+                ? "All units have a saved response."
+                : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
+          }),
+      actions: hasControllerError ? [] : availableActions,
+      canSaveProgress:
+        !hasControllerError && availableActions.includes("save_progress"),
+      showUnitMenu: !hasControllerError && policy.navigation.unitMenuEnabled,
+      showUnitNavigationList:
+        !hasControllerError && Boolean(policy.navigation.unitListEnabled),
+      showPreviousUnitControl:
+        !hasControllerError && policy.navigation.unitControls === "both",
+      showNextUnitControl:
+        !hasControllerError && policy.navigation.unitControls !== "hidden",
       canGoPreviousUnit:
+        !hasControllerError &&
         canNavigateUnits && previousUnitKey != null && backwardDeniedReasons.length === 0,
       canGoNextUnit:
+        !hasControllerError &&
         canNavigateUnits && nextUnitKey != null && forwardDeniedReasons.length === 0,
-      canResumeRun: availableActions.includes("resume"),
+      canResumeRun: !hasControllerError && availableActions.includes("resume"),
       canComplete:
-        availableActions.includes("complete") ||
-        (!executionMode.saveResponses &&
-          canNavigateUnits &&
-          nextUnitKey == null &&
-          currentState.navigation.nextTestletGate == null &&
-          forwardDeniedReasons.length === 0),
-      canReview: availableActions.includes("review"),
-      canClearSession: !this.pendingVeronaSave,
+        !hasControllerError &&
+        (availableActions.includes("complete") ||
+          (!executionMode.saveResponses &&
+            canNavigateUnits &&
+            nextUnitKey == null &&
+            currentState.navigation.nextTestletGate == null &&
+            forwardDeniedReasons.length === 0)),
+      canReview: !hasControllerError && availableActions.includes("review"),
+      canClearSession: !hasControllerError && !this.pendingVeronaSave,
       saveProgressLabel:
         !executionMode.saveResponses
           ? "Continue Without Saving"
@@ -1028,7 +1045,11 @@ export class ParticipantViewFacade {
 
   get screenHeaderLabel(): string {
     const currentState = this.readCurrentRunState();
-    if (!currentState || currentState.testRun.status === "completed") {
+    if (
+      !currentState ||
+      currentState.testRun.status === "completed" ||
+      this.hasControllerError
+    ) {
       return "";
     }
     switch (currentState.booklet.policy.display.headerContent) {
@@ -1054,6 +1075,7 @@ export class ParticipantViewFacade {
     return Boolean(
       currentState &&
         currentState.testRun.status !== "completed" &&
+        !this.hasControllerError &&
         currentState.booklet.policy.display.fullscreenPrompt &&
         !this.fullscreenActive() &&
         this.fullscreenPromptDismissedRunId !== currentState.testRun.testRunId
@@ -1064,6 +1086,7 @@ export class ParticipantViewFacade {
     const currentState = this.readCurrentRunState();
     return Boolean(
       currentState?.testRun.status !== "completed" &&
+        !this.hasControllerError &&
         currentState?.booklet.policy.display.fullscreenButton
     );
   }
@@ -1072,6 +1095,7 @@ export class ParticipantViewFacade {
     const currentState = this.readCurrentRunState();
     return Boolean(
       currentState?.testRun.status !== "completed" &&
+        !this.hasControllerError &&
         currentState?.booklet.policy.display.reloadButton
     );
   }
@@ -1081,7 +1105,8 @@ export class ParticipantViewFacade {
   }
 
   get bookletLoadedUnitCount(): number {
-    return this.readCurrentRunState()?.testRun.status === "completed"
+    return this.readCurrentRunState()?.testRun.status === "completed" ||
+      this.hasControllerError
       ? 0
       : (this.loadedBookletAssets()?.assets?.units.length ?? 0);
   }
@@ -1129,9 +1154,24 @@ export class ParticipantViewFacade {
     globalThis.window?.location.reload();
   }
 
+  reloadAfterControllerError(): void {
+    if (!this.hasControllerError) {
+      return;
+    }
+    this.persistState();
+    const entryLink = this.createParticipantSessionEntryLink();
+    if (entryLink) {
+      globalThis.window?.history.replaceState(null, "", entryLink);
+    }
+    globalThis.window?.location.reload();
+  }
+
   get fullscreenStatusText(): string {
     const currentState = this.readCurrentRunState();
-    if (currentState?.testRun.status === "completed") {
+    if (
+      currentState?.testRun.status === "completed" ||
+      this.hasControllerError
+    ) {
       return "";
     }
     const testRunId = currentState?.testRun.testRunId ?? "";
@@ -1215,6 +1255,41 @@ export class ParticipantViewFacade {
     );
   }
 
+  get hasControllerError(): boolean {
+    const currentState = this.readCurrentRunState();
+    const controllerError = this.activeControllerError();
+    return Boolean(
+      currentState &&
+        currentState.testRun.status !== "completed" &&
+        controllerError?.testRunId === currentState.testRun.testRunId
+    );
+  }
+
+  get controllerErrorMessage(): string {
+    return this.hasControllerError
+      ? (this.activeControllerError()?.message ?? "")
+      : "";
+  }
+
+  get controllerErrorText(): string {
+    return this.customText(
+      "booklet_errormessage",
+      "A technical problem occurred. Reload the page and ask the test supervisor for help if the problem continues."
+    );
+  }
+
+  handleVeronaControllerError(controllerError: VeronaControllerError): void {
+    const currentState = this.readCurrentRunState();
+    if (
+      currentState?.testRun.status !== "running" ||
+      controllerError.testRunId !== currentState.testRun.testRunId ||
+      controllerError.unitKey !== currentState.currentUnit.unitKey
+    ) {
+      return;
+    }
+    this.activeControllerError.set(controllerError);
+  }
+
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
     const currentState = this.readCurrentRunState();
     const player = currentState?.currentUnit.player;
@@ -1223,6 +1298,7 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       currentState.testRun.status !== "running" ||
+      this.hasControllerError ||
       this.eagerBookletLoading ||
       !player?.html.trim() ||
       !unitDefinition ||
@@ -1591,6 +1667,7 @@ export class ParticipantViewFacade {
 
   get canSignIn(): boolean {
     return Boolean(
+      !this.hasControllerError &&
       this.workspace.workspaceKey.trim() &&
       this.runtime.loginKey.trim() &&
       (!this.participantCodeRequired || this.runtime.participantCode.trim())
@@ -1598,6 +1675,9 @@ export class ParticipantViewFacade {
   }
 
   get canStartOrResume(): boolean {
+    if (this.hasControllerError) {
+      return false;
+    }
     if (!this.runtime.participantSessionId.trim()) {
       return this.canSignIn;
     }
@@ -1608,7 +1688,9 @@ export class ParticipantViewFacade {
   }
 
   get canRefreshCurrentState(): boolean {
-    return Boolean(this.runtime.participantSessionId.trim());
+    return Boolean(
+      !this.hasControllerError && this.runtime.participantSessionId.trim()
+    );
   }
 
   get adaptiveStates(): ParticipantCurrentRunStateResponse["currentRunState"]["adaptiveStates"] {
@@ -2271,6 +2353,7 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
     this.currentRunState = null;
+    this.activeControllerError.set(null);
     this.resetTimerLifecyclePresentation();
     this.adaptiveStateFeedback = "";
     this.adaptiveStateChangePending = "";
@@ -2310,6 +2393,7 @@ export class ParticipantViewFacade {
     this.optimisticVeronaResponse = null;
     this.ephemeralUnitResponses.clear();
     this.currentRunState = null;
+    this.activeControllerError.set(null);
     this.resetTimerLifecyclePresentation();
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
@@ -3426,6 +3510,13 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
+    const controllerError = this.activeControllerError();
+    if (
+      controllerError &&
+      controllerError.testRunId !== currentState.testRun.testRunId
+    ) {
+      this.activeControllerError.set(null);
+    }
     if (
       currentState.testRun.testRunId !==
       this.loadedBookletAssets()?.testRunId

@@ -31,7 +31,7 @@ test("participant custom-text scopes follow original global-login-booklet preced
 });
 
 test("participant custom-text catalog preserves the complete original key set", () => {
-  assert.equal(originalParticipantCustomTextKeys.length, 42);
+  assert.equal(originalParticipantCustomTextKeys.length, 43);
   assert.deepEqual(
     [...originalParticipantCustomTextKeys].sort(),
     [
@@ -55,6 +55,7 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_msgTimerCancelled",
       "booklet_msgTimerStarted",
       "booklet_pausedmessage",
+      "booklet_reload",
       "booklet_requestFullscreen",
       "booklet_tasklisttitle",
       "booklet_unitLoading",

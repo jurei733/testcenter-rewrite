@@ -41,6 +41,9 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
 
+const controllerRecoveryStorageKey =
+  "testcenter-rewrite:participant-controller-recovery:v1";
+
 export type VeronaResponseChange = {
   testRunId: string;
   unitKey: string;
@@ -54,6 +57,12 @@ export type VeronaLogChange = {
   testRunId: string;
   unitKey: string;
   entries: ParticipantTestLogEntryInput[];
+};
+
+export type VeronaControllerError = {
+  testRunId: string;
+  unitKey: string;
+  message: string;
 };
 
 type RetiredVeronaFrame = {
@@ -240,6 +249,8 @@ export class VeronaPlayerHostComponent
   @Output() readonly logEntries = new EventEmitter<VeronaLogChange>();
   @Output() readonly testLogEntries =
     new EventEmitter<ParticipantTestLogEntryInput[]>();
+  @Output() readonly controllerError =
+    new EventEmitter<VeronaControllerError>();
   @Output() readonly navigationRequest = new EventEmitter<string>();
   @Output() readonly retrySave = new EventEmitter<void>();
 
@@ -599,7 +610,7 @@ export class VeronaPlayerHostComponent
       timeStamp: Date.now(),
       content: "RUNNING"
     }, this.savedResponse);
-    if (this.controllerRecoveryTestRunId === this.frameTestRunId) {
+    if (this.hasPendingControllerRecovery()) {
       this.testLogEntries.emit([{
         key: "CONTROLLER",
         timeStamp: Date.now(),
@@ -938,12 +949,46 @@ export class VeronaPlayerHostComponent
     if (!this.controllerErrorLoggedForFrame) {
       this.controllerErrorLoggedForFrame = true;
       this.controllerRecoveryTestRunId = this.frameTestRunId;
+      try {
+        globalThis.window?.sessionStorage.setItem(
+          controllerRecoveryStorageKey,
+          this.frameTestRunId
+        );
+      } catch {
+        // Recovery logging still works for an in-page Player reload.
+      }
       this.testLogEntries.emit([{
         key: "CONTROLLER",
         timeStamp: Date.now(),
         content: "ERROR"
       }]);
+      this.controllerError.emit({
+        testRunId: this.frameTestRunId,
+        unitKey: this.frameUnitKey,
+        message
+      });
     }
+  }
+
+  private hasPendingControllerRecovery(): boolean {
+    let persistedTestRunId = "";
+    try {
+      persistedTestRunId =
+        globalThis.window?.sessionStorage.getItem(
+          controllerRecoveryStorageKey
+        ) ?? "";
+      if (persistedTestRunId === this.frameTestRunId) {
+        globalThis.window?.sessionStorage.removeItem(
+          controllerRecoveryStorageKey
+        );
+      }
+    } catch {
+      // Session storage can be unavailable under restrictive browser policies.
+    }
+    return (
+      this.controllerRecoveryTestRunId === this.frameTestRunId ||
+      persistedTestRunId === this.frameTestRunId
+    );
   }
 
   private clearReadyTimeout(): void {

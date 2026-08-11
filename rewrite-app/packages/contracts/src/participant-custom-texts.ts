@@ -29,6 +29,7 @@ export const originalParticipantCustomTextDefaults = {
   booklet_msgTimerStarted:
     "Die Bearbeitungszeit für diesen Abschnitt hat begonnen: ",
   booklet_pausedmessage: "Der Test wurde kurz angehalten.",
+  booklet_reload: "Neu Laden",
   booklet_requestFullscreen: "Soll das Vollbild aktiviert werden?",
   booklet_tasklisttitle: "Aufgaben",
   booklet_unitLoading: "Geladen",

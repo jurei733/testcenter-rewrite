@@ -299,6 +299,30 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </section>
           </ng-container>
           <ng-template #participantActiveRun>
+          <ng-container *ngIf="view.hasControllerError; else participantRunnableState">
+            <section
+              id="participantRouteControllerErrorState"
+              class="participant-controller-error-state"
+              role="alert"
+              aria-live="assertive"
+              aria-labelledby="participantRouteControllerErrorTitle"
+            >
+              <span id="participantRouteStatus">error</span>
+              <strong id="participantRouteControllerErrorTitle">The test cannot continue.</strong>
+              <p id="participantRouteControllerErrorText">{{ view.controllerErrorText }}</p>
+              <details>
+                <summary>Technical details</summary>
+                <code id="participantRouteControllerErrorDetail">{{ view.controllerErrorMessage }}</code>
+              </details>
+              <button
+                id="participantRouteControllerReloadButton"
+                class="primary"
+                type="button"
+                (click)="view.reloadAfterControllerError()"
+              >{{ view.customText('booklet_reload', 'Neu Laden') }}</button>
+            </section>
+          </ng-container>
+          <ng-template #participantRunnableState>
           <header>
             <div>
               <h3 *ngIf="view.showUnitTitle" id="participantRouteUnit">{{ view.player.headline }}</h3>
@@ -423,6 +447,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [errorText]="view.veronaErrorText"
               (logEntries)="view.queueVeronaLogs($event)"
               (testLogEntries)="view.saveVeronaTestLogs($event)"
+              (controllerError)="view.handleVeronaControllerError($event)"
               (responseUpdate)="view.saveVeronaResponse($event)"
               (navigationRequest)="view.navigateFromVerona($event)"
               (retrySave)="view.retryVeronaSave()"
@@ -759,6 +784,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (click)="view.resumeRun()"
               >Continue Test</button>
             </section>
+          </ng-template>
           </ng-template>
           </ng-template>
         </div>
