@@ -11560,10 +11560,11 @@ try {
     const participantSessionId =
       signInPayload.participantSession?.participantSessionId;
     assert.ok(participantSessionId, `${loginKey} should create a session.`);
-    await sendSmokeJson(
+    const resumeResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
       { body: { bookletKey } }
     );
+    const resumePayload = await resumeResponse.json();
     await page.goto(
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
@@ -11576,7 +11577,8 @@ try {
       .waitFor({ timeout: 30_000 });
     return {
       frame: page.frameLocator("#participantVeronaPlayerFrame"),
-      participantSessionId
+      participantSessionId,
+      testRunId: resumePayload.testRun?.testRunId
     };
   };
 
@@ -11746,6 +11748,113 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
     .waitFor({ timeout: 15_000 });
+
+  const confirmLeaveController = await openOriginalTestController(
+    "Test_Ctrl-15",
+    "Cy-Bklt_TC-6"
+  );
+  assert.ok(confirmLeaveController.testRunId);
+  await page.locator("#participantRouteTestletTimer").waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  const confirmLeaveTarget = page.locator("#participantRouteNextUnitButton");
+  await confirmLeaveTarget.click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave timed block?" })
+    .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor();
+  await confirmLeaveTarget.click();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-104" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTimerLifecycleMessage")
+    .filter({ hasText: "cancelled" })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${confirmLeaveController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.testletTimers?.Tslt1?.status ===
+        "cancelled" &&
+      payload.currentRunState.activeTestletTimer == null
+  );
+  await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+
+  const allowedLeaveController = await openOriginalTestController(
+    "Test_Ctrl-16",
+    "Cy-Bklt_TC-7"
+  );
+  assert.ok(allowedLeaveController.testRunId);
+  await page.locator("#participantRouteTestletTimer").waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteNextUnitButton").click();
+  assert.equal(await page.locator("#participantConfirmationBackdrop").count(), 0);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-104" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${allowedLeaveController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.testletTimers?.Tslt1?.status ===
+        "cancelled" &&
+      payload.currentRunState.activeTestletTimer == null
+  );
+  await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+
+  const forbiddenLeaveController = await openOriginalTestController(
+    "Test_Ctrl-17",
+    "Cy-Bklt_TC-8"
+  );
+  assert.ok(forbiddenLeaveController.testRunId);
+  await page.locator("#participantRouteTestletTimer").waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteNavigationNotice")
+    .filter({ hasText: "cannot be left before its time expires" })
+    .waitFor();
+  await expectButtonSelectorDisabled("#participantRouteNextUnitButton");
+  const forbiddenLeaveResponse = await fetch(
+    `${baseUrl}/api/v1/participant/test-runs/${forbiddenLeaveController.testRunId}/save-progress`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        currentUnitKey: "CY-Unit.Sample-104",
+        status: "running"
+      })
+    }
+  );
+  assert.equal(forbiddenLeaveResponse.status, 409);
+  const forbiddenLeavePayload = await forbiddenLeaveResponse.json();
+  assert.equal(forbiddenLeavePayload.error, "booklet_navigation_denied");
+  assert.ok(
+    forbiddenLeavePayload.details?.deniedReasons?.includes(
+      "testlet_time_leave_forbidden"
+    )
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor();
   stopAfter("participant-original-test-controller");
 
   logStep("nav-runtime");
