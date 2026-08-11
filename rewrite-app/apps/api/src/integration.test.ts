@@ -15631,6 +15631,8 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
   assert.deepEqual(
     packageImport.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
     [
+      "source_document_testtakers_booklet_missing",
+      "source_document_testtakers_booklet_missing",
       expectation.diagnosticCode,
       "testcenter_xml_unit_id_duplicate",
       "testcenter_xml_syscheck_id_duplicate",
@@ -15639,7 +15641,9 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     ]
   );
   assert.match(
-    packageImport.body.importJob.diagnostics[0]?.message ?? "",
+    packageImport.body.importJob.diagnostics.find(
+      diagnostic => diagnostic.code === expectation.diagnosticCode
+    )?.message ?? "",
     /Booklet\.xml.*Booklet_sameBookletID\.xml.*BOOKLET\.SAMPLE-100/
   );
   assert.match(
@@ -20225,6 +20229,211 @@ test("original Testcenter compatibility corpus executes the complete 17.6 sample
     await resourceResponse.text(),
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
   );
+});
+
+test("original Testcenter compatibility corpus resolves Testtakers booklet dependencies", async () => {
+  const tenantKey = "integration-tenant-testtakers-booklet-dependencies";
+  const workspaceKey = "integration-workspace-testtakers-booklet-dependencies";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const bookletKey = "BOOKLET.ROSTER-GRAPH";
+  const unitKey = "UNIT.ROSTER-GRAPH";
+  const looseFiles = [
+    {
+      fileName: "Unit-roster-graph.xml",
+      sourceDocument: [
+        "<Unit>",
+        `  <Metadata><Id>${unitKey}</Id><Label>Roster graph unit</Label></Metadata>`,
+        "  <Definition>Roster graph definition</Definition>",
+        "</Unit>"
+      ].join("\n")
+    },
+    {
+      fileName: "Booklet-roster-graph.xml",
+      sourceDocument: [
+        "<Booklet>",
+        `  <Metadata><Id>${bookletKey}</Id><Label>Roster graph booklet</Label></Metadata>`,
+        `  <Units><Unit id="${unitKey}" label="Roster graph unit" /></Units>`,
+        "</Booklet>"
+      ].join("\n")
+    },
+    {
+      fileName: "Testtakers-roster-graph.xml",
+      sourceDocument: [
+        "<Testtakers>",
+        '  <Group id="roster-graph" label="Roster graph">',
+        '    <Login name="roster-graph-login">',
+        `      <Booklet codes="code-a" state="variant:one"> ${bookletKey} </Booklet>`,
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    }
+  ];
+  const uploadedSourcePackages: Array<{ sourcePackageId: string }> = [];
+  for (const file of looseFiles) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: { ...file, mediaType: "application/xml" }
+    });
+    assert.equal(upload.status, 201, file.fileName);
+    uploadedSourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const automaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+    participantRosterImport?: {
+      importedCount: number;
+      updatedCount: number;
+      operationalLoginCandidateCount: number;
+      sourceFileNames: string[];
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: uploadedSourcePackages[2]!.sourcePackageId
+    }
+  });
+  assert.equal(
+    automaticImport.body.importJob.status,
+    "completed",
+    JSON.stringify(automaticImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(automaticImport.body.importJob.diagnostics, []);
+  assert.notEqual(
+    automaticImport.body.importJob.sourcePackageId,
+    uploadedSourcePackages[2]!.sourcePackageId
+  );
+  assert.ok(automaticImport.body.stagedContentRelease?.contentReleaseId);
+  assert.deepEqual(automaticImport.body.participantRosterImport, {
+    sourceFileNames: ["Testtakers-roster-graph.xml"],
+    importedCount: 1,
+    updatedCount: 0,
+    operationalLoginCandidateCount: 0
+  });
+
+  const assembledDetail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: { fileName: string };
+      dependencyGraph: { edges: Array<{ relationshipType: string }> };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${automaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    assembledDetail.body.sourcePackageDetail.sourcePackage.fileName,
+    "Testtakers-roster-graph.workspace-dependencies.zip"
+  );
+  assert.equal(
+    assembledDetail.body.sourcePackageDetail.dependencyGraph.edges.filter(
+      edge => edge.relationshipType === "assembled_from"
+    ).length,
+    3
+  );
+
+  const missingLooseRosterUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Testtakers-missing-booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: [
+        "<Testtakers>",
+        '  <Group id="missing-booklet" label="Missing booklet">',
+        '    <Login name="missing-booklet-login">',
+        "      <Booklet>BOOKLET.DOES-NOT-EXIST</Booklet>",
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    }
+  });
+  assert.equal(missingLooseRosterUpload.status, 201);
+  const missingLooseRosterImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        missingLooseRosterUpload.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(missingLooseRosterImport.body.importJob.status, "failed");
+  assert.deepEqual(
+    missingLooseRosterImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_testtakers_booklet_missing"]
+  );
+  assert.equal(missingLooseRosterImport.body.stagedContentRelease, null);
+
+  const missingZipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: [
+        '<manifest identifier="missing-testtakers-booklet">',
+        "  <resources>",
+        '    <resource identifier="ROSTER.MISSING" href="Testtakers.xml" />',
+        "  </resources>",
+        "</manifest>"
+      ].join("\n")
+    },
+    {
+      fileName: "Testtakers.xml",
+      content: [
+        "<Testtakers>",
+        '  <Group id="missing-zip-booklet" label="Missing ZIP booklet">',
+        '    <Login name="missing-zip-booklet-login">',
+        "      <Booklet>BOOKLET.NOT-IN-ZIP</Booklet>",
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    }
+  ]);
+  const missingZipUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "missing-testtakers-booklet.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${missingZipPayload}`
+    }
+  });
+  assert.equal(missingZipUpload.status, 201);
+  const missingZipImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: missingZipUpload.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(missingZipImport.body.importJob.status, "failed");
+  assert.ok(
+    missingZipImport.body.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_testtakers_booklet_missing"
+    )
+  );
+  assert.equal(missingZipImport.body.stagedContentRelease, null);
 });
 
 test("original Testcenter compatibility corpus assembles loose dependency files", async () => {

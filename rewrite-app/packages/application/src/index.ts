@@ -2409,6 +2409,26 @@ type TesttakersRosterStructure = {
   }>;
 };
 
+const collectTesttakersBookletReferences = (
+  root: XmlElement
+): string[] => {
+  if (xmlElementLocalName(root).toLowerCase() !== "testtakers") {
+    return [];
+  }
+  const bookletIds = new Set<string>();
+  for (const group of xmlChildrenNamed(root, "Group")) {
+    for (const login of xmlChildrenNamed(group, "Login")) {
+      for (const booklet of xmlChildrenNamed(login, "Booklet")) {
+        const bookletId = xmlElementText(booklet).replace(/\s/g, "");
+        if (bookletId) {
+          bookletIds.add(bookletId);
+        }
+      }
+    }
+  }
+  return [...bookletIds];
+};
+
 const readTesttakersRosterStructure = (
   sourceDocument: string
 ): TesttakersRosterStructure | null => {
@@ -14195,6 +14215,12 @@ const collectLooseSourcePackageDependencyReferences = (
     addReference(xmlChildrenNamed(root, "Config")[0]?.getAttribute("unit"));
   }
 
+  if (rootName === "testtakers") {
+    for (const bookletId of collectTesttakersBookletReferences(root)) {
+      addReference(bookletId);
+    }
+  }
+
   return [...references];
 };
 
@@ -14279,6 +14305,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   ]);
   const pending = [input.rootSourcePackage];
   const missingReferences = new Set<string>();
+  const missingTesttakersBookletReferences = new Set<string>();
   while (pending.length > 0) {
     const currentSourcePackage = pending.shift();
     if (!currentSourcePackage) {
@@ -14332,6 +14359,12 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       }
       if (matches.length === 0) {
         missingReferences.add(reference);
+        if (
+          readStandaloneTestcenterXmlFileIdentity(currentSourcePackage)
+            ?.fileType === "Testtakers"
+        ) {
+          missingTesttakersBookletReferences.add(reference);
+        }
         continue;
       }
       const dependency = matches[0]!.sourcePackage;
@@ -14344,6 +14377,15 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   }
 
   if (missingReferences.size > 0) {
+    if (missingTesttakersBookletReferences.size > 0) {
+      return {
+        status: "blocked",
+        diagnostic: createImportDiagnostic(
+          "source_document_testtakers_booklet_missing",
+          `Testtakers file '${input.rootSourcePackage.fileName}' references missing Booklet IDs: ${[...missingTesttakersBookletReferences].join(", ")}. Upload the referenced Booklet files before importing the roster.`
+        )
+      };
+    }
     return selected.size > 1
       ? {
           status: "blocked",
@@ -16172,6 +16214,11 @@ const validateZipXmlEntries = (
     { sourceFileName: string; variableIds: Set<string> }
   >();
   const adaptiveVariableReferences: TestcenterAdaptiveVariableReference[] = [];
+  const bookletSourceFileById = new Map<string, string>();
+  const testtakersBookletReferences: Array<{
+    bookletId: string;
+    sourceFileName: string;
+  }> = [];
   for (const entry of manifestExtraction.entries) {
     if (
       entry.fileName.endsWith("/") ||
@@ -16193,7 +16240,27 @@ const validateZipXmlEntries = (
       )
     );
     const root = parseTestcenterXmlRoot(sourceDocument);
-    if (!root || xmlElementLocalName(root) !== "Unit") {
+    if (!root) {
+      continue;
+    }
+    const rootName = xmlElementLocalName(root);
+    if (rootName === "Booklet") {
+      const metadata = xmlChildrenNamed(root, "Metadata")[0];
+      const bookletId = xmlElementText(
+        xmlChildrenNamed(metadata ?? root, "Id")[0]
+      );
+      if (bookletId && !bookletSourceFileById.has(bookletId.toLowerCase())) {
+        bookletSourceFileById.set(bookletId.toLowerCase(), entry.fileName);
+      }
+    } else if (rootName === "Testtakers") {
+      testtakersBookletReferences.push(
+        ...collectTesttakersBookletReferences(root).map(bookletId => ({
+          bookletId,
+          sourceFileName: entry.fileName
+        }))
+      );
+    }
+    if (rootName !== "Unit") {
       continue;
     }
     const metadata = xmlChildrenNamed(root, "Metadata")[0];
@@ -16228,6 +16295,22 @@ const validateZipXmlEntries = (
         sourceFileName: entry.fileName,
         variableIds
       });
+    }
+  }
+  const reportedMissingBookletIds = new Set<string>();
+  for (const reference of testtakersBookletReferences) {
+    const bookletIdentityKey = reference.bookletId.toLowerCase();
+    if (
+      !bookletSourceFileById.has(bookletIdentityKey) &&
+      !reportedMissingBookletIds.has(bookletIdentityKey)
+    ) {
+      reportedMissingBookletIds.add(bookletIdentityKey);
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_testtakers_booklet_missing",
+          `Testtakers ZIP entry '${reference.sourceFileName}' references missing Booklet ID '${reference.bookletId}'.`
+        )
+      );
     }
   }
   for (const reference of adaptiveVariableReferences) {
@@ -21488,7 +21571,9 @@ export const createFirstSliceServices = (
     let workspaceDependencyDiagnostic: ImportJobDiagnostic | null = null;
     if (
       options.resolveWorkspaceDependencies !== false &&
-      standaloneImportResolution.runtimeSnapshot
+      (standaloneImportResolution.runtimeSnapshot ||
+        readStandaloneTestcenterXmlFileIdentity(sourcePackage)?.fileType ===
+          "Testtakers")
     ) {
       const workspaceSourcePackages =
         await repository.listSourcePackagesByWorkspace(
