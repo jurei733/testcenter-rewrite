@@ -1285,7 +1285,7 @@ try {
     },
     {
       fileName: "export/booklets/Booklet.xml",
-      content: `<Booklet><Metadata><Id>${customTextBookletKey}</Id><Label>UI Custom Text Booklet</Label></Metadata><CustomTexts><CustomText key="login_testResumeButtonLabel">UI Booklet Resume</CustomText></CustomTexts><Units><Unit id="${customTextUnitKey}" alias="ui-custom-text-unit" label="UI Custom Text Unit" /></Units></Booklet>`
+      content: `<Booklet><Metadata><Id>${customTextBookletKey}</Id><Label>UI Custom Text Booklet</Label></Metadata><CustomTexts><CustomText key="login_testResumeButtonLabel">UI Booklet Resume</CustomText><CustomText key="login_testEndButtonLabel">UI Booklet Complete</CustomText></CustomTexts><Units><Unit id="${customTextUnitKey}" alias="ui-custom-text-unit" label="UI Custom Text Unit" /></Units></Booklet>`
     },
     {
       fileName: "export/units/Unit.xml",
@@ -1419,9 +1419,14 @@ try {
     .locator("#participantRouteStartOrResumeButton")
     .click();
   await brandedParticipantPage
-    .locator("#participantRouteStartOrResumeButton")
-    .filter({ hasText: "UI Booklet Resume" })
+    .locator("#participantRouteCompleteButton")
+    .filter({ hasText: "UI Booklet Complete" })
     .waitFor();
+  assert.equal(
+    await brandedParticipantPage.locator("#participantRouteEntry").count(),
+    0,
+    "A running test must replace the Participant entry surface."
+  );
   await brandedParticipantPage.close();
 
   await fillAndCommit(
@@ -5358,9 +5363,7 @@ try {
         "running" &&
       document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
         expectedRunId &&
-      document.querySelector("#participantEntryNextStep")?.textContent?.includes(
-        "Answer current unit"
-      ),
+      document.querySelector("#participantRouteEntry") == null,
     [participantEntrySignInSessionId, participantEntryStartedRunId],
     { timeout: 15_000 }
   );
@@ -5389,6 +5392,7 @@ try {
     .waitFor();
   await page.locator("#participantRouteFullscreenPrompt").waitFor({ state: "detached" });
   await page.locator("#participantRouteReloadButton").waitFor();
+  await page.locator("#participantRouteClearSessionButton").waitFor();
   await page.locator("#participantRouteReloadButton").click();
   await page.waitForLoadState("networkidle");
   await page.waitForURL(url =>
@@ -5399,7 +5403,8 @@ try {
       document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
         expectedRunId &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "running",
+        "running" &&
+      document.querySelector("#participantRouteEntry") == null,
     participantEntryStartedRunId,
     { timeout: 15_000 }
   );
@@ -5789,7 +5794,6 @@ try {
     )}`,
     { waitUntil: "networkidle" }
   );
-  await page.locator("#participantLoginKey").waitFor();
   await page.getByRole("heading", { name: "Participant Test" }).waitFor();
   assert.equal(
     await page.locator('[data-view-nav="runtime"]').count(),
@@ -5800,16 +5804,6 @@ try {
     await page.locator("#rawDebugToggle").count(),
     0,
     "Participant route should not expose the raw debug toggle."
-  );
-  await expectInputValue("#participantTenantKey", tenantKey);
-  await expectInputValue("#participantWorkspaceKey", workspaceKey);
-  await expectInputValue("#participantLoginKey", participantRouteLoginKey);
-  await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
-  await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
-  await expectInputValue("#participantRouteCurrentUnitKey", participantRouteUnitKey);
-  await expectInputValue(
-    "#participantRouteUnitResponse",
-    participantRouteUnitResponse
   );
   logStep("participant-route-auto-start");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
@@ -5845,9 +5839,8 @@ try {
     groupKey: participantRouteGroupKey,
     bookletKey: participantRouteBookletKey
   }).toString()}`;
-  await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
-  await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
   const participantRouteSessionAnchor = page.locator("#participantRouteSessionAnchor");
+  await participantRouteSessionAnchor.waitFor({ state: "visible" });
   assert.equal(
     await participantRouteSessionAnchor.getAttribute("href"),
     participantRouteSessionLink,
@@ -5872,18 +5865,15 @@ try {
       payload.currentRunState.testRun.status === "running"
   );
   await page.waitForFunction(
-    ([expectedLoginKey, expectedGroupKey, expectedDisplayName, expectedSessionId]) =>
+    ([expectedLoginKey, expectedGroupKey, expectedDisplayName, expectedSessionId, expectedResponse]) =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "running" &&
-      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
-        "running" &&
+      document.querySelector("#participantRouteEntry") == null &&
       document.querySelector("#participantRouteLoginLabel")?.textContent?.trim() ===
         expectedLoginKey &&
       document.querySelector("#participantRouteGroupLabel")?.textContent?.trim() ===
         expectedGroupKey &&
       document.querySelector("#participantRouteDisplayName")?.textContent?.trim() ===
-        expectedDisplayName &&
-      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
         expectedDisplayName &&
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
@@ -5895,12 +5885,15 @@ try {
       document.querySelector("#participantRouteUnitDescription")?.textContent?.trim() ===
         "Read the participant prompt." &&
       document.querySelector("#participantRouteUnitContent")?.textContent?.trim() ===
-        "Explain how the starter example works.",
+        "Explain how the starter example works." &&
+      document.querySelector("#participantRouteUnitResponse")?.value ===
+        expectedResponse,
     [
       participantRouteLoginKey,
       participantRouteGroupKey,
       participantRouteDisplayName,
-      participantRouteSessionId
+      participantRouteSessionId,
+      participantRouteUnitResponse
     ],
     { timeout: 15_000 }
   );
@@ -6070,16 +6063,13 @@ try {
     )}`,
     { waitUntil: "networkidle" }
   );
-  await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
-  await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
-  await page.locator("#participantLoginKey").waitFor();
-  await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await page.waitForFunction(
     ([expectedSessionId]) =>
-      document.querySelector("#participantRouteSessionId")?.value ===
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "running",
+        "running" &&
+      document.querySelector("#participantRouteEntry") == null,
     [participantRouteSessionId],
     { timeout: 15_000 }
   );
@@ -7450,10 +7440,7 @@ try {
     await page.locator("#participantRouteStatus").textContent(),
     "error"
   );
-  assert.equal(
-    await page.locator("#participantEntryStatus").textContent(),
-    "error"
-  );
+  assert.equal(await page.locator("#participantRouteEntry").count(), 0);
   assert.equal(
     await page.locator("#participantRouteControllerErrorText").textContent(),
     "The project player could not be loaded."
@@ -7480,10 +7467,20 @@ try {
       `Controller error must remove ${selector} from the participant unit surface.`
     );
   }
-  await expectButtonSelectorDisabled("#participantRouteSignInButton");
-  await expectButtonSelectorDisabled("#participantRouteStartOrResumeButton");
-  await expectButtonSelectorDisabled("#participantRouteRefreshCurrentStateButton");
-  await expectButtonSelectorDisabled("#participantRouteClearSessionButton");
+  for (const selector of [
+    "#participantRouteSignInButton",
+    "#participantRouteStartOrResumeButton",
+    "#participantRouteRefreshCurrentStateButton",
+    "#participantRouteClearSessionButton",
+    "#participantRouteSessionAnchor",
+    "#participantRouteCopySessionLinkButton"
+  ]) {
+    assert.equal(
+      await page.locator(selector).count(),
+      0,
+      `Controller error must remove ${selector} from the participant route.`
+    );
+  }
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

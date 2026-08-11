@@ -13,7 +13,11 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent],
   template: `
     <div class="stack">
-      <article class="card participant-entry-card">
+      <article
+        *ngIf="!view.isParticipantPlayerFocused"
+        id="participantRouteEntry"
+        class="card participant-entry-card"
+      >
         <header class="participant-entry-hero">
           <div>
             <span>Participant Entry</span>
@@ -184,6 +188,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
       </article>
 
       <article class="card" id="participantRoutePlayer">
+        <input
+          *ngIf="view.isParticipantPlayerFocused"
+          id="participantRouteSessionId"
+          name="participantRouteSessionId"
+          type="hidden"
+          [value]="view.runtime.participantSessionId"
+        />
         <h2>Current Test</h2>
         <section
           *ngIf="view.showParticipantConnectionState"
@@ -216,7 +227,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </div>
         </section>
         <div
-          *ngIf="view.screenHeaderLabel || view.showFullscreenButton || view.showReloadButton"
+          *ngIf="view.screenHeaderLabel || view.showFullscreenButton || view.showReloadButton || (view.isParticipantPlayerFocused && !view.hasControllerError)"
           class="participant-runtime-toolbar"
         >
           <strong id="participantRouteScreenHeader" *ngIf="view.screenHeaderLabel">{{ view.screenHeaderLabel }}</strong>
@@ -234,7 +245,45 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             type="button"
             (click)="view.toggleFullscreen()"
           >{{ view.fullscreenActive() ? "Exit Fullscreen" : "Fullscreen" }}</button>
+          <div
+            *ngIf="view.isParticipantPlayerFocused && !view.hasControllerError"
+            class="participant-runtime-actions"
+          >
+            <a
+              *ngIf="view.player.sessionEntryLink"
+              id="participantRouteSessionAnchor"
+              class="button-link secondary"
+              [href]="view.player.sessionEntryLink"
+              [attr.aria-label]="'Session Re-Entry: ' + view.player.sessionEntryLink"
+              [attr.title]="view.player.sessionEntryLink"
+              target="_blank"
+              rel="noreferrer"
+            >Open Session</a>
+            <button
+              *ngIf="view.player.sessionEntryLink"
+              id="participantRouteCopySessionLinkButton"
+              class="ghost"
+              type="button"
+              [attr.aria-label]="(view.isSessionEntryLinkCopied(view.player.sessionEntryLink) ? 'Copied Session Re-Entry: ' : 'Copy Session Re-Entry: ') + view.player.sessionEntryLink"
+              [attr.title]="'Copy ' + view.player.sessionEntryLink"
+              (click)="view.copySessionEntryLink(view.player.sessionEntryLink)"
+            >{{ view.isSessionEntryLinkCopied(view.player.sessionEntryLink) ? "Copied" : "Copy Session Link" }}</button>
+            <button
+              *ngIf="view.player.canClearSession"
+              id="participantRouteClearSessionButton"
+              class="ghost"
+              type="button"
+              (click)="view.clearSession()"
+            >Leave Session</button>
+          </div>
         </div>
+        <span
+          *ngIf="view.isParticipantPlayerFocused && view.isSessionEntryLinkCopied(view.player.sessionEntryLink)"
+          id="participantRouteSessionLinkCopyStatus"
+          class="participant-session-link-copy-status"
+          role="status"
+          aria-live="polite"
+        >Session link copied</span>
         <p
           *ngIf="view.fullscreenStatusText"
           id="participantRouteFullscreenStatus"

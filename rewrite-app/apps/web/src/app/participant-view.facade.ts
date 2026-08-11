@@ -436,6 +436,13 @@ export class ParticipantViewFacade {
     );
   }
 
+  get isParticipantPlayerFocused(): boolean {
+    const currentState = this.readCurrentRunState();
+    return Boolean(
+      currentState && currentState.testRun.status !== "completed"
+    );
+  }
+
   notifyBrowserNavigationPrevented(): void {
     const currentState = this.readCurrentRunState();
     if (!currentState || currentState.booklet.policy.display.silentMode) {

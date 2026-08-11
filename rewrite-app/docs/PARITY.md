@@ -76,6 +76,19 @@ starts successfully. The production-built SQLite/Chromium gate proves the DOM
 boundary, disabled entry commands, custom reload label, de-duplicated error log,
 response preservation, and successful Player restoration.
 
+Latest P0 Participant route-separation closure: the original Starter and Test
+Controller are separate routes, so a running or paused test never exposes
+editable tenant, workspace, login, password, group, Booklet, Session, or Unit
+fields beside the Player. The Rewrite now applies the same presentation
+boundary: once a run opens, the complete entry card leaves the DOM and the
+Current Test surface becomes the sole participant workspace. A compact runtime
+toolbar retains only session re-entry/copy, local leave, configured reload, and
+fullscreen actions; the controller-error guard removes those session actions as
+well. Completion restores the Starter so the participant can select another
+assigned Booklet or leave. Production-built Chromium coverage proves direct
+start, hot-return re-entry, pause/continue, full-page reload, controller error,
+recovery, completion, and Starter restoration across that boundary.
+
 Latest P0 non-saving-mode re-entry closure: the original Demo and Review E2E
 flows discard Unit and Test state when the participant returns to the starter,
 so opening the same test again begins at its start page even though the same run

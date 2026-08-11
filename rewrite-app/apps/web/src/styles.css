@@ -1343,7 +1343,16 @@ pre {
   background: rgba(255, 255, 255, 0.72);
 }
 
-.participant-runtime-toolbar button {
+.participant-runtime-toolbar > button {
+  margin-left: auto;
+}
+
+.participant-runtime-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
   margin-left: auto;
 }
 
@@ -1368,8 +1377,14 @@ pre {
     flex-direction: column;
   }
 
-  .participant-runtime-toolbar button {
+  .participant-runtime-toolbar > button,
+  .participant-runtime-actions {
     margin-left: 0;
+  }
+
+  .participant-runtime-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
