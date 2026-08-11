@@ -13212,6 +13212,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "booklets/Booklet_sameBookletID.xml"),
     "utf8"
   );
+  const invalidBookletRootSequenceXml = validBookletXml.replace(
+    /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
+    "$2$1"
+  );
   const schemaFacetCases: Array<{
     fileName: string;
     sourceDocument: string;
@@ -13419,6 +13423,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "  <Unexpected />\n\n  <Units>"
       ),
       diagnosticCode: "testcenter_xml_booklet_child_invalid"
+    },
+    {
+      fileName: "booklet-invalid-root-sequence.xml",
+      sourceDocument: invalidBookletRootSequenceXml,
+      diagnosticCode: "testcenter_xml_booklet_sequence_invalid"
     },
     {
       fileName: "booklet-duplicate-metadata-label.xml",
@@ -14760,6 +14769,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
         'key="logPolicy"'
       ),
       diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
+      fileName: "invalid-booklet-root-sequence-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: invalidBookletRootSequenceXml,
+      diagnosticCode: "testcenter_xml_booklet_sequence_invalid"
     },
     {
       fileName: "legacy-schema-file-name-dependency.zip",

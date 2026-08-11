@@ -9329,6 +9329,16 @@ const validateTestcenterXmlSourceDocument = (
       ...(usesAdaptiveBookletSchema ? ["States"] : []),
       "Units"
     ]);
+    const directChildRanks = new Map([
+      ["Metadata", 0],
+      ["CustomTexts", 1],
+      ["BookletConfig", 2],
+      ...(usesAdaptiveBookletSchema
+        ? ([["States", 3]] as Array<[string, number]>)
+        : []),
+      ["Units", 4]
+    ]);
+    let previousDirectChildRank = -1;
     for (const child of xmlChildElements(root)) {
       const childName = xmlElementLocalName(child);
       if (!allowedDirectChildNames.has(childName)) {
@@ -9338,7 +9348,19 @@ const validateTestcenterXmlSourceDocument = (
             `Original Testcenter booklet '${sourceFileName}' contains unsupported direct child '${childName}'.`
           )
         );
+        continue;
       }
+      const rank = directChildRanks.get(childName)!;
+      if (rank < previousDirectChildRank) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_sequence_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains direct children outside schema order.`
+          )
+        );
+        break;
+      }
+      previousDirectChildRank = rank;
     }
     const metadataContainers = xmlChildrenNamed(root, "Metadata");
     const customTextContainers = xmlChildrenNamed(root, "CustomTexts");
