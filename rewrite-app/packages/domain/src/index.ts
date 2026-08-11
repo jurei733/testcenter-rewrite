@@ -343,6 +343,10 @@ export type Workspace = {
   createdAt: string;
 };
 
+export type WorkspaceDirectoryItem = Workspace & {
+  latestFileModificationAt: string | null;
+};
+
 export type ParticipantRosterEntry = {
   participantRosterEntryId: string;
   tenantId: string;

@@ -260,7 +260,7 @@ try {
       document
         .querySelector("#workspaceDirectoryExportPreview")
         ?.textContent?.includes(
-          "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt"
+          "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt,latestFileModificationAt"
         ) &&
       document
         .querySelector("#workspaceDirectoryExportPreview")

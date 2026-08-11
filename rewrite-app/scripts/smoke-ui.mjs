@@ -2274,6 +2274,20 @@ try {
       has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
     })
     .filter({ hasText: workspaceKey })
+    .filter({ hasText: "Latest File Modification" })
+    .waitFor();
+  await page
+    .locator("#workspaceDirectorySortBy")
+    .selectOption("latestFileModificationAt");
+  await page.locator("#workspaceDirectorySortDirection").selectOption("desc");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Workspace directory window" }) })
+    .filter({ hasText: "Latest file modification · desc" })
     .waitFor();
   const workspaceDirectoryDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Workspace Directory CSV");
@@ -2285,7 +2299,8 @@ try {
   await page
     .locator("#workspaceDirectoryExportPreview")
     .filter({
-      hasText: "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt"
+      hasText:
+        "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt,latestFileModificationAt"
     })
     .filter({ hasText: workspaceKey })
     .waitFor();

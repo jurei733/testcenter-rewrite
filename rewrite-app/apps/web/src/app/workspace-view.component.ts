@@ -133,6 +133,25 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="Refresh the tenant directory after signing in as an operator."
       ></app-record-collection>
 
+      <article id="workspaceDirectorySortCard" class="card">
+        <h2>Workspace Directory View</h2>
+        <p>Match the Original Superadmin table by sorting workspaces by name or by the newest currently stored file.</p>
+        <div class="form-grid">
+          <label>
+            Sort By
+            <select id="workspaceDirectorySortBy" name="workspaceDirectorySortBy" [(ngModel)]="view.workspaceDirectorySortBy">
+              <option *ngFor="let option of view.workspaceDirectorySortOptions" [value]="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+          <label>
+            Direction
+            <select id="workspaceDirectorySortDirection" name="workspaceDirectorySortDirection" [(ngModel)]="view.workspaceDirectorySortDirection">
+              <option *ngFor="let option of view.workspaceDirectorySortDirectionOptions" [value]="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+        </div>
+      </article>
+
       <app-record-collection
         title="Workspace Directory"
         subtitle="Tenant-scoped workspace list for choosing the active workspace."

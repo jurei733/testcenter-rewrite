@@ -4718,6 +4718,56 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
     assert.match(tenantDirectoryCsv.body, /"auth-required-tenant","Auth Required"/);
 
+    const emptyWorkspaceDirectory = await requestJsonAt<{
+      items: Array<{
+        workspaceKey: string;
+        latestFileModificationAt: string | null;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      { headers: adminHeaders }
+    );
+    assert.equal(emptyWorkspaceDirectory.status, 200);
+    assert.equal(emptyWorkspaceDirectory.body.items.length, 1);
+    assert.equal(
+      emptyWorkspaceDirectory.body.items[0]?.latestFileModificationAt,
+      null
+    );
+
+    const workspaceDirectoryFile = await requestJsonAt<{
+      sourcePackage: { uploadedAt: string };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          fileName: "workspace-directory-modification.txt",
+          mediaType: "text/plain",
+          sourceDocument: "Workspace directory modification timestamp"
+        }
+      }
+    );
+    assert.equal(workspaceDirectoryFile.status, 201);
+
+    const populatedWorkspaceDirectory = await requestJsonAt<{
+      items: Array<{
+        workspaceKey: string;
+        latestFileModificationAt: string | null;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      { headers: adminHeaders }
+    );
+    assert.equal(populatedWorkspaceDirectory.status, 200);
+    assert.equal(
+      populatedWorkspaceDirectory.body.items[0]?.latestFileModificationAt,
+      workspaceDirectoryFile.body.sourcePackage.uploadedAt
+    );
+
     const workspaceDirectoryCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces.csv",
@@ -4728,11 +4778,15 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(workspaceDirectoryCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       workspaceDirectoryCsv.body,
-      /^tenantKey,workspaceKey,displayName,status,workspaceId,createdAt\n/
+      /^tenantKey,workspaceKey,displayName,status,workspaceId,createdAt,latestFileModificationAt\n/
     );
     assert.match(
       workspaceDirectoryCsv.body,
       /"auth-required-tenant","auth-required-workspace","Auth Required Workspace"/
+    );
+    assert.match(
+      workspaceDirectoryCsv.body,
+      new RegExp(workspaceDirectoryFile.body.sourcePackage.uploadedAt)
     );
 
     const invalidWorkspaceRename = await requestJsonAt<{ error: string }>(

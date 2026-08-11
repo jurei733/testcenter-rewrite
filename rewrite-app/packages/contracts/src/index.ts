@@ -39,6 +39,7 @@ import type {
   Tenant,
   TestRun,
   Workspace,
+  WorkspaceDirectoryItem,
   WorkspaceDeletion,
   WorkspaceAttachment,
   WorkspaceContentReleaseListItem,
@@ -2691,7 +2692,7 @@ export type DeleteWorkspaceResponse = {
 };
 
 export type ListWorkspacesResponse = {
-  items: Workspace[];
+  items: WorkspaceDirectoryItem[];
 };
 
 export type BootstrapAdminUserResponse = {

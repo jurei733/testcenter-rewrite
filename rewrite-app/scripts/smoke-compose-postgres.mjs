@@ -278,7 +278,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const workspaceDirectoryCsvText = await workspaceDirectoryCsv.text();
   if (
     !workspaceDirectoryCsvText.startsWith(
-      "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt\n"
+      "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt,latestFileModificationAt\n"
     ) ||
     !workspaceDirectoryCsvText.includes(
       '"demo-tenant","demo-workspace","Demo Workspace"'

@@ -107,6 +107,7 @@ import type {
   UnitCodingScheme,
   UnitAttachmentRequest,
   Workspace,
+  WorkspaceDirectoryItem,
   WorkspaceAttachment,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
@@ -156,7 +157,7 @@ export type PlatformPort = {
   listTenants(): Promise<Tenant[]>;
   exportTenantsCsv(): Promise<string>;
   createTenant(input: { tenantKey: string; displayName: string }): Promise<Tenant>;
-  listWorkspaces(input: { tenantKey: string }): Promise<Workspace[]>;
+  listWorkspaces(input: { tenantKey: string }): Promise<WorkspaceDirectoryItem[]>;
   exportWorkspacesCsv(input: { tenantKey: string }): Promise<string>;
   createWorkspace(input: {
     tenantKey: string;
@@ -6103,7 +6104,7 @@ const formatTenantsCsv = (items: Tenant[]): string => {
 
 const formatWorkspacesCsv = (input: {
   tenantKey: string;
-  items: Workspace[];
+  items: WorkspaceDirectoryItem[];
 }): string => {
   const header = [
     "tenantKey",
@@ -6111,7 +6112,8 @@ const formatWorkspacesCsv = (input: {
     "displayName",
     "status",
     "workspaceId",
-    "createdAt"
+    "createdAt",
+    "latestFileModificationAt"
   ];
 
   return [
@@ -6123,7 +6125,8 @@ const formatWorkspacesCsv = (input: {
         workspace.displayName,
         workspace.status,
         workspace.workspaceId,
-        workspace.createdAt
+        workspace.createdAt,
+        workspace.latestFileModificationAt ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -23796,9 +23799,29 @@ export const createFirstSliceServices = (
       },
       async listWorkspaces(input) {
         const tenant = await requireTenant(repository, input.tenantKey);
-        return (await repository.listWorkspacesByTenantId(tenant.tenantId)).sort(
+        const workspaces = await repository.listWorkspacesByTenantId(
+          tenant.tenantId
+        );
+        const directoryItems = await Promise.all(
+          workspaces.map(async workspace => {
+            const sourcePackages =
+              await repository.listSourcePackagesByWorkspace(
+                tenant.tenantId,
+                workspace.workspaceId
+              );
+            const latestFileModificationAt =
+              sourcePackages
+                .map(sourcePackage => sourcePackage.uploadedAt)
+                .sort((left, right) => right.localeCompare(left))[0] ?? null;
+            return {
+              ...workspace,
+              latestFileModificationAt
+            };
+          })
+        );
+        return directoryItems.sort(
           (left, right) =>
-            left.createdAt.localeCompare(right.createdAt) ||
+            left.displayName.localeCompare(right.displayName) ||
             left.workspaceKey.localeCompare(right.workspaceKey)
         );
       },

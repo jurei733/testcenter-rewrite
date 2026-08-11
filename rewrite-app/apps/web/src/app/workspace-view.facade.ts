@@ -44,6 +44,9 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
+type WorkspaceDirectorySortBy = "displayName" | "latestFileModificationAt";
+type WorkspaceDirectorySortDirection = "asc" | "desc";
+
 @Injectable({ providedIn: "root" })
 export class WorkspaceViewFacade {
   private readonly contentService = inject(RewriteAppContentService);
@@ -59,6 +62,22 @@ export class WorkspaceViewFacade {
   workspaceDisplayNameDraft = "";
   readonly workspaceActivityEventTypeOptions = workspaceActivityEventTypes;
   readonly workspaceActivitySubjectTypeOptions = workspaceActivitySubjectTypes;
+  readonly workspaceDirectorySortOptions: Array<{
+    value: WorkspaceDirectorySortBy;
+    label: string;
+  }> = [
+    { value: "displayName", label: "Workspace name" },
+    { value: "latestFileModificationAt", label: "Latest file modification" }
+  ];
+  readonly workspaceDirectorySortDirectionOptions: Array<{
+    value: WorkspaceDirectorySortDirection;
+    label: string;
+  }> = [
+    { value: "asc", label: "Ascending" },
+    { value: "desc", label: "Descending" }
+  ];
+  workspaceDirectorySortBy: WorkspaceDirectorySortBy = "displayName";
+  workspaceDirectorySortDirection: WorkspaceDirectorySortDirection = "asc";
 
   private readonly unitProgressBadges = (
     unit: WorkspaceStudyMonitorUnitProgress
@@ -2017,6 +2036,22 @@ export class WorkspaceViewFacade {
     if (!payload) {
       return [];
     }
+    const direction = this.workspaceDirectorySortDirection === "asc" ? 1 : -1;
+    const items = [...payload.items].sort((left, right) => {
+      if (this.workspaceDirectorySortBy === "latestFileModificationAt") {
+        if (left.latestFileModificationAt === right.latestFileModificationAt) {
+          return left.displayName.localeCompare(right.displayName);
+        }
+        if (left.latestFileModificationAt === null) return 1;
+        if (right.latestFileModificationAt === null) return -1;
+        return (
+          left.latestFileModificationAt.localeCompare(
+            right.latestFileModificationAt
+          ) * direction
+        );
+      }
+      return left.displayName.localeCompare(right.displayName) * direction;
+    });
 
     return [
       this.buildDirectoryWindowItem(
@@ -2028,17 +2063,31 @@ export class WorkspaceViewFacade {
           {
             label: "Selected Workspace",
             value: this.workspace.workspaceKey || "none"
+          },
+          {
+            label: "Sort",
+            value: `${
+              this.workspaceDirectorySortOptions.find(
+                option => option.value === this.workspaceDirectorySortBy
+              )?.label ?? this.workspaceDirectorySortBy
+            } · ${this.workspaceDirectorySortDirection}`
           }
         ]
       ),
-      ...payload.items.map(workspace => ({
+      ...items.map(workspace => ({
         headline: workspace.displayName,
         subline: workspace.workspaceKey,
         badges: [workspace.status],
         rows: [
           { label: "Workspace ID", value: workspace.workspaceId },
           { label: "Tenant ID", value: workspace.tenantId },
-          { label: "Created", value: this.formatDateTime(workspace.createdAt) }
+          { label: "Created", value: this.formatDateTime(workspace.createdAt) },
+          {
+            label: "Latest File Modification",
+            value: workspace.latestFileModificationAt
+              ? this.formatDateTime(workspace.latestFileModificationAt)
+              : "No files"
+          }
         ],
         selected: workspace.workspaceKey === this.workspace.workspaceKey,
         actionLabel: "Use Workspace",
