@@ -286,6 +286,7 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       lockOnTermination: on(read("lock_test_on_termination"), false)
     },
     display: {
+      headerHidden: on(read("header_hidden"), false),
       headerContent: choice(
         headerContent,
         ["none", "booklet", "block", "unit"] as const,

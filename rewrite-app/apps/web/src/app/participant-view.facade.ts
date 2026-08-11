@@ -60,6 +60,7 @@ import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantEventStreamService } from "./participant-event-stream.service";
+import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
@@ -256,6 +257,7 @@ export class ParticipantViewFacade {
   private readonly browserCompatibility = inject(BrowserCompatibilityService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly participantEvents = inject(ParticipantEventStreamService);
+  private readonly participantShell = inject(ParticipantShellStateService);
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
@@ -405,6 +407,9 @@ export class ParticipantViewFacade {
   private readonly pageHideListener = (): void => {
     this.queuePendingVeronaSaveForBackgroundDelivery();
   };
+  private readonly leaveSessionListener = (): void => {
+    this.clearSession();
+  };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
     this.refreshCurrentStateInternal(true);
   private readonly logParticipantConnectionMode = (
@@ -425,6 +430,10 @@ export class ParticipantViewFacade {
     );
     globalThis.window?.addEventListener("online", this.onlineListener);
     globalThis.window?.addEventListener("pagehide", this.pageHideListener);
+    globalThis.window?.addEventListener(
+      "participant-leave-session",
+      this.leaveSessionListener
+    );
     this.fullscreenChangeListener();
     this.startTimerTicker();
   }
@@ -465,6 +474,11 @@ export class ParticipantViewFacade {
 
   destroy(): void {
     this.participantEvents.stop();
+    this.participantShell.setHeaderHidden(false);
+    globalThis.window?.removeEventListener(
+      "participant-leave-session",
+      this.leaveSessionListener
+    );
     if (this.timerTickerHandle != null) {
       globalThis.window?.clearInterval(this.timerTickerHandle);
       this.timerTickerHandle = null;
@@ -544,6 +558,7 @@ export class ParticipantViewFacade {
         this.runtime.participantSessionId = "";
         this.runtime.testRunId = "";
         this.currentRunState = null;
+        this.syncParticipantHeaderVisibility();
         this.runtime.currentRunStateView = 'Use "Start Or Resume".';
       }
     }
@@ -1057,7 +1072,8 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       currentState.testRun.status === "completed" ||
-      this.hasControllerError
+      this.hasControllerError ||
+      (currentState.booklet.policy.display.headerHidden ?? false)
     ) {
       return "";
     }
@@ -2366,6 +2382,7 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
     this.currentRunState = null;
+    this.syncParticipantHeaderVisibility();
     this.activeControllerError.set(null);
     this.resetTimerLifecyclePresentation();
     this.adaptiveStateFeedback = "";
@@ -2406,6 +2423,7 @@ export class ParticipantViewFacade {
     this.optimisticVeronaResponse = null;
     this.ephemeralUnitResponses.clear();
     this.currentRunState = null;
+    this.syncParticipantHeaderVisibility();
     this.activeControllerError.set(null);
     this.resetTimerLifecyclePresentation();
     this.queuedVeronaLogs = [];
@@ -3297,6 +3315,7 @@ export class ParticipantViewFacade {
       ) {
         this.participantEvents.stop();
         this.currentRunState = null;
+        this.syncParticipantHeaderVisibility();
         this.runtime.currentRunStateView = prettyPrintJson(
           error,
           this.runtime.currentRunStateView
@@ -3449,6 +3468,7 @@ export class ParticipantViewFacade {
           ...testRun
         }
       };
+      this.syncParticipantHeaderVisibility();
     }
     this.runtime.testRunId = testRun.testRunId;
     if (testRun.bookletAssignmentKey || testRun.bookletKey) {
@@ -3503,6 +3523,7 @@ export class ParticipantViewFacade {
         : []
     };
     this.currentRunState = completedState;
+    this.syncParticipantHeaderVisibility();
     this.runtime.currentUnitKey = "";
     this.runtime.currentRunStateView = prettyPrintJson(
       { currentRunState: completedState },
@@ -3538,6 +3559,7 @@ export class ParticipantViewFacade {
     }
     this.captureTimerLifecycleTransitions(currentState.testRun);
     this.currentRunState = currentState;
+    this.syncParticipantHeaderVisibility();
     this.workspace.tenantKey = currentState.scope.tenantKey;
     this.workspace.workspaceKey = currentState.scope.workspaceKey;
     this.syncParticipantSessionFields(currentState.participantSession);
@@ -3921,10 +3943,22 @@ export class ParticipantViewFacade {
         ParticipantCurrentRunStateResponse
       >;
       this.currentRunState = payload.currentRunState ?? null;
+      this.syncParticipantHeaderVisibility();
       return this.currentRunState;
     } catch {
       return null;
     }
+  }
+
+  private syncParticipantHeaderVisibility(): void {
+    const currentState = this.currentRunState;
+    this.participantShell.setHeaderHidden(
+      Boolean(
+        currentState &&
+          currentState.testRun.status !== "completed" &&
+          (currentState.booklet.policy.display.headerHidden ?? false)
+      )
+    );
   }
 
   private describeParticipantEntryIssue(

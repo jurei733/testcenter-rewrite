@@ -11,6 +11,7 @@ import { AppShellFacade } from "./app-shell.facade";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
 import { LiveContextComponent } from "./live-context.component";
+import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
 
@@ -43,6 +44,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
+  readonly participantShell = inject(ParticipantShellStateService);
   readonly isOffline = signal(!navigator.onLine);
   requiredAdminPassword = "";
   requiredAdminPasswordConfirmation = "";
@@ -70,6 +72,18 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isAttachmentCaptureView ||
       this.isLegalNoticeView
     );
+  }
+
+  get isParticipantHeaderHidden(): boolean {
+    return (
+      this.app.activeView === "participant" &&
+      this.participantShell.headerHidden()
+    );
+  }
+
+  leaveParticipantSession(): void {
+    this.participantShell.setHeaderHidden(false);
+    globalThis.dispatchEvent(new CustomEvent("participant-leave-session"));
   }
 
   get isAttachmentCaptureView(): boolean {

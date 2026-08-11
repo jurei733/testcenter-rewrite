@@ -10644,6 +10644,10 @@ try {
       fixture: "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
       bookletKey: "Cy-Bklt_BkltConfig-4"
     },
+    ...[15, 16].map(number => ({
+      fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
+      bookletKey: `Cy-Bklt_BkltConfig-${number}`
+    })),
     ...Array.from({ length: 8 }, (_, index) => {
       const number = index + 19;
       return {
@@ -10959,8 +10963,11 @@ try {
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`,
     {
       body: {
-        rosterText: Array.from({ length: 8 }, (_, index) => {
-          const number = index + 19;
+        rosterText: [
+          15,
+          16,
+          ...Array.from({ length: 8 }, (_, index) => index + 19)
+        ].map(number => {
           return {
             loginKey: `Bklt_Config-${number}`,
             password: "123",
@@ -10972,6 +10979,33 @@ try {
       }
     }
   );
+  await openOriginalBookletConfig(
+    "Bklt_Config-15",
+    "Cy-Bklt_BkltConfig-15"
+  );
+  await page.locator("#participantApplicationHeader").waitFor();
+  assert.equal(await page.locator("#participantStandaloneLogo").count(), 0);
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-16",
+    "Cy-Bklt_BkltConfig-16"
+  );
+  await page.locator("#participantStandaloneLogo").waitFor();
+  assert.equal(await page.locator("#participantApplicationHeader").count(), 0);
+  assert.equal(await page.locator("#participantRouteScreenHeader").count(), 0);
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  await page.locator("#participantRouteClearSessionButton").waitFor();
+  await page.locator("#participantStandaloneLogo").click();
+  await page.locator("#participantRouteEntry").waitFor();
+  await page.locator("#participantApplicationHeader").waitFor();
+  assert.equal(await page.locator("#participantStandaloneLogo").count(), 0);
   await openOriginalBookletConfig(
     "Bklt_Config-23",
     "Cy-Bklt_BkltConfig-23"

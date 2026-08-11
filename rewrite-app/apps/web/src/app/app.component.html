@@ -184,7 +184,11 @@
     </form>
   </section>
   <ng-container *ngIf="isParticipantView; else operatorShell">
-    <header class="participant-topbar">
+    <header
+      *ngIf="!isParticipantHeaderHidden; else standaloneParticipantLogo"
+      id="participantApplicationHeader"
+      class="participant-topbar"
+    >
       <div class="application-brand">
         <img
           id="applicationLogo"
@@ -199,6 +203,22 @@
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
     </header>
+    <ng-template #standaloneParticipantLogo>
+      <button
+        id="participantStandaloneLogo"
+        class="participant-standalone-logo"
+        type="button"
+        aria-label="Return to participant entry"
+        (click)="leaveParticipantSession()"
+      >
+        <img
+          id="applicationLogo"
+          class="application-logo"
+          [src]="applicationSettings.settings().mainLogo"
+          [alt]="applicationSettings.settings().appTitle + ' logo'"
+        />
+      </button>
+    </ng-template>
 
     <section
       class="status-banner"

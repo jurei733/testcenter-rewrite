@@ -914,6 +914,8 @@ export type BookletRuntimePolicy = {
     lockOnTermination: boolean;
   };
   display: {
+    /** Optional so runtime snapshots created before global header visibility policy remain readable. */
+    headerHidden?: boolean;
     headerContent: "none" | "booklet" | "block" | "unit";
     unitTitle: boolean;
     fullscreenPrompt: boolean;

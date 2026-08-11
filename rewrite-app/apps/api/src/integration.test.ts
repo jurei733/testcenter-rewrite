@@ -12040,6 +12040,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     policy?: {
       logPolicy?: string;
       pagingMode?: string;
+      headerHidden?: boolean;
       headerContent?: string;
       unitMenuEnabled?: boolean;
       unitControls?: string;
@@ -12210,6 +12211,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
                 };
                 completion: { lockOnTermination: boolean };
                 display: {
+                  headerHidden?: boolean;
                   headerContent: string;
                   unitTitle: boolean;
                   fullscreenPrompt: boolean;
@@ -12372,6 +12374,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.display.headerContent,
         expectation.policy.headerContent
+      );
+    }
+    if (expectation.policy.headerHidden !== undefined) {
+      assert.equal(
+        booklet.policy.display.headerHidden,
+        expectation.policy.headerHidden,
+        expectation.sourcePath
       );
     }
     if (expectation.policy.unitMenuEnabled !== undefined) {
@@ -16263,6 +16272,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
     };
     completion: { lockOnTermination: boolean };
     display: {
+      headerHidden: boolean;
       headerContent: string;
       unitTitle: boolean;
       fullscreenPrompt: boolean;
@@ -16335,6 +16345,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       completion: { lockOnTermination: false },
       display: {
+        headerHidden: false,
         headerContent: "none",
         unitTitle: true,
         fullscreenPrompt: false,
@@ -16367,6 +16378,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       completion: { lockOnTermination: true },
       display: {
+        headerHidden: false,
         headerContent: "unit",
         unitTitle: false,
         fullscreenPrompt: true,
@@ -16399,6 +16411,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       completion: { lockOnTermination: false },
       display: {
+        headerHidden: false,
         headerContent: "booklet",
         unitTitle: true,
         fullscreenPrompt: false,
@@ -16431,6 +16444,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       completion: { lockOnTermination: false },
       display: {
+        headerHidden: false,
         headerContent: "block",
         unitTitle: true,
         fullscreenPrompt: false,

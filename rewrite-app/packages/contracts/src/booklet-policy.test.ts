@@ -29,6 +29,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.navigation.forwardButton, "hidden");
   assert.equal(defaults.player.loadingMode, "lazy");
   assert.equal(defaults.timing.showTimeLeft, false);
+  assert.equal(defaults.display.headerHidden, false);
   assert.equal(defaults.display.reloadButton, false);
   assert.equal(defaults.display.silentMode, false);
   assert.deepEqual(defaults.player.pageNavigation, {
@@ -64,6 +65,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     navbar_page_label: "LABEL",
     navbar_page_controls_hidden: "TRUE",
     lock_test_on_termination: "ON",
+    header_hidden: "TRUE",
     toolbar_show_reload_button: "TRUE",
     silent_mode: "TRUE",
     unit_show_time_left: "ON",
@@ -100,6 +102,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     controlsHidden: true
   });
   assert.equal(policy.completion.lockOnTermination, true);
+  assert.equal(policy.display.headerHidden, true);
   assert.equal(policy.display.reloadButton, true);
   assert.equal(policy.display.silentMode, true);
   assert.equal(policy.timing.showTimeLeft, true);
@@ -136,6 +139,10 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     compileBookletRuntimePolicy({ page_navibuttons: "SEPARATE_BOTTOM" }).player
       .pageNavigation,
     { labelMode: "index", controlsHidden: false }
+  );
+  assert.equal(
+    compileBookletRuntimePolicy({ header_hidden: "FALSE" }).display.headerHidden,
+    false
   );
 
   const legacyUnitNavigation = {
