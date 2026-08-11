@@ -2620,6 +2620,10 @@ export class RuntimeViewFacade {
           ? this.monitorText(monitorBookletErrorTextKeys[openRun.bookletError])
           : null;
         const monitorState = resolveOpenMonitorRunSuperState(openRun);
+        const batchSelectable =
+          !openRun.bookletError && monitorState !== "pending";
+        const cohortSelectable =
+          batchSelectable && monitorState !== "locked";
         const controllerState = openRun.testState.CONTROLLER ?? "PENDING";
 
         return {
@@ -2765,16 +2769,31 @@ export class RuntimeViewFacade {
             bookletSpecies: openRun.bookletSpecies ?? "",
             displayName: displayName ?? ""
           },
-          actions: openRun.bookletError || this.monitorAutoSelectAllActive
+          actions: !batchSelectable || this.monitorAutoSelectAllActive
             ? []
             : [
                 {
                   label: batchSelected ? "Remove from Batch" : "Add to Batch",
                   payload: {
                     monitorBatchCommand: "toggle",
-                    testRunId: openRun.testRunId
+                    testRunId: openRun.testRunId,
+                    bookletSpecies: openRun.bookletSpecies ?? ""
                   }
-                }
+                },
+                ...(cohortSelectable &&
+                  highlightBookletSpecies &&
+                  openRun.bookletSpecies
+                  ? [
+                      {
+                        label: "Select Species Cohort",
+                        payload: {
+                          monitorBatchCommand: "select-species",
+                          testRunId: openRun.testRunId,
+                          bookletSpecies: openRun.bookletSpecies
+                        }
+                      }
+                    ]
+                  : [])
               ]
         };
       })
@@ -4780,6 +4799,24 @@ export class RuntimeViewFacade {
     if (!testRunId) {
       return;
     }
+    if (item.actionPayload?.monitorBatchCommand === "select-species") {
+      if (this.monitorAutoSelectAllActive) {
+        return;
+      }
+      const bookletSpecies = item.actionPayload.bookletSpecies?.trim();
+      if (!bookletSpecies) {
+        return;
+      }
+      const cohortRunIds = this.commandSafeVisibleMonitorRuns
+        .filter(openRun => openRun.bookletSpecies === bookletSpecies)
+        .map(openRun => openRun.testRunId);
+      this.monitorBatchSelection.clear();
+      for (const cohortRunId of cohortRunIds) {
+        this.monitorBatchSelection.add(cohortRunId);
+      }
+      this.uiState.renderVersion.update(version => version + 1);
+      return;
+    }
     if (item.actionPayload?.monitorBatchCommand === "toggle") {
       if (this.monitorAutoSelectAllActive) {
         return;
@@ -5190,7 +5227,14 @@ export class RuntimeViewFacade {
   }
 
   private get commandSafeVisibleMonitorRuns(): OpenMonitorRun[] {
-    return this.visibleOpenMonitorRuns.filter(openRun => !openRun.bookletError);
+    return this.visibleOpenMonitorRuns.filter(openRun => {
+      const monitorState = resolveOpenMonitorRunSuperState(openRun);
+      return (
+        !openRun.bookletError &&
+        monitorState !== "pending" &&
+        monitorState !== "locked"
+      );
+    });
   }
 
   private sortMonitorRuns(openRuns: OpenMonitorRun[]): OpenMonitorRun[] {

@@ -13291,9 +13291,17 @@ try {
           items: [
             {
               ...template,
-              testRunId: `${template.testRunId}:species-beta`,
-              participantSessionId: `${template.participantSessionId}:species-beta`,
-              loginKey: `${template.loginKey}-species-beta`,
+              testRunId: `${template.testRunId}:species-beta-one`,
+              participantSessionId: `${template.participantSessionId}:species-beta-one`,
+              loginKey: `${template.loginKey}-species-beta-one`,
+              participantRosterEntry: null,
+              bookletSpecies: "beta"
+            },
+            {
+              ...template,
+              testRunId: `${template.testRunId}:species-beta-two`,
+              participantSessionId: `${template.participantSessionId}:species-beta-two`,
+              loginKey: `${template.loginKey}-species-beta-two`,
               participantRosterEntry: null,
               bookletSpecies: "beta"
             },
@@ -13324,7 +13332,7 @@ try {
   await speciesMonitorRunCards.first().waitFor();
   assert.equal(
     await speciesMonitorRunCards.count(),
-    2,
+    3,
     "Every run must be species-highlighted when multiple Booklet species are visible."
   );
   const speciesBackgrounds = await speciesMonitorRunCards.evaluateAll(cards =>
@@ -13335,6 +13343,31 @@ try {
     2,
     "Different visible Booklet species must receive deterministic distinct surfaces."
   );
+  await speciesMonitorRunCards
+    .filter({ hasText: `${participantLoginKey}-species-beta-one` })
+    .getByRole("button", { name: "Select Species Cohort" })
+    .click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "2 run" })
+    .filter({ hasText: "1 booklet" })
+    .waitFor();
+  const selectedSpeciesRunIds = await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Monitor Batch Command Preview" })
+    })
+    .locator("li code")
+    .allTextContents();
+  assert.deepEqual(
+    new Set(selectedSpeciesRunIds),
+    new Set([
+      `${pausedTestRunId}:species-beta-one`,
+      `${pausedTestRunId}:species-beta-two`
+    ]),
+    "Species-cohort selection must replace the batch with every visible run of the chosen species."
+  );
+  await page.locator("#clearMonitorBatchSelectionButton").click();
   while (monitorSpeciesRouteOperations.size > 0) {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
