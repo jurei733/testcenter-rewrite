@@ -741,6 +741,16 @@ SQLite integration stores; a production-built protected SQLite browser gate
 also proves reload-safe platform access, confirmed deletion, directory cleanup,
 audit retention, and return to the original workspace.
 
+The Original Superadmin's symmetric permission presentation is now reproduced
+in both directions. Angular can project all visible administrators for one
+workspace or every visible workspace in one tenant for a selected
+administrator. Both matrices distinguish direct RO/RW assignments from
+inherited tenant/platform write access and route grant, mode change, and
+confirmed revocation through the same delegated, audited role boundary. A
+production SQLite/Chromium gate exercises RO to RW to RO, revoke, and fresh RO
+grant from the administrator-centred direction in addition to the existing
+workspace-centred gate.
+
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
 | Response inspection/export | workspace results | done | P1 | detailed filters, explicit session/test-run identity on response cards, run drill-down, CSV |

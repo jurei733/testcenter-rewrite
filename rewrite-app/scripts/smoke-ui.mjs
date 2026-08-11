@@ -2660,6 +2660,119 @@ try {
       )
   );
 
+  await expectInputValue("#adminWorkspaceMatrixTenantKey", tenantKey);
+  await expectInputValue("#adminWorkspaceMatrixUserId", workspaceAdminUserId);
+  await expectButtonSelectorEnabled("#refreshAdminWorkspaceAccessMatrixButton");
+  await page.locator("#refreshAdminWorkspaceAccessMatrixButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Admin Workspace Access",
+        exact: true
+      })
+    })
+    .locator(".record-card")
+    .filter({ hasText: workspaceKey })
+    .filter({ hasText: "Read only (RO)" })
+    .filter({ hasText: "workspace role" })
+    .waitFor();
+
+  logStep("admin-workspace-access-matrix-read-write");
+  await clickCardAction("Admin Workspace Access", "Set Read Write");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_write"
+          )
+      )
+  );
+  logStep("admin-workspace-access-matrix-read-only");
+  await clickCardAction("Admin Workspace Access", "Set Read Only");
+  const adminWorkspaceReadOnlyUsers = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_only"
+          )
+      )
+  );
+  const adminWorkspaceRoleAssignmentId =
+    adminWorkspaceReadOnlyUsers.items
+      .find(item => item?.adminUser?.adminUserId === workspaceAdminUserId)
+      ?.roleAssignments?.find(
+        roleAssignment => roleAssignment?.role === "workspace_admin"
+      )?.roleAssignmentId;
+  assert.ok(
+    adminWorkspaceRoleAssignmentId,
+    "UI smoke expected a workspace role assignment in the admin-centred matrix."
+  );
+
+  logStep("admin-workspace-access-matrix-revoke");
+  const revokeAdminWorkspaceAccessDialog = acceptAppConfirmation(
+    /Revoke role assignment\?/,
+    new RegExp(
+      `Revoke role assignment '${adminWorkspaceRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
+    )
+  );
+  await clickCardAction("Admin Workspace Access", "Revoke Access");
+  await revokeAdminWorkspaceAccessDialog;
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          !item.roleAssignments?.some(
+            roleAssignment => roleAssignment?.role === "workspace_admin"
+          )
+      )
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Admin Workspace Access",
+        exact: true
+      })
+    })
+    .locator(".record-card")
+    .filter({ hasText: workspaceKey })
+    .filter({ hasText: "No workspace access" })
+    .waitFor();
+
+  logStep("admin-workspace-access-matrix-grant-read-only");
+  await clickCardAction("Admin Workspace Access", "Grant Read Only");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_only"
+          )
+      )
+  );
+  stopAfter("admin-workspace-access-matrix");
+
   await fillAndCommit("#adminRoleTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminRoleRole", "tenant_admin");
   await fillAndCommit("#adminRoleTenantKey", tenantKey);

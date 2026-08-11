@@ -244,6 +244,8 @@ export class OpsViewFacade {
   adminCustomTextsUpdateDraft = "{}";
   private workspaceAdminMatrixTenantKey = "";
   private workspaceAdminMatrixWorkspaceKey = "";
+  private adminWorkspaceMatrixTenantKey = "";
+  private adminWorkspaceMatrixUserId = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -1164,6 +1166,28 @@ export class OpsViewFacade {
     });
   }
 
+  get canRefreshAdminWorkspaceAccessMatrix(): boolean {
+    return (
+      this.canUseAdminSession &&
+      !!this.workspace.tenantKey.trim() &&
+      !!this.ops.adminRoleTargetUserId.trim()
+    );
+  }
+
+  refreshAdminWorkspaceAccessMatrix(): void {
+    if (!this.canRefreshAdminWorkspaceAccessMatrix) {
+      return;
+    }
+    const tenantKey = this.workspace.tenantKey.trim();
+    const adminUserId = this.ops.adminRoleTargetUserId.trim();
+    this.viewState.onActionAsync(async () => {
+      await this.workspaceService.refreshWorkspaceDirectory();
+      await this.opsService.refreshAdminUsers();
+      this.adminWorkspaceMatrixTenantKey = tenantKey;
+      this.adminWorkspaceMatrixUserId = adminUserId;
+    });
+  }
+
   exportAdminUsersCsv(): void {
     if (!this.canUseAdminSession) {
       return;
@@ -1780,6 +1804,39 @@ export class OpsViewFacade {
     this.ops.adminRoleAccessMode = command;
     this.ops.adminRoleTenantKey = this.workspaceAdminMatrixTenantKey;
     this.ops.adminRoleWorkspaceKey = this.workspaceAdminMatrixWorkspaceKey;
+    this.ops.adminRoleGroupKey = "";
+    this.persistState();
+    this.assignAdminRole();
+  }
+
+  runAdminWorkspaceAccessAction(item: RecordCollectionItem): void {
+    const command = item.actionPayload?.adminWorkspaceAccessCommand;
+    const workspaceKey = item.actionPayload?.workspaceKey?.trim();
+    const roleAssignmentId = item.actionPayload?.roleAssignmentId?.trim();
+    const adminUserId = this.adminWorkspaceMatrixUserId;
+    if (!adminUserId || !workspaceKey) {
+      return;
+    }
+
+    if (command === "revoke") {
+      if (!roleAssignmentId) {
+        return;
+      }
+      this.ops.adminRevokeTargetUserId = adminUserId;
+      this.ops.adminRevokeRoleAssignmentId = roleAssignmentId;
+      this.persistState();
+      void this.confirmRevokeAdminRole();
+      return;
+    }
+
+    if (command !== "read_only" && command !== "read_write") {
+      return;
+    }
+    this.ops.adminRoleTargetUserId = adminUserId;
+    this.ops.adminRoleRole = "workspace_admin";
+    this.ops.adminRoleAccessMode = command;
+    this.ops.adminRoleTenantKey = this.adminWorkspaceMatrixTenantKey;
+    this.ops.adminRoleWorkspaceKey = workspaceKey;
     this.ops.adminRoleGroupKey = "";
     this.persistState();
     this.assignAdminRole();
@@ -2659,6 +2716,159 @@ export class OpsViewFacade {
         ]
       },
       ...userItems
+    ];
+  }
+
+  get adminWorkspaceAccessMatrixItems(): RecordCollectionItem[] {
+    const adminUsers = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    const workspaces = parseJsonDocument<ListWorkspacesResponse>(
+      this.workspace.workspacesView
+    );
+    const tenantKey = this.adminWorkspaceMatrixTenantKey;
+    const adminUserId = this.adminWorkspaceMatrixUserId;
+    if (
+      tenantKey !== this.workspace.tenantKey.trim() ||
+      adminUserId !== this.ops.adminRoleTargetUserId.trim()
+    ) {
+      return [];
+    }
+    const adminUser = adminUsers?.items.find(
+      item => item.adminUser.adminUserId === adminUserId
+    );
+    if (!adminUser || !workspaces) {
+      return [];
+    }
+
+    const workspaceItems: RecordCollectionItem[] = [...workspaces.items]
+      .sort((left, right) => left.displayName.localeCompare(right.displayName))
+      .map(workspace => {
+        const platformAssignment = adminUser.roleAssignments.find(
+          roleAssignment => roleAssignment.role === "platform_admin"
+        );
+        const tenantAssignment = adminUser.roleAssignments.find(
+          roleAssignment =>
+            roleAssignment.role === "tenant_admin" &&
+            roleAssignment.tenantId === workspace.tenantId
+        );
+        const workspaceAssignment = adminUser.roleAssignments.find(
+          roleAssignment =>
+            roleAssignment.role === "workspace_admin" &&
+            roleAssignment.workspaceId === workspace.workspaceId
+        );
+        const inheritedAssignment = platformAssignment ?? tenantAssignment;
+        const accessMode = inheritedAssignment
+          ? "read_write"
+          : workspaceAssignment?.accessMode ?? "none";
+        const inheritedLabel = platformAssignment
+          ? "platform admin"
+          : tenantAssignment
+            ? "tenant admin"
+            : "";
+        const actions = inheritedAssignment
+          ? []
+          : workspaceAssignment
+            ? [
+                {
+                  label: "Revoke Access",
+                  payload: {
+                    adminWorkspaceAccessCommand: "revoke",
+                    workspaceKey: workspace.workspaceKey,
+                    roleAssignmentId: workspaceAssignment.roleAssignmentId
+                  }
+                }
+              ]
+            : [
+                {
+                  label: "Grant Read Write",
+                  payload: {
+                    adminWorkspaceAccessCommand: "read_write",
+                    workspaceKey: workspace.workspaceKey
+                  }
+                }
+              ];
+        return {
+          headline: workspace.displayName,
+          subline: workspace.workspaceKey,
+          badges: [
+            workspace.status,
+            accessMode === "none" ? "no access" : accessMode,
+            ...(inheritedLabel ? [`inherited ${inheritedLabel}`] : [])
+          ],
+          rows: [
+            { label: "Workspace ID", value: workspace.workspaceId },
+            {
+              label: "Effective Access",
+              value:
+                accessMode === "read_write"
+                  ? "Read and write (RW)"
+                  : accessMode === "read_only"
+                    ? "Read only (RO)"
+                    : "No workspace access"
+            },
+            {
+              label: "Access Source",
+              value:
+                inheritedLabel || (workspaceAssignment ? "workspace role" : "none")
+            },
+            {
+              label: "Role Assignment ID",
+              value:
+                inheritedAssignment?.roleAssignmentId ??
+                workspaceAssignment?.roleAssignmentId ??
+                "none"
+            }
+          ],
+          ...(inheritedAssignment
+            ? {}
+            : {
+                actionLabel:
+                  accessMode === "read_only"
+                    ? "Set Read Write"
+                    : accessMode === "read_write"
+                      ? "Set Read Only"
+                      : "Grant Read Only",
+                actionPayload: {
+                  adminWorkspaceAccessCommand:
+                    accessMode === "read_only" ? "read_write" : "read_only",
+                  workspaceKey: workspace.workspaceKey,
+                  roleAssignmentId: workspaceAssignment?.roleAssignmentId ?? ""
+                },
+                actions
+              })
+        } satisfies RecordCollectionItem;
+      });
+
+    return [
+      {
+        headline: adminUser.adminUser.username,
+        subline: adminUser.adminUser.displayName,
+        badges: [adminUser.adminUser.status, `${workspaceItems.length} workspace(s)`],
+        rows: [
+          { label: "Admin User ID", value: adminUser.adminUser.adminUserId },
+          { label: "Tenant Key", value: tenantKey },
+          {
+            label: "Read Write",
+            value: String(
+              workspaceItems.filter(item => item.badges.includes("read_write")).length
+            )
+          },
+          {
+            label: "Read Only",
+            value: String(
+              workspaceItems.filter(item => item.badges.includes("read_only")).length
+            )
+          },
+          {
+            label: "No Access",
+            value: String(
+              workspaceItems.filter(item => item.badges.includes("no access")).length
+            )
+          }
+        ]
+      },
+      ...workspaceItems
     ];
   }
 

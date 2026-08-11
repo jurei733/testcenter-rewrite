@@ -778,6 +778,38 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Sign in with an administrative delegation role, then refresh admin users."
       ></app-record-collection>
 
+      <article id="adminWorkspaceAccessMatrixCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Original Superadmin parity</span>
+            <h2>Admin Workspace Access Matrix</h2>
+          </div>
+          <span class="status-pill">RO / RW</span>
+        </div>
+        <p>Select an account from Admin Users, then review that administrator across every visible workspace in one tenant. Inherited platform or tenant access is explicit; direct workspace access can be granted, changed, or revoked through the existing delegation boundary.</p>
+        <div class="form-grid">
+          <label>
+            Tenant Key
+            <input id="adminWorkspaceMatrixTenantKey" name="adminWorkspaceMatrixTenantKey" [(ngModel)]="view.workspace.tenantKey" (change)="view.persistState()" />
+          </label>
+          <label>
+            Selected Admin User ID
+            <input id="adminWorkspaceMatrixUserId" name="adminWorkspaceMatrixUserId" readonly [value]="view.ops.adminRoleTargetUserId" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshAdminWorkspaceAccessMatrixButton" class="primary" type="button" [disabled]="!view.canRefreshAdminWorkspaceAccessMatrix" (click)="view.refreshAdminWorkspaceAccessMatrix()">Refresh Access Matrix</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Admin Workspace Access"
+        subtitle="Administrator-centred workspace access with effective inherited and direct RO/RW roles."
+        [items]="view.adminWorkspaceAccessMatrixItems"
+        (itemAction)="view.runAdminWorkspaceAccessAction($event)"
+        emptyState="Select an admin user, enter a tenant key, then refresh the access matrix."
+      ></app-record-collection>
+
       <article id="workspaceAdminAccessMatrixCard" class="card">
         <div class="section-heading">
           <div>
