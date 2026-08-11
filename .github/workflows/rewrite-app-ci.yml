@@ -10,6 +10,12 @@ on:
       - ".github/workflows/rewrite-app-ci.yml"
       - "rewrite-app/**"
 
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -18,6 +24,7 @@ jobs:
   verify-memory-sqlite:
     name: verify-memory-sqlite (${{ matrix.check }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: rewrite-app
@@ -31,11 +38,23 @@ jobs:
           - check: unit
             command: npm run test:unit
             playwright: false
+          - check: compatibility
+            command: npm run build && npm run test:compatibility:built
+            playwright: false
           - check: integration-memory
             command: npm run test:integration:memory
             playwright: false
+          - check: integration-file
+            command: npm run test:integration:file
+            playwright: false
           - check: integration-sqlite
             command: npm run test:integration:sqlite
+            playwright: false
+          - check: startup-file
+            command: npm run smoke:startup:file
+            playwright: false
+          - check: shutdown-file
+            command: npm run smoke:shutdown:file
             playwright: false
           - check: startup
             command: npm run smoke:startup:sqlite
@@ -60,7 +79,7 @@ jobs:
             playwright: true
           - check: local-demo
             command: npm run smoke:local-demo
-            playwright: true
+            playwright: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -76,6 +95,7 @@ jobs:
 
   verify-postgres:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: rewrite-app
@@ -107,11 +127,24 @@ jobs:
       - run: npm run build
       - run: npm run db:migrate:postgres:built
       - run: npm run db:doctor:postgres:built
+      - name: Run Postgres runtime preflight
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_STORE=postgres \
+          RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true \
+          npm run preflight:runtime:built
       - run: npm run test:integration:postgres:built
-      - run: npm run smoke:startup:postgres:built
+      - name: Run protected Postgres startup smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true \
+          npm run smoke:startup:postgres:built
 
   verify-postgres-ui:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: rewrite-app
@@ -144,17 +177,68 @@ jobs:
       - run: npm run build
       - run: npm run smoke:ui:postgres:built
 
-  docker-compose-release-smoke:
+  deployability:
+    name: Deployability preflight
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: rewrite-app
-    env:
-      APP_BUILD_SHA: ${{ github.sha }}
-      APP_BUILD_TIMESTAMP: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node ./scripts/smoke-compose-postgres.mjs
+          cache: npm
+          cache-dependency-path: rewrite-app/package-lock.json
+      - run: npm ci
+      - name: Run metadata-required file and SQLite gates
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          npm run ci:deployability
+
+  docker-image-runtime-smoke:
+    name: Docker image runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and run production image smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          DOCKER_IMAGE_TAG="testcenter-rewrite-app:${GITHUB_SHA::12}" \
+          npm run smoke:docker:runtime
+
+  docker-compose-release-smoke:
+    name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        bootstrap-demo: ["false", "true"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rewrite-app/package-lock.json
+      - run: npm ci
+      - name: Run compose release smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_BOOTSTRAP_DEMO="${{ matrix.bootstrap-demo }}" \
+          npm run smoke:compose:postgres

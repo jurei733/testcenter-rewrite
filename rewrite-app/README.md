@@ -752,9 +752,10 @@ For runtime probes:
 
 ## CI / Deployability
 
-- [ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
+- [rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) is the repository-root workflow GitHub executes and verifies:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts and file-store helpers
+  - the built original Testcenter compatibility corpus
   - built runtime preflight against file, SQLite, and Postgres stores
   - metadata-required file/SQLite deployability preflight plus built startup smoke
   - memory + file + sqlite integration matrix
@@ -762,7 +763,7 @@ For runtime probes:
   - protected browser-driven Angular UI smoke against a Postgres service database
   - file and SQLite startup/shutdown, grouped quick/review/monitor/ops browser suites, full browser, and local-demo smokes as isolated matrix jobs
   - standalone production Docker image runtime smoke with image-time artifact preflight, in-container SQLite migration, non-root API start, and `/readyz`/`/manifest`/`/app` verification
-  - Docker compose release smoke with explicit migrate, preflight, and api roles
+  - Docker compose release smoke with explicit migrate, preflight, and api roles in both demo-disabled and demo-enabled modes
 - [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/file/SQLite integration plus file/SQLite startup/shutdown, `ci:browser:quick` (including the offline App-Shell gate), `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for file/SQLite metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
