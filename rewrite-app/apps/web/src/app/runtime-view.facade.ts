@@ -2612,6 +2612,17 @@ export class RuntimeViewFacade {
           this.commandSafeVisibleMonitorRuns.map(openRun => openRun.testRunId)
         )
       : null;
+    const selectedTargetBlockKey =
+      this.selectedMonitorBlockNavigationTargets.find(
+        target =>
+          target.targetUnitKey === this.runtime.monitorTargetUnitKey.trim()
+      )?.blockKey ?? null;
+    const selectedTargetRun = visibleOpenMonitorRuns.find(
+      openRun => openRun.testRunId === this.runtime.testRunId.trim()
+    );
+    const selectedTargetSpecies = selectedTargetRun
+      ? selectedTargetRun.bookletSpecies ?? selectedTargetRun.bookletKey
+      : null;
     return (
       visibleOpenMonitorRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
@@ -2672,6 +2683,12 @@ export class RuntimeViewFacade {
               compactLabel: `${index + 1}/${openRun.unitPath?.length ?? 0}`,
               current: unit.current,
               complete: unit.answered,
+              selected:
+                batchSelected &&
+                selectedTargetBlockKey !== null &&
+                unit.blockKey === selectedTargetBlockKey &&
+                (openRun.bookletSpecies ?? openRun.bookletKey) ===
+                  selectedTargetSpecies,
               ...(cohortSelectable && blockTarget
                 ? {
                     actionLabel: `Select ${blockTarget.blockLabel} for monitor jump`,

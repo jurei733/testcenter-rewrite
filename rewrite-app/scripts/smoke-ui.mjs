@@ -13780,17 +13780,44 @@ try {
     "#monitorTargetUnitKey",
     speciesReferenceTarget.targetUnitKey
   );
+  assert.equal(
+    await betaOneBlockTargetButton.getAttribute("aria-pressed"),
+    "true",
+    "The first block activation must visibly select the origin run target."
+  );
   await betaOneBlockTargetButton.click();
   await page
     .locator("#monitorBatchSelectionStatus")
     .filter({ hasText: "2 run" })
     .filter({ hasText: "1 booklet" })
     .waitFor();
+  const pressedBetaBlockTarget = page.getByRole("button", {
+    name: `Select ${speciesReferenceTarget.blockLabel} for monitor jump`,
+    pressed: true
+  });
+  const betaSpeciesSelectedRunCards = speciesMonitorRunCards
+    .filter({ hasText: `${participantLoginKey}-species-beta` })
+    .filter({ has: pressedBetaBlockTarget });
+  assert.equal(
+    await betaSpeciesSelectedRunCards.count(),
+    2,
+    "The second block activation must mark the matching target across the selected species cohort."
+  );
   await betaOneBlockTargetButton.click();
   await page
     .locator("#monitorBatchSelectionStatus")
     .filter({ hasText: "UI No Runs Selected" })
     .waitFor();
+  assert.equal(
+    await speciesMonitorRunCards
+      .getByRole("button", {
+        name: `Select ${speciesReferenceTarget.blockLabel} for monitor jump`,
+        pressed: true
+      })
+      .count(),
+    0,
+    "The third block activation must clear every selected target marker."
+  );
   await page.locator("#monitorResetDisplayOptionsButton").click();
   await betaOneMonitorRunCard
     .getByRole("button", { name: "Select Species Cohort" })

@@ -24,6 +24,7 @@ export type RecordCollectionProgressStep = {
   compactLabel: string;
   current?: boolean;
   complete?: boolean;
+  selected?: boolean;
   actionLabel?: string;
   actionPayload?: Record<string, string>;
 };
@@ -100,6 +101,7 @@ export type RecordCollectionItem = {
               *ngFor="let step of item.progressSteps"
               [class.is-current]="step.current"
               [class.is-complete]="step.complete"
+              [class.is-target-selected]="step.selected"
               [class.has-action]="step.actionPayload"
               [attr.data-progress-key]="step.key"
               [attr.aria-current]="step.current ? 'step' : null"
@@ -111,6 +113,7 @@ export type RecordCollectionItem = {
                 class="record-card-progress-action"
                 type="button"
                 [attr.aria-label]="step.actionLabel ?? step.label"
+                [attr.aria-pressed]="step.selected ? 'true' : 'false'"
                 (click)="emitProgressAction(item, step)"
               >
                 <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
