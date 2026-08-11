@@ -1737,10 +1737,15 @@ try {
     const systemCheckSourceDocument = (await readFile(
       resolve("test-fixtures/original-testcenter/system-checks/SysCheck.xml"),
       "utf8"
-    )).replace(
-      '    <Q id="1"',
-      '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n\n    <Q id="1"'
-    );
+    ))
+      .replace(
+        '    <Q id="1"',
+        '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n\n    <Q id="1"'
+      )
+      .replace(
+        '<Q id="1" type="header" prompt="Beispielüberschrift"/>',
+        '<Q id="1" type="header" prompt="Fallback heading">UI authored heading</Q>'
+      );
     const systemCheckUnitDocument = (await readFile(
       resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
       "utf8"
@@ -1876,6 +1881,9 @@ try {
       .waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page
+      .getByRole("heading", { name: "UI authored heading", exact: true })
+      .waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");
     await selectAndCommit("#systemCheckQuestion-3", "Option B");
     await fillAndCommit("#systemCheckQuestion-4", "Browser flow verified");

@@ -175,7 +175,10 @@ type ThroughputResult = {
           <p id="systemCheckQuestionsIntro">{{ customText('syscheck_questionsintro', 'Please answer all fields marked as required.') }}</p>
           <div class="system-check-questionnaire">
             <ng-container *ngFor="let question of check.questions">
-              <h3 *ngIf="question.type === 'header'">{{ question.prompt }}</h3>
+              <h3
+                *ngIf="question.type === 'header'"
+                [id]="'systemCheckQuestionHeader-' + question.id"
+              >{{ question.options.length > 0 ? question.options.join(',') : question.prompt }}</h3>
               <label *ngIf="question.type === 'string'">
                 {{ question.prompt }}{{ question.required ? ' *' : '' }}
                 <input [id]="'systemCheckQuestion-' + question.id" [(ngModel)]="answers[question.id]" />

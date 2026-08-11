@@ -36579,6 +36579,10 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     )
     .replace('maxErrorsPerSequence="0"', 'maxErrorsPerSequence="-2"')
     .replace('maxSequenceRepetitions="15"', 'maxSequenceRepetitions="-15"')
+    .replace(
+      '<Q id="1" type="header" prompt="Beispielüberschrift"/>',
+      '<Q id="1" type="header" prompt="Fallback heading">Authored heading</Q>'
+    )
     .replace('skipnetwork="false"', 'skipnetwork="0"')
     .replace('required="true"', 'required="1"')
     .replace('<Q id="3"', '<Q id="3" required="0"');
@@ -36747,6 +36751,7 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.equal(configuration?.canSave, true);
   assert.equal(configuration?.skipNetwork, false);
   assert.equal(configuration?.questions.length, 6);
+  assert.deepEqual(configuration?.questions[0]?.options, ["Authored heading"]);
   assert.equal(configuration?.questions[1]?.required, true);
   assert.deepEqual(configuration?.questions[2]?.options, ["Option A", "Option B"]);
   assert.equal(configuration?.uploadSpeed.min, -1024);
