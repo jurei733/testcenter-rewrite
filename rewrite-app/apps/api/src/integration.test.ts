@@ -14483,7 +14483,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
           "  <Metadata />",
           '  <Group id="unicode-digits" label="Unicode digits">',
           '    <Login mode="run-hot-return" name="unicode-digit-participant">',
-          `      <Booklet state="${unicodeStateKey}:${unicodeOptionKey}">BOOKLET.SAMPLE-2</Booklet>`,
+          `      <Booklet state="${unicodeStateKey}:${unicodeOptionKey};bonus:yes">BOOKLET.SAMPLE-2</Booklet>`,
           "    </Login>",
           "  </Group>",
           "</Testtakers>"
@@ -14498,7 +14498,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
     )?.bookletStatePresets,
     {
       "BOOKLET.SAMPLE-2": {
-        [unicodeStateKey]: unicodeOptionKey
+        [unicodeStateKey]: unicodeOptionKey,
+        bonus: "yes"
       }
     }
   );

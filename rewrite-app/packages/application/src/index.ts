@@ -8974,7 +8974,7 @@ const isTestcenterXmlId = (value: string): boolean =>
 const testcenterXmlSchemaStateIdPattern = /^[a-z\p{Nd}-]+$/u;
 const testcenterXmlSchemaVariableFormatPattern = /^[a-z\p{Nd}-]*$/u;
 const testcenterXmlSchemaStatePresetPattern =
-  /^[a-z\p{Nd}-]+:[a-z\p{Nd}-]+(?:\s*,\s*[a-z\p{Nd}-]+:[a-z\p{Nd}-]+)*$/u;
+  /^[a-z\p{Nd}-]+:[a-z\p{Nd}-]+(?:\s*[,;]\s*[a-z\p{Nd}-]+:[a-z\p{Nd}-]+)*$/u;
 
 const testcenterBookletVariableSourceNames = [
   "Code",
