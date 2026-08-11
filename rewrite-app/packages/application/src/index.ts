@@ -15986,22 +15986,50 @@ const collectTestcenterAdaptiveVariableReferences = (
   if (!states) {
     return [];
   }
+  const comparisonNames = [
+    "equal",
+    "notEqual",
+    "greaterThan",
+    "lowerThan"
+  ] as const;
+  const belongsToExecutableCondition = (source: XmlElement): boolean => {
+    let ancestor = source.parentNode;
+    while (ancestor && ancestor !== states) {
+      if (ancestor.nodeType === 1) {
+        const ancestorElement = ancestor as XmlElement;
+        if (xmlElementLocalName(ancestorElement) === "If") {
+          const expression = xmlChildrenNamed(ancestorElement, "Is")[0];
+          return Boolean(
+            expression &&
+              comparisonNames.some(
+                comparisonName =>
+                  expression.getAttribute(comparisonName) !== null
+              )
+          );
+        }
+      }
+      ancestor = ancestor.parentNode;
+    }
+    return false;
+  };
   return testcenterBookletVariableSourceNames.flatMap(sourceType =>
-    xmlDescendantsNamed(states, sourceType).flatMap(source => {
-      const unitRuntimeKey = source.getAttribute("from")?.trim() ?? "";
-      const variableId = source.getAttribute("of")?.trim() ?? "";
-      const unitId = unitIdByRuntimeKey.get(unitRuntimeKey) ?? "";
-      return unitRuntimeKey && variableId && unitId
-        ? [{
-            bookletFileName,
-            bookletId,
-            unitRuntimeKey,
-            unitId,
-            variableId,
-            sourceType
-          }]
-        : [];
-    })
+    xmlDescendantsNamed(states, sourceType)
+      .filter(belongsToExecutableCondition)
+      .flatMap(source => {
+        const unitRuntimeKey = source.getAttribute("from")?.trim() ?? "";
+        const variableId = source.getAttribute("of")?.trim() ?? "";
+        const unitId = unitIdByRuntimeKey.get(unitRuntimeKey) ?? "";
+        return unitRuntimeKey && variableId && unitId
+          ? [{
+              bookletFileName,
+              bookletId,
+              unitRuntimeKey,
+              unitId,
+              variableId,
+              sourceType
+            }]
+          : [];
+      })
   );
 };
 

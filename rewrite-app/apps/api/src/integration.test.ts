@@ -15866,6 +15866,61 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
   assert.equal(invalidVariableImport.body.stagedContentRelease, null);
 
+  const emptyExpressionBookletDocument = bookletDocument.replace(
+    '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
+    '<If><Value of="missing_var" from="decision-unit" /><Is /></If>'
+  );
+  assert.notEqual(emptyExpressionBookletDocument, bookletDocument);
+  const emptyExpressionPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-adaptive-empty-expression.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createAdaptiveZipPayload(
+        emptyExpressionBookletDocument
+      )}`
+    }
+  });
+  const emptyExpressionImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          stateEntries?: Array<{
+            stateKey: string;
+            options: Array<{
+              optionKey: string;
+              conditions: unknown[];
+            }>;
+          }>;
+        }>;
+      };
+    } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: emptyExpressionPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(emptyExpressionImport.status, 201);
+  assert.equal(
+    emptyExpressionImport.body.importJob.status,
+    "completed",
+    JSON.stringify(emptyExpressionImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(emptyExpressionImport.body.importJob.diagnostics, []);
+  const emptyExpressionOption =
+    emptyExpressionImport.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0]?.stateEntries?.find(state => state.stateKey === "level")
+      ?.options.find(option => option.optionKey === "advanced");
+  assert.deepEqual(
+    emptyExpressionOption?.conditions,
+    [],
+    "An empty Is must not retain its non-executable variable dependency."
+  );
+
   const externalVariablesDocument = `
     <Variables>
       <BaseVariables>
