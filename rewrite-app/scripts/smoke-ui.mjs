@@ -15369,6 +15369,8 @@ try {
   await fillAndCommit("#sourcePackageMediaTypeFilter", "application/xml");
   await fillAndCommit("#sourcePackageFileNameFilter", retriedSourcePackageFileName);
   await selectAndCommit("#sourcePackageLatestImportStatusFilter", "completed");
+  await selectAndCommit("#sourcePackageSortBy", "fileSize");
+  await selectAndCommit("#sourcePackageSortDirection", "desc");
   await fillAndCommit("#sourcePackageLimit", "1");
   await selectAndCommit("#importJobStatusFilter", "completed");
   await fillAndCommit("#importJobSourcePackageFilter", failedSourcePackageId);
@@ -15377,7 +15379,16 @@ try {
   await fillAndCommit("#contentReleaseImportJobFilter", completedRetryImportJobId);
   await fillAndCommit("#contentReleaseSourcePackageFilter", failedSourcePackageId);
   await fillAndCommit("#contentReleaseLimit", "1");
+  const sortedSourcePackageRequest = page.waitForRequest(request => {
+    const url = new URL(request.url());
+    return (
+      url.pathname.endsWith("/source-packages") &&
+      url.searchParams.get("sortBy") === "fileSize" &&
+      url.searchParams.get("sortDirection") === "desc"
+    );
+  });
   await clickContentFilterApply();
+  await sortedSourcePackageRequest;
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
@@ -15388,6 +15399,8 @@ try {
     .filter({ hasText: "limit 1" })
     .filter({ hasText: "Loaded Records" })
     .filter({ hasText: "status, file type, media type, file name, latest import" })
+    .filter({ hasText: "Sort" })
+    .filter({ hasText: "fileSize desc" })
     .waitFor();
   await page
     .locator("article.card")

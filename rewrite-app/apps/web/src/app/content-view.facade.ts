@@ -270,6 +270,8 @@ export class ContentViewFacade {
     this.content.sourcePackageMediaTypeFilter = "";
     this.content.sourcePackageFileNameFilter = "";
     this.content.sourcePackageLatestImportStatusFilter = "";
+    this.content.sourcePackageSortBy = "fileName";
+    this.content.sourcePackageSortDirection = "asc";
     this.content.sourcePackageLimit = "100";
     this.content.importJobStatusFilter = "";
     this.content.importJobSourcePackageFilter = "";
@@ -657,7 +659,11 @@ export class ContentViewFacade {
           this.content.sourcePackageLatestImportStatusFilter.trim()
             ? "latest import"
             : ""
-        ].filter(Boolean)
+        ].filter(Boolean),
+        [{
+          label: "Sort",
+          value: `${this.content.sourcePackageSortBy || "fileName"} ${this.content.sourcePackageSortDirection || "asc"}`
+        }]
       ),
       ...payload.items.map(item => ({
         headline: item.sourcePackage.fileName,
@@ -2604,7 +2610,8 @@ export class ContentViewFacade {
     recordLabel: string,
     loadedCount: number,
     limit: string,
-    activeFilters: string[]
+    activeFilters: string[],
+    additionalRows: RecordCollectionItem["rows"] = []
   ): RecordCollectionItem {
     return {
       headline,
@@ -2616,7 +2623,8 @@ export class ContentViewFacade {
         {
           label: "Active Filters",
           value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
-        }
+        },
+        ...additionalRows
       ]
     };
   }

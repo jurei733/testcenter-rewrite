@@ -2204,6 +2204,8 @@ export type SourcePackageListQuery = {
   mediaType?: string;
   fileName?: string;
   latestImportStatus?: ImportJobStatus;
+  sortBy?: "fileName" | "fileSize" | "uploadedAt";
+  sortDirection?: "asc" | "desc";
   limit?: number;
 };
 

@@ -174,6 +174,18 @@ export function createShellPersistenceStateHost(args: {
     set sourcePackageLatestImportStatusFilter(nextValue) {
       args.contentState.sourcePackageLatestImportStatusFilter = nextValue;
     },
+    get sourcePackageSortBy() {
+      return args.contentState.sourcePackageSortBy;
+    },
+    set sourcePackageSortBy(nextValue) {
+      args.contentState.sourcePackageSortBy = nextValue;
+    },
+    get sourcePackageSortDirection() {
+      return args.contentState.sourcePackageSortDirection;
+    },
+    set sourcePackageSortDirection(nextValue) {
+      args.contentState.sourcePackageSortDirection = nextValue;
+    },
     get sourcePackageLimit() {
       return args.contentState.sourcePackageLimit;
     },

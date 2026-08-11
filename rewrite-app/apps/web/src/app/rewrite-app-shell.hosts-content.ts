@@ -91,6 +91,8 @@ export function createContentReadsStateHost(args: {
           "latestImportStatus",
           args.contentState.sourcePackageLatestImportStatusFilter
         ],
+        ["sortBy", args.contentState.sourcePackageSortBy],
+        ["sortDirection", args.contentState.sourcePackageSortDirection],
         ["limit", args.contentState.sourcePackageLimit]
       ]
     );

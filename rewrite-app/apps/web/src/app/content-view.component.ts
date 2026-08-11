@@ -115,6 +115,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             </select>
           </label>
           <label>
+            Workspace File Sort
+            <select id="sourcePackageSortBy" name="sourcePackageSortBy" [(ngModel)]="view.content.sourcePackageSortBy" (change)="view.persistState()">
+              <option value="fileName">File name</option>
+              <option value="fileSize">Stored size</option>
+              <option value="uploadedAt">Upload time</option>
+            </select>
+          </label>
+          <label>
+            Workspace File Sort Direction
+            <select id="sourcePackageSortDirection" name="sourcePackageSortDirection" [(ngModel)]="view.content.sourcePackageSortDirection" (change)="view.persistState()">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+          <label>
             Source Package Limit
             <input id="sourcePackageLimit" name="sourcePackageLimit" inputmode="numeric" [(ngModel)]="view.content.sourcePackageLimit" (change)="view.persistState()" />
           </label>

@@ -24,6 +24,8 @@ export type ShellPersistenceTarget = {
   sourcePackageMediaTypeFilter: string;
   sourcePackageFileNameFilter: string;
   sourcePackageLatestImportStatusFilter: string;
+  sourcePackageSortBy: string;
+  sourcePackageSortDirection: string;
   sourcePackageLimit: string;
   importJobStatusFilter: string;
   importJobSourcePackageFilter: string;
@@ -161,6 +163,8 @@ export const createPersistedShellState = (
   sourcePackageFileNameFilter: target.sourcePackageFileNameFilter,
   sourcePackageLatestImportStatusFilter:
     target.sourcePackageLatestImportStatusFilter,
+  sourcePackageSortBy: target.sourcePackageSortBy,
+  sourcePackageSortDirection: target.sourcePackageSortDirection,
   sourcePackageLimit: target.sourcePackageLimit,
   importJobStatusFilter: target.importJobStatusFilter,
   importJobSourcePackageFilter: target.importJobSourcePackageFilter,
@@ -374,6 +378,13 @@ export const applyHydratedShellState = (
     hydrateString(
       snapshot.sourcePackageLatestImportStatusFilter,
       target.sourcePackageLatestImportStatusFilter
+    );
+  target.sourcePackageSortBy =
+    hydrateString(snapshot.sourcePackageSortBy, target.sourcePackageSortBy);
+  target.sourcePackageSortDirection =
+    hydrateString(
+      snapshot.sourcePackageSortDirection,
+      target.sourcePackageSortDirection
     );
   target.sourcePackageLimit =
     hydrateString(snapshot.sourcePackageLimit, target.sourcePackageLimit);

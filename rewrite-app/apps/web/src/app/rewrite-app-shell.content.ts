@@ -100,9 +100,14 @@ export function applyContentReads(
     `${payload.sourcePackages.items.length} package(s), ${payload.importJobs.items.length} import(s), ${payload.participantSessions.items.length} session(s), ${payload.contentReleases.items.length} release(s), ${failedImportCount} failed import(s)`
   );
 
+  const selectedSourcePackageId = host.getSourcePackageId();
   host.setSourcePackageId(
-    payload.sourcePackages.items[0]?.sourcePackage.sourcePackageId ??
-      host.getSourcePackageId()
+    payload.sourcePackages.items.some(
+      item => item.sourcePackage.sourcePackageId === selectedSourcePackageId
+    )
+      ? selectedSourcePackageId
+      : payload.sourcePackages.items[0]?.sourcePackage.sourcePackageId ??
+          selectedSourcePackageId
   );
   host.setImportJobId(
     payload.importJobs.items[0]?.importJob.importJobId ?? host.getImportJobId()

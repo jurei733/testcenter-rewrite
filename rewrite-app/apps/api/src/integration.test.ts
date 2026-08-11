@@ -9811,8 +9811,9 @@ test("workspace files are classified by original Testcenter type", async () => {
 
   const files = await requestJson<{
     items: Array<{
-      sourcePackage: { fileName: string };
+      sourcePackage: { sourcePackageId: string; fileName: string };
       fileType: string;
+      fileSizeBytes: number | null;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
   assert.equal(files.status, 200);
@@ -9832,6 +9833,67 @@ test("workspace files are classified by original Testcenter type", async () => {
   assert.deepEqual(
     booklets.body.items.map(item => [item.sourcePackage.fileName, item.fileType]),
     [["booklet.xml", "Booklet"]]
+  );
+
+  const filesByName = await requestJson<{
+    items: Array<{ sourcePackage: { fileName: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortBy=fileName&sortDirection=asc&limit=3`
+  );
+  assert.equal(filesByName.status, 200);
+  assert.deepEqual(
+    filesByName.body.items.map(item => item.sourcePackage.fileName),
+    ["booklet.xml", "delivery.zip", "participants.xml"]
+  );
+
+  const filesBySize = await requestJson<{
+    items: Array<{
+      sourcePackage: { fileName: string };
+      fileSizeBytes: number | null;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortBy=fileSize&sortDirection=desc&limit=2`
+  );
+  assert.equal(filesBySize.status, 200);
+  const expectedLargestFiles = [...files.body.items]
+    .sort((left, right) =>
+      (right.fileSizeBytes ?? -1) - (left.fileSizeBytes ?? -1) ||
+      left.sourcePackage.sourcePackageId.localeCompare(
+        right.sourcePackage.sourcePackageId
+      )
+    )
+    .slice(0, 2)
+    .map(item => item.sourcePackage.fileName);
+  assert.deepEqual(
+    filesBySize.body.items.map(item => item.sourcePackage.fileName),
+    expectedLargestFiles
+  );
+
+  const sortedCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/source-packages.csv?sortBy=fileName&sortDirection=desc&limit=2`
+  );
+  assert.equal(sortedCsv.status, 200);
+  assert.ok(
+    sortedCsv.body.indexOf('"unit.xml"') <
+      sortedCsv.body.indexOf('"system-check.xml"')
+  );
+
+  const invalidSortField = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortBy=unknown`
+  );
+  assert.equal(invalidSortField.status, 400);
+  assert.equal(
+    invalidSortField.body.error,
+    "source_package_sort_field_invalid"
+  );
+
+  const invalidSortDirection = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?sortDirection=sideways`
+  );
+  assert.equal(invalidSortDirection.status, 400);
+  assert.equal(
+    invalidSortDirection.body.error,
+    "source_package_sort_direction_invalid"
   );
 });
 

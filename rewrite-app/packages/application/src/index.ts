@@ -369,6 +369,8 @@ export type WorkspaceAdminReadPort = {
     mediaType?: string;
     fileName?: string;
     latestImportStatus?: ImportJobStatus;
+    sortBy?: "fileName" | "fileSize" | "uploadedAt";
+    sortDirection?: "asc" | "desc";
     limit?: number;
   }): Promise<WorkspaceSourcePackageListItem[]>;
   exportSourcePackagesCsv(input: {
@@ -379,6 +381,8 @@ export type WorkspaceAdminReadPort = {
     mediaType?: string;
     fileName?: string;
     latestImportStatus?: ImportJobStatus;
+    sortBy?: "fileName" | "fileSize" | "uploadedAt";
+    sortDirection?: "asc" | "desc";
     limit?: number;
   }): Promise<string>;
   getImportJobDetail(input: {
@@ -24719,6 +24723,10 @@ export const createFirstSliceServices = (
 
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
+        const sortBy = input.sortBy ?? "uploadedAt";
+        const sortDirection = input.sortDirection ?? "desc";
+        const direction = sortDirection === "asc" ? 1 : -1;
+
         return sourcePackages
           .map<WorkspaceSourcePackageListItem>(sourcePackage => {
             const sourcePackageImportJobs = importJobs
@@ -24769,11 +24777,29 @@ export const createFirstSliceServices = (
               (!input.latestImportStatus ||
                 item.latestImportJob?.status === input.latestImportStatus)
           )
-          .sort((left, right) =>
-            right.sourcePackage.uploadedAt.localeCompare(
-              left.sourcePackage.uploadedAt
-            )
-          )
+          .sort((left, right) => {
+            let comparison = 0;
+            if (sortBy === "fileName") {
+              comparison = left.sourcePackage.fileName.localeCompare(
+                right.sourcePackage.fileName,
+                undefined,
+                { sensitivity: "base" }
+              );
+            } else if (sortBy === "fileSize") {
+              comparison =
+                (left.fileSizeBytes ?? -1) - (right.fileSizeBytes ?? -1);
+            } else {
+              comparison = left.sourcePackage.uploadedAt.localeCompare(
+                right.sourcePackage.uploadedAt
+              );
+            }
+            if (comparison !== 0) {
+              return comparison * direction;
+            }
+            return left.sourcePackage.sourcePackageId.localeCompare(
+              right.sourcePackage.sourcePackageId
+            );
+          })
           .slice(0, limit);
       },
       async exportSourcePackagesCsv(input) {

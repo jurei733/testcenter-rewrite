@@ -3176,6 +3176,28 @@ const parseSourcePackageListQuery = (
     return null;
   }
 
+  const sortBy = readOptionalQueryValue(url, "sortBy");
+  if (sortBy && !["fileName", "fileSize", "uploadedAt"].includes(sortBy)) {
+    sendError(
+      response,
+      400,
+      "source_package_sort_field_invalid",
+      `Source package sort field '${sortBy}' is not supported.`
+    );
+    return null;
+  }
+
+  const sortDirection = readOptionalQueryValue(url, "sortDirection");
+  if (sortDirection && !["asc", "desc"].includes(sortDirection)) {
+    sendError(
+      response,
+      400,
+      "source_package_sort_direction_invalid",
+      `Source package sort direction '${sortDirection}' is not supported.`
+    );
+    return null;
+  }
+
   const limit = parseOperatorReadLimit(
     url,
     response,
@@ -3192,6 +3214,8 @@ const parseSourcePackageListQuery = (
     mediaType: readOptionalQueryValue(url, "mediaType"),
     fileName: readOptionalQueryValue(url, "fileName"),
     latestImportStatus: latestImportStatus as ImportJobStatus | undefined,
+    sortBy: sortBy as "fileName" | "fileSize" | "uploadedAt" | undefined,
+    sortDirection: sortDirection as "asc" | "desc" | undefined,
     limit: limit.limit
   };
 };

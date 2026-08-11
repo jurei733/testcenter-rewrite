@@ -176,6 +176,8 @@ export interface ShellContentState {
   sourcePackageMediaTypeFilter: string;
   sourcePackageFileNameFilter: string;
   sourcePackageLatestImportStatusFilter: string;
+  sourcePackageSortBy: string;
+  sourcePackageSortDirection: string;
   sourcePackageLimit: string;
   importJobStatusFilter: string;
   importJobSourcePackageFilter: string;
@@ -419,6 +421,8 @@ export function createInitialShellContentState(
     sourcePackageMediaTypeFilter: "",
     sourcePackageFileNameFilter: "",
     sourcePackageLatestImportStatusFilter: "",
+    sourcePackageSortBy: "fileName",
+    sourcePackageSortDirection: "asc",
     sourcePackageLimit: "100",
     importJobStatusFilter: "",
     importJobSourcePackageFilter: "",
