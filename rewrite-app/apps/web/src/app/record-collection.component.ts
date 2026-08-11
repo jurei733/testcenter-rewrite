@@ -24,6 +24,8 @@ export type RecordCollectionProgressStep = {
   compactLabel: string;
   current?: boolean;
   complete?: boolean;
+  actionLabel?: string;
+  actionPayload?: Record<string, string>;
 };
 
 export type RecordCollectionItem = {
@@ -98,15 +100,30 @@ export type RecordCollectionItem = {
               *ngFor="let step of item.progressSteps"
               [class.is-current]="step.current"
               [class.is-complete]="step.complete"
+              [class.has-action]="step.actionPayload"
               [attr.data-progress-key]="step.key"
               [attr.aria-current]="step.current ? 'step' : null"
-              [attr.aria-label]="(step.current ? 'Current Unit: ' : 'Unit: ') + step.label + (step.detail ? ', ' + step.detail : '')"
+              [attr.aria-label]="step.actionPayload ? null : (step.current ? 'Current Unit: ' : 'Unit: ') + step.label + (step.detail ? ', ' + step.detail : '')"
               [attr.title]="step.detail ? step.detail + ': ' + step.label : step.label"
             >
-              <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
-              <span class="record-card-progress-marker" aria-hidden="true">{{ step.current ? '●' : step.complete ? '✓' : '○' }}</span>
-              <span class="record-card-progress-label">{{ step.label }}</span>
-              <span class="record-card-progress-compact" aria-hidden="true">{{ step.compactLabel }}</span>
+              <button
+                *ngIf="step.actionPayload; else staticProgressStep"
+                class="record-card-progress-action"
+                type="button"
+                [attr.aria-label]="step.actionLabel ?? step.label"
+                (click)="emitProgressAction(item, step)"
+              >
+                <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
+                <span class="record-card-progress-marker" aria-hidden="true">{{ step.current ? '●' : step.complete ? '✓' : '○' }}</span>
+                <span class="record-card-progress-label">{{ step.label }}</span>
+                <span class="record-card-progress-compact" aria-hidden="true">{{ step.compactLabel }}</span>
+              </button>
+              <ng-template #staticProgressStep>
+                <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
+                <span class="record-card-progress-marker" aria-hidden="true">{{ step.current ? '●' : step.complete ? '✓' : '○' }}</span>
+                <span class="record-card-progress-label">{{ step.label }}</span>
+                <span class="record-card-progress-compact" aria-hidden="true">{{ step.compactLabel }}</span>
+              </ng-template>
             </li>
           </ol>
 
@@ -209,6 +226,20 @@ export class RecordCollectionComponent implements OnDestroy {
       ...item,
       actionLabel: action.label,
       actionPayload: action.payload
+    });
+  }
+
+  emitProgressAction(
+    item: RecordCollectionItem,
+    step: RecordCollectionProgressStep
+  ): void {
+    if (!step.actionPayload) {
+      return;
+    }
+    this.itemAction.emit({
+      ...item,
+      actionLabel: step.actionLabel ?? step.label,
+      actionPayload: step.actionPayload
     });
   }
 

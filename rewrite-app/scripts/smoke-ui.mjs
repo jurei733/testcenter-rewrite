@@ -13756,8 +13756,43 @@ try {
     2,
     "Different visible Booklet species must receive deterministic distinct surfaces."
   );
-  await speciesMonitorRunCards
-    .filter({ hasText: `${participantLoginKey}-species-beta-one` })
+  await page.locator("#monitorDisplayFullButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#openMonitorRunsCollection .record-collection-grid")
+        ?.getAttribute("data-density") === "full"
+  );
+  const betaOneMonitorRunCard = speciesMonitorRunCards.filter({
+    hasText: `${participantLoginKey}-species-beta-one`
+  });
+  const betaOneBlockTargetButton = betaOneMonitorRunCard
+    .getByRole("button", {
+      name: `Select ${speciesReferenceTarget.blockLabel} for monitor jump`
+    })
+    .first();
+  await betaOneBlockTargetButton.click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "1 run" })
+    .waitFor();
+  await expectInputValue(
+    "#monitorTargetUnitKey",
+    speciesReferenceTarget.targetUnitKey
+  );
+  await betaOneBlockTargetButton.click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "2 run" })
+    .filter({ hasText: "1 booklet" })
+    .waitFor();
+  await betaOneBlockTargetButton.click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
+    .waitFor();
+  await page.locator("#monitorResetDisplayOptionsButton").click();
+  await betaOneMonitorRunCard
     .getByRole("button", { name: "Select Species Cohort" })
     .click();
   await page

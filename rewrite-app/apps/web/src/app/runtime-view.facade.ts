@@ -2659,14 +2659,34 @@ export class RuntimeViewFacade {
           speciesHighlighted:
             highlightBookletSpecies && Boolean(openRun.bookletSpecies),
           progressLabel: "Booklet Unit Path",
-          progressSteps: (openRun.unitPath ?? []).map((unit, index) => ({
-            key: unit.unitKey,
-            label: unit.unitLabel || unit.unitKey,
-            detail: unit.blockLabel ?? undefined,
-            compactLabel: `${index + 1}/${openRun.unitPath?.length ?? 0}`,
-            current: unit.current,
-            complete: unit.answered
-          })),
+          progressSteps: (openRun.unitPath ?? []).map((unit, index) => {
+            const blockTarget = unit.blockKey
+              ? openRun.blockNavigationTargets?.find(
+                  target => target.blockKey === unit.blockKey
+                )
+              : null;
+            return {
+              key: unit.unitKey,
+              label: unit.unitLabel || unit.unitKey,
+              detail: unit.blockLabel ?? undefined,
+              compactLabel: `${index + 1}/${openRun.unitPath?.length ?? 0}`,
+              current: unit.current,
+              complete: unit.answered,
+              ...(cohortSelectable && blockTarget
+                ? {
+                    actionLabel: `Select ${blockTarget.blockLabel} for monitor jump`,
+                    actionPayload: {
+                      monitorBatchCommand: "select-block",
+                      testRunId: openRun.testRunId,
+                      blockKey: blockTarget.blockKey,
+                      bookletSpecies:
+                        openRun.bookletSpecies ?? openRun.bookletKey,
+                      displayName: displayName ?? ""
+                    }
+                  }
+                : {})
+            };
+          }),
           badges: [
             openRun.status,
             `state ${monitorState}`,
@@ -4928,6 +4948,53 @@ export class RuntimeViewFacade {
   selectTestRun(item: RecordCollectionItem): void {
     const testRunId = item.actionPayload?.testRunId?.trim();
     if (!testRunId) {
+      return;
+    }
+    if (item.actionPayload?.monitorBatchCommand === "select-block") {
+      const blockKey = item.actionPayload.blockKey?.trim();
+      const openRun = this.commandSafeVisibleMonitorRuns.find(
+        candidate => candidate.testRunId === testRunId
+      );
+      const target = openRun?.blockNavigationTargets?.find(
+        candidate => candidate.blockKey === blockKey
+      );
+      if (!openRun || !target) {
+        return;
+      }
+      if (!this.monitorAutoSelectAllActive) {
+        const species = openRun.bookletSpecies ?? openRun.bookletKey;
+        const cohortRunIds = this.commandSafeVisibleMonitorRuns
+          .filter(
+            candidate =>
+              (candidate.bookletSpecies ?? candidate.bookletKey) === species
+          )
+          .map(candidate => candidate.testRunId);
+        const cohortSelected =
+          cohortRunIds.length === this.monitorBatchSelection.size &&
+          cohortRunIds.every(runId => this.monitorBatchSelection.has(runId));
+        if (!this.monitorBatchSelection.has(testRunId)) {
+          this.monitorBatchSelection.add(testRunId);
+        } else if (!cohortSelected) {
+          this.monitorBatchSelection.clear();
+          for (const runId of cohortRunIds) {
+            this.monitorBatchSelection.add(runId);
+          }
+        } else {
+          this.monitorBatchSelection.clear();
+        }
+      }
+      this.runtime.testRunId = openRun.testRunId;
+      this.runtime.currentUnitKey = openRun.currentUnitKey ?? "";
+      this.runtime.loginKey = openRun.loginKey;
+      this.runtime.groupKey = openRun.groupKey;
+      this.runtime.bookletKey = openRun.bookletKey;
+      this.runtime.participantSessionId = openRun.participantSessionId;
+      this.runtime.monitorTargetUnitKey = target.targetUnitKey;
+      this.selectedMonitorBlockNavigationTargets =
+        openRun.blockNavigationTargets ?? [];
+      this.syncParticipantDisplayName(item);
+      this.persistState();
+      this.uiState.renderVersion.update(version => version + 1);
       return;
     }
     if (item.actionPayload?.monitorBatchCommand === "select-species") {
