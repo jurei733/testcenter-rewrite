@@ -13457,6 +13457,25 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_unit_last_change_invalid"
     },
     {
+      fileName: "unit-leading-zero-extended-year.xml",
+      sourceDocument: validUnitXml.replace(
+        'lastChange="2024-10-02T09:30:00+00:00"',
+        'lastChange="02026-10-02T09:30:00+00:00"'
+      ),
+      diagnosticCode: "testcenter_xml_unit_last_change_invalid"
+    },
+    {
+      fileName: "unit-valid-extended-year.xml",
+      sourceDocument: validUnitXml
+        .replace(
+          'lastChange="2024-10-02T09:30:00+00:00"',
+          'lastChange="12024-02-29T09:30:00+00:00"'
+        )
+        .replace("<Unit ", '<Unit ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_unit_last_change_invalid"
+    },
+    {
       fileName: "unit-14-variable-id-too-long.xml",
       sourceDocument: validUnitXml
         .replace("/17.6.0/definitions/", "/14.3.0/definitions/")

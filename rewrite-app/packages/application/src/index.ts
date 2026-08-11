@@ -8667,7 +8667,22 @@ const isTestcenterXmlDateTime = (value: string): boolean => {
   if (!match) {
     return false;
   }
-  const year = Number(match[1]);
+  const yearDigits = match[1]!.startsWith("-")
+    ? match[1]!.slice(1)
+    : match[1]!;
+  if (
+    /^0+$/.test(yearDigits) ||
+    (yearDigits.length > 4 && yearDigits.startsWith("0"))
+  ) {
+    return false;
+  }
+  const yearModulo = (divisor: number): number => {
+    let remainder = 0;
+    for (const digit of yearDigits) {
+      remainder = (remainder * 10 + Number(digit)) % divisor;
+    }
+    return remainder;
+  };
   const month = Number(match[2]);
   const day = Number(match[3]);
   const hour = Number(match[4]);
@@ -8676,7 +8691,6 @@ const isTestcenterXmlDateTime = (value: string): boolean => {
   const timezoneHour = Number(match[9] ?? 0);
   const timezoneMinute = Number(match[10] ?? 0);
   if (
-    year === 0 ||
     month < 1 ||
     month > 12 ||
     day < 1 ||
@@ -8690,7 +8704,9 @@ const isTestcenterXmlDateTime = (value: string): boolean => {
   ) {
     return false;
   }
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const leapYear =
+    yearModulo(4) === 0 &&
+    (yearModulo(100) !== 0 || yearModulo(400) === 0);
   const daysInMonth = [
     31,
     leapYear ? 29 : 28,

@@ -187,6 +187,13 @@ sections fail with `testcenter_xml_booklet_schema_id_duplicate` before config
 normalization can silently choose a value. The direct-upload and nested-ZIP
 paths are both pinned against the executable Original schema behavior.
 
+Latest P0 date-time lexical closure: Unit `lastChange` attributes and the
+deprecated `Metadata/Lastchange` element now follow the extended-year rules of
+XML Schema `xs:dateTime`. Years longer than four digits are accepted without
+numeric precision loss, including exact Gregorian leap-year validation, while
+forbidden leading-zero forms such as `02026-…` fail with the existing stable
+`testcenter_xml_unit_last_change_invalid` diagnostic.
+
 Latest P0 Booklet-schema closure: the importer now validates the complete
 `Units`/nested-`Testlet` tree and the ordered `Restrictions` surface before
 normalization. Unknown container, Unit, Testlet, `CodeToEnter`, `TimeMax`,
