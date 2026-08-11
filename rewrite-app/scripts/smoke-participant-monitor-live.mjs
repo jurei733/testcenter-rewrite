@@ -192,6 +192,10 @@ try {
   const context = await browser.newContext();
   const participantPage = await context.newPage();
   let participantStreamAttemptCount = 0;
+  let releaseParticipantReconnect;
+  const participantReconnectGate = new Promise(resolvePromise => {
+    releaseParticipantReconnect = resolvePromise;
+  });
   await participantPage.route(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/events`,
     async route => {
@@ -200,14 +204,9 @@ try {
         await route.abort("failed");
         return;
       }
+      await participantReconnectGate;
       await route.continue();
     }
-  );
-  const participantStreamResponse = participantPage.waitForResponse(
-    response =>
-      response.url().endsWith(
-        `/api/v1/participant/sessions/${participantSessionId}/events`
-      ) && response.status() === 200
   );
   await participantPage.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(participantSessionId)}`,
@@ -223,15 +222,6 @@ try {
     await participantPage.locator("#participantRouteConnectionDetail").innerText(),
     /reconnecting automatically/i
   );
-  await participantStreamResponse;
-  await participantPage
-    .locator("#participantRouteConnectionState[data-status='live']")
-    .waitFor({ timeout: 15_000 });
-  assert.ok(
-    participantStreamAttemptCount >= 2,
-    "Participant event stream must reconnect after the initial channel failure."
-  );
-
   const operatorPage = await context.newPage();
   await operatorPage.goto(`${baseUrl}/app/workspace`, {
     waitUntil: "networkidle"
@@ -245,6 +235,37 @@ try {
   });
   await operatorPage.locator("#testRunId").fill(testRunId);
   await operatorPage.locator("#testRunId").dispatchEvent("change");
+
+  const openRunCard = operatorPage
+    .locator("#openMonitorRunsCollection .record-card")
+    .filter({ hasText: testRunId });
+  await openRunCard.waitFor({ timeout: 15_000 });
+  await waitForStateBadge(operatorPage, testRunId, "CONNECTION_POLLING");
+  const participantStreamResponse = participantPage.waitForResponse(
+    response =>
+      response.url().endsWith(
+        `/api/v1/participant/sessions/${participantSessionId}/events`
+      ) && response.status() === 200
+  );
+  releaseParticipantReconnect();
+  await participantStreamResponse;
+  await participantPage
+    .locator("#participantRouteConnectionState[data-status='live']")
+    .waitFor({ timeout: 15_000 });
+  assert.ok(
+    participantStreamAttemptCount >= 2,
+    "Participant event stream must reconnect after the initial channel failure."
+  );
+  await waitForStateBadge(operatorPage, testRunId, "CONNECTION_WEBSOCKET");
+  const connectedOpenRuns = await getJson(
+    baseUrl,
+    `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?testRunId=${encodeURIComponent(testRunId)}`
+  );
+  assert.equal(
+    connectedOpenRuns.items?.[0]?.testState?.CONNECTION,
+    "WEBSOCKET",
+    "The Participant channel must persist its recovered connection mode."
+  );
 
   const pauseButton = operatorPage.getByRole("button", {
     name: "Monitor Pause",
@@ -271,40 +292,11 @@ try {
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
 
-  const openRunCard = operatorPage
-    .locator("#openMonitorRunsCollection .record-card")
-    .filter({ hasText: testRunId });
-  await openRunCard.waitFor({ timeout: 15_000 });
   const idleClock = Date.now() + 6 * 60 * 1_000;
   await operatorPage.evaluate(timestamp => {
     globalThis.__monitorRealDateNow = Date.now;
     Date.now = () => timestamp;
   }, idleClock);
-  const pollingActivityStartedAt = Date.now();
-  await sendJson(
-    baseUrl,
-    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
-    {
-      deliveryId: `monitor-connection-polling:${testRunId}`,
-      logs: [{
-        entries: [{
-          key: "CONNECTION",
-          content: "POLLING",
-          timeStamp: pollingActivityStartedAt
-        }]
-      }]
-    }
-  );
-  const pollingOpenRuns = await getJson(
-    baseUrl,
-    `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?testRunId=${encodeURIComponent(testRunId)}`
-  );
-  assert.equal(pollingOpenRuns.items?.[0]?.testState?.CONNECTION, "POLLING");
-  assert.ok(
-    Date.parse(pollingOpenRuns.items?.[0]?.updatedAt ?? "") >=
-      pollingActivityStartedAt,
-    "Open-run activity must include the server-recorded test-state update."
-  );
   await waitForStateBadge(operatorPage, testRunId, "IDLE");
   const controllerErrorAt = Date.now() + 1_000;
   await sendJson(
@@ -353,20 +345,6 @@ try {
     Date.now = globalThis.__monitorRealDateNow;
     delete globalThis.__monitorRealDateNow;
   });
-  await sendJson(
-    baseUrl,
-    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
-    {
-      deliveryId: `monitor-connection-websocket:${testRunId}`,
-      logs: [{
-        entries: [{
-          key: "CONNECTION",
-          content: "WEBSOCKET",
-          timeStamp: Date.now()
-        }]
-      }]
-    }
-  );
   await waitForStateBadge(operatorPage, testRunId, "CONNECTION_WEBSOCKET");
   await openRunCard.getByRole("button", { name: "Add to Batch" }).click();
   const completeButton = operatorPage.locator("#monitorBatchCompleteButton");

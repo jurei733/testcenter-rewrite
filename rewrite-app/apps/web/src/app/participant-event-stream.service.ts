@@ -10,6 +10,9 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
 type ParticipantRefresh = () => Promise<void>;
+type ParticipantConnectionModeChange = (
+  mode: "WEBSOCKET" | "POLLING"
+) => void;
 
 export type ParticipantEventStreamConnectionStatus =
   | "idle"
@@ -34,6 +37,8 @@ export class ParticipantEventStreamService {
   private refreshRunning = false;
   private refreshPending = false;
   private refresh: ParticipantRefresh | null = null;
+  private connectionModeChange: ParticipantConnectionModeChange | null = null;
+  private lastReportedConnectionMode: "WEBSOCKET" | "POLLING" | null = null;
   private readonly connectionStateValue =
     signal<ParticipantEventStreamConnectionState>({
       status: "idle",
@@ -44,7 +49,8 @@ export class ParticipantEventStreamService {
 
   start(
     participantSessionId: string,
-    refresh: ParticipantRefresh
+    refresh: ParticipantRefresh,
+    connectionModeChange: ParticipantConnectionModeChange
   ): void {
     const normalizedParticipantSessionId = participantSessionId.trim();
     if (!normalizedParticipantSessionId) {
@@ -53,6 +59,7 @@ export class ParticipantEventStreamService {
     }
 
     this.refresh = refresh;
+    this.connectionModeChange = connectionModeChange;
     if (
       this.activeParticipantSessionId === normalizedParticipantSessionId &&
       (this.abortController || this.connectHandle != null)
@@ -61,6 +68,7 @@ export class ParticipantEventStreamService {
     }
 
     this.stopConnection();
+    this.lastReportedConnectionMode = null;
     this.activeParticipantSessionId = normalizedParticipantSessionId;
     this.setConnectionState(
       "connecting",
@@ -82,6 +90,8 @@ export class ParticipantEventStreamService {
     this.stopConnection();
     this.activeParticipantSessionId = "";
     this.refresh = null;
+    this.connectionModeChange = null;
+    this.lastReportedConnectionMode = null;
     this.refreshPending = false;
     this.setConnectionState("idle", "Live participant updates are inactive.");
   }
@@ -261,5 +271,15 @@ export class ParticipantEventStreamService {
     }
     this.connectionStateValue.set({ status, detail });
     this.uiState.renderVersion.update(version => version + 1);
+    const mode =
+      status === "live"
+        ? "WEBSOCKET"
+        : status === "reconnecting" || status === "offline"
+          ? "POLLING"
+          : null;
+    if (mode && mode !== this.lastReportedConnectionMode) {
+      this.lastReportedConnectionMode = mode;
+      this.connectionModeChange?.(mode);
+    }
   }
 }
