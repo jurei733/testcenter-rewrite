@@ -34,13 +34,13 @@ import { downloadBlobFile } from "./download-text-file";
           <span class="eyebrow">Original Testcenter parity</span>
           <h2>Attachment Manager</h2>
         </div>
-        <span class="status-pill">{{ missingCount }} missing · {{ imageCount }} captured</span>
+        <span class="status-pill">{{ attachments.length }} requested · {{ captureCount }} capture-ready · {{ imageCount }} captured</span>
       </div>
-      <p>Manage requested participant image captures by group, login, test, unit, and variable. The attachment code can be copied into a capture-device handoff.</p>
+      <p>Inspect every requested participant attachment by group, login, test, unit, and variable. Camera capture is available for the original <code>capture-image</code> format; other imported formats remain visible without pretending to offer an unsupported workflow.</p>
       <div class="actions">
         <button id="loadAttachmentsButton" class="primary" type="button" [disabled]="busy || !hasScope" (click)="load()">{{ busy ? 'Working…' : 'Load Attachments' }}</button>
-        <button id="downloadAttachmentPagesButton" class="secondary" type="button" [disabled]="busy || attachments.length === 0" (click)="downloadPages()">Download all QR pages</button>
-        <a id="openAttachmentCaptureButton" class="button-link secondary" routerLink="/attachment-capture">Open camera capture</a>
+        <button id="downloadAttachmentPagesButton" class="secondary" type="button" [disabled]="busy || captureCount === 0" (click)="downloadPages()">Download capture QR pages</button>
+        <a id="openAttachmentCaptureButton" class="button-link secondary" routerLink="/attachment-capture" *ngIf="captureCount > 0">Open camera capture</a>
       </div>
       <label>
         QR page label template
@@ -67,25 +67,30 @@ import { downloadBlobFile } from "./download-text-file";
               <span>{{ attachment.groupKey }} / {{ attachment.loginKey }}</span>
               <span>{{ attachment.testLabel }}</span>
               <span>{{ attachment.unitLabel }} · {{ attachment.variableId }}</span>
+              <span>type: {{ attachment.attachmentType || 'unspecified' }}</span>
             </span>
           </button>
         </div>
 
         <section class="attachment-side" *ngIf="selectedAttachment as selected">
           <h3>{{ selected.unitLabel }} · {{ selected.variableId }}</h3>
+          <p>Attachment type: <code>{{ selected.attachmentType || 'unspecified' }}</code></p>
           <p class="attachment-code" id="selectedAttachmentCode">{{ selected.attachmentId }}</p>
           <div class="actions">
             <button class="ghost" type="button" (click)="copyCode(selected.attachmentId)">Copy attachment code</button>
-            <button id="downloadSelectedAttachmentPageButton" class="secondary" type="button" [disabled]="busy" (click)="downloadSelectedPage(selected)">Download QR page</button>
+            <button id="downloadSelectedAttachmentPageButton" class="secondary" type="button" [disabled]="busy" (click)="downloadSelectedPage(selected)" *ngIf="isCaptureImage(selected)">Download QR page</button>
             <a
               id="captureSelectedAttachmentButton"
               class="button-link secondary"
               routerLink="/attachment-capture"
               [queryParams]="{ code: selected.attachmentId }"
-              *ngIf="!readOnly"
+              *ngIf="!readOnly && isCaptureImage(selected)"
             >Capture on this device</a>
           </div>
-          <label>
+          <p id="unsupportedAttachmentType" *ngIf="!isCaptureImage(selected)">
+            This attachment declaration is retained for Original Testcenter compatibility. No {{ selected.attachmentType || 'unspecified' }} capture workflow is implemented yet.
+          </p>
+          <label *ngIf="isCaptureImage(selected)">
             Add PNG or JPEG (max. 10 MiB)
             <input
               id="attachmentFileInput"
@@ -153,6 +158,10 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     return this.attachments.filter(item => item.dataType === "image").length;
   }
 
+  get captureCount(): number {
+    return this.attachments.filter(item => this.isCaptureImage(item)).length;
+  }
+
   ngOnChanges(): void {
     this.attachments = [];
     this.selectedAttachmentId = "";
@@ -189,12 +198,22 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     this.selectedAttachmentId = attachment.attachmentId;
   }
 
+  isCaptureImage(attachment: WorkspaceAttachment): boolean {
+    return attachment.attachmentType === "capture-image";
+  }
+
   async uploadSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     const attachment = this.selectedAttachment;
     input.value = "";
-    if (!file || !attachment || this.busy || this.readOnly) {
+    if (
+      !file ||
+      !attachment ||
+      !this.isCaptureImage(attachment) ||
+      this.busy ||
+      this.readOnly
+    ) {
       return;
     }
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 10 * 1024 * 1024) {
@@ -221,7 +240,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   }
 
   async downloadPages(): Promise<void> {
-    if (!this.hasScope || this.attachments.length === 0) return;
+    if (!this.hasScope || this.captureCount === 0) return;
     await this.run(async () => {
       const download = await this.manager.downloadPages(this.scope(), {
         labelTemplate: this.labelTemplate
@@ -231,7 +250,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
           download.filename || `${this.workspaceKey}-attachment-pages.pdf`,
         blob: download.blob
       });
-      this.status = `${this.attachments.length} QR page(s) downloaded.`;
+      this.status = `${this.captureCount} capture QR page(s) downloaded.`;
     });
   }
 

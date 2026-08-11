@@ -15595,6 +15595,10 @@ try {
                       {
                         variableId: "participant-photo",
                         attachmentType: "capture-image"
+                      },
+                      {
+                        variableId: "source-audio",
+                        attachmentType: "audio"
                       }
                     ]
                   }
@@ -15658,7 +15662,33 @@ try {
     .filter({ hasText: "Attachment Smoke Participant" })
     .filter({ hasText: "missing" })
     .waitFor();
-  await attachmentManager.locator(".attachment-row").click();
+  const unsupportedAttachmentRow = attachmentManager
+    .locator(".attachment-row")
+    .filter({ hasText: "source-audio" })
+    .filter({ hasText: "type: audio" });
+  await unsupportedAttachmentRow.waitFor();
+  await unsupportedAttachmentRow.click();
+  await attachmentManager
+    .locator("#unsupportedAttachmentType")
+    .filter({ hasText: "No audio capture workflow" })
+    .waitFor();
+  assert.equal(
+    await attachmentManager.locator("#downloadSelectedAttachmentPageButton").count(),
+    0
+  );
+  assert.equal(
+    await attachmentManager.locator("#captureSelectedAttachmentButton").count(),
+    0
+  );
+  await attachmentManager
+    .locator(".attachment-row")
+    .filter({ hasText: "participant-photo" })
+    .click();
+  await attachmentManager
+    .locator(".attachment-side")
+    .filter({ hasText: "participant-photo" })
+    .filter({ hasText: "capture-image" })
+    .waitFor();
   await attachmentManager
     .locator("#selectedAttachmentCode")
     .filter({ hasText: /^att-/ })
@@ -15767,7 +15797,10 @@ try {
     .locator("#attachmentRows")
     .filter({ hasText: "image" })
     .waitFor();
-  await refreshedAttachmentManager.locator(".attachment-row").click();
+  await refreshedAttachmentManager
+    .locator(".attachment-row")
+    .filter({ hasText: "participant-photo" })
+    .click();
   await refreshedAttachmentManager.getByRole("button", { name: "Preview" }).click();
   await refreshedAttachmentManager.locator("#attachmentPreview").waitFor();
   await refreshedAttachmentManager.getByRole("button", { name: "Delete" }).click();

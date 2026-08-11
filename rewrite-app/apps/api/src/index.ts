@@ -5193,12 +5193,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const attachments = await services.attachments.listAttachments({
-          sessionToken,
-          tenantKey,
-          workspaceKey,
-          groupKey: url.searchParams.get("groupKey")?.trim() || undefined
-        });
+        const attachments = (
+          await services.attachments.listAttachments({
+            sessionToken,
+            tenantKey,
+            workspaceKey,
+            groupKey: url.searchParams.get("groupKey")?.trim() || undefined
+          })
+        ).filter(attachment => attachment.attachmentType === "capture-image");
         if (attachments.length === 0) {
           sendError(
             response,
@@ -5268,6 +5270,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey,
           attachmentId
         });
+        if (attachment.attachmentType !== "capture-image") {
+          sendError(
+            response,
+            409,
+            "attachment_capture_type_unsupported",
+            `Attachment type '${attachment.attachmentType || "unspecified"}' is retained for compatibility but does not support capture pages.`
+          );
+          return;
+        }
         const pdf = await createAttachmentPagesPdf({
           attachments: [attachment],
           labelTemplate

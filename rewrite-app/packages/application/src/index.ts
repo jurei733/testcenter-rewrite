@@ -7007,12 +7007,12 @@ const normalizeUnitAttachmentRequests = (
     const record = candidate as Record<string, unknown>;
     const variableId = normalizeManifestToken(record.variableId);
     const attachmentType = normalizeManifestToken(record.attachmentType);
-    if (!variableId || attachmentType !== "capture-image") {
+    if (!variableId) {
       continue;
     }
     requests.set(variableId.toLowerCase(), {
       variableId,
-      attachmentType: "capture-image"
+      attachmentType
     });
   }
   return [...requests.values()];
@@ -15293,10 +15293,12 @@ const extractZipUnitAttachmentRequests = (
     return [];
   }
   return normalizeUnitAttachmentRequests(
-    xmlChildrenNamed(baseVariables, "Variable").map(variable => ({
-      variableId: variable.getAttribute("id"),
-      attachmentType: variable.getAttribute("format")
-    }))
+    xmlChildrenNamed(baseVariables, "Variable")
+      .filter(variable => variable.getAttribute("type")?.trim() === "attachment")
+      .map(variable => ({
+        variableId: variable.getAttribute("id"),
+        attachmentType: variable.getAttribute("format")
+      }))
   );
 };
 
@@ -22330,6 +22332,13 @@ export const createFirstSliceServices = (
           groupKeys: access.groupKeys,
           attachmentId: input.attachmentId
         });
+        if (attachment.attachmentType !== "capture-image") {
+          throw new FirstSliceError(
+            409,
+            "attachment_capture_type_unsupported",
+            `Attachment type '${attachment.attachmentType || "unspecified"}' is retained for compatibility but does not support image capture.`
+          );
+        }
         const normalizedFile = normalizeAttachmentFileInput(input);
         const attachmentFile: AttachmentFile = {
           attachmentFileId: `image:${idGenerator()}.${normalizedFile.extension}`,

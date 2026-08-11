@@ -938,7 +938,8 @@ export type ContentReleaseUnitEntry = {
 
 export type UnitAttachmentRequest = {
   variableId: string;
-  attachmentType: "capture-image";
+  /** Authored Original Testcenter Variable/@format; empty when omitted. */
+  attachmentType: string;
 };
 
 export type AttachmentFile = {

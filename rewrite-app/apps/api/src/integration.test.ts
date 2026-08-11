@@ -3399,7 +3399,7 @@ test("participant custom texts retain global-login-booklet precedence inputs", a
   assert.equal(resetSettings.status, 200);
 });
 
-test("attachment manager accepts schema-valid variables, imports capture requests, and enforces monitor scope", async () => {
+test("attachment manager retains typed BaseVariable requests and enforces capture scope", async () => {
   const tenantKey = "attachment-tenant";
   const workspaceKey = "attachment-workspace";
   let platformSignIn = await requestJson<{ sessionToken: string }>(
@@ -3554,6 +3554,26 @@ test("attachment manager accepts schema-valid variables, imports capture request
       {
         variableId: "participant-photo",
         attachmentType: "capture-image"
+      },
+      {
+        variableId: "reference-image",
+        attachmentType: "image"
+      },
+      {
+        variableId: "spoken-answer",
+        attachmentType: "audio"
+      },
+      {
+        variableId: "geogebra-file",
+        attachmentType: "ggb-file"
+      },
+      {
+        variableId: "custom-file",
+        attachmentType: "scanner-pdf"
+      },
+      {
+        variableId: "untyped-file",
+        attachmentType: ""
       }
     ]
   );
@@ -3619,6 +3639,7 @@ test("attachment manager accepts schema-valid variables, imports capture request
       groupKey: string;
       loginKey: string;
       variableId: string;
+      attachmentType: string;
       dataType: string;
       attachmentFileIds: string[];
     }>;
@@ -3626,16 +3647,22 @@ test("attachment manager accepts schema-valid variables, imports capture request
     headers: { authorization }
   });
   assert.equal(inventory.status, 200);
-  assert.equal(inventory.body.items.length, 2);
+  assert.equal(inventory.body.items.length, 12);
   assert.deepEqual(
-    inventory.body.items.map(item => [item.groupKey, item.loginKey, item.dataType]),
+    inventory.body.items
+      .filter(item => item.groupKey === "group-a")
+      .map(item => [item.variableId, item.attachmentType]),
     [
-      ["group-a", "attachment-a", "missing"],
-      ["group-b", "attachment-b", "missing"]
+      ["custom-file", "scanner-pdf"],
+      ["geogebra-file", "ggb-file"],
+      ["participant-photo", "capture-image"],
+      ["reference-image", "image"],
+      ["spoken-answer", "audio"],
+      ["untyped-file", ""]
     ]
   );
   assert.ok(
-    inventory.body.items.every(item => item.variableId === "participant-photo")
+    inventory.body.items.every(item => item.dataType === "missing")
   );
 
   const groupMonitor = await requestJson<{
@@ -3675,9 +3702,9 @@ test("attachment manager accepts schema-valid variables, imports capture request
     { headers: { authorization: groupAuthorization } }
   );
   assert.equal(scopedInventory.status, 200);
-  assert.deepEqual(
-    scopedInventory.body.items.map(item => item.groupKey),
-    ["group-a"]
+  assert.equal(scopedInventory.body.items.length, 6);
+  assert.ok(
+    scopedInventory.body.items.every(item => item.groupKey === "group-a")
   );
   const attachmentPagesPath =
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
@@ -3715,7 +3742,8 @@ test("attachment manager accepts schema-valid variables, imports capture request
   assert.equal(forbiddenPages.status, 403);
   assert.equal(forbiddenPages.body.error, "attachment_group_scope_forbidden");
   const groupBAttachment = inventory.body.items.find(
-    item => item.groupKey === "group-b"
+    item =>
+      item.groupKey === "group-b" && item.variableId === "participant-photo"
   );
   assert.ok(groupBAttachment);
   const forbiddenAttachment = await requestJson<{ error: string }>(
@@ -3729,12 +3757,46 @@ test("attachment manager accepts schema-valid variables, imports capture request
   );
 
   const groupAAttachment = inventory.body.items.find(
-    item => item.groupKey === "group-a"
+    item =>
+      item.groupKey === "group-a" && item.variableId === "participant-photo"
   );
   assert.ok(groupAAttachment);
   const attachmentPath =
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments/` +
     encodeURIComponent(groupAAttachment.attachmentId);
+  const unsupportedAttachment = inventory.body.items.find(
+    item => item.groupKey === "group-a" && item.variableId === "reference-image"
+  );
+  assert.ok(unsupportedAttachment);
+  const unsupportedAttachmentPath =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments/` +
+    encodeURIComponent(unsupportedAttachment.attachmentId);
+  const unsupportedPage = await requestJson<{ error: string }>(
+    `${unsupportedAttachmentPath}/page.pdf`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(unsupportedPage.status, 409);
+  assert.equal(
+    unsupportedPage.body.error,
+    "attachment_capture_type_unsupported"
+  );
+  const unsupportedUpload = await requestJson<{ error: string }>(
+    `${unsupportedAttachmentPath}/files`,
+    {
+      method: "POST",
+      headers: { authorization: groupAuthorization },
+      body: {
+        fileName: "unsupported.png",
+        mediaType: "image/png",
+        dataBase64: ""
+      }
+    }
+  );
+  assert.equal(unsupportedUpload.status, 409);
+  assert.equal(
+    unsupportedUpload.body.error,
+    "attachment_capture_type_unsupported"
+  );
   const singlePageResponse = await fetch(
     `${baseUrl}${attachmentPath}/page.pdf?labelTemplate=${encodeURIComponent("%TESTTAKER% | %CODE%")}`,
     { headers: { authorization: groupAuthorization } }

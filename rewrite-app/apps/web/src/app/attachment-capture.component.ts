@@ -130,7 +130,7 @@ type AttachmentScope = {
               <span class="status-pill">{{ target.dataType }}</span>
             </div>
 
-            <div class="capture-panel" *ngIf="attachment">
+            <div class="capture-panel" *ngIf="attachment && canCaptureTarget">
               <h3>3. Capture page</h3>
               <div class="actions">
                 <button id="captureAttachmentFrameButton" class="secondary" type="button" [disabled]="busy || !cameraActive" (click)="captureCurrentFrame()">Capture camera frame</button>
@@ -142,7 +142,7 @@ type AttachmentScope = {
               <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Attachment page ready to upload" />
             </div>
 
-            <div class="capture-panel" *ngIf="attachment && captureBlob">
+            <div class="capture-panel" *ngIf="attachment && canCaptureTarget && captureBlob">
               <h3>4. Upload confirmed image</h3>
               <div class="actions">
                 <button id="uploadCapturedAttachmentButton" class="primary" type="button" [disabled]="busy || !canWrite" (click)="uploadCapture()">{{ busy ? 'Uploading…' : 'Upload attachment' }}</button>
@@ -215,6 +215,10 @@ export class AttachmentCaptureComponent
       !this.operatorAccess.isReadOnlyAdmin &&
       !this.operatorAccess.isSystemCheckOnly
     );
+  }
+
+  get canCaptureTarget(): boolean {
+    return this.attachment?.attachmentType === "capture-image";
   }
 
   ngAfterViewInit(): void {
@@ -468,8 +472,14 @@ export class AttachmentCaptureComponent
     try {
       this.attachment = await this.manager.get(this.scope(), attachmentId);
       this.attachmentCode = this.attachment.attachmentId;
-      this.status = `Attachment resolved for ${this.attachment.personLabel}.`;
-      this.statusIsError = false;
+      if (!this.canCaptureTarget) {
+        this.clearCapture();
+        this.status = `Attachment type '${this.attachment.attachmentType || "unspecified"}' is retained for compatibility but has no camera-capture workflow.`;
+        this.statusIsError = true;
+      } else {
+        this.status = `Attachment resolved for ${this.attachment.personLabel}.`;
+        this.statusIsError = false;
+      }
     } catch (error) {
       this.attachment = null;
       this.status = this.manager.describeError(error);
