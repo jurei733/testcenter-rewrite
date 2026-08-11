@@ -368,6 +368,11 @@ message shapes and the 200-record log bound; the production Chromium/SQLite
 gate sends malformed notifications from the active sandboxed Player, observes
 no host exception, persists the valid record from a mixed log, and then
 continues through valid state and page navigation.
+The Player sandbox now also permits the user-activated Clipboard, Blob-download,
+and popup paths present in the byte-exact IQB Aspect Player. Popups remain
+sandboxed, while same-origin access, top navigation, and sandbox escape stay
+disabled; production Chromium executes all three capabilities and asserts that
+the stronger isolation tokens remain absent.
 
 Latest P0 Player page-state closure: every Verona `playerState` report now
 produces the original host-side `CURRENT_PAGE_NR`, `CURRENT_PAGE_ID`, and

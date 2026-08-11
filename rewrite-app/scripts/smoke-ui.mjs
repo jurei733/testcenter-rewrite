@@ -6638,8 +6638,12 @@ try {
       <output id="playerResource"></output>
       <output id="playerResourceRange"></output>
       <output id="playerResourceMultiRange"></output>
+      <output id="playerClipboardResult"></output>
       <label>Player answer <input id="playerAnswer" /></label>
       <button id="playerEnd" type="button">End from player</button>
+      <button id="playerDownload" type="button">Download from player</button>
+      <button id="playerPopup" type="button">Open player help</button>
+      <button id="playerClipboard" type="button">Use player clipboard</button>
       <button id="playerRuntimeError" type="button">Report runtime error</button>
       <script>
         let sessionId = "";
@@ -6781,6 +6785,30 @@ try {
           sessionId,
           targetRelative: "end"
         }, "*"));
+        document.querySelector("#playerDownload").addEventListener("click", () => {
+          const link = document.createElement("a");
+          const url = URL.createObjectURL(new File(["Verona player export"], "verona-player-export.txt", {
+            type: "text/plain"
+          }));
+          link.href = url;
+          link.download = "verona-player-export.txt";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 0);
+        });
+        document.querySelector("#playerPopup").addEventListener("click", () => {
+          window.open("about:blank", "verona-player-help");
+        });
+        document.querySelector("#playerClipboard").addEventListener("click", async () => {
+          const output = document.querySelector("#playerClipboardResult");
+          try {
+            await navigator.clipboard.writeText("Verona player clipboard");
+            output.textContent = await navigator.clipboard.readText();
+          } catch (error) {
+            output.textContent = "clipboard-error: " + error.message;
+          }
+        });
         document.querySelector("#playerRuntimeError").addEventListener("click", () => parent.postMessage({
           type: "vopRuntimeErrorNotification",
           sessionId,
@@ -7200,6 +7228,35 @@ try {
     .waitFor();
   const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  const veronaPlayerFrameElement = page.locator("#participantVeronaPlayerFrame");
+  const veronaSandboxTokens = new Set(
+    ((await veronaPlayerFrameElement.getAttribute("sandbox")) ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+  );
+  assert.ok(veronaSandboxTokens.has("allow-downloads"));
+  assert.ok(veronaSandboxTokens.has("allow-popups"));
+  assert.equal(veronaSandboxTokens.has("allow-same-origin"), false);
+  assert.equal(veronaSandboxTokens.has("allow-top-navigation"), false);
+  assert.equal(veronaSandboxTokens.has("allow-popups-to-escape-sandbox"), false);
+  assert.equal(
+    await veronaPlayerFrameElement.getAttribute("allow"),
+    "clipboard-read; clipboard-write"
+  );
+  const playerDownloadPromise = page.waitForEvent("download");
+  await veronaFrame.locator("#playerDownload").click();
+  const playerDownload = await playerDownloadPromise;
+  assert.equal(playerDownload.suggestedFilename(), "verona-player-export.txt");
+  const playerPopupPromise = page.waitForEvent("popup");
+  await veronaFrame.locator("#playerPopup").click();
+  const playerPopup = await playerPopupPromise;
+  assert.equal(playerPopup.url(), "about:blank");
+  await playerPopup.close();
+  await veronaFrame.locator("#playerClipboard").click();
+  await veronaFrame
+    .locator("#playerClipboardResult")
+    .filter({ hasText: "Verona player clipboard" })
+    .waitFor({ timeout: 10_000 });
   await veronaFrame
     .locator("#playerDefinition")
     .filter({ hasText: "Smoke unit definition" })

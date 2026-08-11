@@ -624,7 +624,11 @@ export class VeronaPlayerHostComponent
     frame.className = "verona-player-frame";
     frame.id = "participantVeronaPlayerFrame";
     frame.title = this.unitTitle || this.unitKey || "Verona unit player";
-    frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
+    frame.setAttribute(
+      "sandbox",
+      "allow-scripts allow-forms allow-modals allow-downloads allow-popups"
+    );
+    frame.setAttribute("allow", "clipboard-read; clipboard-write");
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("srcdoc", this.playerHtml);
     frame.addEventListener(
