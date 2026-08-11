@@ -11855,6 +11855,120 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
     .waitFor();
+
+  const confirmedUnitLockController = await openOriginalTestController(
+    "Test_Ctrl-21",
+    "Cy-Bklt_TC-12"
+  );
+  assert.ok(confirmedUnitLockController.testRunId);
+  await page
+    .locator("#participantRouteLeaveLockLabel")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  const confirmedUnitLockTarget = page.locator(
+    "#participantRouteNextUnitButton"
+  );
+  await confirmedUnitLockTarget.click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave task?" })
+    .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor();
+  await confirmedUnitLockTarget.click();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${confirmedUnitLockController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.lockedUnitKeys?.includes(
+        "CY-Unit.Sample-101"
+      ) === true
+  );
+  await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+  const lockedUnitReentryResponse = await fetch(
+    `${baseUrl}/api/v1/participant/test-runs/${confirmedUnitLockController.testRunId}/save-progress`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        currentUnitKey: "CY-Unit.Sample-101",
+        status: "running"
+      })
+    }
+  );
+  assert.equal(lockedUnitReentryResponse.status, 409);
+  const lockedUnitReentryPayload = await lockedUnitReentryResponse.json();
+  assert.equal(lockedUnitReentryPayload.error, "booklet_navigation_denied");
+  assert.ok(
+    lockedUnitReentryPayload.details?.deniedReasons?.includes(
+      "testlet_leave_locked"
+    )
+  );
+
+  const automaticTestletLockController = await openOriginalTestController(
+    "Test_Ctrl-22",
+    "Cy-Bklt_TC-13"
+  );
+  assert.ok(automaticTestletLockController.testRunId);
+  await page
+    .locator("#participantRouteLeaveLockLabel")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  assert.equal(await page.locator("#participantConfirmationBackdrop").count(), 0);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  const withinTestletLockState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${automaticTestletLockController.participantSessionId}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.deepEqual(
+    withinTestletLockState.currentRunState?.testRun?.lockedTestletKeys,
+    []
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  assert.equal(await page.locator("#participantConfirmationBackdrop").count(), 0);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-104" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${automaticTestletLockController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.lockedTestletKeys?.includes("Tslt1") ===
+      true
+  );
+  await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+  const lockedTestletReentryResponse = await fetch(
+    `${baseUrl}/api/v1/participant/test-runs/${automaticTestletLockController.testRunId}/save-progress`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        currentUnitKey: "CY-Unit.Sample-102",
+        status: "running"
+      })
+    }
+  );
+  assert.equal(lockedTestletReentryResponse.status, 409);
+  const lockedTestletReentryPayload = await lockedTestletReentryResponse.json();
+  assert.equal(lockedTestletReentryPayload.error, "booklet_navigation_denied");
+  assert.ok(
+    lockedTestletReentryPayload.details?.deniedReasons?.includes(
+      "testlet_leave_locked"
+    )
+  );
   stopAfter("participant-original-test-controller");
 
   logStep("nav-runtime");
