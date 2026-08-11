@@ -11943,6 +11943,65 @@ try {
       forceTimeRestrictions: true,
       requiresCode: true
     });
+  await page
+    .locator(
+      '#participantRouteUnitRail [data-unit-key="CY-Unit.Sample-104"]'
+    )
+    .click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave timed block?" })
+    .waitFor();
+  const hotReturnDialogStateBeforeResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${hotReturnTimedController.participantSessionId}/current-state`,
+    { method: "GET" }
+  );
+  assert.equal(hotReturnDialogStateBeforeResponse.status, 200);
+  const hotReturnDialogStateBefore =
+    await hotReturnDialogStateBeforeResponse.json();
+  const hotReturnDialogRemainingBefore =
+    hotReturnDialogStateBefore.currentRunState?.activeTestletTimer
+      ?.remainingSeconds;
+  assert.ok(
+    Number.isInteger(hotReturnDialogRemainingBefore) &&
+      hotReturnDialogRemainingBefore > 3
+  );
+  await new Promise(resolve => setTimeout(resolve, 2_500));
+  const hotReturnDialogStateAfterResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${hotReturnTimedController.participantSessionId}/current-state`,
+    { method: "GET" }
+  );
+  assert.equal(hotReturnDialogStateAfterResponse.status, 200);
+  const hotReturnDialogStateAfter = await hotReturnDialogStateAfterResponse.json();
+  const hotReturnDialogRemainingAfter =
+    hotReturnDialogStateAfter.currentRunState?.activeTestletTimer
+      ?.remainingSeconds;
+  assert.equal(
+    hotReturnDialogStateAfter.currentRunState?.testRun?.currentUnitKey,
+    "CY-Unit.Sample-101"
+  );
+  assert.equal(
+    hotReturnDialogStateAfter.currentRunState?.testRun?.testletTimers?.Tslt1
+      ?.status,
+    "running"
+  );
+  assert.ok(
+    Number.isInteger(hotReturnDialogRemainingAfter) &&
+      hotReturnDialogRemainingAfter <= hotReturnDialogRemainingBefore - 2,
+    `Expected the TC-5 timer to continue while the leave dialog was open, received ${hotReturnDialogRemainingBefore} then ${hotReturnDialogRemainingAfter}.`
+  );
+  await page.locator("#participantConfirmationStayButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor();
+  const hotReturnExpiryController =
+    await enterOriginalControllerTimedTestlet({
+      loginKey: "Test_Ctrl-11",
+      executionMode: "run-hot-return",
+      forceTimeRestrictions: true,
+      requiresCode: true
+    });
   const hotRestartTimedController =
     await enterOriginalControllerTimedTestlet({
       loginKey: "Test_Ctrl-12",
@@ -11984,6 +12043,7 @@ try {
   );
   for (const controller of [
     hotReturnTimedController,
+    hotReturnExpiryController,
     hotRestartTimedController
   ]) {
     await pollJsonWithPredicate(
