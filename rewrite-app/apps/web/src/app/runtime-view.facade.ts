@@ -2639,6 +2639,10 @@ export class RuntimeViewFacade {
         const cohortSelectable =
           batchSelectable && monitorState !== "locked";
         const controllerState = openRun.testState.CONTROLLER ?? "PENDING";
+        const unitState = openRun.currentUnitState;
+        const currentPageText = unitState
+          ? this.monitorCurrentPageText(unitState)
+          : null;
 
         return {
           headline: displayName ?? openRun.loginKey,
@@ -2665,6 +2669,13 @@ export class RuntimeViewFacade {
             ...(activeTimer
               ? [activeTimerText ?? `timer ${activeTimer.status}`]
               : []),
+            ...(unitState?.presentationProgress
+              ? [`presentation ${unitState.presentationProgress}`]
+              : []),
+            ...(unitState?.responseProgress
+              ? [`response ${unitState.responseProgress}`]
+              : []),
+            ...(currentPageText ? [`page ${currentPageText}`] : []),
             bookletStates.length > 0
               ? `${bookletStates.length} booklet state${bookletStates.length === 1 ? "" : "s"}`
               : "no booklet states",
@@ -2743,7 +2754,22 @@ export class RuntimeViewFacade {
                     label: this.monitorText("gm_col_unitLabel"),
                     value:
                       openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "none"
-                  }
+                  },
+                  ...(unitState
+                    ? [
+                        {
+                          label: "Presentation Progress",
+                          value: unitState.presentationProgress ?? "unknown"
+                        },
+                        {
+                          label: "Response Progress",
+                          value: unitState.responseProgress ?? "unknown"
+                        },
+                        ...(currentPageText
+                          ? [{ label: "Current Page", value: currentPageText }]
+                          : [])
+                      ]
+                    : [])
                 ]),
             ...(displaySettings.view === "small"
               ? []
@@ -2812,6 +2838,26 @@ export class RuntimeViewFacade {
         };
       })
     );
+  }
+
+  private monitorCurrentPageText(
+    unitState: NonNullable<OpenMonitorRun["currentUnitState"]>
+  ): string | null {
+    if (!unitState.currentPageId && unitState.currentPageIndex === null) {
+      return null;
+    }
+    const position =
+      unitState.currentPageIndex === null
+        ? unitState.currentPageId
+        : unitState.pageCount
+          ? `${unitState.currentPageIndex + 1} / ${unitState.pageCount}`
+          : String(unitState.currentPageIndex + 1);
+    const identity = [unitState.currentPageLabel, unitState.currentPageId]
+      .filter((value, index, values): value is string =>
+        Boolean(value) && values.indexOf(value) === index
+      )
+      .join(" · ");
+    return identity ? `${position} · ${identity}` : position;
   }
 
   get monitorBookletItems(): RecordCollectionItem[] {

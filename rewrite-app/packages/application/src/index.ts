@@ -25,6 +25,7 @@ import {
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText,
   parseVeronaUnitResponse,
+  projectVeronaPageState,
   readBookletConfigValues
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -69,6 +70,7 @@ import type {
   ImportJobStatus,
   ImportJobDiagnostic,
   MonitorBookletError,
+  MonitorCurrentUnitState,
   MonitorTestletTimer,
   MonitorRunCommandResult,
   MonitorRunCommandType,
@@ -4988,6 +4990,9 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         locked: normalizedTestRun.locked === true,
         currentUnitKey: normalizedTestRun.currentUnitKey,
         currentUnitLabel: location.currentUnitLabel,
+        currentUnitState: projectOpenMonitorRunCurrentUnitState(
+          normalizedTestRun
+        ),
         currentBlockKey: location.currentBlockKey,
         currentBlockLabel: location.currentBlockLabel,
         blockNavigationTargets: location.blockNavigationTargets,
@@ -5082,6 +5087,45 @@ const buildOpenMonitorRunTestState = (
       ? { status: "pending" }
       : {})
 });
+
+const projectOpenMonitorRunCurrentUnitState = (
+  testRun: TestRun
+): MonitorCurrentUnitState | null => {
+  const currentUnitKey = testRun.currentUnitKey;
+  if (!currentUnitKey) {
+    return null;
+  }
+  const response = normalizeTestRun(testRun).unitResponses[currentUnitKey] ?? "";
+  const veronaResponse = parseVeronaUnitResponse(response);
+  if (!veronaResponse) {
+    return null;
+  }
+
+  const pageState = veronaResponse.playerState
+    ? projectVeronaPageState(veronaResponse.playerState)
+    : null;
+  const currentPageIndex =
+    pageState && pageState.currentPageIndex >= 0
+      ? pageState.currentPageIndex
+      : null;
+  const currentPage = veronaResponse.playerState?.currentPage;
+  const currentPageEntry =
+    currentPageIndex === null ? null : pageState?.pages[currentPageIndex] ?? null;
+
+  return {
+    presentationProgress:
+      veronaResponse.unitState.presentationProgress ?? null,
+    responseProgress: veronaResponse.unitState.responseProgress ?? null,
+    currentPageId:
+      currentPageEntry?.id ??
+      (currentPage === undefined || currentPage === null
+        ? null
+        : String(currentPage)),
+    currentPageLabel: currentPageEntry?.label ?? null,
+    currentPageIndex,
+    pageCount: pageState?.pages.length ? pageState.pages.length : null
+  };
+};
 
 const resolveOpenMonitorRunUpdatedAt = (
   testRun: TestRun,
@@ -6649,7 +6693,8 @@ const formatOpenMonitorRunsCsv = (input: {
     "activeTestletTimer",
     "updatedAt",
     "rosterBookletKey",
-    "rosterDisplayName"
+    "rosterDisplayName",
+    "currentUnitState"
   ];
 
   return [
@@ -6681,7 +6726,8 @@ const formatOpenMonitorRunsCsv = (input: {
           : "",
         item.updatedAt,
         item.participantRosterEntry?.bookletKey ?? "",
-        item.participantRosterEntry?.displayName ?? ""
+        item.participantRosterEntry?.displayName ?? "",
+        item.currentUnitState ? JSON.stringify(item.currentUnitState) : ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -28985,6 +29031,7 @@ export const createFirstSliceServices = (
               locked: testRun.locked === true,
               currentUnitKey: testRun.currentUnitKey,
               currentUnitLabel: location.currentUnitLabel,
+              currentUnitState: projectOpenMonitorRunCurrentUnitState(testRun),
               currentBlockKey: location.currentBlockKey,
               currentBlockLabel: location.currentBlockLabel,
               blockNavigationTargets: location.blockNavigationTargets,

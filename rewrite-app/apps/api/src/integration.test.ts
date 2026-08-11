@@ -7455,7 +7455,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName,currentUnitState\n/
     );
     assert.match(
       openRunsCsv.body,
@@ -22959,6 +22959,34 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     ISO_DATE_REGEX
   );
 
+  const currentUnitResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      presentationProgress: "complete",
+      responseProgress: "some"
+    },
+    playerState: {
+      currentPage: "page-2",
+      validPages: [
+        { id: "page-1", label: "Introduction" },
+        { id: "page-2", label: "Review" }
+      ]
+    }
+  });
+  const savedCurrentUnitState = await requestJson(
+    `/api/v1/participant/test-runs/${testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        responseUnitKey: "UNIT.TIMED",
+        unitResponse: currentUnitResponse,
+        status: "running"
+      }
+    }
+  );
+  assert.equal(savedCurrentUnitState.status, 200);
+
   const blockedLeave = await requestJson<{
     error: string;
     details?: { deniedReasons?: string[] };
@@ -23053,6 +23081,14 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       bookletSpecies: string | null;
       currentUnitKey: string | null;
       currentUnitLabel: string | null;
+      currentUnitState: {
+        presentationProgress: string | null;
+        responseProgress: string | null;
+        currentPageId: string | null;
+        currentPageLabel: string | null;
+        currentPageIndex: number | null;
+        pageCount: number | null;
+      } | null;
       currentBlockKey: string | null;
       currentBlockLabel: string | null;
       testState: Record<string, string>;
@@ -23091,6 +23127,14 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "The newest test-wide controller state must win over older and unit-scoped values."
   );
   assert.equal(openRunsWithTimer.body.items[0]?.testState.CONNECTION, "LOST");
+  assert.deepEqual(openRunsWithTimer.body.items[0]?.currentUnitState, {
+    presentationProgress: "complete",
+    responseProgress: "some",
+    currentPageId: "page-2",
+    currentPageLabel: "Review",
+    currentPageIndex: 1,
+    pageCount: 2
+  });
   assert.ok(
     Date.parse(openRunsWithTimer.body.items[0]?.updatedAt ?? "") >=
       monitorStateRequestStartedAt,
@@ -23212,10 +23256,11 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName,currentUnitState\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
   assert.match(openRunsTimerCsv.body, /CONTROLLER.*RUNNING/);
+  assert.match(openRunsTimerCsv.body, /presentationProgress.*complete/);
 
   const studyMonitorTimerCsv = await requestText(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-runs/${testRunId}.csv`

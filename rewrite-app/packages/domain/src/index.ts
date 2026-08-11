@@ -1118,6 +1118,26 @@ export const monitorBookletErrors = [
 
 export type MonitorBookletError = (typeof monitorBookletErrors)[number];
 
+export type MonitorCurrentUnitState = {
+  presentationProgress:
+    | "none"
+    | "some"
+    | "complete"
+    | "complete-and-valid"
+    | null;
+  responseProgress:
+    | "none"
+    | "some"
+    | "complete"
+    | "complete-and-valid"
+    | null;
+  currentPageId: string | null;
+  currentPageLabel: string | null;
+  /** Zero-based index in the Player's current valid-page list. */
+  currentPageIndex: number | null;
+  pageCount: number | null;
+};
+
 export type OpenMonitorRun = {
   testRunId: string;
   participantSessionId: string;
@@ -1138,6 +1158,8 @@ export type OpenMonitorRun = {
   locked?: boolean;
   currentUnitKey: string | null;
   currentUnitLabel?: string | null;
+  /** Latest structured Verona progress for the current Unit, when available. */
+  currentUnitState: MonitorCurrentUnitState | null;
   currentBlockKey?: string | null;
   currentBlockLabel?: string | null;
   blockNavigationTargets?: Array<{

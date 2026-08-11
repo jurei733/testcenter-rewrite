@@ -185,8 +185,33 @@ try {
     {}
   );
   const testRunId = resumed.testRun?.testRunId;
+  const currentUnitKey = resumed.testRun?.currentUnitKey;
   assert.ok(testRunId, "Demo resume must return a test run.");
+  assert.ok(currentUnitKey, "Demo resume must select a current Unit.");
   assert.equal(resumed.testRun.status, "running");
+  await sendJson(
+    baseUrl,
+    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/save-progress`,
+    {
+      responseUnitKey: currentUnitKey,
+      status: "running",
+      unitResponse: JSON.stringify({
+        kind: "verona_unit_state",
+        version: 1,
+        unitState: {
+          presentationProgress: "complete",
+          responseProgress: "some"
+        },
+        playerState: {
+          currentPage: "page-2",
+          validPages: [
+            { id: "page-1", label: "Introduction" },
+            { id: "page-2", label: "Review" }
+          ]
+        }
+      })
+    }
+  );
 
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -240,6 +265,11 @@ try {
     .locator("#openMonitorRunsCollection .record-card")
     .filter({ hasText: testRunId });
   await openRunCard.waitFor({ timeout: 15_000 });
+  await openRunCard
+    .filter({ hasText: "presentation complete" })
+    .filter({ hasText: "response some" })
+    .filter({ hasText: "page 2 / 2 · Review · page-2" })
+    .waitFor({ timeout: 15_000 });
   await waitForStateBadge(operatorPage, testRunId, "CONNECTION_POLLING");
   const participantStreamResponse = participantPage.waitForResponse(
     response =>

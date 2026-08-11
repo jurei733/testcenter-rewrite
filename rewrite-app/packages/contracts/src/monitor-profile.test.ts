@@ -30,6 +30,7 @@ const createOpenRun = (
   testState: {},
   status,
   currentUnitKey: "unit:one",
+  currentUnitState: null,
   activeTestletTimer: null,
   updatedAt: "2026-08-01T00:00:00.000Z"
 });
