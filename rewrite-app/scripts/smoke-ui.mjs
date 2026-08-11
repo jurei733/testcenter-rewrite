@@ -10019,33 +10019,65 @@ try {
 
   logStep("participant-official-stars-player-family");
   const starsPlayerPackage =
-    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
-      playerPackage => playerPackage.family === "STARS choice interaction"
-    );
+    officialProtocolCorpus.currentOriginalStarsPackage;
   assert.ok(
     starsPlayerPackage,
-    "The official STARS player fixture should be pinned."
+    "The current Original Testcenter STARS package should be pinned."
   );
   const starsTenantKey = `${tenantKey}-verona-stars`;
   const starsWorkspaceKey = `${workspaceKey}-verona-stars`;
-  const starsBookletKey = "BOOKLET.OFFICIAL.STARS-0.6";
-  const starsUnitKey = "UNIT.OFFICIAL.STARS-0.6";
-  const starsLoginKey = "student-official-stars";
-  const starsExpectedValue = "3";
-  const [starsPlayerDocument, starsDefinitionDocument] = await Promise.all([
+  const starsBookletKey = starsPlayerPackage.booklet.bookletKey;
+  const starsUnitKey = starsPlayerPackage.unit.unitKey;
+  const starsLoginKey = "stars-3";
+  const [
+    starsPlayerDocument,
+    starsDefinitionDocument,
+    starsMetadataDocument,
+    starsUnitDocument,
+    starsBookletDocument,
+    starsRosterDocument
+  ] = await Promise.all([
     readBrotliBase64Text(
       resolve(
         "test-fixtures/original-testcenter",
-        starsPlayerPackage.playerFixture
+        starsPlayerPackage.player.fixture
       )
     ),
     readFile(
       resolve(
         "test-fixtures/original-testcenter",
-        starsPlayerPackage.definitionFixture
+        starsPlayerPackage.definition.fixture
       ),
       "utf8"
-    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.metadata.fixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.unit.fixture
+      ),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.booklet.fixture
+      ),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.roster.fixture
+      ),
+      "utf8"
+    )
   ]);
   const starsPlayerZip = createStoredZipBuffer([
     {
@@ -10053,41 +10085,33 @@ try {
       content: `
         <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
           <resources>
-            <resource identifier="${starsBookletKey}" href="booklets/Booklet.xml" />
-            <resource identifier="${starsUnitKey}" href="units/Unit.xml" />
-            <resource identifier="${starsPlayerPackage.playerKey}" href="players/Player.html" />
+            <resource identifier="${starsBookletKey}" href="booklets/CY_Bklt_Stars.xml" />
+            <resource identifier="${starsUnitKey}" href="units/CY-StarsUnit-001.xml" />
+            <resource identifier="${starsUnitKey}.voud" href="units/CY-StarsUnit-001.voud" />
+            <resource identifier="${starsUnitKey}.vomd" href="units/CY-StarsUnit-001.vomd" />
+            <resource identifier="${starsPlayerPackage.player.playerKey}" href="players/iqb-player-stars-0.6.40.html" />
           </resources>
         </manifest>
       `
     },
     {
-      fileName: "export/booklets/Booklet.xml",
-      content: `
-        <Booklet>
-          <Metadata>
-            <Id>${starsBookletKey}</Id>
-            <Label>Official STARS choice interaction</Label>
-          </Metadata>
-          <Units>
-            <Unit id="${starsUnitKey}" label="STARS choice interaction" />
-          </Units>
-        </Booklet>
-      `
+      fileName: "export/booklets/CY_Bklt_Stars.xml",
+      content: starsBookletDocument
     },
     {
-      fileName: "export/units/Unit.xml",
-      content: `
-        <Unit>
-          <Metadata>
-            <Id>${starsUnitKey}</Id>
-            <Label>Official STARS choice interaction</Label>
-          </Metadata>
-          <Definition player="${starsPlayerPackage.playerKey}" type="${starsPlayerPackage.unitDefinitionType}"><![CDATA[${starsDefinitionDocument}]]></Definition>
-        </Unit>
-      `
+      fileName: "export/units/CY-StarsUnit-001.xml",
+      content: starsUnitDocument
     },
     {
-      fileName: "export/players/Player.html",
+      fileName: "export/units/CY-StarsUnit-001.voud",
+      content: starsDefinitionDocument
+    },
+    {
+      fileName: "export/units/CY-StarsUnit-001.vomd",
+      content: starsMetadataDocument
+    },
+    {
+      fileName: "export/players/iqb-player-stars-0.6.40.html",
       content: starsPlayerDocument
     }
   ]);
@@ -10113,7 +10137,7 @@ try {
     `${starsWorkspaceApiUrl}/source-packages`,
     {
       body: {
-        fileName: "official-stars-0.6-browser-smoke.zip",
+        fileName: "current-original-stars-0.6.40-browser-smoke.zip",
         mediaType: "application/zip",
         sourceDocument: `data:application/zip;base64,${starsPlayerZip.toString("base64")}`
       }
@@ -10142,53 +10166,107 @@ try {
   );
   await sendSmokeJson(`${starsWorkspaceApiUrl}/participant-roster`, {
     body: {
-      rosterText: [
-        {
-          loginKey: starsLoginKey,
-          groupKey: "group:official-stars",
-          bookletKey: starsBookletKey,
-          displayName: "Official STARS Participant",
-          executionMode: "run-hot-return"
-        }
-      ]
+      rosterText: starsRosterDocument
     }
   });
+  const starsSignInResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/auth/sign-in`,
+    {
+      body: {
+        tenantKey: starsTenantKey,
+        workspaceKey: starsWorkspaceKey,
+        loginKey: starsLoginKey,
+        password: "123"
+      }
+    }
+  );
+  const starsSignInPayload = await starsSignInResponse.json();
+  const starsParticipantSessionId =
+    starsSignInPayload.participantSession.participantSessionId;
+  assert.ok(starsParticipantSessionId);
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/resume`,
+    { body: { bookletKey: starsBookletKey } }
+  );
   await page.goto(
-    `${baseUrl}/participant?${new URLSearchParams({
-      tenantKey: starsTenantKey,
-      workspaceKey: starsWorkspaceKey,
-      loginKey: starsLoginKey,
-      bookletKey: starsBookletKey
-    }).toString()}`,
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      starsParticipantSessionId
+    )}`,
     { waitUntil: "networkidle" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
-    .filter({ hasText: `API ${starsPlayerPackage.playerApiVersion}` })
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
   const starsFrame = page.frameLocator("#participantVeronaPlayerFrame");
-  const starsChoice = starsFrame.locator("#BUTTONS_2");
+  const starsChoice = starsFrame.locator('[data-cy="button-0"] input');
   await starsChoice.waitFor({ state: "attached", timeout: 30_000 });
   await starsChoice.dispatchEvent("click");
-  const starsParticipantSessionId = await page
-    .locator("#participantRouteSessionId")
-    .inputValue();
-  assert.ok(starsParticipantSessionId);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
     payload => {
       const response =
-        payload?.currentRunState?.testRun?.unitResponses?.[starsUnitKey];
+        payload?.currentRunState?.testRun?.unitResponses?.["1"];
       if (typeof response !== "string") return false;
       try {
-        const responses = JSON.parse(response).unitState?.dataParts?.responses;
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          starsPlayerPackage.player.unitStateType
+        ) return false;
+        const responses = unitState?.dataParts?.responses;
         if (typeof responses !== "string") return false;
         const values = JSON.parse(responses);
         return values?.some(
           value =>
-            value?.id === "BUTTONS" &&
-            value?.status === "VALUE_CHANGED" &&
-            value?.value === starsExpectedValue
+            value?.id === "interact" &&
+            value?.status === "CODING_COMPLETE" &&
+            String(value?.value) === "1"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  const starsContinueButton = starsFrame.locator(
+    '[data-cy="continue-button"]'
+  );
+  await starsContinueButton.waitFor({ state: "attached", timeout: 30_000 });
+  await starsContinueButton.dispatchEvent("click");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.currentUnitKey === "2",
+    30_000
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "2" })
+    .waitFor({ timeout: 30_000 });
+  const starsSecondFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const starsSecondChoice = starsSecondFrame.locator(
+    '[data-cy="button-1"] input'
+  );
+  await starsSecondChoice.waitFor({ state: "attached", timeout: 30_000 });
+  await starsSecondChoice.dispatchEvent("click");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload => {
+      const response = payload?.currentRunState?.testRun?.unitResponses?.["2"];
+      if (typeof response !== "string") return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          starsPlayerPackage.player.unitStateType
+        ) return false;
+        const responses = unitState?.dataParts?.responses;
+        if (typeof responses !== "string") return false;
+        return JSON.parse(responses)?.some(
+          value =>
+            value?.id === "interact" &&
+            value?.status === "CODING_COMPLETE" &&
+            String(value?.value) === "2"
         );
       } catch {
         return false;
@@ -10204,10 +10282,12 @@ try {
   );
   await page
     .locator("#participantVeronaPlayerVersion")
-    .filter({ hasText: `API ${starsPlayerPackage.playerApiVersion}` })
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
   const restoredStarsFrame = page.frameLocator("#participantVeronaPlayerFrame");
-  const restoredStarsChoice = restoredStarsFrame.locator("#BUTTONS_2");
+  const restoredStarsChoice = restoredStarsFrame.locator(
+    '[data-cy="button-1"] input'
+  );
   await restoredStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
   assert.equal(await restoredStarsChoice.isChecked(), true);
   stopAfter("participant-verona-player-families");

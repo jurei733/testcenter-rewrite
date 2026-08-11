@@ -14,7 +14,7 @@ type PinnedOriginalFixture = {
   fixture: string;
   sourcePath: string;
   sha256: string;
-  encoding?: "base64";
+  encoding?: "base64" | "brotli-base64";
 };
 
 type OriginalTestcenterCorpus = {
@@ -258,6 +258,37 @@ type OriginalTestcenterCorpus = {
       unitSha256: string;
     };
   }>;
+  currentOriginalStarsPackage: {
+    family: string;
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+      playerModuleId: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+      metadataVersion: string;
+      unitStateType: string;
+    };
+    unit: PinnedOriginalFixture & { unitKey: string };
+    definition: PinnedOriginalFixture & {
+      encoding: "base64";
+      definitionType: string;
+    };
+    metadata: PinnedOriginalFixture & { encoding: "base64" };
+    booklet: PinnedOriginalFixture & {
+      bookletKey: string;
+      unitKey: string;
+      unitCount: number;
+      aliases: string[];
+    };
+    roster: PinnedOriginalFixture & {
+      groupKey: string;
+      participantLogins: Array<[loginKey: string, executionMode: string]>;
+    };
+  };
   codingSchemePackages: Array<{
     family: string;
     schemeFixture: string;
@@ -887,6 +918,123 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.deepEqual(
     starsDefinition.interactionParameters.options.buttons.map(button => button.text),
     ["A", "B", "C", "D"]
+  );
+});
+
+test("original Testcenter compatibility corpus pins the current STARS system-test graph", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const stars = corpus.currentOriginalStarsPackage;
+  assert.equal(
+    stars.sourceCommit,
+    "94b04751abfe024eb1d354c29718f90b4740c4c6"
+  );
+
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, stars.player.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  const definitionDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, stars.definition.fixture), "utf8").trim(),
+    "base64"
+  );
+  const metadataDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, stars.metadata.fixture), "utf8").trim(),
+    "base64"
+  );
+  const unitDocument = readFileSync(resolve(corpusRoot, stars.unit.fixture));
+  const bookletDocument = readFileSync(resolve(corpusRoot, stars.booklet.fixture));
+  const rosterDocument = readFileSync(resolve(corpusRoot, stars.roster.fixture));
+  for (const [document, fixture] of [
+    [playerDocument, stars.player],
+    [definitionDocument, stars.definition],
+    [metadataDocument, stars.metadata],
+    [unitDocument, stars.unit],
+    [bookletDocument, stars.booklet],
+    [rosterDocument, stars.roster]
+  ] as const) {
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+    assert.ok(fixture.sourcePath.startsWith(`${stars.sourceDirectory}/`));
+  }
+
+  const playerHtml = playerDocument.toString("utf8");
+  assert.match(playerHtml, /"id"\s*:\s*"iqb-player-stars"/);
+  assert.match(playerHtml, /"version"\s*:\s*"0\.6\.40"/);
+  assert.match(playerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(playerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.equal(stars.player.unitStateType, "iqb-standard@2.0");
+
+  const definition = JSON.parse(definitionDocument.toString("utf8")) as {
+    id: string;
+    version: string;
+    continueButtonShow: string;
+    interactionType: string;
+    interactionParameters: {
+      variableId: string;
+      multiSelect: boolean;
+      options: { buttons: Array<{ text: string }> };
+    };
+  };
+  assert.equal(definition.id, "stars-unit-definition");
+  assert.equal(definition.version, "0.7");
+  assert.equal(definition.continueButtonShow, "ON_ANY_RESPONSE");
+  assert.equal(definition.interactionType, "BUTTONS");
+  assert.equal(definition.interactionParameters.variableId, "interact");
+  assert.equal(definition.interactionParameters.multiSelect, false);
+  assert.deepEqual(
+    definition.interactionParameters.options.buttons.map(button => button.text),
+    ["M", "A", "F", "I"]
+  );
+  assert.deepEqual(JSON.parse(metadataDocument.toString("utf8")), {
+    profiles: [],
+    items: []
+  });
+
+  const unitXml = unitDocument.toString("utf8");
+  assert.match(unitXml, /<Id>CY-StarsUnit-001<\/Id>/);
+  assert.match(unitXml, /<Reference>CY-StarsUnit-001\.vomd<\/Reference>/);
+  assert.match(
+    unitXml,
+    /<DefinitionRef player="iqb-player-stars@0\.6"[^>]*>CY-StarsUnit-001\.voud<\/DefinitionRef>/
+  );
+
+  const bookletXml = bookletDocument.toString("utf8");
+  assert.match(bookletXml, /<Id>Cy-Bklt_Stars-1<\/Id>/);
+  const unitReferences = Array.from(
+    bookletXml.matchAll(/<Unit\b[^>]*\bid="([^"]+)"[^>]*\balias="([^"]+)"[^>]*\/>/g)
+  );
+  assert.equal(unitReferences.length, stars.booklet.unitCount);
+  assert.deepEqual(
+    unitReferences.map(reference => reference[1]),
+    Array(stars.booklet.unitCount).fill(stars.booklet.unitKey)
+  );
+  assert.deepEqual(
+    unitReferences.map(reference => reference[2]),
+    stars.booklet.aliases
+  );
+
+  const participants = parseParticipantRosterText(rosterDocument.toString("utf8"));
+  assert.deepEqual(
+    participants.map(participant => [
+      participant.loginKey,
+      participant.executionMode
+    ]),
+    stars.roster.participantLogins
+  );
+  assert.ok(
+    participants.every(
+      participant =>
+        participant.groupKey === stars.roster.groupKey &&
+        participant.bookletKey === stars.booklet.bookletKey &&
+        participant.password === "123"
+    )
   );
 });
 

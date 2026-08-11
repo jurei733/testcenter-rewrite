@@ -2416,6 +2416,68 @@
       "unitStateType": "iqb-standard@1.1"
     }
   ],
+  "currentOriginalStarsPackage": {
+    "family": "Original Testcenter STARS system test",
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "94b04751abfe024eb1d354c29718f90b4740c4c6",
+    "sourceDirectory": "sampledata/system-test/load-player/stars",
+    "player": {
+      "fixture": "players/iqb-player-stars-0.6.40.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/iqb-player-stars-0.6.40.html",
+      "sha256": "04cc96dc343bc4c2f4f248669569a9673fadd104685a8e3232ee3214a09d4cd5",
+      "playerKey": "iqb-player-stars@0.6",
+      "playerModuleId": "iqb-player-stars",
+      "playerModuleVersion": "0.6.40",
+      "playerApiVersion": "6.0",
+      "metadataVersion": "2.0",
+      "unitStateType": "iqb-standard@2.0"
+    },
+    "unit": {
+      "fixture": "units/CY-StarsUnit-001.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.xml",
+      "sha256": "9df6b68828b126a05c5656afe4e879df801572766e37cc6ceda157b7bc6e828f",
+      "unitKey": "CY-StarsUnit-001"
+    },
+    "definition": {
+      "fixture": "definitions/stars-CY-StarsUnit-001.voud.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.voud",
+      "sha256": "d2de55691182b7277a3ba80c6e96a787e95e00f45fead9cfadc5ce470f99a131",
+      "definitionType": "stars-unit-definition@0.7"
+    },
+    "metadata": {
+      "fixture": "definitions/stars-CY-StarsUnit-001.vomd.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.vomd",
+      "sha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
+    },
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Stars.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Bklt_Stars.xml",
+      "sha256": "af4f05ae04b190ef9f010d22f36e7a684b831afa3707b885ea60e5d9cdc5a8b3",
+      "bookletKey": "Cy-Bklt_Stars-1",
+      "unitKey": "CY-StarsUnit-001",
+      "unitCount": 28,
+      "aliases": [
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+        "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+        "21", "22", "23", "24", "25", "26", "27", "28"
+      ]
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Stars.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Logins_Stars.xml",
+      "sha256": "63401d260a84e71e0270b84faea4f53f64c7c94f7f4a3b9a96bda3faedba83f0",
+      "groupKey": "group1",
+      "participantLogins": [
+        ["stars-1", "run-review"],
+        ["stars-2", "run-demo"],
+        ["stars-3", "run-hot-return"],
+        ["stars-4", "run-hot-restart"]
+      ]
+    }
+  },
   "playerPackages": [
     {
       "bookletFixture": "booklets/booklet-17.4.xml",

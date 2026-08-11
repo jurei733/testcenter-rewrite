@@ -15588,6 +15588,30 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_login_booklet_visibility_invalid"
     },
     {
+      label: "unsupported login view-settings child",
+      rosterText: validRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><Unexpected /></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_view_settings_child_invalid"
+    },
+    {
+      label: "invalid login code-input type",
+      rosterText: validRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><codeInput><type>keyboard</type><length>3</length></codeInput></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_code_input_type_invalid"
+    },
+    {
+      label: "invalid login code-input length",
+      rosterText: validRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><codeInput><type>keypad-numbers</type><length>2</length></codeInput></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_code_input_length_invalid"
+    },
+    {
       label: "duplicate custom text key",
       rosterText: validRosterXml.replace(
         '<CustomText key="somestr">string</CustomText>',
@@ -19360,6 +19384,276 @@ test("original Testcenter compatibility corpus imports official independent play
       JSON.stringify(importResult.body.importJob.diagnostics)
     );
   }
+});
+
+test("original Testcenter compatibility corpus imports and starts the current STARS system-test graph", async () => {
+  type PinnedFixture = {
+    fixture: string;
+    sha256: string;
+  };
+  type CurrentStarsPackage = {
+    player: PinnedFixture & {
+      playerKey: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+    };
+    unit: PinnedFixture & { unitKey: string };
+    definition: PinnedFixture;
+    metadata: PinnedFixture;
+    booklet: PinnedFixture & {
+      bookletKey: string;
+      unitKey: string;
+      unitCount: number;
+      aliases: string[];
+    };
+    roster: PinnedFixture & {
+      groupKey: string;
+      participantLogins: Array<[loginKey: string, executionMode: string]>;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentOriginalStarsPackage: CurrentStarsPackage };
+  const stars = corpus.currentOriginalStarsPackage;
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, stars.player.fixture)
+  );
+  const definitionDocument = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, stars.definition.fixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  );
+  const metadataDocument = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, stars.metadata.fixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  );
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, stars.unit.fixture)
+  );
+  const bookletDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, stars.booklet.fixture)
+  );
+  const rosterDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, stars.roster.fixture)
+  );
+  for (const [document, fixture] of [
+    [playerDocument, stars.player],
+    [definitionDocument, stars.definition],
+    [metadataDocument, stars.metadata],
+    [unitDocument, stars.unit],
+    [bookletDocument, stars.booklet],
+    [rosterDocument, stars.roster]
+  ] as const) {
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      fixture.sha256
+    );
+  }
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${stars.booklet.bookletKey}" href="booklets/CY_Bklt_Stars.xml" />
+            <resource identifier="${stars.unit.unitKey}" href="units/CY-StarsUnit-001.xml" />
+            <resource identifier="${stars.unit.unitKey}.voud" href="units/CY-StarsUnit-001.voud" />
+            <resource identifier="${stars.unit.unitKey}.vomd" href="units/CY-StarsUnit-001.vomd" />
+            <resource identifier="${stars.player.playerKey}" href="players/iqb-player-stars-0.6.40.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/CY_Bklt_Stars.xml",
+      content: bookletDocument.toString("utf8")
+    },
+    {
+      fileName: "export/units/CY-StarsUnit-001.xml",
+      content: unitDocument.toString("utf8")
+    },
+    {
+      fileName: "export/units/CY-StarsUnit-001.voud",
+      content: definitionDocument.toString("utf8")
+    },
+    {
+      fileName: "export/units/CY-StarsUnit-001.vomd",
+      content: metadataDocument.toString("utf8")
+    },
+    {
+      fileName: "export/players/iqb-player-stars-0.6.40.html",
+      content: playerDocument
+    }
+  ]);
+  const tenantKey = "integration-tenant-current-original-stars";
+  const workspaceKey = "integration-workspace-current-original-stars";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "current-original-stars.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`${workspaceUrl}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.equal(
+    importResult.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const contentReleaseId =
+    importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              originalUnitId?: string;
+              displayLabel: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(`${workspaceUrl}/content-releases/${contentReleaseId}`);
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = snapshot.bookletEntries.find(
+    entry => entry.bookletKey === stars.booklet.bookletKey
+  );
+  assert.ok(booklet);
+  assert.equal(booklet.unitEntries.length, stars.booklet.unitCount);
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.unitKey),
+    stars.booklet.aliases
+  );
+  assert.ok(
+    booklet.unitEntries.every(
+      unit =>
+        unit.originalUnitId === stars.booklet.unitKey &&
+        unit.playerKey === stars.player.playerKey &&
+        unit.unitDefinition === definitionDocument.toString("utf8").trim()
+    )
+  );
+  assert.equal(snapshot.playerEntries?.[0]?.playerKey, stars.player.playerKey);
+  assert.match(snapshot.playerEntries?.[0]?.html ?? "", /"version"\s*:\s*"0\.6\.40"/);
+
+  const activation = await requestJson(
+    `${workspaceUrl}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+  const rosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      groupKey: string;
+      bookletKey: string | null;
+      executionMode?: string;
+      passwordRequired: boolean;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+  }>(`${workspaceUrl}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: rosterDocument.toString("utf8") }
+  });
+  assert.equal(rosterImport.status, 201, JSON.stringify(rosterImport.body));
+  assert.deepEqual(
+    rosterImport.body.items.map(item => [item.loginKey, item.executionMode]),
+    stars.roster.participantLogins
+  );
+  assert.ok(
+    rosterImport.body.items.every(
+      item =>
+        item.groupKey === stars.roster.groupKey &&
+        item.bookletKey === stars.booklet.bookletKey &&
+        item.passwordRequired &&
+        item.validationWarnings.length === 0
+    )
+  );
+
+  const signIn = await requestJson<{
+    participantSession: {
+      participantSessionId: string;
+      executionMode?: string;
+    };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "stars-3",
+      password: "123"
+    }
+  });
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.participantSession.executionMode, "run-hot-return");
+  const participantSessionId =
+    signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { currentUnitKey: string | null; executionMode?: string };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: stars.booklet.bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.equal(resume.body.testRun.currentUnitKey, "1");
+  assert.equal(resume.body.testRun.executionMode, "run-hot-return");
+  const currentState = await requestJson<{
+    currentRunState: {
+      currentUnit?: {
+        unitKey: string;
+        player?: { playerKey: string; moduleVersion?: string } | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(currentState.body.currentRunState.currentUnit?.unitKey, "1");
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.player?.playerKey,
+    stars.player.playerKey
+  );
 });
 
 test("original Testcenter compatibility corpus imports the historical DAN DefinitionRef graph", async () => {

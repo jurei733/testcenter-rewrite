@@ -2,7 +2,9 @@
 
 These fixtures are pinned from IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20). Their source
-paths and executable expectations are declared in `corpus.json`.
+paths and executable expectations are declared in `corpus.json`. Newer
+package-level additions are pinned independently to their introducing Original
+Testcenter commit so the historical baseline remains reproducible.
 
 The coding-scheme corpus also pins the official MIT-licensed
 `@iqb/responses` 3.6.0 `SOLVER/case1` scheme, input, and expected outcome at
@@ -130,6 +132,15 @@ independent family. STARS declares
 metadata 2.0 and Verona API 6, emits `iqb-standard@1.1` state through its
 JSON-string `responses` data part, and restores the selected option after a
 production Chromium/SQLite reload. The corpus
+also pins the complete current Original Testcenter STARS system-test package at
+commit `94b04751abfe024eb1d354c29718f90b4740c4c6`: Player 0.6.40, Unit,
+Voud/Vomd definition, 28-alias Booklet, and four-account Testtakers roster are
+all byte-exact. This graph gates the current `unit-xml` W3ID schema URL, nested
+18.0 `ViewSettings` (`theme` and `codeInput`), `iqb-standard@2.0` responses,
+Player navigation to the next alias, and selected-option restoration after a
+production Chromium/SQLite reload. The older 0.6.19 pair remains an independent
+release-family compatibility fixture rather than being replaced by the current
+Original package. The corpus
 also retains the Testbed's historical metadata-free `IQBVisualUnitPlayerV2.99.2`
 artifact and original `G231mm.xml`; import and production browser gates resolve
 and execute their unmodified

@@ -9354,9 +9354,9 @@ const validateTestcenterXmlSourceDocument = (
       )
     );
   }
-  const w3idSchemaSlug = {
+  const w3idSchemaSlugPattern = {
     Booklet: "testcenter-booklet-xml",
-    Unit: "testcenter-unit-xml",
+    Unit: "(?:unit-xml|testcenter-unit-xml)",
     Testtakers: "testcenter-testtaker-xml",
     SysCheck: "testcenter-syscheck-xml"
   }[canonicalRootName];
@@ -9365,7 +9365,7 @@ const validateTestcenterXmlSourceDocument = (
       `(?:^|/)definitions/v?o?_?${canonicalRootName}\\.xsd(?:[?#].*)?$`
     ).test(schemaLocation) ||
     new RegExp(
-      `^https://w3id\\.org/iqb/spec/${w3idSchemaSlug}/\\d+\\.\\d+(?:\\.\\d+)?(?:[?#].*)?$`,
+      `^https://w3id\\.org/iqb/spec/${w3idSchemaSlugPattern}/\\d+\\.\\d+(?:\\.\\d+)?(?:[?#].*)?$`,
       "i"
     ).test(schemaLocation);
   if (schemaLocation && !isSupportedSchemaReference) {
@@ -11620,15 +11620,147 @@ const validateTestcenterXmlSourceDocument = (
           ["monitorBookletVisibility"],
           `ViewSettings for login '${loginName}'`
         );
-        if (xmlChildElements(viewSetting).length > 0) {
+        const viewSettingChildren = xmlChildElements(viewSetting);
+        for (const child of viewSettingChildren) {
+          const childName = xmlElementLocalName(child);
+          if (!["theme", "codeInput", "monitorBookletVisibility"].includes(childName)) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_login_view_settings_child_invalid",
+                `Original Testcenter roster '${sourceFileName}' contains unsupported ViewSettings child '${childName}' for login '${loginName}'.`
+              )
+            );
+          }
+        }
+        const themes = xmlChildrenNamed(viewSetting, "theme");
+        const codeInputs = xmlChildrenNamed(viewSetting, "codeInput");
+        const visibilityElements = xmlChildrenNamed(
+          viewSetting,
+          "monitorBookletVisibility"
+        );
+        for (const [elements, childName] of [
+          [themes, "theme"],
+          [codeInputs, "codeInput"],
+          [visibilityElements, "monitorBookletVisibility"]
+        ] as const) {
+          if (elements.length > 1) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_login_view_settings_cardinality_invalid",
+                `Original Testcenter roster '${sourceFileName}' contains repeated ViewSettings/${childName} for login '${loginName}'.`
+              )
+            );
+          }
+        }
+        for (const theme of themes) {
+          validateAttributes(theme, [], `ViewSettings/theme for login '${loginName}'`);
+          validateSimpleContent(
+            theme,
+            `ViewSettings/theme for login '${loginName}'`
+          );
+        }
+        for (const codeInput of codeInputs) {
+          validateAttributes(
+            codeInput,
+            [],
+            `ViewSettings/codeInput for login '${loginName}'`
+          );
+          const codeInputChildren = xmlChildElements(codeInput);
+          for (const child of codeInputChildren) {
+            const childName = xmlElementLocalName(child);
+            if (!["type", "length"].includes(childName)) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "testcenter_xml_login_code_input_child_invalid",
+                  `Original Testcenter roster '${sourceFileName}' contains unsupported ViewSettings/codeInput child '${childName}' for login '${loginName}'.`
+                )
+              );
+            }
+          }
+          const codeInputTypes = xmlChildrenNamed(codeInput, "type");
+          const codeInputLengths = xmlChildrenNamed(codeInput, "length");
+          if (codeInputTypes.length !== 1 || codeInputLengths.length > 1) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_login_code_input_cardinality_invalid",
+                `Original Testcenter roster '${sourceFileName}' requires one ViewSettings/codeInput/type and at most one length for login '${loginName}'.`
+              )
+            );
+          }
+          for (const type of codeInputTypes) {
+            validateAttributes(
+              type,
+              [],
+              `ViewSettings/codeInput/type for login '${loginName}'`
+            );
+            validateSimpleContent(
+              type,
+              `ViewSettings/codeInput/type for login '${loginName}'`
+            );
+            const value = xmlElementText(type);
+            if (
+              ![
+                "text-field",
+                "keypad-symbols",
+                "keypad-symbols-alt",
+                "keypad-numbers"
+              ].includes(value)
+            ) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "testcenter_xml_login_code_input_type_invalid",
+                  `Original Testcenter roster '${sourceFileName}' contains invalid ViewSettings/codeInput/type '${value}' for login '${loginName}'.`
+                )
+              );
+            }
+          }
+          for (const length of codeInputLengths) {
+            validateAttributes(
+              length,
+              [],
+              `ViewSettings/codeInput/length for login '${loginName}'`
+            );
+            validateSimpleContent(
+              length,
+              `ViewSettings/codeInput/length for login '${loginName}'`
+            );
+            const value = xmlElementText(length);
+            if (!isTestcenterXmlInteger(value) || Number(value) < 3) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "testcenter_xml_login_code_input_length_invalid",
+                  `Original Testcenter roster '${sourceFileName}' contains invalid ViewSettings/codeInput/length '${value}' for login '${loginName}'.`
+                )
+              );
+            }
+          }
+        }
+        for (const visibilityElement of visibilityElements) {
+          validateAttributes(
+            visibilityElement,
+            [],
+            `ViewSettings/monitorBookletVisibility for login '${loginName}'`
+          );
+          validateSimpleContent(
+            visibilityElement,
+            `ViewSettings/monitorBookletVisibility for login '${loginName}'`
+          );
+        }
+        const attributeVisibility = viewSetting.getAttribute(
+          "monitorBookletVisibility"
+        );
+        if (attributeVisibility !== null && visibilityElements.length > 0) {
           diagnostics.push(
             createImportDiagnostic(
-              "testcenter_xml_login_view_settings_child_invalid",
-              `Original Testcenter roster '${sourceFileName}' contains nested elements in ViewSettings for login '${loginName}'.`
+              "testcenter_xml_login_view_settings_cardinality_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains both legacy ViewSettings/@monitorBookletVisibility and the current child element for login '${loginName}'.`
             )
           );
         }
-        const visibility = viewSetting.getAttribute("monitorBookletVisibility");
+        const visibility =
+          visibilityElements.length > 0
+            ? xmlElementText(visibilityElements[0])
+            : attributeVisibility;
         if (
           visibility !== null &&
           !["visible", "collapsed", "hidden"].includes(visibility)

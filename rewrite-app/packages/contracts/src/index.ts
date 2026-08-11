@@ -1795,14 +1795,17 @@ export const parseOriginalTestcenterOperationalLogins = (
         )
     ).filter((profileId): profileId is string => Boolean(profileId));
     const uniqueProfileIds = Array.from(new Set(profileIds));
-    const viewSettingsAttributes = content.match(
+    const viewSettingsMatch = content.match(
       /<(?:[a-zA-Z_][\w.-]*:)?viewsettings\b([^>]*?)(?:\/?>)/i
-    )?.[1];
-    const importedVisibility = viewSettingsAttributes
+    );
+    const importedVisibility = viewSettingsMatch
       ? readXmlAttribute(
-          parseXmlAttributes(viewSettingsAttributes),
+          parseXmlAttributes(viewSettingsMatch[1] ?? ""),
           "monitorBookletVisibility"
-        )?.trim()
+        )?.trim() ??
+        normalizeRosterTextValue(
+          readXmlChildText(content, "monitorBookletVisibility")
+        )
       : undefined;
     const monitorBookletVisibility =
       importedVisibility === "collapsed" || importedVisibility === "hidden"

@@ -252,7 +252,7 @@ describe("parseParticipantRosterText", () => {
         "      <Profile id=\"small\" />",
         "      <Profile id=\"all\" />",
         "      <Profile id=\"missing\" />",
-        "      <ViewSettings monitorBookletVisibility=\"collapsed\" />",
+        "      <ViewSettings><monitorBookletVisibility>collapsed</monitorBookletVisibility></ViewSettings>",
         "    </Login>",
         "    <Login mode=\"sys-check-login\" name=\"sys-check\" />",
         "    <Login mode=\"run-hot-return\" name=\"participant\"><Booklet>BOOKLET.A</Booklet></Login>",
