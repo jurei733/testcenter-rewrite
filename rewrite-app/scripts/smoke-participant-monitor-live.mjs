@@ -266,6 +266,9 @@ try {
   await operatorPage
     .locator("#playerPreviewStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewPauseSource", { hasText: "not paused" })
+    .waitFor({ timeout: 15_000 });
 
   const openRunCard = operatorPage
     .locator("#openMonitorRunsCollection .record-card")
@@ -324,6 +327,12 @@ try {
   await operatorPage
     .locator("#playerPreviewActions", { hasText: "none" })
     .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewPauseSource", { hasText: "monitor" })
+    .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewHint", { hasText: /participant cannot resume/i })
+    .waitFor({ timeout: 15_000 });
   await participantPage
     .locator("#participantRouteStatus", { hasText: "paused" })
     .waitFor({ timeout: 15_000 });
@@ -350,6 +359,9 @@ try {
     .waitFor({ timeout: 15_000 });
   await operatorPage
     .locator("#playerPreviewActions", { hasText: "save_progress" })
+    .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewPauseSource", { hasText: "not paused" })
     .waitFor({ timeout: 15_000 });
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })

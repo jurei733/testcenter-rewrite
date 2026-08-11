@@ -67,6 +67,7 @@ type RuntimePlayerPreview = {
   unitKey: string;
   unitResponse: string;
   runStatus: string;
+  pauseSource: string;
   runId: string;
   availableActions: string[];
   hint: string;
@@ -3285,6 +3286,7 @@ export class RuntimeViewFacade {
         unitKey: "n/a",
         unitResponse: "",
         runStatus: "idle",
+        pauseSource: "not paused",
         runId: this.runtime.testRunId.trim() || "no run selected",
         availableActions: [],
         hint: "Sign in and resume a participant session to load the first unit.",
@@ -3305,6 +3307,17 @@ export class RuntimeViewFacade {
     const canResume = currentRunState.availableActions.includes("resume");
     const canComplete = currentRunState.availableActions.includes("complete");
     const unitResponse = currentRunState.testRun.unitResponses?.[unitKey] ?? "";
+    let hint =
+      "This preview is sourced from the same current-state endpoint a participant shell can use.";
+    if (currentRunState.testRun.status === "completed") {
+      hint =
+        "This run is complete; monitor reads should no longer list it as an open blocker.";
+    } else if (currentRunState.testRun.pauseSource === "monitor") {
+      hint =
+        "Paused by a monitor. The participant cannot resume this run; use Monitor Resume when supervision allows it.";
+    } else if (currentRunState.testRun.pauseSource === "participant") {
+      hint = "Paused by the participant. Participant Resume remains available.";
+    }
 
     return {
       hasRun: true,
@@ -3313,12 +3326,10 @@ export class RuntimeViewFacade {
       unitKey,
       unitResponse,
       runStatus: currentRunState.testRun.status,
+      pauseSource: currentRunState.testRun.pauseSource ?? "not paused",
       runId: currentRunState.testRun.testRunId,
       availableActions: currentRunState.availableActions,
-      hint:
-        currentRunState.testRun.status === "completed"
-          ? "This run is complete; monitor reads should no longer list it as an open blocker."
-          : "This preview is sourced from the same current-state endpoint a participant shell can use.",
+      hint,
       canSaveProgress,
       canResume,
       canComplete,

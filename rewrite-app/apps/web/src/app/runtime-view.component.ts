@@ -405,6 +405,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <dd id="playerPreviewRunId">{{ view.playerPreview.runId }}</dd>
             </div>
             <div>
+              <dt>Pause Source</dt>
+              <dd id="playerPreviewPauseSource">{{ view.playerPreview.pauseSource }}</dd>
+            </div>
+            <div>
               <dt>Available Actions</dt>
               <dd id="playerPreviewActions">{{ view.playerPreview.availableActions.join(", ") || "none" }}</dd>
             </div>
@@ -424,7 +428,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               placeholder="Write or inspect the response saved for this unit."
             ></textarea>
           </label>
-          <p>{{ view.playerPreview.hint }}</p>
+          <p id="playerPreviewHint">{{ view.playerPreview.hint }}</p>
           <div class="actions">
             <button class="secondary" type="button" [disabled]="!view.playerPreview.canSaveProgress" (click)="view.saveProgressFromPreview()">Preview {{ view.playerPreview.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.playerPreview.canResume" (click)="view.resumeRun()">Resume</button>
