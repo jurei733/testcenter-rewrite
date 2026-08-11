@@ -12351,6 +12351,68 @@ test("original Testcenter compatibility corpus imports representative booklets",
     );
   }
 
+  const version15TimedBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/Booklet_sameBookletID.xml"
+    ),
+    "utf8"
+  )
+    .replace("/14.3.0/definitions/", "/15.1.8/definitions/")
+    .replace('minutes="1"', 'minutes="1" leave="forbidden"');
+  const version15TimedBookletWorkspaceKey = await createValidationWorkspace(
+    "booklet-15-time-max-leave.xml"
+  );
+  const version15TimedBookletPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${version15TimedBookletWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet-15-time-max-leave.xml",
+        mediaType: "application/xml",
+        sourceDocument: version15TimedBookletXml
+      }
+    }
+  );
+  assert.equal(version15TimedBookletPackage.status, 201);
+  const version15TimedBookletImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          testletEntries?: Array<{
+            testletKey: string;
+            restrictions?: { timeMax?: { minutes: number; leave: string } };
+          }>;
+        }>;
+      };
+    } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${version15TimedBookletWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          version15TimedBookletPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    version15TimedBookletImport.body.importJob.status,
+    "completed",
+    JSON.stringify(version15TimedBookletImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(version15TimedBookletImport.body.importJob.diagnostics, []);
+  assert.deepEqual(
+    version15TimedBookletImport.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0]?.testletEntries?.find(
+        testlet => testlet.testletKey === "a_testlet_with_restrictions_100"
+      )?.restrictions?.timeMax,
+    { minutes: 1, leave: "forbidden" }
+  );
+
   const validBookletXml = readFileSync(
     resolve(originalTestcenterCorpusRoot, corpus.booklets[0].fixture),
     "utf8"
@@ -12898,6 +12960,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
         '<State id="Level"'
       ),
       diagnosticCode: "testcenter_xml_state_id_invalid"
+    },
+    {
+      fileName: "booklet-14-time-max-leave.xml",
+      sourceDocument: validLegacyBookletXml.replace(
+        'minutes="1"',
+        'minutes="1" leave="confirm"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-15-invalid-time-max-leave.xml",
+      sourceDocument: validLegacyBookletXml
+        .replace("/14.3.0/definitions/", "/15.1.8/definitions/")
+        .replace('minutes="1"', 'minutes="1" leave="allowed"'),
+      diagnosticCode: "testcenter_xml_time_max_leave_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_booklet_attribute_invalid"
     },
     {
       fileName: "booklet-missing-state-id.xml",

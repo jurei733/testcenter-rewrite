@@ -9091,6 +9091,10 @@ const validateTestcenterXmlSourceDocument = (
     const bookletSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
     const usesAdaptiveBookletSchema =
       bookletSchemaVersion === null || bookletSchemaVersion.major >= 17;
+    const supportsTimeMaxLeave =
+      bookletSchemaVersion === null ||
+      bookletSchemaVersion.major > 15 ||
+      (bookletSchemaVersion.major === 15 && bookletSchemaVersion.minor >= 1);
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -9529,7 +9533,7 @@ const validateTestcenterXmlSourceDocument = (
       for (const timeMax of xmlChildrenNamed(restriction, "TimeMax")) {
         validateAttributes(
           timeMax,
-          usesAdaptiveBookletSchema ? ["minutes", "leave"] : ["minutes"],
+          supportsTimeMaxLeave ? ["minutes", "leave"] : ["minutes"],
           `TimeMax for ${context}`
         );
         validateSimpleContent(timeMax, `TimeMax for ${context}`);
@@ -9550,7 +9554,11 @@ const validateTestcenterXmlSourceDocument = (
         }
         if (
           leave !== null &&
-          !["forbidden", "confirm", "allowed"].includes(leave.trim())
+          supportsTimeMaxLeave &&
+          !(usesAdaptiveBookletSchema
+            ? ["forbidden", "confirm", "allowed"]
+            : ["forbidden", "confirm"]
+          ).includes(leave.trim())
         ) {
           diagnostics.push(
             createImportDiagnostic(
