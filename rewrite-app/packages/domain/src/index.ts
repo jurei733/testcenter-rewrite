@@ -383,6 +383,8 @@ export type ParticipantRosterEntry = {
   validForMinutes?: number | null;
   customTexts?: Record<string, string>;
   viewSettings?: ParticipantViewSettings;
+  /** Original application asset filenames keyed by the Testtakers slot name. */
+  assetAssignments?: Record<string, string>;
   importedAt: string;
 };
 
@@ -523,6 +525,8 @@ export type OperationalLoginMigrationCandidate = {
   monitorProfiles: MonitorViewProfile[];
   monitorBookletVisibility: MonitorBookletVisibility;
   customTexts: Record<string, string>;
+  /** Original application asset filenames keyed by the Testtakers slot name. */
+  assetAssignments?: Record<string, string>;
   unresolvedProfileIds: string[];
   validFrom?: string | null;
   validTo?: string | null;

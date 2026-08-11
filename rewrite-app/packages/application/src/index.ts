@@ -10977,6 +10977,8 @@ const validateTestcenterXmlSourceDocument = (
     const supportsBookletStatePresets = rosterSchemaSupports(15, 4);
     const supportsExtendedMonitorProfiles = rosterSchemaSupports(15, 4);
     const supportsLoginViewSettings = rosterSchemaSupports(17, 6);
+    const supportsNestedLoginViewSettings = rosterSchemaSupports(18, 0);
+    const supportsAssetAssignments = rosterSchemaSupports(18, 0);
     const rosterSchemaLabel = rosterSchemaVersion
       ? `${rosterSchemaVersion.major}.${rosterSchemaVersion.minor}`
       : "unknown";
@@ -11018,6 +11020,73 @@ const validateTestcenterXmlSourceDocument = (
           createImportDiagnostic(
             "testcenter_xml_testtakers_simple_content_invalid",
             `Original Testcenter roster '${sourceFileName}' contains nested element '${xmlElementLocalName(nestedChildren[0])}' in text-only ${context}.`
+          )
+        );
+      }
+    };
+    const validateAssetAssignments = (
+      parent: XmlElement,
+      context: string
+    ): void => {
+      const containers = xmlChildrenNamed(parent, "AssetAssignments");
+      if (containers.length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_asset_assignments_cardinality_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains repeated AssetAssignments for ${context}.`
+          )
+        );
+      }
+      for (const container of containers) {
+        if (!supportsAssetAssignments) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_asset_assignments_version_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains AssetAssignments for ${context}, which are not supported by schema ${rosterSchemaLabel}.`
+            )
+          );
+        }
+        validateAttributes(container, [], `AssetAssignments for ${context}`);
+        const assets = xmlChildElements(container);
+        for (const asset of assets) {
+          if (xmlElementLocalName(asset) !== "Asset") {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_asset_assignments_child_invalid",
+                `Original Testcenter roster '${sourceFileName}' contains unsupported AssetAssignments child '${xmlElementLocalName(asset)}' for ${context}.`
+              )
+            );
+            continue;
+          }
+          validateAttributes(asset, ["slot"], `Asset for ${context}`);
+          validateSimpleContent(asset, `Asset for ${context}`);
+          if (!asset.getAttribute("slot")?.trim()) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_asset_slot_missing",
+                `Original Testcenter roster '${sourceFileName}' contains an Asset without a slot for ${context}.`
+              )
+            );
+          }
+          if (!xmlElementText(asset).trim()) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_asset_name_missing",
+                `Original Testcenter roster '${sourceFileName}' contains an Asset without a filename for ${context}.`
+              )
+            );
+          }
+        }
+        diagnostics.push(
+          ...validateUniqueTestcenterXmlValues(
+            assets
+              .filter(asset => xmlElementLocalName(asset) === "Asset")
+              .map(asset => ({
+                value: asset.getAttribute("slot")?.trim() ?? "",
+                label: "asset slot"
+              })),
+            "testcenter_xml_asset_slot_duplicate",
+            sourceFileName
           )
         );
       }
@@ -11389,17 +11458,31 @@ const validateTestcenterXmlSourceDocument = (
         `Group '${group.getAttribute("id")?.trim() || "unknown"}'`
       );
       const groupChildren = xmlChildElements(group);
+      let loginSeen = false;
       for (const child of groupChildren) {
         const childName = xmlElementLocalName(child);
-        if (childName !== "Login") {
+        if (!["AssetAssignments", "Login"].includes(childName)) {
           diagnostics.push(
             createImportDiagnostic(
               "testcenter_xml_group_child_invalid",
               `Original Testcenter roster '${sourceFileName}' contains unsupported Group child '${childName}' for '${group.getAttribute("id")?.trim() || "unknown"}'.`
             )
           );
+        } else if (childName === "Login") {
+          loginSeen = true;
+        } else if (loginSeen) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_group_sequence_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains AssetAssignments after a Login for Group '${group.getAttribute("id")?.trim() || "unknown"}'.`
+            )
+          );
         }
       }
+      validateAssetAssignments(
+        group,
+        `Group '${group.getAttribute("id")?.trim() || "unknown"}'`
+      );
       if (xmlChildrenNamed(group, "Login").length === 0) {
         diagnostics.push(
           createImportDiagnostic(
@@ -11481,9 +11564,14 @@ const validateTestcenterXmlSourceDocument = (
       );
       const loginChildren = xmlChildElements(login);
       let viewSettingsSeen = false;
+      let assetAssignmentsSeen = false;
       for (const child of loginChildren) {
         const childName = xmlElementLocalName(child);
-        if (!["Booklet", "Profile", "ViewSettings"].includes(childName)) {
+        if (
+          !["Booklet", "Profile", "AssetAssignments", "ViewSettings"].includes(
+            childName
+          )
+        ) {
           diagnostics.push(
             createImportDiagnostic(
               "testcenter_xml_login_child_invalid",
@@ -11494,6 +11582,17 @@ const validateTestcenterXmlSourceDocument = (
         }
         if (childName === "ViewSettings") {
           viewSettingsSeen = true;
+        } else if (childName === "AssetAssignments") {
+          if (viewSettingsSeen) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_login_sequence_invalid",
+                `Original Testcenter roster '${sourceFileName}' contains AssetAssignments after ViewSettings for login '${loginName}'.`
+              )
+            );
+            break;
+          }
+          assetAssignmentsSeen = true;
         } else if (viewSettingsSeen) {
           diagnostics.push(
             createImportDiagnostic(
@@ -11502,8 +11601,17 @@ const validateTestcenterXmlSourceDocument = (
             )
           );
           break;
+        } else if (assetAssignmentsSeen) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_sequence_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains a Booklet or Profile assignment after AssetAssignments for login '${loginName}'.`
+            )
+          );
+          break;
         }
       }
+      validateAssetAssignments(login, `login '${loginName}'`);
       if (!login.getAttribute("name")?.trim()) {
         diagnostics.push(
           createImportDiagnostic(
@@ -11621,6 +11729,17 @@ const validateTestcenterXmlSourceDocument = (
           `ViewSettings for login '${loginName}'`
         );
         const viewSettingChildren = xmlChildElements(viewSetting);
+        if (
+          viewSettingChildren.length > 0 &&
+          !supportsNestedLoginViewSettings
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_view_settings_children_version_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains nested ViewSettings for login '${loginName}', which are not supported by schema ${rosterSchemaLabel}.`
+            )
+          );
+        }
         for (const child of viewSettingChildren) {
           const childName = xmlElementLocalName(child);
           if (!["theme", "codeInput", "monitorBookletVisibility"].includes(childName)) {
@@ -21814,6 +21933,10 @@ export const createFirstSliceServices = (
         validForMinutes: parsedEntry.validForMinutes ?? null,
         customTexts: parsedEntry.customTexts ?? {},
         viewSettings: parsedEntry.viewSettings ?? {},
+        ...(parsedEntry.assetAssignments &&
+        Object.keys(parsedEntry.assetAssignments).length > 0
+          ? { assetAssignments: parsedEntry.assetAssignments }
+          : {}),
         importedAt: now()
       };
 

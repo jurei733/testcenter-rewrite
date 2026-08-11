@@ -381,6 +381,18 @@ const readStateFromFile = async (
             !Array.isArray(entry.viewSettings)
               ? entry.viewSettings
               : {},
+          ...(entry.assetAssignments &&
+            typeof entry.assetAssignments === "object" &&
+            !Array.isArray(entry.assetAssignments)
+            ? {
+                assetAssignments: Object.fromEntries(
+                  Object.entries(entry.assetAssignments).filter(
+                    (assignment): assignment is [string, string] =>
+                      typeof assignment[1] === "string"
+                  )
+                )
+              }
+            : {}),
           bookletKey:
             entry.bookletKey ??
             (Array.isArray(entry.bookletKeys) &&

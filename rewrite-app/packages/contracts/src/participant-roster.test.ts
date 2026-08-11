@@ -9,6 +9,49 @@ import {
 } from "./index.js";
 
 describe("parseParticipantRosterText", () => {
+  it("inherits Testtakers 18.0 group assets and lets login assets override slots", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          '<Testtakers xmlns="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0">',
+          '  <Group id="group-a">',
+          "    <AssetAssignments>",
+          '      <Asset slot="logo">school.png</Asset>',
+          '      <Asset slot="starterCompanion">group-start.webp</Asset>',
+          "    </AssetAssignments>",
+          '    <Login name="student-a" mode="run-hot-return">',
+          '      <Booklet>booklet-a</Booklet>',
+          "      <AssetAssignments>",
+          '        <Asset slot="starterCompanion">student-start.jpg</Asset>',
+          "      </AssetAssignments>",
+          "    </Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      ),
+      [
+        {
+          loginKey: "student-a",
+          executionMode: "run-hot-return",
+          groupKey: "group-a",
+          bookletKey: "booklet-a",
+          bookletAssignments: [
+            {
+              assignmentKey: "booklet-a",
+              bookletKey: "booklet-a",
+              statePreset: {}
+            }
+          ],
+          displayName: null,
+          assetAssignments: {
+            logo: "school.png",
+            starterCompanion: "student-start.jpg"
+          }
+        }
+      ]
+    );
+  });
+
   it("parses CSV, TSV, and semicolon roster rows", () => {
     assert.deepEqual(
       parseParticipantRosterText(
@@ -255,11 +298,13 @@ describe("parseParticipantRosterText", () => {
         "    <Profile id=\"small\" label=\"Reduced\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"hide\" bookletColumn=\"hide\" filterLocked=\"yes\" filterPending=\"yes\"><Filter label=\"Reduced Booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Reduced Booklet\" not=\"1\" /><Filter label=\"Operator group\" type=\"equal\" field=\"groupName\" value=\"operators\" not=\"0\" /></Profile>",
         "  </GroupMonitor></Profiles>",
         "  <Group id=\"scheduled-operators\" validFrom=\"1/6/2023 10:00\" validFor=\"45\">",
+        "    <AssetAssignments><Asset slot=\"logo\">operator-logo.png</Asset></AssetAssignments>",
         "    <Login mode=\"monitor-group\" name=\"group-monitor\" pw=\"secret\">",
         "      <Profile id=\"all\" />",
         "      <Profile id=\"small\" />",
         "      <Profile id=\"all\" />",
         "      <Profile id=\"missing\" />",
+        "      <AssetAssignments><Asset slot=\"logo\">monitor-logo.webp</Asset></AssetAssignments>",
         "      <ViewSettings><monitorBookletVisibility>collapsed</monitorBookletVisibility></ViewSettings>",
         "    </Login>",
         "    <Login mode=\"sys-check-login\" name=\"sys-check\" />",
@@ -327,6 +372,7 @@ describe("parseParticipantRosterText", () => {
         ],
         monitorBookletVisibility: "collapsed",
         customTexts: { gm_headline: "Custom monitor" },
+        assetAssignments: { logo: "monitor-logo.webp" },
         unresolvedProfileIds: ["missing"],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
@@ -340,6 +386,7 @@ describe("parseParticipantRosterText", () => {
         monitorProfiles: [],
         monitorBookletVisibility: "visible",
         customTexts: { gm_headline: "Custom monitor" },
+        assetAssignments: { logo: "operator-logo.png" },
         unresolvedProfileIds: [],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45

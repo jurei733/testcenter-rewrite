@@ -158,6 +158,17 @@ byte identity, participant/operational separation, custom-text retention,
 idempotent legacy updates, and the version boundaries across memory, file, and
 SQLite.
 
+Latest P0 Testtakers 18.0 asset-assignment intake closure: group- and
+login-level `<AssetAssignments>` now pass generation-aware schema validation,
+including child/attribute/cardinality/order checks and unique non-empty slots.
+The roster parser applies the original Group < Login precedence and preserves
+the resulting filename map for participant and password-redacted operational
+logins. File, SQLite, and PostgreSQL adapters retain participant assignments;
+API and restart tests cover import and persistence. Schemas before 18.0 reject
+the new container explicitly. Uploading the referenced global image registry,
+resolving missing filenames, and rendering the eight slots remain the next
+branding/Participant vertical slice.
+
 Latest P0 adaptive initial-state closure: the server now mirrors the original
 Testloader by registering every variable referenced anywhere in a state
 expression as `{status: "UNSET", value: null}` before any Unit response exists.
@@ -738,6 +749,12 @@ now persist through file, SQLite, and PostgreSQL stores: Angular applies and
 clears the per-login theme override and renders Original-style numeric, symbol,
 or alternative-symbol keypads at both the second-login-code and `CodeToEnter`
 block gates, auto-submitting at the configured length.
+
+Current 18.0 intake also validates Group/Login `AssetAssignments`, rejects the
+container in earlier generations, inherits group filenames into each login,
+and lets a login replace individual slots. The effective filename map survives
+all persistent roster adapters; asset registry administration and Player image
+delivery remain partial.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |

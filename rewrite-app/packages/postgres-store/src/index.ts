@@ -412,6 +412,24 @@ const mapParticipantRosterEntry = (
             return {};
           }
         })();
+        const assetAssignments = (() => {
+          try {
+            const parsed =
+              typeof row.asset_assignments_json === "string"
+                ? JSON.parse(row.asset_assignments_json)
+                : row.asset_assignments_json ?? {};
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? Object.fromEntries(
+                  Object.entries(parsed).filter(
+                    (entry): entry is [string, string] =>
+                      typeof entry[1] === "string"
+                  )
+                )
+              : {};
+          } catch {
+            return {};
+          }
+        })();
         return {
           participantRosterEntryId: String(row.participant_roster_entry_id),
           tenantId: String(row.tenant_id),
@@ -453,6 +471,9 @@ const mapParticipantRosterEntry = (
               : Number(row.valid_for_minutes),
           customTexts,
           viewSettings,
+          ...(Object.keys(assetAssignments).length > 0
+            ? { assetAssignments }
+            : {}),
           importedAt: String(row.imported_at)
         };
       })()
@@ -1282,6 +1303,14 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE participant_roster_entries
         ADD COLUMN IF NOT EXISTS view_settings_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `
+  },
+  {
+    version: 44,
+    name: "add_participant_asset_assignments",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN IF NOT EXISTS asset_assignments_json JSONB NOT NULL DEFAULT '{}'::jsonb;
     `
   }
 ];
@@ -2239,7 +2268,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -2288,8 +2317,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await pool.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           execution_mode = EXCLUDED.execution_mode,
@@ -2305,6 +2334,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           valid_for_minutes = EXCLUDED.valid_for_minutes,
           custom_texts_json = EXCLUDED.custom_texts_json,
           view_settings_json = EXCLUDED.view_settings_json,
+          asset_assignments_json = EXCLUDED.asset_assignments_json,
           imported_at = EXCLUDED.imported_at`,
         [
           participantRosterEntry.participantRosterEntryId,
@@ -2330,6 +2360,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.validForMinutes ?? null,
           JSON.stringify(participantRosterEntry.customTexts ?? {}),
           JSON.stringify(participantRosterEntry.viewSettings ?? {}),
+          JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
           participantRosterEntry.importedAt
         ]
       );

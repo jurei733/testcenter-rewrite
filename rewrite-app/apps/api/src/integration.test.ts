@@ -15355,6 +15355,43 @@ test("original Testcenter compatibility corpus imports representative booklets",
       ?.filters[0]?.not,
     true
   );
+  const assetAssignmentsRoster = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0/definitions/vo_Testtakers.xsd">',
+          "  <Metadata><Description>Asset assignments</Description></Metadata>",
+          '  <Group id="asset-group" label="Asset Group">',
+          '    <AssetAssignments><Asset slot="logo">school.png</Asset></AssetAssignments>',
+          '    <Login mode="run-hot-return" name="asset-participant">',
+          '      <Booklet>BOOKLET.SAMPLE-1</Booklet>',
+          '      <AssetAssignments><Asset slot="starterCompanion">start.webp</Asset></AssetAssignments>',
+          "    </Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  assert.equal(assetAssignmentsRoster.status, 201);
+  const persistedAssetAssignments = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      assetAssignments?: Record<string, string>;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`);
+  assert.deepEqual(
+    persistedAssetAssignments.body.items.find(
+      item => item.loginKey === "asset-participant"
+    )?.assetAssignments,
+    {
+      logo: "school.png",
+      starterCompanion: "start.webp"
+    }
+  );
   const invalidRosterFacetCases = [
     {
       label: "future Testtakers schema version",
@@ -15443,6 +15480,17 @@ test("original Testcenter compatibility corpus imports representative booklets",
           '<Login mode="monitor-group" name="test-group-monitor" pw="user123"><ViewSettings monitorBookletVisibility="visible" /></Login>'
         ),
       diagnosticCode: "testcenter_xml_login_view_settings_version_invalid"
+    },
+    {
+      label: "asset assignments before schema 18.0",
+      rosterText: validRosterXml.replace(
+        '<Group id="sample_group"',
+        '<Group id="sample_group"'
+      ).replace(
+        ">\n    <Login",
+        '><AssetAssignments><Asset slot="logo">school.png</Asset></AssetAssignments>\n    <Login'
+      ),
+      diagnosticCode: "testcenter_xml_asset_assignments_version_invalid"
     },
     {
       label: "duplicate Testtakers metadata container",

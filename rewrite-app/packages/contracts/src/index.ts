@@ -108,6 +108,8 @@ export type ParsedParticipantRosterEntry = {
   validForMinutes?: number | null;
   customTexts?: Record<string, string>;
   viewSettings?: ParticipantViewSettings;
+  /** Original asset filenames keyed by the Testtakers 18.0 slot name. */
+  assetAssignments?: Record<string, string>;
 };
 
 export const originalTestcenterOperationalLoginModes = [
@@ -523,6 +525,32 @@ const readXmlParticipantViewSettings = (
   };
 };
 
+const readXmlAssetAssignments = (
+  content: string
+): Record<string, string> => {
+  const section = content.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?assetassignments)\b[^>]*>([\s\S]*?)<\/\1>/i
+  )?.[2];
+  if (!section) {
+    return {};
+  }
+  return Object.fromEntries(
+    Array.from(
+      section.matchAll(
+        /<((?:[a-zA-Z_][\w.-]*:)?asset)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+      )
+    ).flatMap(match => {
+      const slot = normalizeRosterTextValue(
+        readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "slot")
+      );
+      const originalName = normalizeRosterTextValue(
+        decodeXmlText((match[3] ?? "").replace(/<[^>]+>/g, "").trim())
+      );
+      return slot && originalName ? [[slot, originalName] as const] : [];
+    })
+  );
+};
+
 const parseBookletStatePreset = (
   value: string | undefined
 ): Record<string, string> => {
@@ -729,6 +757,14 @@ const mergeParsedParticipantRosterEntries = (
                     } as NonNullable<ParticipantViewSettings["codeInput"]>
                   }
                 : {})
+            }
+          }
+        : {}),
+      ...((existingEntry.assetAssignments || entry.assetAssignments)
+        ? {
+            assetAssignments: {
+              ...(existingEntry.assetAssignments ?? {}),
+              ...(entry.assetAssignments ?? {})
             }
           }
         : {})
@@ -1272,6 +1308,41 @@ type XmlRosterContextRange = {
   value: string;
 };
 
+type XmlAssetAssignmentContextRange = {
+  start: number;
+  end: number;
+  value: Record<string, string>;
+};
+
+const collectXmlGroupAssetAssignmentRanges = (
+  rosterText: string
+): XmlAssetAssignmentContextRange[] =>
+  Array.from(
+    rosterText.matchAll(
+      /<((?:[a-zA-Z_][\w.-]*:)?group)\b[^>]*>([\s\S]*?)<\/\1>/gi
+    )
+  ).flatMap(match => {
+    const start = match.index ?? 0;
+    const groupContent = match[2] ?? "";
+    const contentBeforeFirstLogin = groupContent.split(
+      /<(?:[a-zA-Z_][\w.-]*:)?login\b/i,
+      1
+    )[0] ?? "";
+    const value = readXmlAssetAssignments(contentBeforeFirstLogin);
+    return Object.keys(value).length > 0
+      ? [{ start, end: start + match[0].length, value }]
+      : [];
+  });
+
+const findNearestXmlAssetAssignments = (
+  ranges: XmlAssetAssignmentContextRange[],
+  offset: number
+): Record<string, string> =>
+  ranges
+    .filter(range => range.start < offset && range.end > offset)
+    .sort((left, right) => left.end - left.start - (right.end - right.start))[0]
+    ?.value ?? {};
+
 const collectXmlRosterContextRanges = (
   rosterText: string,
   tagNames: string,
@@ -1411,6 +1482,8 @@ const parseParticipantRosterXmlText = (
     "name",
     "label"
   );
+  const groupAssetAssignmentRanges =
+    collectXmlGroupAssetAssignmentRanges(rosterText);
   const bookletContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref",
@@ -1585,6 +1658,13 @@ const parseParticipantRosterXmlText = (
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
     const viewSettings = readXmlParticipantViewSettings(content);
+    const assetAssignments = {
+      ...findNearestXmlAssetAssignments(
+        groupAssetAssignmentRanges,
+        entryOffset
+      ),
+      ...readXmlAssetAssignments(content)
+    };
 
     entries.push({
       loginKey,
@@ -1608,6 +1688,9 @@ const parseParticipantRosterXmlText = (
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...(viewSettings ? { viewSettings } : {}),
+      ...(Object.keys(assetAssignments).length > 0
+        ? { assetAssignments }
+        : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
@@ -1714,6 +1797,13 @@ const parseParticipantRosterXmlText = (
       ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
     );
     const viewSettings = readXmlParticipantViewSettings(content);
+    const assetAssignments = {
+      ...findNearestXmlAssetAssignments(
+        groupAssetAssignmentRanges,
+        entryOffset
+      ),
+      ...readXmlAssetAssignments(content)
+    };
 
     entries.push({
       loginKey,
@@ -1737,6 +1827,9 @@ const parseParticipantRosterXmlText = (
       ...(password ? { password } : {}),
       ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...(viewSettings ? { viewSettings } : {}),
+      ...(Object.keys(assetAssignments).length > 0
+        ? { assetAssignments }
+        : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
@@ -1840,6 +1933,8 @@ export const parseOriginalTestcenterOperationalLogins = (
     "name",
     "label"
   );
+  const groupAssetAssignmentRanges =
+    collectXmlGroupAssetAssignmentRanges(rosterText);
   const validFromContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -1929,6 +2024,13 @@ export const parseOriginalTestcenterOperationalLogins = (
       importedVisibility === "collapsed" || importedVisibility === "hidden"
         ? importedVisibility
         : "visible";
+    const assetAssignments = {
+      ...findNearestXmlAssetAssignments(
+        groupAssetAssignmentRanges,
+        entryOffset
+      ),
+      ...readXmlAssetAssignments(content)
+    };
 
     candidates.push({
       loginKey,
@@ -1942,6 +2044,9 @@ export const parseOriginalTestcenterOperationalLogins = (
       }),
       monitorBookletVisibility,
       customTexts: { ...customTexts },
+      ...(Object.keys(assetAssignments).length > 0
+        ? { assetAssignments }
+        : {}),
       unresolvedProfileIds: uniqueProfileIds.filter(
         profileId => !monitorProfiles.has(profileId)
       ),

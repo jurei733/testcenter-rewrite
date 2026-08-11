@@ -122,7 +122,7 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
   );
 });
 
-test("SQLite persists participant view settings across repository restarts", async () => {
+test("SQLite persists participant view settings and asset assignments across repository restarts", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-participant-view-"));
   const databasePath = join(tempDirectory, "participant-view.sqlite");
   const rosterEntry: ParticipantRosterEntry = {
@@ -142,6 +142,10 @@ test("SQLite persists participant view settings across repository restarts", asy
     viewSettings: {
       theme: "Sekundar",
       codeInput: { type: "keypad-symbols-alt", length: 3 }
+    },
+    assetAssignments: {
+      logo: "school.png",
+      starterCompanion: "start.webp"
     },
     importedAt: "2026-08-12T00:00:00.000Z"
   };
