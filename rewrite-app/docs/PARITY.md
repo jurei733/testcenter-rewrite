@@ -519,7 +519,11 @@ Latest P0 IMS-path closure: XML manifest resource lookup now composes inherited
 the manifest below the archive root, distributes the path across the manifest,
 resources container, and individual resources, and requires the resolved Unit
 title and body to reach the staged runtime snapshot instead of accepting only a
-synthetic organization entry.
+synthetic organization entry. Local URI references additionally decode valid
+percent-encoded UTF-8 path characters and discard query or fragment suffixes
+before ZIP lookup, while malformed escapes remain literal. The same gate uses a
+Unicode filename with encoded spaces plus an entry fragment and requires its
+decoded canonical Unit key in the release.
 
 Latest P0 ZIP-integrity closure: every extracted archive entry must use an
 unencrypted supported compression method, expand to its central-directory size,

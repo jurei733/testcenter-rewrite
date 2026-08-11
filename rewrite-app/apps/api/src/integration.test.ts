@@ -30440,7 +30440,7 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
   ]);
 });
 
-test("source document import composes IMS xml:base paths for ZIP unit content", async () => {
+test("source document import composes IMS URI paths for ZIP unit content", async () => {
   const tenantKey = "integration-tenant-zip-xml-base";
   const workspaceKey = "integration-workspace-zip-xml-base";
 
@@ -30471,14 +30471,14 @@ test("source document import composes IMS xml:base paths for ZIP unit content", 
           <resources xml:base="assessments/">
             <resource identifier="RES-ZIP-BASE-BOOKLET" xml:base="booklets/" href="zip-base-booklet.xml" />
             <resource identifier="RES-ZIP-BASE-UNIT" xml:base="items/">
-              <file xml:base="forms/" href="../zip-base-unit.xml" />
+              <file xml:base="forms/" href="../zip%20base%20%C3%BCnit.xml#entry" />
             </resource>
           </resources>
         </manifest>
       `
     },
     {
-      fileName: "export/content/assessments/items/zip-base-unit.xml",
+      fileName: "export/content/assessments/items/zip base ünit.xml",
       content: `
         <assessmentItem>
           <title>ZIP Base Unit Description</title>
@@ -30547,7 +30547,7 @@ test("source document import composes IMS xml:base paths for ZIP unit content", 
           displayLabel: "ZIP Base Booklet",
           unitEntries: [
             {
-              unitKey: "content/assessments/items/zip-base-unit.xml",
+              unitKey: "content/assessments/items/zip base ünit.xml",
               displayLabel: "ZIP Base Unit",
               description: "ZIP Base Unit Description",
               content: "Use xml base paths to find this unit."

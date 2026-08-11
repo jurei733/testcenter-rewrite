@@ -11490,7 +11490,17 @@ const resolveXmlManifestPath = (...segments: Array<string | undefined>): string 
   let resolvedPath = "";
 
   for (const segment of segments) {
-    const normalizedSegment = normalizeManifestToken(segment);
+    const manifestToken = normalizeManifestToken(segment);
+    const suffixStart = manifestToken.search(/[?#]/);
+    const pathToken = suffixStart >= 0
+      ? manifestToken.slice(0, suffixStart)
+      : manifestToken;
+    let normalizedSegment = pathToken;
+    try {
+      normalizedSegment = decodeURI(pathToken);
+    } catch {
+      // Keep malformed percent escapes literal so they cannot redirect lookup.
+    }
     if (!normalizedSegment) {
       continue;
     }
