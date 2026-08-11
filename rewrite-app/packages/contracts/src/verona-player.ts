@@ -266,6 +266,31 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+export const normalizeVeronaStateLogEntries = (
+  value: unknown
+): VeronaStateLogEntry[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap(entry => {
+    const record = asRecord(entry);
+    const key = typeof record?.key === "string" ? record.key.trim() : "";
+    const timeStamp = Number(record?.timeStamp);
+    const content = record?.content == null ? "" : String(record.content);
+    if (
+      !key ||
+      key.length > 200 ||
+      content.length > 32_768 ||
+      !Number.isSafeInteger(timeStamp) ||
+      timeStamp < 0 ||
+      timeStamp > 8_640_000_000_000_000
+    ) {
+      return [];
+    }
+    return [{ key, timeStamp, content }];
+  }).slice(-200);
+};
+
 const normalizeDataParts = (value: unknown): Record<string, string> | undefined => {
   const record = asRecord(value);
   if (!record) {
@@ -470,11 +495,17 @@ export const parseVeronaIncomingNotification = (
     case "vopReadyNotification":
       return message as VeronaReadyNotification;
     case "vopStateChangedNotification":
-      return typeof message.sessionId === "string"
+      return typeof message.sessionId === "string" &&
+        (message.unitState === undefined || asRecord(message.unitState)) &&
+        (message.playerState === undefined || asRecord(message.playerState)) &&
+        (message.log === undefined || Array.isArray(message.log))
         ? (message as VeronaStateChangedNotification)
         : null;
     case "vopUnitNavigationRequestedNotification":
-      return typeof message.sessionId === "string"
+      return typeof message.sessionId === "string" &&
+        (message.target === undefined || typeof message.target === "string") &&
+        (message.targetRelative === undefined ||
+          typeof message.targetRelative === "string")
         ? (message as VeronaNavigationRequestedNotification)
         : null;
     case "vopWindowFocusChangedNotification":
@@ -482,7 +513,12 @@ export const parseVeronaIncomingNotification = (
         ? (message as VeronaWindowFocusChangedNotification)
         : null;
     case "vopRuntimeErrorNotification":
-      return message as VeronaRuntimeErrorNotification;
+      return (message.sessionId === undefined ||
+        typeof message.sessionId === "string") &&
+        (message.code === undefined || typeof message.code === "string") &&
+        (message.message === undefined || typeof message.message === "string")
+        ? (message as VeronaRuntimeErrorNotification)
+        : null;
     default:
       return null;
   }

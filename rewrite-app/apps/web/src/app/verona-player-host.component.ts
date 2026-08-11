@@ -19,6 +19,7 @@ import type {
 import {
   isSupportedVeronaPlayerApiVersion,
   mergeVeronaUnitResponse,
+  normalizeVeronaStateLogEntries,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
@@ -408,7 +409,7 @@ export class VeronaPlayerHostComponent
           logEntries.push(...projectVeronaUnitStateLogs(notification.unitState));
         }
         if (Array.isArray(notification.log)) {
-          logEntries.push(...this.normalizeLogEntries(notification.log));
+          logEntries.push(...normalizeVeronaStateLogEntries(notification.log));
         }
         if (logEntries.length > 0) {
           this.logEntries.emit({
@@ -850,7 +851,7 @@ export class VeronaPlayerHostComponent
       logEntries.push(...projectVeronaUnitStateLogs(notification.unitState));
     }
     if (Array.isArray(notification.log)) {
-      logEntries.push(...this.normalizeLogEntries(notification.log));
+      logEntries.push(...normalizeVeronaStateLogEntries(notification.log));
     }
     if (logEntries.length > 0) {
       this.logEntries.emit({
@@ -902,27 +903,6 @@ export class VeronaPlayerHostComponent
         content: message
       }
     };
-  }
-
-  private normalizeLogEntries(
-    entries: Array<{ key: string; timeStamp: number; content: string }>
-  ): ParticipantTestLogEntryInput[] {
-    return entries.flatMap(entry => {
-      const key = typeof entry?.key === "string" ? entry.key.trim() : "";
-      const timeStamp = Number(entry?.timeStamp);
-      const content = entry.content == null ? "" : String(entry.content);
-      if (
-        !key ||
-        key.length > 200 ||
-        content.length > 32_768 ||
-        !Number.isSafeInteger(timeStamp) ||
-        timeStamp < 0 ||
-        timeStamp > 8_640_000_000_000_000
-      ) {
-        return [];
-      }
-      return [{ key, timeStamp, content }];
-    }).slice(-200);
   }
 
   private scheduleFocusLog(playerHasFocus?: boolean): void {

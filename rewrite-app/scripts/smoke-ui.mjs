@@ -6297,6 +6297,30 @@ try {
           document.querySelector("#playerCurrentPage").textContent = currentPage;
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
           document.querySelector("#playerAnswer").addEventListener("input", () => sendState(true));
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            unitState: null
+          }, "*");
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            playerState: null
+          }, "*");
+          parent.postMessage({
+            type: "vopUnitNavigationRequestedNotification",
+            sessionId,
+            target: 1
+          }, "*");
+          parent.postMessage({
+            type: "vopStateChangedNotification",
+            sessionId,
+            log: [null, {
+              key: "PLAYER_RECOVERED_AFTER_MALFORMED_LOG",
+              timeStamp: Date.now(),
+              content: "valid"
+            }]
+          }, "*");
           sendState(false);
           parent.postMessage({
             type: "vopWindowFocusChangedNotification",
@@ -6658,6 +6682,11 @@ try {
       window.requestAnimationFrame(recordLoadingFrame);
     recordLoadingPhase();
   });
+  const malformedVeronaMessageErrors = [];
+  const recordMalformedVeronaMessageError = error => {
+    malformedVeronaMessageErrors.push(error.message);
+  };
+  page.on("pageerror", recordMalformedVeronaMessageError);
   await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
   await page.locator("#participantRouteTestletUnlockButton").click();
   await page
@@ -6784,6 +6813,12 @@ try {
     .locator("#participantVeronaPageLabel")
     .filter({ hasText: "Introduction" })
     .waitFor();
+  page.off("pageerror", recordMalformedVeronaMessageError);
+  assert.deepEqual(
+    malformedVeronaMessageErrors,
+    [],
+    "Malformed Verona notifications must be ignored without crashing the Participant host."
+  );
   await expectButtonSelectorDisabled("#participantVeronaPreviousPageButton");
   await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
   await page.locator("#participantVeronaNextPageButton").click();
@@ -6927,6 +6962,15 @@ try {
           item.testLog?.unitKey === veronaUnitKey
       )
   );
+  const recoveredMalformedVeronaLog = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PLAYER_RECOVERED_AFTER_MALFORMED_LOG&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(item => item.testLog?.logContent === "valid")
+  );
+  assert.equal(recoveredMalformedVeronaLog.items.length, 1);
   const veronaPlayerLifecycleLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

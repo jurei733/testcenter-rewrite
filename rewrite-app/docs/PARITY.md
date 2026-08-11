@@ -189,6 +189,16 @@ timer, blocks premature completion according to `leave`, persists through the
 existing timer model, and completes the whole Booklet on expiry. Participant,
 monitor, and timer-adjustment paths share the same root timer identity.
 
+Latest P0 Verona message-boundary closure: the Participant host now rejects
+malformed state, page-state, navigation, and runtime-error notifications before
+they reach typed Player handling. Mixed Player log arrays keep valid bounded
+entries while discarding null or malformed records, so a broken optional log
+cannot suppress the accompanying response state. Contract tests cover invalid
+message shapes and the 200-record log bound; the production Chromium/SQLite
+gate sends malformed notifications from the active sandboxed Player, observes
+no host exception, persists the valid record from a mixed log, and then
+continues through valid state and page navigation.
+
 Latest P0 Player page-state closure: every Verona `playerState` report now
 produces the original host-side `CURRENT_PAGE_NR`, `CURRENT_PAGE_ID`, and
 `PAGE_COUNT` Unit logs alongside the durable response envelope. These records

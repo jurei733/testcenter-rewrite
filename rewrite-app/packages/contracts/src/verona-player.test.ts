@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   isSupportedVeronaPlayerApiVersion,
   mergeVeronaUnitResponse,
+  normalizeVeronaStateLogEntries,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
@@ -269,6 +270,30 @@ test("Verona unit state projects the original host-side progress logs", () => {
   ]);
 });
 
+test("Verona Player logs discard malformed entries without losing valid records", () => {
+  const entries: unknown[] = Array.from({ length: 202 }, (_, index) => ({
+    key: `LOG_${index}`,
+    timeStamp: index,
+    content: index
+  }));
+  entries.splice(50, 0, null, { key: "", timeStamp: 50, content: 50 });
+
+  const normalized = normalizeVeronaStateLogEntries(entries);
+
+  assert.equal(normalized.length, 200);
+  assert.deepEqual(normalized[0], {
+    key: "LOG_2",
+    timeStamp: 2,
+    content: "2"
+  });
+  assert.deepEqual(normalized.at(-1), {
+    key: "LOG_201",
+    timeStamp: 201,
+    content: "201"
+  });
+  assert.deepEqual(normalizeVeronaStateLogEntries([null, "invalid"]), []);
+});
+
 test("Verona notifications and supported API versions are validated", () => {
   assert.equal(
     readVeronaPlayerApiVersion({
@@ -298,6 +323,22 @@ test("Verona notifications and supported API versions are validated", () => {
     }),
     null
   );
+  for (const invalidState of [
+    { unitState: null },
+    { unitState: "complete" },
+    { playerState: null },
+    { playerState: "page-2" },
+    { log: { key: "PLAYER" } }
+  ]) {
+    assert.equal(
+      parseVeronaIncomingNotification({
+        type: "vopStateChangedNotification",
+        sessionId: "run:unit",
+        ...invalidState
+      }),
+      null
+    );
+  }
   assert.deepEqual(
     parseVeronaIncomingNotification({
       type: "vopWindowFocusChangedNotification",
@@ -314,6 +355,39 @@ test("Verona notifications and supported API versions are validated", () => {
       hasFocus: "true"
     }),
     null
+  );
+  for (const invalidNavigation of [
+    { target: 1 },
+    { targetRelative: true }
+  ]) {
+    assert.equal(
+      parseVeronaIncomingNotification({
+        type: "vopUnitNavigationRequestedNotification",
+        sessionId: "run:unit",
+        ...invalidNavigation
+      }),
+      null
+    );
+  }
+  assert.equal(
+    parseVeronaIncomingNotification({
+      type: "vopRuntimeErrorNotification",
+      code: 500,
+      message: "broken"
+    }),
+    null
+  );
+  assert.deepEqual(
+    parseVeronaIncomingNotification({
+      type: "vopStateChangedNotification",
+      sessionId: "run:unit",
+      unitState: { responseProgress: "complete" }
+    }),
+    {
+      type: "vopStateChangedNotification",
+      sessionId: "run:unit",
+      unitState: { responseProgress: "complete" }
+    }
   );
 });
 
