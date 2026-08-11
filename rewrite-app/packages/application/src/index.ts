@@ -7029,6 +7029,20 @@ const hasStructuredContent = (
 const normalizeManifestToken = (value: unknown): string =>
   String(value ?? "").trim();
 
+const normalizeManifestUriPathToken = (value: unknown): string => {
+  const manifestToken = normalizeManifestToken(value);
+  const suffixStart = manifestToken.search(/[?#]/);
+  const pathToken = suffixStart >= 0
+    ? manifestToken.slice(0, suffixStart)
+    : manifestToken;
+  try {
+    return decodeURI(pathToken);
+  } catch {
+    // Keep malformed percent escapes literal so they cannot redirect lookup.
+    return pathToken;
+  }
+};
+
 const normalizeManifestLabel = (
   value: unknown,
   fallbackPrefix: string,
@@ -11490,17 +11504,7 @@ const resolveXmlManifestPath = (...segments: Array<string | undefined>): string 
   let resolvedPath = "";
 
   for (const segment of segments) {
-    const manifestToken = normalizeManifestToken(segment);
-    const suffixStart = manifestToken.search(/[?#]/);
-    const pathToken = suffixStart >= 0
-      ? manifestToken.slice(0, suffixStart)
-      : manifestToken;
-    let normalizedSegment = pathToken;
-    try {
-      normalizedSegment = decodeURI(pathToken);
-    } catch {
-      // Keep malformed percent escapes literal so they cannot redirect lookup.
-    }
+    const normalizedSegment = normalizeManifestUriPathToken(segment);
     if (!normalizedSegment) {
       continue;
     }
@@ -14159,8 +14163,9 @@ const collectLooseSourcePackageDependencyReferences = (
 
 const workspaceDependencyReferenceKeys = (reference: string): string[] => {
   const normalizedReference = reference.trim().replace(/\\/g, "/");
-  const normalizedPath = normalizeZipEntryPath(normalizedReference);
-  const baseName = normalizedReference.split("/").at(-1) ?? normalizedReference;
+  const normalizedUriPath = normalizeManifestUriPathToken(normalizedReference);
+  const normalizedPath = normalizeZipEntryPath(normalizedUriPath);
+  const baseName = normalizedUriPath.split("/").at(-1) ?? normalizedUriPath;
   return [normalizedReference, normalizedPath, baseName]
     .map(value => value.trim().toLowerCase())
     .filter((value, index, values) => value && values.indexOf(value) === index);
@@ -14248,7 +14253,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       const referenceKeys = workspaceDependencyReferenceKeys(reference);
       const exactReferenceKey = reference.trim().toLowerCase();
       const normalizedReferencePath = normalizeZipEntryPath(
-        reference.trim().replace(/\\/g, "/")
+        normalizeManifestUriPathToken(reference.trim().replace(/\\/g, "/"))
       ).toLowerCase();
       const normalizedReferenceBaseName =
         normalizedReferencePath.split("/").at(-1) ?? normalizedReferencePath;
@@ -14322,13 +14327,16 @@ const resolveZipResourcePathCandidates = (
   manifestFileName: string,
   resourcePath: string
 ): string[] => {
-  const directPath = normalizeZipEntryPath(resourcePath);
+  const normalizedResourcePath = normalizeManifestUriPathToken(resourcePath);
+  const directPath = normalizeZipEntryPath(normalizedResourcePath);
   const manifestPath = normalizeZipEntryPath(manifestFileName);
   const manifestDirectory = manifestPath.includes("/")
     ? manifestPath.slice(0, manifestPath.lastIndexOf("/"))
     : "";
   const relativePath = normalizeZipEntryPath(
-    manifestDirectory ? `${manifestDirectory}/${resourcePath}` : resourcePath
+    manifestDirectory
+      ? `${manifestDirectory}/${normalizedResourcePath}`
+      : normalizedResourcePath
   );
 
   return [...new Set([directPath, relativePath].filter(Boolean))];
@@ -15332,7 +15340,9 @@ const findZipUnitReferencedEntry = (
     return directEntry;
   }
 
-  const referenceFileName = normalizeZipEntryPath(reference)
+  const referenceFileName = normalizeZipEntryPath(
+    normalizeManifestUriPathToken(reference)
+  )
     .split("/")
     .at(-1)
     ?.toLowerCase();

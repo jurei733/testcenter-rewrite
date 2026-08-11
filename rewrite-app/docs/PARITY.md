@@ -525,6 +525,17 @@ before ZIP lookup, while malformed escapes remain literal. The same gate uses a
 Unicode filename with encoded spaces plus an entry fragment and requires its
 decoded canonical Unit key in the release.
 
+Latest P0 Unit-URI closure: the same local-URI canonicalization now governs
+Testcenter Unit cross-references inside packaged ZIPs and the automatic loose
+workspace dependency graph, covering definition, variables, coding-scheme,
+Player, dependency-resource, and SysCheck Unit paths through their shared
+resolvers. The manifestless Original-style workspace gate now imports a
+percent-encoded external `DefinitionRef` with a fragment and requires its HTML
+in the activated Unit snapshot. The loose Booklet → Unit → definition → Player
+→ original resource-package gate independently resolves an encoded definition
+filename into the immutable automatic assembly and keeps Participant delivery
+intact.
+
 Latest P0 ZIP-integrity closure: every extracted archive entry must use an
 unencrypted supported compression method, expand to its central-directory size,
 and match its CRC-32 before it can participate in manifest, XML, or

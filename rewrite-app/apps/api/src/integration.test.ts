@@ -21777,7 +21777,7 @@ test("source document import derives ZIP runtime structure from referenced bookl
   );
 });
 
-test("source document import assembles original manifestless root ZIP archives", async () => {
+test("source document import resolves Unit URI paths in manifestless root ZIP archives", async () => {
   const tenantKey = "integration-tenant-manifestless-root-zip";
   const workspaceKey = "integration-workspace-manifestless-root-zip";
   const expectedResourceContent =
@@ -21827,13 +21827,13 @@ test("source document import assembles original manifestless root ZIP archives",
             <Id>MANIFESTLESS.UNIT</Id>
             <Label>Manifestless unit</Label>
           </Metadata>
-          <DefinitionRef player="verona-player-simple@6.0">definition/Unit-Definition.html</DefinitionRef>
+          <DefinitionRef player="verona-player-simple@6.0">definition/Unit%20Definition.html#entry</DefinitionRef>
           <Dependencies><File for="player">sample_resource_package.itcr.zip</File></Dependencies>
         </Unit>
       `
     },
     {
-      fileName: "nested/content/definition/Unit-Definition.html",
+      fileName: "nested/content/definition/Unit Definition.html",
       content: "<main>Manifestless external definition</main>"
     },
     {
@@ -29514,7 +29514,7 @@ test("original Testcenter compatibility corpus retains separately uploaded Veron
             <Id>${unitKey}</Id>
             <Label>Loose Player Resource Unit</Label>
           </Metadata>
-          <DefinitionRef player="${playerKey}">../definitions/loose-resource-unit.html</DefinitionRef>
+          <DefinitionRef player="${playerKey}">../definitions/loose%20resource%20unit.html#entry</DefinitionRef>
           <Dependencies>
             <File for="player">${resourceFileName}</File>
           </Dependencies>
@@ -29522,7 +29522,7 @@ test("original Testcenter compatibility corpus retains separately uploaded Veron
       `
     },
     {
-      fileName: "definitions/loose-resource-unit.html",
+      fileName: "definitions/loose resource unit.html",
       mediaType: "text/html",
       sourceDocument:
         '<form><label>Loose resource response <input name="response" /></label></form>'
