@@ -194,6 +194,46 @@
       "policy": { "requireResponseComplete": "always" }
     },
     {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_11.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_11.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "5f2756620d1ad498df5b295410c6dcb36b33948e230d4515bbe94575510d632a",
+      "bookletKey": "Cy-Bklt_BkltConfig-11",
+      "displayLabel": "Bklt-config-11",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "booklet" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_12.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_12.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "04f0e3a34ac076cfc9f4ad9c09820585d885d790120cdf647bf45b752e441314",
+      "bookletKey": "Cy-Bklt_BkltConfig-12",
+      "displayLabel": "Bklt-config-12",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "none" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_13.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_13.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0c15198dbb6d583890562f798597e152bb7ba61a9f0a8aea8271aa985c4c7a20",
+      "bookletKey": "Cy-Bklt_BkltConfig-13",
+      "displayLabel": "Bklt-config-13",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "block" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_14.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_14.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "69de8daf80252bcd3cb72a7f72e732684aa84117975964d46c7a4a4b816994ef",
+      "bookletKey": "Cy-Bklt_BkltConfig-14",
+      "displayLabel": "Bklt-config-14",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "unit" }
+    },
+    {
       "fixture": "booklets/system-test/CY_Bklt_BkltConfig_15.xml",
       "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_15.xml",
       "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",

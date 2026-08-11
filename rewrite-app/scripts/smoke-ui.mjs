@@ -10651,6 +10651,13 @@ try {
         bookletKey: `Cy-Bklt_BkltConfig-${number}`
       };
     }),
+    ...Array.from({ length: 4 }, (_, index) => {
+      const number = index + 11;
+      return {
+        fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
+        bookletKey: `Cy-Bklt_BkltConfig-${number}`
+      };
+    }),
     ...[15, 16].map(number => ({
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
@@ -10971,6 +10978,7 @@ try {
     {
       body: {
         rosterText: [
+          ...Array.from({ length: 4 }, (_, index) => index + 11),
           15,
           16,
           ...Array.from({ length: 8 }, (_, index) => index + 19)
@@ -10986,6 +10994,52 @@ try {
       }
     }
   );
+  await openOriginalBookletConfig(
+    "Bklt_Config-11",
+    "Cy-Bklt_BkltConfig-11"
+  );
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Bklt-config-11" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-12",
+    "Cy-Bklt_BkltConfig-12"
+  );
+  assert.equal(await page.locator("#participantRouteScreenHeader").count(), 0);
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-13",
+    "Cy-Bklt_BkltConfig-13"
+  );
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-14",
+    "Cy-Bklt_BkltConfig-14"
+  );
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "cpy" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Aufgabe2" })
+    .waitFor();
+
   await openOriginalBookletConfig(
     "Bklt_Config-15",
     "Cy-Bklt_BkltConfig-15"
