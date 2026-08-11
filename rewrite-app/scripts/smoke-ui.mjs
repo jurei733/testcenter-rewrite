@@ -7205,7 +7205,10 @@ try {
     true
   );
   assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
-  assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
+  assert.equal(
+    await page.locator("#participantRouteNextUnitButton").count(),
+    0
+  );
   const veronaParticipantSessionId = await page
     .locator("#participantRouteSessionId")
     .inputValue();
@@ -10662,7 +10665,7 @@ try {
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
     })),
-    ...Array.from({ length: 10 }, (_, index) => {
+    ...Array.from({ length: 15 }, (_, index) => {
       const number = index + 19;
       return {
         fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
@@ -10983,7 +10986,7 @@ try {
           16,
           17,
           18,
-          ...Array.from({ length: 10 }, (_, index) => index + 19)
+          ...Array.from({ length: 15 }, (_, index) => index + 19)
         ].map(number => {
           return {
             loginKey: `Bklt_Config-${number}`,
@@ -11192,6 +11195,50 @@ try {
   };
   await verifyCurrentPageOnReturn(27, "Page 1/2");
   await verifyCurrentPageOnReturn(28, "Page 2/2");
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-29",
+    "Cy-Bklt_BkltConfig-29"
+  );
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Unit 1 / 2" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-30",
+    "Cy-Bklt_BkltConfig-30"
+  );
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-31",
+    "Cy-Bklt_BkltConfig-31"
+  );
+  assert.equal(
+    await page.locator("#participantRouteUnitNavigationLabel").count(),
+    0
+  );
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-32",
+    "Cy-Bklt_BkltConfig-32"
+  );
+  await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+  await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-33",
+    "Cy-Bklt_BkltConfig-33"
+  );
+  assert.equal(
+    await page.locator("#participantRoutePreviousUnitButton").count(),
+    0
+  );
+  assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");
