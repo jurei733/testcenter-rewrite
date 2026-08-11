@@ -13216,6 +13216,19 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
     "$2$1"
   );
+  const invalidAdaptiveStatusAggregateXml = validAdaptiveBookletXml
+    .replace(
+      '<Value of="var3" from="decision-unit" />',
+      '<Status of="var3" from="decision-unit" />'
+    )
+    .replace(
+      '<Value of="var4" from="decision-unit" />',
+      '<Status of="var4" from="decision-unit" />'
+    )
+    .replace(
+      '<Value of="var5" from="decision-unit" />',
+      '<Status of="var5" from="decision-unit" />'
+    );
   const schemaFacetCases: Array<{
     fileName: string;
     sourceDocument: string;
@@ -13937,6 +13950,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
       sourceDocument: validAdaptiveBookletXml
         .replace('<Value of="var4" from="decision-unit" />', "")
         .replace('<Value of="var5" from="decision-unit" />', ""),
+      diagnosticCode: "testcenter_xml_state_condition_aggregation_invalid"
+    },
+    {
+      fileName: "booklet-invalid-status-aggregate.xml",
+      sourceDocument: invalidAdaptiveStatusAggregateXml,
       diagnosticCode: "testcenter_xml_state_condition_aggregation_invalid"
     },
     {
@@ -14775,6 +14793,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
       entryFileName: "export/booklets/Booklet_error.xml",
       entryDocument: invalidBookletRootSequenceXml,
       diagnosticCode: "testcenter_xml_booklet_sequence_invalid"
+    },
+    {
+      fileName: "invalid-status-aggregate-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: invalidAdaptiveStatusAggregateXml,
+      diagnosticCode: "testcenter_xml_state_condition_aggregation_invalid"
     },
     {
       fileName: "legacy-schema-file-name-dependency.zip",

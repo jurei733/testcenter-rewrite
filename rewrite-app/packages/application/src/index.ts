@@ -8909,6 +8909,12 @@ const testcenterBookletVariableSourceNames = [
   "Score"
 ] as const;
 
+const testcenterBookletAggregateSourceNames = [
+  "Code",
+  "Value",
+  "Score"
+] as const;
+
 const validateTestcenterBookletCondition = (
   condition: XmlElement,
   sourceFileName: string,
@@ -9018,7 +9024,7 @@ const validateTestcenterBookletCondition = (
         aggregateSources.length < 2 ||
         aggregateSourceNames.size !== 1 ||
         !aggregateSources.every(source =>
-          (testcenterBookletVariableSourceNames as readonly string[]).includes(
+          (testcenterBookletAggregateSourceNames as readonly string[]).includes(
             xmlElementLocalName(source)
           )
         )
@@ -9032,7 +9038,7 @@ const validateTestcenterBookletCondition = (
       }
       aggregateSources
         .filter(source =>
-          (testcenterBookletVariableSourceNames as readonly string[]).includes(
+          (testcenterBookletAggregateSourceNames as readonly string[]).includes(
             xmlElementLocalName(source)
           )
         )
