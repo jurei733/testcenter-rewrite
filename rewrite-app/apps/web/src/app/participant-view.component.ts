@@ -322,6 +322,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
             <p id="participantRouteCompletionLabel" [class.is-complete]="view.player.isComplete">{{ view.player.completionLabel }}</p>
           </section>
+          <ng-container *ngIf="!view.isRunPaused; else participantPaused">
           <section
             *ngIf="view.canChangeAdaptiveStates"
             id="participantRouteAdaptiveStates"
@@ -705,6 +706,27 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>
             <button id="participantRouteCompleteButton" class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">{{ view.customText('login_testEndButtonLabel', 'Complete Test') }}</button>
           </div>
+          </ng-container>
+          <ng-template #participantPaused>
+            <section
+              id="participantRoutePausedState"
+              class="participant-paused-state"
+              role="status"
+              aria-live="assertive"
+            >
+              <span>Test paused</span>
+              <strong>{{ view.pausedMessage }}</strong>
+              <p *ngIf="view.isMonitorPaused">Please wait until your test supervisor continues the test.</p>
+              <p *ngIf="!view.isMonitorPaused">Your answers are saved. You can continue when you are ready.</p>
+              <button
+                *ngIf="view.player.canResumeRun"
+                id="participantRouteResumeRunButton"
+                class="primary"
+                type="button"
+                (click)="view.resumeRun()"
+              >Continue Test</button>
+            </section>
+          </ng-template>
         </div>
       </article>
       <section

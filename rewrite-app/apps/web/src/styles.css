@@ -2012,6 +2012,36 @@ pre {
   white-space: pre-wrap;
 }
 
+.participant-paused-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: clamp(28px, 6vw, 64px) 24px;
+  border: 1px solid rgba(27, 36, 48, 0.12);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.82);
+  text-align: center;
+}
+
+.participant-paused-state span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-paused-state strong {
+  color: var(--ink);
+  font-size: clamp(20px, 3vw, 30px);
+}
+
+.participant-paused-state p {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--muted);
+}
+
 .verona-player-shell {
   display: grid;
   gap: 10px;

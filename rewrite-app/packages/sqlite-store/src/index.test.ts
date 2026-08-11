@@ -53,7 +53,7 @@ test("SQLite persists a renamed workspace without changing its stable identity",
   }
 });
 
-test("SQLite preserves whole-test locks through every run lookup", async () => {
+test("SQLite preserves whole-test locks and monitor pauses through every run lookup", async () => {
   const repository = createSqliteFirstSliceRepository(":memory:");
   const testRun: TestRun = {
     testRunId: "run-locked",
@@ -65,6 +65,7 @@ test("SQLite preserves whole-test locks through every run lookup", async () => {
     executionMode: "run-hot-return",
     bookletAssignmentKey: "booklet-locked",
     status: "paused",
+    pauseSource: "monitor",
     locked: true,
     currentUnitKey: "unit-locked",
     unitResponses: {},
@@ -85,9 +86,18 @@ test("SQLite preserves whole-test locks through every run lookup", async () => {
 
   assert.equal((await repository.getTestRunById(testRun.testRunId))?.locked, true);
   assert.equal(
+    (await repository.getTestRunById(testRun.testRunId))?.pauseSource,
+    "monitor"
+  );
+  assert.equal(
     (await repository.listTestRunsByParticipantSessionId(testRun.participantSessionId))[0]
       ?.locked,
     true
+  );
+  assert.equal(
+    (await repository.listTestRunsByParticipantSessionId(testRun.participantSessionId))[0]
+      ?.pauseSource,
+    "monitor"
   );
   assert.equal(
     (await repository.getOpenTestRunByParticipantSessionId(testRun.participantSessionId))
@@ -95,9 +105,19 @@ test("SQLite preserves whole-test locks through every run lookup", async () => {
     true
   );
   assert.equal(
+    (await repository.getOpenTestRunByParticipantSessionId(testRun.participantSessionId))
+      ?.pauseSource,
+    "monitor"
+  );
+  assert.equal(
     (await repository.listTestRunsByWorkspace(testRun.tenantId, testRun.workspaceId))[0]
       ?.locked,
     true
+  );
+  assert.equal(
+    (await repository.listTestRunsByWorkspace(testRun.tenantId, testRun.workspaceId))[0]
+      ?.pauseSource,
+    "monitor"
   );
 });
 
@@ -290,6 +310,7 @@ test("SQLite adds current defaults to legacy application settings", async () => 
       );
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
+      CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
       CREATE TABLE application_settings (
         settings_key TEXT PRIMARY KEY,
         app_title TEXT NOT NULL,
@@ -373,6 +394,7 @@ test("SQLite upgrades legacy admin roles to read-write access", async () => {
       );
       INSERT INTO schema_migrations (version, name, applied_at)
       VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
+      CREATE TABLE test_runs (test_run_id TEXT PRIMARY KEY);
       CREATE TABLE admin_role_assignments (
         role_assignment_id TEXT PRIMARY KEY,
         admin_user_id TEXT NOT NULL,

@@ -1188,6 +1188,22 @@ export class ParticipantViewFacade {
     );
   }
 
+  get isRunPaused(): boolean {
+    return this.readCurrentRunState()?.testRun.status === "paused";
+  }
+
+  get isMonitorPaused(): boolean {
+    const testRun = this.readCurrentRunState()?.testRun;
+    return testRun?.status === "paused" && testRun.pauseSource === "monitor";
+  }
+
+  get pausedMessage(): string {
+    return this.customText(
+      "booklet_pausedmessage",
+      "This test is currently paused."
+    );
+  }
+
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
     const currentState = this.readCurrentRunState();
     const player = currentState?.currentUnit.player;
@@ -1195,6 +1211,7 @@ export class ParticipantViewFacade {
     const unitKey = currentState?.currentUnit.unitKey;
     if (
       !currentState ||
+      currentState.testRun.status !== "running" ||
       this.eagerBookletLoading ||
       !player?.html.trim() ||
       !unitDefinition ||
@@ -3518,7 +3535,9 @@ export class ParticipantViewFacade {
       this.runtime.currentUnitResponse = saved.response;
     }
     if (
-      currentState.availableActions.includes("save_progress") &&
+      (currentState.availableActions.includes("save_progress") ||
+        (currentState.testRun.status === "paused" &&
+          currentState.testRun.pauseSource === "monitor")) &&
       globalThis.navigator?.onLine !== false
     ) {
       this.scheduleVeronaSaveDrain();

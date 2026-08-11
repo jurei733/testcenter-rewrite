@@ -8687,7 +8687,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
         commandType: string;
         actorId: string | null;
         previousStatus: string;
-        testRun: { testRunId: string; status: string };
+        testRun: {
+          testRunId: string;
+          status: string;
+          pauseSource?: string;
+        };
         participantSession: { participantSessionId: string; loginKey: string };
       };
     }>(isolated.baseUrl, commandPath, {
@@ -8704,9 +8708,119 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(pauseCommand.body.command.actorId, "operator-demo");
     assert.equal(pauseCommand.body.command.previousStatus, "running");
     assert.equal(pauseCommand.body.command.testRun.status, "paused");
+    assert.equal(pauseCommand.body.command.testRun.pauseSource, "monitor");
     assert.equal(
       pauseCommand.body.command.participantSession.participantSessionId,
       participantSignIn.body.participantSession.participantSessionId
+    );
+
+    const stateAfterMonitorPause = await requestJsonAt<{
+      currentRunState: {
+        availableActions: string[];
+        testRun: {
+          status: string;
+          pauseSource?: string;
+          currentUnitKey: string | null;
+          unitResponses: Record<string, string>;
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+    assert.equal(stateAfterMonitorPause.status, 200);
+    assert.equal(stateAfterMonitorPause.body.currentRunState.testRun.status, "paused");
+    assert.equal(
+      stateAfterMonitorPause.body.currentRunState.testRun.pauseSource,
+      "monitor"
+    );
+    assert.equal(
+      stateAfterMonitorPause.body.currentRunState.availableActions.includes("resume"),
+      false
+    );
+    assert.equal(
+      stateAfterMonitorPause.body.currentRunState.availableActions.includes(
+        "save_progress"
+      ),
+      false
+    );
+    assert.equal(
+      stateAfterMonitorPause.body.currentRunState.availableActions.includes(
+        "complete"
+      ),
+      false
+    );
+
+    const participantResumeDuringMonitorPause = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(participantResumeDuringMonitorPause.status, 409);
+    assert.equal(
+      participantResumeDuringMonitorPause.body.error,
+      "test_run_monitor_paused"
+    );
+
+    const participantCompleteDuringMonitorPause = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`,
+      { method: "POST" }
+    );
+    assert.equal(participantCompleteDuringMonitorPause.status, 409);
+    assert.equal(
+      participantCompleteDuringMonitorPause.body.error,
+      "test_run_monitor_paused"
+    );
+
+    const sessionResumeDuringMonitorPause = await requestJsonAt<{
+      testRun: { status: string; pauseSource?: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(sessionResumeDuringMonitorPause.status, 200);
+    assert.equal(sessionResumeDuringMonitorPause.body.testRun.status, "paused");
+    assert.equal(
+      sessionResumeDuringMonitorPause.body.testRun.pauseSource,
+      "monitor"
+    );
+
+    const staleSaveDuringMonitorPause = await requestJsonAt<{
+      testRun: {
+        status: string;
+        pauseSource?: string;
+        currentUnitKey: string | null;
+        unitResponses: Record<string, string>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          deliveryId: "monitor-pause-buffered-save",
+          responseUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: "Buffered before monitor pause"
+        }
+      }
+    );
+    assert.equal(staleSaveDuringMonitorPause.status, 200);
+    assert.equal(staleSaveDuringMonitorPause.body.testRun.status, "paused");
+    assert.equal(staleSaveDuringMonitorPause.body.testRun.pauseSource, "monitor");
+    assert.equal(
+      staleSaveDuringMonitorPause.body.testRun.currentUnitKey,
+      stateAfterMonitorPause.body.currentRunState.testRun.currentUnitKey
+    );
+    assert.equal(
+      staleSaveDuringMonitorPause.body.testRun.unitResponses["unit-intro"],
+      "Buffered before monitor pause"
     );
 
     const openRunsAfterPause = await requestJsonAt<{
@@ -8892,7 +9006,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       command: {
         commandType: string;
         previousStatus: string;
-        testRun: { status: string };
+        testRun: { status: string; pauseSource?: string };
       };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -8907,6 +9021,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(resumeCommand.body.command.commandType, "resume");
     assert.equal(resumeCommand.body.command.previousStatus, "paused");
     assert.equal(resumeCommand.body.command.testRun.status, "running");
+    assert.equal(resumeCommand.body.command.testRun.pauseSource, undefined);
 
     const missingTimeTarget = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,

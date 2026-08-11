@@ -5361,6 +5361,12 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
   return {
     ...testRun,
     locked: testRun.locked === true,
+    pauseSource:
+      testRun.status === "paused"
+        ? testRun.pauseSource === "monitor"
+          ? "monitor"
+          : "participant"
+        : undefined,
     executionMode: normalizeParticipantExecutionMode(testRun.executionMode),
     bookletAssignmentKey:
       String(testRun.bookletAssignmentKey ?? "").trim() || testRun.bookletKey,
@@ -5418,6 +5424,17 @@ const requireParticipantTestRunUnlocked = (testRun: TestRun): void => {
       423,
       "test_run_locked",
       `Test run '${testRun.testRunId}' is locked and must be unlocked by a monitor.`,
+      { testRunId: testRun.testRunId }
+    );
+  }
+};
+
+const requireParticipantTestRunNotMonitorPaused = (testRun: TestRun): void => {
+  if (testRun.status === "paused" && testRun.pauseSource === "monitor") {
+    throw new FirstSliceError(
+      409,
+      "test_run_monitor_paused",
+      `Test run '${testRun.testRunId}' is paused by a monitor and can only be continued by a monitor.`,
       { testRunId: testRun.testRunId }
     );
   }
@@ -27105,20 +27122,31 @@ export const createFirstSliceServices = (
         );
         if (currentTestRun.locked) {
           // A whole-test monitor lock is independent of the paused/running state.
-        } else if (currentTestRun.status === "paused") {
-          availableActions.push("resume", "save_progress");
+        } else if (
+          currentTestRun.status === "paused" &&
+          currentTestRun.pauseSource !== "monitor"
+        ) {
+          availableActions.push("resume");
         } else if (currentTestRun.status === "running") {
           availableActions.push("save_progress");
         }
-        if (!currentTestRun.locked && navigation.canComplete) {
+        if (
+          !currentTestRun.locked &&
+          currentTestRun.status === "running" &&
+          navigation.canComplete
+        ) {
           availableActions.push("complete");
         }
-        if (!currentTestRun.locked && executionMode.canReview) {
+        if (
+          !currentTestRun.locked &&
+          currentTestRun.status === "running" &&
+          executionMode.canReview
+        ) {
           availableActions.push("review");
         }
         if (
           executionMode.canChangeStateOptions &&
-          currentTestRun.status !== "completed" &&
+          currentTestRun.status === "running" &&
           !currentTestRun.locked &&
           (currentBooklet?.stateEntries?.length ?? 0) > 0
         ) {
@@ -27205,6 +27233,7 @@ export const createFirstSliceServices = (
         }
         const testRun = normalizeTestRun(storedTestRun);
         requireParticipantTestRunUnlocked(testRun);
+        requireParticipantTestRunNotMonitorPaused(testRun);
         const participantSession = await requireAccessibleParticipantSession(
           testRun.participantSessionId
         );
@@ -27840,7 +27869,14 @@ export const createFirstSliceServices = (
             }
           }
 
-          if (existingRun.status === "paused") {
+          if (
+            normalizedExistingRun.status === "paused" &&
+            normalizedExistingRun.pauseSource === "monitor"
+          ) {
+            return normalizedExistingRun;
+          }
+
+          if (normalizedExistingRun.status === "paused") {
             const timestamp = now();
             const contentRelease = await requireContentRelease(
               repository,
@@ -27969,6 +28005,19 @@ export const createFirstSliceServices = (
         const nextCurrentUnitKey = hasCurrentUnitKeyInput
           ? normalizeOptionalCurrentUnitKey(input.currentUnitKey)
           : testRun.currentUnitKey;
+        const monitorPauseActive =
+          testRun.status === "paused" && testRun.pauseSource === "monitor";
+        if (
+          monitorPauseActive &&
+          hasCurrentUnitKeyInput &&
+          nextCurrentUnitKey !== testRun.currentUnitKey
+        ) {
+          throw new FirstSliceError(
+            409,
+            "test_run_monitor_paused",
+            `Test run '${testRunId}' is paused by a monitor and cannot navigate until the monitor resumes it.`
+          );
+        }
         const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         const hasResponseUnitKeyInput = input.responseUnitKey !== undefined;
         const responseUnitKey = hasResponseUnitKeyInput
@@ -28024,7 +28073,7 @@ export const createFirstSliceServices = (
         let activatedLeaveLock: ReturnType<
           typeof resolveCurrentLeaveLock
         > = null;
-        if (nextCurrentUnitKey) {
+        if (nextCurrentUnitKey && !monitorPauseActive) {
           requireRuntimeUnitForBooklet(
             contentRelease,
             testRun.bookletKey,
@@ -28080,7 +28129,8 @@ export const createFirstSliceServices = (
         ) {
           nextUnitResponses[responseUnitKey] = nextUnitResponse;
         }
-        const nextStatus = normalizeTestRunProgressStatus(input.status);
+        const requestedStatus = normalizeTestRunProgressStatus(input.status);
+        const nextStatus = monitorPauseActive ? "paused" : requestedStatus;
         const statusAdjustedRun = transitionTestletTimersForRunStatus(
           navigationTestRun,
           nextStatus,
@@ -28090,6 +28140,12 @@ export const createFirstSliceServices = (
         const evaluatedUpdatedRun = withEvaluatedBookletStates(booklet, {
           ...statusAdjustedRun,
           status: nextStatus,
+          pauseSource:
+            nextStatus === "paused"
+              ? monitorPauseActive
+                ? "monitor"
+                : "participant"
+              : undefined,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
           updatedAt: timestamp
@@ -28322,6 +28378,7 @@ export const createFirstSliceServices = (
           timestamp
         });
         requireParticipantTestRunUnlocked(testRun);
+        requireParticipantTestRunNotMonitorPaused(testRun);
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -28478,6 +28535,8 @@ export const createFirstSliceServices = (
           return testRun;
         }
 
+        requireParticipantTestRunNotMonitorPaused(testRun);
+
         const resumedRun = transitionTestletTimersForRunStatus(
           testRun,
           "running",
@@ -28549,6 +28608,7 @@ export const createFirstSliceServices = (
           timestamp
         });
         requireParticipantTestRunUnlocked(testRun);
+        requireParticipantTestRunNotMonitorPaused(testRun);
         if (testRun.status === "completed") {
           return testRun;
         }
@@ -29041,7 +29101,7 @@ export const createFirstSliceServices = (
         let adjustedTestletKey: string | null = null;
         let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
           null;
-        const nextTestRun: TestRun =
+        const transitionedTestRun: TestRun =
           commandType === "complete" || commandType === "complete_and_lock"
             ? {
                 ...closeRunningTestletTimers(testRun, issuedAt),
@@ -29110,6 +29170,18 @@ export const createFirstSliceServices = (
                             >,
                             issuedAt
                           );
+        const nextTestRun = normalizeTestRun({
+          ...transitionedTestRun,
+          pauseSource:
+            commandType === "pause"
+              ? "monitor"
+              : commandType === "resume" ||
+                  commandType === "goto" ||
+                  commandType === "complete" ||
+                  commandType === "complete_and_lock"
+                ? undefined
+                : transitionedTestRun.pauseSource
+        });
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
         }

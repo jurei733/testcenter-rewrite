@@ -276,6 +276,12 @@ try {
   await participantPage
     .locator("#participantRouteStatus", { hasText: "paused" })
     .waitFor({ timeout: 15_000 });
+  await participantPage
+    .locator("#participantRoutePausedState", { hasText: /supervisor continues/i })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(await participantPage.locator("#participantVeronaPlayerFrame").count(), 0);
+  assert.equal(await participantPage.locator("#participantRouteUnitResponse").count(), 0);
+  assert.equal(await participantPage.locator("#participantRouteResumeRunButton").count(), 0);
 
   const resumeButton = operatorPage.getByRole("button", {
     name: "Monitor Resume",
@@ -291,6 +297,9 @@ try {
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
+  await participantPage.locator("#participantRouteUnitResponse").waitFor({
+    timeout: 15_000
+  });
 
   const idleClock = Date.now() + 6 * 60 * 1_000;
   await operatorPage.evaluate(timestamp => {

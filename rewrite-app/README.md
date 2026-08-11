@@ -46,6 +46,13 @@ Review comments. Completing one of these non-saving runs shows the terminal
 confirmation in the active browser, then keeps the same response-free run open
 for another attempt instead of consuming the booklet assignment.
 
+Participant-authored and monitor-authored pauses are distinct durable states.
+A monitor pause removes the active Player and fallback response controls, cannot
+be bypassed through Participant Resume or session re-entry, and waits for an
+operator command. Buffered responses already secured before the command may
+still drain idempotently, but the server preserves the pause, timer state, and
+current Unit. Participant-authored pauses retain their own Continue action.
+
 Platform administrators can configure the original-style instance application
 title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded
 global warning plus global custom-text overrides from the Angular Ops view. The

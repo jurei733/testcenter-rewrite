@@ -479,6 +479,10 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
             ? String(row.booklet_key)
             : String(row.booklet_assignment_key),
         status: row.status as TestRun["status"],
+        pauseSource:
+          row.pause_source === "monitor" || row.pause_source === "participant"
+            ? row.pause_source
+            : undefined,
         locked: Number(row.locked ?? 0) === 1,
         currentUnitKey:
           row.current_unit_key === null || row.current_unit_key === undefined
@@ -1324,6 +1328,13 @@ const sqliteMigrations: SqliteMigration[] = [
           recorded_at DESC
         )
         WHERE unit_key IS NULL;
+    `
+  },
+  {
+    version: 48,
+    name: "add_test_run_pause_source",
+    sql: `
+      ALTER TABLE test_runs ADD COLUMN pause_source TEXT;
     `
   }
 ];
@@ -2524,7 +2535,7 @@ export const createSqliteFirstSliceRepository = (
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE test_run_id = ?`
         )
@@ -2534,7 +2545,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE participant_session_id = ?`
         )
@@ -2544,7 +2555,7 @@ export const createSqliteFirstSliceRepository = (
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE participant_session_id = ? AND status != 'completed'
            ORDER BY updated_at ASC
@@ -2556,7 +2567,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -2567,8 +2578,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO test_runs (
-            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(test_run_id) DO UPDATE SET
             participant_session_id = excluded.participant_session_id,
             tenant_id = excluded.tenant_id,
@@ -2591,7 +2602,8 @@ export const createSqliteFirstSliceRepository = (
             locked_unit_keys_json = excluded.locked_unit_keys_json,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at,
-            completed_at = excluded.completed_at`
+            completed_at = excluded.completed_at,
+            pause_source = excluded.pause_source`
         )
         .run(
           testRun.testRunId,
@@ -2616,7 +2628,8 @@ export const createSqliteFirstSliceRepository = (
           JSON.stringify(testRun.lockedUnitKeys ?? []),
           testRun.createdAt,
           testRun.updatedAt,
-          testRun.completedAt
+          testRun.completedAt,
+          testRun.status === "paused" ? testRun.pauseSource ?? null : null
         );
     },
     async deleteTestRunsByIds(testRunIds) {

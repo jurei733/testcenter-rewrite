@@ -65,6 +65,7 @@ export const participantSessionStatuses = [
   "closed"
 ] as const satisfies readonly ParticipantSessionStatus[];
 export type TestRunStatus = "created" | "running" | "paused" | "completed";
+export type TestRunPauseSource = "participant" | "monitor";
 export const testRunStatuses = [
   "created",
   "running",
@@ -1000,6 +1001,8 @@ export type TestRun = {
   /** Participant-selected state options that take precedence over automatic evaluation. */
   bookletStateOverrides?: Record<string, string>;
   status: TestRunStatus;
+  /** Identifies who may release a paused run; omitted for non-paused runs. */
+  pauseSource?: TestRunPauseSource;
   /** Whole-test lock from the original monitor protocol; independent of progress status. */
   locked?: boolean;
   currentUnitKey: string | null;

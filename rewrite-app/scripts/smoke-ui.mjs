@@ -5938,20 +5938,20 @@ try {
         participantRouteUnitResponse
   );
   await page.waitForFunction(
-    ([expectedUnitKey, expectedResponse]) =>
+    expectedUnitKey =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "paused" &&
       document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
         expectedUnitKey &&
-      document.querySelector("#participantRouteUnitResponse")?.value ===
-        expectedResponse &&
+      document.querySelector("#participantRoutePausedState") != null &&
+      document.querySelector("#participantRouteUnitResponse") == null &&
       document
         .querySelector("#participantRouteActions")
         ?.textContent?.includes("resume"),
-    [participantRouteUnitKey, participantRouteUnitResponse],
+    participantRouteUnitKey,
     { timeout: 15_000 }
   );
-  await clickAction("Resume Run");
+  await clickAction("Continue Test");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
