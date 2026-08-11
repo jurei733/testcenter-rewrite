@@ -36572,6 +36572,13 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
       '    <Q id="1"',
       '    <CustomText key="syscheck_intro">Project-specific readiness introduction</CustomText>\n\n    <Q id="1"'
     )
+    .replace('min="1024"', 'min="-1024"')
+    .replace(
+      'maxDevianceBytesPerSecond="10000"',
+      'maxDevianceBytesPerSecond="-10000"'
+    )
+    .replace('maxErrorsPerSequence="0"', 'maxErrorsPerSequence="-2"')
+    .replace('maxSequenceRepetitions="15"', 'maxSequenceRepetitions="-15"')
     .replace('skipnetwork="false"', 'skipnetwork="0"')
     .replace('required="true"', 'required="1"')
     .replace('<Q id="3"', '<Q id="3" required="0"');
@@ -36707,7 +36714,13 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
         required: boolean;
         options: string[];
       }>;
-      uploadSpeed: { min: number; sequenceSizes: number[] };
+      uploadSpeed: {
+        min: number;
+        maxDevianceBytesPerSecond: number;
+        maxErrorsPerSequence: number;
+        maxSequenceRepetitions: number;
+        sequenceSizes: number[];
+      };
       customTexts: Record<string, string>;
       unit: {
         unitKey: string;
@@ -36736,7 +36749,10 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.equal(configuration?.questions.length, 6);
   assert.equal(configuration?.questions[1]?.required, true);
   assert.deepEqual(configuration?.questions[2]?.options, ["Option A", "Option B"]);
-  assert.equal(configuration?.uploadSpeed.min, 1024);
+  assert.equal(configuration?.uploadSpeed.min, -1024);
+  assert.equal(configuration?.uploadSpeed.maxDevianceBytesPerSecond, -10000);
+  assert.equal(configuration?.uploadSpeed.maxErrorsPerSequence, -2);
+  assert.equal(configuration?.uploadSpeed.maxSequenceRepetitions, -15);
   assert.deepEqual(configuration?.uploadSpeed.sequenceSizes, [
     100000,
     200000,

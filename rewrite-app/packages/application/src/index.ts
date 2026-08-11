@@ -7157,26 +7157,27 @@ const normalizeContentStructure = (
     }
     const normalizeSpeed = (
       speed: SourcePackageSystemCheckEntry["uploadSpeed"] | undefined
-    ): SourcePackageSystemCheckEntry["uploadSpeed"] => ({
-      min: Math.max(0, Number(speed?.min) || 0),
-      good: Math.max(0, Number(speed?.good) || 0),
-      maxDevianceBytesPerSecond: Math.max(
-        0,
-        Number(speed?.maxDevianceBytesPerSecond) || 0
-      ),
-      maxErrorsPerSequence: Math.max(
-        0,
-        Number(speed?.maxErrorsPerSequence) || 0
-      ),
-      maxSequenceRepetitions: Math.max(
-        0,
-        Number(speed?.maxSequenceRepetitions) || 0
-      ),
-      sequenceSizes: (speed?.sequenceSizes ?? []).flatMap(value => {
-        const size = Number(value);
-        return Number.isFinite(size) && size > 0 ? [size] : [];
-      })
-    });
+    ): SourcePackageSystemCheckEntry["uploadSpeed"] => {
+      const normalizeInteger = (value: unknown): number => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      return {
+        min: normalizeInteger(speed?.min),
+        good: normalizeInteger(speed?.good),
+        maxDevianceBytesPerSecond: normalizeInteger(
+          speed?.maxDevianceBytesPerSecond
+        ),
+        maxErrorsPerSequence: normalizeInteger(speed?.maxErrorsPerSequence),
+        maxSequenceRepetitions: normalizeInteger(
+          speed?.maxSequenceRepetitions
+        ),
+        sequenceSizes: (speed?.sequenceSizes ?? []).flatMap(value => {
+          const size = Number(value);
+          return Number.isFinite(size) && size > 0 ? [size] : [];
+        })
+      };
+    };
     const validQuestionTypes = new Set([
       "string",
       "select",
@@ -12702,29 +12703,29 @@ const parseSystemCheckSourceDocument = (
     }
     return "";
   };
-  const readNonNegativeInteger = (
+  const readInteger = (
     element: XmlElement | undefined,
     name: string
   ): number => {
     const value = Number.parseInt(readAttribute(element, name), 10);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
+    return Number.isFinite(value) ? value : 0;
   };
   const readSpeed = (
     name: "UploadSpeed" | "DownloadSpeed"
   ): SourcePackageSystemCheckEntry["uploadSpeed"] => {
     const element = config ? xmlChildrenNamed(config, name)[0] : undefined;
     return {
-      min: readNonNegativeInteger(element, "min"),
-      good: readNonNegativeInteger(element, "good"),
-      maxDevianceBytesPerSecond: readNonNegativeInteger(
+      min: readInteger(element, "min"),
+      good: readInteger(element, "good"),
+      maxDevianceBytesPerSecond: readInteger(
         element,
         "maxDevianceBytesPerSecond"
       ),
-      maxErrorsPerSequence: readNonNegativeInteger(
+      maxErrorsPerSequence: readInteger(
         element,
         "maxErrorsPerSequence"
       ),
-      maxSequenceRepetitions: readNonNegativeInteger(
+      maxSequenceRepetitions: readInteger(
         element,
         "maxSequenceRepetitions"
       ),
