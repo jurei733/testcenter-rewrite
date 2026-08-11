@@ -110,7 +110,6 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     window.removeEventListener("online", this.onlineListener);
     window.removeEventListener("offline", this.offlineListener);
-    this.app.destroy();
   }
 
   get canSubmitRequiredAdminPassword(): boolean {

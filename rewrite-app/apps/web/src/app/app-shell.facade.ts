@@ -6,10 +6,10 @@ import type { AppView } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
 import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { AdminPasswordChangeService } from "./admin-password-change.service";
 import type { LiveContextSection } from "./live-context.component";
+import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 
 const localDemoParticipantLink = buildParticipantEntryUrl(
   {
@@ -25,7 +25,7 @@ const localDemoParticipantLink = buildParticipantEntryUrl(
 @Injectable({ providedIn: "root" })
 export class AppShellFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
-  private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly adminPasswordChange = inject(AdminPasswordChangeService);
 
@@ -184,7 +184,7 @@ export class AppShellFacade {
 
   toggleRawDebug(): void {
     this.uiState.showRawDebug = !this.uiState.showRawDebug;
-    this.viewState.persistShellState();
+    this.persistence.persistShellState();
   }
 
   get liveContextSections(): LiveContextSection[] {
@@ -280,15 +280,15 @@ export class AppShellFacade {
   }
 
   init(initialView: AppView | null = null): void {
-    this.viewState.init(initialView);
-  }
-
-  destroy(): void {
-    this.viewState.destroy();
+    this.persistence.hydrateShellState();
+    if (initialView) {
+      this.uiState.activeView = initialView;
+      this.persistence.persistShellState();
+    }
   }
 
   getPersistedView(): AppView {
-    return this.viewState.getPersistedView();
+    return this.uiState.activeView;
   }
 
   private displayValue(value: string): string {

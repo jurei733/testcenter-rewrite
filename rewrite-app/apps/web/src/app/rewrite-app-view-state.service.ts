@@ -19,6 +19,7 @@ export class RewriteAppViewStateService {
   private readonly contentService = inject(RewriteAppContentService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
   private readonly opsService = inject(RewriteAppOpsService);
+  private initialized = false;
 
   private readonly workspaceState = this.uiState.workspace;
   private readonly refreshWorkspaceOverview = (quiet?: boolean) =>
@@ -39,7 +40,13 @@ export class RewriteAppViewStateService {
   }
 
   init(initialView: AppView | null = null): void {
-    this.lifecycle.hydrateShellState();
+    if (this.initialized) {
+      if (initialView) {
+        this.setActiveView(initialView);
+      }
+      return;
+    }
+    this.initialized = true;
     if (initialView) {
       this.activeView = initialView;
       this.persistShellState();
@@ -55,6 +62,10 @@ export class RewriteAppViewStateService {
   }
 
   destroy(): void {
+    if (!this.initialized) {
+      return;
+    }
+    this.initialized = false;
     this.monitorEvents.stop("Application shell closed.");
     this.lifecycle.clearAutoRefresh(
       this.refreshWorkspaceOverview,
@@ -65,6 +76,10 @@ export class RewriteAppViewStateService {
   }
 
   setActiveView(view: AppView): void {
+    if (!this.initialized) {
+      this.init(view);
+      return;
+    }
     if (this.activeView === view) {
       this.syncMonitorEventStream();
       void this.lifecycle.ensureDataForView(
