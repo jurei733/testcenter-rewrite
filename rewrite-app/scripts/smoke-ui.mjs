@@ -10665,7 +10665,7 @@ try {
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
     })),
-    ...Array.from({ length: 21 }, (_, index) => {
+    ...Array.from({ length: 33 }, (_, index) => {
       const number = index + 19;
       return {
         fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
@@ -10986,7 +10986,7 @@ try {
           16,
           17,
           18,
-          ...Array.from({ length: 21 }, (_, index) => index + 19)
+          ...Array.from({ length: 33 }, (_, index) => index + 19)
         ].map(number => {
           return {
             loginKey: `Bklt_Config-${number}`,
@@ -11297,6 +11297,104 @@ try {
   );
   assert.equal(
     await page.locator("#participantVeronaNextPageButton").count(),
+    0
+  );
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-40",
+    "Cy-Bklt_BkltConfig-40"
+  );
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-41",
+    "Cy-Bklt_BkltConfig-41"
+  );
+  assert.equal(await page.locator("#participantRouteUnit").count(), 0);
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-42",
+    "Cy-Bklt_BkltConfig-42"
+  );
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-43",
+    "Cy-Bklt_BkltConfig-43"
+  );
+  await page.locator("#participantRouteUnitRail").waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-44",
+    "Cy-Bklt_BkltConfig-44"
+  );
+  assert.equal(await page.locator("#participantRouteFullscreenButton").count(), 0);
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-45",
+    "Cy-Bklt_BkltConfig-45"
+  );
+  await page.locator("#participantRouteFullscreenButton").waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-46",
+    "Cy-Bklt_BkltConfig-46"
+  );
+  assert.equal(await page.locator("#participantRouteReloadButton").count(), 0);
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-47",
+    "Cy-Bklt_BkltConfig-47"
+  );
+  await page.locator("#participantRouteReloadButton").waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-48",
+    "Cy-Bklt_BkltConfig-48"
+  );
+  await page.locator("#participantRouteTestletTimer").waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletTimerValue").count(),
+    0
+  );
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-49",
+    "Cy-Bklt_BkltConfig-49"
+  );
+  await page.locator("#participantRouteTestletTimerValue").waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-50",
+    "Cy-Bklt_BkltConfig-50"
+  );
+  await page.locator("#participantRouteTimerLifecycleEvent").waitFor();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "xyz" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTimerLifecycleMessage")
+    .filter({ hasText: "ended" })
+    .waitFor();
+
+  await openOriginalBookletConfig(
+    "Bklt_Config-51",
+    "Cy-Bklt_BkltConfig-51"
+  );
+  assert.equal(
+    await page.locator("#participantRouteTimerLifecycleEvent").count(),
+    0
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "xyz" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteTimerLifecycleEvent").count(),
     0
   );
   stopAfter("participant-original-booklet-config");

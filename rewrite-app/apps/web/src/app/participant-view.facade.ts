@@ -847,6 +847,7 @@ export class ParticipantViewFacade {
           const minutes = Math.floor(remainingSeconds / 60);
           const seconds = remainingSeconds % 60;
           const activeWarning =
+            !policy.display.silentMode &&
             this.activeTimerWarning?.testletKey === activeTestletTimer.testletKey &&
             this.activeTimerWarning.startedAt === activeTestletTimer.startedAt &&
             this.activeTimerWarning.visibleUntilMs > this.timerTick()
@@ -1652,6 +1653,9 @@ export class ParticipantViewFacade {
     },
     forceVisible = false
   ): void {
+    if (this.readCurrentRunState()?.booklet.policy.display.silentMode) {
+      return;
+    }
     const key = `${testRunId}:${timer.testletKey}:${timer.startedAt}:${kind}`;
     if (this.seenTimerLifecycleEvents.has(key) && !forceVisible) {
       return;

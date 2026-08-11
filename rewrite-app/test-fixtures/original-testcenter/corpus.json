@@ -483,6 +483,130 @@
       "unitKeys": ["CY-Unit.Sample-101", "cpy"],
       "policy": { "pageControlsHidden": true }
     },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_40.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_40.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "3392a181b13919b6f6a08c4aea8d1692c3b6d199bcd6ce274956f853c7c89178",
+      "bookletKey": "Cy-Bklt_BkltConfig-40",
+      "displayLabel": "Bklt-config-40",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitTitle": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_41.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_41.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "caf148f4f3b5f37fad80a6e2dd9b20c7923d9faf40a9680ba8b80a721c94b886",
+      "bookletKey": "Cy-Bklt_BkltConfig-41",
+      "displayLabel": "Bklt-config-41",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitTitle": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_42.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_42.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "672e40d48e2603b873da49facda81fb43c28d97e43f92145167389fec01d2702",
+      "bookletKey": "Cy-Bklt_BkltConfig-42",
+      "displayLabel": "Bklt-config-43",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitMenuEnabled": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_43.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_43.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "8087d7d57016d9946c8853339452c195b260d30a304b78fe7a8adb6b0a234219",
+      "bookletKey": "Cy-Bklt_BkltConfig-43",
+      "displayLabel": "Bklt-config-43",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_44.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_44.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "e7d159dff32be442276d8ab54a6357bbaafdfbf4c5a941517007fc1b51fd6770",
+      "bookletKey": "Cy-Bklt_BkltConfig-44",
+      "displayLabel": "Bklt-config-44",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "fullscreenButton": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_45.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_45.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "d7fecb588f4f5e53261f81a03c6a437581b7c7b24073b46a64fb1154d882d847",
+      "bookletKey": "Cy-Bklt_BkltConfig-45",
+      "displayLabel": "Bklt-config-45",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "fullscreenButton": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_46.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_46.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0a9ec451b9e55bce29becd48e730fc14854a02aaf59d26a3fbac033ffe0fade8",
+      "bookletKey": "Cy-Bklt_BkltConfig-46",
+      "displayLabel": "Bklt-config-46",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "reloadButton": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_47.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_47.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "cc21c2e4d5f91f7206f110242ce8ed233669d1d7e4972349775728e1d915de35",
+      "bookletKey": "Cy-Bklt_BkltConfig-47",
+      "displayLabel": "Bklt-config-47",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "reloadButton": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_48.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_48.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "e1438ba41782c401251340f692cece13664f51f0c6ec58eef9bc956f050344f1",
+      "bookletKey": "Cy-Bklt_BkltConfig-48",
+      "displayLabel": "Bklt-config-48",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [1, "confirm"] }],
+      "policy": { "showTimeLeft": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_49.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_49.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c22900c68757a2134f4843776090443c934f5175ba240264de24c475e04dec0b",
+      "bookletKey": "Cy-Bklt_BkltConfig-49",
+      "displayLabel": "Bklt-config-49",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [1, "confirm"] }],
+      "policy": { "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_50.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_50.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c8a31ec836d13ceaffc751e142ade738bf6d823b8c7924caa00ee74e43696936",
+      "bookletKey": "Cy-Bklt_BkltConfig-50",
+      "displayLabel": "Bklt-config-50",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy", "xyz"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": { "showTimeLeft": true, "silentMode": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_51.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_51.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "2314edf5dafed53ca49717819c278142b6fe72a769d1928d08328556d8649617",
+      "bookletKey": "Cy-Bklt_BkltConfig-51",
+      "displayLabel": "Bklt-config-51",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy", "xyz"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": { "showTimeLeft": true, "silentMode": true }
+    },
 
     {
       "fixture": "booklets/system-test/CY_Bklt_TC-1.xml",

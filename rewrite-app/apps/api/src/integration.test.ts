@@ -12058,6 +12058,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
       unitTitle?: boolean;
       fullscreenPrompt?: boolean;
       fullscreenButton?: boolean;
+      reloadButton?: boolean;
+      silentMode?: boolean;
       showTimeLeft?: boolean;
       warningMinutes?: number[];
       unitResponsesBufferMs?: number;
@@ -12222,6 +12224,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
                   unitTitle: boolean;
                   fullscreenPrompt: boolean;
                   fullscreenButton: boolean;
+                  reloadButton: boolean;
+                  silentMode: boolean;
                 };
                 timing: {
                   showTimeLeft: boolean;
@@ -12486,6 +12490,20 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.display.fullscreenButton,
         expectation.policy.fullscreenButton
+      );
+    }
+    if (expectation.policy.reloadButton !== undefined) {
+      assert.equal(
+        booklet.policy.display.reloadButton,
+        expectation.policy.reloadButton,
+        expectation.sourcePath
+      );
+    }
+    if (expectation.policy.silentMode !== undefined) {
+      assert.equal(
+        booklet.policy.display.silentMode,
+        expectation.policy.silentMode,
+        expectation.sourcePath
       );
     }
     if (expectation.policy.showTimeLeft !== undefined) {
