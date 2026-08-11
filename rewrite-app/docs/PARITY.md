@@ -165,9 +165,12 @@ The roster parser applies the original Group < Login precedence and preserves
 the resulting filename map for participant and password-redacted operational
 logins. File, SQLite, and PostgreSQL adapters retain participant assignments;
 API and restart tests cover import and persistence. Schemas before 18.0 reject
-the new container explicitly. Uploading the referenced global image registry,
-resolving missing filenames, and rendering the eight slots remain the next
-branding/Participant vertical slice.
+the new container explicitly. A platform-admin registry now uploads or replaces
+PNG/JPEG/WebP assets by original filename with the Original's 2 MiB limit,
+persists them in every store, exposes bounded public image delivery, and blocks
+roster imports that reference missing filenames. Assigning global defaults,
+rendering the eight slots, and the corresponding Angular administration remain
+the next branding/Participant vertical slice.
 
 Latest P0 adaptive initial-state closure: the server now mirrors the original
 Testloader by registering every variable referenced anywhere in a state
@@ -753,8 +756,9 @@ block gates, auto-submitting at the configured length.
 Current 18.0 intake also validates Group/Login `AssetAssignments`, rejects the
 container in earlier generations, inherits group filenames into each login,
 and lets a login replace individual slots. The effective filename map survives
-all persistent roster adapters; asset registry administration and Player image
-delivery remain partial.
+all persistent roster adapters; the protected global registry and public image
+delivery are available, while global slot defaults and Player rendering remain
+partial.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |

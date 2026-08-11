@@ -7,6 +7,7 @@ import type {
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationAsset,
   ApplicationSettings,
   AttachmentFile,
   ContentRelease,
@@ -238,6 +239,19 @@ const mapApplicationSettings = (
           row.updated_by_admin_user_id == null
             ? null
             : String(row.updated_by_admin_user_id)
+      }
+    : null;
+
+const mapApplicationAsset = (row: Row | undefined): ApplicationAsset | null =>
+  row
+    ? {
+        applicationAssetId: String(row.application_asset_id),
+        originalName: String(row.original_name),
+        mediaType: row.media_type as ApplicationAsset["mediaType"],
+        dataBase64: String(row.data_base64),
+        byteLength: Number(row.byte_length),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at)
       }
     : null;
 
@@ -1312,6 +1326,21 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE participant_roster_entries
         ADD COLUMN IF NOT EXISTS asset_assignments_json JSONB NOT NULL DEFAULT '{}'::jsonb;
     `
+  },
+  {
+    version: 45,
+    name: "add_application_assets",
+    sql: `
+      CREATE TABLE IF NOT EXISTS application_assets (
+        application_asset_id TEXT PRIMARY KEY,
+        original_name TEXT NOT NULL UNIQUE,
+        media_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        byte_length INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `
   }
 ];
 
@@ -1476,6 +1505,66 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.updatedByAdminUserId
         ]
       );
+    },
+    async listApplicationAssets() {
+      return many(
+        `SELECT application_asset_id, original_name, media_type, data_base64,
+                byte_length, created_at, updated_at
+         FROM application_assets
+         ORDER BY original_name ASC`,
+        [],
+        mapApplicationAsset
+      );
+    },
+    async getApplicationAssetById(applicationAssetId) {
+      return one(
+        `SELECT application_asset_id, original_name, media_type, data_base64,
+                byte_length, created_at, updated_at
+         FROM application_assets
+         WHERE application_asset_id = $1`,
+        [applicationAssetId],
+        mapApplicationAsset
+      );
+    },
+    async getApplicationAssetByOriginalName(originalName) {
+      return one(
+        `SELECT application_asset_id, original_name, media_type, data_base64,
+                byte_length, created_at, updated_at
+         FROM application_assets
+         WHERE original_name = $1`,
+        [originalName],
+        mapApplicationAsset
+      );
+    },
+    async saveApplicationAsset(applicationAsset) {
+      await pool.query(
+        `INSERT INTO application_assets (
+          application_asset_id, original_name, media_type, data_base64,
+          byte_length, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (application_asset_id) DO UPDATE SET
+          original_name = EXCLUDED.original_name,
+          media_type = EXCLUDED.media_type,
+          data_base64 = EXCLUDED.data_base64,
+          byte_length = EXCLUDED.byte_length,
+          updated_at = EXCLUDED.updated_at`,
+        [
+          applicationAsset.applicationAssetId,
+          applicationAsset.originalName,
+          applicationAsset.mediaType,
+          applicationAsset.dataBase64,
+          applicationAsset.byteLength,
+          applicationAsset.createdAt,
+          applicationAsset.updatedAt
+        ]
+      );
+    },
+    async deleteApplicationAsset(applicationAssetId) {
+      const result = await pool.query(
+        "DELETE FROM application_assets WHERE application_asset_id = $1",
+        [applicationAssetId]
+      );
+      return (result.rowCount ?? 0) > 0;
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       return many(

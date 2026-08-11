@@ -9,6 +9,7 @@ import type {
   AdminLoginAttempt,
   AdminRoleAssignment,
   AdminUser,
+  ApplicationAsset,
   OperationalLoginMigrationCandidate,
   ParticipantRosterEntry,
   TestRun,
@@ -16,6 +17,41 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
+
+test("SQLite preserves global application assets across repository restarts", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-app-assets-"));
+  const databasePath = join(tempDirectory, "application-assets.sqlite");
+  const applicationAsset: ApplicationAsset = {
+    applicationAssetId: "asset:school-logo",
+    originalName: "school.png",
+    mediaType: "image/png",
+    dataBase64: "iVBORw0KGgo=",
+    byteLength: 8,
+    createdAt: "2026-08-12T00:00:00.000Z",
+    updatedAt: "2026-08-12T00:00:00.000Z"
+  };
+  try {
+    await createSqliteFirstSliceRepository(databasePath).saveApplicationAsset(
+      applicationAsset
+    );
+    const restarted = createSqliteFirstSliceRepository(databasePath);
+    assert.deepEqual(await restarted.listApplicationAssets(), [applicationAsset]);
+    assert.deepEqual(
+      await restarted.getApplicationAssetByOriginalName("school.png"),
+      applicationAsset
+    );
+    assert.equal(
+      await restarted.deleteApplicationAsset(applicationAsset.applicationAssetId),
+      true
+    );
+    assert.equal(
+      await restarted.getApplicationAssetById(applicationAsset.applicationAssetId),
+      null
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
 
 test("SQLite persists a renamed workspace without changing its stable identity", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-workspace-"));

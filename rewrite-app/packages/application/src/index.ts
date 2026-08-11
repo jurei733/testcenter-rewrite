@@ -54,6 +54,7 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
+  ApplicationAsset,
   ApplicationSettings,
   AttachmentFile,
   BookletStateCondition,
@@ -1027,6 +1028,23 @@ export type ApplicationSettingsPort = {
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
+  listApplicationAssets(input: {
+    sessionToken: string;
+  }): Promise<ApplicationAsset[]>;
+  getApplicationAsset(input: {
+    applicationAssetId?: string;
+    originalName?: string;
+  }): Promise<ApplicationAsset>;
+  uploadApplicationAsset(input: {
+    sessionToken: string;
+    originalName: string;
+    mediaType: string;
+    dataBase64: string;
+  }): Promise<ApplicationAsset>;
+  deleteApplicationAsset(input: {
+    sessionToken: string;
+    applicationAssetId: string;
+  }): Promise<ApplicationAsset>;
 };
 
 export type FirstSlicePorts = {
@@ -1188,6 +1206,15 @@ export type FirstSliceServices = FirstSlicePorts & {
 export type FirstSliceRepository = {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
+  listApplicationAssets(): Promise<ApplicationAsset[]>;
+  getApplicationAssetById(
+    applicationAssetId: string
+  ): Promise<ApplicationAsset | null>;
+  getApplicationAssetByOriginalName(
+    originalName: string
+  ): Promise<ApplicationAsset | null>;
+  saveApplicationAsset(applicationAsset: ApplicationAsset): Promise<void>;
+  deleteApplicationAsset(applicationAssetId: string): Promise<boolean>;
   listAttachmentFilesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -4149,6 +4176,80 @@ const normalizeGlobalWarningExpiration = (value: unknown): string | null => {
     );
   }
   return new Date(timestamp).toISOString();
+};
+
+const normalizeApplicationAssetInput = (input: {
+  originalName: string;
+  mediaType: string;
+  dataBase64: string;
+}): Pick<
+  ApplicationAsset,
+  "originalName" | "mediaType" | "dataBase64" | "byteLength"
+> => {
+  const originalName = input.originalName.trim().split(/[\\/]/).at(-1)?.trim() ?? "";
+  if (!originalName || originalName.length > 255) {
+    throw new FirstSliceError(
+      400,
+      "application_asset_name_invalid",
+      "Application asset filenames must contain between 1 and 255 characters."
+    );
+  }
+  const mediaType = input.mediaType.trim().toLowerCase();
+  if (!(["image/png", "image/jpeg", "image/webp"] as string[]).includes(mediaType)) {
+    throw new FirstSliceError(
+      400,
+      "application_asset_media_type_invalid",
+      "Application assets must be PNG, JPEG, or WebP images."
+    );
+  }
+  const dataBase64 = input.dataBase64.replace(/\s+/g, "");
+  if (
+    !dataBase64 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+      dataBase64
+    )
+  ) {
+    throw new FirstSliceError(
+      400,
+      "application_asset_data_invalid",
+      "Application asset data must be valid base64."
+    );
+  }
+  const bytes = Buffer.from(dataBase64, "base64");
+  if (bytes.length === 0 || bytes.length > 2 * 1024 * 1024) {
+    throw new FirstSliceError(
+      413,
+      "application_asset_file_too_large",
+      "Application assets must contain data and must not exceed 2 MiB."
+    );
+  }
+  const validSignature =
+    mediaType === "image/png"
+      ? bytes.length >= 8 &&
+        bytes.subarray(0, 8).equals(
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+        )
+      : mediaType === "image/jpeg"
+        ? bytes.length >= 3 &&
+          bytes[0] === 0xff &&
+          bytes[1] === 0xd8 &&
+          bytes[2] === 0xff
+        : bytes.length >= 12 &&
+          bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+          bytes.subarray(8, 12).toString("ascii") === "WEBP";
+  if (!validSignature) {
+    throw new FirstSliceError(
+      400,
+      "application_asset_image_signature_invalid",
+      "Application asset data does not match its declared media type."
+    );
+  }
+  return {
+    originalName,
+    mediaType: mediaType as ApplicationAsset["mediaType"],
+    dataBase64,
+    byteLength: bytes.length
+  };
 };
 
 const hasAdminManagementRole = (
@@ -21859,6 +21960,28 @@ export const createFirstSliceServices = (
       seenLoginKeys.add(normalizedLoginKey);
     }
 
+    const referencedAssetNames = Array.from(
+      new Set(
+        [...parsedEntries, ...operationalLoginCandidates].flatMap(entry =>
+          Object.values(entry.assetAssignments ?? {})
+        )
+      )
+    ).sort();
+    const missingAssetNames: string[] = [];
+    for (const originalName of referencedAssetNames) {
+      if (!(await repository.getApplicationAssetByOriginalName(originalName))) {
+        missingAssetNames.push(originalName);
+      }
+    }
+    if (missingAssetNames.length > 0) {
+      throw new FirstSliceError(
+        400,
+        "participant_roster_asset_missing",
+        `Participant roster references missing application asset${missingAssetNames.length === 1 ? "" : "s"}: ${missingAssetNames.join(", ")}.`,
+        { missingAssetNames }
+      );
+    }
+
     const normalizedParsedEntries = parsedEntries.map(parsedEntry => {
       const validFrom = normalizeParticipantAccessBoundary(
         parsedEntry.validFrom,
@@ -22973,6 +23096,97 @@ export const createFirstSliceServices = (
             ...defaultApplicationSettings
           }
         );
+      },
+      async listApplicationAssets(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        return repository.listApplicationAssets();
+      },
+      async getApplicationAsset(input) {
+        const applicationAssetId = input.applicationAssetId?.trim();
+        const originalName = input.originalName?.trim();
+        const applicationAsset = applicationAssetId
+          ? await repository.getApplicationAssetById(applicationAssetId)
+          : originalName
+            ? await repository.getApplicationAssetByOriginalName(originalName)
+            : null;
+        if (!applicationAsset) {
+          throw new FirstSliceError(
+            404,
+            "application_asset_not_found",
+            "The requested application asset was not found."
+          );
+        }
+        return applicationAsset;
+      },
+      async uploadApplicationAsset(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        const normalized = normalizeApplicationAssetInput(input);
+        const existing = await repository.getApplicationAssetByOriginalName(
+          normalized.originalName
+        );
+        const timestamp = now();
+        const applicationAsset: ApplicationAsset = {
+          applicationAssetId:
+            existing?.applicationAssetId ?? `asset:${idGenerator()}`,
+          ...normalized,
+          createdAt: existing?.createdAt ?? timestamp,
+          updatedAt: timestamp
+        };
+        await repository.saveApplicationAsset(applicationAsset);
+        await recordAdminAuditEvent({
+          eventType: "application_asset_uploaded",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          summary: `Platform admin '${currentSession.adminUser.username}' ${existing ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
+          details: {
+            applicationAssetId: applicationAsset.applicationAssetId,
+            originalName: applicationAsset.originalName,
+            mediaType: applicationAsset.mediaType,
+            byteLength: applicationAsset.byteLength,
+            replaced: Boolean(existing)
+          }
+        });
+        return applicationAsset;
+      },
+      async deleteApplicationAsset(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        const applicationAsset = await repository.getApplicationAssetById(
+          input.applicationAssetId.trim()
+        );
+        if (!applicationAsset) {
+          throw new FirstSliceError(
+            404,
+            "application_asset_not_found",
+            "The requested application asset was not found."
+          );
+        }
+        await repository.deleteApplicationAsset(
+          applicationAsset.applicationAssetId
+        );
+        await recordAdminAuditEvent({
+          eventType: "application_asset_deleted",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          summary: `Platform admin '${currentSession.adminUser.username}' deleted application asset '${applicationAsset.originalName}'.`,
+          details: {
+            applicationAssetId: applicationAsset.applicationAssetId,
+            originalName: applicationAsset.originalName
+          }
+        });
+        return applicationAsset;
       },
       async updateApplicationSettings(input) {
         const currentSession = await requireActiveAdminSession(

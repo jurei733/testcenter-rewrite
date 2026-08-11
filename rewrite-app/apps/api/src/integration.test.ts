@@ -15355,25 +15355,102 @@ test("original Testcenter compatibility corpus imports representative booklets",
       ?.filters[0]?.not,
     true
   );
+  const assetAssignmentsRosterText = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0/definitions/vo_Testtakers.xsd">',
+    "  <Metadata><Description>Asset assignments</Description></Metadata>",
+    '  <Group id="asset-group" label="Asset Group">',
+    '    <AssetAssignments><Asset slot="logo">school.png</Asset></AssetAssignments>',
+    '    <Login mode="run-hot-return" name="asset-participant">',
+    '      <Booklet>BOOKLET.SAMPLE-1</Booklet>',
+    '      <AssetAssignments><Asset slot="starterCompanion">start.webp</Asset></AssetAssignments>',
+    "    </Login>",
+    "  </Group>",
+    "</Testtakers>"
+  ].join("\n");
+  const missingAssetAssignmentsRoster = await requestJson<{
+    error: string;
+    details: { missingAssetNames: string[] };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: { rosterText: assetAssignmentsRosterText }
+    }
+  );
+  assert.equal(missingAssetAssignmentsRoster.status, 400);
+  assert.equal(
+    missingAssetAssignmentsRoster.body.error,
+    "participant_roster_asset_missing"
+  );
+  assert.deepEqual(missingAssetAssignmentsRoster.body.details.missingAssetNames, [
+    "school.png",
+    "start.webp"
+  ]);
+  const assetAdminSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: { username: "integration.admin", password: "integration-secret" }
+    }
+  );
+  assert.equal(assetAdminSignIn.status, 200);
+  for (const asset of [
+    {
+      originalName: "school.png",
+      mediaType: "image/png",
+      dataBase64: Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+      ]).toString("base64")
+    },
+    {
+      originalName: "start.webp",
+      mediaType: "image/webp",
+      dataBase64: Buffer.from("RIFF0000WEBP", "ascii").toString("base64")
+    }
+  ]) {
+    const upload = await requestJson<{
+      applicationAsset: { applicationAssetId: string; originalName: string };
+    }>("/api/v1/admin/application-assets", {
+      method: "POST",
+      headers: { authorization: `Bearer ${assetAdminSignIn.body.sessionToken}` },
+      body: asset
+    });
+    assert.equal(upload.status, 201);
+    assert.equal(upload.body.applicationAsset.originalName, asset.originalName);
+  }
+  const applicationAssets = await requestJson<{
+    items: Array<{
+      applicationAssetId: string;
+      originalName: string;
+      dataBase64?: string;
+    }>;
+  }>("/api/v1/admin/application-assets", {
+    headers: { authorization: `Bearer ${assetAdminSignIn.body.sessionToken}` }
+  });
+  assert.equal(applicationAssets.status, 200);
+  assert.equal(
+    applicationAssets.body.items.some(item => "dataBase64" in item),
+    false
+  );
+  const schoolAsset = applicationAssets.body.items.find(
+    item => item.originalName === "school.png"
+  );
+  assert.ok(schoolAsset);
+  const schoolAssetDownload = await fetch(
+    `${baseUrl}/api/v1/system/application-assets?applicationAssetId=${encodeURIComponent(schoolAsset.applicationAssetId)}`
+  );
+  assert.equal(schoolAssetDownload.status, 200);
+  assert.equal(schoolAssetDownload.headers.get("content-type"), "image/png");
+  assert.deepEqual(
+    Buffer.from(await schoolAssetDownload.arrayBuffer()),
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  );
   const assetAssignmentsRoster = await requestJson(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       method: "POST",
-      body: {
-        rosterText: [
-          '<?xml version="1.0" encoding="UTF-8"?>',
-          '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0/definitions/vo_Testtakers.xsd">',
-          "  <Metadata><Description>Asset assignments</Description></Metadata>",
-          '  <Group id="asset-group" label="Asset Group">',
-          '    <AssetAssignments><Asset slot="logo">school.png</Asset></AssetAssignments>',
-          '    <Login mode="run-hot-return" name="asset-participant">',
-          '      <Booklet>BOOKLET.SAMPLE-1</Booklet>',
-          '      <AssetAssignments><Asset slot="starterCompanion">start.webp</Asset></AssetAssignments>',
-          "    </Login>",
-          "  </Group>",
-          "</Testtakers>"
-        ].join("\n")
-      }
+      body: { rosterText: assetAssignmentsRosterText }
     }
   );
   assert.equal(assetAssignmentsRoster.status, 201);

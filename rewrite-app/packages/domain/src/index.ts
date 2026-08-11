@@ -23,6 +23,8 @@ export type AdminAuditEventType =
   | "admin_role_assigned"
   | "admin_role_revoked"
   | "workspace_deleted"
+  | "application_asset_uploaded"
+  | "application_asset_deleted"
   | "application_settings_updated";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export const sourcePackageStatuses = [
@@ -241,6 +243,8 @@ export const adminAuditEventTypes = [
   "admin_role_assigned",
   "admin_role_revoked",
   "workspace_deleted",
+  "application_asset_uploaded",
+  "application_asset_deleted",
   "application_settings_updated"
 ] as const satisfies readonly AdminAuditEventType[];
 export type WorkspaceActivityEventType =
@@ -446,6 +450,21 @@ export const applicationThemeNames = [
 ] as const;
 
 export type ApplicationThemeName = (typeof applicationThemeNames)[number];
+
+export type ApplicationAssetMediaType =
+  | "image/png"
+  | "image/jpeg"
+  | "image/webp";
+
+export type ApplicationAsset = {
+  applicationAssetId: string;
+  originalName: string;
+  mediaType: ApplicationAssetMediaType;
+  dataBase64: string;
+  byteLength: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type ApplicationSettings = {
   appTitle: string;

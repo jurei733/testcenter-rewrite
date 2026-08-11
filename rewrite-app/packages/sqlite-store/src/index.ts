@@ -9,6 +9,7 @@ import type {
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationAsset,
   ApplicationSettings,
   AttachmentFile,
   ContentRelease,
@@ -249,6 +250,21 @@ const mapApplicationSettings = (
           row.updated_by_admin_user_id == null
             ? null
             : String(row.updated_by_admin_user_id)
+      }
+    : null;
+
+const mapApplicationAsset = (
+  row: Record<string, unknown> | undefined
+): ApplicationAsset | null =>
+  row
+    ? {
+        applicationAssetId: String(row.application_asset_id),
+        originalName: String(row.original_name),
+        mediaType: row.media_type as ApplicationAsset["mediaType"],
+        dataBase64: String(row.data_base64),
+        byteLength: Number(row.byte_length),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at)
       }
     : null;
 
@@ -1383,6 +1399,21 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE participant_roster_entries
         ADD COLUMN asset_assignments_json TEXT NOT NULL DEFAULT '{}';
     `
+  },
+  {
+    version: 51,
+    name: "add_application_assets",
+    sql: `
+      CREATE TABLE application_assets (
+        application_asset_id TEXT PRIMARY KEY,
+        original_name TEXT NOT NULL UNIQUE,
+        media_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        byte_length INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `
   }
 ];
 
@@ -1541,6 +1572,76 @@ export const createSqliteFirstSliceRepository = (
           settings.updatedAt,
           settings.updatedByAdminUserId
         );
+    },
+    async listApplicationAssets() {
+      const rows = database
+        .prepare(
+          `SELECT application_asset_id, original_name, media_type, data_base64,
+                  byte_length, created_at, updated_at
+           FROM application_assets
+           ORDER BY original_name ASC`
+        )
+        .all() as Record<string, unknown>[];
+      return rows
+        .map(row => mapApplicationAsset(row))
+        .filter(Boolean) as ApplicationAsset[];
+    },
+    async getApplicationAssetById(applicationAssetId) {
+      return mapApplicationAsset(
+        database
+          .prepare(
+            `SELECT application_asset_id, original_name, media_type, data_base64,
+                    byte_length, created_at, updated_at
+             FROM application_assets
+             WHERE application_asset_id = ?`
+          )
+          .get(applicationAssetId) as Record<string, unknown> | undefined
+      );
+    },
+    async getApplicationAssetByOriginalName(originalName) {
+      return mapApplicationAsset(
+        database
+          .prepare(
+            `SELECT application_asset_id, original_name, media_type, data_base64,
+                    byte_length, created_at, updated_at
+             FROM application_assets
+             WHERE original_name = ?`
+          )
+          .get(originalName) as Record<string, unknown> | undefined
+      );
+    },
+    async saveApplicationAsset(applicationAsset) {
+      database
+        .prepare(
+          `INSERT INTO application_assets (
+            application_asset_id, original_name, media_type, data_base64,
+            byte_length, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(application_asset_id) DO UPDATE SET
+            original_name = excluded.original_name,
+            media_type = excluded.media_type,
+            data_base64 = excluded.data_base64,
+            byte_length = excluded.byte_length,
+            updated_at = excluded.updated_at`
+        )
+        .run(
+          applicationAsset.applicationAssetId,
+          applicationAsset.originalName,
+          applicationAsset.mediaType,
+          applicationAsset.dataBase64,
+          applicationAsset.byteLength,
+          applicationAsset.createdAt,
+          applicationAsset.updatedAt
+        );
+    },
+    async deleteApplicationAsset(applicationAssetId) {
+      return (
+        database
+          .prepare(
+            "DELETE FROM application_assets WHERE application_asset_id = ?"
+          )
+          .run(applicationAssetId).changes > 0
+      );
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       const rows = database

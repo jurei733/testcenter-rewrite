@@ -152,6 +152,10 @@ import {
   type UpdateAdminUserResponse,
   type UpdateApplicationSettingsRequest,
   type UpdateApplicationSettingsResponse,
+  type UploadApplicationAssetRequest,
+  type UploadApplicationAssetResponse,
+  type ListApplicationAssetsResponse,
+  type DeleteApplicationAssetResponse,
   type UploadAttachmentFileRequest,
   type UploadAttachmentFileResponse,
   type UpdateParticipantReviewRequest,
@@ -2615,6 +2619,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (
     method === "GET" &&
+    pathname === productionApiRoutes.system.getApplicationAsset
+  ) {
+    return `GET ${productionApiRoutes.system.getApplicationAsset}`;
+  }
+
+  if (
+    method === "GET" &&
     pathname === productionApiRoutes.system.getSystemCheckAccess
   ) {
     return `GET ${productionApiRoutes.system.getSystemCheckAccess}`;
@@ -2696,6 +2707,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     pathname === productionApiRoutes.admin.updateApplicationSettings
   ) {
     return `PATCH ${productionApiRoutes.admin.updateApplicationSettings}`;
+  }
+
+  if (
+    ["GET", "POST", "DELETE"].includes(method) &&
+    pathname === productionApiRoutes.admin.applicationAssets
+  ) {
+    return `${method} ${productionApiRoutes.admin.applicationAssets}`;
   }
 
   if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
@@ -4043,6 +4061,41 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (
         request.method === "GET" &&
+        pathname === productionApiRoutes.system.getApplicationAsset
+      ) {
+        const applicationAssetId = url.searchParams
+          .get("applicationAssetId")
+          ?.trim();
+        const originalName = url.searchParams.get("originalName")?.trim();
+        if (!applicationAssetId && !originalName) {
+          sendError(
+            response,
+            400,
+            "application_asset_id_missing",
+            "applicationAssetId or originalName is required."
+          );
+          return;
+        }
+        const applicationAsset =
+          await services.applicationSettings.getApplicationAsset({
+            applicationAssetId,
+            originalName
+          });
+        sendAsset(
+          response,
+          200,
+          applicationAsset.mediaType,
+          Buffer.from(applicationAsset.dataBase64, "base64"),
+          {
+            "cache-control": "public, max-age=300",
+            "content-disposition": `inline; filename="${applicationAsset.originalName.replace(/["\\\r\n]/g, "_")}"`
+          }
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         pathname === productionApiRoutes.system.getSystemCheckAccess
       ) {
         const allSystemCheckRoles = await listSystemCheckRoleAssignments(
@@ -4118,6 +4171,61 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
         sendJson<UpdateApplicationSettingsResponse>(response, 200, {
           applicationSettings
+        });
+        return;
+      }
+
+      if (
+        pathname === productionApiRoutes.admin.applicationAssets &&
+        ["GET", "POST", "DELETE"].includes(request.method ?? "")
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        if (request.method === "GET") {
+          const items = await services.applicationSettings.listApplicationAssets(
+            { sessionToken }
+          );
+          sendJson<ListApplicationAssetsResponse>(response, 200, {
+            items: items.map(({ dataBase64: _dataBase64, ...item }) => item)
+          });
+          return;
+        }
+        if (request.method === "POST") {
+          const body =
+            await readApplicationSettingsRequestJsonBody<UploadApplicationAssetRequest>();
+          const { dataBase64: _dataBase64, ...applicationAsset } =
+            await services.applicationSettings.uploadApplicationAsset({
+              sessionToken,
+              originalName: body.originalName,
+              mediaType: body.mediaType,
+              dataBase64: body.dataBase64
+            });
+          sendJson<UploadApplicationAssetResponse>(response, 201, {
+            applicationAsset
+          });
+          return;
+        }
+        const applicationAssetId = url.searchParams
+          .get("applicationAssetId")
+          ?.trim();
+        if (!applicationAssetId) {
+          sendError(
+            response,
+            400,
+            "application_asset_id_missing",
+            "applicationAssetId is required."
+          );
+          return;
+        }
+        const { dataBase64: _dataBase64, ...applicationAsset } =
+          await services.applicationSettings.deleteApplicationAsset({
+            sessionToken,
+            applicationAssetId
+          });
+        sendJson<DeleteApplicationAssetResponse>(response, 200, {
+          applicationAsset
         });
         return;
       }

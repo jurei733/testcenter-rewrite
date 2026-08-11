@@ -22,6 +22,7 @@ import type {
   AdminSession,
   AdminUser,
   ApplicationSettings,
+  ApplicationAsset,
   AttachmentFile,
   ContentRelease,
   ImportJob,
@@ -40,6 +41,7 @@ import type {
 
 type PersistedFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
+  applicationAssets: Record<string, ApplicationAsset>;
   attachmentFiles: Record<string, AttachmentFile>;
   adminUsers: Record<string, AdminUser>;
   adminLoginAttempts: Record<string, AdminLoginAttempt>;
@@ -83,6 +85,7 @@ type LoadedFirstSliceState = {
 
 const createInitialState = (): PersistedFirstSliceState => ({
   applicationSettings: null,
+  applicationAssets: {},
   attachmentFiles: {},
   adminUsers: {},
   adminLoginAttempts: {},
@@ -570,6 +573,38 @@ export const createFileFirstSliceRepository = (
       await mutate(state => {
         state.applicationSettings = { ...settings };
       });
+    },
+    async listApplicationAssets() {
+      const state = await getState();
+      return Object.values(state.applicationAssets);
+    },
+    async getApplicationAssetById(applicationAssetId) {
+      const state = await getState();
+      return state.applicationAssets[applicationAssetId] ?? null;
+    },
+    async getApplicationAssetByOriginalName(originalName) {
+      const state = await getState();
+      return (
+        Object.values(state.applicationAssets).find(
+          asset => asset.originalName === originalName
+        ) ?? null
+      );
+    },
+    async saveApplicationAsset(applicationAsset) {
+      await mutate(state => {
+        state.applicationAssets[applicationAsset.applicationAssetId] =
+          applicationAsset;
+      });
+    },
+    async deleteApplicationAsset(applicationAssetId) {
+      let deleted = false;
+      await mutate(state => {
+        if (state.applicationAssets[applicationAssetId]) {
+          delete state.applicationAssets[applicationAssetId];
+          deleted = true;
+        }
+      });
+      return deleted;
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       const state = await getState();

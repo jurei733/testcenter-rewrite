@@ -11,6 +11,7 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
+  ApplicationAsset,
   ApplicationSettings,
   ContentReleaseActivationReadiness,
   ContentRelease,
@@ -2108,7 +2109,8 @@ export const productionApiRoutes = {
     exportUsersCsv: "/api/v1/admin/users.csv",
     listAuditEvents: "/api/v1/admin/audit-events",
     exportAuditEventsCsv: "/api/v1/admin/audit-events.csv",
-    updateApplicationSettings: "/api/v1/admin/application-settings"
+    updateApplicationSettings: "/api/v1/admin/application-settings",
+    applicationAssets: "/api/v1/admin/application-assets"
   },
   platform: {
     listTenants: "/api/v1/platform/tenants",
@@ -2294,6 +2296,7 @@ export const productionApiRoutes = {
   },
   system: {
     getApplicationSettings: "/api/v1/system/application-settings",
+    getApplicationAsset: "/api/v1/system/application-assets",
     getRuntimeDiagnostics: "/diagnostics/runtime",
     getRuntimeConfig: "/diagnostics/config",
     getSystemCheckAccess: "/api/v1/system-check/access",
@@ -2803,6 +2806,14 @@ export type UpdateApplicationSettingsRequest = {
   globalWarningExpiresAt?: string | null;
 };
 
+export type UploadApplicationAssetRequest = {
+  originalName: string;
+  mediaType: string;
+  dataBase64: string;
+};
+
+export type ApplicationAssetSummary = Omit<ApplicationAsset, "dataBase64">;
+
 export type ParticipantLaunchRequest = {
   participantSessionId?: string;
   tenantKey?: string | null;
@@ -3013,6 +3024,16 @@ export type GetApplicationSettingsResponse = {
 };
 
 export type UpdateApplicationSettingsResponse = GetApplicationSettingsResponse;
+
+export type ListApplicationAssetsResponse = {
+  items: ApplicationAssetSummary[];
+};
+
+export type UploadApplicationAssetResponse = {
+  applicationAsset: ApplicationAssetSummary;
+};
+
+export type DeleteApplicationAssetResponse = UploadApplicationAssetResponse;
 
 export type ListAttachmentsResponse = {
   items: WorkspaceAttachment[];

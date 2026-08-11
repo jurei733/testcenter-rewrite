@@ -7,6 +7,7 @@ import type {
   AdminSession,
   AdminUser,
   ApplicationSettings,
+  ApplicationAsset,
   AttachmentFile,
   ContentRelease,
   ImportJob,
@@ -25,6 +26,7 @@ import type {
 
 type InMemoryFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
+  applicationAssets: Map<string, ApplicationAsset>;
   attachmentFiles: Map<string, AttachmentFile>;
   adminUsers: Map<string, AdminUser>;
   adminUsersByUsername: Map<string, AdminUser>;
@@ -54,6 +56,7 @@ type InMemoryFirstSliceState = {
 
 const createInitialState = (): InMemoryFirstSliceState => ({
   applicationSettings: null,
+  applicationAssets: new Map(),
   attachmentFiles: new Map(),
   adminUsers: new Map(),
   adminUsersByUsername: new Map(),
@@ -98,6 +101,28 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveApplicationSettings(settings) {
       state.applicationSettings = { ...settings };
+    },
+    async listApplicationAssets() {
+      return Array.from(state.applicationAssets.values());
+    },
+    async getApplicationAssetById(applicationAssetId) {
+      return state.applicationAssets.get(applicationAssetId) ?? null;
+    },
+    async getApplicationAssetByOriginalName(originalName) {
+      return (
+        Array.from(state.applicationAssets.values()).find(
+          asset => asset.originalName === originalName
+        ) ?? null
+      );
+    },
+    async saveApplicationAsset(applicationAsset) {
+      state.applicationAssets.set(
+        applicationAsset.applicationAssetId,
+        applicationAsset
+      );
+    },
+    async deleteApplicationAsset(applicationAssetId) {
+      return state.applicationAssets.delete(applicationAssetId);
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       return Array.from(state.attachmentFiles.values()).filter(
