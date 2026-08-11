@@ -2132,7 +2132,58 @@ const decodePersistedSourceDocument = (
 const stripTextByteOrderMark = (value: string): string =>
   value.startsWith("\uFEFF") ? value.slice(1) : value;
 
+const decodeUtf32Bytes = (
+  bytes: Buffer,
+  byteOrder: "little-endian" | "big-endian"
+): string => {
+  const decodedChunks: string[] = [];
+  let codePoints: number[] = [];
+  const flushCodePoints = (): void => {
+    if (codePoints.length > 0) {
+      decodedChunks.push(String.fromCodePoint(...codePoints));
+      codePoints = [];
+    }
+  };
+  for (let offset = 0; offset + 3 < bytes.length; offset += 4) {
+    const codePoint =
+      byteOrder === "little-endian"
+        ? bytes.readUInt32LE(offset)
+        : bytes.readUInt32BE(offset);
+    codePoints.push(
+      codePoint <= 0x10ffff && !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+        ? codePoint
+        : 0xfffd
+    );
+    if (codePoints.length === 8192) {
+      flushCodePoints();
+    }
+  }
+  if (bytes.length % 4 !== 0) {
+    codePoints.push(0xfffd);
+  }
+  flushCodePoints();
+  return decodedChunks.join("");
+};
+
 const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xfe &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x00
+  ) {
+    return decodeUtf32Bytes(bytes.subarray(4), "little-endian");
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0xfe &&
+    bytes[3] === 0xff
+  ) {
+    return decodeUtf32Bytes(bytes.subarray(4), "big-endian");
+  }
   if (
     bytes.length >= 3 &&
     bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
@@ -2148,6 +2199,33 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
     return stripTextByteOrderMark(
       new TextDecoder("utf-16be").decode(bytes.subarray(2))
     );
+  }
+
+  const startsAsUtf32LittleEndian =
+    bytes.length >= 8 &&
+    bytes[0] === 0x3c &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x00 &&
+    bytes[4] !== 0x00 &&
+    bytes[5] === 0x00 &&
+    bytes[6] === 0x00 &&
+    bytes[7] === 0x00;
+  if (startsAsUtf32LittleEndian) {
+    return decodeUtf32Bytes(bytes, "little-endian");
+  }
+  const startsAsUtf32BigEndian =
+    bytes.length >= 8 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x3c &&
+    bytes[4] === 0x00 &&
+    bytes[5] === 0x00 &&
+    bytes[6] === 0x00 &&
+    bytes[7] !== 0x00;
+  if (startsAsUtf32BigEndian) {
+    return decodeUtf32Bytes(bytes, "big-endian");
   }
 
   const startsAsUtf16LittleEndian =
@@ -2200,6 +2278,16 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
     }
     if (["utf-16be", "utf16be"].includes(normalizedEncoding)) {
       return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
+    }
+    if (
+      ["utf-32", "utf-32le", "utf32", "utf32le"].includes(
+        normalizedEncoding
+      )
+    ) {
+      return decodeUtf32Bytes(bytes, "little-endian");
+    }
+    if (["utf-32be", "utf32be"].includes(normalizedEncoding)) {
+      return decodeUtf32Bytes(bytes, "big-endian");
     }
   }
 

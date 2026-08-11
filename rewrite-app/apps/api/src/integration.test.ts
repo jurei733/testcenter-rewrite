@@ -68,6 +68,22 @@ const zipFixtureCrc32 = (content: Buffer): number => {
   return (checksum ^ 0xffffffff) >>> 0;
 };
 
+const encodeUtf32 = (
+  value: string,
+  byteOrder: "little-endian" | "big-endian"
+): Buffer => {
+  const codePoints = Array.from(value, character => character.codePointAt(0)!);
+  const bytes = Buffer.alloc(codePoints.length * 4);
+  for (const [index, codePoint] of codePoints.entries()) {
+    if (byteOrder === "little-endian") {
+      bytes.writeUInt32LE(codePoint, index * 4);
+    } else {
+      bytes.writeUInt32BE(codePoint, index * 4);
+    }
+  }
+  return bytes;
+};
+
 const createZipBase64 = (
   entries: ZipFixtureEntry[],
   options: {
@@ -12347,6 +12363,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     utf16BookletXml,
     "utf16le"
   ).swap16();
+  const utf32BookletXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="UTF-32"'
+  );
   const latin1BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-1"')
     .replace(
@@ -12379,6 +12399,27 @@ test("original Testcenter compatibility corpus imports representative booklets",
         Buffer.from([0xfe, 0xff]),
         utf16BigEndianBookletBytes
       ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "utf-32le-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0xff, 0xfe, 0x00, 0x00]),
+        encodeUtf32(utf32BookletXml, "little-endian")
+      ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "utf-32be-original-booklet.xml",
+      bytes: Buffer.concat([
+        Buffer.from([0x00, 0x00, 0xfe, 0xff]),
+        encodeUtf32(utf32BookletXml, "big-endian")
+      ]),
+      displayLabel: "Sample booklet"
+    },
+    {
+      fileName: "utf-32le-signature-original-booklet.xml",
+      bytes: encodeUtf32(utf32BookletXml, "little-endian"),
       displayLabel: "Sample booklet"
     },
     {
@@ -20198,9 +20239,9 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
     {
       fileName: "export/imsmanifest.xml",
       content: Buffer.concat([
-        Buffer.from([0xff, 0xfe]),
-        Buffer.from(
-          `<?xml version="1.0" encoding="UTF-16"?>
+        Buffer.from([0x00, 0x00, 0xfe, 0xff]),
+        encodeUtf32(
+          `<?xml version="1.0" encoding="UTF-32"?>
           <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
             <organizations default="ORG-ZIP">
               <organization identifier="ORG-ZIP">
@@ -20217,7 +20258,7 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
               <resource identifier="RES-ZIP-UNIT" href="items/zip-unit.xml" />
             </resources>
           </manifest>`,
-          "utf16le"
+          "big-endian"
         )
       ])
     }
