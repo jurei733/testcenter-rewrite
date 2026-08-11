@@ -7416,7 +7416,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         endResponse(response);
         return;
       }
-      if (request.method === "GET" && participantResourceMatch?.groups) {
+      if (
+        (request.method === "GET" || request.method === "HEAD") &&
+        participantResourceMatch?.groups
+      ) {
         const participantSessionId = decodeRouteGroup(
           participantResourceMatch.groups.participantSessionId
         );
@@ -7443,6 +7446,30 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             "accept-ranges, content-length, content-range",
           "accept-ranges": "bytes"
         };
+        const sendParticipantResource = (
+          statusCode: number,
+          contentType: string,
+          body: Buffer,
+          additionalHeaders: Record<string, string>
+        ): void => {
+          if (request.method === "HEAD") {
+            response.writeHead(statusCode, {
+              ...securityHeaders,
+              "content-type": contentType,
+              "cache-control": "no-cache",
+              ...additionalHeaders
+            });
+            endResponse(response);
+            return;
+          }
+          sendAsset(
+            response,
+            statusCode,
+            contentType,
+            body,
+            additionalHeaders
+          );
+        };
         const rangeHeader = request.headers.range;
         if (rangeHeader !== undefined) {
           const byteRanges = resolveByteRanges(
@@ -7450,7 +7477,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             resourceBody.byteLength
           );
           if (!byteRanges) {
-            sendAsset(response, 416, resource.mediaType, Buffer.alloc(0), {
+            sendParticipantResource(416, resource.mediaType, Buffer.alloc(0), {
               ...resourceHeaders,
               "content-length": "0",
               "content-range": `bytes */${resourceBody.byteLength}`
@@ -7465,8 +7492,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
               resourceBody,
               byteRanges
             });
-            sendAsset(
-              response,
+            sendParticipantResource(
               206,
               `multipart/byteranges; boundary=${boundary}`,
               multipartBody,
@@ -7482,7 +7508,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             byteRange.start,
             byteRange.end + 1
           );
-          sendAsset(response, 206, resource.mediaType, partialBody, {
+          sendParticipantResource(206, resource.mediaType, partialBody, {
             ...resourceHeaders,
             "content-length": String(partialBody.byteLength),
             "content-range":
@@ -7490,8 +7516,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
           return;
         }
-        sendAsset(
-          response,
+        sendParticipantResource(
           200,
           resource.mediaType,
           resourceBody,

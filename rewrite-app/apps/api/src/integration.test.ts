@@ -22478,6 +22478,19 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   assert.equal(resourceResponse.status, 200);
   assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
   assert.equal(resourceResponse.headers.get("access-control-allow-origin"), "*");
+  const resourceHeadResponse = await fetch(resourceUrl, { method: "HEAD" });
+  assert.equal(resourceHeadResponse.status, 200);
+  assert.match(
+    resourceHeadResponse.headers.get("content-type") ?? "",
+    /^text\/plain/
+  );
+  assert.equal(
+    resourceHeadResponse.headers.get("content-length"),
+    String(expectedResourceBytes.byteLength)
+  );
+  assert.equal(resourceHeadResponse.headers.get("accept-ranges"), "bytes");
+  assert.equal(resourceHeadResponse.headers.get("access-control-allow-origin"), "*");
+  assert.equal((await resourceHeadResponse.arrayBuffer()).byteLength, 0);
   assert.equal(resourceResponse.headers.get("accept-ranges"), "bytes");
   assert.equal(
     resourceResponse.headers.get("access-control-expose-headers"),
