@@ -2655,6 +2655,15 @@ export class RuntimeViewFacade {
           ),
           speciesHighlighted:
             highlightBookletSpecies && Boolean(openRun.bookletSpecies),
+          progressLabel: "Booklet Unit Path",
+          progressSteps: (openRun.unitPath ?? []).map((unit, index) => ({
+            key: unit.unitKey,
+            label: unit.unitLabel || unit.unitKey,
+            detail: unit.blockLabel ?? undefined,
+            compactLabel: `${index + 1}/${openRun.unitPath?.length ?? 0}`,
+            current: unit.current,
+            complete: unit.answered
+          })),
           badges: [
             openRun.status,
             `state ${monitorState}`,

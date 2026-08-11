@@ -270,6 +270,15 @@ try {
     .filter({ hasText: "response some" })
     .filter({ hasText: "page 2 / 2 · Review · page-2" })
     .waitFor({ timeout: 15_000 });
+  const currentProgressStep = openRunCard.locator(
+    ".record-card-progress-step.is-current"
+  );
+  await currentProgressStep.waitFor({ timeout: 15_000 });
+  assert.equal(
+    await currentProgressStep.getAttribute("data-progress-key"),
+    currentUnitKey,
+    "The monitor progress strip must mark the server-authoritative current Unit."
+  );
   await waitForStateBadge(operatorPage, testRunId, "CONNECTION_POLLING");
   const participantStreamResponse = participantPage.waitForResponse(
     response =>

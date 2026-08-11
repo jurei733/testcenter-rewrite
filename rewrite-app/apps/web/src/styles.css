@@ -1044,6 +1044,19 @@ pre {
   margin-top: 6px;
 }
 
+.record-collection-grid[data-density="small"] .record-card-progress-step:not(.is-current) {
+  display: none;
+}
+
+.record-collection-grid[data-density="small"] .record-card-progress-detail,
+.record-collection-grid[data-density="small"] .record-card-progress-label {
+  display: none;
+}
+
+.record-collection-grid[data-density="small"] .record-card-progress-compact {
+  display: inline;
+}
+
 .record-card {
   display: grid;
   gap: 14px;
@@ -1098,6 +1111,71 @@ pre {
   font-size: 11px;
   color: var(--ink);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.record-card-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record-card-progress-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 6px;
+  align-items: center;
+  min-width: 58px;
+  padding: 6px 9px;
+  border: 1px solid rgba(27, 36, 48, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+}
+
+.record-card-progress-step.is-complete {
+  border-color: rgba(31, 92, 84, 0.3);
+  color: var(--secondary);
+}
+
+.record-card-progress-step.is-current {
+  border-color: rgba(196, 82, 47, 0.68);
+  background: rgba(241, 216, 195, 0.72);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(196, 82, 47, 0.14);
+}
+
+.record-card-progress-detail {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.record-card-progress-marker {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.record-card-progress-label,
+.record-card-progress-compact {
+  overflow: hidden;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-card-progress-compact {
+  display: none;
 }
 
 .record-card-rows {

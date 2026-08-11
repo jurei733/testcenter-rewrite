@@ -17,6 +17,15 @@ export type RecordCollectionAction = {
 
 export type RecordCollectionDensity = "full" | "medium" | "small";
 
+export type RecordCollectionProgressStep = {
+  key: string;
+  label: string;
+  detail?: string;
+  compactLabel: string;
+  current?: boolean;
+  complete?: boolean;
+};
+
 export type RecordCollectionItem = {
   headline: string;
   subline: string;
@@ -25,6 +34,8 @@ export type RecordCollectionItem = {
   presentationState?: string;
   surfaceBackground?: string;
   speciesHighlighted?: boolean;
+  progressLabel?: string;
+  progressSteps?: RecordCollectionProgressStep[];
   selected?: boolean;
   actionLabel?: string;
   actionPayload?: Record<string, string>;
@@ -76,6 +87,28 @@ export type RecordCollectionItem = {
           <div class="record-card-selection" *ngIf="item.selected">
             Active selection
           </div>
+
+          <ol
+            class="record-card-progress"
+            *ngIf="item.progressSteps?.length"
+            [attr.aria-label]="item.progressLabel ?? 'Progress'"
+          >
+            <li
+              class="record-card-progress-step"
+              *ngFor="let step of item.progressSteps"
+              [class.is-current]="step.current"
+              [class.is-complete]="step.complete"
+              [attr.data-progress-key]="step.key"
+              [attr.aria-current]="step.current ? 'step' : null"
+              [attr.aria-label]="(step.current ? 'Current Unit: ' : 'Unit: ') + step.label + (step.detail ? ', ' + step.detail : '')"
+              [attr.title]="step.detail ? step.detail + ': ' + step.label : step.label"
+            >
+              <span class="record-card-progress-detail" *ngIf="step.detail">{{ step.detail }}</span>
+              <span class="record-card-progress-marker" aria-hidden="true">{{ step.current ? '●' : step.complete ? '✓' : '○' }}</span>
+              <span class="record-card-progress-label">{{ step.label }}</span>
+              <span class="record-card-progress-compact" aria-hidden="true">{{ step.compactLabel }}</span>
+            </li>
+          </ol>
 
           <dl class="record-card-rows">
             <div *ngFor="let row of item.rows">

@@ -17368,6 +17368,14 @@ test("original Testcenter compatibility corpus executes the official group monit
         bookletError: string | null;
         currentUnitKey: string | null;
         currentUnitLabel: string | null;
+        unitPath: Array<{
+          unitKey: string;
+          unitLabel: string;
+          blockKey: string | null;
+          blockLabel: string | null;
+          current: boolean;
+          answered: boolean;
+        }>;
         currentBlockKey: string | null;
         currentBlockLabel: string | null;
         blockNavigationTargets: Array<{
@@ -17395,6 +17403,48 @@ test("original Testcenter compatibility corpus executes the official group monit
     assert.equal(openRuns.body.items[0]?.bookletSpecies, "species: 1");
     assert.equal(openRuns.body.items[0]?.bookletError, null);
     assert.equal(openRuns.body.items[0]?.currentUnitLabel, "Startseite");
+    assert.deepEqual(openRuns.body.items[0]?.unitPath, [
+      {
+        unitKey: "CY-Unit.Sample-100",
+        unitLabel: "Startseite",
+        blockKey: null,
+        blockLabel: null,
+        current: true,
+        answered: false
+      },
+      {
+        unitKey: "CY-Unit.Sample-101",
+        unitLabel: "Aufgabe1",
+        blockKey: "Tslt1",
+        blockLabel: "Aufgabenblock 1",
+        current: false,
+        answered: false
+      },
+      {
+        unitKey: "CY-Unit.Sample-102",
+        unitLabel: "Aufgabe2",
+        blockKey: "Tslt1",
+        blockLabel: "Aufgabenblock 1",
+        current: false,
+        answered: false
+      },
+      {
+        unitKey: "CY-Unit.Sample-103",
+        unitLabel: "Aufgabe3",
+        blockKey: "Tslt1",
+        blockLabel: "Aufgabenblock 1",
+        current: false,
+        answered: false
+      },
+      {
+        unitKey: "CY-Unit.Sample-104",
+        unitLabel: "Endseite",
+        blockKey: null,
+        blockLabel: null,
+        current: false,
+        answered: false
+      }
+    ]);
     assert.deepEqual(openRuns.body.items[0]?.blockNavigationTargets, [
       {
         blockKey: "Tslt1",

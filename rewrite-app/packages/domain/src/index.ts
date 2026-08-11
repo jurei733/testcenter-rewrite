@@ -1160,6 +1160,15 @@ export type OpenMonitorRun = {
   currentUnitLabel?: string | null;
   /** Latest structured Verona progress for the current Unit, when available. */
   currentUnitState: MonitorCurrentUnitState | null;
+  /** Adaptive-visible Unit order used by the original monitor progress strip. */
+  unitPath: Array<{
+    unitKey: string;
+    unitLabel: string;
+    blockKey: string | null;
+    blockLabel: string | null;
+    current: boolean;
+    answered: boolean;
+  }>;
   currentBlockKey?: string | null;
   currentBlockLabel?: string | null;
   blockNavigationTargets?: Array<{

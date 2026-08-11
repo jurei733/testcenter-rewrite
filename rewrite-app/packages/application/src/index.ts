@@ -4993,6 +4993,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         currentUnitState: projectOpenMonitorRunCurrentUnitState(
           normalizedTestRun
         ),
+        unitPath: location.unitPath,
         currentBlockKey: location.currentBlockKey,
         currentBlockLabel: location.currentBlockLabel,
         blockNavigationTargets: location.blockNavigationTargets,
@@ -5249,6 +5250,7 @@ const resolveOpenMonitorRunLocation = (
   | "bookletSpecies"
   | "bookletError"
   | "currentUnitLabel"
+  | "unitPath"
   | "currentBlockKey"
   | "currentBlockLabel"
   | "blockNavigationTargets"
@@ -5261,6 +5263,7 @@ const resolveOpenMonitorRunLocation = (
       bookletSpecies: null,
       bookletError: bookletResolution.error,
       currentUnitLabel: testRun.currentUnitKey,
+      unitPath: [],
       currentBlockKey: null,
       currentBlockLabel: null,
       blockNavigationTargets: []
@@ -5282,6 +5285,28 @@ const resolveOpenMonitorRunLocation = (
         testlet.testletKey,
         testlet
       ])
+    );
+    const unitResponses = normalizeTestRun(testRun).unitResponses;
+    const unitPath: OpenMonitorRun["unitPath"] = visibleUnits.map(
+      visibleUnit => {
+        const blockKey = visibleUnit.testletPath?.[0] ?? null;
+        const response = unitResponses[visibleUnit.unitKey] ?? "";
+        const veronaResponse = parseVeronaUnitResponse(response);
+        return {
+          unitKey: visibleUnit.unitKey,
+          unitLabel: visibleUnit.displayLabel,
+          blockKey,
+          blockLabel: blockKey
+            ? testletsByKey.get(blockKey)?.displayLabel ?? blockKey
+            : null,
+          current: visibleUnit.unitKey === testRun.currentUnitKey,
+          answered: veronaResponse
+            ? (veronaResponse.unitState.responseProgress != null &&
+                veronaResponse.unitState.responseProgress !== "none") ||
+              Object.keys(veronaResponse.unitState.dataParts ?? {}).length > 0
+            : Boolean(response.trim())
+        };
+      }
     );
     const blockNavigationTargets: NonNullable<
       OpenMonitorRun["blockNavigationTargets"]
@@ -5327,6 +5352,7 @@ const resolveOpenMonitorRunLocation = (
         : null,
       bookletError: null,
       currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
+      unitPath,
       currentBlockKey,
       currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey,
       blockNavigationTargets
@@ -5337,6 +5363,7 @@ const resolveOpenMonitorRunLocation = (
       bookletSpecies: null,
       bookletError: "xml",
       currentUnitLabel: testRun.currentUnitKey,
+      unitPath: [],
       currentBlockKey: null,
       currentBlockLabel: null,
       blockNavigationTargets: []
@@ -29032,6 +29059,7 @@ export const createFirstSliceServices = (
               currentUnitKey: testRun.currentUnitKey,
               currentUnitLabel: location.currentUnitLabel,
               currentUnitState: projectOpenMonitorRunCurrentUnitState(testRun),
+              unitPath: location.unitPath,
               currentBlockKey: location.currentBlockKey,
               currentBlockLabel: location.currentBlockLabel,
               blockNavigationTargets: location.blockNavigationTargets,
