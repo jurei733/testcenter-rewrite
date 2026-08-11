@@ -10658,7 +10658,7 @@ try {
         bookletKey: `Cy-Bklt_BkltConfig-${number}`
       };
     }),
-    ...[15, 16].map(number => ({
+    ...[15, 16, 17, 18].map(number => ({
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
     })),
@@ -10981,6 +10981,8 @@ try {
           ...Array.from({ length: 4 }, (_, index) => index + 11),
           15,
           16,
+          17,
+          18,
           ...Array.from({ length: 8 }, (_, index) => index + 19)
         ].map(number => {
           return {
@@ -11067,6 +11069,78 @@ try {
   await page.locator("#participantRouteEntry").waitFor();
   await page.locator("#participantApplicationHeader").waitFor();
   assert.equal(await page.locator("#participantStandaloneLogo").count(), 0);
+
+  const configSeventeenBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-17",
+    "Cy-Bklt_BkltConfig-17"
+  );
+  await expectButtonSelectorEnabled("#participantRouteCompleteButton");
+  await page.locator("#participantRouteCompleteButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Complete test?" })
+    .waitFor();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page.locator("#participantRouteCompletedState").waitFor();
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "completed" })
+    .waitFor();
+  const configSeventeenRuntimeState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        configSeventeenBrowser.participantSessionId
+      )}/runtime-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.equal(
+    configSeventeenRuntimeState.runtimeState?.runtimeStatus,
+    "completed"
+  );
+  assert.equal(
+    configSeventeenRuntimeState.runtimeState?.availableAction,
+    "none"
+  );
+
+  const configEighteenBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-18",
+    "Cy-Bklt_BkltConfig-18"
+  );
+  await page.locator("#participantRouteUnitRail").waitFor();
+  await expectButtonSelectorEnabled("#participantRouteCompleteButton");
+  await page.locator("#participantRouteCompleteButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Complete test?" })
+    .waitFor();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page.locator("#participantRoutePausedState").waitFor();
+  assert.equal(
+    await page.locator("#participantRouteResumeRunButton").count(),
+    0
+  );
+  const configEighteenLockedState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        configEighteenBrowser.participantSessionId
+      )}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.equal(
+    configEighteenLockedState.currentRunState?.testRun?.status,
+    "paused"
+  );
+  assert.equal(
+    configEighteenLockedState.currentRunState?.testRun?.locked,
+    true
+  );
+  assert.deepEqual(
+    configEighteenLockedState.currentRunState?.availableActions,
+    []
+  );
+
   await openOriginalBookletConfig(
     "Bklt_Config-23",
     "Cy-Bklt_BkltConfig-23"

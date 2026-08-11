@@ -254,6 +254,26 @@
       "policy": { "headerHidden": true }
     },
     {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_17.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_17.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "4161d663387db817f87539aaba26f0d626f512423eb58879ada46485d7bec877",
+      "bookletKey": "Cy-Bklt_BkltConfig-17",
+      "displayLabel": "Bklt-config-17",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "lockOnTermination": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_18.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_18.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "ce82be104ad8dc5296767559ab59fc97da76df45244cdb175eaca6552e4f9b4c",
+      "bookletKey": "Cy-Bklt_BkltConfig-18",
+      "displayLabel": "Bklt-config-18",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "lockOnTermination": true, "unitMenuEnabled": true }
+    },
+    {
       "fixture": "booklets/system-test/CY_Bklt_BkltConfig_19.xml",
       "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_19.xml",
       "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
