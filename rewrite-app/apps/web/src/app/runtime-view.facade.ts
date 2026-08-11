@@ -2586,13 +2586,17 @@ export class RuntimeViewFacade {
 
   get openRunItems(): RecordCollectionItem[] {
     const displaySettings = this.monitorDisplaySettings;
+    const visibleOpenMonitorRuns = this.visibleOpenMonitorRuns;
+    const highlightBookletSpecies =
+      new Set(visibleOpenMonitorRuns.map(openRun => openRun.bookletSpecies))
+        .size > 1;
     const autoSelectedRunIds = this.monitorAutoSelectAllActive
       ? new Set(
           this.commandSafeVisibleMonitorRuns.map(openRun => openRun.testRunId)
         )
       : null;
     return (
-      this.visibleOpenMonitorRuns.map(openRun => {
+      visibleOpenMonitorRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
         const activeTimer = openRun.activeTestletTimer;
         const activeTimerRemaining = activeTimer
@@ -2621,6 +2625,14 @@ export class RuntimeViewFacade {
         return {
           headline: displayName ?? openRun.loginKey,
           subline: displayName ? openRun.loginKey : openRun.testRunId,
+          presentationState: monitorState,
+          surfaceBackground: this.monitorRunBackground(
+            monitorState,
+            openRun.bookletSpecies,
+            highlightBookletSpecies
+          ),
+          speciesHighlighted:
+            highlightBookletSpecies && Boolean(openRun.bookletSpecies),
           badges: [
             openRun.status,
             `state ${monitorState}`,
@@ -5109,6 +5121,47 @@ export class RuntimeViewFacade {
         value: states.length > 0 ? states.join(" | ") : "none"
       }
     ];
+  }
+
+  private monitorRunBackground(
+    state: ReturnType<typeof resolveOpenMonitorRunSuperState>,
+    bookletSpecies: string | null,
+    highlightBookletSpecies: boolean
+  ): string {
+    const stripes = (first: string, second: string): string =>
+      `repeating-linear-gradient(45deg, ${first}, ${first} 10px, ${second} 10px, ${second} 20px)`;
+    const hsl = (hue: number, saturation: number, lightness: number): string =>
+      `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    const colorful = highlightBookletSpecies && Boolean(bookletSpecies);
+    const species = bookletSpecies ?? "";
+    const hue = colorful
+      ? (species.length *
+          species.charCodeAt(0) *
+          species.charCodeAt(species.length / 4) *
+          species.charCodeAt(species.length / 4) *
+          species.charCodeAt(species.length / 2) *
+          species.charCodeAt(3 * (species.length / 4)) *
+          species.charCodeAt(species.length - 1)) %
+        360
+      : 0;
+
+    switch (state) {
+      case "paused":
+        return hsl(hue, colorful ? 45 : 0, 90);
+      case "pending":
+      case "locked":
+        return stripes(
+          hsl(hue, colorful ? 75 : 0, 95),
+          hsl(0, 0, 92)
+        );
+      case "error":
+        return stripes(
+          hsl(hue, colorful ? 75 : 0, 95),
+          hsl(0, 30, 95)
+        );
+      default:
+        return hsl(hue, colorful ? 75 : 0, colorful ? 95 : 100);
+    }
   }
 
   private get monitorDisplaySettings(): MonitorDisplaySettings {

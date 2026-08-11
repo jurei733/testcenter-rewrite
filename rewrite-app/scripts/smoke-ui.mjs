@@ -13158,6 +13158,31 @@ try {
     .filter({ hasText: "Paused" })
     .getByRole("heading", { name: "1", exact: true })
     .waitFor();
+  const pausedMonitorRunCard = scopedOpenRuns
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .first();
+  await page.waitForFunction(
+    loginKey =>
+      [...document.querySelectorAll(".record-card")].some(
+        card =>
+          card.textContent?.includes(loginKey) &&
+          card.getAttribute("data-presentation-state") === "paused"
+      ),
+    participantLoginKey
+  );
+  assert.equal(
+    await pausedMonitorRunCard.getAttribute("data-presentation-state"),
+    "paused",
+    "The monitor run card must expose the Original paused presentation state."
+  );
+  assert.equal(
+    await pausedMonitorRunCard.evaluate(
+      element => getComputedStyle(element).backgroundColor
+    ),
+    "rgb(230, 230, 230)",
+    "The monitor run card must render the Original neutral paused surface."
+  );
   await page.locator("#monitorConsoleResumeButton").click();
   await waitForNotBusy("group-monitor-resume");
   await pollJsonWithPredicate(
@@ -13249,6 +13274,74 @@ try {
     .filter({ hasText: "Paused" })
     .getByRole("heading", { name: "0", exact: true })
     .waitFor();
+  const monitorSpeciesRoute = new RegExp(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
+  );
+  const monitorSpeciesRouteOperations = new Set();
+  await page.route(monitorSpeciesRoute, route => {
+    const operation = (async () => {
+      const response = await route.fetch();
+      const payload = await response.json();
+      const template = payload.items?.[0];
+      assert.ok(template, "Species highlighting needs one real scoped run.");
+      await route.fulfill({
+        response,
+        json: {
+          ...payload,
+          items: [
+            {
+              ...template,
+              testRunId: `${template.testRunId}:species-beta`,
+              participantSessionId: `${template.participantSessionId}:species-beta`,
+              loginKey: `${template.loginKey}-species-beta`,
+              participantRosterEntry: null,
+              bookletSpecies: "beta"
+            },
+            {
+              ...template,
+              testRunId: `${template.testRunId}:species-two`,
+              participantSessionId: `${template.participantSessionId}:species-two`,
+              loginKey: `${template.loginKey}-species-two`,
+              participantRosterEntry: null,
+              bookletSpecies: "two"
+            }
+          ]
+        }
+      });
+    })();
+    monitorSpeciesRouteOperations.add(operation);
+    void operation.then(
+      () => monitorSpeciesRouteOperations.delete(operation),
+      () => monitorSpeciesRouteOperations.delete(operation)
+    );
+    return operation;
+  });
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-species-highlighting");
+  const speciesMonitorRunCards = scopedOpenRuns.locator(
+    ".record-card.is-species-highlighted"
+  );
+  await speciesMonitorRunCards.first().waitFor();
+  assert.equal(
+    await speciesMonitorRunCards.count(),
+    2,
+    "Every run must be species-highlighted when multiple Booklet species are visible."
+  );
+  const speciesBackgrounds = await speciesMonitorRunCards.evaluateAll(cards =>
+    cards.map(card => getComputedStyle(card).backgroundColor)
+  );
+  assert.equal(
+    new Set(speciesBackgrounds).size,
+    2,
+    "Different visible Booklet species must receive deterministic distinct surfaces."
+  );
+  while (monitorSpeciesRouteOperations.size > 0) {
+    await Promise.all([...monitorSpeciesRouteOperations]);
+  }
+  await page.unroute(monitorSpeciesRoute);
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-species-highlighting-restore");
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   stopAfter("group-monitor-auto-next-block");
 
   logStep("group-monitor-booklet-error-copy");

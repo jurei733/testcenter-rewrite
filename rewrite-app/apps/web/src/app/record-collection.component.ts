@@ -22,6 +22,9 @@ export type RecordCollectionItem = {
   subline: string;
   badges: string[];
   rows: RecordCollectionRow[];
+  presentationState?: string;
+  surfaceBackground?: string;
+  speciesHighlighted?: boolean;
   selected?: boolean;
   actionLabel?: string;
   actionPayload?: Record<string, string>;
@@ -53,6 +56,9 @@ export type RecordCollectionItem = {
         <article
           class="record-card"
           [class.is-selected]="item.selected"
+          [class.is-species-highlighted]="item.speciesHighlighted"
+          [style.background]="item.surfaceBackground ?? null"
+          [attr.data-presentation-state]="item.presentationState ?? null"
           [attr.aria-current]="item.selected ? 'true' : null"
           [attr.aria-label]="item.headline + ': ' + item.subline"
           *ngFor="let item of items"
