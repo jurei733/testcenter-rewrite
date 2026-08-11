@@ -10662,7 +10662,7 @@ try {
       fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
       bookletKey: `Cy-Bklt_BkltConfig-${number}`
     })),
-    ...Array.from({ length: 8 }, (_, index) => {
+    ...Array.from({ length: 10 }, (_, index) => {
       const number = index + 19;
       return {
         fixture: `booklets/system-test/CY_Bklt_BkltConfig_${number}.xml`,
@@ -10983,7 +10983,7 @@ try {
           16,
           17,
           18,
-          ...Array.from({ length: 8 }, (_, index) => index + 19)
+          ...Array.from({ length: 10 }, (_, index) => index + 19)
         ].map(number => {
           return {
             loginKey: `Bklt_Config-${number}`,
@@ -11160,6 +11160,38 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "cpy" })
     .waitFor({ timeout: 15_000 });
+  const verifyCurrentPageOnReturn = async (number, expectedPageLabel) => {
+    await openOriginalBookletConfig(
+      `Bklt_Config-${number}`,
+      `Cy-Bklt_BkltConfig-${number}`
+    );
+    await page
+      .locator("#participantVeronaPageLabel")
+      .filter({ hasText: "Page 1/2" })
+      .waitFor();
+    await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
+    await page.locator("#participantVeronaNextPageButton").click();
+    await page
+      .locator("#participantVeronaPageLabel")
+      .filter({ hasText: "Page 2/2" })
+      .waitFor();
+    await page.locator("#participantRouteNextUnitButton").click();
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: "cpy" })
+      .waitFor({ timeout: 15_000 });
+    await page.locator("#participantRoutePreviousUnitButton").click();
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: "CY-Unit.Sample-101" })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator("#participantVeronaPageLabel")
+      .filter({ hasText: expectedPageLabel })
+      .waitFor({ timeout: 15_000 });
+  };
+  await verifyCurrentPageOnReturn(27, "Page 1/2");
+  await verifyCurrentPageOnReturn(28, "Page 2/2");
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");
