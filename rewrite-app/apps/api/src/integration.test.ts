@@ -438,6 +438,66 @@ const completeRequiredAdminPasswordChangeAt = async (
   return signIn.body.sessionToken;
 };
 
+const uploadMinimalOriginalUnitDependencies = async (
+  tenantKey: string,
+  workspaceKey: string,
+  unitIds: readonly string[]
+): Promise<void> => {
+  for (const unitId of unitIds) {
+    const upload = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: `compat-unit-${unitId.replaceAll(/[^a-zA-Z0-9.-]/g, "-")}.xml`,
+          mediaType: "application/xml",
+          sourceDocument: `<Unit><Metadata><Id>${unitId}</Id><Label>${unitId}</Label></Metadata><Definition player="">Compatibility fixture</Definition></Unit>`
+        }
+      }
+    );
+    assert.equal(upload.status, 201, unitId);
+  }
+};
+
+const uploadOriginalAdaptiveUnitDependencies = async (
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  for (const dependency of [
+    {
+      fileName: "Unit2.xml",
+      mediaType: "application/xml",
+      fixture: "units/Unit2.xml"
+    },
+    {
+      fileName: "coding-scheme.vocs.json",
+      mediaType: "application/json",
+      fixture: "schemes/coding-scheme.vocs.json"
+    },
+    {
+      fileName: "verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      fixture: "players/verona-player-simple-6.0.html"
+    }
+  ]) {
+    const upload = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: dependency.fileName,
+          mediaType: dependency.mediaType,
+          sourceDocument: readFileSync(
+            resolve(originalTestcenterCorpusRoot, dependency.fixture),
+            "utf8"
+          )
+        }
+      }
+    );
+    assert.equal(upload.status, 201, dependency.fileName);
+  }
+};
+
 const requestText = async (
   path: string,
   init?: {
@@ -12114,6 +12174,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
     method: "POST",
     body: { workspaceKey, displayName: workspaceKey }
   });
+  await uploadOriginalAdaptiveUnitDependencies(tenantKey, workspaceKey);
+  await uploadMinimalOriginalUnitDependencies(tenantKey, workspaceKey, [
+    "UNIT.SAMPLE",
+    "testcenter-sample1",
+    "testcenter-sample2",
+    "testcenter-sample3",
+    "CY-Unit.Sample-100",
+    "CY-Unit.Sample-101",
+    "CY-Unit.Sample-102",
+    "CY-Unit.Sample-103",
+    "CY-Unit.Sample-104"
+  ]);
 
   let validationWorkspaceIndex = 0;
   const createValidationWorkspace = async (
@@ -12176,7 +12248,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(
       importResult.body.importJob.status,
       "completed",
-      expectation.sourcePath
+      `${expectation.sourcePath}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
     );
     assert.deepEqual(
       importResult.body.importJob.diagnostics,
@@ -12737,6 +12809,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
       }
     );
     assert.equal(validWorkspace.status, 201, expectation.sourcePath);
+    const validSourceDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.fixture),
+      "utf8"
+    );
+    const referencedUnitIds = [
+      ...new Set(
+        [...validSourceDocument.matchAll(/<Unit\b[^>]*\bid\s*=\s*"([^"]+)"/g)]
+          .map(match => match[1]?.trim() ?? "")
+          .filter(Boolean)
+      )
+    ];
+    await uploadMinimalOriginalUnitDependencies(
+      tenantKey,
+      validWorkspaceKey,
+      referencedUnitIds
+    );
     const validSourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
     }>(`/api/v1/tenants/${tenantKey}/workspaces/${validWorkspaceKey}/source-packages`, {
@@ -12744,10 +12832,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       body: {
         fileName: expectation.fixture.split("/").at(-1),
         mediaType: "application/xml",
-        sourceDocument: readFileSync(
-          resolve(originalTestcenterCorpusRoot, expectation.fixture),
-          "utf8"
-        )
+        sourceDocument: validSourceDocument
       }
     });
     assert.equal(validSourcePackage.status, 201, expectation.sourcePath);
@@ -12796,6 +12881,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
     .replace('minutes="1"', 'minutes="1" leave="forbidden"');
   const version15TimedBookletWorkspaceKey = await createValidationWorkspace(
     "booklet-15-time-max-leave.xml"
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    version15TimedBookletWorkspaceKey,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
   );
   const version15TimedBookletPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -12857,6 +12947,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   const schemaLessWorkspaceKey = await createValidationWorkspace(
     "booklet-without-schema-reference.xml"
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    schemaLessWorkspaceKey,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
   );
   const schemaLessPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -13016,6 +13111,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
   ]) {
     const validationWorkspaceKey = await createValidationWorkspace(
       encodedCase.fileName
+    );
+    await uploadMinimalOriginalUnitDependencies(
+      tenantKey,
+      validationWorkspaceKey,
+      ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
     );
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
@@ -14226,6 +14326,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const emptyAdaptiveExpressionWorkspaceKey = await createValidationWorkspace(
     emptyAdaptiveExpressionFileName
   );
+  await uploadOriginalAdaptiveUnitDependencies(
+    tenantKey,
+    emptyAdaptiveExpressionWorkspaceKey
+  );
   const emptyAdaptiveExpressionSourceDocument = validAdaptiveBookletXml.replace(
     '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
     '<If><Value of="derived_var" from="decision-unit" /><Is /></If>'
@@ -14352,6 +14456,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     const validationWorkspaceKey = await createValidationWorkspace(
       optionalVariableReferenceCase.fileName
     );
+    await uploadOriginalAdaptiveUnitDependencies(
+      tenantKey,
+      validationWorkspaceKey
+    );
     const sourceDocument = validAdaptiveBookletXml.replace(
       '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
       `<If>${optionalVariableReferenceCase.sourceElement}<Is greaterThan="99" /></If>`
@@ -14421,6 +14529,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
   for (const floatLexeme of ["INF", "-INF", "NaN"]) {
     const fileName = `booklet-valid-float-${floatLexeme.toLowerCase()}.xml`;
     const validationWorkspaceKey = await createValidationWorkspace(fileName);
+    await uploadOriginalAdaptiveUnitDependencies(
+      tenantKey,
+      validationWorkspaceKey
+    );
     const sourceDocument = validAdaptiveBookletXml.replace(
       '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
       `<If><Score of="derived_var" from="decision-unit" or="${floatLexeme}" /><Is greaterThan="${floatLexeme}" /></If>`
@@ -14657,6 +14769,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
 
   const numericBooleanWorkspaceKey = await createValidationWorkspace(
     "valid-original-lock-boolean.xml"
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    numericBooleanWorkspaceKey,
+    ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"]
   );
   const numericBooleanPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -15311,6 +15428,10 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     method: "POST",
     body: { workspaceKey, displayName: workspaceKey }
   });
+  await uploadMinimalOriginalUnitDependencies(tenantKey, workspaceKey, [
+    "UNIT.SAMPLE",
+    "UNIT.SAMPLE-2"
+  ]);
 
   const originalUpload = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -15363,11 +15484,13 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
   const sourcePackagesAfterConflicts = await requestJson<{
     items: Array<{ sourcePackage: { sourcePackageId: string } }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
-  assert.deepEqual(
-    sourcePackagesAfterConflicts.body.items.map(
-      item => item.sourcePackage.sourcePackageId
-    ),
-    [originalUpload.body.sourcePackage.sourcePackageId]
+  assert.equal(sourcePackagesAfterConflicts.body.items.length, 3);
+  assert.ok(
+    sourcePackagesAfterConflicts.body.items.some(
+      item =>
+        item.sourcePackage.sourcePackageId ===
+        originalUpload.body.sourcePackage.sourcePackageId
+    )
   );
 
   for (const identityCase of [
@@ -15544,7 +15667,7 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     }
   );
   assert.equal(replacement.status, 201);
-  assert.equal(replacement.body.replacementSourcePackage.status, "accepted");
+  assert.equal(replacement.body.replacementSourcePackage.status, "uploaded");
   assert.equal(replacement.body.importJob.status, "completed");
 
   const zipPayload = createZipBase64([
@@ -15633,6 +15756,10 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     [
       "source_document_testtakers_booklet_missing",
       "source_document_testtakers_booklet_missing",
+      "source_document_booklet_unit_missing",
+      "source_document_booklet_unit_missing",
+      "source_document_booklet_unit_missing",
+      "source_document_booklet_unit_missing",
       expectation.diagnosticCode,
       "testcenter_xml_unit_id_duplicate",
       "testcenter_xml_syscheck_id_duplicate",
@@ -22724,6 +22851,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     unitControls: "both",
     unitLabel: "index",
     unitListEnabled: false,
+    backwardButton: "hidden",
+    forwardButton: "hidden",
     playerEnd: "last_unit"
   });
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
@@ -23172,6 +23301,130 @@ test("original Testcenter Unit cross-file references block incomplete packages",
   );
 });
 
+test("original Testcenter compatibility corpus requires schema-declared Booklet Unit dependencies", async () => {
+  const tenantKey = "integration-tenant-booklet-unit-dependencies";
+  const workspaceKey = "integration-workspace-booklet-unit-dependencies";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const createSourcePackage = async (input: {
+    fileName: string;
+    mediaType: string;
+    sourceDocument: string;
+  }): Promise<string> => {
+    const response = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: input
+    });
+    assert.equal(response.status, 201);
+    return response.body.sourcePackage.sourcePackageId;
+  };
+  const importSourcePackage = (sourcePackageId: string) =>
+    requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId }
+    });
+
+  const bookletId = "BOOKLET.STRICT-UNITS";
+  const unitId = "UNIT.STRICT-DEPENDENCY";
+  const schemaDeclaredBooklet = `
+    <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+      <Metadata><Id>${bookletId}</Id><Label>Strict Unit Booklet</Label></Metadata>
+      <Units><Unit id="${unitId}" label="Strict Unit" /></Units>
+    </Booklet>
+  `;
+  const bookletSourcePackageId = await createSourcePackage({
+    fileName: "Booklet-strict-units.xml",
+    mediaType: "application/xml",
+    sourceDocument: schemaDeclaredBooklet
+  });
+  const missingLooseUnit = await importSourcePackage(bookletSourcePackageId);
+  assert.equal(missingLooseUnit.body.importJob.status, "failed");
+  assert.equal(missingLooseUnit.body.stagedContentRelease, null);
+  assert.equal(
+    missingLooseUnit.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.code === "source_document_booklet_unit_missing"
+    ),
+    true
+  );
+
+  await createSourcePackage({
+    fileName: "Unit-strict-dependency.xml",
+    mediaType: "application/xml",
+    sourceDocument: `
+      <Unit>
+        <Metadata><Id>${unitId}</Id><Label>Strict Unit</Label></Metadata>
+        <Definition player="">Strict dependency content</Definition>
+      </Unit>
+    `
+  });
+  const resolvedLooseUnit = await importSourcePackage(bookletSourcePackageId);
+  assert.equal(resolvedLooseUnit.body.importJob.status, "completed");
+  assert.ok(resolvedLooseUnit.body.stagedContentRelease);
+
+  const zipBookletId = "BOOKLET.STRICT-ZIP";
+  const zipUnitId = "UNIT.STRICT-ZIP-MISSING";
+  const incompleteZip = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${zipBookletId}" href="booklet.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "booklet.xml",
+      content: schemaDeclaredBooklet
+        .replace(bookletId, zipBookletId)
+        .replace(unitId, zipUnitId)
+    }
+  ]);
+  const incompleteZipSourcePackageId = await createSourcePackage({
+    fileName: "booklet-strict-units-incomplete.zip",
+    mediaType: "application/zip",
+    sourceDocument: `data:application/zip;base64,${incompleteZip}`
+  });
+  const missingZipUnit = await importSourcePackage(incompleteZipSourcePackageId);
+  assert.equal(missingZipUnit.body.importJob.status, "failed");
+  assert.equal(missingZipUnit.body.stagedContentRelease, null);
+  assert.equal(
+    missingZipUnit.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.code === "source_document_booklet_unit_missing"
+    ),
+    true
+  );
+
+  const shellBookletId = "BOOKLET.LEGACY-SHELL";
+  const shellSourcePackageId = await createSourcePackage({
+    fileName: "Booklet-legacy-shell.xml",
+    mediaType: "application/xml",
+    sourceDocument: `
+      <Booklet>
+        <Metadata><Id>${shellBookletId}</Id><Label>Legacy Shell</Label></Metadata>
+        <Units><Unit id="UNIT.LEGACY-SHELL" label="Legacy Unit Shell" /></Units>
+      </Booklet>
+    `
+  });
+  const acceptedLegacyShell = await importSourcePackage(shellSourcePackageId);
+  assert.equal(acceptedLegacyShell.body.importJob.status, "completed");
+  assert.ok(acceptedLegacyShell.body.stagedContentRelease);
+});
+
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {
   const tenantKey = "integration-tenant-testlet-code";
   const workspaceKey = "integration-workspace-testlet-code";
@@ -23545,6 +23798,27 @@ test("original Testcenter root restrictions govern the complete booklet", async 
     method: "POST",
     body: { workspaceKey, displayName: workspaceKey }
   });
+  for (const [unitId, unitLabel] of [
+    ["UNIT.ROOT-1", "Root Unit One"],
+    ["UNIT.ROOT-2", "Root Unit Two"]
+  ] as const) {
+    const unitSource = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `${unitId}.xml`,
+        mediaType: "application/xml",
+        sourceDocument: `
+          <Unit>
+            <Metadata><Id>${unitId}</Id><Label>${unitLabel}</Label></Metadata>
+            <Definition player="">${unitLabel} content</Definition>
+          </Unit>
+        `
+      }
+    });
+    assert.equal(unitSource.status, 201);
+  }
   const sourcePackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
@@ -30355,6 +30629,8 @@ test("original BookletConfig compiles into enforced participant navigation polic
     unitControls: "forward_only",
     unitLabel: "label",
     unitListEnabled: false,
+    backwardButton: "hidden",
+    forwardButton: "hidden",
     playerEnd: "last_unit"
   });
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {

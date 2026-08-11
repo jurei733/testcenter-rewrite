@@ -2396,6 +2396,19 @@ const encodeUnicodeSourceTextForAssembly = (sourceDocument: string): Buffer =>
     "utf8"
   );
 
+const isTextualSourcePackageForAssembly = (
+  sourcePackage: SourcePackage,
+  decodedMediaType: string
+): boolean => {
+  const mediaType =
+    decodedMediaType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return (
+    mediaType.startsWith("text/") ||
+    /(?:xml|json|javascript)$/.test(mediaType) ||
+    /\.(?:css|csv|html?|js|json|md|txt|xml|xsd)$/i.test(sourcePackage.fileName)
+  );
+};
+
 type TestcenterXmlFileIdentity = {
   fileType: "Booklet" | "Unit" | "SysCheck" | "Testtakers";
   id: string;
@@ -8935,6 +8948,26 @@ const testcenterBookletAggregateSourceNames = [
   "Score"
 ] as const;
 
+const testcenterXmlSchemaInstanceNamespace =
+  "http://www.w3.org/2001/XMLSchema-instance";
+
+const getTestcenterXmlSchemaLocation = (root: XmlElement): string =>
+  root.getAttributeNS(
+    testcenterXmlSchemaInstanceNamespace,
+    "noNamespaceSchemaLocation"
+  ) || root.getAttribute("xsi:noNamespaceSchemaLocation") || "";
+
+const declaresTestcenterXmlSchemaProfile = (root: XmlElement): boolean =>
+  Boolean(getTestcenterXmlSchemaLocation(root)) ||
+  Array.from(
+    { length: root.attributes.length },
+    (_, index) => root.attributes.item(index)
+  ).some(
+    attribute =>
+      attribute?.namespaceURI === "http://www.w3.org/2000/xmlns/" &&
+      attribute.value === testcenterXmlSchemaInstanceNamespace
+  );
+
 const validateTestcenterBookletCondition = (
   condition: XmlElement,
   sourceFileName: string,
@@ -9173,20 +9206,8 @@ const validateTestcenterXmlSourceDocument = (
     return [];
   }
 
-  const schemaLocation =
-    root.getAttributeNS(
-      "http://www.w3.org/2001/XMLSchema-instance",
-      "noNamespaceSchemaLocation"
-    ) || root.getAttribute("xsi:noNamespaceSchemaLocation") || "";
-  const declaresXmlSchemaInstanceNamespace = Array.from(
-    { length: root.attributes.length },
-    (_, index) => root.attributes.item(index)
-  ).some(
-    attribute =>
-      attribute?.namespaceURI === "http://www.w3.org/2000/xmlns/" &&
-      attribute.value === "http://www.w3.org/2001/XMLSchema-instance"
-  );
-  if (!schemaLocation && !declaresXmlSchemaInstanceNamespace) {
+  const schemaLocation = getTestcenterXmlSchemaLocation(root);
+  if (!declaresTestcenterXmlSchemaProfile(root)) {
     return [];
   }
 
@@ -14070,7 +14091,17 @@ const assembleSourcePackageArchive = (
         `Source package '${sourcePackage.sourcePackageId}' has no readable source document.`
       );
     }
-    if (decodedDocument.bytes.length > MAX_EXTRACTED_RESOURCE_BYTES) {
+    const sourceText = isTextualSourcePackageForAssembly(
+      sourcePackage,
+      decodedDocument.mediaType
+    )
+      ? readPersistedSourceText(sourcePackage, decodedDocument)
+      : null;
+    const bytes =
+      sourceText === null
+        ? decodedDocument.bytes
+        : encodeUnicodeSourceTextForAssembly(sourceText);
+    if (bytes.length > MAX_EXTRACTED_RESOURCE_BYTES) {
       throw new FirstSliceError(
         413,
         "source_package_assembly_member_too_large",
@@ -14080,9 +14111,7 @@ const assembleSourcePackageArchive = (
     return {
       sourcePackageId: sourcePackage.sourcePackageId,
       fileName: normalizeSourcePackageAssemblyPath(sourcePackage.fileName),
-      bytes: /^data:/i.test(sourcePackage.sourceDocument ?? "")
-        ? decodedDocument.bytes
-        : encodeUnicodeSourceTextForAssembly(sourcePackage.sourceDocument ?? "")
+      bytes
     };
   });
   const duplicateFileNames = members.filter(
@@ -14224,6 +14253,26 @@ const collectLooseSourcePackageDependencyReferences = (
   return [...references];
 };
 
+const collectLooseSchemaDeclaredBookletUnitReferences = (
+  sourcePackage: SourcePackage
+): TestcenterBookletUnitReference[] => {
+  const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+  if (
+    !decodedDocument ||
+    sourcePackage.fileName.toLowerCase().endsWith(".zip") ||
+    sourcePackage.mediaType.toLowerCase().includes("zip")
+  ) {
+    return [];
+  }
+  const sourceDocument = readPersistedSourceText(sourcePackage, decodedDocument);
+  return sourceDocument === null
+    ? []
+    : collectSchemaDeclaredTestcenterBookletUnitReferences(
+        sourceDocument,
+        sourcePackage.fileName
+      );
+};
+
 const workspaceDependencyReferenceKeys = (reference: string): string[] => {
   const normalizedReference = reference.trim().replace(/\\/g, "/");
   const normalizedUriPath = normalizeManifestUriPathToken(normalizedReference);
@@ -14306,11 +14355,20 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   const pending = [input.rootSourcePackage];
   const missingReferences = new Set<string>();
   const missingTesttakersBookletReferences = new Set<string>();
+  const missingBookletUnitReferences = new Map<
+    string,
+    TestcenterBookletUnitReference
+  >();
   while (pending.length > 0) {
     const currentSourcePackage = pending.shift();
     if (!currentSourcePackage) {
       continue;
     }
+    const strictBookletUnitReferences = new Map(
+      collectLooseSchemaDeclaredBookletUnitReferences(currentSourcePackage).map(
+        reference => [reference.unitId.toLowerCase(), reference]
+      )
+    );
     for (const reference of collectLooseSourcePackageDependencyReferences(
       currentSourcePackage
     )) {
@@ -14359,6 +14417,15 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       }
       if (matches.length === 0) {
         missingReferences.add(reference);
+        const missingBookletUnit = strictBookletUnitReferences.get(
+          reference.trim().toLowerCase()
+        );
+        if (missingBookletUnit) {
+          missingBookletUnitReferences.set(
+            `${missingBookletUnit.bookletFileName.toLowerCase()}\u0000${missingBookletUnit.unitId.toLowerCase()}`,
+            missingBookletUnit
+          );
+        }
         if (
           readStandaloneTestcenterXmlFileIdentity(currentSourcePackage)
             ?.fileType === "Testtakers"
@@ -14383,6 +14450,21 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         diagnostic: createImportDiagnostic(
           "source_document_testtakers_booklet_missing",
           `Testtakers file '${input.rootSourcePackage.fileName}' references missing Booklet IDs: ${[...missingTesttakersBookletReferences].join(", ")}. Upload the referenced Booklet files before importing the roster.`
+        )
+      };
+    }
+    if (missingBookletUnitReferences.size > 0) {
+      const missingUnits = [...missingBookletUnitReferences.values()]
+        .map(
+          reference =>
+            `'${reference.unitId}' for Booklet '${reference.bookletId || "unknown"}' in '${reference.bookletFileName}'`
+        )
+        .join(", ");
+      return {
+        status: "blocked",
+        diagnostic: createImportDiagnostic(
+          "source_document_booklet_unit_missing",
+          `Original Testcenter Booklet dependencies are incomplete: ${missingUnits}. Upload the referenced Unit files before importing the Booklet.`
         )
       };
     }
@@ -16049,6 +16131,39 @@ const parseTestcenterXmlRoot = (sourceDocument: string): XmlElement | null => {
   }
 };
 
+type TestcenterBookletUnitReference = {
+  bookletFileName: string;
+  bookletId: string;
+  unitId: string;
+};
+
+const collectSchemaDeclaredTestcenterBookletUnitReferences = (
+  sourceDocument: string,
+  bookletFileName: string
+): TestcenterBookletUnitReference[] => {
+  const root = parseTestcenterXmlRoot(sourceDocument);
+  if (
+    !root ||
+    xmlElementLocalName(root) !== "Booklet" ||
+    !declaresTestcenterXmlSchemaProfile(root)
+  ) {
+    return [];
+  }
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  const bookletId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+  const units = xmlChildrenNamed(root, "Units")[0];
+  const seenUnitIds = new Set<string>();
+  return (units ? xmlDescendantsNamed(units, "Unit") : []).flatMap(unit => {
+    const unitId = unit.getAttribute("id")?.trim() ?? "";
+    const identityKey = unitId.toLowerCase();
+    if (!unitId || seenUnitIds.has(identityKey)) {
+      return [];
+    }
+    seenUnitIds.add(identityKey);
+    return [{ bookletFileName, bookletId, unitId }];
+  });
+};
+
 const collectTestcenterVariableIds = (root: XmlElement): Set<string> => {
   const variableIds = new Set<string>();
   for (const containerName of ["BaseVariables", "DerivedVariables"]) {
@@ -16213,7 +16328,9 @@ const validateZipXmlEntries = (
     string,
     { sourceFileName: string; variableIds: Set<string> }
   >();
+  const availableUnitReferenceKeys = new Set<string>();
   const adaptiveVariableReferences: TestcenterAdaptiveVariableReference[] = [];
+  const bookletUnitReferences: TestcenterBookletUnitReference[] = [];
   const bookletSourceFileById = new Map<string, string>();
   const testtakersBookletReferences: Array<{
     bookletId: string;
@@ -16245,6 +16362,12 @@ const validateZipXmlEntries = (
     }
     const rootName = xmlElementLocalName(root);
     if (rootName === "Booklet") {
+      bookletUnitReferences.push(
+        ...collectSchemaDeclaredTestcenterBookletUnitReferences(
+          sourceDocument,
+          entry.fileName
+        )
+      );
       const metadata = xmlChildrenNamed(root, "Metadata")[0];
       const bookletId = xmlElementText(
         xmlChildrenNamed(metadata ?? root, "Id")[0]
@@ -16267,6 +16390,10 @@ const validateZipXmlEntries = (
     const unitId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
     if (!unitId) {
       continue;
+    }
+    availableUnitReferenceKeys.add(unitId.toLowerCase());
+    for (const referenceKey of workspaceDependencyReferenceKeys(entry.fileName)) {
+      availableUnitReferenceKeys.add(referenceKey);
     }
     const variableIds = collectTestcenterVariableIds(root);
     const declaredUnitReferences =
@@ -16309,6 +16436,20 @@ const validateZipXmlEntries = (
         createImportDiagnostic(
           "source_document_testtakers_booklet_missing",
           `Testtakers ZIP entry '${reference.sourceFileName}' references missing Booklet ID '${reference.bookletId}'.`
+        )
+      );
+    }
+  }
+  for (const reference of bookletUnitReferences) {
+    if (
+      !workspaceDependencyReferenceKeys(reference.unitId).some(referenceKey =>
+        availableUnitReferenceKeys.has(referenceKey)
+      )
+    ) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_booklet_unit_missing",
+          `Booklet ZIP entry '${reference.bookletFileName}' (${reference.bookletId || "unknown"}) references missing Unit ID '${reference.unitId}'.`
         )
       );
     }

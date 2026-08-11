@@ -267,6 +267,20 @@ XML. Fully declaration-free legacy/native XML retains the rewrite's established
 permissive compatibility path. Direct upload, roster, and nested-ZIP intake are
 all regression-gated.
 
+Latest P0 Booklet-dependency closure: every `Units/Unit/@id` in an
+XSD-declaring Booklet, or in a Booklet with the orphaned-XSI compatibility
+profile, must now resolve to a packaged Unit before staging. Loose workspace
+imports follow the Unit IDs into the audited immutable dependency snapshot;
+prebuilt ZIPs apply the same check and retain the established explicit
+file-path/basename reference compatibility. Missing Units fail with the stable
+`source_document_booklet_unit_missing` diagnostic and name the Booklet, Unit,
+and source file. Fully declaration-free Booklet runtime shells remain the
+explicit permissive migration boundary. Automatic assemblies additionally
+decode textual Data-URI members with their declared charset and write canonical
+UTF-8 ZIP entries, so ISO-8859-1, UTF-16, and UTF-32 Booklets keep their labels
+while acquiring the required Unit package. The complete Original compatibility
+suite now gates 37 corpus behaviors with this boundary enabled.
+
 Latest P0 Booklet-ID closure: Booklet `CustomText/@key` and `Config/@key`
 now share the document-wide `xs:ID` uniqueness boundary declared by the
 Original XSD. Duplicate keys within one section and collisions across the two
