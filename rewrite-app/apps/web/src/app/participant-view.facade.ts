@@ -256,6 +256,33 @@ export class ParticipantViewFacade {
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
+
+  get participantConnectionState() {
+    return this.participantEvents.connectionState();
+  }
+
+  get participantConnectionLabel(): string {
+    switch (this.participantConnectionState.status) {
+      case "connecting":
+        return "Connecting";
+      case "live":
+        return "Live";
+      case "reconnecting":
+        return "Reconnecting";
+      case "offline":
+        return "Offline";
+      default:
+        return "Inactive";
+    }
+  }
+
+  get showParticipantConnectionState(): boolean {
+    return (
+      !!this.runtime.participantSessionId.trim() &&
+      this.participantConnectionState.status !== "idle"
+    );
+  }
+
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
   private participantRosterCustomTexts: Record<string, string> = {};
   private participantBookletCustomTexts: Record<string, string> = {};

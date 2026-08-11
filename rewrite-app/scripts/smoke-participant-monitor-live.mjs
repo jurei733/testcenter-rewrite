@@ -191,6 +191,18 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const participantPage = await context.newPage();
+  let participantStreamAttemptCount = 0;
+  await participantPage.route(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/events`,
+    async route => {
+      participantStreamAttemptCount += 1;
+      if (participantStreamAttemptCount === 1) {
+        await route.abort("failed");
+        return;
+      }
+      await route.continue();
+    }
+  );
   const participantStreamResponse = participantPage.waitForResponse(
     response =>
       response.url().endsWith(
@@ -204,7 +216,21 @@ try {
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
+  await participantPage
+    .locator("#participantRouteConnectionState[data-status='reconnecting']")
+    .waitFor({ timeout: 15_000 });
+  assert.match(
+    await participantPage.locator("#participantRouteConnectionDetail").innerText(),
+    /reconnecting automatically/i
+  );
   await participantStreamResponse;
+  await participantPage
+    .locator("#participantRouteConnectionState[data-status='live']")
+    .waitFor({ timeout: 15_000 });
+  assert.ok(
+    participantStreamAttemptCount >= 2,
+    "Participant event stream must reconnect after the initial channel failure."
+  );
 
   const operatorPage = await context.newPage();
   await operatorPage.goto(`${baseUrl}/app/workspace`, {
@@ -350,13 +376,19 @@ try {
         HTMLButtonElement) &&
       !document.querySelector("#monitorBatchCompleteButton").disabled
   );
+  await completeButton.click();
+  const confirmationDialog = operatorPage.locator("#globalConfirmationDialog");
+  await confirmationDialog.waitFor();
+  assert.match(
+    await operatorPage.locator("#globalConfirmationMessage").innerText(),
+    /complete_and_lock.*1 selected run/i
+  );
   const completeResponsePromise = operatorPage.waitForResponse(
     response =>
       response.url().endsWith("/monitor/open-runs/commands") &&
       response.request().method() === "POST"
   );
-  operatorPage.once("dialog", dialog => dialog.accept());
-  await completeButton.click();
+  await operatorPage.locator("#globalConfirmationConfirmButton").click();
   const completeResponse = await completeResponsePromise;
   assert.equal(completeResponse.status(), 200);
   const completePayload = await completeResponse.json();
@@ -370,7 +402,7 @@ try {
     .waitFor({ timeout: 15_000 });
 
   process.stdout.write(
-    `Participant monitor live idle/controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
+    `Participant monitor reconnect/live idle/controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
   );
 } catch (error) {
   if (serverOutput) {

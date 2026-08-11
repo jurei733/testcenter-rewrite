@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { ApplicationRef, Injectable, inject, signal } from "@angular/core";
 
 import {
   parseParticipantEventStreamEvent,
@@ -11,6 +11,18 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
 type ParticipantRefresh = () => Promise<void>;
 
+export type ParticipantEventStreamConnectionStatus =
+  | "idle"
+  | "connecting"
+  | "live"
+  | "reconnecting"
+  | "offline";
+
+export interface ParticipantEventStreamConnectionState {
+  status: ParticipantEventStreamConnectionStatus;
+  detail: string;
+}
+
 @Injectable({ providedIn: "root" })
 export class ParticipantEventStreamService {
   private readonly applicationRef = inject(ApplicationRef);
@@ -22,6 +34,13 @@ export class ParticipantEventStreamService {
   private refreshRunning = false;
   private refreshPending = false;
   private refresh: ParticipantRefresh | null = null;
+  private readonly connectionStateValue =
+    signal<ParticipantEventStreamConnectionState>({
+      status: "idle",
+      detail: "Live participant updates are inactive."
+    });
+
+  readonly connectionState = this.connectionStateValue.asReadonly();
 
   start(
     participantSessionId: string,
@@ -43,13 +62,18 @@ export class ParticipantEventStreamService {
 
     this.stopConnection();
     this.activeParticipantSessionId = normalizedParticipantSessionId;
+    this.setConnectionState(
+      "connecting",
+      "Opening the live participant update channel."
+    );
     this.generation += 1;
     const generation = this.generation;
     this.connectHandle = globalThis.window?.setTimeout(() => {
       this.connectHandle = null;
       void this.connect({
         generation,
-        participantSessionId: normalizedParticipantSessionId
+        participantSessionId: normalizedParticipantSessionId,
+        reconnecting: false
       });
     }, 1_000) ?? null;
   }
@@ -59,6 +83,7 @@ export class ParticipantEventStreamService {
     this.activeParticipantSessionId = "";
     this.refresh = null;
     this.refreshPending = false;
+    this.setConnectionState("idle", "Live participant updates are inactive.");
   }
 
   private stopConnection(): void {
@@ -74,6 +99,7 @@ export class ParticipantEventStreamService {
   private async connect(input: {
     generation: number;
     participantSessionId: string;
+    reconnecting: boolean;
   }): Promise<void> {
     if (input.generation !== this.generation) {
       return;
@@ -81,6 +107,12 @@ export class ParticipantEventStreamService {
 
     const controller = new AbortController();
     this.abortController = controller;
+    if (input.reconnecting) {
+      this.setConnectionState(
+        "reconnecting",
+        "Reconnecting the live participant update channel."
+      );
+    }
     try {
       const response = await fetch(
         resolveRoutePath(productionApiRoutes.participant.eventStream, {
@@ -104,6 +136,10 @@ export class ParticipantEventStreamService {
         throw new Error("Participant channel returned an unexpected content type.");
       }
 
+      this.setConnectionState(
+        "live",
+        "Live participant updates are connected."
+      );
       await this.consume(response.body, input.generation);
       if (input.generation === this.generation) {
         throw new Error("Participant channel closed.");
@@ -117,10 +153,18 @@ export class ParticipantEventStreamService {
       }
       // A failed persistent channel degrades to one quiet state refresh per
       // reconnect interval until streaming becomes available again.
+      const offline =
+        typeof navigator !== "undefined" && !navigator.onLine;
+      this.setConnectionState(
+        offline ? "offline" : "reconnecting",
+        offline
+          ? "The network is unavailable. Live updates reconnect automatically when the device is online."
+          : "Live updates are temporarily unavailable. Reconnecting automatically; queued answers keep their retry protection."
+      );
       this.queueRefresh();
       this.connectHandle = globalThis.window?.setTimeout(() => {
         this.connectHandle = null;
-        void this.connect(input);
+        void this.connect({ ...input, reconnecting: true });
       }, 3_000) ?? null;
     }
   }
@@ -175,6 +219,10 @@ export class ParticipantEventStreamService {
     if (!event || event.participantSessionId !== this.activeParticipantSessionId) {
       return;
     }
+    this.setConnectionState(
+      "live",
+      `Live participant updates are connected; ${event.eventType} #${event.sequence}.`
+    );
     if (event.eventType === "snapshot" || event.eventType === "change") {
       this.queueRefresh();
     }
@@ -201,5 +249,17 @@ export class ParticipantEventStreamService {
           this.queueRefresh();
         }
       });
+  }
+
+  private setConnectionState(
+    status: ParticipantEventStreamConnectionStatus,
+    detail: string
+  ): void {
+    const current = this.connectionStateValue();
+    if (current.status === status && current.detail === detail) {
+      return;
+    }
+    this.connectionStateValue.set({ status, detail });
+    this.uiState.renderVersion.update(version => version + 1);
   }
 }

@@ -1281,6 +1281,43 @@ pre {
   background: linear-gradient(135deg, rgba(215, 235, 231, 0.92), rgba(255, 252, 246, 0.94));
 }
 
+.participant-connection-state {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: baseline;
+  margin: 0 0 16px;
+  padding: 13px 16px;
+  border: 1px solid rgba(31, 92, 84, 0.28);
+  border-radius: var(--radius-lg);
+  background: rgba(215, 235, 231, 0.72);
+  color: #184f48;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.participant-connection-state span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.participant-connection-state strong {
+  font-size: 14px;
+}
+
+.participant-connection-state p {
+  margin: 0;
+  color: inherit;
+  font-size: 13px;
+}
+
+.participant-connection-state.is-degraded {
+  border-color: rgba(139, 89, 17, 0.34);
+  background: #fff1cf;
+  color: #5d3b0c;
+}
+
 .participant-fullscreen-prompt span {
   display: block;
   margin-bottom: 5px;
@@ -1317,6 +1354,14 @@ pre {
 }
 
 @media (max-width: 720px) {
+  .participant-connection-state {
+    grid-template-columns: auto 1fr;
+  }
+
+  .participant-connection-state p {
+    grid-column: 1 / -1;
+  }
+
   .participant-fullscreen-prompt,
   .participant-runtime-toolbar {
     align-items: stretch;

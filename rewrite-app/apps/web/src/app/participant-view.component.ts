@@ -186,6 +186,19 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
       <article class="card" id="participantRoutePlayer">
         <h2>Current Test</h2>
         <section
+          *ngIf="view.showParticipantConnectionState"
+          id="participantRouteConnectionState"
+          class="participant-connection-state"
+          [class.is-degraded]="view.participantConnectionState.status === 'reconnecting' || view.participantConnectionState.status === 'offline'"
+          [attr.data-status]="view.participantConnectionState.status"
+          role="status"
+          aria-live="polite"
+        >
+          <span>Live updates</span>
+          <strong id="participantRouteConnectionStatus">{{ view.participantConnectionLabel }}</strong>
+          <p id="participantRouteConnectionDetail">{{ view.participantConnectionState.detail }}</p>
+        </section>
+        <section
           *ngIf="view.showFullscreenPrompt"
           id="participantRouteFullscreenPrompt"
           class="participant-fullscreen-prompt"
