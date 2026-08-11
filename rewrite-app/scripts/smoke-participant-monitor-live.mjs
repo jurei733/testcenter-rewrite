@@ -258,8 +258,14 @@ try {
   await operatorPage.goto(`${baseUrl}/app/runtime`, {
     waitUntil: "domcontentloaded"
   });
+  await operatorPage.locator("#participantSessionId").fill(participantSessionId);
+  await operatorPage.locator("#participantSessionId").dispatchEvent("change");
   await operatorPage.locator("#testRunId").fill(testRunId);
   await operatorPage.locator("#testRunId").dispatchEvent("change");
+  await operatorPage.locator("#runtimeRefreshRuntimeReadsButton").click();
+  await operatorPage
+    .locator("#playerPreviewStatus", { hasText: "running" })
+    .waitFor({ timeout: 15_000 });
 
   const openRunCard = operatorPage
     .locator("#openMonitorRunsCollection .record-card")
@@ -312,6 +318,12 @@ try {
   });
   await pauseButton.waitFor();
   await pauseButton.click();
+  await operatorPage
+    .locator("#playerPreviewStatus", { hasText: "paused" })
+    .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewActions", { hasText: "none" })
+    .waitFor({ timeout: 15_000 });
   await participantPage
     .locator("#participantRouteStatus", { hasText: "paused" })
     .waitFor({ timeout: 15_000 });
@@ -333,6 +345,12 @@ try {
   );
   await resumeButton.click();
   assert.equal((await resumeResponsePromise).status(), 200);
+  await operatorPage
+    .locator("#playerPreviewStatus", { hasText: "running" })
+    .waitFor({ timeout: 15_000 });
+  await operatorPage
+    .locator("#playerPreviewActions", { hasText: "save_progress" })
+    .waitFor({ timeout: 15_000 });
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });

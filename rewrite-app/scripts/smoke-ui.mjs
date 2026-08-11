@@ -12464,7 +12464,7 @@ try {
         "paused" &&
       document
         .querySelector("#playerPreviewActions")
-        ?.textContent?.includes("resume"),
+        ?.textContent?.trim() === "none",
     undefined,
     { timeout: 15_000 }
   );
@@ -12546,8 +12546,8 @@ try {
       );
     }
   );
-  logStep("resume-run");
-  await clickAction("Resume Run");
+  logStep("monitor-resume-after-time-setting");
+  await clickAction("Monitor Resume");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
