@@ -53,6 +53,14 @@ operator command. Buffered responses already secured before the command may
 still drain idempotently, but the server preserves the pause, timer state, and
 current Unit. Participant-authored pauses retain their own Continue action.
 
+Completed runs are terminal in the Participant route, matching the original
+Test Controller's `TERMINATED` Unit-host guard. The UI replaces the complete
+interactive test surface with a completion summary, so no Verona/fallback
+Player, response editor, Review form, timer, Unit navigation, or mutation
+control remains available. This is production-browser-gated for both normal
+Participant completion (including final-draft autosave) and monitor-side
+`complete_and_lock`, and remains terminal after session re-entry.
+
 Platform administrators can configure the original-style instance application
 title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded
 global warning plus global custom-text overrides from the Angular Ops view. The

@@ -279,6 +279,7 @@ export class ParticipantViewFacade {
   get showParticipantConnectionState(): boolean {
     return (
       !!this.runtime.participantSessionId.trim() &&
+      this.readCurrentRunState()?.testRun.status !== "completed" &&
       this.participantConnectionState.status !== "idle"
     );
   }
@@ -1027,7 +1028,7 @@ export class ParticipantViewFacade {
 
   get screenHeaderLabel(): string {
     const currentState = this.readCurrentRunState();
-    if (!currentState) {
+    if (!currentState || currentState.testRun.status === "completed") {
       return "";
     }
     switch (currentState.booklet.policy.display.headerContent) {
@@ -1060,14 +1061,18 @@ export class ParticipantViewFacade {
   }
 
   get showFullscreenButton(): boolean {
+    const currentState = this.readCurrentRunState();
     return Boolean(
-      this.readCurrentRunState()?.booklet.policy.display.fullscreenButton
+      currentState?.testRun.status !== "completed" &&
+        currentState?.booklet.policy.display.fullscreenButton
     );
   }
 
   get showReloadButton(): boolean {
+    const currentState = this.readCurrentRunState();
     return Boolean(
-      this.readCurrentRunState()?.booklet.policy.display.reloadButton
+      currentState?.testRun.status !== "completed" &&
+        currentState?.booklet.policy.display.reloadButton
     );
   }
 
@@ -1076,7 +1081,9 @@ export class ParticipantViewFacade {
   }
 
   get bookletLoadedUnitCount(): number {
-    return this.loadedBookletAssets()?.assets?.units.length ?? 0;
+    return this.readCurrentRunState()?.testRun.status === "completed"
+      ? 0
+      : (this.loadedBookletAssets()?.assets?.units.length ?? 0);
   }
 
   get veronaLoadingTitle(): string {
@@ -1123,7 +1130,11 @@ export class ParticipantViewFacade {
   }
 
   get fullscreenStatusText(): string {
-    const testRunId = this.readCurrentRunState()?.testRun.testRunId ?? "";
+    const currentState = this.readCurrentRunState();
+    if (currentState?.testRun.status === "completed") {
+      return "";
+    }
+    const testRunId = currentState?.testRun.testRunId ?? "";
     return testRunId && testRunId === this.fullscreenStatusRunId
       ? this.fullscreenStatus()
       : "";

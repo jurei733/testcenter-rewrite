@@ -6154,21 +6154,26 @@ try {
         "completed" &&
       document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "completed" &&
+      document.querySelector("#participantRouteCompletedState") != null &&
+      document
+        .querySelector("#participantRouteCompletedDetail")
+        ?.textContent?.includes("responses are closed") &&
       document.querySelector("#participantRouteProgressLabel")?.textContent?.trim() ===
         "3 / 3 responses saved" &&
-      document.querySelector("#participantRouteUnitOverview")?.textContent?.trim() ===
-        "3/3 answered · 0 open" &&
       document.querySelector("#participantRouteMissingLabel")?.textContent?.trim() ===
         "All units have a saved response." &&
       document
-        .querySelector("#participantRouteCompletionReadinessLabel")
-        ?.textContent?.trim() === "Complete" &&
-      document
-        .querySelector("#participantRouteCompletionReadinessDetail")
-        ?.textContent?.includes("closed and ready for operator review") &&
-      document
         .querySelector("#participantRouteCompletionLabel")
-        ?.textContent?.includes("Completed"),
+        ?.textContent?.includes("Completed") &&
+      document.querySelector("app-verona-player-host") == null &&
+      document.querySelector("#participantRouteUnitResponse") == null &&
+      document.querySelector("#participantRouteUnitKey") == null &&
+      document.querySelector("#participantRouteReviewPanel") == null &&
+      document.querySelector("#participantRouteTestletTimer") == null &&
+      document.querySelector("#participantRouteConnectionState") == null &&
+      document.querySelector("#participantRouteBookletLoadingStatus") == null &&
+      document.querySelector(".participant-runtime-toolbar") == null &&
+      document.querySelector("#participantRouteCompleteButton") == null,
     undefined,
     { timeout: 15_000 }
   );
@@ -6213,12 +6218,13 @@ try {
       document.querySelector("#participantEntryNextStep")?.textContent?.includes(
         "Completed"
       ) &&
-      document
-        .querySelector("#participantRouteCompletionReadinessLabel")
-        ?.textContent?.trim() === "Complete" &&
+      document.querySelector("#participantRouteCompletedState") != null &&
       document
         .querySelector("#participantRouteCompletionLabel")
-        ?.textContent?.includes("Completed"),
+        ?.textContent?.includes("Completed") &&
+      document.querySelector("app-verona-player-host") == null &&
+      document.querySelector("#participantRouteUnitResponse") == null &&
+      document.querySelector("#participantRouteCompleteButton") == null,
     participantRouteSessionId,
     { timeout: 15_000 }
   );

@@ -387,6 +387,29 @@ try {
   await participantPage
     .locator("#participantRouteStatus", { hasText: "completed" })
     .waitFor({ timeout: 15_000 });
+  await participantPage
+    .locator("#participantRouteCompletedState")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await participantPage.locator("app-verona-player-host").count(),
+    0,
+    "Monitor completion must remove the Verona player host."
+  );
+  assert.equal(
+    await participantPage.locator("#participantRouteUnitResponse").count(),
+    0,
+    "Monitor completion must remove the fallback response editor."
+  );
+  assert.equal(
+    await participantPage.locator("#participantRouteCompleteButton").count(),
+    0,
+    "Monitor completion must remove participant completion controls."
+  );
+  assert.equal(
+    await participantPage.locator(".participant-runtime-toolbar").count(),
+    0,
+    "Monitor completion must remove the Unit runtime toolbar."
+  );
 
   process.stdout.write(
     `Participant monitor reconnect/live idle/controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`

@@ -2012,7 +2012,8 @@ pre {
   white-space: pre-wrap;
 }
 
-.participant-paused-state {
+.participant-paused-state,
+.participant-completed-state {
   display: grid;
   justify-items: center;
   gap: 12px;
@@ -2023,7 +2024,8 @@ pre {
   text-align: center;
 }
 
-.participant-paused-state span {
+.participant-paused-state span,
+.participant-completed-state > span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -2031,15 +2033,68 @@ pre {
   text-transform: uppercase;
 }
 
-.participant-paused-state strong {
+.participant-paused-state strong,
+.participant-completed-state > strong {
   color: var(--ink);
   font-size: clamp(20px, 3vw, 30px);
 }
 
-.participant-paused-state p {
+.participant-paused-state p,
+.participant-completed-state > p {
   max-width: 52ch;
   margin: 0;
   color: var(--muted);
+}
+
+.participant-completed-state {
+  border-color: rgba(31, 92, 84, 0.24);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(56, 148, 131, 0.16), transparent 42%),
+    rgba(255, 255, 255, 0.86);
+}
+
+.participant-completed-state > strong,
+.participant-completed-state #participantRouteCompletionLabel {
+  color: var(--success, #1f5c54);
+}
+
+.participant-completed-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 620px);
+  margin: 8px 0 0;
+  overflow: hidden;
+  border: 1px solid rgba(31, 92, 84, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.participant-completed-summary div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.participant-completed-summary dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.participant-completed-summary dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .participant-completed-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .verona-player-shell {

@@ -50,6 +50,18 @@ SQLite coverage pins restart persistence, and the production-built live-monitor
 Chromium gate proves pause presentation, Player teardown, absent Participant
 Resume, monitor-only continuation, and Player restoration.
 
+Latest P0 Participant completion-boundary closure: the original Test Controller
+guards the Unit host once a run reaches `TERMINATED`; the rewrite now applies the
+same terminal presentation to `completed`. The active Angular route replaces the
+entire Unit surface with a dedicated completion state that retains only session,
+run, saved-progress, and completion context. Verona and fallback players,
+response fields, adaptive routing, Review, timers, Unit menus, navigation, save,
+resume, and completion controls are no longer present in the DOM. This boundary
+also survives direct session re-entry. Production-built Chromium/SQLite gates
+prove both participant-authored completion with final-draft autosave and the
+monitor's atomic `complete_and_lock` path, including Player teardown and absence
+of every participant mutation control.
+
 Latest P0 non-saving-mode re-entry closure: the original Demo and Review E2E
 flows discard Unit and Test state when the participant returns to the starter,
 so opening the same test again begins at its start page even though the same run

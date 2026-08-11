@@ -266,6 +266,39 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <strong id="participantRouteSessionLabel">{{ view.player.sessionLabel }}</strong>
             </div>
           </div>
+          <ng-container *ngIf="view.player.isComplete; else participantActiveRun">
+            <section
+              id="participantRouteCompletedState"
+              class="participant-completed-state"
+              role="status"
+              aria-live="assertive"
+              aria-labelledby="participantRouteCompletedTitle"
+            >
+              <span>Test completed</span>
+              <strong id="participantRouteCompletedTitle">Your test is finished.</strong>
+              <p id="participantRouteCompletedDetail">Your responses are closed and can no longer be changed. You can leave this session or select another available test above.</p>
+              <dl class="participant-completed-summary">
+                <div>
+                  <dt>Status</dt>
+                  <dd id="participantRouteStatus">{{ view.player.runStatus }}</dd>
+                </div>
+                <div>
+                  <dt>Run</dt>
+                  <dd id="participantRouteRunId">{{ view.player.runId }}</dd>
+                </div>
+                <div>
+                  <dt>Saved progress</dt>
+                  <dd id="participantRouteProgressLabel">{{ view.player.responseProgressLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Completed</dt>
+                  <dd id="participantRouteCompletionLabel">{{ view.player.completionLabel }}</dd>
+                </div>
+              </dl>
+              <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
+            </section>
+          </ng-container>
+          <ng-template #participantActiveRun>
           <header>
             <div>
               <h3 *ngIf="view.showUnitTitle" id="participantRouteUnit">{{ view.player.headline }}</h3>
@@ -726,6 +759,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (click)="view.resumeRun()"
               >Continue Test</button>
             </section>
+          </ng-template>
           </ng-template>
         </div>
       </article>
