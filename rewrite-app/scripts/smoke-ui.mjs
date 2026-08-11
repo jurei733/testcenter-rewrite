@@ -11581,6 +11581,106 @@ try {
       testRunId: resumePayload.testRun?.testRunId
     };
   };
+  const completeOriginalControllerUnit = async frame => {
+    await frame
+      .locator('[data-cy="TestController-radio1-Aufg1"]')
+      .check();
+    await frame.locator("#next-page").click();
+    await frame
+      .getByText("Presentation complete", { exact: true })
+      .waitFor({ timeout: 15_000 });
+  };
+  const waitForOriginalControllerCompletenessDenial = async (
+    controller,
+    direction
+  ) =>
+    pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
+      payload => {
+        const reasons =
+          direction === "forward"
+            ? payload?.currentRunState?.navigation?.forwardDeniedReasons
+            : payload?.currentRunState?.navigation?.backwardDeniedReasons;
+        return (
+          reasons?.includes("presentation_incomplete") === true &&
+          reasons.includes("response_incomplete")
+        );
+      }
+    );
+  const assertOriginalControllerCompletenessDenied = async (
+    controller,
+    targetUnitKey,
+    direction
+  ) => {
+    await waitForOriginalControllerCompletenessDenial(controller, direction);
+    const response = await fetch(
+      `${baseUrl}/api/v1/participant/test-runs/${controller.testRunId}/save-progress`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ currentUnitKey: targetUnitKey, status: "running" })
+      }
+    );
+    assert.equal(response.status, 409);
+    const payload = await response.json();
+    assert.equal(payload.error, "booklet_navigation_denied");
+    assert.equal(payload.details?.direction, direction);
+    assert.deepEqual(payload.details?.deniedReasons, [
+      "presentation_incomplete",
+      "response_incomplete"
+    ]);
+  };
+  const runOriginalControllerCompletenessCase = async ({
+    loginKey,
+    bookletKey,
+    secondUnitKey,
+    policy
+  }) => {
+    const controller = await openOriginalTestController(loginKey, bookletKey);
+    assert.ok(controller.testRunId);
+    const frame = controller.frame;
+    await frame
+      .getByText(
+        "Testung Controller: Aufgabe1: Check response complete and presentation complete",
+        { exact: true }
+      )
+      .waitFor({ timeout: 15_000 });
+
+    if (policy === "off") {
+      await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
+    } else {
+      await expectButtonSelectorDisabled("#participantRouteNextUnitButton");
+      await assertOriginalControllerCompletenessDenied(
+        controller,
+        secondUnitKey,
+        "forward"
+      );
+      await completeOriginalControllerUnit(frame);
+      await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
+    }
+
+    await page.locator("#participantRouteNextUnitButton").click();
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: secondUnitKey })
+      .waitFor({ timeout: 15_000 });
+
+    if (policy === "always") {
+      await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+      await assertOriginalControllerCompletenessDenied(
+        controller,
+        "CY-Unit.Sample-101",
+        "backward"
+      );
+      await completeOriginalControllerUnit(frame);
+    }
+    await expectButtonSelectorEnabled("#participantRoutePreviousUnitButton");
+    await page.locator("#participantRoutePreviousUnitButton").click();
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: "CY-Unit.Sample-101" })
+      .waitFor({ timeout: 15_000 });
+  };
 
   const protectedController = await openOriginalTestController(
     "Test_Ctrl-3",
@@ -11748,6 +11848,43 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
     .waitFor({ timeout: 15_000 });
+
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-18",
+    bookletKey: "Cy-Bklt_TC-9",
+    secondUnitKey: "unit2",
+    policy: "off"
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-19",
+    bookletKey: "Cy-Bklt_TC-10",
+    secondUnitKey: "unit2",
+    policy: "forward"
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-20",
+    bookletKey: "Cy-Bklt_TC-11",
+    secondUnitKey: "unit2",
+    policy: "always"
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-24",
+    bookletKey: "Cy-Bklt_TC-15",
+    secondUnitKey: "CY-Unit.Sample-102",
+    policy: "off"
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-25",
+    bookletKey: "Cy-Bklt_TC-16",
+    secondUnitKey: "CY-Unit.Sample-102",
+    policy: "forward"
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-26",
+    bookletKey: "Cy-Bklt_TC-17",
+    secondUnitKey: "unit2",
+    policy: "always"
+  });
 
   const confirmLeaveController = await openOriginalTestController(
     "Test_Ctrl-15",
