@@ -9056,12 +9056,29 @@ const validateTestcenterXmlSourceDocument = (
     root.getAttributeNS(
       "http://www.w3.org/2001/XMLSchema-instance",
       "noNamespaceSchemaLocation"
-    ) || root.getAttribute("xsi:noNamespaceSchemaLocation");
-  if (!schemaLocation) {
+    ) || root.getAttribute("xsi:noNamespaceSchemaLocation") || "";
+  const declaresXmlSchemaInstanceNamespace = Array.from(
+    { length: root.attributes.length },
+    (_, index) => root.attributes.item(index)
+  ).some(
+    attribute =>
+      attribute?.namespaceURI === "http://www.w3.org/2000/xmlns/" &&
+      attribute.value === "http://www.w3.org/2001/XMLSchema-instance"
+  );
+  if (!schemaLocation && !declaresXmlSchemaInstanceNamespace) {
     return [];
   }
 
   const diagnostics: ImportJobDiagnostic[] = [];
+  if (!schemaLocation) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_schema_reference_missing",
+        `Original Testcenter ${canonicalRootName} '${sourceFileName}' has no XSD reference; the locally pinned ${latestSupportedOriginalTestcenterSchemaVersion.major}.${latestSupportedOriginalTestcenterSchemaVersion.minor} compatibility profile is used instead.`,
+        "warning"
+      )
+    );
+  }
   if (rootName !== canonicalRootName) {
     diagnostics.push(
       createImportDiagnostic(
@@ -9090,6 +9107,7 @@ const validateTestcenterXmlSourceDocument = (
     );
   }
   if (
+    schemaLocation &&
     !new RegExp(
       `(?:^|/)definitions/v?o?_?${canonicalRootName}\\.xsd(?:[?#].*)?$`
     ).test(schemaLocation)

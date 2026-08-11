@@ -12622,6 +12622,57 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, corpus.booklets[0].fixture),
     "utf8"
   );
+  const schemaLessBookletXml = validBookletXml.replace(
+    /\s+xsi:noNamespaceSchemaLocation=(?:"[^"]*"|'[^']*')/,
+    ""
+  );
+  const schemaLessWorkspaceKey = await createValidationWorkspace(
+    "booklet-without-schema-reference.xml"
+  );
+  const schemaLessPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${schemaLessWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet-without-schema-reference.xml",
+        mediaType: "application/xml",
+        sourceDocument: schemaLessBookletXml
+      }
+    }
+  );
+  assert.equal(schemaLessPackage.status, 201);
+  const schemaLessImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; severity: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${schemaLessWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId: schemaLessPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(schemaLessImport.body.importJob.status, "completed");
+  assert.deepEqual(
+    schemaLessImport.body.importJob.diagnostics.map(diagnostic => ({
+      severity: diagnostic.severity,
+      code: diagnostic.code
+    })),
+    [
+      {
+        severity: "warning",
+        code: "testcenter_xml_schema_reference_missing"
+      }
+    ],
+    "schema-less Original XML should use the current compatibility profile"
+  );
+  assert.ok(schemaLessImport.body.stagedContentRelease);
   const utf16BookletXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-16"'
@@ -12954,6 +13005,28 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "/99.0.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      fileName: "booklet-missing-schema-fallback.xml",
+      sourceDocument: schemaLessBookletXml.replace(
+        "<Booklet ",
+        '<Booklet ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      fileName: "unit-missing-schema-fallback.xml",
+      sourceDocument: validUnitXml
+        .replace(/\s+xsi:noNamespaceSchemaLocation=(?:"[^"]*"|'[^']*')/, "")
+        .replace("<Unit ", '<Unit ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      fileName: "syscheck-missing-schema-fallback.xml",
+      sourceDocument: validSystemCheckXml
+        .replace(/\s+xsi:noNamespaceSchemaLocation=(?:"[^"]*"|'[^']*')/, "")
+        .replace("<SysCheck ", '<SysCheck ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
     },
     {
       fileName: "booklet-legacy-schema-file-name.xml",
@@ -14172,6 +14245,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
     },
     {
+      fileName: "missing-schema-fallback-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: schemaLessBookletXml.replace(
+        "<Booklet ",
+        '<Booklet ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
       fileName: "duplicate-schema-id-dependency.zip",
       entryFileName: "export/booklets/Booklet_error.xml",
       entryDocument: validBookletXml.replace(
@@ -14299,6 +14381,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "/18.0.0/definitions/"
       ),
       diagnosticCode: "testcenter_xml_schema_version_unsupported"
+    },
+    {
+      label: "missing Testtakers schema fallback",
+      rosterText: validRosterXml
+        .replace(/\s+xsi:noNamespaceSchemaLocation=(?:"[^"]*"|'[^']*')/, "")
+        .replace("<Testtakers ", '<Testtakers ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
     },
     {
       label: "legacy Testtakers schema file name",
