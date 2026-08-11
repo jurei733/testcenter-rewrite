@@ -170,7 +170,7 @@ export class RewriteAppRuntimeService {
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time",
-    options?: { remainingSeconds?: number },
+    options?: { remainingSeconds?: number; targetUnitKey?: string },
     onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
   ): Promise<IssueMonitorRunCommandsResponse> {
     const result = await issueMonitorRunCommandsAction(

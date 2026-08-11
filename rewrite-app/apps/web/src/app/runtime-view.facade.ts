@@ -15,6 +15,7 @@ import {
 import type {
   GetParticipantSessionResponse,
   ImportParticipantRosterResponse,
+  IssueMonitorRunCommandsResponse,
   ListDetailedResponsesResponse,
   ListGroupResultsResponse,
   ListReviewsResponse,
@@ -86,6 +87,19 @@ type RuntimeEntryLink = {
 type MonitorBlockNavigationTarget = NonNullable<
   OpenMonitorRun["blockNavigationTargets"]
 >[number];
+
+type MonitorBatchNavigationGroup = {
+  targetUnitKey: string;
+  testRunIds: string[];
+};
+
+type MonitorBatchNavigationPlan = {
+  blockKey: string;
+  blockLabel: string;
+  groups: MonitorBatchNavigationGroup[];
+  matchedRunCount: number;
+  unmatchedRunCount: number;
+};
 
 type MonitorDisplayColumn =
   | "groupColumn"
@@ -3078,10 +3092,13 @@ export class RuntimeViewFacade {
     const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
       selectedRunIds.has(openRun.testRunId)
     );
-    const restoration = this.monitorGotoRestoration(selectedRuns);
+    const navigationPlan = this.monitorBatchNavigationPlan(selectedRuns);
+    const restoration = navigationPlan
+      ? this.monitorGotoRestoration(selectedRuns, navigationPlan.blockKey)
+      : null;
     return (
       this.canIssueMonitorBatch &&
-      Boolean(this.runtime.monitorTargetUnitKey.trim()) &&
+      Boolean(navigationPlan?.matchedRunCount) &&
       (!restoration || this.hasValidMonitorTimeSeconds)
     );
   }
@@ -4261,9 +4278,15 @@ export class RuntimeViewFacade {
     const selectedRuns = openRuns.filter(openRun =>
       testRunIds.includes(openRun.testRunId)
     );
+    const usesBlockTarget =
+      commandType === "goto" || commandType === "set_testlet_time";
+    const navigationPlan =
+      usesBlockTarget
+        ? this.monitorBatchNavigationPlan(selectedRuns)
+        : null;
     const restoration =
-      commandType === "goto"
-        ? this.monitorGotoRestoration(selectedRuns)
+      commandType === "goto" && navigationPlan
+        ? this.monitorGotoRestoration(selectedRuns, navigationPlan.blockKey)
         : null;
     const navigationTargetsByRun = new Map(
       openRuns.map(openRun => [
@@ -4280,11 +4303,15 @@ export class RuntimeViewFacade {
     if (!canIssueCommand || testRunIds.length === 0) {
       return;
     }
+    const unmatchedDescription =
+      usesBlockTarget && navigationPlan?.unmatchedRunCount
+        ? ` ${navigationPlan.unmatchedRunCount} selected run(s) without that block will remain unchanged.`
+        : "";
     const targetDescription =
       commandType === "goto"
-        ? ` to unit ${this.runtime.monitorTargetUnitKey.trim()}`
+        ? ` to block ${navigationPlan?.blockLabel ?? ""} (${navigationPlan?.blockKey ?? ""}) using ${navigationPlan?.groups.length ?? 0} matching unit target(s)${unmatchedDescription}`
         : commandType === "set_testlet_time"
-          ? ` for unit ${this.runtime.monitorTargetUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
+          ? ` for block ${navigationPlan?.blockLabel ?? ""} (${navigationPlan?.blockKey ?? ""}) using ${navigationPlan?.groups.length ?? 0} matching unit target(s) with ${this.runtime.monitorTimeSeconds} seconds${unmatchedDescription}`
           : "";
     const commandConfirmation = `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`;
     const confirmed = await this.confirmation.confirm({
@@ -4314,32 +4341,68 @@ export class RuntimeViewFacade {
     }
 
     this.viewState.onActionAsync(async () => {
-      const result = await this.runtimeService.issueMonitorRunCommands(
-        testRunIds,
-        commandType,
-        restoration
-          ? { remainingSeconds: restoration.remainingSeconds }
-          : undefined,
-        acceptedResult => {
-          if (
-            acceptedResult.succeededCount > 0 &&
-            commandType === "unlock_test"
-          ) {
-            this.runtime.monitorCommandNoticeKind = "warning";
-            this.runtime.monitorCommandNotice = this.monitorText(
-              "gm_control_unlock_success_warning"
-            );
-          } else if (
-            acceptedResult.succeededCount > 0 &&
-            commandType === "unlock_navigation"
-          ) {
-            this.runtime.monitorCommandNoticeKind = "info";
-            this.runtime.monitorCommandNotice = this.monitorText(
-              "gm_codetoenter_unlock_tooltip"
-            );
+      let result: IssueMonitorRunCommandsResponse;
+      if (usesBlockTarget && navigationPlan) {
+        const groupedResults = await Promise.all(
+          navigationPlan.groups.map(group =>
+            this.runtimeService.issueMonitorRunCommands(
+              group.testRunIds,
+              commandType,
+              {
+                targetUnitKey: group.targetUnitKey,
+                ...(restoration
+                  ? { remainingSeconds: restoration.remainingSeconds }
+                  : {})
+              }
+            )
+          )
+        );
+        result = {
+          requestedCount: groupedResults.reduce(
+            (sum, groupedResult) => sum + groupedResult.requestedCount,
+            0
+          ),
+          succeededCount: groupedResults.reduce(
+            (sum, groupedResult) => sum + groupedResult.succeededCount,
+            0
+          ),
+          failedCount: groupedResults.reduce(
+            (sum, groupedResult) => sum + groupedResult.failedCount,
+            0
+          ),
+          commands: groupedResults.flatMap(groupedResult =>
+            groupedResult.commands
+          ),
+          failures: groupedResults.flatMap(groupedResult =>
+            groupedResult.failures
+          )
+        };
+      } else {
+        result = await this.runtimeService.issueMonitorRunCommands(
+          testRunIds,
+          commandType,
+          undefined,
+          acceptedResult => {
+            if (
+              acceptedResult.succeededCount > 0 &&
+              commandType === "unlock_test"
+            ) {
+              this.runtime.monitorCommandNoticeKind = "warning";
+              this.runtime.monitorCommandNotice = this.monitorText(
+                "gm_control_unlock_success_warning"
+              );
+            } else if (
+              acceptedResult.succeededCount > 0 &&
+              commandType === "unlock_navigation"
+            ) {
+              this.runtime.monitorCommandNoticeKind = "info";
+              this.runtime.monitorCommandNotice = this.monitorText(
+                "gm_codetoenter_unlock_tooltip"
+              );
+            }
           }
-        }
-      );
+        );
+      }
       for (const command of result.commands) {
         this.monitorBatchSelection.delete(command.testRun.testRunId);
       }
@@ -5447,10 +5510,17 @@ export class RuntimeViewFacade {
   }
 
   private monitorGotoRestoration(
-    openRuns: readonly OpenMonitorRun[]
+    openRuns: readonly OpenMonitorRun[],
+    blockKey?: string
   ): { affectedCount: number; remainingSeconds: number } | null {
     const affectedCount = openRuns.filter(openRun => {
-      const timer = this.findMonitorTarget(openRun)?.timer;
+      const timer = (
+        blockKey
+          ? openRun.blockNavigationTargets?.find(
+              target => target.blockKey === blockKey
+            ) ?? null
+          : this.findMonitorTarget(openRun)
+      )?.timer;
       return Boolean(
         timer &&
           (timer.status === "expired" ||
@@ -5464,6 +5534,59 @@ export class RuntimeViewFacade {
     return {
       affectedCount,
       remainingSeconds: Number(this.runtime.monitorTimeSeconds)
+    };
+  }
+
+  private monitorBatchNavigationPlan(
+    openRuns: readonly OpenMonitorRun[]
+  ): MonitorBatchNavigationPlan | null {
+    const targetUnitKey = this.runtime.monitorTargetUnitKey.trim();
+    if (!targetUnitKey || openRuns.length === 0) {
+      return null;
+    }
+    const referenceTarget = [
+      ...this.monitorBlockNavigationTargets,
+      ...openRuns.flatMap(openRun => openRun.blockNavigationTargets ?? [])
+    ].find(
+      target =>
+        target.targetUnitKey === targetUnitKey ||
+        target.unitKeys.includes(targetUnitKey)
+    );
+    if (!referenceTarget) {
+      return null;
+    }
+
+    const groupsByTargetUnitKey = new Map<string, string[]>();
+    for (const openRun of openRuns) {
+      const target = openRun.blockNavigationTargets?.find(
+        candidate => candidate.blockKey === referenceTarget.blockKey
+      );
+      if (!target) {
+        continue;
+      }
+      const group = groupsByTargetUnitKey.get(target.targetUnitKey) ?? [];
+      group.push(openRun.testRunId);
+      groupsByTargetUnitKey.set(target.targetUnitKey, group);
+    }
+    const groups = [...groupsByTargetUnitKey].map(
+      ([groupTargetUnitKey, groupTestRunIds]) => ({
+        targetUnitKey: groupTargetUnitKey,
+        testRunIds: groupTestRunIds
+      })
+    );
+    const matchedRunCount = groups.reduce(
+      (sum, group) => sum + group.testRunIds.length,
+      0
+    );
+    if (matchedRunCount === 0) {
+      return null;
+    }
+    return {
+      blockKey: referenceTarget.blockKey,
+      blockLabel: referenceTarget.blockLabel,
+      groups,
+      matchedRunCount,
+      unmatchedRunCount: openRuns.length - matchedRunCount
     };
   }
 

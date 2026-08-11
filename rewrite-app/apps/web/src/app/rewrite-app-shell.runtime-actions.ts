@@ -357,7 +357,7 @@ export async function issueMonitorRunCommandsAction(
     | "unlock_navigation"
     | "lock_navigation"
     | "set_testlet_time",
-  options?: { remainingSeconds?: number },
+  options?: { remainingSeconds?: number; targetUnitKey?: string },
   onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
 ): Promise<IssueMonitorRunCommandsResponse> {
   const payload = await host.request<IssueMonitorRunCommandsResponse>(
@@ -370,14 +370,18 @@ export async function issueMonitorRunCommandsAction(
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
         ? {
-            targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+            targetUnitKey:
+              options?.targetUnitKey?.trim() ||
+              host.getMonitorTargetUnitKey().trim(),
             ...(options?.remainingSeconds != null
               ? { remainingSeconds: options.remainingSeconds }
               : {})
           }
         : commandType === "set_testlet_time"
           ? {
-              targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+              targetUnitKey:
+                options?.targetUnitKey?.trim() ||
+                host.getMonitorTargetUnitKey().trim(),
               remainingSeconds: Number(host.getMonitorTimeSeconds())
             }
           : {})

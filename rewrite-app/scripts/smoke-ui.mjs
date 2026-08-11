@@ -13278,12 +13278,23 @@ try {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
   );
   const monitorSpeciesRouteOperations = new Set();
+  let speciesReferenceTarget;
+  let speciesVariantTargetUnitKey;
   await page.route(monitorSpeciesRoute, route => {
     const operation = (async () => {
       const response = await route.fetch();
       const payload = await response.json();
       const template = payload.items?.[0];
       assert.ok(template, "Species highlighting needs one real scoped run.");
+      speciesReferenceTarget ??=
+        template.blockNavigationTargets?.find(target => !target.timer) ??
+        template.blockNavigationTargets?.[0];
+      assert.ok(
+        speciesReferenceTarget,
+        "Species cohort navigation needs one visible block target."
+      );
+      speciesVariantTargetUnitKey ??=
+        `${speciesReferenceTarget.targetUnitKey}-species-variant`;
       await route.fulfill({
         response,
         json: {
@@ -13303,7 +13314,17 @@ try {
               participantSessionId: `${template.participantSessionId}:species-beta-two`,
               loginKey: `${template.loginKey}-species-beta-two`,
               participantRosterEntry: null,
-              bookletSpecies: "beta"
+              bookletSpecies: "beta",
+              blockNavigationTargets: template.blockNavigationTargets.map(
+                target =>
+                  target.blockKey === speciesReferenceTarget.blockKey
+                    ? {
+                        ...target,
+                        targetUnitKey: speciesVariantTargetUnitKey,
+                        unitKeys: [speciesVariantTargetUnitKey]
+                      }
+                    : target
+              )
             },
             {
               ...template,
@@ -13367,7 +13388,69 @@ try {
     ]),
     "Species-cohort selection must replace the batch with every visible run of the chosen species."
   );
-  await page.locator("#clearMonitorBatchSelectionButton").click();
+  await selectAndCommit(
+    "#monitorTargetUnitKey",
+    speciesReferenceTarget.targetUnitKey
+  );
+  await expectButtonSelectorEnabled("#monitorBatchGotoButton");
+  const groupedGotoRequests = [];
+  const monitorBatchCommandsRoute = new RegExp(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/commands$`
+  );
+  await page.route(monitorBatchCommandsRoute, async route => {
+    const requestBody = route.request().postDataJSON();
+    groupedGotoRequests.push(requestBody);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        requestedCount: requestBody.testRunIds.length,
+        succeededCount: requestBody.testRunIds.length,
+        failedCount: 0,
+        commands: requestBody.testRunIds.map(testRunId => ({
+          testRun: {
+            testRunId,
+            currentUnitKey: requestBody.targetUnitKey
+          }
+        })),
+        failures: []
+      })
+    });
+  });
+  const acceptGroupedGoto = acceptAppConfirmation(
+    /Issue monitor command/,
+    /using 2 matching unit target\(s\)/
+  );
+  await page.locator("#monitorBatchGotoButton").click();
+  await acceptGroupedGoto;
+  await waitForNotBusy("group-monitor-species-cohort-goto");
+  assert.deepEqual(
+    groupedGotoRequests
+      .map(requestBody => ({
+        targetUnitKey: requestBody.targetUnitKey,
+        testRunIds: requestBody.testRunIds
+      }))
+      .sort((left, right) =>
+        left.targetUnitKey.localeCompare(right.targetUnitKey)
+      ),
+    [
+      {
+        targetUnitKey: speciesReferenceTarget.targetUnitKey,
+        testRunIds: [`${pausedTestRunId}:species-beta-one`]
+      },
+      {
+        targetUnitKey: speciesVariantTargetUnitKey,
+        testRunIds: [`${pausedTestRunId}:species-beta-two`]
+      }
+    ].sort((left, right) =>
+      left.targetUnitKey.localeCompare(right.targetUnitKey)
+    ),
+    "A cohort go-to must resolve the selected block to each run's own first visible unit."
+  );
+  await page.unroute(monitorBatchCommandsRoute);
+  if (await page.locator("#clearMonitorBatchSelectionButton").isEnabled()) {
+    await page.locator("#clearMonitorBatchSelectionButton").click();
+  }
   while (monitorSpeciesRouteOperations.size > 0) {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
