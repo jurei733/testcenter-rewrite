@@ -12497,6 +12497,71 @@ test("original Testcenter compatibility corpus imports representative booklets",
       encodedCase.fileName
     );
   }
+  const utf16EncodingMismatchBytes = Buffer.concat([
+    Buffer.from([0xff, 0xfe]),
+    Buffer.from(validBookletXml, "utf16le")
+  ]);
+  const utf32EncodingMismatchXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="UTF-16"'
+  );
+  const utf32EncodingMismatchBytes = Buffer.concat([
+    Buffer.from([0x00, 0x00, 0xfe, 0xff]),
+    encodeUtf32(utf32EncodingMismatchXml, "big-endian")
+  ]);
+  for (const encodingMismatchCase of [
+    {
+      fileName: "utf-16le-declared-utf-8-original-booklet.xml",
+      sourceDocument: `data:application/xml;base64,${utf16EncodingMismatchBytes.toString("base64")}`
+    },
+    {
+      fileName: "utf-32be-declared-utf-16-original-booklet.xml",
+      sourceDocument: `data:application/xml,${Array.from(
+        utf32EncodingMismatchBytes,
+        byte => `%${byte.toString(16).padStart(2, "0")}`
+      ).join("")}`
+    }
+  ]) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      encodingMismatchCase.fileName
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: encodingMismatchCase.fileName,
+        mediaType: "application/xml",
+        sourceDocument: encodingMismatchCase.sourceDocument
+      }
+    });
+    assert.equal(sourcePackage.status, 201, encodingMismatchCase.fileName);
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; message: string }>;
+      };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201, encodingMismatchCase.fileName);
+    assert.equal(
+      importResult.body.importJob.status,
+      "failed",
+      encodingMismatchCase.fileName
+    );
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === "source_document_xml_encoding_mismatch" &&
+          diagnostic.message.includes("declares XML encoding")
+      ),
+      encodingMismatchCase.fileName
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
   for (const malformedCase of [
     {
       fileName: "malformed-original-booklet.xml",
@@ -20319,6 +20384,64 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
       ]
     }
   );
+
+  const mismatchedZipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: Buffer.concat([
+        Buffer.from([0x00, 0x00, 0xfe, 0xff]),
+        encodeUtf32(
+          `<?xml version="1.0" encoding="UTF-16"?>
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <organizations default="ORG-ZIP">
+              <organization identifier="ORG-ZIP">
+                <item identifierref="RES-ZIP-BOOKLET">
+                  <title>ZIP Booklet</title>
+                  <item identifierref="RES-ZIP-UNIT">
+                    <title>ZIP Unit</title>
+                  </item>
+                </item>
+              </organization>
+            </organizations>
+            <resources>
+              <resource identifier="RES-ZIP-BOOKLET" href="booklets/zip-booklet.xml" />
+              <resource identifier="RES-ZIP-UNIT" href="items/zip-unit.xml" />
+            </resources>
+          </manifest>`,
+          "big-endian"
+        )
+      ])
+    }
+  ]);
+  const mismatchedSourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "mismatched-testcenter-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${mismatchedZipPayload}`
+    }
+  });
+  assert.equal(mismatchedSourcePackage.status, 201);
+  const mismatchedImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        mismatchedSourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(mismatchedImport.status, 201);
+  assert.equal(mismatchedImport.body.importJob.status, "failed");
+  assert.ok(
+    mismatchedImport.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.code === "source_document_xml_encoding_mismatch"
+    )
+  );
+  assert.equal(mismatchedImport.body.stagedContentRelease, null);
 });
 
 test("source document import extracts IMS manifest from deflated base64 ZIP packages", async () => {

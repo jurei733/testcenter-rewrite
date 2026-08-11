@@ -2132,6 +2132,105 @@ const decodePersistedSourceDocument = (
 const stripTextByteOrderMark = (value: string): string =>
   value.startsWith("\uFEFF") ? value.slice(1) : value;
 
+type SourceTextByteEncoding =
+  | "utf-8"
+  | "utf-16le"
+  | "utf-16be"
+  | "utf-32le"
+  | "utf-32be";
+
+type DetectedSourceTextByteEncoding = {
+  encoding: SourceTextByteEncoding;
+  byteOffset: number;
+};
+
+const detectSourceTextByteEncoding = (
+  bytes: Buffer
+): DetectedSourceTextByteEncoding | null => {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xfe &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x00
+  ) {
+    return { encoding: "utf-32le", byteOffset: 4 };
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0xfe &&
+    bytes[3] === 0xff
+  ) {
+    return { encoding: "utf-32be", byteOffset: 4 };
+  }
+  if (
+    bytes.length >= 3 &&
+    bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
+  ) {
+    return { encoding: "utf-8", byteOffset: 3 };
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return { encoding: "utf-16le", byteOffset: 2 };
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return { encoding: "utf-16be", byteOffset: 2 };
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x3c &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x00 &&
+    bytes[4] !== 0x00 &&
+    bytes[5] === 0x00 &&
+    bytes[6] === 0x00 &&
+    bytes[7] === 0x00
+  ) {
+    return { encoding: "utf-32le", byteOffset: 0 };
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x00 &&
+    bytes[2] === 0x00 &&
+    bytes[3] === 0x3c &&
+    bytes[4] === 0x00 &&
+    bytes[5] === 0x00 &&
+    bytes[6] === 0x00 &&
+    bytes[7] !== 0x00
+  ) {
+    return { encoding: "utf-32be", byteOffset: 0 };
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x3c &&
+    bytes[1] === 0x00 &&
+    bytes[2] !== 0x00 &&
+    bytes[3] === 0x00
+  ) {
+    return { encoding: "utf-16le", byteOffset: 0 };
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x3c &&
+    bytes[2] === 0x00 &&
+    bytes[3] !== 0x00
+  ) {
+    return { encoding: "utf-16be", byteOffset: 0 };
+  }
+
+  return null;
+};
+
+const readDeclaredXmlEncoding = (sourceDocument: string): string | null =>
+  sourceDocument.match(
+    /<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i
+  )?.[1] ?? null;
+
 const decodeUtf32Bytes = (
   bytes: Buffer,
   byteOrder: "little-endian" | "big-endian"
@@ -2166,93 +2265,30 @@ const decodeUtf32Bytes = (
 };
 
 const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
-  if (
-    bytes.length >= 4 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xfe &&
-    bytes[2] === 0x00 &&
-    bytes[3] === 0x00
-  ) {
-    return decodeUtf32Bytes(bytes.subarray(4), "little-endian");
-  }
-  if (
-    bytes.length >= 4 &&
-    bytes[0] === 0x00 &&
-    bytes[1] === 0x00 &&
-    bytes[2] === 0xfe &&
-    bytes[3] === 0xff
-  ) {
-    return decodeUtf32Bytes(bytes.subarray(4), "big-endian");
-  }
-  if (
-    bytes.length >= 3 &&
-    bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))
-  ) {
-    return bytes.subarray(3).toString("utf8");
-  }
-  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
-    return stripTextByteOrderMark(
-      new TextDecoder("utf-16le").decode(bytes.subarray(2))
-    );
-  }
-  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-    return stripTextByteOrderMark(
-      new TextDecoder("utf-16be").decode(bytes.subarray(2))
-    );
-  }
-
-  const startsAsUtf32LittleEndian =
-    bytes.length >= 8 &&
-    bytes[0] === 0x3c &&
-    bytes[1] === 0x00 &&
-    bytes[2] === 0x00 &&
-    bytes[3] === 0x00 &&
-    bytes[4] !== 0x00 &&
-    bytes[5] === 0x00 &&
-    bytes[6] === 0x00 &&
-    bytes[7] === 0x00;
-  if (startsAsUtf32LittleEndian) {
-    return decodeUtf32Bytes(bytes, "little-endian");
-  }
-  const startsAsUtf32BigEndian =
-    bytes.length >= 8 &&
-    bytes[0] === 0x00 &&
-    bytes[1] === 0x00 &&
-    bytes[2] === 0x00 &&
-    bytes[3] === 0x3c &&
-    bytes[4] === 0x00 &&
-    bytes[5] === 0x00 &&
-    bytes[6] === 0x00 &&
-    bytes[7] !== 0x00;
-  if (startsAsUtf32BigEndian) {
-    return decodeUtf32Bytes(bytes, "big-endian");
-  }
-
-  const startsAsUtf16LittleEndian =
-    bytes.length >= 4 &&
-    bytes[0] === 0x3c &&
-    bytes[1] === 0x00 &&
-    bytes[2] !== 0x00 &&
-    bytes[3] === 0x00;
-  if (startsAsUtf16LittleEndian) {
-    return stripTextByteOrderMark(new TextDecoder("utf-16le").decode(bytes));
-  }
-  const startsAsUtf16BigEndian =
-    bytes.length >= 4 &&
-    bytes[0] === 0x00 &&
-    bytes[1] === 0x3c &&
-    bytes[2] === 0x00 &&
-    bytes[3] !== 0x00;
-  if (startsAsUtf16BigEndian) {
-    return stripTextByteOrderMark(new TextDecoder("utf-16be").decode(bytes));
+  const detectedEncoding = detectSourceTextByteEncoding(bytes);
+  if (detectedEncoding) {
+    const encodedBytes = bytes.subarray(detectedEncoding.byteOffset);
+    switch (detectedEncoding.encoding) {
+      case "utf-8":
+        return encodedBytes.toString("utf8");
+      case "utf-16le":
+        return stripTextByteOrderMark(
+          new TextDecoder("utf-16le").decode(encodedBytes)
+        );
+      case "utf-16be":
+        return stripTextByteOrderMark(
+          new TextDecoder("utf-16be").decode(encodedBytes)
+        );
+      case "utf-32le":
+        return decodeUtf32Bytes(encodedBytes, "little-endian");
+      case "utf-32be":
+        return decodeUtf32Bytes(encodedBytes, "big-endian");
+    }
   }
 
   const declaredEncoding =
-    bytes
-      .subarray(0, 1024)
-      .toString("latin1")
-      .match(/<\?xml\b[^>]*\bencoding\s*=\s*["']\s*([^"'\s]+)\s*["']/i)
-      ?.[1] ?? mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
+    readDeclaredXmlEncoding(bytes.subarray(0, 1024).toString("latin1")) ??
+    mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
   const normalizedEncoding = declaredEncoding
     ?.toLowerCase()
     .replace(/_/g, "-");
@@ -6787,6 +6823,62 @@ const createImportDiagnostic = (
   code,
   message
 });
+
+const normalizeXmlEncodingName = (value: string): string =>
+  value.toLowerCase().replace(/_/g, "-");
+
+const isXmlEncodingCompatibleWithDetectedBytes = (
+  declaredEncoding: string,
+  detectedEncoding: SourceTextByteEncoding
+): boolean => {
+  const normalizedDeclaredEncoding = normalizeXmlEncodingName(declaredEncoding);
+  switch (detectedEncoding) {
+    case "utf-8":
+      return ["utf-8", "utf8"].includes(normalizedDeclaredEncoding);
+    case "utf-16le":
+      return ["utf-16", "utf16", "utf-16le", "utf16le"].includes(
+        normalizedDeclaredEncoding
+      );
+    case "utf-16be":
+      return ["utf-16", "utf16", "utf-16be", "utf16be"].includes(
+        normalizedDeclaredEncoding
+      );
+    case "utf-32le":
+      return ["utf-32", "utf32", "utf-32le", "utf32le"].includes(
+        normalizedDeclaredEncoding
+      );
+    case "utf-32be":
+      return ["utf-32", "utf32", "utf-32be", "utf32be"].includes(
+        normalizedDeclaredEncoding
+      );
+  }
+};
+
+const validateXmlEncodingDeclaration = (
+  bytes: Buffer,
+  decodedSourceDocument: string,
+  sourceFileName: string
+): ImportJobDiagnostic[] => {
+  const detectedEncoding = detectSourceTextByteEncoding(bytes)?.encoding;
+  const declaredEncoding = readDeclaredXmlEncoding(decodedSourceDocument);
+  if (
+    !detectedEncoding ||
+    !declaredEncoding ||
+    isXmlEncodingCompatibleWithDetectedBytes(
+      declaredEncoding,
+      detectedEncoding
+    )
+  ) {
+    return [];
+  }
+
+  return [
+    createImportDiagnostic(
+      "source_document_xml_encoding_mismatch",
+      `Source package '${sourceFileName}' declares XML encoding '${declaredEncoding}', but its byte order mark or leading XML byte signature identifies '${detectedEncoding.toUpperCase()}'.`
+    )
+  ];
+};
 
 const hasStructuredContent = (
   contentStructure: SourcePackageContentStructure | null | undefined
@@ -15867,11 +15959,15 @@ const validateZipXmlEntries = (
       continue;
     }
 
-    const sourceDocument = readZipEntryText(
+    const sourceBytes = readZipEntryBuffer(
       manifestExtraction.zipBuffer,
-      entry
+      entry,
+      MAX_EXTRACTED_RESOURCE_BYTES
     );
-    if (sourceDocument === null) {
+    const sourceDocument = sourceBytes
+      ? decodeSourceTextBytes(sourceBytes)
+      : null;
+    if (!sourceBytes || sourceDocument === null) {
       diagnostics.push(
         createImportDiagnostic(
           "source_document_zip_xml_unreadable",
@@ -15881,6 +15977,11 @@ const validateZipXmlEntries = (
       continue;
     }
     diagnostics.push(
+      ...validateXmlEncodingDeclaration(
+        sourceBytes,
+        sourceDocument,
+        entry.fileName
+      ),
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
@@ -16397,9 +16498,13 @@ const deriveRuntimeSnapshotFromSourceDocument = (
   const normalizedFileName = sourcePackage.fileName.toLowerCase();
   const looksLikeZipPackage =
     normalizedMediaType.includes("zip") || normalizedFileName.endsWith(".zip");
+  const decodedPersistedDocument = looksLikeZipPackage
+    ? null
+    : decodePersistedSourceDocument(sourcePackage);
   const decodedSourceDocument = looksLikeZipPackage
     ? sourcePackage.sourceDocument
-    : readPersistedSourceText(sourcePackage) ?? sourcePackage.sourceDocument;
+    : readPersistedSourceText(sourcePackage, decodedPersistedDocument) ??
+      sourcePackage.sourceDocument;
   const sourceDocumentText = decodedSourceDocument.trimStart();
   const looksLikeJsonDocument =
     sourceDocumentText.startsWith("{") || sourceDocumentText.startsWith("[");
@@ -16437,10 +16542,19 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     normalizedFileName.endsWith(".manifest") ||
     looksLikeXmlDocument
   ) {
-    const diagnostics = validateTestcenterXmlSourceDocument(
-      decodedSourceDocument,
-      sourcePackage.fileName
-    );
+    const diagnostics = [
+      ...(decodedPersistedDocument
+        ? validateXmlEncodingDeclaration(
+            decodedPersistedDocument.bytes,
+            decodedSourceDocument,
+            sourcePackage.fileName
+          )
+        : []),
+      ...validateTestcenterXmlSourceDocument(
+        decodedSourceDocument,
+        sourcePackage.fileName
+      )
+    ];
     if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
       return { runtimeSnapshot: null, diagnostics };
     }
