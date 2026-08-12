@@ -676,7 +676,7 @@ export type WorkspaceReviewPort = {
 export type ParticipantRuntimePort = {
   signIn(input: {
     tenantKey?: string | null;
-    workspaceKey: string;
+    workspaceKey?: string;
     loginKey: string;
     groupKey?: string;
     password?: string;
@@ -5418,6 +5418,54 @@ const resolveUniqueWorkspaceByWorkspaceKey = async (
   }
 
   return workspaces[0] ?? null;
+};
+
+const resolveUniqueWorkspaceByParticipantLoginKey = async (
+  repository: FirstSliceRepository,
+  loginKey: string,
+  tenantKey: string | null
+): Promise<Workspace> => {
+  const tenants = tenantKey
+    ? [await repository.getTenantByKey(tenantKey)].filter(
+        (tenant): tenant is Tenant => tenant !== null
+      )
+    : await repository.listTenants();
+  const workspaces = (
+    await Promise.all(
+      tenants.map(tenant => repository.listWorkspacesByTenantId(tenant.tenantId))
+    )
+  ).flat();
+  const matchingWorkspaces: Workspace[] = [];
+  for (const workspace of workspaces) {
+    const matches = (
+      await repository.listParticipantRosterEntriesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      )
+    ).some(entry => entry.loginKey === loginKey);
+    if (matches) {
+      matchingWorkspaces.push(workspace);
+    }
+  }
+
+  if (matchingWorkspaces.length !== 1) {
+    throw new FirstSliceError(
+      matchingWorkspaces.length === 0 ? 401 : 409,
+      matchingWorkspaces.length === 0
+        ? "participant_login_invalid"
+        : "participant_login_ambiguous",
+      matchingWorkspaces.length === 0
+        ? "Participant login is invalid."
+        : `Participant login '${loginKey}' exists in multiple workspaces. Use the complete participant entry link.`,
+      matchingWorkspaces.length === 0
+        ? undefined
+        : {
+            matchingWorkspaceCount: matchingWorkspaces.length
+          }
+    );
+  }
+
+  return matchingWorkspaces[0]!;
 };
 
 const findParticipantRosterEntryByLoginKey = async (
@@ -29281,19 +29329,31 @@ export const createFirstSliceServices = (
     participantRuntime: {
       async signIn(input) {
         const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
-        const workspaceKey = normalizeParticipantWorkspaceKey(input.workspaceKey);
+        const requestedWorkspaceKey = String(input.workspaceKey ?? "").trim();
         const loginKey = normalizeParticipantLoginKey(input.loginKey);
-        const workspace = tenantKey
-          ? await repository.getWorkspaceByScope(tenantKey, workspaceKey)
-          : await resolveUniqueWorkspaceByWorkspaceKey(repository, workspaceKey);
+        const workspace = requestedWorkspaceKey
+          ? tenantKey
+            ? await repository.getWorkspaceByScope(
+                tenantKey,
+                normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
+              )
+            : await resolveUniqueWorkspaceByWorkspaceKey(
+                repository,
+                normalizeParticipantWorkspaceKey(requestedWorkspaceKey)
+              )
+          : await resolveUniqueWorkspaceByParticipantLoginKey(
+              repository,
+              loginKey,
+              tenantKey
+            );
 
         if (!workspace) {
           throw new FirstSliceError(
             404,
             "workspace_not_found",
             tenantKey
-              ? `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
-              : `Workspace '${workspaceKey}' was not found.`
+              ? `Workspace '${requestedWorkspaceKey}' was not found in tenant '${tenantKey}'.`
+              : `Workspace '${requestedWorkspaceKey}' was not found.`
           );
         }
 
@@ -29307,7 +29367,7 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "workspace_has_no_active_content_release",
-            `Workspace '${input.workspaceKey}' has no active content release.`
+            `Workspace '${workspace.workspaceKey}' has no active content release.`
           );
         }
 

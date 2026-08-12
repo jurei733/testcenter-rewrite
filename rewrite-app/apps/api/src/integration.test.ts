@@ -34552,6 +34552,62 @@ test("participant sign-in requires tenant key for ambiguous workspace keys", asy
     body: { workspaceKey, displayName: "Shared B" }
   });
 
+  for (const tenantKey of [firstTenantKey, secondTenantKey]) {
+    const roster = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      {
+        method: "POST",
+        body: {
+          rosterText: [
+            {
+              loginKey: "ambiguous-short-link-student",
+              groupKey: "group:ambiguous-short-link"
+            },
+            ...(tenantKey === firstTenantKey
+              ? [
+                  {
+                    loginKey: "unique-short-link-student",
+                    groupKey: "group:unique-short-link"
+                  }
+                ]
+              : [])
+          ]
+        }
+      }
+    );
+    assert.equal(roster.status, 201);
+  }
+
+  const ambiguousShortLinkSignIn = await requestJson<{
+    error: string;
+    details: { matchingWorkspaceCount: number };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { loginKey: "ambiguous-short-link-student" }
+  });
+  assert.equal(ambiguousShortLinkSignIn.status, 409);
+  assert.equal(
+    ambiguousShortLinkSignIn.body.error,
+    "participant_login_ambiguous"
+  );
+  assert.equal(
+    ambiguousShortLinkSignIn.body.details.matchingWorkspaceCount,
+    2
+  );
+
+  const uniqueShortLinkSignIn = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: { loginKey: "unique-short-link-student" }
+    }
+  );
+  assert.equal(uniqueShortLinkSignIn.status, 409);
+  assert.equal(
+    uniqueShortLinkSignIn.body.error,
+    "workspace_has_no_active_content_release"
+  );
+
   const ambiguousSignIn = await requestJson<{
     error: string;
     details: {

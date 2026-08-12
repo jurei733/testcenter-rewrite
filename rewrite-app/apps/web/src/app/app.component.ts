@@ -156,6 +156,20 @@ export class AppComponent implements OnInit, OnDestroy {
     window.addEventListener("online", this.onlineListener);
     window.addEventListener("offline", this.offlineListener);
     void this.applicationSettings.load().catch(() => undefined);
+    const legacyParticipantLogin = this.getLegacyParticipantLoginFromHash();
+    if (legacyParticipantLogin) {
+      this.app.init("participant");
+      await this.router.navigate(["/participant"], {
+        queryParams: {
+          tenantKey: "",
+          workspaceKey: "",
+          loginKey: legacyParticipantLogin,
+          legacyShortLink: "true"
+        },
+        replaceUrl: true
+      });
+      return;
+    }
     const initialView = this.getInitialViewFromLocation();
     const isApplicationRoot = this.router.url === "/" || this.router.url === "";
     this.app.init(initialView ?? (isApplicationRoot ? "home" : null));
@@ -327,5 +341,19 @@ export class AppComponent implements OnInit, OnDestroy {
       .split("/")
       .at(0);
     return routeViews.find(view => view === routeSegment) ?? null;
+  }
+
+  private getLegacyParticipantLoginFromHash(): string | null {
+    const match = /^#\/([^/?#]+)\/?$/.exec(window.location.hash);
+    if (!match?.[1]) {
+      return null;
+    }
+
+    try {
+      const loginKey = decodeURIComponent(match[1]).trim();
+      return loginKey && !loginKey.includes("/") ? loginKey : null;
+    } catch {
+      return null;
+    }
   }
 }

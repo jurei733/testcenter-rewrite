@@ -5860,6 +5860,7 @@ try {
 
   logStep("participant-entry-sign-in");
   const participantEntrySignInLoginKey = "student-entry-sign-in";
+  const legacyShortLinkLoginKey = "student-legacy-short-link";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
   const participantEntrySignInDisplayName = "Student Entry Sign In";
   await sendSmokeJson(
@@ -5872,11 +5873,67 @@ try {
             participantEntrySignInLoginKey,
             participantEntrySignInGroupKey,
             participantEntrySignInDisplayName
+          ].join(","),
+          [
+            legacyShortLinkLoginKey,
+            "group:legacy-short-link",
+            "Student Legacy Short Link"
           ].join(",")
         ].join("\n")
       }
     }
   );
+  logStep("participant-entry-legacy-short-link");
+  const legacyShortLinkContext = await browser.newContext();
+  await legacyShortLinkContext.addInitScript(
+    ({ staleTenantKey, staleWorkspaceKey }) => {
+      window.localStorage.setItem(
+        "testcenter-rewrite-app-shell",
+        JSON.stringify({
+          tenantKey: staleTenantKey,
+          workspaceKey: staleWorkspaceKey,
+          loginKey: "stale-login",
+          groupKey: "group:stale",
+          bookletKey: "booklet:stale",
+          participantSessionId: "stale-session",
+          testRunId: "stale-run"
+        })
+      );
+    },
+    {
+      staleTenantKey: ambiguousParticipantTenantA,
+      staleWorkspaceKey: ambiguousParticipantWorkspaceKey
+    }
+  );
+  const legacyShortLinkPage = await legacyShortLinkContext.newPage();
+  await legacyShortLinkPage.goto(
+    `${baseUrl}/#/${encodeURIComponent(legacyShortLinkLoginKey)}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await legacyShortLinkPage.waitForURL(url =>
+    url.pathname.endsWith("/participant") &&
+    Boolean(url.searchParams.get("participantSessionId")) &&
+    url.searchParams.get("legacyShortLink") == null &&
+    url.searchParams.get("loginKey") == null &&
+    url.hash === ""
+  );
+  await legacyShortLinkPage.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "signed_in" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        "no run yet" &&
+      document.querySelector("#participantRouteEntry") != null,
+    undefined,
+    { timeout: 15_000 }
+  );
+  await legacyShortLinkPage
+    .locator("#participantEntryDisplayName")
+    .filter({ hasText: "Student Legacy Short Link" })
+    .waitFor();
+  await legacyShortLinkContext.close();
+  stopAfter("participant-entry-legacy-short-link");
+
   await page.goto(`${baseUrl}/participant`, { waitUntil: "domcontentloaded" });
   await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", tenantKey);

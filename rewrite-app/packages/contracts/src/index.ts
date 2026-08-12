@@ -522,7 +522,7 @@ export type AdminAuditEventListQuery = {
 
 export type ParticipantSignInRequest = {
   tenantKey?: string;
-  workspaceKey: string;
+  workspaceKey?: string;
   loginKey: string;
   groupKey?: string;
   password?: string;
