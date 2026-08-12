@@ -238,7 +238,7 @@
   </ng-container>
 
   <ng-template #operatorShell>
-    <section class="hero" [class.is-home-hero]="isHomeView">
+    <section class="hero" [class.is-home-hero]="isFocusedEntryView">
       <div class="hero-panel">
         <div class="application-brand operator-brand">
           <img
@@ -255,7 +255,7 @@
         <section
           id="localDemoStartupCard"
           class="local-demo-startup"
-          *ngIf="app.localDemoBootstrapEnabled && !app.isMonitorOnlySession"
+          *ngIf="isHomeView && app.localDemoBootstrapEnabled && !app.isMonitorOnlySession"
         >
           <div>
             <span class="eyebrow">Local Demo Startup</span>
@@ -292,7 +292,7 @@
           </div>
         </section>
       </div>
-      <div class="hero-panel status-grid" *ngIf="!isHomeView">
+      <div class="hero-panel status-grid" *ngIf="!isFocusedEntryView">
         <div class="status-pill">
           <strong>Storage</strong>
           <span>{{ app.ops.storageKind }}</span>
@@ -428,7 +428,7 @@
       >Sign out</button>
     </nav>
 
-    <main class="home-stage" *ngIf="isHomeView; else operationalWorkspace">
+    <main class="home-stage" *ngIf="isFocusedEntryView; else operationalWorkspace">
       <router-outlet></router-outlet>
     </main>
 

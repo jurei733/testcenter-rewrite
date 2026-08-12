@@ -141,7 +141,12 @@ export class RewriteAppViewStateService {
   }
 
   onActionAsync(action: () => Promise<unknown>): void {
-    void action()
+    void this.runActionAsync(action);
+  }
+
+  runActionAsync(action: () => Promise<unknown>): Promise<void> {
+    return action()
+      .then(() => undefined)
       .catch(() => undefined)
       .finally(() => {
         this.uiState.renderVersion.update(version => version + 1);

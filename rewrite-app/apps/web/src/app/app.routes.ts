@@ -2,6 +2,7 @@ import type { Routes } from "@angular/router";
 
 import {
   rejectSystemCheckOperator,
+  requireAuthenticatedOperator,
   requireAdministrativeOperator
 } from "./rewrite-app-admin-route.guard";
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
@@ -35,7 +36,7 @@ export const appRoutes: Routes = [
       import("./runtime-view.component").then(
         module => module.RuntimeViewComponent
       ),
-    canActivate: [rejectSystemCheckOperator]
+    canActivate: [requireAuthenticatedOperator]
   },
   {
     path: "participant",
@@ -58,7 +59,7 @@ export const appRoutes: Routes = [
       import("./attachment-capture.component").then(
         module => module.AttachmentCaptureComponent
       ),
-    canActivate: [rejectSystemCheckOperator]
+    canActivate: [requireAuthenticatedOperator]
   },
   {
     path: "legal-notice",

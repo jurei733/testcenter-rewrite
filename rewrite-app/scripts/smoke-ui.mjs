@@ -945,31 +945,36 @@ try {
   logStep("nav-ops");
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
-  await page
-    .locator("article.card")
-    .filter({
-      has: page.getByRole("heading", { name: "Ops Action Queue" })
-    })
-    .waitFor();
+  await page.locator("#operatorAccessCard.is-signed-out").waitFor();
+  assert.equal(
+    await page.getByRole("heading", { name: "Ops Action Queue", exact: true }).count(),
+    0
+  );
   logStep("admin-bootstrap-sign-in");
+  await page.locator("#firstDeploymentSetup").evaluate(details => {
+    details.open = true;
+  });
   await fillAndCommit("#adminUsername", adminUsername);
   await fillAndCommit("#adminDisplayName", "UI Smoke Admin");
   await fillAndCommit("#adminPassword", "");
-  await fillAndCommit("#adminSessionToken", "");
   await expectButtonSelectorDisabled("#adminBootstrapOrSignInButton");
   await expectButtonSelectorDisabled("#adminBootstrapButton");
   await expectButtonSelectorDisabled("#adminSignInButton");
-  await expectButtonSelectorDisabled("#adminCurrentSessionButton");
-  await expectButtonSelectorDisabled("#adminSessionsButton");
-  await expectButtonSelectorDisabled("#adminUsersButton");
-  await expectButtonSelectorDisabled("#adminAuditEventsButton");
-  await expectButtonSelectorDisabled("#adminSignOutButton");
-  await expectButtonSelectorDisabled("#applyAdminSessionFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminSessionsCsvButton");
-  await expectButtonSelectorDisabled("#applyAdminUserFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminUsersCsvButton");
-  await expectButtonSelectorDisabled("#applyAdminAuditFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminAuditCsvButton");
+  for (const protectedSelector of [
+    "#adminCurrentSessionButton",
+    "#adminSessionsButton",
+    "#adminUsersButton",
+    "#adminAuditEventsButton",
+    "#adminSignOutButton",
+    "#applyAdminSessionFiltersButton",
+    "#exportAdminSessionsCsvButton",
+    "#applyAdminUserFiltersButton",
+    "#exportAdminUsersCsvButton",
+    "#applyAdminAuditFiltersButton",
+    "#exportAdminAuditCsvButton"
+  ]) {
+    assert.equal(await page.locator(protectedSelector).count(), 0);
+  }
   await fillAndCommit("#adminPassword", adminPassword);
   await expectButtonSelectorEnabled("#adminBootstrapOrSignInButton");
   await expectButtonSelectorEnabled("#adminBootstrapButton");
@@ -987,6 +992,12 @@ try {
   await expectButtonSelectorEnabled("#exportAdminUsersCsvButton");
   await expectButtonSelectorEnabled("#applyAdminAuditFiltersButton");
   await expectButtonSelectorEnabled("#exportAdminAuditCsvButton");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Ops Action Queue" })
+    })
+    .waitFor();
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
   const adminCurrentSessionResponse = await fetch(
     `${baseUrl}/api/v1/admin/auth/current-session`,
@@ -1651,17 +1662,18 @@ try {
   logStep("admin-sign-out");
   await clickAction("Sign Out");
   await expectInputValue("#adminSessionToken", "");
-  await expectButtonSelectorDisabled("#adminCurrentSessionButton");
-  await expectButtonSelectorDisabled("#adminSessionsButton");
-  await expectButtonSelectorDisabled("#adminUsersButton");
-  await expectButtonSelectorDisabled("#adminAuditEventsButton");
-  await expectButtonSelectorDisabled("#adminSignOutButton");
-  await expectButtonSelectorDisabled("#applyAdminSessionFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminSessionsCsvButton");
-  await expectButtonSelectorDisabled("#applyAdminUserFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminUsersCsvButton");
-  await expectButtonSelectorDisabled("#applyAdminAuditFiltersButton");
-  await expectButtonSelectorDisabled("#exportAdminAuditCsvButton");
+  for (const signedOutSelector of [
+    "#adminCurrentSessionButton",
+    "#adminSessionsButton",
+    "#adminUsersButton",
+    "#adminAuditEventsButton",
+    "#adminSignOutButton"
+  ]) {
+    assert.equal(await page.locator(signedOutSelector).count(), 0);
+  }
+  assert.equal(await page.locator("#applyAdminSessionFiltersButton").count(), 0);
+  assert.equal(await page.locator("#applyAdminUserFiltersButton").count(), 0);
+  assert.equal(await page.locator("#applyAdminAuditFiltersButton").count(), 0);
   smokeAdminSessionToken = "";
   logStep("admin-sign-in");
   await fillAndCommit("#adminPassword", adminPassword);

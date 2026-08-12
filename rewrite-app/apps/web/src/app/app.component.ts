@@ -79,9 +79,20 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.app.activeView === "home";
   }
 
+  get isSignedOutOpsView(): boolean {
+    return this.app.activeView === "ops" && !this.app.hasAdminSession;
+  }
+
+  get isFocusedEntryView(): boolean {
+    return this.isHomeView || this.isSignedOutOpsView;
+  }
+
   get operatorHeroEyebrow(): string {
     if (this.isHomeView) {
       return "Assessment delivery";
+    }
+    if (this.isSignedOutOpsView) {
+      return "Operator access";
     }
     if (this.app.isMonitorOnlySession || this.app.isReadOnlyAdminSession) {
       return this.app.operatorAccessLabel;
@@ -92,6 +103,9 @@ export class AppComponent implements OnInit, OnDestroy {
   get operatorHeroTitle(): string {
     if (this.isHomeView) {
       return "Run, Monitor, And Manage Assessments.";
+    }
+    if (this.isSignedOutOpsView) {
+      return "Sign In To Continue.";
     }
     if (this.app.isMonitorOnlySession) {
       return "Monitor The Active Test Session.";
@@ -105,6 +119,9 @@ export class AppComponent implements OnInit, OnDestroy {
   get operatorHeroDetail(): string {
     if (this.isHomeView) {
       return "Choose a participant, system-check, or protected operator entry point. The application keeps each workflow focused while sharing one production runtime.";
+    }
+    if (this.isSignedOutOpsView) {
+      return "Administrative and monitoring tools stay private until an authorized operator session has been established.";
     }
     if (this.app.isMonitorOnlySession) {
       return "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls.";
@@ -206,6 +223,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.requiredAdminPasswordConfirmation = "";
       this.requiredAdminPasswordError = "";
       this.changeDetector.detectChanges();
+      await this.router.navigateByUrl("/ops", { replaceUrl: true });
     }
   }
 
@@ -216,6 +234,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.ownAdminPasswordDialogOpen = false;
       this.clearOwnAdminPasswordDialog();
       this.changeDetector.detectChanges();
+      await this.router.navigateByUrl("/ops", { replaceUrl: true });
     }
   }
 

@@ -243,22 +243,57 @@ try {
     `The public application start must stay focused; got ${mobileStartDimensions.bodyHeight}px.`
   );
   await page.setViewportSize({ width: 1280, height: 720 });
-  await demoAdminLink.click();
-  await page.waitForURL(/\/app\/ops$/);
+  const protectedRouteUnauthorizedResponses = [];
+  const trackProtectedRouteUnauthorizedResponse = response => {
+    if (response.status() === 401) {
+      protectedRouteUnauthorizedResponses.push(response.url());
+    }
+  };
+  page.on("response", trackProtectedRouteUnauthorizedResponse);
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  await page.waitForURL(url =>
+    url.pathname === "/app/ops" && url.searchParams.get("returnUrl") === "/workspace"
+  );
+  page.off("response", trackProtectedRouteUnauthorizedResponse);
+  assert.deepEqual(
+    protectedRouteUnauthorizedResponses,
+    [],
+    "A protected direct link must reach operator sign-in without probing protected APIs."
+  );
   await page.locator('[data-view-nav="ops"].is-active').waitFor({
     timeout: 15_000
   });
-  await page.waitForFunction(
-    () => {
-      const token = document.querySelector("#adminSessionToken")?.value ?? "";
-      return token.trim().length > 0;
-    },
-    undefined,
-    { timeout: 15_000 }
+  await page.locator("#operatorAccessCard.is-signed-out").waitFor();
+  assert.equal(
+    await page.getByRole("heading", { name: "Diagnostics", exact: true }).count(),
+    0,
+    "Signed-out operator access must not expose the diagnostic console."
   );
-  assert.equal(await page.locator("#adminUsername").inputValue(), "demo-admin");
-
-  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  assert.equal(
+    await page.getByRole("heading", { name: "Ops Action Queue", exact: true }).count(),
+    0,
+    "Signed-out operator access must not render operational data cards."
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileOperatorDimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    bodyHeight: document.body.scrollHeight
+  }));
+  assert.equal(
+    mobileOperatorDimensions.scrollWidth,
+    mobileOperatorDimensions.clientWidth,
+    "Operator sign-in must not overflow the mobile viewport."
+  );
+  assert.ok(
+    mobileOperatorDimensions.bodyHeight < 3_000,
+    `Operator sign-in must stay focused; got ${mobileOperatorDimensions.bodyHeight}px.`
+  );
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.locator("#adminUsername").fill("demo-admin");
+  await page.locator("#adminPassword").fill("demo-admin-password");
+  await page.locator("#adminSignInButton").click();
+  await page.waitForURL(/\/app\/workspace$/);
   await page.locator('[data-view-nav="workspace"].is-active').waitFor({
     timeout: 15_000
   });
@@ -892,6 +927,36 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+
+  const activeGlobalSessionToken = await page.evaluate(() => {
+    const snapshot = JSON.parse(
+      window.localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}"
+    );
+    return typeof snapshot.adminSessionToken === "string"
+      ? snapshot.adminSessionToken
+      : "";
+  });
+  assert.ok(activeGlobalSessionToken.length > 20);
+  const globalSignOutResponsePromise = page.waitForResponse(response =>
+    response.url().endsWith("/api/v1/admin/auth/sign-out")
+  );
+  await page.locator("#globalAdminSignOutButton").click();
+  assert.equal((await globalSignOutResponsePromise).status(), 200);
+  await page.waitForURL(/\/app\/ops$/);
+  await page.locator("#operatorAccessCard.is-signed-out").waitFor();
+  assert.equal(
+    await page.getByRole("heading", { name: "Ops Action Queue", exact: true }).count(),
+    0
+  );
+  const signedOutSessionResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/current-session`,
+    {
+      headers: {
+        authorization: `Bearer ${activeGlobalSessionToken}`
+      }
+    }
+  );
+  assert.equal(signedOutSessionResponse.status, 401);
 
   const staleParticipantSessionId = "00000000-0000-4000-8000-000000000000";
   await page.evaluate(staleSessionId => {

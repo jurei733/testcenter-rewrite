@@ -301,9 +301,7 @@ export class OpsViewFacade {
   }
 
   get canUseAdminManagement(): boolean {
-    return (
-      this.operatorAccess.mode === "signed_out" || this.operatorAccess.mode === "admin"
-    );
+    return this.operatorAccess.mode === "admin";
   }
 
   get canBootstrapAdmin(): boolean {
@@ -1141,12 +1139,12 @@ export class OpsViewFacade {
       : `${Math.max(1, Math.ceil(byteLength / 1024))} KiB`;
   }
 
-  bootstrapOrSignInAdmin(): void {
+  bootstrapOrSignInAdmin(): Promise<void> {
     if (!this.canUseAdminCredentials) {
-      return;
+      return Promise.resolve();
     }
     this.clearAdminBatches();
-    this.viewState.onActionAsync(async () => {
+    return this.viewState.runActionAsync(async () => {
       await this.opsService.bootstrapOrSignInAdmin();
       await this.loadApplicationAssetsIfAllowed();
     });
@@ -1159,12 +1157,12 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.bootstrapAdmin());
   }
 
-  signInAdmin(): void {
+  signInAdmin(): Promise<void> {
     if (!this.canUseAdminCredentials) {
-      return;
+      return Promise.resolve();
     }
     this.clearAdminBatches();
-    this.viewState.onActionAsync(async () => {
+    return this.viewState.runActionAsync(async () => {
       await this.opsService.signInAdmin();
       await this.loadApplicationAssetsIfAllowed();
     });
@@ -1791,9 +1789,9 @@ export class OpsViewFacade {
     this.persistState();
   }
 
-  signInLocalDemoAdmin(): void {
+  signInLocalDemoAdmin(): Promise<void> {
     this.clearAdminBatches();
-    this.viewState.onActionAsync(async () => {
+    return this.viewState.runActionAsync(async () => {
       this.ops.adminUsername = localDemoAccess.adminUsername;
       this.ops.adminDisplayName = localDemoAccess.adminDisplayName;
       this.ops.adminPassword = localDemoAccess.adminPassword;

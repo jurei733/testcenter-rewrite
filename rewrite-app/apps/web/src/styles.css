@@ -626,6 +626,60 @@ textarea {
   font-weight: 700;
 }
 
+.operator-access-card.is-signed-out {
+  width: min(100%, 760px);
+  margin-inline: auto;
+  padding: clamp(24px, 4vw, 42px);
+}
+
+.operator-sign-in-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.operator-sign-in-form > label {
+  min-width: 0;
+}
+
+.operator-sign-in-form > button {
+  min-height: 46px;
+}
+
+.operator-bootstrap-details,
+.technical-session-details {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.operator-bootstrap-details > summary,
+.technical-session-details > summary {
+  color: var(--secondary);
+  cursor: pointer;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 800;
+}
+
+.operator-bootstrap-details > label,
+.technical-session-details > label {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.operator-session-fields {
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .operator-sign-in-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .participant-unit-navigation-label {
   display: inline-flex;
   align-items: center;
