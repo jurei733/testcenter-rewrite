@@ -314,6 +314,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.ownAdminPasswordError = "";
   }
 
+  trackOperatorAccountAccess(
+    _index: number,
+    access: { role: string; scope: string }
+  ): string {
+    return `${access.role}\u0000${access.scope}`;
+  }
+
   private getInitialViewFromLocation(): AppView | null {
     const routeSegment = window.location.pathname
       .replace(/^\/app\/?/, "")

@@ -31,6 +31,8 @@ export type OperatorAccountAccessItem = {
 @Injectable({ providedIn: "root" })
 export class RewriteAppOperatorAccessService {
   private readonly uiState = inject(RewriteAppUiStateService);
+  private accountAccessSource = "";
+  private accountAccessCache: OperatorAccountAccessItem[] = [];
 
   private get session(): OperatorSessionView | null {
     return parseJsonDocument<OperatorSessionView>(
@@ -59,10 +61,16 @@ export class RewriteAppOperatorAccessService {
   }
 
   get accountAccessItems(): OperatorAccountAccessItem[] {
-    return this.roleAssignments.map(assignment => ({
+    const source = this.uiState.ops.adminSessionView;
+    if (source === this.accountAccessSource) {
+      return this.accountAccessCache;
+    }
+    this.accountAccessSource = source;
+    this.accountAccessCache = this.roleAssignments.map(assignment => ({
       role: this.formatRole(assignment),
       scope: this.formatScope(assignment)
     }));
+    return this.accountAccessCache;
   }
 
   get mode(): OperatorAccessMode | "signed_out" {

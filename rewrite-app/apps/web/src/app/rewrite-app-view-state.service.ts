@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, Injector, inject } from "@angular/core";
+import { Injectable, Injector, inject } from "@angular/core";
 
 import type { MonitorEventStreamService } from "./monitor-event-stream.service";
 import { RewriteAppShellLifecycleService } from "./rewrite-app-shell-lifecycle.service";
@@ -8,7 +8,6 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 @Injectable({ providedIn: "root" })
 export class RewriteAppViewStateService {
   private readonly uiState = inject(RewriteAppUiStateService);
-  private readonly applicationRef = inject(ApplicationRef);
   private readonly injector = inject(Injector);
   private readonly lifecycle = inject(RewriteAppShellLifecycleService);
   private monitorEvents: MonitorEventStreamService | null = null;
@@ -150,7 +149,6 @@ export class RewriteAppViewStateService {
       .catch(() => undefined)
       .finally(() => {
         this.uiState.renderVersion.update(version => version + 1);
-        this.applicationRef.tick();
       });
   }
 

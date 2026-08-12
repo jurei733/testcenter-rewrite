@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
@@ -208,7 +208,6 @@ const monitorBookletErrorTextKeys: Readonly<
 
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
-  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
   private readonly router = inject(Router);
@@ -4117,7 +4116,6 @@ export class RuntimeViewFacade {
     this.runtime.entryRosterText = rosterText;
     this.persistState();
     this.uiState.renderVersion.update(version => version + 1);
-    this.applicationRef.tick();
     this.feedback.rememberActivity(
       "Participant Roster Loaded",
       `${file.name} loaded as CSV/TSV/XML/JSON roster text with ${rosterText.length} character(s).`
@@ -5293,7 +5291,6 @@ export class RuntimeViewFacade {
 
   private renderNow(): void {
     this.uiState.renderVersion.update(version => version + 1);
-    this.applicationRef.tick();
   }
 
   private parseEntryRosterRows(): RuntimeEntryLink[] {

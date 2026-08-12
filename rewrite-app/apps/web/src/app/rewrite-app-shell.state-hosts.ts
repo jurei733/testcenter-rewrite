@@ -1,4 +1,4 @@
-import type { ApplicationRef, WritableSignal } from "@angular/core";
+import type { WritableSignal } from "@angular/core";
 
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import type { ShellLifecycleHost } from "./rewrite-app-shell.lifecycle";
@@ -906,7 +906,6 @@ export function createShellRequestStateHost(args: {
   responseMeta: WritableSignal<string>;
   lastResponse: WritableSignal<string>;
   renderVersion: WritableSignal<number>;
-  applicationRef: ApplicationRef;
 }): ShellRequestStateHost {
   return {
     get foregroundRequestDepth() {
@@ -920,7 +919,6 @@ export function createShellRequestStateHost(args: {
     lastApiError: args.lastApiError,
     responseMeta: args.responseMeta,
     lastResponse: args.lastResponse,
-    renderVersion: args.renderVersion,
-    applicationRef: args.applicationRef
+    renderVersion: args.renderVersion
   };
 }

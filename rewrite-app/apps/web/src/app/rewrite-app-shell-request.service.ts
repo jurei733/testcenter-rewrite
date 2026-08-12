@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 
 import {
   RewriteAppApiService,
@@ -19,7 +19,6 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 export class RewriteAppShellRequestService {
   private readonly api = inject(RewriteAppApiService);
   private readonly uiState = inject(RewriteAppUiStateService);
-  private readonly applicationRef = inject(ApplicationRef);
 
   requestJson<T = Record<string, unknown>>(
     label: string,
@@ -143,8 +142,7 @@ export class RewriteAppShellRequestService {
       lastApiError: this.uiState.lastApiError,
       responseMeta: this.uiState.responseMeta,
       lastResponse: this.uiState.lastResponse,
-      renderVersion: this.uiState.renderVersion,
-      applicationRef: this.applicationRef
+      renderVersion: this.uiState.renderVersion
     });
   }
 

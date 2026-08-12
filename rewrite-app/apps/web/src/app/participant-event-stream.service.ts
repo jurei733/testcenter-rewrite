@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject, signal } from "@angular/core";
+import { Injectable, inject, signal } from "@angular/core";
 
 import {
   parseParticipantEventStreamEvent,
@@ -28,7 +28,6 @@ export interface ParticipantEventStreamConnectionState {
 
 @Injectable({ providedIn: "root" })
 export class ParticipantEventStreamService {
-  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private abortController: AbortController | null = null;
   private connectHandle: number | null = null;
@@ -253,7 +252,6 @@ export class ParticipantEventStreamService {
       .finally(() => {
         this.refreshRunning = false;
         this.uiState.renderVersion.update(version => version + 1);
-        this.applicationRef.tick();
         if (this.refreshPending) {
           this.refreshPending = false;
           this.queueRefresh();

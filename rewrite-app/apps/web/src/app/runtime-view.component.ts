@@ -86,7 +86,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               [ngModel]="view.activeMonitorProfileId"
               (ngModelChange)="view.selectMonitorProfile($event)"
             >
-              <option *ngFor="let profile of view.monitorProfiles" [value]="profile.profileId">
+              <option *ngFor="let profile of view.monitorProfiles; trackBy: trackMonitorProfile" [value]="profile.profileId">
                 {{ profile.label || profile.profileId }}
               </option>
             </select>
@@ -99,7 +99,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             {{ view.monitorText("gm_col_blockLabel") }}
             <select id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()">
               <option value="">Choose a block</option>
-              <option *ngFor="let target of view.monitorBlockNavigationTargets" [value]="target.targetUnitKey">
+              <option *ngFor="let target of view.monitorBlockNavigationTargets; trackBy: trackMonitorTarget" [value]="target.targetUnitKey">
                 {{ target.blockLabel }} ({{ target.blockKey }}){{ view.monitorTargetTimerText(target) ? " · " + view.monitorTargetTimerText(target) : "" }}
               </option>
             </select>
@@ -123,7 +123,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <div class="actions">
             <button id="monitorPendingFilterButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorStatusFilterActive('pending')" (click)="view.toggleMonitorStatusFilter('pending')">{{ view.monitorText("gm_filter_pending") }}</button>
             <button id="monitorLockedFilterButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorStatusFilterActive('locked')" (click)="view.toggleMonitorStatusFilter('locked')">{{ view.monitorText("gm_filter_locked") }}</button>
-            <button *ngFor="let filter of view.monitorProfileFilterOptions" class="ghost monitor-profile-filter" type="button" [attr.data-filter-index]="filter.index" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorProfileFilter(filter.index)">{{ filter.label }}</button>
+            <button *ngFor="let filter of view.monitorProfileFilterOptions; trackBy: trackMonitorProfileFilter" class="ghost monitor-profile-filter" type="button" [attr.data-filter-index]="filter.index" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorProfileFilter(filter.index)">{{ filter.label }}</button>
             <button id="monitorResetRuntimeFiltersButton" class="ghost" type="button" (click)="view.resetMonitorRuntimeFilters()">Reset to Profile</button>
           </div>
           <details id="monitorCustomFilterEditor" open>
@@ -133,13 +133,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <label>
                 Feld
                 <select id="monitorCustomFilterTarget" name="monitorCustomFilterTarget" [ngModel]="view.monitorCustomFilterTarget" (ngModelChange)="view.setMonitorCustomFilterTarget($event)">
-                  <option *ngFor="let option of view.monitorCustomFilterTargetOptions" [value]="option.value">{{ option.label }}</option>
+                  <option *ngFor="let option of view.monitorCustomFilterTargetOptions; trackBy: trackMonitorOption" [value]="option.value">{{ option.label }}</option>
                 </select>
               </label>
               <label>
                 Filtertyp
                 <select id="monitorCustomFilterType" name="monitorCustomFilterType" [(ngModel)]="view.monitorCustomFilterType" [disabled]="view.monitorCustomFilterTarget === 'state'">
-                  <option *ngFor="let option of view.monitorCustomFilterTypeOptions" [value]="option.value">{{ option.label }}</option>
+                  <option *ngFor="let option of view.monitorCustomFilterTypeOptions; trackBy: trackMonitorOption" [value]="option.value">{{ option.label }}</option>
                 </select>
               </label>
               <label>
@@ -164,7 +164,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button *ngIf="view.monitorCustomFilterEditingId" id="monitorCancelCustomFilterEditButton" class="ghost" type="button" (click)="view.cancelMonitorCustomFilterEdit()">Bearbeiten abbrechen</button>
             </div>
             <div id="monitorCustomFilterList" class="actions" *ngIf="view.monitorCustomFilterOptions.length > 0">
-              <ng-container *ngFor="let filter of view.monitorCustomFilterOptions">
+              <ng-container *ngFor="let filter of view.monitorCustomFilterOptions; trackBy: trackMonitorCustomFilter">
                 <button class="ghost monitor-custom-filter" type="button" [attr.data-custom-filter-id]="filter.customFilterId" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorCustomFilter(filter.customFilterId)">{{ filter.label }}</button>
                 <button class="ghost monitor-custom-filter-edit" type="button" [attr.data-custom-filter-id]="filter.customFilterId" (click)="view.editMonitorCustomFilter(filter.customFilterId)">Bearbeiten</button>
                 <button class="ghost monitor-custom-filter-remove" type="button" [attr.data-custom-filter-id]="filter.customFilterId" (click)="view.removeMonitorCustomFilter(filter.customFilterId)">Entfernen</button>
@@ -183,7 +183,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <label>
               Sort field
               <select id="monitorSortKey" name="monitorSortKey" [ngModel]="view.monitorSortKey" (ngModelChange)="view.selectMonitorSortKey($event)">
-                <option *ngFor="let option of view.monitorSortOptions" [value]="option.key">{{ option.label }}</option>
+                <option *ngFor="let option of view.monitorSortOptions; trackBy: trackMonitorSortOption" [value]="option.key">{{ option.label }}</option>
               </select>
             </label>
             <button id="monitorSortDirectionButton" class="ghost" type="button" [attr.aria-label]="view.monitorSortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'" [attr.data-direction]="view.monitorSortDirection" (click)="view.toggleMonitorSortDirection()">{{ view.monitorSortDirection === 'asc' ? 'Ascending' : 'Descending' }}</button>
@@ -1029,5 +1029,32 @@ export class RuntimeViewComponent implements OnInit {
 
   ngOnInit(): void {
     this.view.init();
+  }
+
+  trackMonitorProfile(_index: number, profile: { profileId: string }): string {
+    return profile.profileId;
+  }
+
+  trackMonitorTarget(_index: number, target: { targetUnitKey: string }): string {
+    return target.targetUnitKey;
+  }
+
+  trackMonitorProfileFilter(_index: number, filter: { index: number }): number {
+    return filter.index;
+  }
+
+  trackMonitorOption(_index: number, option: { value: string }): string {
+    return option.value;
+  }
+
+  trackMonitorCustomFilter(
+    _index: number,
+    filter: { customFilterId: string }
+  ): string {
+    return filter.customFilterId;
+  }
+
+  trackMonitorSortOption(_index: number, option: { key: string }): string {
+    return option.key;
   }
 }

@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import type {
@@ -45,7 +45,6 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
 @Injectable({ providedIn: "root" })
 export class ContentViewFacade {
-  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly contentService = inject(RewriteAppContentService);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
@@ -274,7 +273,6 @@ export class ContentViewFacade {
     this.content.sourceDocument = sourceDocument;
     this.persistState();
     this.uiState.renderVersion.update(version => version + 1);
-    this.applicationRef.tick();
     this.feedback.rememberActivity(
       "Source Document Loaded",
       `${file.name} loaded with ${sourceDocument.length} character(s) as ${this.content.sourceMediaType}.`
@@ -2810,7 +2808,6 @@ export class ContentViewFacade {
       this.assemblyFileName = `${report.uploaded[0]!.sourcePackage.fileName.replace(/\.[^.]+$/, "")}-bundle.zip`;
     }
     this.uiState.renderVersion.update(version => version + 1);
-    this.applicationRef.tick();
   }
 
   private inferMediaTypeFromFile(file: File): string {

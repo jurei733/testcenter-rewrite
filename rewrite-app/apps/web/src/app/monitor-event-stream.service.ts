@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 
 import {
   parseMonitorEventStreamEvent,
@@ -13,7 +13,6 @@ type MonitorRefresh = () => Promise<void>;
 
 @Injectable({ providedIn: "root" })
 export class MonitorEventStreamService {
-  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private abortController: AbortController | null = null;
   private reconnectHandle: number | null = null;
@@ -223,7 +222,6 @@ export class MonitorEventStreamService {
       .finally(() => {
         this.refreshRunning = false;
         this.uiState.renderVersion.update(version => version + 1);
-        this.applicationRef.tick();
         if (this.refreshPending) {
           this.refreshPending = false;
           this.queueRefresh();

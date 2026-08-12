@@ -11098,7 +11098,7 @@ try {
       loginKey: originalSampleLoginKey,
       bookletKey: originalSampleBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -11166,7 +11166,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalSampleParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const resumedOriginalSampleFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
@@ -14943,6 +14943,8 @@ try {
   const groupMonitorSignInResponse = await groupMonitorSignInResponsePromise;
   assert.equal(groupMonitorSignInResponse.status(), 200);
   const groupMonitorSignIn = await groupMonitorSignInResponse.json();
+  const groupMonitorSessionToken = groupMonitorSignIn.sessionToken;
+  assert.ok(groupMonitorSessionToken);
   assert.equal(groupMonitorSignIn.adminUser.validForMinutes, 45);
   assert.ok(groupMonitorSignIn.adminUser.firstSignedInAt);
   assert.equal(groupMonitorSignIn.adminUser.customTexts.gm_headline, "UI Scoped Monitor");
@@ -15089,8 +15091,32 @@ try {
   );
   await fillAndCommit("#monitorTenantKey", tenantKey);
   await fillAndCommit("#monitorWorkspaceKey", workspaceKey);
+  const monitorOpenRunsRoute = new RegExp(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
+  );
+  const applyMonitorScopeAndWaitForOpenRuns = async step => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const responsePromise = page
+        .waitForResponse(
+          response =>
+            response.request().method() === "GET" &&
+            monitorOpenRunsRoute.test(response.url()),
+          { timeout: 5_000 }
+        )
+        .catch(() => null);
+      await page.locator("#monitorApplyScopeButton").click();
+      const response = await responsePromise;
+      if (response) {
+        assert.equal(response.status(), 200);
+        await waitForNotBusy(step);
+        return;
+      }
+      await waitForNotBusy(`${step}-retry-${attempt + 1}`);
+    }
+    throw new Error(`${step} did not request the scoped monitor runs.`);
+  };
   await clickAction("Clear Open Run Filters");
-  await page.locator("#monitorApplyScopeButton").click();
+  await applyMonitorScopeAndWaitForOpenRuns("group-monitor-initial-scope");
   const scopedOpenRuns = page
     .locator("app-record-collection")
     .filter({ has: page.getByRole("heading", { name: "UI Open Monitor Tests" }) });
@@ -15453,7 +15479,25 @@ try {
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.locked === true
   );
+  await applyMonitorScopeAndWaitForOpenRuns(
+    "group-monitor-runtime-locked-filter-refresh"
+  );
+  await scopedOpenRuns
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: "test locked" })
+    .waitFor();
+  assert.equal(
+    await page.locator("#monitorLockedFilterButton").getAttribute("aria-pressed"),
+    "false",
+    "The runtime locked filter must start inactive."
+  );
   await page.locator("#monitorLockedFilterButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#monitorLockedFilterButton")
+        ?.getAttribute("aria-pressed") === "true"
+  );
   await scopedOpenRuns.getByText("No open runs are currently loaded.").waitFor();
   assert.equal(
     await page.locator("#monitorLockedFilterButton").getAttribute("aria-pressed"),
@@ -15934,14 +15978,27 @@ try {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
   await page.unroute(monitorSpeciesRoute);
-  await page.locator("#monitorApplyScopeButton").click();
-  await waitForNotBusy("group-monitor-species-highlighting-restore");
+  await applyMonitorScopeAndWaitForOpenRuns(
+    "group-monitor-species-highlighting-restore"
+  );
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   stopAfter("group-monitor-auto-next-block");
 
   logStep("group-monitor-booklet-error-copy");
-  const monitorOpenRunsRoute = new RegExp(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
+  const monitorBookletErrorTemplateResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?limit=100`,
+    {
+      headers: { authorization: `Bearer ${groupMonitorSessionToken}` }
+    }
+  );
+  assert.equal(monitorBookletErrorTemplateResponse.status, 200);
+  const monitorBookletErrorTemplatePayload =
+    await monitorBookletErrorTemplateResponse.json();
+  const monitorBookletErrorTemplate =
+    monitorBookletErrorTemplatePayload.items?.[0];
+  assert.ok(
+    monitorBookletErrorTemplate,
+    "Booklet-error presentation needs one real scoped run."
   );
   const monitorBookletErrors = [
     ["missing-id", "UI No Booklet Assigned"],
@@ -15949,24 +16006,20 @@ try {
     ["xml", "UI Broken Booklet XML"],
     ["general", "UI Booklet Access Error"]
   ];
-  let monitorBookletErrorTemplate;
   const monitorBookletErrorRouteOperations = new Set();
   await page.route(monitorOpenRunsRoute, route => {
     const operation = (async () => {
       const response = await route.fetch();
       const payload = await response.json();
-      const template = payload.items?.[0] ?? monitorBookletErrorTemplate;
-      assert.ok(template, "Booklet-error presentation needs one real scoped run.");
-      monitorBookletErrorTemplate = template;
       await route.fulfill({
         response,
         json: {
           ...payload,
           items: monitorBookletErrors.map(([bookletError], index) => ({
-            ...template,
-            testRunId: `${template.testRunId}:booklet-error:${bookletError}`,
-            participantSessionId: `${template.participantSessionId}:booklet-error:${index}`,
-            loginKey: `${template.loginKey}-${bookletError}`,
+            ...monitorBookletErrorTemplate,
+            testRunId: `${monitorBookletErrorTemplate.testRunId}:booklet-error:${bookletError}`,
+            participantSessionId: `${monitorBookletErrorTemplate.participantSessionId}:booklet-error:${index}`,
+            loginKey: `${monitorBookletErrorTemplate.loginKey}-${bookletError}`,
             bookletKey:
               bookletError === "missing-id" ? "" : `broken-${bookletError}`,
             bookletLabel: null,
@@ -15986,8 +16039,7 @@ try {
     return operation;
   });
   await selectAndCommit("#monitorProfile", "booklet-errors");
-  await page.locator("#monitorApplyScopeButton").click();
-  await waitForNotBusy("group-monitor-booklet-error-copy");
+  await applyMonitorScopeAndWaitForOpenRuns("group-monitor-booklet-error-copy");
   for (const [, expectedCopy] of monitorBookletErrors) {
     await scopedOpenRuns.getByText(expectedCopy, { exact: true }).waitFor();
   }
@@ -16009,8 +16061,9 @@ try {
   await page.unroute(monitorOpenRunsRoute);
   await selectAndCommit("#monitorProfile", "all");
   await clickAction("Clear Open Run Filters");
-  await page.locator("#monitorApplyScopeButton").click();
-  await waitForNotBusy("group-monitor-booklet-error-copy-restore");
+  await applyMonitorScopeAndWaitForOpenRuns(
+    "group-monitor-booklet-error-copy-restore"
+  );
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   stopAfter("group-monitor-booklet-error-copy");
 
@@ -17655,12 +17708,23 @@ try {
           )
       )
   );
+  const failedSourcePackageDetailResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "GET" &&
+      response.url().endsWith(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${failedSourcePackageId}`
+      )
+  );
+  await clickAction("Source Package Detail");
+  const failedSourcePackageDetailResponse =
+    await failedSourcePackageDetailResponsePromise;
+  assert.equal(failedSourcePackageDetailResponse.status(), 200);
   await expectButtonSelectorEnabled("#retrySourcePackageImportButton");
 
-  await fillAndCommit("#sourceFileName", "fixed.xml");
-  await fillAndCommit("#sourceMediaType", "application/xml");
+  await fillAndCommitUntilValue("#sourceFileName", "fixed.xml");
+  await fillAndCommitUntilValue("#sourceMediaType", "application/xml");
   await expectInputValue("#sourceMediaType", "application/xml");
-  await fillAndCommit("#sourceDocument", repairedImportSourceDocument);
+  await fillAndCommitUntilValue("#sourceDocument", repairedImportSourceDocument);
   logStep("retry-failed-import");
   await clickAction("Retry Failed Import");
   const retriedSourcePackagePayload = await pollJsonWithPredicate(
@@ -17843,55 +17907,35 @@ try {
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   logStep("refresh-monitor-command-target");
-  let monitorCommandLoginKey = participantLoginKey;
-  const firstMonitorCommandLaunchResponse = await fetch(
-    `${baseUrl}/api/v1/participant/starter:launch`,
+  const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
+  const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+      body: {
+        rosterText: [
+          "loginKey,groupKey,bookletKey,displayName",
+          [
+            monitorCommandLoginKey,
+            monitorCommandGroupKey,
+            participantBookletKey,
+            monitorCommandLoginKey
+          ].join(",")
+        ].join("\n")
+      }
+    }
+  );
+  const refreshedMonitorTarget = await (
+    await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
+      body: {
         tenantKey,
         workspaceKey,
         loginKey: monitorCommandLoginKey,
-        groupKey: participantGroupKey,
+        groupKey: monitorCommandGroupKey,
         bookletKey: participantBookletKey
-      })
-    }
-  );
-  let refreshedMonitorTarget;
-  if (firstMonitorCommandLaunchResponse.ok) {
-    refreshedMonitorTarget = await firstMonitorCommandLaunchResponse.json();
-  } else {
-    assert.equal(firstMonitorCommandLaunchResponse.status, 409);
-    monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
-    await sendSmokeJson(
-      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
-      {
-        body: {
-          rosterText: [
-            "loginKey,groupKey,bookletKey,displayName",
-            [
-              monitorCommandLoginKey,
-              participantGroupKey,
-              participantBookletKey,
-              monitorCommandLoginKey
-            ].join(",")
-          ].join("\n")
-        }
       }
-    );
-    refreshedMonitorTarget = await (
-      await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
-        body: {
-          tenantKey,
-          workspaceKey,
-          loginKey: monitorCommandLoginKey,
-          groupKey: participantGroupKey,
-          bookletKey: participantBookletKey
-        }
-      })
-    ).json();
-  }
+    })
+  ).json();
   participantSessionId = refreshedMonitorTarget.participantSession.participantSessionId;
   pausedTestRunId = refreshedMonitorTarget.testRun.testRunId;
   await sendSmokeJson(
@@ -17985,14 +18029,14 @@ try {
           item.activityEvent.details?.locked === true &&
           item.activityEvent.details?.participantSessionId === participantSessionId &&
           item.activityEvent.details?.loginKey === monitorCommandLoginKey &&
-          item.activityEvent.details?.groupKey === participantGroupKey &&
+          item.activityEvent.details?.groupKey === monitorCommandGroupKey &&
           item.activityEvent.details?.bookletKey === participantBookletKey
       )
   );
   logStep("force-activate-after-complete");
   await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);
-  await fillAndCommit("#contentReleaseId", retriedContentReleaseId);
+  await fillAndCommitUntilValue("#contentReleaseId", retriedContentReleaseId);
   await page.locator("#forceActivation").check({ force: true });
   await page.locator("#forceActivation").dispatchEvent("change");
   const forceActivationDialog = acceptAppConfirmation(
@@ -18015,6 +18059,18 @@ try {
           item?.contentRelease?.status === "active"
       )
   );
+  await fillAndCommitUntilValue("#contentReleaseId", retriedContentReleaseId);
+  const activatedReleaseReadinessResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "GET" &&
+      response.url().endsWith(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${retriedContentReleaseId}/activation-readiness`
+      )
+  );
+  await clickAction("Release Readiness");
+  const activatedReleaseReadinessResponse =
+    await activatedReleaseReadinessResponsePromise;
+  assert.equal(activatedReleaseReadinessResponse.status(), 200);
   await page
     .locator("#activityFeed")
     .filter({ hasText: "Release Activated" })
@@ -18273,7 +18329,9 @@ try {
     .locator(".attachment-row")
     .filter({ hasText: "participant-photo" })
     .click();
-  await refreshedAttachmentManager.getByRole("button", { name: "Preview" }).click();
+  await refreshedAttachmentManager
+    .getByRole("button", { name: "Preview" })
+    .click({ force: true });
   await refreshedAttachmentManager.locator("#attachmentPreview").waitFor();
   await refreshedAttachmentManager.getByRole("button", { name: "Delete" }).click();
   await refreshedAttachmentManager

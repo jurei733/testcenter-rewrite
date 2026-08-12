@@ -1,4 +1,4 @@
-import type { ApplicationRef, WritableSignal } from "@angular/core";
+import type { WritableSignal } from "@angular/core";
 
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
@@ -11,7 +11,6 @@ export interface ShellRequestStateHost {
   readonly responseMeta: WritableSignal<string>;
   readonly lastResponse: WritableSignal<string>;
   readonly renderVersion: WritableSignal<number>;
-  readonly applicationRef: ApplicationRef;
 }
 
 export function beginForegroundShellRequest(
@@ -57,5 +56,4 @@ export function finishForegroundShellRequest(
 
 export function flushShellRender(host: ShellRequestStateHost): void {
   host.renderVersion.update(version => version + 1);
-  host.applicationRef.tick();
 }
