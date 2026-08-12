@@ -342,7 +342,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
       this.status = this.manager.describeError(error);
     } finally {
       this.busy = false;
-      this.changeDetectorRef.markForCheck();
+      this.changeDetectorRef.detectChanges();
     }
   }
 
