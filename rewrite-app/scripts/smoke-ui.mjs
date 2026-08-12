@@ -2024,7 +2024,7 @@ try {
     ))
       .replace(
         '    <Q id="1"',
-        '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n\n    <Q id="1"'
+        '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n    <CustomText key="login_pagesNaviPrompt">UI system-check pages:</CustomText>\n\n    <Q id="1"'
       )
       .replace(
         '<Q id="1" type="header" prompt="Beispielüberschrift"/>',
@@ -2033,7 +2033,16 @@ try {
     const systemCheckUnitDocument = (await readFile(
       resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
       "utf8"
-    )).replace("<Id>UNIT.SAMPLE-2</Id>", "<Id>UNIT.SAMPLE</Id>");
+    ))
+      .replace("<Id>UNIT.SAMPLE-2</Id>", "<Id>UNIT.SAMPLE</Id>")
+      .replace(
+        "<![CDATA[\n    <div",
+        "<![CDATA[\n    <fieldset><legend>System-check task</legend>\n    <div"
+      )
+      .replace(
+        "    </div>\n  ]]></Definition>",
+        "    </div>\n    </fieldset>\n  ]]></Definition>"
+      );
     for (const dependency of [
       {
         fileName: "SystemCheckUnit.xml",
@@ -2190,6 +2199,10 @@ try {
     await page
       .locator("#participantVeronaPlayerStatus")
       .filter({ hasText: "running" })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator("#participantVeronaPageNavigationPrompt")
+      .filter({ hasText: "UI system-check pages:" })
       .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
@@ -7288,6 +7301,7 @@ try {
             displayName: "Verona Smoke Participant",
             customTexts: {
               booklet_loading: "Please wait for the project player.",
+              booklet_console_warning: "Project console warning",
               booklet_loadingBlock: "Project block is loading",
               booklet_unitLoadingPending: "Project player is queued.",
               booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
@@ -7299,6 +7313,7 @@ try {
               booklet_msgTimerCancelled: "Project timer was cancelled.",
               login_unsupportedBrowserBanner:
                 "Project browser %s %s needs an update.",
+              login_pagesNaviPrompt: "Project pages:",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
               booklet_codeToEnterWarning: "Letters are normalized automatically.",
@@ -7385,6 +7400,16 @@ try {
       lazyBookletPreloadCompleted = true;
       return response;
     });
+  const veronaConsoleWarnings = [];
+  const recordVeronaConsoleWarning = message => {
+    if (
+      message.type() === "warning" &&
+      message.text().includes("Project console warning")
+    ) {
+      veronaConsoleWarnings.push(message.text());
+    }
+  };
+  page.on("console", recordVeronaConsoleWarning);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -7618,6 +7643,16 @@ try {
     .locator("#participantVeronaPageLabel")
     .filter({ hasText: "Introduction" })
     .waitFor();
+  await page
+    .locator("#participantVeronaPageNavigationPrompt")
+    .filter({ hasText: "Project pages:" })
+    .waitFor();
+  assert.deepEqual(
+    veronaConsoleWarnings,
+    ["Project console warning"],
+    "The effective console warning should be emitted once when the run starts."
+  );
+  page.off("console", recordVeronaConsoleWarning);
   page.off("pageerror", recordMalformedVeronaMessageError);
   assert.deepEqual(
     malformedVeronaMessageErrors,

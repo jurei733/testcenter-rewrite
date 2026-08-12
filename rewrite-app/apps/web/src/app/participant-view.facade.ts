@@ -31,6 +31,7 @@ import {
   hasMeaningfulVeronaResponse,
   isBookletPlayerEndAllowed,
   mergeParticipantCustomTextScopes,
+  originalParticipantCustomTextDefaults,
   parseVeronaUnitResponse,
   projectTestcenterLoadEnvironment,
   productionApiRoutes,
@@ -350,6 +351,7 @@ export class ParticipantViewFacade {
   private copiedSessionEntryLink = "";
   private fullscreenPromptDismissedRunId = "";
   private fullscreenStatusRunId = "";
+  private consoleWarningRunId = "";
   private timerTickerHandle: number | null = null;
   private timerExpiryRefreshPending = false;
   private activeTimerWarning: {
@@ -1724,6 +1726,19 @@ export class ParticipantViewFacade {
       this.participantBookletCustomTexts
     );
     this.browserCompatibility.setCustomTexts(this.participantCustomTexts);
+  }
+
+  private presentParticipantConsoleWarning(): void {
+    const testRunId = this.runtime.testRunId.trim();
+    if (!testRunId || this.consoleWarningRunId === testRunId) {
+      return;
+    }
+    const warning = this.customText(
+      "booklet_console_warning",
+      originalParticipantCustomTextDefaults.booklet_console_warning
+    );
+    this.consoleWarningRunId = testRunId;
+    globalThis.console.warn(warning);
   }
 
   get canSignIn(): boolean {
@@ -3916,6 +3931,9 @@ export class ParticipantViewFacade {
       booklet => booklet.bookletKey === this.runtime.bookletKey.trim()
     );
     this.setParticipantBookletCustomTexts(activeBooklet?.customTexts ?? {});
+    if (activeBooklet) {
+      this.presentParticipantConsoleWarning();
+    }
   }
 
   formatBookletVariant(booklet: ParticipantRuntimeBooklet): string {

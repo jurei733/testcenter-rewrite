@@ -133,48 +133,52 @@ type RetiredVeronaFrame = {
           ← Back
         </button>
         <ng-container *ngIf="showPageNavigation">
-        <button
-          *ngIf="!pageNavigationControlsHidden"
-          id="participantVeronaPreviousPageButton"
-          type="button"
-          class="ghost"
-          aria-label="Previous page"
-          [disabled]="currentPageIndex <= 0"
-          (click)="goToRelativePage(-1)"
-        >
-          ←
-        </button>
-        <div
-          *ngIf="showPageNavigationLabel"
-          class="verona-player-page-label"
-          id="participantVeronaPageLabel"
-          aria-live="polite"
-        >
-          <span *ngIf="pageNavigationLabelMode !== 'list'">{{ pageNavigationLabel }}</span>
           <span
-            *ngIf="pageNavigationLabelMode === 'list'"
-            class="verona-player-page-list"
-            aria-label="Available pages"
+            id="participantVeronaPageNavigationPrompt"
+            class="verona-player-page-navigation-prompt"
+          >{{ pageNavigationPrompt }}</span>
+          <button
+            *ngIf="!pageNavigationControlsHidden"
+            id="participantVeronaPreviousPageButton"
+            type="button"
+            class="ghost"
+            aria-label="Previous page"
+            [disabled]="currentPageIndex <= 0"
+            (click)="goToRelativePage(-1)"
           >
+            ←
+          </button>
+          <div
+            *ngIf="showPageNavigationLabel"
+            class="verona-player-page-label"
+            id="participantVeronaPageLabel"
+            aria-live="polite"
+          >
+            <span *ngIf="pageNavigationLabelMode !== 'list'">{{ pageNavigationLabel }}</span>
             <span
-              *ngFor="let page of pages; let pageIndex = index"
-              [class.is-current]="pageIndex === currentPageIndex"
-              [attr.aria-current]="pageIndex === currentPageIndex ? 'page' : null"
-              [attr.title]="page.label"
-            >{{ pageIndex + 1 }}</span>
-          </span>
-        </div>
-        <button
-          *ngIf="!pageNavigationControlsHidden"
-          id="participantVeronaNextPageButton"
-          type="button"
-          class="ghost"
-          aria-label="Next page"
-          [disabled]="currentPageIndex < 0 || currentPageIndex >= pages.length - 1"
-          (click)="goToRelativePage(1)"
-        >
-          →
-        </button>
+              *ngIf="pageNavigationLabelMode === 'list'"
+              class="verona-player-page-list"
+              aria-label="Available pages"
+            >
+              <span
+                *ngFor="let page of pages; let pageIndex = index"
+                [class.is-current]="pageIndex === currentPageIndex"
+                [attr.aria-current]="pageIndex === currentPageIndex ? 'page' : null"
+                [attr.title]="page.label"
+              >{{ pageIndex + 1 }}</span>
+            </span>
+          </div>
+          <button
+            *ngIf="!pageNavigationControlsHidden"
+            id="participantVeronaNextPageButton"
+            type="button"
+            class="ghost"
+            aria-label="Next page"
+            [disabled]="currentPageIndex < 0 || currentPageIndex >= pages.length - 1"
+            (click)="goToRelativePage(1)"
+          >
+            →
+          </button>
         </ng-container>
         <button
           *ngIf="showGlobalForwardButton"
@@ -259,6 +263,7 @@ export class VeronaPlayerHostComponent
   @Input() pageNavigationLabelMode: "hidden" | "index" | "label" | "list" =
     "index";
   @Input() pageNavigationControlsHidden = false;
+  @Input() pageNavigationPrompt = "Weitere Seiten:";
   @Input() globalBackwardButtonMode:
     | "hidden"
     | "dynamic"

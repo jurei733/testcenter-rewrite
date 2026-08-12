@@ -224,6 +224,7 @@ type ThroughputResult = {
             [unitDefinitionType]="check.unit!.unitDefinitionType || ''"
             [canComplete]="true"
             [savedResponse]="unitResponse"
+            [pageNavigationPrompt]="customText('login_pagesNaviPrompt', 'Weitere Seiten:')"
             (responseChange)="onUnitResponse($event)"
           ></app-verona-player-host>
           <ng-template #unresolvedUnit>

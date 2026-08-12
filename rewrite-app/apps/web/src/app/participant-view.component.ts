@@ -569,6 +569,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
               [pageNavigationLabelMode]="verona.pageNavigationLabelMode"
               [pageNavigationControlsHidden]="verona.pageNavigationControlsHidden"
+              [pageNavigationPrompt]="view.customText('login_pagesNaviPrompt', 'Weitere Seiten:')"
               [globalBackwardButtonMode]="verona.globalBackwardButtonMode"
               [globalForwardButtonMode]="verona.globalForwardButtonMode"
               [saveStatus]="view.veronaSaveStatus"
