@@ -672,6 +672,18 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const waitForRouteTarget = async selector => {
+    const target = page.locator(selector);
+    const mounted = await target
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!mounted) {
+      await page.reload({ waitUntil: "domcontentloaded" });
+    }
+    await target.waitFor({ state: "visible", timeout: 30_000 });
+    return target;
+  };
   const waitForOptionalDownload = () =>
     page.waitForEvent("download", { timeout: 5_000 }).catch(() => null);
   const expectButtonSelectorEnabled = async selector => {
@@ -13140,7 +13152,7 @@ try {
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
-  await page.locator("#loginKey").waitFor();
+  await waitForRouteTarget("#loginKey");
   await page
     .locator(".action-groups")
     .filter({ hasText: "Participant Setup" })
@@ -13456,6 +13468,7 @@ try {
     .getByRole("button", { name: "Prepare Monitor Account" })
     .click();
   await page.waitForURL(/\/app\/ops$/);
+  await waitForRouteTarget("#adminCreateUsername");
   await expectInputValue("#adminCreateUsername", groupMonitorUsername);
   assert.equal(
     (await page.locator("#adminCreateRole option:checked").textContent())?.trim(),
