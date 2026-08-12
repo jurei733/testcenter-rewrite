@@ -1142,6 +1142,20 @@ try {
   );
   await page.locator("#applicationSettingsCard").waitFor();
   await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
+  const configuredLogoBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  await page.locator("#applicationAssetInput").setInputFiles({
+    name: "ui-login-illustration.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(configuredLogoBase64, "base64")
+  });
+  await page
+    .locator(".application-asset-card")
+    .filter({ hasText: "ui-login-illustration.png" })
+    .waitFor();
+  await page
+    .locator("#applicationAssetSlot-loginIllustration")
+    .selectOption("ui-login-illustration.png");
   await page.locator("#applicationCustomTextsEditor summary").click();
   await fillAndCommit(
     "#applicationCustomText-login_subtitle",
@@ -1156,8 +1170,6 @@ try {
     "UI Global Hidden Sessions"
   );
   await page.locator("#applicationThemeSelect").selectOption({ label: "Sekundar" });
-  const configuredLogoBase64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const configuredLogo = `data:image/png;base64,${configuredLogoBase64}`;
   const configuredIntroHtml =
     '<p id="uiConfiguredIntro">Welcome to the <strong>UI smoke assessment</strong>.</p><img id="uiIntroSanitizerProbe" src="missing-intro.png" onerror="document.body.dataset.introUnsafe=\'true\'">';
@@ -1272,6 +1284,18 @@ try {
     login_subtitle: "UI Global Selection",
     login_testResumeButtonLabel: "UI Global Resume"
   });
+  assert.deepEqual(
+    configuredSettingsPayload.applicationSettings.assetAssignments,
+    { loginIllustration: "ui-login-illustration.png" }
+  );
+  const configuredApplicationAssetResponse = await fetch(
+    `${baseUrl}/api/v1/system/application-assets?originalName=ui-login-illustration.png`
+  );
+  assert.equal(configuredApplicationAssetResponse.status, 200);
+  assert.equal(
+    configuredApplicationAssetResponse.headers.get("content-type"),
+    "image/png"
+  );
   assert.equal(
     configuredSettingsPayload.applicationSettings.globalWarningText,
     "UI smoke planned maintenance warning"

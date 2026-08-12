@@ -1,6 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  ApplicationAssetSummary,
   AdminSignInResponse,
   AdminSignOutResponse,
   BootstrapAdminUserResponse,
@@ -22,12 +23,14 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import {
   adminAuditEventTypes,
+  applicationAssetSlotNames,
   applicationThemeNames,
   defaultApplicationSettings,
   type AdminRole,
   type AdminRoleAccessMode,
   type AdminSessionStatus,
   type AdminUserStatus,
+  type ApplicationAssetSlotName,
   type ApplicationSettings,
   type MonitorViewProfile,
   type MonitorViewProfileFilter
@@ -37,6 +40,7 @@ import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { ApplicationAssetAdminService } from "./application-asset-admin.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import {
   parseJsonDocument,
@@ -148,6 +152,7 @@ export class OpsViewFacade {
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly confirmation = inject(ConfirmationDialogService);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  readonly applicationAssets = inject(ApplicationAssetAdminService);
 
   readonly ops = this.uiState.ops;
   readonly workspace = this.uiState.workspace;
@@ -262,6 +267,26 @@ export class OpsViewFacade {
   applicationCustomTextNewValue = "";
   applicationWarningTextDraft = "";
   applicationWarningExpiresAtDraft = "";
+  applicationAssetAssignmentsDraft: Partial<
+    Record<ApplicationAssetSlotName, string>
+  > = {};
+  applicationAssetUploadError = "";
+  readonly applicationAssetSlotOptions: ReadonlyArray<{
+    name: ApplicationAssetSlotName;
+    label: string;
+  }> = applicationAssetSlotNames.map(name => ({
+    name,
+    label: ({
+      logo: "Logo",
+      loginIllustration: "Login illustration",
+      codeInputIllustration: "Code-input illustration",
+      codeInputCompanion: "Code-input companion",
+      starterCompanion: "Starter companion",
+      starterCardDone: "Completed booklet card",
+      loadingProgress: "Loading progress",
+      confirmDialog: "Confirmation dialog"
+    } satisfies Record<ApplicationAssetSlotName, string>)[name]
+  }));
 
   init(): void {
     this.viewState.setActiveView("ops");
@@ -909,6 +934,7 @@ export class OpsViewFacade {
           introHtml: this.applicationIntroHtmlDraft,
           legalNoticeHtml: this.applicationLegalNoticeHtmlDraft,
           customTexts: this.normalizedApplicationCustomTexts(),
+          assetAssignments: this.normalizedApplicationAssetAssignments(),
           globalWarningText: this.applicationWarningTextDraft,
           globalWarningExpiresAt: expirationInput
             ? new Date(expirationInput).toISOString()
@@ -1015,12 +1041,115 @@ export class OpsViewFacade {
     this.applicationLogoDraftError = "";
   }
 
+  refreshApplicationAssets(): void {
+    if (!this.canManageApplicationSettings) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.applicationAssets.load(this.ops.adminSessionToken.trim())
+    );
+  }
+
+  selectApplicationAsset(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    this.applicationAssetUploadError = "";
+    if (!file) {
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      input.value = "";
+      this.applicationAssetUploadError = "Choose a PNG, JPEG, or WebP image.";
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      input.value = "";
+      this.applicationAssetUploadError = "Application assets must not exceed 2 MiB.";
+      return;
+    }
+    this.viewState.onActionAsync(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => {
+            input.value = "";
+            this.applicationAssetUploadError =
+              "The selected application asset could not be read.";
+            resolve();
+          };
+          reader.onload = () => {
+            input.value = "";
+            const result = typeof reader.result === "string" ? reader.result : "";
+            const separatorIndex = result.indexOf(",");
+            if (separatorIndex < 0) {
+              this.applicationAssetUploadError =
+                "The selected application asset could not be read.";
+              resolve();
+              return;
+            }
+            this.applicationAssets
+              .upload(this.ops.adminSessionToken.trim(), {
+                originalName: file.name,
+                mediaType: file.type,
+                dataBase64: result.slice(separatorIndex + 1)
+              })
+              .then(() => resolve(), reject);
+          };
+          reader.readAsDataURL(file);
+        })
+    );
+  }
+
+  async confirmDeleteApplicationAsset(
+    asset: ApplicationAssetSummary
+  ): Promise<void> {
+    if (!this.canManageApplicationSettings) {
+      return;
+    }
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete application asset?",
+      message: `Delete '${asset.originalName}' from the shared asset registry? Assigned assets must be unassigned first.`,
+      confirmLabel: "Delete asset"
+    });
+    if (!confirmed || !this.canManageApplicationSettings) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.applicationAssets.delete(
+        this.ops.adminSessionToken.trim(),
+        asset.applicationAssetId
+      )
+    );
+  }
+
+  setApplicationAssetAssignment(
+    slot: ApplicationAssetSlotName,
+    originalName: string
+  ): void {
+    const next = { ...this.applicationAssetAssignmentsDraft };
+    if (originalName) {
+      next[slot] = originalName;
+    } else {
+      delete next[slot];
+    }
+    this.applicationAssetAssignmentsDraft = next;
+  }
+
+  formatApplicationAssetBytes(byteLength: number): string {
+    return byteLength >= 1024 * 1024
+      ? `${(byteLength / (1024 * 1024)).toFixed(1)} MiB`
+      : `${Math.max(1, Math.ceil(byteLength / 1024))} KiB`;
+  }
+
   bootstrapOrSignInAdmin(): void {
     if (!this.canUseAdminCredentials) {
       return;
     }
     this.clearAdminBatches();
-    this.viewState.onActionAsync(() => this.opsService.bootstrapOrSignInAdmin());
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.bootstrapOrSignInAdmin();
+      await this.loadApplicationAssetsIfAllowed();
+    });
   }
 
   bootstrapAdmin(): void {
@@ -1035,14 +1164,20 @@ export class OpsViewFacade {
       return;
     }
     this.clearAdminBatches();
-    this.viewState.onActionAsync(() => this.opsService.signInAdmin());
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.signInAdmin();
+      await this.loadApplicationAssetsIfAllowed();
+    });
   }
 
   refreshAdminSession(): void {
     if (!this.canUseAdminSession) {
       return;
     }
-    this.viewState.onActionAsync(() => this.opsService.refreshAdminSession());
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.refreshAdminSession();
+      await this.loadApplicationAssetsIfAllowed();
+    });
   }
 
   refreshAdminSessions(): void {
@@ -1664,6 +1799,7 @@ export class OpsViewFacade {
       this.ops.adminPassword = localDemoAccess.adminPassword;
       this.persistState();
       await this.opsService.signInAdmin();
+      await this.loadApplicationAssetsIfAllowed();
     });
   }
 
@@ -3867,6 +4003,14 @@ export class OpsViewFacade {
     this.applyApplicationSettingsDraft(settings);
   }
 
+  private async loadApplicationAssetsIfAllowed(): Promise<void> {
+    if (this.canManageApplicationSettings) {
+      await this.applicationAssets.load(
+        this.ops.adminSessionToken.trim()
+      );
+    }
+  }
+
   private applyApplicationSettingsDraft(settings: ApplicationSettings): void {
     this.applicationTitleDraft = settings.appTitle;
     this.applicationLogoDraft = settings.mainLogo;
@@ -3875,6 +4019,7 @@ export class OpsViewFacade {
     this.applicationIntroHtmlDraft = settings.introHtml;
     this.applicationLegalNoticeHtmlDraft = settings.legalNoticeHtml;
     this.applicationCustomTextDrafts = { ...settings.customTexts };
+    this.applicationAssetAssignmentsDraft = { ...settings.assetAssignments };
     this.applicationCustomTextNewKey = "";
     this.applicationCustomTextNewValue = "";
     this.applicationWarningTextDraft = settings.globalWarningText ?? "";
@@ -3893,6 +4038,17 @@ export class OpsViewFacade {
           : [];
       })
     );
+  }
+
+  private normalizedApplicationAssetAssignments(): ApplicationSettings["assetAssignments"] {
+    return Object.fromEntries(
+      Object.entries(this.applicationAssetAssignmentsDraft).flatMap(
+        ([slot, originalName]) =>
+          originalName?.trim()
+            ? [[slot, originalName.trim()] as const]
+            : []
+      )
+    ) as ApplicationSettings["assetAssignments"];
   }
 
   private toLocalDateTimeInput(timestamp: string): string {

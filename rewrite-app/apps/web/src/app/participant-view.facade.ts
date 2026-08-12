@@ -1856,6 +1856,7 @@ export class ParticipantViewFacade {
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
     this.setParticipantViewSettings({});
+    this.applicationSettings.applyParticipantAssets({});
   }
 
   refreshCurrentState(): void {
@@ -2526,6 +2527,7 @@ export class ParticipantViewFacade {
     this.setParticipantRosterCustomTexts({});
     this.setParticipantBookletCustomTexts({});
     this.setParticipantViewSettings({});
+    this.applicationSettings.applyParticipantAssets({});
     this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
@@ -3684,13 +3686,16 @@ export class ParticipantViewFacade {
   private syncParticipantRosterEntry(
     participantRosterEntry: Pick<
       ParticipantRosterEntry,
-      "displayName" | "customTexts" | "viewSettings"
+      "displayName" | "customTexts" | "viewSettings" | "assetAssignments"
     > | null
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
     this.setParticipantRosterCustomTexts(participantRosterEntry?.customTexts ?? {});
     this.setParticipantViewSettings(participantRosterEntry?.viewSettings ?? {});
+    this.applicationSettings.applyParticipantAssets(
+      participantRosterEntry?.assetAssignments ?? {}
+    );
   }
 
   private normalizeParticipantViewSettings(value: unknown): ParticipantViewSettings {

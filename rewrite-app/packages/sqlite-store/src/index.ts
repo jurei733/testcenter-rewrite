@@ -237,6 +237,18 @@ const mapApplicationSettings = (
             return {};
           }
         })(),
+        assetAssignments: (() => {
+          try {
+            const parsed = JSON.parse(
+              String(row.asset_assignments_json ?? "{}")
+            );
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? parsed as ApplicationSettings["assetAssignments"]
+              : {};
+          } catch {
+            return {};
+          }
+        })(),
         globalWarningText:
           row.global_warning_text == null
             ? null
@@ -1414,6 +1426,14 @@ const sqliteMigrations: SqliteMigration[] = [
         updated_at TEXT NOT NULL
       );
     `
+  },
+  {
+    version: 52,
+    name: "add_application_asset_assignments",
+    sql: `
+      ALTER TABLE application_settings
+        ADD COLUMN asset_assignments_json TEXT NOT NULL DEFAULT '{}';
+    `
   }
 ];
 
@@ -1530,7 +1550,7 @@ export const createSqliteFirstSliceRepository = (
       const row = database
         .prepare(
           `SELECT app_title, main_logo, theme_name, intro_html,
-                  legal_notice_html, custom_texts_json,
+                  legal_notice_html, custom_texts_json, asset_assignments_json,
                   global_warning_text, global_warning_expires_at,
                   updated_at, updated_by_admin_user_id
            FROM application_settings
@@ -1544,10 +1564,10 @@ export const createSqliteFirstSliceRepository = (
         .prepare(
           `INSERT INTO application_settings (
             settings_key, app_title, main_logo, theme_name, intro_html,
-            legal_notice_html, custom_texts_json,
+            legal_notice_html, custom_texts_json, asset_assignments_json,
             global_warning_text, global_warning_expires_at,
             updated_at, updated_by_admin_user_id
-          ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(settings_key) DO UPDATE SET
             app_title = excluded.app_title,
             main_logo = excluded.main_logo,
@@ -1555,6 +1575,7 @@ export const createSqliteFirstSliceRepository = (
             intro_html = excluded.intro_html,
             legal_notice_html = excluded.legal_notice_html,
             custom_texts_json = excluded.custom_texts_json,
+            asset_assignments_json = excluded.asset_assignments_json,
             global_warning_text = excluded.global_warning_text,
             global_warning_expires_at = excluded.global_warning_expires_at,
             updated_at = excluded.updated_at,
@@ -1567,6 +1588,7 @@ export const createSqliteFirstSliceRepository = (
           settings.introHtml,
           settings.legalNoticeHtml,
           JSON.stringify(settings.customTexts),
+          JSON.stringify(settings.assetAssignments),
           settings.globalWarningText,
           settings.globalWarningExpiresAt,
           settings.updatedAt,

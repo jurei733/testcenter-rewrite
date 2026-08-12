@@ -346,6 +346,61 @@ h1 {
   object-fit: contain;
 }
 
+.application-asset-editor {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.55);
+}
+
+.application-asset-editor p {
+  margin: 4px 0 0;
+}
+
+.application-asset-grid,
+.application-asset-assignments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.application-asset-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.application-asset-card img {
+  width: 64px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.application-asset-card div,
+.application-asset-card span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.application-asset-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.participant-assigned-asset {
+  display: block;
+  max-width: min(100%, 320px);
+  max-height: 180px;
+  object-fit: contain;
+}
+
 .application-custom-texts-editor {
   padding: 14px;
   border: 1px solid var(--line);

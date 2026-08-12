@@ -193,7 +193,7 @@
         <img
           id="applicationLogo"
           class="application-logo"
-          [src]="applicationSettings.settings().mainLogo"
+          [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
           [alt]="applicationSettings.settings().appTitle + ' logo'"
         />
         <div>
@@ -214,7 +214,7 @@
         <img
           id="applicationLogo"
           class="application-logo"
-          [src]="applicationSettings.settings().mainLogo"
+          [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
           [alt]="applicationSettings.settings().appTitle + ' logo'"
         />
       </button>
@@ -244,7 +244,7 @@
           <img
             id="applicationLogo"
             class="application-logo"
-            [src]="applicationSettings.settings().mainLogo"
+            [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
             [alt]="applicationSettings.settings().appTitle + ' logo'"
           />
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>

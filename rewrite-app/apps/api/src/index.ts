@@ -4166,6 +4166,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             introHtml: body.introHtml,
             legalNoticeHtml: body.legalNoticeHtml,
             customTexts: body.customTexts,
+            assetAssignments: body.assetAssignments,
             globalWarningText: body.globalWarningText,
             globalWarningExpiresAt: body.globalWarningExpiresAt
           });

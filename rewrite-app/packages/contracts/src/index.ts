@@ -2802,6 +2802,7 @@ export type UpdateApplicationSettingsRequest = {
   introHtml?: string;
   legalNoticeHtml?: string;
   customTexts?: Record<string, string>;
+  assetAssignments?: ApplicationSettings["assetAssignments"];
   globalWarningText?: string | null;
   globalWarningExpiresAt?: string | null;
 };

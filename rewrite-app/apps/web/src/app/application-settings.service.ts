@@ -8,6 +8,7 @@ import type {
 import { productionApiRoutes } from "@testcenter-rewrite-app/contracts";
 import {
   defaultApplicationSettings,
+  type ApplicationAssetSlotName,
   type ApplicationSettings
 } from "@testcenter-rewrite-app/domain";
 
@@ -20,6 +21,7 @@ export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
   private warningExpirationTimer: ReturnType<typeof setTimeout> | null = null;
   private participantThemeOverride: ApplicationSettings["themeName"] | null = null;
+  private participantAssetOverrides: Record<string, string> = {};
 
   readonly settings = signal<ApplicationSettings>({
     ...defaultApplicationSettings
@@ -76,8 +78,28 @@ export class ApplicationSettingsService {
     this.syncDocumentTheme();
   }
 
+  applyParticipantAssets(assetAssignments?: Record<string, string> | null): void {
+    this.participantAssetOverrides = { ...(assetAssignments ?? {}) };
+  }
+
+  assetUrl(
+    slot: ApplicationAssetSlotName,
+    fallback = ""
+  ): string {
+    const originalName =
+      this.participantAssetOverrides[slot] ??
+      this.settings().assetAssignments[slot];
+    return originalName
+      ? `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`
+      : fallback;
+  }
+
+  applicationAssetUrl(originalName: string): string {
+    return `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
+  }
+
   private apply(settings: ApplicationSettings): void {
-    this.settings.set(settings);
+    this.settings.set({ ...settings, assetAssignments: settings.assetAssignments ?? {} });
     this.loaded.set(true);
     document.title = settings.appTitle;
     this.syncDocumentTheme();

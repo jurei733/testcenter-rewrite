@@ -2879,6 +2879,7 @@ test("platform application settings are public, durable, validated, and audited"
       introHtml: string;
       legalNoticeHtml: string;
       customTexts: Record<string, string>;
+      assetAssignments: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -2893,6 +2894,7 @@ test("platform application settings are public, durable, validated, and audited"
     introHtml: "",
     legalNoticeHtml: "",
     customTexts: {},
+    assetAssignments: {},
     globalWarningText: null,
     globalWarningExpiresAt: null,
     updatedAt: null,
@@ -3098,6 +3100,38 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(invalidLogo.status, 400);
   assert.equal(invalidLogo.body.error, "application_logo_invalid");
 
+  const missingAssetAssignment = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        assetAssignments: { loginIllustration: "missing-global.png" }
+      }
+    }
+  );
+  assert.equal(missingAssetAssignment.status, 400);
+  assert.equal(
+    missingAssetAssignment.body.error,
+    "application_asset_assignment_missing"
+  );
+
+  const globalAssetUpload = await requestJson<{
+    applicationAsset: { applicationAssetId: string; originalName: string };
+  }>("/api/v1/admin/application-assets", {
+    method: "POST",
+    headers: { authorization },
+    body: {
+      originalName: "global-login.png",
+      mediaType: "image/png",
+      dataBase64: Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+      ]).toString("base64")
+    }
+  });
+  assert.equal(globalAssetUpload.status, 201);
+
   const configuredLogo =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const configuredIntroHtml =
@@ -3113,6 +3147,7 @@ test("platform application settings are public, durable, validated, and audited"
       introHtml: string;
       legalNoticeHtml: string;
       customTexts: Record<string, string>;
+      assetAssignments: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -3131,6 +3166,7 @@ test("platform application settings are public, durable, validated, and audited"
         login_subtitle: "  Global test selection  ",
         login_testResumeButtonLabel: "Begin"
       },
+      assetAssignments: { loginIllustration: "global-login.png" },
       globalWarningText: "  Planned maintenance from 18:00.  ",
       globalWarningExpiresAt: "2050-12-12T19:00:00+01:00"
     }
@@ -3153,6 +3189,9 @@ test("platform application settings are public, durable, validated, and audited"
   assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
     login_subtitle: "Global test selection",
     login_testResumeButtonLabel: "Begin"
+  });
+  assert.deepEqual(updatedSettings.body.applicationSettings.assetAssignments, {
+    loginIllustration: "global-login.png"
   });
   assert.equal(
     updatedSettings.body.applicationSettings.globalWarningText,
@@ -3225,6 +3264,20 @@ test("platform application settings are public, durable, validated, and audited"
     settingsAudit.body.items[0]?.details["changedCustomTextKeys"],
     ["login_subtitle", "login_testResumeButtonLabel"]
   );
+  assert.deepEqual(
+    settingsAudit.body.items[0]?.details["changedAssetAssignmentSlots"],
+    ["loginIllustration"]
+  );
+
+  const assignedAssetDeletion = await requestJson<{ error: string }>(
+    `/api/v1/admin/application-assets?applicationAssetId=${encodeURIComponent(globalAssetUpload.body.applicationAsset.applicationAssetId)}`,
+    {
+      method: "DELETE",
+      headers: { authorization }
+    }
+  );
+  assert.equal(assignedAssetDeletion.status, 409);
+  assert.equal(assignedAssetDeletion.body.error, "application_asset_in_use");
 
   const resetSettings = await requestJson<typeof updatedSettings.body>(
     "/api/v1/admin/application-settings",
@@ -3238,6 +3291,7 @@ test("platform application settings are public, durable, validated, and audited"
         introHtml: "",
         legalNoticeHtml: "",
         customTexts: {},
+        assetAssignments: {},
         globalWarningText: "",
         globalWarningExpiresAt: null
       }
@@ -3250,8 +3304,18 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(resetSettings.body.applicationSettings.introHtml, "");
   assert.equal(resetSettings.body.applicationSettings.legalNoticeHtml, "");
   assert.deepEqual(resetSettings.body.applicationSettings.customTexts, {});
+  assert.deepEqual(resetSettings.body.applicationSettings.assetAssignments, {});
   assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);
   assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);
+
+  const deletedGlobalAsset = await requestJson(
+    `/api/v1/admin/application-assets?applicationAssetId=${encodeURIComponent(globalAssetUpload.body.applicationAsset.applicationAssetId)}`,
+    {
+      method: "DELETE",
+      headers: { authorization }
+    }
+  );
+  assert.equal(deletedGlobalAsset.status, 200);
 });
 
 test("participant custom texts retain global-login-booklet precedence inputs", async () => {

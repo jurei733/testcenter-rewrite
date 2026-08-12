@@ -148,6 +148,54 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             />
             <button id="resetApplicationLogoButton" class="ghost" type="button" (click)="view.resetApplicationLogo()">Use Default Logo</button>
           </div>
+          <section class="span-all application-asset-editor">
+            <div class="section-heading">
+              <div>
+                <strong>Original application assets</strong>
+                <p>Upload shared PNG, JPEG, or WebP images up to 2 MiB, then assign them to the original Testcenter presentation slots.</p>
+              </div>
+              <div class="actions compact-actions">
+                <label class="button-link secondary" for="applicationAssetInput">Upload asset</label>
+                <input
+                  id="applicationAssetInput"
+                  name="applicationAssetInput"
+                  class="visually-hidden"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  (change)="view.selectApplicationAsset($event)"
+                />
+                <button id="refreshApplicationAssetsButton" class="ghost" type="button" (click)="view.refreshApplicationAssets()">Refresh assets</button>
+              </div>
+            </div>
+            <p id="applicationAssetUploadError" *ngIf="view.applicationAssetUploadError">{{ view.applicationAssetUploadError }}</p>
+            <div class="application-asset-grid" *ngIf="view.applicationAssets.assets().length; else noApplicationAssets">
+              <article class="application-asset-card" *ngFor="let asset of view.applicationAssets.assets()">
+                <img [src]="view.applicationSettings.applicationAssetUrl(asset.originalName)" alt="" />
+                <div>
+                  <strong>{{ asset.originalName }}</strong>
+                  <span>{{ asset.mediaType }} · {{ view.formatApplicationAssetBytes(asset.byteLength) }}</span>
+                </div>
+                <button class="ghost" type="button" (click)="view.confirmDeleteApplicationAsset(asset)">Delete</button>
+              </article>
+            </div>
+            <ng-template #noApplicationAssets>
+              <p>No shared application assets loaded. Refresh the registry or upload the first image.</p>
+            </ng-template>
+            <div class="application-asset-assignments">
+              <label *ngFor="let slot of view.applicationAssetSlotOptions">
+                {{ slot.label }}
+                <select
+                  [id]="'applicationAssetSlot-' + slot.name"
+                  [name]="'applicationAssetSlot-' + slot.name"
+                  [ngModel]="view.applicationAssetAssignmentsDraft[slot.name] || ''"
+                  (ngModelChange)="view.setApplicationAssetAssignment(slot.name, $event)"
+                >
+                  <option value="">Built-in / unassigned</option>
+                  <option *ngFor="let asset of view.applicationAssets.assets()" [value]="asset.originalName">{{ asset.originalName }}</option>
+                </select>
+              </label>
+            </div>
+          </section>
           <label class="span-all">
             Start Page HTML
             <textarea
@@ -1119,5 +1167,8 @@ export class OpsViewComponent implements OnInit {
 
   selectAdminSection(section: AdministrationSection): void {
     this.activeAdminSection = section;
+    if (section === "settings") {
+      this.view.refreshApplicationAssets();
+    }
   }
 }

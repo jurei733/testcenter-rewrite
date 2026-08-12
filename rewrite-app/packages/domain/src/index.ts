@@ -466,6 +466,20 @@ export type ApplicationAsset = {
   updatedAt: string;
 };
 
+export const applicationAssetSlotNames = [
+  "logo",
+  "loginIllustration",
+  "codeInputIllustration",
+  "codeInputCompanion",
+  "starterCompanion",
+  "starterCardDone",
+  "loadingProgress",
+  "confirmDialog"
+] as const;
+
+export type ApplicationAssetSlotName =
+  (typeof applicationAssetSlotNames)[number];
+
 export type ApplicationSettings = {
   appTitle: string;
   mainLogo: string;
@@ -475,6 +489,7 @@ export type ApplicationSettings = {
   /** Original public Impressum/Datenschutz HTML, rendered through the frontend sanitizer. */
   legalNoticeHtml: string;
   customTexts: Record<string, string>;
+  assetAssignments: Partial<Record<ApplicationAssetSlotName, string>>;
   globalWarningText: string | null;
   globalWarningExpiresAt: string | null;
   updatedAt: string | null;
@@ -488,6 +503,7 @@ export const defaultApplicationSettings: ApplicationSettings = {
   introHtml: "",
   legalNoticeHtml: "",
   customTexts: {},
+  assetAssignments: {},
   globalWarningText: null,
   globalWarningExpiresAt: null,
   updatedAt: null,

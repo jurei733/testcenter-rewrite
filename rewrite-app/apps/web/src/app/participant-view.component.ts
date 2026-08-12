@@ -32,6 +32,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </small>
           </div>
         </header>
+        <img
+          id="participantLoginIllustration"
+          class="participant-assigned-asset"
+          *ngIf="applicationSettings.assetUrl('loginIllustration') as assetUrl"
+          [src]="assetUrl"
+          alt=""
+        />
         <section
           id="applicationIntroContent"
           class="configured-application-content"
@@ -113,6 +120,20 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <input id="participantPassword" name="participantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
           </label>
           <div *ngIf="view.participantCodeRequired" class="participant-code-control">
+            <img
+              id="participantCodeInputIllustration"
+              class="participant-assigned-asset"
+              *ngIf="applicationSettings.assetUrl('codeInputIllustration') as assetUrl"
+              [src]="assetUrl"
+              alt=""
+            />
+            <img
+              id="participantCodeInputCompanion"
+              class="participant-assigned-asset"
+              *ngIf="applicationSettings.assetUrl('codeInputCompanion') as assetUrl"
+              [src]="assetUrl"
+              alt=""
+            />
             <span>{{ view.customText('login_codeInputTitle', 'Participant Code') }}</span>
             <input
               *ngIf="!view.usesParticipantCodeKeypad"
@@ -185,6 +206,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </label>
         </div>
         <section class="participant-booklet-list" *ngIf="view.assignedBooklets.length > 1" aria-label="Assigned booklets">
+          <img
+            id="participantStarterCompanion"
+            class="participant-assigned-asset"
+            *ngIf="applicationSettings.assetUrl('starterCompanion') as assetUrl"
+            [src]="assetUrl"
+            alt=""
+          />
           <span>Assigned Booklets</span>
           <div>
             <button
@@ -357,6 +385,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               aria-live="assertive"
               aria-labelledby="participantRouteCompletedTitle"
             >
+              <img
+                id="participantCompletedAsset"
+                class="participant-assigned-asset"
+                *ngIf="applicationSettings.assetUrl('starterCardDone') as assetUrl"
+                [src]="assetUrl"
+                alt=""
+              />
               <span>Test completed</span>
               <strong id="participantRouteCompletedTitle">Your test is finished.</strong>
               <p id="participantRouteCompletedDetail">Your responses are closed and can no longer be changed. You can leave this session or select another available test above.</p>
@@ -563,6 +598,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               role="status"
               aria-live="polite"
             >
+              <img
+                id="participantLoadingProgressAsset"
+                class="participant-assigned-asset"
+                *ngIf="applicationSettings.assetUrl('loadingProgress') as assetUrl"
+                [src]="assetUrl"
+                alt=""
+              />
               <span>{{ view.veronaLoadingLabel }}</span>
               <strong>Booklet is loading</strong>
               <p>{{ view.veronaLoadingPendingStatus }}</p>
@@ -914,6 +956,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           aria-labelledby="participantConfirmationTitle"
           aria-describedby="participantConfirmationMessage"
         >
+          <img
+            id="participantConfirmationAsset"
+            class="participant-assigned-asset"
+            *ngIf="applicationSettings.assetUrl('confirmDialog') as assetUrl"
+            [src]="assetUrl"
+            alt=""
+          />
           <h2 id="participantConfirmationTitle">{{ confirmation.title }}</h2>
           <p id="participantConfirmationMessage">{{ confirmation.message }}</p>
           <div class="actions">

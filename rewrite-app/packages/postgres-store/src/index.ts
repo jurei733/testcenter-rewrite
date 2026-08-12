@@ -226,6 +226,19 @@ const mapApplicationSettings = (
             return {};
           }
         })(),
+        assetAssignments: (() => {
+          try {
+            const parsed =
+              typeof row.asset_assignments_json === "string"
+                ? JSON.parse(row.asset_assignments_json)
+                : row.asset_assignments_json ?? {};
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? parsed as ApplicationSettings["assetAssignments"]
+              : {};
+          } catch {
+            return {};
+          }
+        })(),
         globalWarningText:
           row.global_warning_text == null
             ? null
@@ -1341,6 +1354,14 @@ const migrations: PostgresMigration[] = [
         updated_at TEXT NOT NULL
       );
     `
+  },
+  {
+    version: 46,
+    name: "add_application_asset_assignments",
+    sql: `
+      ALTER TABLE application_settings
+        ADD COLUMN IF NOT EXISTS asset_assignments_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `
   }
 ];
 
@@ -1464,7 +1485,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async getApplicationSettings() {
       return one(
         `SELECT app_title, main_logo, theme_name, intro_html,
-                legal_notice_html, custom_texts_json,
+                legal_notice_html, custom_texts_json, asset_assignments_json,
                 global_warning_text, global_warning_expires_at,
                 updated_at, updated_by_admin_user_id
          FROM application_settings
@@ -1477,10 +1498,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       await pool.query(
         `INSERT INTO application_settings (
           settings_key, app_title, main_logo, theme_name, intro_html,
-          legal_notice_html, custom_texts_json,
+          legal_notice_html, custom_texts_json, asset_assignments_json,
           global_warning_text, global_warning_expires_at,
           updated_at, updated_by_admin_user_id
-        ) VALUES ('global', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ('global', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT(settings_key) DO UPDATE SET
           app_title = EXCLUDED.app_title,
           main_logo = EXCLUDED.main_logo,
@@ -1488,6 +1509,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           intro_html = EXCLUDED.intro_html,
           legal_notice_html = EXCLUDED.legal_notice_html,
           custom_texts_json = EXCLUDED.custom_texts_json,
+          asset_assignments_json = EXCLUDED.asset_assignments_json,
           global_warning_text = EXCLUDED.global_warning_text,
           global_warning_expires_at = EXCLUDED.global_warning_expires_at,
           updated_at = EXCLUDED.updated_at,
@@ -1499,6 +1521,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.introHtml,
           settings.legalNoticeHtml,
           JSON.stringify(settings.customTexts),
+          JSON.stringify(settings.assetAssignments),
           settings.globalWarningText,
           settings.globalWarningExpiresAt,
           settings.updatedAt,

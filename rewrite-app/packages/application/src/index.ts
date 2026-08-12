@@ -41,6 +41,7 @@ import {
   monitorRunCommandTypes,
   participantExecutionModeDefinitions,
   participantExecutionModes,
+  applicationAssetSlotNames,
   workspaceFileTypes
 } from "@testcenter-rewrite-app/domain";
 import type {
@@ -951,6 +952,7 @@ export type AdminDirectoryPort = {
     password: string;
     confirmationPassword?: string;
     customTexts?: Record<string, string>;
+    assetAssignments?: ApplicationSettings["assetAssignments"];
     validFrom?: string | null;
     validTo?: string | null;
     validForMinutes?: number | null;
@@ -1025,6 +1027,7 @@ export type ApplicationSettingsPort = {
     introHtml?: string;
     legalNoticeHtml?: string;
     customTexts?: Record<string, string>;
+    assetAssignments?: ApplicationSettings["assetAssignments"];
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
@@ -23174,6 +23177,20 @@ export const createFirstSliceServices = (
             "The requested application asset was not found."
           );
         }
+        const applicationSettings = await repository.getApplicationSettings();
+        const assignedSlots = Object.entries(
+          applicationSettings?.assetAssignments ?? {}
+        ).flatMap(([slot, originalName]) =>
+          originalName === applicationAsset.originalName ? [slot] : []
+        );
+        if (assignedSlots.length > 0) {
+          throw new FirstSliceError(
+            409,
+            "application_asset_in_use",
+            `Application asset '${applicationAsset.originalName}' is assigned to application settings.`,
+            { assignedSlots }
+          );
+        }
         await repository.deleteApplicationAsset(
           applicationAsset.applicationAssetId
         );
@@ -23222,6 +23239,43 @@ export const createFirstSliceServices = (
             input.customTexts === undefined
               ? previousSettings.customTexts
               : normalizeApplicationCustomTexts(input.customTexts),
+          assetAssignments:
+            input.assetAssignments === undefined
+              ? previousSettings.assetAssignments
+              : Object.fromEntries(
+                  await Promise.all(
+                    Object.entries(input.assetAssignments).map(
+                      async ([slot, originalName]) => {
+                        if (
+                          !(applicationAssetSlotNames as readonly string[]).includes(
+                            slot
+                          ) ||
+                          typeof originalName !== "string" ||
+                          !originalName.trim()
+                        ) {
+                          throw new FirstSliceError(
+                            400,
+                            "application_asset_assignment_invalid",
+                            `Application asset assignment '${slot}' is invalid.`
+                          );
+                        }
+                        const normalizedName = originalName.trim();
+                        if (
+                          !(await repository.getApplicationAssetByOriginalName(
+                            normalizedName
+                          ))
+                        ) {
+                          throw new FirstSliceError(
+                            400,
+                            "application_asset_assignment_missing",
+                            `Application asset '${normalizedName}' does not exist.`
+                          );
+                        }
+                        return [slot, normalizedName] as const;
+                      }
+                    )
+                  )
+                ),
           globalWarningText: normalizeGlobalWarningText(
             input.globalWarningText
           ),
@@ -23240,6 +23294,11 @@ export const createFirstSliceServices = (
         ].filter(
           key =>
             previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
+        );
+        const changedAssetAssignmentSlots = applicationAssetSlotNames.filter(
+          slot =>
+            previousSettings.assetAssignments[slot] !==
+            updatedSettings.assetAssignments[slot]
         );
         await recordAdminAuditEvent({
           eventType: "application_settings_updated",
@@ -23278,6 +23337,12 @@ export const createFirstSliceServices = (
             previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
             nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
             changedCustomTextKeys,
+            previousAssetAssignmentCount: Object.keys(
+              previousSettings.assetAssignments
+            ).length,
+            nextAssetAssignmentCount: Object.keys(updatedSettings.assetAssignments)
+              .length,
+            changedAssetAssignmentSlots,
             previousGlobalWarningText: previousSettings.globalWarningText,
             nextGlobalWarningText: updatedSettings.globalWarningText,
             previousGlobalWarningExpiresAt:
