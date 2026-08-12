@@ -1819,10 +1819,19 @@ export class ParticipantViewFacade {
     if (!this.runtime.participantSessionId.trim()) {
       return this.canSignIn;
     }
-    const runtimeState = parseJsonDocument<ParticipantRuntimeStateResponse>(
-      this.runtime.runtimeStateView
-    )?.runtimeState;
-    return runtimeState?.availableAction !== "none";
+    const currentRunState = this.readCurrentRunState();
+    if (!currentRunState) {
+      return true;
+    }
+    if (
+      currentRunState.testRun.status === "completed" &&
+      !currentRunState.executionMode.saveResponses
+    ) {
+      return true;
+    }
+    return currentRunState.availableActions.some(action =>
+      action === "resume" || action === "save_progress"
+    );
   }
 
   get canRefreshCurrentState(): boolean {

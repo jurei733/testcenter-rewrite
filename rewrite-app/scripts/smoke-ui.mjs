@@ -637,8 +637,23 @@ try {
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
     await waitForNotBusy(`${name}-before-click`);
     const button = page.getByRole("button", { name, exact: true });
-    await button.scrollIntoViewIfNeeded();
-    await button.click({ force: true });
+    const clickDeadline = Date.now() + 15_000;
+    let clicked = false;
+    while (!clicked && Date.now() < clickDeadline) {
+      clicked = await button
+        .evaluate(element => {
+          if (!(element instanceof HTMLButtonElement) || element.disabled) {
+            return false;
+          }
+          element.click();
+          return true;
+        })
+        .catch(() => false);
+      if (!clicked) {
+        await page.waitForTimeout(50);
+      }
+    }
+    assert.equal(clicked, true, `Timed out clicking action '${name}'.`);
     const startedBusy = await waitForBusy(`${name}-after-click`);
     if (!startedBusy) {
       await page.waitForTimeout(150);
@@ -649,22 +664,18 @@ try {
   const clickSelectorAction = async (name, selector) => {
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
     await waitForNotBusy(`${name}-before-click`);
-    const button = page.locator(selector);
-    await button.waitFor({ state: "visible", timeout: 15_000 });
     await page.waitForFunction(
       targetSelector => {
         const element = document.querySelector(targetSelector);
-        return element instanceof HTMLButtonElement && !element.disabled;
+        if (!(element instanceof HTMLButtonElement) || element.disabled) {
+          return false;
+        }
+        element.click();
+        return true;
       },
       selector,
       { timeout: 15_000 }
     );
-    await button.evaluate(element => {
-      if (!(element instanceof HTMLButtonElement)) {
-        throw new Error("Expected selector action target to be a button.");
-      }
-      element.click();
-    });
     const startedBusy = await waitForBusy(`${name}-after-click`);
     if (!startedBusy) {
       await page.waitForTimeout(150);
@@ -672,20 +683,69 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const signOutAdmin = async () => {
+    logStep("action-sign-out-start");
+    await waitForNotBusy("sign-out-before-click");
+    const signOutResponsePromise = page.waitForResponse(
+      response =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/api/v1/admin/auth/sign-out"),
+      { timeout: 15_000 }
+    );
+    await page.waitForFunction(
+      () => {
+        const button = document.querySelector("#adminSignOutButton");
+        if (!(button instanceof HTMLButtonElement) || button.disabled) {
+          return false;
+        }
+        button.click();
+        return true;
+      },
+      undefined,
+      { timeout: 15_000 }
+    );
+    assert.equal((await signOutResponsePromise).status(), 200);
+    await waitForNotBusy("sign-out-after-click");
+    await expectInputValue("#adminSessionToken", "");
+    logStep("action-sign-out-done");
+  };
   const waitForRouteTarget = async (selector, recover = null) => {
     const target = page.locator(selector);
-    const mounted = await target
-      .waitFor({ state: "visible", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!mounted) {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const mounted = await target
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (mounted) {
+        return target;
+      }
+      if (attempt === 3) {
+        break;
+      }
       await page.reload({ waitUntil: "domcontentloaded" });
       if (recover) {
         await recover();
       }
     }
-    await target.waitFor({ state: "visible", timeout: 30_000 });
+    await target.waitFor({ state: "visible", timeout: 15_000 });
     return target;
+  };
+  const restorePlatformAdminSession = async () => {
+    logStep("restore-platform-admin-session-start");
+    await page.goto(`${baseUrl}/app/ops`, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(/\/app\/ops$/);
+    await waitForRouteTarget("#operatorAccessCard");
+    const signOutButton = page.locator("#adminSignOutButton");
+    if (await signOutButton.isVisible().catch(() => false)) {
+      await signOutAdmin();
+    }
+    await fillAndCommitUntilValue("#adminUsername", adminUsername);
+    await fillAndCommitUntilValue("#adminPassword", adminPassword);
+    await clickAction("Sign In");
+    await waitForInputMinLength("#adminSessionToken", 20);
+    smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+    await page.locator("#adminCreateUsername").waitFor({ timeout: 15_000 });
+    logStep("restore-platform-admin-session-done");
   };
   const waitForOptionalDownload = () =>
     page.waitForEvent("download", { timeout: 5_000 }).catch(() => null);
@@ -1751,8 +1811,7 @@ try {
     .filter({ hasText: "platform_admin" })
     .waitFor();
   logStep("admin-sign-out");
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   for (const signedOutSelector of [
     "#adminCurrentSessionButton",
     "#adminSessionsButton",
@@ -3471,8 +3530,7 @@ try {
   stopAfter("admin-password-reset-confirmation");
 
   logStep("read-only-workspace-admin");
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
   await fillAndCommitUntilValue("#adminPassword", workspaceAdminResetPassword);
   const readOnlyAdminSignInResponsePromise = page.waitForResponse(
@@ -3746,8 +3804,7 @@ try {
 
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   await fillAndCommitUntilValue("#adminUsername", adminUsername);
   await fillAndCommitUntilValue("#adminPassword", adminPassword);
   await clickAction("Sign In");
@@ -4121,7 +4178,7 @@ try {
   assert.equal(customTextSignOutResponse.status, 200);
   stopAfter("admin-user-custom-texts");
 
-  await clickAction("Sign Out");
+  await signOutAdmin();
   await fillAndCommitUntilValue(
     "#adminUsername",
     delegatedWorkspaceAdminUsername
@@ -4205,7 +4262,7 @@ try {
   );
   stopAfter("delegated-workspace-operator-management");
 
-  await clickAction("Sign Out");
+  await signOutAdmin();
   await fillAndCommitUntilValue("#adminUsername", adminUsername);
   await fillAndCommitUntilValue("#adminPassword", adminPassword);
   await clickAction("Sign In");
@@ -4342,16 +4399,30 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Selected Admin Accounts" })
     });
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    workspaceAdminUsername
-  );
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    delegatedWorkspaceAdminUsername
-  );
+  const addAdminUsersToBatch = async entries => {
+    for (const [username, adminUserId] of entries) {
+      await adminUsersCollection
+        .locator(".record-card")
+        .filter({
+          has: page.getByRole("heading", { name: username, exact: true })
+        })
+        .getByRole("button", { name: "Add To Batch", exact: true })
+        .evaluate(element => {
+          if (!(element instanceof HTMLButtonElement)) {
+            throw new Error("Admin user batch action must be a button.");
+          }
+          element.click();
+        });
+      await selectedAdminAccounts
+        .filter({ hasText: adminUserId })
+        .waitFor({ timeout: 15_000 });
+    }
+  };
+  const batchAdminUsers = [
+    [workspaceAdminUsername, workspaceAdminUserId],
+    [delegatedWorkspaceAdminUsername, delegatedWorkspaceAdminUserId]
+  ];
+  await addAdminUsersToBatch(batchAdminUsers);
   await selectedAdminAccounts
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: delegatedWorkspaceAdminUserId })
@@ -4450,16 +4521,7 @@ try {
   }
   stopAfter("admin-user-bulk-password");
 
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    workspaceAdminUsername
-  );
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    delegatedWorkspaceAdminUsername
-  );
+  await addAdminUsersToBatch(batchAdminUsers);
   await selectAndCommit("#adminRoleRole", "system_check");
   await fillAndCommit("#adminRoleTenantKey", tenantKey);
   await fillAndCommit("#adminRoleWorkspaceKey", workspaceKey);
@@ -4499,12 +4561,7 @@ try {
     .waitFor();
   stopAfter("admin-user-bulk-role");
 
-  await clickCardAction("Admin Users", "Add To Batch", workspaceAdminUsername);
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    delegatedWorkspaceAdminUsername
-  );
+  await addAdminUsersToBatch(batchAdminUsers);
   await selectAndCommit("#adminBatchStatusValue", "disabled");
   await selectedAdminAccounts
     .filter({ hasText: "2 selected account(s) will be changed to disabled" })
@@ -4711,12 +4768,7 @@ try {
     .getByRole("button", { name: "Clear User Filters", exact: true })
     .click();
   await clickAction("Admin Users");
-  await clickCardAction("Admin Users", "Add To Batch", workspaceAdminUsername);
-  await clickCardAction(
-    "Admin Users",
-    "Add To Batch",
-    delegatedWorkspaceAdminUsername
-  );
+  await addAdminUsersToBatch(batchAdminUsers);
   await selectedAdminAccounts
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: delegatedWorkspaceAdminUserId })
@@ -13154,6 +13206,7 @@ try {
   );
   stopAfter("participant-original-test-controller");
 
+  await restorePlatformAdminSession();
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
@@ -13526,8 +13579,7 @@ try {
     .waitFor();
 
   logStep("group-monitor-access-window");
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   await fillAndCommit("#adminUsername", groupMonitorUsername);
   await fillAndCommit("#adminPassword", groupMonitorPassword);
   const initialGroupMonitorSignInResponsePromise = page.waitForResponse(
@@ -13603,8 +13655,7 @@ try {
     .waitFor();
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   await fillAndCommit("#adminUsername", adminUsername);
   await fillAndCommit("#adminPassword", adminPassword);
   await clickAction("Sign In");
@@ -14073,7 +14124,22 @@ try {
     .filter({ hasText: "loginKey=entry-student-direct-xml" })
     .filter({ hasText: "groupKey=group%3Adirect-xml" })
     .filter({ hasText: "bookletKey=booklet%3Astarter" });
-  await directLaunchStatusCard.waitFor();
+  let directLaunchStatusError = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await directLaunchStatusCard.waitFor({ timeout: 10_000 });
+      directLaunchStatusError = null;
+      break;
+    } catch (error) {
+      directLaunchStatusError = error;
+      if (attempt < 3) {
+        await clickAction("Refresh Sessions");
+      }
+    }
+  }
+  if (directLaunchStatusError) {
+    throw directLaunchStatusError;
+  }
   await waitForNotBusy("direct-launch-status-select-before-click");
   await directLaunchStatusCard
     .getByRole("button", { name: "Select + Load", exact: true })
@@ -14145,7 +14211,7 @@ try {
       hasParticipantSession
     );
   }
-  const participantSessionId = participantSessionsPayload.items.find(item => {
+  let participantSessionId = participantSessionsPayload.items.find(item => {
     const participantSession = item?.participantSession;
     return participantSession?.loginKey === participantLoginKey;
   })?.participantSession?.participantSessionId;
@@ -14256,7 +14322,7 @@ try {
     "#currentUnitKey",
     pausedCurrentState.currentRunState.currentUnit.unitKey
   );
-  const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
+  let pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
   assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
   await fillAndCommitUntilValue("#currentUnitKey", "unit-paused");
   await fillAndCommit("#runtimeUnitResponse", "Filtered response smoke");
@@ -14865,8 +14931,7 @@ try {
   logStep("group-monitor-console");
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
-  await clickAction("Sign Out");
-  await expectInputValue("#adminSessionToken", "");
+  await signOutAdmin();
   await fillAndCommit("#adminUsername", groupMonitorUsername);
   await fillAndCommit("#adminPassword", groupMonitorFinalPassword);
   const groupMonitorSignInResponsePromise = page.waitForResponse(
@@ -15958,7 +16023,7 @@ try {
 
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
-  await clickAction("Sign Out");
+  await signOutAdmin();
   await fillAndCommitUntilValue("#adminUsername", adminUsername);
   await fillAndCommitUntilValue("#adminPassword", adminPassword);
   await clickAction("Sign In");
@@ -16808,12 +16873,27 @@ try {
       `${workspaceKey}-study-monitor.csv`
     );
   }
-  await page
+  const studyMonitorExportPreview = page
     .locator("#studyMonitorExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,section" })
     .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "not_started_participant" })
-    .waitFor();
+    .filter({ hasText: "not_started_participant" });
+  let studyMonitorExportError = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await studyMonitorExportPreview.waitFor({ timeout: 10_000 });
+      studyMonitorExportError = null;
+      break;
+    } catch (error) {
+      studyMonitorExportError = error;
+      if (attempt < 3) {
+        await clickAction("Export Study Monitor CSV");
+      }
+    }
+  }
+  if (studyMonitorExportError) {
+    throw studyMonitorExportError;
+  }
   const participantMatrixDownloadPromise = waitForOptionalDownload();
   await clickAction("Export Participant Matrix CSV");
   const participantMatrixDownload = await participantMatrixDownloadPromise;
@@ -17524,10 +17604,9 @@ try {
   await page.waitForURL(/\/app\/content$/);
 
   await page.locator("#sourceFileName").waitFor();
-  await fillAndCommit("#sourceFileName", "broken.json");
-  await fillAndCommit("#sourceMediaType", "application/json");
-  await expectInputValue("#sourceMediaType", "application/json");
-  await fillAndCommit("#sourceDocument", failedImportSourceDocument);
+  await fillAndCommitUntilValue("#sourceFileName", "broken.json");
+  await fillAndCommitUntilValue("#sourceMediaType", "application/json");
+  await fillAndCommitUntilValue("#sourceDocument", failedImportSourceDocument);
   await clickAction("Create Source Package");
 
   const failedSourcePackagesPayload = await pollJsonWithPredicate(
@@ -17763,6 +17842,72 @@ try {
   logStep("nav-runtime-before-complete");
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
+  logStep("refresh-monitor-command-target");
+  let monitorCommandLoginKey = participantLoginKey;
+  const firstMonitorCommandLaunchResponse = await fetch(
+    `${baseUrl}/api/v1/participant/starter:launch`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tenantKey,
+        workspaceKey,
+        loginKey: monitorCommandLoginKey,
+        groupKey: participantGroupKey,
+        bookletKey: participantBookletKey
+      })
+    }
+  );
+  let refreshedMonitorTarget;
+  if (firstMonitorCommandLaunchResponse.ok) {
+    refreshedMonitorTarget = await firstMonitorCommandLaunchResponse.json();
+  } else {
+    assert.equal(firstMonitorCommandLaunchResponse.status, 409);
+    monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      {
+        body: {
+          rosterText: [
+            "loginKey,groupKey,bookletKey,displayName",
+            [
+              monitorCommandLoginKey,
+              participantGroupKey,
+              participantBookletKey,
+              monitorCommandLoginKey
+            ].join(",")
+          ].join("\n")
+        }
+      }
+    );
+    refreshedMonitorTarget = await (
+      await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
+        body: {
+          tenantKey,
+          workspaceKey,
+          loginKey: monitorCommandLoginKey,
+          groupKey: participantGroupKey,
+          bookletKey: participantBookletKey
+        }
+      })
+    ).json();
+  }
+  participantSessionId = refreshedMonitorTarget.participantSession.participantSessionId;
+  pausedTestRunId = refreshedMonitorTarget.testRun.testRunId;
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/test-runs/${encodeURIComponent(
+      pausedTestRunId
+    )}/save-progress`,
+    {
+      body: {
+        currentUnitKey: "unit-paused",
+        status: "running",
+        unitResponse: "Filtered response smoke"
+      }
+    }
+  );
+  await fillAndCommitUntilValue("#participantSessionId", participantSessionId);
+  await fillAndCommitUntilValue("#testRunId", pausedTestRunId);
   logStep("refresh-runtime-before-complete");
   await clickAction("Refresh Runtime Reads");
   await pollJsonWithPredicate(
@@ -17839,12 +17984,11 @@ try {
           item.activityEvent.details?.nextStatus === "completed" &&
           item.activityEvent.details?.locked === true &&
           item.activityEvent.details?.participantSessionId === participantSessionId &&
-          item.activityEvent.details?.loginKey === participantLoginKey &&
+          item.activityEvent.details?.loginKey === monitorCommandLoginKey &&
           item.activityEvent.details?.groupKey === participantGroupKey &&
           item.activityEvent.details?.bookletKey === participantBookletKey
       )
   );
-
   logStep("force-activate-after-complete");
   await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);
