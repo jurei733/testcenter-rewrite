@@ -6606,6 +6606,9 @@ try {
     { timeout: 15_000 }
   );
   logStep("participant-entry-reentry");
+  await page.evaluate(() => {
+    window.localStorage.removeItem("testcenter-rewrite-app-shell");
+  });
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
