@@ -1931,7 +1931,7 @@ export class ParticipantViewFacade {
       return;
     }
 
-    this.viewState.onActionAsync(() => this.signInInternal());
+    this.viewState.onActionAsync(() => this.signInAndStartSingleBookletInternal());
   }
 
   resetParticipantCodeChallenge(): void {
@@ -2534,6 +2534,20 @@ export class ParticipantViewFacade {
     await this.starterLaunchInternal();
   }
 
+  private async signInAndStartSingleBookletInternal(): Promise<void> {
+    const signedIn = await this.signInInternal();
+    if (!signedIn || this.assignedBooklets.length !== 1) {
+      return;
+    }
+    const [booklet] = this.assignedBooklets;
+    if (!booklet || !["available", "in_progress"].includes(booklet.status)) {
+      return;
+    }
+    this.runtime.bookletKey = booklet.bookletKey;
+    this.persistState();
+    await this.resumeSessionInternal({ quiet: true });
+  }
+
   private async resumeEntrySessionInternal(
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
@@ -2557,7 +2571,7 @@ export class ParticipantViewFacade {
     }
   }
 
-  private async signInInternal(): Promise<void> {
+  private async signInInternal(): Promise<boolean> {
     this.participantEvents.stop();
     let payload: ParticipantSignInResponse;
     try {
@@ -2576,7 +2590,7 @@ export class ParticipantViewFacade {
       );
     } catch (error) {
       if (this.handleParticipantCodeChallenge(error)) {
-        return;
+        return false;
       }
       throw error;
     }
@@ -2613,6 +2627,7 @@ export class ParticipantViewFacade {
     this.replaceLegacyShortLinkWithSessionEntry(
       payload.participantSession.participantSessionId
     );
+    return true;
   }
 
   private replaceLegacyShortLinkWithSessionEntry(

@@ -5955,8 +5955,7 @@ try {
         const participantSession = item?.participantSession;
         return (
           participantSession?.loginKey === participantEntrySignInLoginKey &&
-          participantSession?.groupKey === participantEntrySignInGroupKey &&
-          participantSession?.status === "signed_in"
+          participantSession?.groupKey === participantEntrySignInGroupKey
         );
       })
   );
@@ -5967,36 +5966,8 @@ try {
     })?.participantSession?.participantSessionId;
   assert.ok(
     participantEntrySignInSessionId,
-    "UI smoke expected participant Sign In to create a signed-in session."
+    "UI smoke expected participant Sign In to create a participant session."
   );
-  await expectInputValue("#participantRouteSessionId", participantEntrySignInSessionId);
-  await expectButtonSelectorEnabled("#participantRouteStartOrResumeButton");
-  await expectButtonSelectorEnabled("#participantRouteRefreshCurrentStateButton");
-  await expectButtonSelectorEnabled("#participantRouteClearSessionButton");
-  await page.waitForFunction(
-    ([expectedSessionId, expectedDisplayName]) =>
-      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
-        expectedSessionId &&
-      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
-        expectedDisplayName &&
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
-      document.querySelector("#participantEntryNextStep")?.textContent?.includes(
-        "Start test"
-      ),
-    [participantEntrySignInSessionId, participantEntrySignInDisplayName],
-    { timeout: 15_000 }
-  );
-  assert.equal(
-    await page.locator("#participantEntryIssueCode").count(),
-    0,
-    "Participant entry issue guidance should clear after a successful sign-in."
-  );
-  stopAfter("participant-entry-sign-in");
-  logStep("participant-entry-start-after-sign-in");
-  await page.getByRole("button", { name: "Start Or Resume" }).click();
   const participantEntryStartedPayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
     payload =>
@@ -6011,6 +5982,31 @@ try {
   );
   const participantEntryStartedRunId =
     participantEntryStartedPayload.currentRunState.testRun.testRunId;
+  await page.waitForFunction(
+    ([expectedSessionId, expectedDisplayName, expectedRunId]) =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
+      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+        expectedDisplayName &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteEntry") == null,
+    [
+      participantEntrySignInSessionId,
+      participantEntrySignInDisplayName,
+      participantEntryStartedRunId
+    ],
+    { timeout: 15_000 }
+  );
+  assert.equal(
+    await page.locator("#participantEntryIssueCode").count(),
+    0,
+    "Participant entry issue guidance should clear after a successful sign-in."
+  );
+  stopAfter("participant-entry-sign-in");
+  logStep("participant-entry-start-after-sign-in");
   await page.waitForFunction(
     ([expectedSessionId, expectedRunId]) =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
