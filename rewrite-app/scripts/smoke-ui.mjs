@@ -6617,11 +6617,23 @@ try {
     { waitUntil: "networkidle" }
   );
   await page.waitForFunction(
-    ([expectedSessionId, expectedUnitKey, expectedResponse]) =>
+    expectedSessionId =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "running" &&
+      document.querySelector("#participantRouteEntry") == null,
+    participantRouteSessionId,
+    { timeout: 15_000 }
+  );
+  await clickSelectorAction(
+    "Refresh Current State",
+    "#participantRouteRefreshCurrentStateButton"
+  );
+  await page.waitForFunction(
+    ([expectedSessionId, expectedUnitKey, expectedResponse]) =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
       document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
         expectedUnitKey &&
       document.querySelector("#participantRouteUnitResponse")?.value ===
