@@ -458,7 +458,9 @@ export class ParticipantViewFacade {
   get isParticipantPlayerFocused(): boolean {
     const currentState = this.readCurrentRunState();
     return Boolean(
-      currentState && currentState.testRun.status !== "completed"
+      currentState &&
+        currentState.testRun.status !== "completed" &&
+        currentState.currentUnit.unitKey
     );
   }
 

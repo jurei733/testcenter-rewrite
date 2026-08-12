@@ -8519,6 +8519,11 @@ try {
     false,
     "Simulation responses must not survive in local storage."
   );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page
+    .locator("#participantRouteRunId")
+    .filter({ hasText: simulationRunId })
+    .waitFor({ timeout: 15_000 });
   await clickSelectorAction(
     "resume completed simulation",
     "#participantRouteStartOrResumeButton"
