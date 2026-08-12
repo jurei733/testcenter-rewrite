@@ -424,9 +424,17 @@ try {
     .locator("#demoPlayerTitle")
     .filter({ hasText: "Welcome to the interactive demo" })
     .waitFor({ timeout: 15_000 });
+  const introAnswerSaved = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/save-progress") &&
+      response.ok(),
+    { timeout: 15_000 }
+  );
   await introPlayerFrame
     .locator("#demoPlayerAnswer")
     .fill("Intro answer from smoke");
+  await introAnswerSaved;
   await page
     .locator("#participantVeronaSaveStatus")
     .filter({ hasText: "saved" })

@@ -3837,7 +3837,6 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       !unitKey ||
-      this.veronaPlayer != null ||
       currentState.testRun.testRunId !== incomingState.testRun.testRunId ||
       unitKey !== incomingState.currentUnit.unitKey
     ) {

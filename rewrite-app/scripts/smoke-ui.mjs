@@ -755,15 +755,15 @@ try {
     logStep(`action-${stepName}-start`);
     await waitForNotBusy(`${stepName}-before-click`);
     for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const card = page.locator("article.card").filter({
+        has: page.getByRole("heading", { name: cardTitle, exact: true })
+      });
+      const actionScope = itemHeadline
+        ? card.locator(".record-card").filter({
+            has: page.getByRole("heading", { name: itemHeadline, exact: true })
+          })
+        : card;
       try {
-        const card = page.locator("article.card").filter({
-          has: page.getByRole("heading", { name: cardTitle, exact: true })
-        });
-        const actionScope = itemHeadline
-          ? card.locator(".record-card").filter({
-              has: page.getByRole("heading", { name: itemHeadline, exact: true })
-            })
-          : card;
         await actionScope
           .getByRole("button", { name: buttonName, exact: true })
           .first()

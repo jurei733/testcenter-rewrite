@@ -387,7 +387,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const participantSessionsCsvText = await participantSessionsCsv.text();
   if (
     !participantSessionsCsvText.startsWith(
-      "tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,"
+      "tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,groupLabel,executionMode,sessionStatus,"
     ) ||
     !participantSessionsCsvText.includes('"student-demo"') ||
     !participantSessionsCsvText.includes('"group:student-demo"') ||
