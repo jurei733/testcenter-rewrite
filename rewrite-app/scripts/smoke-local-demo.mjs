@@ -425,10 +425,23 @@ try {
     .filter({ hasText: "Welcome to the interactive demo" })
     .waitFor({ timeout: 15_000 });
   const introAnswerSaved = page.waitForResponse(
-    response =>
-      response.request().method() === "POST" &&
-      response.url().endsWith("/save-progress") &&
-      response.ok(),
+    response => {
+      if (
+        response.request().method() !== "POST" ||
+        !response.url().endsWith("/save-progress") ||
+        !response.ok()
+      ) {
+        return false;
+      }
+      try {
+        const payload = response.request().postDataJSON();
+        return String(payload?.unitResponse ?? "").includes(
+          "Intro answer from smoke"
+        );
+      } catch {
+        return false;
+      }
+    },
     { timeout: 15_000 }
   );
   await introPlayerFrame
