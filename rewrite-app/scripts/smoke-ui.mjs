@@ -5754,7 +5754,7 @@ try {
       }
     }
   );
-  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "domcontentloaded" });
   await page.locator("#participantLoginKey").waitFor();
   await page.evaluate(() => {
     const storageKey = "testcenter-rewrite-app-shell";
@@ -5772,7 +5772,7 @@ try {
       })
     );
   });
-  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "domcontentloaded" });
   await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", "");
   await fillAndCommitUntilValue("#participantWorkspaceKey", "");
@@ -5820,7 +5820,7 @@ try {
   stopAfter("participant-entry-ambiguous-workspace-guidance");
 
   logStep("participant-entry-invalid-booklet-guidance");
-  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "domcontentloaded" });
   await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
   await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
@@ -5871,7 +5871,7 @@ try {
       }
     }
   );
-  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "domcontentloaded" });
   await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
   await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
@@ -6434,7 +6434,7 @@ try {
     )}&unitResponse=${encodeURIComponent(
       participantRouteUnitResponse
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page.getByRole("heading", { name: "Participant Test" }).waitFor();
   assert.equal(
@@ -6702,7 +6702,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page.waitForFunction(
     ([expectedSessionId, expectedUnitKey, expectedResponse]) =>
@@ -6836,7 +6836,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
@@ -8090,7 +8090,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const backgroundSyncedVeronaFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
@@ -8294,7 +8294,7 @@ try {
       loginKey: veronaAdvisoryLoginKey,
       bookletKey: veronaBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const advisoryVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await advisoryVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
@@ -8344,7 +8344,7 @@ try {
       loginKey: veronaSimulationLoginKey,
       bookletKey: veronaBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantRouteExecutionMode")
@@ -8672,7 +8672,7 @@ try {
       loginKey: originalAdaptiveLoginKey,
       bookletKey: originalAdaptiveBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const originalAdaptiveFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
@@ -8845,7 +8845,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalAdaptiveParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const resumedOriginalAdaptiveFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
@@ -9231,7 +9231,7 @@ try {
       loginKey: legacyPlayerLoginKey,
       bookletKey: legacyPlayerBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const legacyPlayerPreloadPayload =
     await (await legacyPlayerPreloadResponse).json();
@@ -9365,7 +9365,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       legacyPlayerParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -9571,7 +9571,7 @@ try {
         loginKey: protocolLoginKey,
         bookletKey: protocolBookletKey
       }).toString()}`,
-      { waitUntil: "networkidle" }
+      { waitUntil: "domcontentloaded" }
     );
     await page
       .locator("#participantVeronaPlayerVersion")
@@ -9679,7 +9679,7 @@ try {
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         protocolParticipantSessionId
       )}`,
-      { waitUntil: "networkidle" }
+      { waitUntil: "domcontentloaded" }
     );
     await page
       .locator("#participantVeronaPlayerVersion")
@@ -9878,7 +9878,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       abiParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10039,7 +10039,7 @@ try {
       loginKey: danLoginKey,
       bookletKey: danBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10082,7 +10082,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       danParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10267,7 +10267,7 @@ try {
       loginKey: historicalDanLoginKey,
       bookletKey: historicalDanBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10315,7 +10315,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       historicalDanParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10517,7 +10517,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       starsParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -10603,7 +10603,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       starsParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -11411,7 +11411,7 @@ try {
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
       )}`,
-      { waitUntil: "networkidle" }
+      { waitUntil: "domcontentloaded" }
     );
     await page
       .locator("#participantVeronaPlayerVersion")
@@ -12144,7 +12144,7 @@ try {
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
       )}`,
-      { waitUntil: "networkidle" }
+      { waitUntil: "domcontentloaded" }
     );
     await page
       .locator("#participantVeronaPlayerVersion")
