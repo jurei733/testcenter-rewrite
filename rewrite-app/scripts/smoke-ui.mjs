@@ -10696,7 +10696,7 @@ try {
       loginKey: aspectLoginKey,
       bookletKey: aspectBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
