@@ -4252,30 +4252,21 @@ try {
     workspaceAdminBatchSession.adminSession.adminSessionId,
     delegatedAdminBatchSession.adminSession.adminSessionId
   ]) {
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      await adminSessionsCollection
-        .locator(".record-card")
-        .filter({ hasText: adminSessionId })
-        .getByRole("button", { name: "Add To Batch" })
-        .click({ force: true });
-      try {
-        await page
-          .locator("app-record-collection")
-          .filter({
-            has: page.getByRole("heading", {
-              name: "Selected Admin Sessions",
-              exact: true
-            })
-          })
-          .filter({ hasText: adminSessionId })
-          .waitFor({ timeout: 5_000 });
-        break;
-      } catch (error) {
-        if (attempt === 3) {
-          throw error;
-        }
-      }
-    }
+    await adminSessionsCollection
+      .locator(".record-card")
+      .filter({ hasText: adminSessionId })
+      .getByRole("button", { name: "Add To Batch" })
+      .click({ force: true });
+    await page
+      .locator("app-record-collection")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Selected Admin Sessions",
+          exact: true
+        })
+      })
+      .filter({ hasText: adminSessionId })
+      .waitFor({ timeout: 15_000 });
   }
   const selectedAdminSessions = page
     .locator("app-record-collection")
