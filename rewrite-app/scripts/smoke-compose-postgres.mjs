@@ -106,11 +106,14 @@ const readExpectedPostgresSchemaVersion = async () => {
     new URL("../packages/postgres-store/src/index.ts", import.meta.url),
     "utf8"
   );
-  const match = /POSTGRES_FIRST_SLICE_SCHEMA_VERSION\s*=\s*(\d+)/.exec(source);
-  if (!match) {
+  const versions = Array.from(
+    source.matchAll(/\bversion:\s*(\d+)\b/g),
+    match => Number.parseInt(match[1], 10)
+  );
+  if (versions.length === 0) {
     throw new Error("Could not resolve expected Postgres schema version.");
   }
-  return Number.parseInt(match[1], 10);
+  return Math.max(...versions);
 };
 
 const pollJson = async url => {

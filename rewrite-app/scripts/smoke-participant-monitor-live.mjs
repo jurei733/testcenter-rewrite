@@ -366,7 +366,7 @@ try {
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
-  await participantPage.locator("#participantRouteUnitResponse").waitFor({
+  await participantPage.locator("#participantVeronaPlayerFrame").waitFor({
     timeout: 15_000
   });
 

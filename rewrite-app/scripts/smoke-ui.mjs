@@ -797,35 +797,53 @@ try {
   await waitForNotBusy("initial-load");
   assert.equal(await page.locator("#authModeBadge").count(), 0);
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
-  await page
-    .locator("article.card")
-    .filter({
-      has: page.getByRole("heading", { name: "Workspace Action Queue" })
-    })
-    .waitFor();
-  await page.waitForFunction(
-    ([expectedPort, expectedAuthMode]) => {
-      const authMode = document.querySelector("#authModeBadge")?.textContent?.trim();
-      const runtimePort = document
-        .querySelector("#runtimePortBadge")
-        ?.textContent?.trim();
-      const routeCount = Number.parseInt(
-        document.querySelector("#routeCountBadge")?.textContent?.trim() ?? "",
-        10
-      );
-      const buildRef = document.querySelector("#buildRefBadge")?.textContent?.trim();
+  if (operatorAuthRequired) {
+    await page.waitForURL(url => {
       return (
-        authMode === expectedAuthMode &&
-        runtimePort === String(expectedPort) &&
-        Number.isFinite(routeCount) &&
-        routeCount >= 30 &&
-        !!buildRef &&
-        buildRef !== "unknown"
+        url.pathname === "/app/ops" &&
+        url.searchParams.get("returnUrl") === "/workspace"
       );
-    },
-    [port, operatorAuthRequired ? "required" : "open"],
-    { timeout: 15_000 }
-  );
+    });
+    await page.locator("#operatorAccessCard.is-signed-out").waitFor();
+    assert.equal(
+      await page
+        .getByRole("heading", { name: "Workspace Action Queue", exact: true })
+        .count(),
+      0
+    );
+    await page.goto(`${baseUrl}/app/ops`, { waitUntil: "networkidle" });
+    await page.locator("#operatorAccessCard.is-signed-out").waitFor();
+  } else {
+    await page
+      .locator("article.card")
+      .filter({
+        has: page.getByRole("heading", { name: "Workspace Action Queue" })
+      })
+      .waitFor();
+    await page.waitForFunction(
+      expectedPort => {
+        const authMode = document.querySelector("#authModeBadge")?.textContent?.trim();
+        const runtimePort = document
+          .querySelector("#runtimePortBadge")
+          ?.textContent?.trim();
+        const routeCount = Number.parseInt(
+          document.querySelector("#routeCountBadge")?.textContent?.trim() ?? "",
+          10
+        );
+        const buildRef = document.querySelector("#buildRefBadge")?.textContent?.trim();
+        return (
+          authMode === "open" &&
+          runtimePort === String(expectedPort) &&
+          Number.isFinite(routeCount) &&
+          routeCount >= 30 &&
+          !!buildRef &&
+          buildRef !== "unknown"
+        );
+      },
+      port,
+      { timeout: 15_000 }
+    );
+  }
   if (!skipOfflineAppShell) {
     logStep("offline-app-shell");
     const offlineShellContext = await browser.newContext({
@@ -913,38 +931,40 @@ try {
     }
   }
   stopAfter("offline-app-shell");
-  logStep("raw-debug-toggle");
-  assert.equal(
-    await page.locator(".raw-debug-panel").count(),
-    0,
-    "Raw debug panels should be hidden by default."
-  );
-  assert.equal(
-    await page.locator("#lastResponse").count(),
-    0,
-    "The full raw last response should be hidden by default."
-  );
-  await page.locator("#lastResponsePreview").waitFor();
-  await page.locator("#rawDebugToggle").click();
-  await page.locator(".raw-debug-panel").first().waitFor();
-  await page.locator("#lastResponse").waitFor();
-  await page.locator("#rawDebugToggle").click();
-  await page.waitForFunction(
-    () =>
-      document.querySelectorAll(".raw-debug-panel").length === 0 &&
-      document.querySelector("#lastResponse") == null,
-    undefined,
-    { timeout: 10_000 }
-  );
-  if (await page.locator("#autoRefreshEnabled").isChecked()) {
-    logStep("disable-auto-refresh");
-    await page.locator("#autoRefreshEnabled").uncheck();
-    await page.waitForTimeout(150);
-  }
+  if (!operatorAuthRequired) {
+    logStep("raw-debug-toggle");
+    assert.equal(
+      await page.locator(".raw-debug-panel").count(),
+      0,
+      "Raw debug panels should be hidden by default."
+    );
+    assert.equal(
+      await page.locator("#lastResponse").count(),
+      0,
+      "The full raw last response should be hidden by default."
+    );
+    await page.locator("#lastResponsePreview").waitFor();
+    await page.locator("#rawDebugToggle").click();
+    await page.locator(".raw-debug-panel").first().waitFor();
+    await page.locator("#lastResponse").waitFor();
+    await page.locator("#rawDebugToggle").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll(".raw-debug-panel").length === 0 &&
+        document.querySelector("#lastResponse") == null,
+      undefined,
+      { timeout: 10_000 }
+    );
+    if (await page.locator("#autoRefreshEnabled").isChecked()) {
+      logStep("disable-auto-refresh");
+      await page.locator("#autoRefreshEnabled").uncheck();
+      await page.waitForTimeout(150);
+    }
 
-  logStep("nav-ops");
-  await page.locator('[data-view-nav="ops"]').click();
-  await page.waitForURL(/\/app\/ops$/);
+    logStep("nav-ops");
+    await page.locator('[data-view-nav="ops"]').click();
+    await page.waitForURL(/\/app\/ops$/);
+  }
   await page.locator("#operatorAccessCard.is-signed-out").waitFor();
   assert.equal(
     await page.getByRole("heading", { name: "Ops Action Queue", exact: true }).count(),
@@ -1123,7 +1143,7 @@ try {
   );
   stopAfter("admin-access-window-copy");
   logStep("admin-current-session");
-  await clickAction("Current Session");
+  await clickSelectorAction("Refresh Session", "#adminCurrentSessionButton");
   await page
     .locator("article.card")
     .filter({

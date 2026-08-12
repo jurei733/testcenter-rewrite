@@ -70,7 +70,9 @@ const mapAdminUser = (row: Row | undefined): AdminUser | null =>
         status: row.status as AdminUser["status"],
         customTexts: (() => {
           try {
-            const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
+            const value = row.custom_texts_json;
+            const parsed =
+              typeof value === "string" ? JSON.parse(value) : (value ?? {});
             return parsed && typeof parsed === "object" && !Array.isArray(parsed)
               ? Object.fromEntries(
                   Object.entries(parsed).filter(
