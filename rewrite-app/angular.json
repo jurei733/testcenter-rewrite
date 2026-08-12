@@ -34,6 +34,11 @@
                 "glob": "app-icon.svg",
                 "input": "apps/web/src",
                 "output": "/"
+              },
+              {
+                "glob": "**/*",
+                "input": "apps/web/src/assets",
+                "output": "/assets"
               }
             ],
             "styles": [

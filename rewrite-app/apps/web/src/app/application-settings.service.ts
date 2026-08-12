@@ -16,6 +16,17 @@ import { RewriteAppApiService } from "./rewrite-app-api.service";
 
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
 
+const defaultApplicationAssetNames: Record<ApplicationAssetSlotName, string> = {
+  logo: "IQB-Logo-2025.png",
+  loginIllustration: "login-illustration.png",
+  codeInputIllustration: "code-input-illustration-kids.png",
+  codeInputCompanion: "bird-character.png",
+  starterCompanion: "bird-character-cool.png",
+  starterCardDone: "bird-character-done.png",
+  loadingProgress: "bird-character-cool.png",
+  confirmDialog: "bird-character-cool.png"
+};
+
 @Injectable({ providedIn: "root" })
 export class ApplicationSettingsService {
   private readonly api = inject(RewriteAppApiService);
@@ -89,9 +100,23 @@ export class ApplicationSettingsService {
     const originalName =
       this.participantAssetOverrides[slot] ??
       this.settings().assetAssignments[slot];
-    return originalName
-      ? `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`
-      : fallback;
+    if (originalName) {
+      return `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
+    }
+    if (
+      slot === "logo" &&
+      fallback &&
+      fallback !== defaultApplicationSettings.mainLogo
+    ) {
+      return fallback;
+    }
+    const themeName =
+      this.participantThemeOverride ?? this.settings().themeName;
+    const assetName =
+      themeName === "Sekundar" && slot === "codeInputIllustration"
+        ? "code-input-illustration-teens.png"
+        : defaultApplicationAssetNames[slot];
+    return `assets/images/${assetName}`;
   }
 
   applicationAssetUrl(originalName: string): string {

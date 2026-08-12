@@ -1142,6 +1142,15 @@ try {
   );
   await page.locator("#applicationSettingsCard").waitFor();
   await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
+  await page.waitForFunction(() => {
+    const image = document.querySelector("#applicationLogo");
+    return (
+      image instanceof HTMLImageElement &&
+      image.complete &&
+      image.naturalWidth > 0 &&
+      image.src.endsWith("/app/assets/images/IQB-Logo-2025.png")
+    );
+  });
   const configuredLogoBase64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   await page.locator("#applicationAssetInput").setInputFiles({
@@ -1399,6 +1408,17 @@ try {
     .locator("#participantCustomLoginSubtitle")
     .filter({ hasText: "UI Global Selection" })
     .waitFor();
+  await brandedParticipantPage.waitForFunction(() => {
+    const image = document.querySelector("#participantLoginIllustration");
+    return (
+      image instanceof HTMLImageElement &&
+      image.complete &&
+      image.naturalWidth > 0 &&
+      image.src.includes(
+        "/api/v1/system/application-assets?originalName=ui-login-illustration.png"
+      )
+    );
+  });
   await brandedParticipantPage
     .locator("#applicationIntroContent p")
     .filter({ hasText: "Welcome to the UI smoke assessment." })
@@ -1488,6 +1508,9 @@ try {
   await page.locator("#applicationThemeSelect").selectOption({ label: "Primar" });
   await page.locator("#resetApplicationLogoButton").click();
   await page.locator("#resetApplicationCustomTextsButton").click();
+  await page
+    .locator("#applicationAssetSlot-loginIllustration")
+    .selectOption("");
   await fillAndCommit("#applicationWarningTextInput", "");
   await fillAndCommit("#applicationWarningExpiresAtInput", "");
   await clickAction("Save Application Settings");
@@ -1499,9 +1522,25 @@ try {
     const image = document.querySelector("#applicationLogo");
     return (
       image instanceof HTMLImageElement &&
-      image.src.endsWith("/app/app-icon.svg")
+      image.complete &&
+      image.naturalWidth > 0 &&
+      image.src.endsWith("/app/assets/images/IQB-Logo-2025.png")
     );
   });
+  const fallbackParticipantPage = await context.newPage();
+  await fallbackParticipantPage.goto(`${baseUrl}/app/participant`, {
+    waitUntil: "networkidle"
+  });
+  await fallbackParticipantPage.waitForFunction(() => {
+    const image = document.querySelector("#participantLoginIllustration");
+    return (
+      image instanceof HTMLImageElement &&
+      image.complete &&
+      image.naturalWidth > 0 &&
+      image.src.endsWith("/app/assets/images/login-illustration.png")
+    );
+  });
+  await fallbackParticipantPage.close();
   const settingsAuditResponse = await fetch(
     `${baseUrl}/api/v1/admin/audit-events?eventType=application_settings_updated`,
     {
@@ -6073,6 +6112,24 @@ try {
     "Sekundar",
     "The participant roster theme must override the application theme during entry."
   );
+  await page.waitForFunction(() => {
+    const illustration = document.querySelector(
+      "#participantCodeInputIllustration"
+    );
+    const companion = document.querySelector("#participantCodeInputCompanion");
+    return (
+      illustration instanceof HTMLImageElement &&
+      illustration.complete &&
+      illustration.naturalWidth > 0 &&
+      illustration.src.endsWith(
+        "/app/assets/images/code-input-illustration-teens.png"
+      ) &&
+      companion instanceof HTMLImageElement &&
+      companion.complete &&
+      companion.naturalWidth > 0 &&
+      companion.src.endsWith("/app/assets/images/bird-character.png")
+    );
+  });
   await page
     .locator(".participant-code-control")
     .filter({ hasText: "Project Access Code" })

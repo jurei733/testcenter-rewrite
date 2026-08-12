@@ -143,7 +143,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <img
               id="applicationLogoPreview"
               class="settings-logo-preview"
-              [src]="view.applicationLogoDraft"
+              [src]="view.applicationSettings.assetUrl('logo', view.applicationLogoDraft)"
               alt="Application logo preview"
             />
             <button id="resetApplicationLogoButton" class="ghost" type="button" (click)="view.resetApplicationLogo()">Use Default Logo</button>
