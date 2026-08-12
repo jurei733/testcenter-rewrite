@@ -4,10 +4,7 @@ import { Router } from "@angular/router";
 import {
   formatMonitorCustomText,
   mergeMonitorCustomTextScopes,
-  mapOriginalTestcenterOperationalLoginToAdminRole,
   filterOpenMonitorRunsByProfile,
-  parseOriginalTestcenterOperationalLogins,
-  parseParticipantRosterText,
   resolveOpenMonitorRunSuperState,
   resolveMonitorCustomText,
   type MonitorCustomTextKey
@@ -23,10 +20,15 @@ import type {
   ListParticipantSessionsResponse,
   ListWorkspaceActivityEventsResponse,
   MonitorOpenRunsResponse,
-  ParsedParticipantRosterEntry,
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
+import {
+  mapOriginalTestcenterOperationalLoginToAdminRole,
+  parseOriginalTestcenterOperationalLogins,
+  parseParticipantRosterText
+} from "@testcenter-rewrite-app/contracts/participant-roster";
+import type { ParsedParticipantRosterEntry } from "@testcenter-rewrite-app/contracts/participant-roster";
 import {
   participantSessionStatuses,
   testRunStatuses

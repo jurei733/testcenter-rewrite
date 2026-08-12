@@ -34768,6 +34768,172 @@ test("workspace participant roster accepts operational-only Testtakers as migrat
   assert.deepEqual(replacedCandidateSet.body.operationalLoginCandidates, []);
 });
 
+test("workspace participant roster imports current canonical Testtakers JSON", async () => {
+  const tenantKey = "integration-tenant-current-testtakers-json";
+  const workspaceKey = "integration-workspace-current-testtakers-json";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const importResult = await requestJson<{
+    importedCount: number;
+    updatedCount: number;
+    items: Array<Record<string, unknown>>;
+    operationalLoginCandidates: Array<Record<string, unknown>>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: {
+        metadata: { description: "Current Testtakers JSON integration fixture" },
+        customTexts: { login_subtitle: "Choose the current project" },
+        profiles: {
+          groupMonitor: [
+            {
+              id: "current-profile",
+              label: "Current profile",
+              view: "small",
+              filters: [
+                {
+                  field: "groupName",
+                  value: "current-group",
+                  label: "Current group",
+                  not: true
+                }
+              ]
+            }
+          ]
+        },
+        groups: [
+          {
+            id: "current-group",
+            label: "Current Group",
+            validFor: 45,
+            logins: [
+              {
+                name: "current-json-student",
+                pw: "current-student-secret",
+                mode: "run-hot-return",
+                booklets: [
+                  { id: "BOOKLET.CURRENT-1", codes: "first second" },
+                  { id: "BOOKLET.CURRENT-2" }
+                ],
+                viewSettings: {
+                  theme: "Sekundar",
+                  codeInput: { type: "keypad-numbers", length: 3 }
+                }
+              },
+              {
+                name: "current-json-monitor",
+                pw: "current-monitor-secret",
+                mode: "monitor-group",
+                profiles: [{ id: "current-profile" }],
+                viewSettings: { monitorBookletVisibility: "collapsed" }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importedCount, 1);
+  assert.equal(importResult.body.updatedCount, 0);
+  assert.deepEqual(importResult.body.items, [
+    {
+      ...importResult.body.items[0],
+      loginKey: "current-json-student",
+      executionMode: "run-hot-return",
+      groupKey: "current-group",
+      bookletKey: "BOOKLET.CURRENT-1",
+      bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
+      bookletAssignments: [
+        {
+          assignmentKey: "BOOKLET.CURRENT-1",
+          bookletKey: "BOOKLET.CURRENT-1",
+          statePreset: {},
+          accessCodes: ["first", "second"]
+        },
+        {
+          assignmentKey: "BOOKLET.CURRENT-2",
+          bookletKey: "BOOKLET.CURRENT-2",
+          statePreset: {}
+        }
+      ],
+      passwordRequired: true,
+      customTexts: { login_subtitle: "Choose the current project" },
+      viewSettings: {
+        theme: "Sekundar",
+        codeInput: { type: "keypad-numbers", length: 3 }
+      },
+      validForMinutes: 45
+    }
+  ]);
+  assert.deepEqual(importResult.body.operationalLoginCandidates, [
+    {
+      loginKey: "current-json-monitor",
+      loginMode: "monitor-group",
+      groupKey: "current-group",
+      passwordRequired: true,
+      profileIds: ["current-profile"],
+      monitorProfiles: [
+        {
+          profileId: "current-profile",
+          label: "Current profile",
+          settings: {
+            blockColumn: "show",
+            unitColumn: "show",
+            view: "small",
+            groupColumn: "hide",
+            bookletColumn: "show",
+            bookletStatesColumns: "",
+            autoselectNextBlock: "yes"
+          },
+          filters: [
+            {
+              target: "groupName",
+              value: "current-group",
+              subValue: null,
+              label: "Current group",
+              type: "equal",
+              not: true
+            }
+          ],
+          filtersEnabled: { pending: "no", locked: "no" }
+        }
+      ],
+      monitorBookletVisibility: "collapsed",
+      customTexts: { login_subtitle: "Choose the current project" },
+      unresolvedProfileIds: [],
+      validForMinutes: 45
+    }
+  ]);
+  assert.equal(
+    JSON.stringify(importResult.body).includes("current-student-secret"),
+    false
+  );
+  assert.equal(
+    JSON.stringify(importResult.body).includes("current-monitor-secret"),
+    false
+  );
+
+  const savedRoster = await requestJson<typeof importResult.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
+  );
+  assert.equal(savedRoster.status, 200);
+  assert.deepEqual(savedRoster.body.items, importResult.body.items);
+  assert.deepEqual(
+    savedRoster.body.operationalLoginCandidates,
+    importResult.body.operationalLoginCandidates
+  );
+});
+
 test("workspace participant roster can be imported, updated, and listed", async () => {
   const tenantKey = "integration-tenant-roster";
   const workspaceKey = "integration-workspace-roster";

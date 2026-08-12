@@ -6,9 +6,186 @@ import {
   mapOriginalTestcenterOperationalLoginToMonitorRole,
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText
-} from "./index.js";
+} from "./participant-roster.js";
 
 describe("parseParticipantRosterText", () => {
+  it("parses the current canonical Testtakers JSON shape", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        JSON.stringify({
+          metadata: { description: "Current Testtakers JSON" },
+          customTexts: { login_subtitle: "Current project selection" },
+          groups: [
+            {
+              id: "current-group",
+              label: "Current Group",
+              validFrom: "1/9/2025 08:00",
+              validFor: 45,
+              assetAssignment: [
+                { slot: "logo", value: "school-logo.png" },
+                { slot: "starterCompanion", value: "school-bird.webp" }
+              ],
+              logins: [
+                {
+                  name: "current-student",
+                  pw: "current-secret",
+                  mode: "run-hot-return",
+                  booklets: [
+                    { id: "BOOKLET.CURRENT-1", codes: "abc def" },
+                    { id: "BOOKLET.CURRENT-2" }
+                  ],
+                  assetAssignment: [
+                    { slot: "starterCompanion", value: "student-bird.jpg" },
+                    { slot: "confirmDialog", value: "student-confirm.png" }
+                  ],
+                  viewSettings: {
+                    theme: "Sekundar",
+                    codeInput: { type: "keypad-numbers", length: 3 }
+                  }
+                },
+                {
+                  name: "current-monitor",
+                  mode: "monitor-group",
+                  profiles: [{ id: "all" }]
+                }
+              ]
+            }
+          ]
+        })
+      ),
+      [
+        {
+          loginKey: "current-student",
+          executionMode: "run-hot-return",
+          groupKey: "current-group",
+          bookletKey: "BOOKLET.CURRENT-1",
+          bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
+          bookletAssignments: [
+            {
+              assignmentKey: "BOOKLET.CURRENT-1",
+              bookletKey: "BOOKLET.CURRENT-1",
+              statePreset: {},
+              accessCodes: ["abc", "def"]
+            },
+            {
+              assignmentKey: "BOOKLET.CURRENT-2",
+              bookletKey: "BOOKLET.CURRENT-2",
+              statePreset: {}
+            }
+          ],
+          displayName: null,
+          password: "current-secret",
+          validFrom: "1/9/2025 08:00",
+          validForMinutes: 45,
+          customTexts: { login_subtitle: "Current project selection" },
+          viewSettings: {
+            theme: "Sekundar",
+            codeInput: { type: "keypad-numbers", length: 3 }
+          },
+          assetAssignments: {
+            logo: "school-logo.png",
+            starterCompanion: "student-bird.jpg",
+            confirmDialog: "student-confirm.png"
+          }
+        }
+      ]
+    );
+  });
+
+  it("classifies operational logins from the current canonical Testtakers JSON shape", () => {
+    const source = {
+      customTexts: { gm_headline: "Current monitor" },
+      profiles: {
+        groupMonitor: [
+          {
+            id: "current-profile",
+            label: "Current profile",
+            view: "small",
+            blockColumn: "hide",
+            filterLocked: "yes",
+            filters: [
+              {
+                field: "groupName",
+                value: "current-group",
+                label: "Current group",
+                type: "equal",
+                not: true
+              }
+            ]
+          }
+        ]
+      },
+      groups: [
+        {
+          id: "current-group",
+          label: "Current Group",
+          validFor: 30,
+          assetAssignment: [{ slot: "logo", value: "group-logo.png" }],
+          logins: [
+            {
+              name: "current-monitor",
+              pw: "source-secret",
+              mode: "monitor-group",
+              profiles: [{ id: "current-profile" }, { id: "missing" }],
+              assetAssignment: [
+                { slot: "logo", value: "monitor-logo.webp" }
+              ],
+              viewSettings: { monitorBookletVisibility: "collapsed" }
+            },
+            {
+              name: "current-participant",
+              mode: "run-hot-return",
+              booklets: [{ id: "BOOKLET.CURRENT" }]
+            }
+          ]
+        }
+      ]
+    };
+
+    const candidates = parseOriginalTestcenterOperationalLogins(source);
+    assert.deepEqual(candidates, [
+      {
+        loginKey: "current-monitor",
+        loginMode: "monitor-group",
+        groupKey: "current-group",
+        passwordRequired: true,
+        profileIds: ["current-profile", "missing"],
+        monitorProfiles: [
+          {
+            profileId: "current-profile",
+            label: "Current profile",
+            settings: {
+              blockColumn: "hide",
+              unitColumn: "show",
+              view: "small",
+              groupColumn: "hide",
+              bookletColumn: "show",
+              bookletStatesColumns: "",
+              autoselectNextBlock: "yes"
+            },
+            filters: [
+              {
+                target: "groupName",
+                value: "current-group",
+                subValue: null,
+                label: "Current group",
+                type: "equal",
+                not: true
+              }
+            ],
+            filtersEnabled: { pending: "no", locked: "yes" }
+          }
+        ],
+        monitorBookletVisibility: "collapsed",
+        customTexts: { gm_headline: "Current monitor" },
+        assetAssignments: { logo: "monitor-logo.webp" },
+        unresolvedProfileIds: ["missing"],
+        validForMinutes: 30
+      }
+    ]);
+    assert.equal(JSON.stringify(candidates).includes("source-secret"), false);
+  });
+
   it("inherits Testtakers 18.0 group assets and lets login assets override slots", () => {
     assert.deepEqual(
       parseParticipantRosterText(

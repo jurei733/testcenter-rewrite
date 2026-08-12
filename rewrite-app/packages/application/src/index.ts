@@ -22,8 +22,6 @@ import {
   compileBookletRuntimePolicy,
   isBookletPlayerEndAllowed,
   isSupportedVeronaPlayerApiVersion,
-  parseOriginalTestcenterOperationalLogins,
-  parseParticipantRosterText,
   parseVeronaUnitResponse,
   projectVeronaPageState,
   readBookletConfigValues
@@ -31,10 +29,16 @@ import {
 import type {
   AdminAccessWindowErrorDetails,
   AdminUserAccessStatus,
-  OriginalTestcenterOperationalLoginCandidate,
-  ParticipantRosterSource,
   SourceDocumentSource
 } from "@testcenter-rewrite-app/contracts";
+import {
+  parseOriginalTestcenterOperationalLogins,
+  parseParticipantRosterText
+} from "@testcenter-rewrite-app/contracts/participant-roster";
+import type {
+  OriginalTestcenterOperationalLoginCandidate,
+  ParticipantRosterSource
+} from "@testcenter-rewrite-app/contracts/participant-roster";
 import {
   defaultApplicationSettings,
   defaultParticipantExecutionMode,

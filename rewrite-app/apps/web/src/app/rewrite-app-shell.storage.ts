@@ -1,8 +1,4 @@
 import type { AppView, PersistedShellState } from "./rewrite-app-shell.types";
-import {
-  parseOriginalTestcenterOperationalLogins,
-  parseParticipantRosterText
-} from "@testcenter-rewrite-app/contracts";
 import type {
   AdminRole,
   AdminRoleAccessMode,
@@ -310,21 +306,7 @@ const redactSensitiveRosterSource = (source: string): string => {
   if (!mayContainRosterPassword) {
     return source;
   }
-
-  try {
-    const containsParticipantPassword = parseParticipantRosterText(source).some(
-      entry => Boolean(entry.password)
-    );
-    const containsOperationalPassword =
-      parseOriginalTestcenterOperationalLogins(source).some(
-        candidate => candidate.passwordRequired
-      );
-    return containsParticipantPassword || containsOperationalPassword
-      ? ""
-      : source;
-  } catch {
-    return source;
-  }
+  return "";
 };
 
 export const applyHydratedShellState = (

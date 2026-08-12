@@ -8,7 +8,7 @@ import { brotliDecompressSync } from "node:zlib";
 import {
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText
-} from "./index.js";
+} from "./participant-roster.js";
 
 type PinnedOriginalFixture = {
   fixture: string;
