@@ -2479,7 +2479,7 @@ const isTextualSourcePackageForAssembly = (
   );
 };
 
-type TestcenterXmlFileIdentity = {
+type TestcenterFileIdentity = {
   fileType: "Booklet" | "Unit" | "SysCheck" | "Testtakers";
   id: string;
   source: "metadata" | "roster";
@@ -2490,6 +2490,96 @@ type TesttakersRosterStructure = {
     groupId: string;
     loginNames: string[];
   }>;
+};
+
+type TesttakersJsonRosterDocument = {
+  structure: TesttakersRosterStructure;
+  bookletIds: string[];
+};
+
+const readTesttakersJsonRosterDocument = (
+  sourceDocument: string
+): TesttakersJsonRosterDocument | null => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(sourceDocument);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const groupsValue = (parsed as Record<string, unknown>).groups;
+  if (!Array.isArray(groupsValue) || groupsValue.length === 0) {
+    return null;
+  }
+
+  const bookletIds = new Set<string>();
+  const groups = groupsValue.map(groupValue => {
+    if (
+      typeof groupValue !== "object" ||
+      groupValue === null ||
+      Array.isArray(groupValue)
+    ) {
+      return null;
+    }
+    const group = groupValue as Record<string, unknown>;
+    const groupId = typeof group.id === "string" ? group.id.trim() : "";
+    if (!groupId || !Array.isArray(group.logins) || group.logins.length === 0) {
+      return null;
+    }
+
+    const loginNames = group.logins.map(loginValue => {
+      if (
+        typeof loginValue !== "object" ||
+        loginValue === null ||
+        Array.isArray(loginValue)
+      ) {
+        return null;
+      }
+      const login = loginValue as Record<string, unknown>;
+      const loginName = typeof login.name === "string" ? login.name.trim() : "";
+      const loginMode = typeof login.mode === "string" ? login.mode.trim() : "";
+      const supportedLoginMode =
+        participantExecutionModes.includes(
+          loginMode as (typeof participantExecutionModes)[number]
+        ) ||
+        ["monitor-group", "monitor-study", "sys-check-login"].includes(
+          loginMode
+        );
+      if (!loginName || !supportedLoginMode) {
+        return null;
+      }
+      if (Array.isArray(login.booklets)) {
+        for (const bookletValue of login.booklets) {
+          if (
+            typeof bookletValue !== "object" ||
+            bookletValue === null ||
+            Array.isArray(bookletValue)
+          ) {
+            continue;
+          }
+          const bookletId = (bookletValue as Record<string, unknown>).id;
+          if (typeof bookletId === "string" && bookletId.trim()) {
+            bookletIds.add(bookletId.trim());
+          }
+        }
+      }
+      return loginName;
+    });
+    if (loginNames.some(loginName => !loginName)) {
+      return null;
+    }
+    return { groupId, loginNames: loginNames as string[] };
+  });
+  if (groups.some(group => !group)) {
+    return null;
+  }
+  return {
+    structure: { groups: groups as TesttakersRosterStructure["groups"] },
+    bookletIds: [...bookletIds]
+  };
 };
 
 const collectTesttakersBookletReferences = (
@@ -2557,10 +2647,9 @@ const readTesttakersRosterStructure = (
   return { groups };
 };
 
-const readTesttakersRosterIdentity = (
-  sourceDocument: string
-): TestcenterXmlFileIdentity | null => {
-  const rosterStructure = readTesttakersRosterStructure(sourceDocument);
+const createTesttakersRosterIdentity = (
+  rosterStructure: TesttakersRosterStructure | null
+): TestcenterFileIdentity | null => {
   if (!rosterStructure) {
     return null;
   }
@@ -2581,9 +2670,21 @@ const readTesttakersRosterIdentity = (
   };
 };
 
+const readTesttakersRosterIdentity = (
+  sourceDocument: string
+): TestcenterFileIdentity | null =>
+  createTesttakersRosterIdentity(readTesttakersRosterStructure(sourceDocument));
+
+const readTesttakersJsonRosterIdentity = (
+  sourceDocument: string
+): TestcenterFileIdentity | null =>
+  createTesttakersRosterIdentity(
+    readTesttakersJsonRosterDocument(sourceDocument)?.structure ?? null
+  );
+
 const readTestcenterXmlFileIdentity = (
   sourceDocument: string
-): TestcenterXmlFileIdentity | null => {
+): TestcenterFileIdentity | null => {
   const documentHead = sourceDocument.slice(0, 256 * 1024);
   if (/<!DOCTYPE\b/i.test(documentHead)) {
     return null;
@@ -2616,9 +2717,9 @@ const readTestcenterXmlFileIdentity = (
     : null;
 };
 
-const readStandaloneTestcenterXmlFileIdentity = (
+const readStandaloneTestcenterFileIdentity = (
   sourcePackage: SourcePackage
-): TestcenterXmlFileIdentity | null => {
+): TestcenterFileIdentity | null => {
   const normalizedFileName = sourcePackage.fileName.trim().toLowerCase();
   const normalizedMediaType = sourcePackage.mediaType.trim().toLowerCase();
   if (
@@ -2635,7 +2736,10 @@ const readStandaloneTestcenterXmlFileIdentity = (
   if (sourceDocument === null) {
     return null;
   }
-  return readTestcenterXmlFileIdentity(sourceDocument);
+  return (
+    readTestcenterXmlFileIdentity(sourceDocument) ??
+    readTesttakersJsonRosterIdentity(sourceDocument)
+  );
 };
 
 const inferVeronaPlayerResourceIdFromFileName = (
@@ -14633,6 +14737,10 @@ const collectLooseSourcePackageDependencyReferences = (
   if (sourceDocument === null) {
     return [];
   }
+  const jsonRosterDocument = readTesttakersJsonRosterDocument(sourceDocument);
+  if (jsonRosterDocument) {
+    return jsonRosterDocument.bookletIds;
+  }
   if (
     !sourceDocument.trimStart().startsWith("<") ||
     /<!DOCTYPE\b/i.test(sourceDocument)
@@ -14892,7 +15000,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
           );
         }
         if (
-          readStandaloneTestcenterXmlFileIdentity(currentSourcePackage)
+          readStandaloneTestcenterFileIdentity(currentSourcePackage)
             ?.fileType === "Testtakers"
         ) {
           missingTesttakersBookletReferences.add(reference);
@@ -16236,16 +16344,19 @@ const extractTesttakersRosterDocumentsFromZipSourcePackage = (
 
   const rosterDocuments: ParticipantRosterDocument[] = [];
   for (const entry of entries) {
+    const normalizedFileName = entry.fileName.toLowerCase();
     if (
       entry.fileName.endsWith("/") ||
-      !entry.fileName.toLowerCase().endsWith(".xml")
+      (!normalizedFileName.endsWith(".xml") &&
+        !normalizedFileName.endsWith(".json"))
     ) {
       continue;
     }
     const rosterText = readZipEntryText(zipBuffer, entry);
     if (
       rosterText &&
-      readTestcenterXmlFileIdentity(rosterText)?.fileType === "Testtakers"
+      (readTestcenterXmlFileIdentity(rosterText)?.fileType === "Testtakers" ||
+        readTesttakersJsonRosterDocument(rosterText))
     ) {
       rosterDocuments.push({
         sourceFileName: entry.fileName,
@@ -22214,7 +22325,7 @@ export const createFirstSliceServices = (
     if (
       options.resolveWorkspaceDependencies !== false &&
       (standaloneImportResolution.runtimeSnapshot ||
-        readStandaloneTestcenterXmlFileIdentity(sourcePackage)?.fileType ===
+        readStandaloneTestcenterFileIdentity(sourcePackage)?.fileType ===
           "Testtakers")
     ) {
       const workspaceSourcePackages =
@@ -27374,25 +27485,26 @@ export const createFirstSliceServices = (
             `Source package file name '${sourcePackage.fileName}' already exists. Create a replacement for source package '${duplicateFileName.sourcePackageId}' to preserve its version history.`
           );
         }
-        const xmlFileIdentity =
-          readStandaloneTestcenterXmlFileIdentity(sourcePackage);
-        const duplicateIdentity = xmlFileIdentity
+        const testcenterFileIdentity =
+          readStandaloneTestcenterFileIdentity(sourcePackage);
+        const duplicateIdentity = testcenterFileIdentity
           ? existingSourcePackages.find(existingSourcePackage => {
               const existingIdentity =
-                readStandaloneTestcenterXmlFileIdentity(existingSourcePackage);
+                readStandaloneTestcenterFileIdentity(existingSourcePackage);
               return (
-                existingIdentity?.fileType === xmlFileIdentity.fileType &&
+                existingIdentity?.fileType === testcenterFileIdentity.fileType &&
                 existingIdentity.id.toUpperCase() ===
-                  xmlFileIdentity.id.toUpperCase()
+                  testcenterFileIdentity.id.toUpperCase()
               );
             })
           : null;
-        if (xmlFileIdentity && duplicateIdentity) {
-          const normalizedFileType = xmlFileIdentity.fileType.toLowerCase();
+        if (testcenterFileIdentity && duplicateIdentity) {
+          const normalizedFileType =
+            testcenterFileIdentity.fileType.toLowerCase();
           const identityConflict =
-            xmlFileIdentity.source === "roster"
+            testcenterFileIdentity.source === "roster"
               ? "A Testtakers roster with the same case-insensitive group and login assignments already exists"
-              : `${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}' already exists`;
+              : `${testcenterFileIdentity.fileType} id '${testcenterFileIdentity.id}' already exists`;
           throw new FirstSliceError(
             409,
             `source_package_${normalizedFileType}_id_duplicate`,

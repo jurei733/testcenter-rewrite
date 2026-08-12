@@ -21264,16 +21264,29 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
       ].join("\n")
     },
     {
-      fileName: "Testtakers-roster-graph.xml",
-      sourceDocument: [
-        "<Testtakers>",
-        '  <Group id="roster-graph" label="Roster graph">',
-        '    <Login name="roster-graph-login">',
-        `      <Booklet codes="code-a" state="variant:one"> ${bookletKey} </Booklet>`,
-        "    </Login>",
-        "  </Group>",
-        "</Testtakers>"
-      ].join("\n")
+      fileName: "Testtakers-roster-graph.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        groups: [
+          {
+            id: "roster-graph",
+            label: "Roster graph",
+            logins: [
+              {
+                name: "roster-graph-login",
+                mode: "run-hot-return",
+                booklets: [
+                  {
+                    id: bookletKey,
+                    codes: "code-a",
+                    state: "variant:one"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      })
     }
   ];
   const uploadedSourcePackages: Array<{ sourcePackageId: string }> = [];
@@ -21282,7 +21295,7 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
       sourcePackage: { sourcePackageId: string };
     }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
       method: "POST",
-      body: { ...file, mediaType: "application/xml" }
+      body: { mediaType: "application/xml", ...file }
     });
     assert.equal(upload.status, 201, file.fileName);
     uploadedSourcePackages.push(upload.body.sourcePackage);
@@ -21319,11 +21332,36 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
   );
   assert.ok(automaticImport.body.stagedContentRelease?.contentReleaseId);
   assert.deepEqual(automaticImport.body.participantRosterImport, {
-    sourceFileNames: ["Testtakers-roster-graph.xml"],
+    sourceFileNames: ["Testtakers-roster-graph.json"],
     importedCount: 1,
     updatedCount: 0,
     operationalLoginCandidateCount: 0
   });
+  const importedRoster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      bookletAssignments: Array<{
+        assignmentKey: string;
+        bookletKey: string;
+        statePreset: Record<string, string>;
+        accessCodes?: string[];
+      }>;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`);
+  assert.deepEqual(importedRoster.body.items, [
+    {
+      ...importedRoster.body.items[0],
+      loginKey: "roster-graph-login",
+      bookletAssignments: [
+        {
+          assignmentKey: `${bookletKey}#variant:one`,
+          bookletKey,
+          statePreset: { variant: "one" },
+          accessCodes: ["code-a"]
+        }
+      ]
+    }
+  ]);
 
   const assembledDetail = await requestJson<{
     sourcePackageDetail: {
@@ -23222,17 +23260,27 @@ test("source document import resolves Unit URI paths in manifestless root ZIP ar
       ].join("\n")
     },
     {
-      fileName: "nested/rosters/Participants-B.xml",
-      content: [
-        "<Testtakers>",
-        '  <Group id="manifestless-participants-b">',
-        '    <Login mode="run-hot-return" name="manifestless-participant-b" pw="participant-b-secret">',
-        "      <Booklet>MANIFESTLESS.BOOKLET</Booklet>",
-        "    </Login>",
-        '    <Login mode="sys-check-login" name="manifestless-system-check" pw="system-check-secret" />',
-        "  </Group>",
-        "</Testtakers>"
-      ].join("\n")
+      fileName: "nested/rosters/Participants-B.json",
+      content: JSON.stringify({
+        groups: [
+          {
+            id: "manifestless-participants-b",
+            logins: [
+              {
+                name: "manifestless-participant-b",
+                mode: "run-hot-return",
+                pw: "participant-b-secret",
+                booklets: [{ id: "MANIFESTLESS.BOOKLET" }]
+              },
+              {
+                name: "manifestless-system-check",
+                mode: "sys-check-login",
+                pw: "system-check-secret"
+              }
+            ]
+          }
+        ]
+      })
     }
   ]);
 
@@ -23274,7 +23322,7 @@ test("source document import resolves Unit URI paths in manifestless root ZIP ar
   assert.deepEqual(importResult.body.participantRosterImport, {
     sourceFileNames: [
       "nested/rosters/Participants-A.xml",
-      "nested/rosters/Participants-B.xml"
+      "nested/rosters/Participants-B.json"
     ],
     importedCount: 2,
     updatedCount: 0,
@@ -23413,7 +23461,7 @@ test("source document import resolves Unit URI paths in manifestless root ZIP ar
     importJobId: importResult.body.importJob.importJobId,
     sourceFileNames: [
       "nested/rosters/Participants-A.xml",
-      "nested/rosters/Participants-B.xml"
+      "nested/rosters/Participants-B.json"
     ]
   });
   assert.equal(JSON.stringify(rosterActivities.body).includes("monitor-secret"), false);
@@ -23477,7 +23525,7 @@ test("source document import resolves Unit URI paths in manifestless root ZIP ar
   assert.deepEqual(repeatedImport.body.participantRosterImport, {
     sourceFileNames: [
       "nested/rosters/Participants-A.xml",
-      "nested/rosters/Participants-B.xml"
+      "nested/rosters/Participants-B.json"
     ],
     importedCount: 0,
     updatedCount: 2,

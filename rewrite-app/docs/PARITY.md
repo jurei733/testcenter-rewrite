@@ -159,6 +159,18 @@ and operational parsing plus asset precedence. The memory API gate imports a
 mixed native JSON roster, persists both read models, reads them back unchanged,
 and proves that neither source password appears in either response.
 
+Latest P0 current Testtakers JSON package closure: canonical JSON roster files
+now participate in the same immutable workspace import graph as Testtakers XML.
+Loose JSON roots contribute their ordered Booklet references to automatic
+dependency assembly, receive the same case-insensitive roster identity guard,
+and import participant assignments, state presets, and second codes from the
+assembled archive. Manifestless Original-style workspace ZIPs discover mixed
+XML and JSON rosters in arbitrary folders, persist participant and operational
+logins together, retain the source filenames in import/audit read models, and
+keep every participant, monitor, and system-check password out of responses.
+Memory API gates cover both the loose JSON → Booklet → Unit graph and a mixed
+XML/JSON workspace ZIP through activation, authentication, and repeated import.
+
 Latest P0 Testtakers-schema closure: the byte-exact original
 `Testtakers_withoutSyscheck.xml` E2E roster extends the pinned corpus with the
 15.2 generation, nine participant accounts, four monitor accounts, no profiles,
