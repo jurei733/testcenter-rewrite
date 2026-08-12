@@ -15440,8 +15440,19 @@ try {
         card =>
           card.textContent?.includes(loginKey) &&
           card.getAttribute("data-presentation-state") === "paused"
-      ),
+    ),
     participantLoginKey
+  );
+  await page.waitForFunction(
+    ([loginKey, expectedBackground]) =>
+      [...document.querySelectorAll(".record-card")].some(
+        card =>
+          card.textContent?.includes(loginKey) &&
+          card.getAttribute("data-presentation-state") === "paused" &&
+          getComputedStyle(card).backgroundColor === expectedBackground
+      ),
+    [participantLoginKey, "rgb(230, 230, 230)"],
+    { timeout: 15_000 }
   );
   assert.equal(
     await pausedMonitorRunCard.getAttribute("data-presentation-state"),
