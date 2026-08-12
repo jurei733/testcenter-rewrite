@@ -357,14 +357,27 @@ const bootstrapLocalDemoState = async (input: {
     });
   }
 
-  await services.workspaceAdminRead.importParticipantRoster({
-    tenantKey: localDemoBootstrap.tenantKey,
-    workspaceKey: localDemoBootstrap.workspaceKey,
-    rosterText: [
-      "loginKey,groupKey,bookletKey,displayName",
-      `${localDemoBootstrap.participantLoginKey},group:student-demo,booklet:demo,Demo Student`
-    ].join("\n")
-  });
+  const existingParticipantRosterEntries =
+    await repository.listParticipantRosterEntriesByWorkspace(
+      tenant.tenantId,
+      workspace.workspaceId
+    );
+  if (
+    !existingParticipantRosterEntries.some(
+      entry =>
+        entry.loginKey.toLocaleLowerCase("en-US") ===
+        localDemoBootstrap.participantLoginKey.toLocaleLowerCase("en-US")
+    )
+  ) {
+    await services.workspaceAdminRead.importParticipantRoster({
+      tenantKey: localDemoBootstrap.tenantKey,
+      workspaceKey: localDemoBootstrap.workspaceKey,
+      rosterText: [
+        "loginKey,groupKey,bookletKey,displayName",
+        `${localDemoBootstrap.participantLoginKey},group:student-demo,booklet:demo,Demo Student`
+      ].join("\n")
+    });
+  }
 
   const existingReleases = await repository.listContentReleasesByWorkspace(
     tenant.tenantId,

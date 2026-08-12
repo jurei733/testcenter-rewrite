@@ -57,6 +57,14 @@ between Player-backed Units, and restores the response after both return
 navigation and a full browser reload. The local browser smoke proves that path
 without depending on test fixtures, external downloads, or network access.
 
+Latest local-demo restart-safety closure: bootstrap now inspects the persisted
+workspace roster before seeding `student-demo`. Once that login exists, an
+ordinary File- or SQLite-backed application restart does not rewrite its mode,
+group, display data, or import timestamp, does not clear other participant
+entries or the operational-login migration inbox, and does not append a
+misleading roster-import audit event. A real stop/start integration gate proves
+all of those invariants in both durable adapters.
+
 Latest P0 Participant pause-boundary closure: participant-authored pauses and
 monitor-authored pauses now persist as distinct run states across memory, file,
 SQLite, and PostgreSQL. A monitor pause removes the Verona iframe and every

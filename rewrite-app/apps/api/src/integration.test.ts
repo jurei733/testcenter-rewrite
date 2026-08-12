@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -8925,6 +8925,220 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(protectedStarterLaunch.body.testRun.bookletKey, "booklet:demo");
   } finally {
     await closeServer(isolated.server);
+  }
+});
+
+test("local demo bootstrap preserves customized roster state across durable restart", async () => {
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "sqlite" ? "sqlite" : "file";
+  const storagePath = resolve(
+    process.cwd(),
+    ".data",
+    `local-demo-bootstrap-restart-${process.pid}.${
+      isolatedStore === "sqlite" ? "sqlite" : "json"
+    }`
+  );
+  const storageFiles = isolatedStore === "sqlite"
+    ? [
+        storagePath,
+        `${storagePath}-wal`,
+        `${storagePath}-shm`,
+        `${storagePath}-journal`
+      ]
+    : [storagePath];
+  for (const storageFile of storageFiles) {
+    rmSync(storageFile, { force: true });
+  }
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    ...(isolatedStore === "sqlite"
+      ? { FIRST_SLICE_SQLITE_FILE: storagePath }
+      : { FIRST_SLICE_FILE: storagePath })
+  };
+  let activeServer: Awaited<ReturnType<typeof createProductionApiServer>> | null =
+    null;
+
+  const signInDemoAdmin = async (targetBaseUrl: string) => {
+    const signIn = await requestJsonAt<{ sessionToken: string }>(
+      targetBaseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "demo-admin",
+          password: "demo-admin-password"
+        }
+      }
+    );
+    assert.equal(signIn.status, 200);
+    return signIn.body.sessionToken;
+  };
+
+  try {
+    const initial = await createIsolatedServer(isolatedEnvironment);
+    activeServer = initial.server;
+    const initialSessionToken = await signInDemoAdmin(initial.baseUrl);
+    const initialHeaders = {
+      authorization: `Bearer ${initialSessionToken}`
+    };
+
+    const customizedRoster = await requestJsonAt<{
+      importedCount: number;
+      updatedCount: number;
+    }>(
+      initial.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        headers: initialHeaders,
+        body: {
+          rosterText: [
+            "loginKey,executionMode,groupKey,bookletKey,displayName",
+            "student-demo,run-review,group:preserved,booklet:demo,Customized Demo Student",
+            "additional-demo,run-hot-return,group:preserved,booklet:demo,Additional Demo Student"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(customizedRoster.status, 201);
+    assert.deepEqual(
+      {
+        importedCount: customizedRoster.body.importedCount,
+        updatedCount: customizedRoster.body.updatedCount
+      },
+      { importedCount: 1, updatedCount: 1 }
+    );
+
+    const operationalRoster = await requestJsonAt<{
+      operationalLoginCandidates: Array<{
+        loginKey: string;
+        loginMode: string;
+      }>;
+    }>(
+      initial.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        headers: initialHeaders,
+        body: {
+          rosterText:
+            '<Testtakers><Group id="demo-operators"><Login mode="monitor-study" name="preserved-demo-monitor" /></Group></Testtakers>'
+        }
+      }
+    );
+    assert.equal(operationalRoster.status, 201);
+    assert.deepEqual(
+      operationalRoster.body.operationalLoginCandidates.map(candidate => ({
+        loginKey: candidate.loginKey,
+        loginMode: candidate.loginMode
+      })),
+      [
+        {
+          loginKey: "preserved-demo-monitor",
+          loginMode: "monitor-study"
+        }
+      ]
+    );
+
+    const initialRosterActivity = await requestJsonAt<{
+      items: Array<{ activityEvent: { activityEventId: string } }>;
+    }>(
+      initial.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=participant_roster_imported&limit=20",
+      { headers: initialHeaders }
+    );
+    assert.equal(initialRosterActivity.status, 200);
+    assert.equal(initialRosterActivity.body.items.length, 3);
+    const initialRosterActivityIds = initialRosterActivity.body.items.map(
+      item => item.activityEvent.activityEventId
+    );
+
+    await closeServer(initial.server);
+    activeServer = null;
+
+    const restarted = await createIsolatedServer(isolatedEnvironment);
+    activeServer = restarted.server;
+    const restartedSessionToken = await signInDemoAdmin(restarted.baseUrl);
+    const restartedHeaders = {
+      authorization: `Bearer ${restartedSessionToken}`
+    };
+    const restartedRoster = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        executionMode: string;
+        groupKey: string;
+        displayName: string | null;
+      }>;
+      operationalLoginCandidates: Array<{
+        loginKey: string;
+        loginMode: string;
+      }>;
+    }>(
+      restarted.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      { headers: restartedHeaders }
+    );
+    assert.equal(restartedRoster.status, 200);
+    assert.deepEqual(
+      restartedRoster.body.items
+        .map(item => ({
+          loginKey: item.loginKey,
+          executionMode: item.executionMode,
+          groupKey: item.groupKey,
+          displayName: item.displayName
+        }))
+        .sort((left, right) => left.loginKey.localeCompare(right.loginKey)),
+      [
+        {
+          loginKey: "additional-demo",
+          executionMode: "run-hot-return",
+          groupKey: "group:preserved",
+          displayName: "Additional Demo Student"
+        },
+        {
+          loginKey: "student-demo",
+          executionMode: "run-review",
+          groupKey: "group:preserved",
+          displayName: "Customized Demo Student"
+        }
+      ]
+    );
+    assert.deepEqual(
+      restartedRoster.body.operationalLoginCandidates.map(candidate => ({
+        loginKey: candidate.loginKey,
+        loginMode: candidate.loginMode
+      })),
+      [
+        {
+          loginKey: "preserved-demo-monitor",
+          loginMode: "monitor-study"
+        }
+      ]
+    );
+
+    const restartedRosterActivity = await requestJsonAt<{
+      items: Array<{ activityEvent: { activityEventId: string } }>;
+    }>(
+      restarted.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=participant_roster_imported&limit=20",
+      { headers: restartedHeaders }
+    );
+    assert.equal(restartedRosterActivity.status, 200);
+    assert.deepEqual(
+      restartedRosterActivity.body.items.map(
+        item => item.activityEvent.activityEventId
+      ),
+      initialRosterActivityIds
+    );
+  } finally {
+    if (activeServer) {
+      await closeServer(activeServer);
+    }
+    for (const storageFile of storageFiles) {
+      rmSync(storageFile, { force: true });
+    }
   }
 });
 

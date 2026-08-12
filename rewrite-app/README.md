@@ -188,7 +188,11 @@ The demo Player uses the same sandboxed handshake, autosave, Unit navigation,
 and reload restoration path as imported production Verona packages. It does not
 need an external Player download or any file from `test-fixtures/`.
 
-If the local database already has an admin user or active demo release, the bootstrap leaves the existing state in place.
+If the local database already has an admin user or active demo release, the
+bootstrap leaves the existing state in place. Once `student-demo` exists, later
+starts also leave the complete participant roster and the operational-login
+migration inbox untouched; local roster edits therefore survive ordinary
+application restarts.
 
 To reset that local demo state and let `start:local` seed it again from a clean SQLite database, run:
 
