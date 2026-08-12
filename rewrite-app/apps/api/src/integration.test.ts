@@ -87,6 +87,31 @@ const encodeUtf32 = (
   return bytes;
 };
 
+const IBM037_TO_LATIN1 = Buffer.from(
+  "AAECA5wJhn+XjY4LDA0ODxAREhOdhQiHGBmSjxwdHh+AgYKDhAoXG4iJiouMBQYHkJEWk5SVlgSYmZqbFBWeGiCg4uTg4ePl5/GiLjwoK3wm6err6O3u7+zfISQqKTusLS/CxMDBw8XH0aYsJV8+P/jJysvIzc7PzGA6I0AnPSLYYWJjZGVmZ2hpq7vw/f6xsGprbG1ub3Bxcqq65rjGpLV+c3R1dnd4eXqhv9Dd3q5eo6W3qae2vL2+W12vqLTXe0FCQ0RFRkdISa309vLz9X1KS0xNTk9QUVK5+/z5+v9c91NUVVZXWFlastTW0tPVMDEyMzQ1Njc4ObPb3Nnanw==",
+  "base64"
+);
+
+const encodeIbm037 = (value: string): Buffer => {
+  const latin1ToIbm037 = new Int16Array(256).fill(-1);
+  for (const [encodedByte, decodedByte] of IBM037_TO_LATIN1.entries()) {
+    latin1ToIbm037[decodedByte] = encodedByte;
+  }
+  const encodedBytes = Buffer.alloc(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.charCodeAt(index);
+    assert.ok(codePoint <= 0xff, "IBM037 fixture text must be Latin-1");
+    const encodedByte = latin1ToIbm037[codePoint]!;
+    assert.notEqual(
+      encodedByte,
+      -1,
+      `IBM037 fixture cannot encode U+${codePoint.toString(16)}`
+    );
+    encodedBytes[index] = encodedByte;
+  }
+  return encodedBytes;
+};
+
 const createZipBase64 = (
   entries: ZipFixtureEntry[],
   options: {
@@ -13339,6 +13364,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const iso885915BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-15"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preis ¤</Label>");
+  const ibm037BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM037"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Prüfung für Köln</Label>");
   const percentEncodedLatin1Booklet = Array.from(
     Buffer.from(latin1BookletXml, "latin1"),
     byte => `%${byte.toString(16).padStart(2, "0")}`
@@ -13423,6 +13451,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "iso-8859-15-original-booklet.xml",
       bytes: Buffer.from(iso885915BookletXml, "latin1"),
       displayLabel: "Preis €"
+    },
+    {
+      fileName: "ibm037-original-booklet.xml",
+      bytes: encodeIbm037(ibm037BookletXml),
+      displayLabel: "Prüfung für Köln"
     },
     {
       fileName: "decoded-iso-8859-1-original-booklet.xml",
@@ -13510,6 +13543,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="x-testcenter-unknown"'
   );
+  const ibm037EncodingMismatchXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="UTF-8"'
+  );
   for (const encodingDiagnosticCase of [
     {
       fileName: "utf-16le-declared-utf-8-original-booklet.xml",
@@ -13531,6 +13568,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "utf8"
       ).toString("base64")}`,
       diagnosticCode: "source_document_xml_encoding_unsupported"
+    },
+    {
+      fileName: "ibm037-declared-utf-8-original-booklet.xml",
+      sourceDocument: `data:application/xml;base64,${encodeIbm037(
+        ibm037EncodingMismatchXml
+      ).toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_mismatch"
     }
   ]) {
     const validationWorkspaceKey = await createValidationWorkspace(
@@ -15689,13 +15733,31 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "school.png",
     "start.webp"
   ]);
-  const assetAdminSignIn = await requestJson<{ sessionToken: string }>(
+  let assetAdminSignIn = await requestJson<{ sessionToken: string }>(
     "/api/v1/admin/auth/sign-in",
     {
       method: "POST",
       body: { username: "integration.admin", password: "integration-secret" }
     }
   );
+  if (assetAdminSignIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    assetAdminSignIn = await requestJson<{ sessionToken: string }>(
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: { username: "integration.admin", password: "integration-secret" }
+      }
+    );
+  }
   assert.equal(assetAdminSignIn.status, 200);
   for (const asset of [
     {
@@ -23503,6 +23565,85 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
           bookletKey: "booklets/zip-booklet.xml",
           displayLabel: "ZIP Booklet",
           unitEntries: [{ unitKey: "items/zip-unit.xml", displayLabel: "ZIP Unit" }]
+        }
+      ]
+    }
+  );
+
+  const ebcdicZipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: encodeIbm037(
+        `<?xml version="1.0" encoding="EBCDIC-CP-US"?>
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <organizations default="ORG-EBCDIC">
+            <organization identifier="ORG-EBCDIC">
+              <item identifierref="RES-EBCDIC-BOOKLET">
+                <title>Prüfung Köln</title>
+                <item identifierref="RES-EBCDIC-UNIT">
+                  <title>Einheit Köln</title>
+                </item>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-EBCDIC-BOOKLET" href="booklets/ebcdic-booklet.xml" />
+            <resource identifier="RES-EBCDIC-UNIT" href="items/ebcdic-unit.xml" />
+          </resources>
+        </manifest>`
+      )
+    }
+  ]);
+  const ebcdicSourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "ebcdic-testcenter-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${ebcdicZipPayload}`
+    }
+  });
+  assert.equal(ebcdicSourcePackage.status, 201);
+  const ebcdicImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: ebcdicSourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(ebcdicImport.status, 201);
+  assert.equal(ebcdicImport.body.importJob.status, "completed");
+  assert.deepEqual(ebcdicImport.body.importJob.diagnostics, []);
+  assert.ok(ebcdicImport.body.stagedContentRelease?.contentReleaseId);
+  const ebcdicContentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${ebcdicImport.body.stagedContentRelease.contentReleaseId}`
+  );
+  assert.equal(ebcdicContentRelease.status, 200);
+  assert.deepEqual(
+    ebcdicContentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/ebcdic-booklet.xml",
+          displayLabel: "Prüfung Köln",
+          unitEntries: [
+            { unitKey: "items/ebcdic-unit.xml", displayLabel: "Einheit Köln" }
+          ]
         }
       ]
     }

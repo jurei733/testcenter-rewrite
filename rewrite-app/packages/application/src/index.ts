@@ -2234,7 +2234,8 @@ type SourceTextByteEncoding =
   | "utf-16le"
   | "utf-16be"
   | "utf-32le"
-  | "utf-32be";
+  | "utf-32be"
+  | "ibm037";
 
 type DetectedSourceTextByteEncoding = {
   encoding: SourceTextByteEncoding;
@@ -2319,6 +2320,15 @@ const detectSourceTextByteEncoding = (
   ) {
     return { encoding: "utf-16be", byteOffset: 0 };
   }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x4c &&
+    bytes[1] === 0x6f &&
+    bytes[2] === 0xa7 &&
+    bytes[3] === 0x94
+  ) {
+    return { encoding: "ibm037", byteOffset: 0 };
+  }
 
   return null;
 };
@@ -2364,6 +2374,22 @@ const decodeUtf32Bytes = (
   return decodedChunks.join("");
 };
 
+// IBM037 is the EBCDIC code page identified by XML's 4C 6F A7 94 leading
+// byte signature. WHATWG TextDecoder deliberately does not provide EBCDIC,
+// so keep the complete single-byte mapping local to the import boundary.
+const IBM037_TO_LATIN1 = Buffer.from(
+  "AAECA5wJhn+XjY4LDA0ODxAREhOdhQiHGBmSjxwdHh+AgYKDhAoXG4iJiouMBQYHkJEWk5SVlgSYmZqbFBWeGiCg4uTg4ePl5/GiLjwoK3wm6err6O3u7+zfISQqKTusLS/CxMDBw8XH0aYsJV8+P/jJysvIzc7PzGA6I0AnPSLYYWJjZGVmZ2hpq7vw/f6xsGprbG1ub3Bxcqq65rjGpLV+c3R1dnd4eXqhv9Dd3q5eo6W3qae2vL2+W12vqLTXe0FCQ0RFRkdISa309vLz9X1KS0xNTk9QUVK5+/z5+v9c91NUVVZXWFlastTW0tPVMDEyMzQ1Njc4ObPb3Nnanw==",
+  "base64"
+);
+
+const decodeIbm037Bytes = (bytes: Buffer): string => {
+  const decodedBytes = Buffer.allocUnsafe(bytes.length);
+  for (let index = 0; index < bytes.length; index += 1) {
+    decodedBytes[index] = IBM037_TO_LATIN1[bytes[index]!]!;
+  }
+  return decodedBytes.toString("latin1");
+};
+
 const decodeSourceTextBytesWithDeclaredEncoding = (
   bytes: Buffer,
   declaredEncoding: string
@@ -2380,6 +2406,21 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
     ["windows-1252", "windows1252", "cp1252"].includes(normalizedEncoding)
   ) {
     return new TextDecoder("windows-1252").decode(bytes);
+  }
+  if (
+    [
+      "037",
+      "cp037",
+      "csibm037",
+      "ebcdic-cp-ca",
+      "ebcdic-cp-nl",
+      "ebcdic-cp-us",
+      "ebcdic-cp-wt",
+      "ibm037",
+      "ibm039"
+    ].includes(normalizedEncoding)
+  ) {
+    return decodeIbm037Bytes(bytes);
   }
   if (
     [
@@ -2448,6 +2489,8 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
         return decodeUtf32Bytes(encodedBytes, "little-endian");
       case "utf-32be":
         return decodeUtf32Bytes(encodedBytes, "big-endian");
+      case "ibm037":
+        return decodeIbm037Bytes(encodedBytes);
     }
   }
 
@@ -8027,6 +8070,18 @@ const isXmlEncodingCompatibleWithDetectedBytes = (
         "ucs-4",
         "ucs4",
         "iso-10646-ucs-4"
+      ].includes(normalizedDeclaredEncoding);
+    case "ibm037":
+      return [
+        "037",
+        "cp037",
+        "csibm037",
+        "ebcdic-cp-ca",
+        "ebcdic-cp-nl",
+        "ebcdic-cp-us",
+        "ebcdic-cp-wt",
+        "ibm037",
+        "ibm039"
       ].includes(normalizedDeclaredEncoding);
   }
 };
