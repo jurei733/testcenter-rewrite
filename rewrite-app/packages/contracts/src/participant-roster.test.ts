@@ -31,7 +31,11 @@ describe("parseParticipantRosterText", () => {
                   pw: "current-secret",
                   mode: "run-hot-return",
                   booklets: [
-                    { id: "BOOKLET.CURRENT-1", codes: "abc def" },
+                    {
+                      id: "BOOKLET.CURRENT-1",
+                      codes: "abc def",
+                      state: "language:de;layout:compact"
+                    },
                     { id: "BOOKLET.CURRENT-2" }
                   ],
                   assetAssignment: [
@@ -62,9 +66,10 @@ describe("parseParticipantRosterText", () => {
           bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
           bookletAssignments: [
             {
-              assignmentKey: "BOOKLET.CURRENT-1",
+              assignmentKey:
+                "BOOKLET.CURRENT-1#language:de;layout:compact",
               bookletKey: "BOOKLET.CURRENT-1",
-              statePreset: {},
+              statePreset: { language: "de", layout: "compact" },
               accessCodes: ["abc", "def"]
             },
             {
@@ -73,6 +78,9 @@ describe("parseParticipantRosterText", () => {
               statePreset: {}
             }
           ],
+          bookletStatePresets: {
+            "BOOKLET.CURRENT-1": { language: "de", layout: "compact" }
+          },
           displayName: null,
           password: "current-secret",
           validFrom: "1/9/2025 08:00",

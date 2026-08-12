@@ -174,19 +174,23 @@ Memory API gates cover both the loose JSON → Booklet → Unit graph and a mixe
 XML/JSON workspace ZIP through activation, authentication, and repeated import.
 
 Latest P0 Testtakers JSON validation closure: unambiguous current-schema roster
-documents are structurally inspected before dependency discovery or roster
-parsing. Standalone packages and JSON entries anywhere in a ZIP now reject an
-invalid root, missing metadata, unknown schema properties, empty or duplicate
-groups/logins, missing group/login IDs and labels, unsupported login modes,
-invalid access-window fields, malformed or conflicting Booklet/Profile
-assignments, duplicate/unknown asset slots, invalid ViewSettings/code-input
-values, and malformed Group-Monitor profiles or filters. The stable
+documents are structurally and semantically inspected before dependency
+discovery or roster parsing. Standalone packages and JSON entries anywhere in
+a ZIP now reject an invalid root, missing metadata, unknown schema properties,
+empty or duplicate groups/logins, missing group/login IDs and labels,
+unsupported login modes,
+syntactically invalid, impossible, or reversed access windows, malformed or
+conflicting Booklet/Profile assignments, unknown monitor-profile references,
+invalid XML-compatible Booklet state presets, duplicate/unknown asset slots,
+empty asset filenames, invalid ViewSettings/code-input values, and malformed
+Group-Monitor profiles or filters. The stable
 `source_document_testtakers_json_invalid` diagnostic carries an exact JSON path;
 direct roster intake returns `participant_roster_json_invalid` for the same
 failures. The supported Booklet `state` compatibility extension remains
-explicit, while generic runtime JSON and the older nested participant JSON
-format stay separate from current Testtakers detection. Memory and SQLite API
-gates prove that rejected documents create neither a content release,
+explicit and a valid multi-state preset is proven from parser through durable
+roster projection, while generic runtime JSON and the older nested participant
+JSON format stay separate from current Testtakers detection. Memory and SQLite
+API gates prove that rejected documents create neither a content release,
 participant or operational-login rows, nor a roster-import activity event.
 
 Latest P0 Testtakers-schema closure: the byte-exact original

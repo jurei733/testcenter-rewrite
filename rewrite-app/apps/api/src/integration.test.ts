@@ -21581,6 +21581,55 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
         ]
       }),
       expectedReason: "$.groups[0].logins[0].viewSettings.codeInput.length"
+    },
+    {
+      workspaceKey: "invalid-testtakers-json-profile-reference",
+      fileName: "Testtakers-invalid-profile-reference.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        metadata: { description: "Unknown monitor profile reference" },
+        profiles: { groupMonitor: [{ id: "known-profile" }] },
+        groups: [
+          {
+            id: "invalid-profile-reference-group",
+            label: "Invalid profile reference group",
+            logins: [
+              {
+                name: "invalid-profile-reference-login",
+                mode: "monitor-group",
+                profiles: [{ id: "missing-profile" }]
+              }
+            ]
+          }
+        ]
+      }),
+      expectedReason:
+        "$.groups[0].logins[0].profiles[0].id references unknown monitor profile 'missing-profile'"
+    },
+    {
+      workspaceKey: "invalid-testtakers-json-state-preset",
+      fileName: "Testtakers-invalid-state-preset.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        metadata: { description: "Invalid Booklet state preset" },
+        groups: [
+          {
+            id: "invalid-state-preset-group",
+            label: "Invalid state preset group",
+            logins: [
+              {
+                name: "invalid-state-preset-login",
+                mode: "run-hot-return",
+                booklets: [
+                  { id: "BOOKLET.INVALID-STATE", state: "Language:de" }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      expectedReason:
+        "$.groups[0].logins[0].booklets[0].state must use state-id:option-id pairs"
     }
   ];
 
@@ -21699,7 +21748,58 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
         ]
       },
       expectedReason:
-        "$.groups[0].validFor must be an integer of at least 1"
+        "$.groups[0].validFor must be a safe integer of at least 1"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Unsafe access duration" },
+        groups: [
+          {
+            id: "direct-unsafe-duration-group",
+            label: "Direct unsafe duration group",
+            validFor: Number.MAX_SAFE_INTEGER + 1,
+            logins: [
+              { name: "direct-unsafe-duration", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].validFor must be a safe integer of at least 1"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Impossible access date" },
+        groups: [
+          {
+            id: "direct-impossible-date-group",
+            label: "Direct impossible date group",
+            validFrom: "31/2/2026 08:00",
+            logins: [
+              { name: "direct-impossible-date", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].validFrom must be a valid dd/mm/yyyy hh:mm timestamp"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Reversed access window" },
+        groups: [
+          {
+            id: "direct-reversed-window-group",
+            label: "Direct reversed window group",
+            validFrom: "2/9/2026 08:00",
+            validTo: "1/9/2026 08:00",
+            logins: [
+              { name: "direct-reversed-window", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason: "$.groups[0].validFrom must not be after validTo"
     },
     {
       rosterText: {
@@ -21720,6 +21820,23 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
       },
       expectedReason:
         "$.groups[0].assetAssignment must not assign slot 'logo' more than once"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Empty asset filename" },
+        groups: [
+          {
+            id: "direct-empty-asset-group",
+            label: "Direct empty asset group",
+            assetAssignment: [{ slot: "logo", value: "  " }],
+            logins: [
+              { name: "direct-empty-asset", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].assetAssignment[0].value must be a non-empty string"
     },
     {
       rosterText: {
@@ -21773,6 +21890,27 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
       },
       expectedReason:
         "$.profiles.groupMonitor[0].blockColumn must be show or hide"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Unknown monitor profile reference" },
+        profiles: { groupMonitor: [{ id: "known-direct-profile" }] },
+        groups: [
+          {
+            id: "direct-unknown-profile-group",
+            label: "Direct unknown profile group",
+            logins: [
+              {
+                name: "direct-unknown-profile",
+                mode: "monitor-group",
+                profiles: [{ id: "missing-direct-profile" }]
+              }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].logins[0].profiles[0].id references unknown monitor profile 'missing-direct-profile'"
     },
     {
       rosterText: {
@@ -35223,7 +35361,11 @@ test("workspace participant roster imports current canonical Testtakers JSON", a
                 pw: "current-student-secret",
                 mode: "run-hot-return",
                 booklets: [
-                  { id: "BOOKLET.CURRENT-1", codes: "first second" },
+                  {
+                    id: "BOOKLET.CURRENT-1",
+                    codes: "first second",
+                    state: "language:de;layout:compact"
+                  },
                   { id: "BOOKLET.CURRENT-2" }
                 ],
                 viewSettings: {
@@ -35258,9 +35400,9 @@ test("workspace participant roster imports current canonical Testtakers JSON", a
       bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
       bookletAssignments: [
         {
-          assignmentKey: "BOOKLET.CURRENT-1",
+          assignmentKey: "BOOKLET.CURRENT-1#language:de;layout:compact",
           bookletKey: "BOOKLET.CURRENT-1",
-          statePreset: {},
+          statePreset: { language: "de", layout: "compact" },
           accessCodes: ["first", "second"]
         },
         {
@@ -35269,6 +35411,9 @@ test("workspace participant roster imports current canonical Testtakers JSON", a
           statePreset: {}
         }
       ],
+      bookletStatePresets: {
+        "BOOKLET.CURRENT-1": { language: "de", layout: "compact" }
+      },
       passwordRequired: true,
       customTexts: { login_subtitle: "Choose the current project" },
       viewSettings: {

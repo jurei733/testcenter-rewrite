@@ -2547,8 +2547,8 @@ const validateTesttakersJsonAssetAssignments = (
     ) {
       return `${assetPath}.slot must be a supported application asset slot`;
     }
-    if (typeof asset.value !== "string") {
-      return `${assetPath}.value must be a string`;
+    if (typeof asset.value !== "string" || !asset.value.trim()) {
+      return `${assetPath}.value must be a non-empty string`;
     }
     if (seenSlots.has(asset.slot)) {
       return `${path} must not assign slot '${asset.slot}' more than once`;
@@ -2615,10 +2615,10 @@ const validateTesttakersJsonViewSettings = (
   if (
     codeInput.length !== undefined &&
     (typeof codeInput.length !== "number" ||
-      !Number.isInteger(codeInput.length) ||
+      !Number.isSafeInteger(codeInput.length) ||
       codeInput.length < 3)
   ) {
-    return `${path}.codeInput.length must be an integer of at least 3`;
+    return `${path}.codeInput.length must be a safe integer of at least 3`;
   }
   return null;
 };
@@ -2906,6 +2906,19 @@ const inspectTesttakersJsonRosterDocument = (
   if (monitorProfileError) {
     return { status: "invalid", reason: monitorProfileError };
   }
+  const groupMonitorProfiles = asTesttakersJsonObject(
+    root.profiles
+  )?.groupMonitor;
+  const knownMonitorProfileIds = new Set(
+    Array.isArray(groupMonitorProfiles)
+      ? groupMonitorProfiles.flatMap(profileValue => {
+          const profile = asTesttakersJsonObject(profileValue);
+          return typeof profile?.id === "string" && profile.id.trim()
+            ? [profile.id.trim()]
+            : [];
+        })
+      : []
+  );
 
   const groupsValue = root.groups;
   if (!Array.isArray(groupsValue) || groupsValue.length === 0) {
@@ -2967,28 +2980,45 @@ const inspectTesttakersJsonRosterDocument = (
         reason: `$.groups[${groupIndex}].label must be a string`
       };
     }
+    const normalizedAccessBoundaries = new Map<string, string>();
     for (const accessProperty of ["validFrom", "validTo"]) {
       const accessValue = group[accessProperty];
-      if (
-        accessValue !== undefined &&
-        (typeof accessValue !== "string" ||
-          !/^\d{1,2}\/\d{1,2}\/\d{2,4}\D\d{1,2}:\d{2}$/.test(accessValue))
-      ) {
+      if (accessValue === undefined) {
+        continue;
+      }
+      const normalizedAccessBoundary =
+        typeof accessValue === "string" &&
+        /^\d{1,2}\/\d{1,2}\/\d{2,4}\D\d{1,2}:\d{2}$/.test(accessValue)
+          ? normalizeParticipantAccessBoundary(accessValue)
+          : null;
+      if (!normalizedAccessBoundary) {
         return {
           status: "invalid",
-          reason: `$.groups[${groupIndex}].${accessProperty} must use dd/mm/yyyy hh:mm`
+          reason: `$.groups[${groupIndex}].${accessProperty} must be a valid dd/mm/yyyy hh:mm timestamp`
         };
       }
+      normalizedAccessBoundaries.set(
+        accessProperty,
+        normalizedAccessBoundary
+      );
+    }
+    const validFrom = normalizedAccessBoundaries.get("validFrom");
+    const validTo = normalizedAccessBoundaries.get("validTo");
+    if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].validFrom must not be after validTo`
+      };
     }
     if (
       group.validFor !== undefined &&
       (typeof group.validFor !== "number" ||
-        !Number.isInteger(group.validFor) ||
+        !Number.isSafeInteger(group.validFor) ||
         group.validFor < 1)
     ) {
       return {
         status: "invalid",
-        reason: `$.groups[${groupIndex}].validFor must be an integer of at least 1`
+        reason: `$.groups[${groupIndex}].validFor must be a safe integer of at least 1`
       };
     }
     const groupAssetError = validateTesttakersJsonAssetAssignments(
@@ -3124,6 +3154,15 @@ const inspectTesttakersJsonRosterDocument = (
               reason: `${bookletPath}.state must be a string when present`
             };
           }
+          if (
+            typeof booklet.state === "string" &&
+            !testcenterXmlSchemaStatePresetPattern.test(booklet.state.trim())
+          ) {
+            return {
+              status: "invalid",
+              reason: `${bookletPath}.state must use state-id:option-id pairs separated by commas or semicolons`
+            };
+          }
           bookletIds.add(bookletId.trim());
         }
       }
@@ -3170,6 +3209,12 @@ const inspectTesttakersJsonRosterDocument = (
             };
           }
           seenProfileReferences.add(normalizedProfileId);
+          if (!knownMonitorProfileIds.has(profileId)) {
+            return {
+              status: "invalid",
+              reason: `${profilePath}.id references unknown monitor profile '${profileId}'`
+            };
+          }
         }
       }
       const loginAssetError = validateTesttakersJsonAssetAssignments(
