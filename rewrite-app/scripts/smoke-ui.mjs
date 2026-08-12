@@ -426,6 +426,49 @@ try {
     await locator.blur();
     await page.waitForTimeout(50);
   };
+  const fillVeronaAnswerAndWaitForHost = async (frame, selector, value) => {
+    const observedAnswer = page.evaluate(
+      expectedValue =>
+        new Promise(resolve => {
+          const timeout = globalThis.setTimeout(() => {
+            globalThis.removeEventListener("message", observeAnswer);
+            resolve(false);
+          }, 15_000);
+          const observeAnswer = event => {
+            const notification = event.data;
+            if (
+              notification?.type !== "vopStateChangedNotification" ||
+              notification.unitState == null
+            ) {
+              return;
+            }
+            let serializedUnitState = "";
+            try {
+              serializedUnitState = JSON.stringify(notification.unitState);
+            } catch {
+              return;
+            }
+            if (!serializedUnitState.includes(expectedValue)) {
+              return;
+            }
+            globalThis.clearTimeout(timeout);
+            globalThis.removeEventListener("message", observeAnswer);
+            resolve(true);
+          };
+          globalThis.addEventListener("message", observeAnswer);
+        }),
+      value
+    );
+    await frame.locator(selector).fill(value);
+    await frame.locator(selector).dispatchEvent("keyup", {
+      key: value.at(-1) ?? "a"
+    });
+    assert.equal(
+      await observedAnswer,
+      true,
+      `UI smoke expected Verona to publish the answer ${JSON.stringify(value)}.`
+    );
+  };
   const selectAndCommit = async (selector, value) => {
     const locator = page.locator(selector);
     await locator.selectOption(String(value));
@@ -2049,7 +2092,11 @@ try {
     const systemCheckPlayerFrame = page.frameLocator(
       "#participantVeronaPlayerFrame"
     );
-    await systemCheckPlayerFrame.locator("#var1").fill("System check answer");
+    await fillVeronaAnswerAndWaitForHost(
+      systemCheckPlayerFrame,
+      "#var1",
+      "System check answer"
+    );
     await page
       .locator("#participantVeronaPlayerStatus")
       .filter({ hasText: "running" })
@@ -2237,9 +2284,11 @@ try {
     const secondSystemCheckPlayerFrame = page.frameLocator(
       "#participantVeronaPlayerFrame"
     );
-    await secondSystemCheckPlayerFrame
-      .locator("#var1")
-      .fill("Second system check answer");
+    await fillVeronaAnswerAndWaitForHost(
+      secondSystemCheckPlayerFrame,
+      "#var1",
+      "Second system check answer"
+    );
     await page
       .locator("#participantVeronaPlayerStatus")
       .filter({ hasText: "running" })
@@ -4175,11 +4224,21 @@ try {
     workspaceAdminBatchSession.adminSession.adminSessionId,
     delegatedAdminBatchSession.adminSession.adminSessionId
   ]) {
-    await adminSessionsCollection
+    const addSessionToBatchButton = adminSessionsCollection
       .locator(".record-card")
       .filter({ hasText: adminSessionId })
-      .getByRole("button", { name: "Add To Batch" })
-      .click();
+      .getByRole("button", { name: "Add To Batch" });
+    await addSessionToBatchButton.evaluate(button => button.click());
+    await page
+      .locator("app-record-collection")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Selected Admin Sessions",
+          exact: true
+        })
+      })
+      .filter({ hasText: adminSessionId })
+      .waitFor();
   }
   const selectedAdminSessions = page
     .locator("app-record-collection")

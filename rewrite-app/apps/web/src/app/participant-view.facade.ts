@@ -2821,8 +2821,17 @@ export class ParticipantViewFacade {
     this.veronaSaveBufferDueAtMs = null;
   }
 
-  private async drainVeronaSaveQueue(): Promise<void> {
-    while (this.pendingVeronaSave && !this.veronaForegroundSaveSettlement) {
+  private async drainVeronaSaveQueue(
+    options: {
+      allowForegroundSettlement?: boolean;
+      refreshCurrentState?: boolean;
+    } = {}
+  ): Promise<void> {
+    while (
+      this.pendingVeronaSave &&
+      (options.allowForegroundSettlement ||
+        !this.veronaForegroundSaveSettlement)
+    ) {
       const save = this.pendingVeronaSave;
       this.pendingVeronaSave = null;
       try {
@@ -2873,7 +2882,12 @@ export class ParticipantViewFacade {
 
     this.veronaSaveStatus = "saved";
     this.persistState();
-    await this.refreshCurrentStateInternal(true);
+    if (
+      options.refreshCurrentState !== false &&
+      !this.veronaForegroundSaveSettlement
+    ) {
+      await this.refreshCurrentStateInternal(true);
+    }
   }
 
   private async goToPlayerUnitInternal(
@@ -3159,33 +3173,47 @@ export class ParticipantViewFacade {
         }
       : this.optimisticVeronaResponse;
     this.clearVeronaSaveBuffer();
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const activeSave = this.veronaSaveDrainPromise;
-      if (activeSave) {
-        await activeSave;
-      }
-      if (this.pendingVeronaSave) {
-        this.scheduleVeronaSaveDrain(0);
-        const forcedSave = this.veronaSaveDrainPromise;
-        if (forcedSave) {
-          await forcedSave;
+    const previousForegroundSettlement =
+      this.veronaForegroundSaveSettlement;
+    this.veronaForegroundSaveSettlement = true;
+    try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const activeSave = this.veronaSaveDrainPromise;
+        if (activeSave) {
+          await activeSave;
+        }
+        if (this.pendingVeronaSave) {
+          await this.drainVeronaSaveQueue({
+            allowForegroundSettlement: true,
+            refreshCurrentState: false
+          });
+        }
+        if (!this.pendingVeronaSave) {
+          return unsettledResponse;
+        }
+        if (attempt < 2) {
+          await new Promise<void>(resolve => {
+            globalThis.setTimeout(resolve, 50);
+          });
         }
       }
-      if (!this.pendingVeronaSave) {
-        return unsettledResponse;
+      if (this.pendingVeronaSave) {
+        throw new Error(
+          "The pending Verona response could not be saved before the participant action."
+        );
       }
-      if (attempt < 2) {
-        await new Promise<void>(resolve => {
-          globalThis.setTimeout(resolve, 50);
-        });
+      return unsettledResponse;
+    } finally {
+      this.veronaForegroundSaveSettlement = previousForegroundSettlement;
+      if (
+        this.pendingVeronaSave &&
+        !previousForegroundSettlement &&
+        this.veronaSaveStatus !== "save_failed" &&
+        this.veronaSaveStatus !== "queued_offline"
+      ) {
+        this.scheduleVeronaSaveDrain();
       }
     }
-    if (this.pendingVeronaSave) {
-      throw new Error(
-        "The pending Verona response could not be saved before the participant action."
-      );
-    }
-    return unsettledResponse;
   }
 
   private compactParticipantTestLogBatches(
@@ -3407,8 +3435,12 @@ export class ParticipantViewFacade {
         currentStateViewPayload,
         this.runtime.currentRunStateView
       );
+      const preserveCurrentTextDraft =
+        this.shouldPreserveCurrentTextDraft(payload.currentRunState);
       this.syncCurrentRunState(payload.currentRunState);
-      this.syncCurrentUnitResponse(payload.currentRunState);
+      if (!preserveCurrentTextDraft) {
+        this.syncCurrentUnitResponse(payload.currentRunState);
+      }
       this.reconcileOptimisticVeronaResponse(payload.currentRunState);
       this.restorePersistentVeronaSave(payload.currentRunState);
       this.persistLoadCompleteLog(payload, testRunId);
@@ -3795,6 +3827,27 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitResponse =
       optimisticResponse ??
       (unitKey ? this.effectiveUnitResponse(currentState, unitKey) : "");
+  }
+
+  private shouldPreserveCurrentTextDraft(
+    incomingState: ParticipantCurrentRunStateResponse["currentRunState"]
+  ): boolean {
+    const currentState = this.readCurrentRunState();
+    const unitKey = currentState?.currentUnit.unitKey;
+    if (
+      !currentState ||
+      !unitKey ||
+      this.veronaPlayer != null ||
+      currentState.testRun.testRunId !== incomingState.testRun.testRunId ||
+      unitKey !== incomingState.currentUnit.unitKey
+    ) {
+      return false;
+    }
+    const draft = this.runtime.currentUnitResponse;
+    return (
+      draft !== this.effectiveUnitResponse(currentState, unitKey) &&
+      draft !== this.effectiveUnitResponse(incomingState, unitKey)
+    );
   }
 
   private restorePersistentVeronaSave(
