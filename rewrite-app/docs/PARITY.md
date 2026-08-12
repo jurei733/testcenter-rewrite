@@ -397,6 +397,16 @@ UTF-8 ZIP entries, so ISO-8859-1, UTF-16, and UTF-32 Booklets keep their labels
 while acquiring the required Unit package. The complete Original compatibility
 suite now gates 37 corpus behaviors with this boundary enabled.
 
+Latest P0 legacy-encoding closure: declaration-driven XML decoding no longer
+stops at Node's browser-oriented WHATWG set. A production `iconv-lite`
+fallback now accepts the valid IANA `ISO-8859-16`/Latin-10 and DOS `CP850`
+aliases used by older source systems, while an explicit allowlist prevents
+iconv transport codecs such as base64, hex, CESU-8, or UTF-7 from becoming XML
+declaration encodings. The representative Booklets retain Romanian, German,
+Euro, and umlaut labels through the complete import/release projection in
+memory, file, and SQLite. Other IANA encodings outside the WHATWG and explicit
+fallback sets remain the bounded gap.
+
 Latest P0 Booklet-ID closure: Booklet `CustomText/@key` and `Config/@key`
 now share the document-wide `xs:ID` uniqueness boundary declared by the
 Original XSD. Duplicate keys within one section and collisions across the two

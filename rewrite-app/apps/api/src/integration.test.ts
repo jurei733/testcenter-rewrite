@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
+import iconv from "iconv-lite";
 import { PDFDocument } from "pdf-lib";
 import { CodingScheme } from "@iqb/responses";
 import type { Response as IqbResponse } from "@iqb/responses";
@@ -13387,6 +13388,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const iso885915BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-15"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preis ¤</Label>");
+  const iso885916BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-16"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Preț 12 €</Label>");
+  const cp850BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM850"')
+    .replace(
+      "<Label>Sample booklet</Label>",
+      "<Label>Größe für Köln</Label>"
+    );
   const ibm037BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM037"')
     .replace("<Label>Sample booklet</Label>", "<Label>Prüfung für Köln</Label>");
@@ -13483,6 +13493,16 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "iso-8859-15-original-booklet.xml",
       bytes: Buffer.from(iso885915BookletXml, "latin1"),
       displayLabel: "Preis €"
+    },
+    {
+      fileName: "iso-8859-16-original-booklet.xml",
+      bytes: iconv.encode(iso885916BookletXml, "iso-8859-16"),
+      displayLabel: "Preț 12 €"
+    },
+    {
+      fileName: "cp850-original-booklet.xml",
+      bytes: iconv.encode(cp850BookletXml, "cp850"),
+      displayLabel: "Größe für Köln"
     },
     {
       fileName: "ibm037-original-booklet.xml",
@@ -13590,6 +13610,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="x-testcenter-unknown"'
   );
+  const iconvTransportEncodingXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="base64"'
+  );
+  const unsafeUtf7EncodingXml = validBookletXml.replace(
+    /encoding=["']utf-8["']/i,
+    'encoding="UTF-7"'
+  );
   const ibm037EncodingMismatchXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-8"'
@@ -13612,6 +13640,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "unsupported-encoding-original-booklet.xml",
       sourceDocument: `data:application/xml;base64,${Buffer.from(
         unsupportedEncodingXml,
+        "utf8"
+      ).toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_unsupported"
+    },
+    {
+      fileName: "iconv-transport-encoding-original-booklet.xml",
+      sourceDocument: `data:application/xml;base64,${Buffer.from(
+        iconvTransportEncodingXml,
+        "utf8"
+      ).toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_unsupported"
+    },
+    {
+      fileName: "utf-7-encoding-original-booklet.xml",
+      sourceDocument: `data:application/xml;base64,${Buffer.from(
+        unsafeUtf7EncodingXml,
         "utf8"
       ).toString("base64")}`,
       diagnosticCode: "source_document_xml_encoding_unsupported"

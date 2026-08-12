@@ -201,6 +201,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "iconv-lite": "^0.7.2",
     "qr-scanner": "1.4.1"
   }
 }

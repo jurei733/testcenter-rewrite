@@ -8,6 +8,7 @@ import {
 import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
+import iconv from "iconv-lite";
 import { DOMParser } from "@xmldom/xmldom";
 import type {
   Document as XmlDocument,
@@ -2437,6 +2438,23 @@ const IBM1141_ENCODING_NAMES = [
   "ccsid01141"
 ];
 
+// Node's WHATWG TextDecoder intentionally supports only the browser encoding
+// set. Original Testcenter XML is decoded by libxml/iconv and can therefore use
+// registered legacy encodings outside that set. Keep this fallback explicitly
+// allowlisted so iconv-lite's transport codecs (for example base64, hex, and
+// UTF-7) cannot become XML declaration encodings by accident.
+const ICONV_XML_ENCODING_NAMES = new Map<string, string>([
+  ["iso-8859-16", "iso-8859-16"],
+  ["iso8859-16", "iso-8859-16"],
+  ["iso-ir-226", "iso-8859-16"],
+  ["latin10", "iso-8859-16"],
+  ["l10", "iso-8859-16"],
+  ["850", "cp850"],
+  ["cp850", "cp850"],
+  ["ibm850", "cp850"],
+  ["cspc850multilingual", "cp850"]
+]);
+
 const isSupportedEbcdicEncodingName = (normalizedEncoding: string): boolean =>
   [
     ...IBM037_ENCODING_NAMES,
@@ -2512,7 +2530,10 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
       new TextDecoder(normalizedEncoding).decode(bytes)
     );
   } catch {
-    return null;
+    const iconvEncoding = ICONV_XML_ENCODING_NAMES.get(normalizedEncoding);
+    return iconvEncoding
+      ? stripTextByteOrderMark(iconv.decode(bytes, iconvEncoding))
+      : null;
   }
 };
 
