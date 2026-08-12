@@ -21267,6 +21267,7 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
       fileName: "Testtakers-roster-graph.json",
       mediaType: "application/json",
       sourceDocument: JSON.stringify({
+        metadata: { description: "Roster dependency graph" },
         groups: [
           {
             id: "roster-graph",
@@ -21435,6 +21436,7 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
     {
       fileName: "Testtakers.json",
       content: JSON.stringify({
+        metadata: { description: "Missing ZIP booklet" },
         groups: [
           {
             id: "missing-zip-booklet",
@@ -21492,6 +21494,7 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
       fileName: "Testtakers-invalid-booklet.json",
       mediaType: "application/json",
       sourceDocument: JSON.stringify({
+        metadata: { description: "Invalid booklet assignment" },
         groups: [
           {
             id: "invalid-booklet-group",
@@ -21536,6 +21539,7 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
         {
           fileName: "config/Participants.json",
           content: JSON.stringify({
+            metadata: { description: "Unsupported login mode" },
             groups: [
               {
                 id: "unsupported-mode-group",
@@ -21553,6 +21557,30 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
         }
       ])}`,
       expectedReason: "$.groups[0].logins[0].mode"
+    },
+    {
+      workspaceKey: "invalid-testtakers-json-view-settings",
+      fileName: "Testtakers-invalid-view-settings.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        metadata: { description: "Invalid view settings" },
+        groups: [
+          {
+            id: "invalid-view-settings-group",
+            label: "Invalid view settings group",
+            logins: [
+              {
+                name: "invalid-view-settings-login",
+                mode: "run-hot-return",
+                viewSettings: {
+                  codeInput: { type: "keypad-numbers", length: 2 }
+                }
+              }
+            ]
+          }
+        ]
+      }),
+      expectedReason: "$.groups[0].logins[0].viewSettings.codeInput.length"
     }
   ];
 
@@ -21624,31 +21652,165 @@ test("Testtakers JSON imports reject malformed structures before workspace mutat
     method: "POST",
     body: { workspaceKey: directWorkspaceKey, displayName: directWorkspaceKey }
   });
-  const directImport = await requestJson<{
-    error: string;
-    details: { reason: string };
-  }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${directWorkspaceKey}/participant-roster`,
+  const directCases: Array<{
+    rosterText: Record<string, unknown>;
+    expectedReason: string;
+  }> = [
     {
-      method: "POST",
-      body: {
-        rosterText: {
-          groups: [
+      rosterText: {
+        groups: [
+          {
+            id: "direct-missing-metadata-group",
+            label: "Direct missing metadata group",
+            logins: [
+              { name: "direct-missing-metadata", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason: "$.metadata must be an object"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Invalid login mode" },
+        groups: [
+          {
+            id: "direct-invalid-mode-group",
+            label: "Direct invalid mode group",
+            logins: [{ name: "direct-invalid-mode", mode: "run-unknown" }]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].logins[0].mode must be a supported Testtakers login mode"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Invalid access window" },
+        groups: [
+          {
+            id: "direct-invalid-window-group",
+            label: "Direct invalid window group",
+            validFor: 0,
+            logins: [
+              { name: "direct-invalid-window", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].validFor must be an integer of at least 1"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Duplicate asset assignment" },
+        groups: [
+          {
+            id: "direct-duplicate-asset-group",
+            label: "Direct duplicate asset group",
+            assetAssignment: [
+              { slot: "logo", value: "first.png" },
+              { slot: "logo", value: "second.png" }
+            ],
+            logins: [
+              { name: "direct-duplicate-asset", mode: "run-hot-return" }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].assetAssignment must not assign slot 'logo' more than once"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Invalid monitor profile" },
+        profiles: {
+          groupMonitor: [
             {
-              id: "direct-invalid-group",
-              logins: [{ name: "direct-invalid-login", mode: "run-unknown" }]
+              id: "invalid-filter-profile",
+              filters: [{ field: "groupName", not: "yes" }]
             }
           ]
-        }
-      }
+        },
+        groups: [
+          {
+            id: "direct-invalid-profile-group",
+            label: "Direct invalid profile group",
+            logins: [
+              {
+                name: "direct-invalid-profile",
+                mode: "monitor-group",
+                profiles: [{ id: "invalid-filter-profile" }]
+              }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.profiles.groupMonitor[0].filters[0].not must be a boolean when present"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Invalid monitor profile setting type" },
+        profiles: {
+          groupMonitor: [
+            { id: "invalid-column-profile", blockColumn: ["show"] }
+          ]
+        },
+        groups: [
+          {
+            id: "direct-invalid-profile-setting-group",
+            label: "Direct invalid profile setting group",
+            logins: [
+              {
+                name: "direct-invalid-profile-setting",
+                mode: "monitor-group",
+                profiles: [{ id: "invalid-column-profile" }]
+              }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.profiles.groupMonitor[0].blockColumn must be show or hide"
+    },
+    {
+      rosterText: {
+        metadata: { description: "Conflicting login assignment" },
+        groups: [
+          {
+            id: "direct-conflicting-assignment-group",
+            label: "Direct conflicting assignment group",
+            logins: [
+              {
+                name: "direct-conflicting-assignment",
+                mode: "run-hot-return",
+                booklets: [{ id: "BOOKLET.DIRECT" }],
+                profiles: [{ id: "unexpected-profile" }]
+              }
+            ]
+          }
+        ]
+      },
+      expectedReason:
+        "$.groups[0].logins[0] must not define both booklets and profiles"
     }
-  );
-  assert.equal(directImport.status, 400);
-  assert.equal(directImport.body.error, "participant_roster_json_invalid");
-  assert.equal(
-    directImport.body.details.reason,
-    "$.groups[0].logins[0].mode must be a supported Testtakers login mode"
-  );
+  ];
+  for (const directCase of directCases) {
+    const directImport = await requestJson<{
+      error: string;
+      details: { reason: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${directWorkspaceKey}/participant-roster`,
+      {
+        method: "POST",
+        body: { rosterText: directCase.rosterText }
+      }
+    );
+    assert.equal(directImport.status, 400);
+    assert.equal(directImport.body.error, "participant_roster_json_invalid");
+    assert.equal(directImport.body.details.reason, directCase.expectedReason);
+  }
 
   const directRoster = await requestJson<{
     items: unknown[];
@@ -23453,9 +23615,11 @@ test("source document import resolves Unit URI paths in manifestless root ZIP ar
     {
       fileName: "nested/rosters/Participants-B.json",
       content: JSON.stringify({
+        metadata: { description: "Manifestless JSON participants" },
         groups: [
           {
             id: "manifestless-participants-b",
+            label: "Manifestless JSON participants",
             logins: [
               {
                 name: "manifestless-participant-b",

@@ -45,6 +45,7 @@ import {
   monitorRunCommandTypes,
   participantExecutionModeDefinitions,
   participantExecutionModes,
+  participantCodeInputTypes,
   applicationAssetSlotNames,
   workspaceFileTypes
 } from "@testcenter-rewrite-app/domain";
@@ -2502,6 +2503,302 @@ type TesttakersJsonRosterInspection =
   | { status: "invalid"; reason: string }
   | { status: "valid"; document: TesttakersJsonRosterDocument };
 
+const asTesttakersJsonObject = (
+  value: unknown
+): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const findUnsupportedJsonProperty = (
+  value: Record<string, unknown>,
+  allowedProperties: readonly string[]
+): string | null =>
+  Object.keys(value).find(property => !allowedProperties.includes(property)) ??
+  null;
+
+const validateTesttakersJsonAssetAssignments = (
+  value: unknown,
+  path: string
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  if (!Array.isArray(value)) {
+    return `${path} must be an array when present`;
+  }
+  const seenSlots = new Set<string>();
+  for (const [assetIndex, assetValue] of value.entries()) {
+    const assetPath = `${path}[${assetIndex}]`;
+    const asset = asTesttakersJsonObject(assetValue);
+    if (!asset) {
+      return `${assetPath} must be an object`;
+    }
+    const unsupportedProperty = findUnsupportedJsonProperty(asset, [
+      "slot",
+      "value"
+    ]);
+    if (unsupportedProperty) {
+      return `${assetPath}.${unsupportedProperty} is not supported`;
+    }
+    if (
+      typeof asset.slot !== "string" ||
+      !(applicationAssetSlotNames as readonly string[]).includes(asset.slot)
+    ) {
+      return `${assetPath}.slot must be a supported application asset slot`;
+    }
+    if (typeof asset.value !== "string") {
+      return `${assetPath}.value must be a string`;
+    }
+    if (seenSlots.has(asset.slot)) {
+      return `${path} must not assign slot '${asset.slot}' more than once`;
+    }
+    seenSlots.add(asset.slot);
+  }
+  return null;
+};
+
+const validateTesttakersJsonViewSettings = (
+  value: unknown,
+  path: string
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  const viewSettings = asTesttakersJsonObject(value);
+  if (!viewSettings) {
+    return `${path} must be an object when present`;
+  }
+  const unsupportedProperty = findUnsupportedJsonProperty(viewSettings, [
+    "theme",
+    "codeInput",
+    "monitorBookletVisibility"
+  ]);
+  if (unsupportedProperty) {
+    return `${path}.${unsupportedProperty} is not supported`;
+  }
+  if (
+    viewSettings.theme !== undefined &&
+    typeof viewSettings.theme !== "string"
+  ) {
+    return `${path}.theme must be a string when present`;
+  }
+  if (
+    viewSettings.monitorBookletVisibility !== undefined &&
+    (typeof viewSettings.monitorBookletVisibility !== "string" ||
+      !["visible", "collapsed", "hidden"].includes(
+        viewSettings.monitorBookletVisibility
+      ))
+  ) {
+    return `${path}.monitorBookletVisibility must be visible, collapsed, or hidden`;
+  }
+  if (viewSettings.codeInput === undefined) {
+    return null;
+  }
+  const codeInput = asTesttakersJsonObject(viewSettings.codeInput);
+  if (!codeInput) {
+    return `${path}.codeInput must be an object when present`;
+  }
+  const unsupportedCodeInputProperty = findUnsupportedJsonProperty(codeInput, [
+    "type",
+    "length"
+  ]);
+  if (unsupportedCodeInputProperty) {
+    return `${path}.codeInput.${unsupportedCodeInputProperty} is not supported`;
+  }
+  if (
+    typeof codeInput.type !== "string" ||
+    !(participantCodeInputTypes as readonly string[]).includes(codeInput.type)
+  ) {
+    return `${path}.codeInput.type must be a supported code-input type`;
+  }
+  if (
+    codeInput.length !== undefined &&
+    (typeof codeInput.length !== "number" ||
+      !Number.isInteger(codeInput.length) ||
+      codeInput.length < 3)
+  ) {
+    return `${path}.codeInput.length must be an integer of at least 3`;
+  }
+  return null;
+};
+
+const testtakersJsonMonitorProfileProperties = [
+  "id",
+  "label",
+  "blockColumn",
+  "unitColumn",
+  "groupColumn",
+  "bookletColumn",
+  "bookletStatesColumns",
+  "view",
+  "filterPending",
+  "filterLocked",
+  "autoselectNextBlock",
+  "filters"
+] as const;
+
+const testtakersJsonMonitorFilterFields = [
+  "bookletLabel",
+  "personLabel",
+  "state",
+  "blockLabel",
+  "groupName",
+  "bookletId",
+  "unitId",
+  "unitLabel",
+  "blockId",
+  "testState",
+  "mode",
+  "bookletSpecies",
+  "bookletStates"
+] as const;
+
+const validateTesttakersJsonMonitorProfiles = (
+  value: unknown,
+  path: string
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  const profiles = asTesttakersJsonObject(value);
+  if (!profiles) {
+    return `${path} must be an object when present`;
+  }
+  const unsupportedProfilesProperty = findUnsupportedJsonProperty(profiles, [
+    "groupMonitor"
+  ]);
+  if (unsupportedProfilesProperty) {
+    return `${path}.${unsupportedProfilesProperty} is not supported`;
+  }
+  if (profiles.groupMonitor === undefined) {
+    return null;
+  }
+  if (!Array.isArray(profiles.groupMonitor)) {
+    return `${path}.groupMonitor must be an array when present`;
+  }
+
+  const seenProfileIds = new Set<string>();
+  for (const [profileIndex, profileValue] of profiles.groupMonitor.entries()) {
+    const profilePath = `${path}.groupMonitor[${profileIndex}]`;
+    const profile = asTesttakersJsonObject(profileValue);
+    if (!profile) {
+      return `${profilePath} must be an object`;
+    }
+    const unsupportedProfileProperty = findUnsupportedJsonProperty(
+      profile,
+      testtakersJsonMonitorProfileProperties
+    );
+    if (unsupportedProfileProperty) {
+      return `${profilePath}.${unsupportedProfileProperty} is not supported`;
+    }
+    const profileId = typeof profile.id === "string" ? profile.id.trim() : "";
+    if (!profileId) {
+      return `${profilePath}.id must be a non-empty string`;
+    }
+    const normalizedProfileId = profileId.toLocaleLowerCase("en-US");
+    if (seenProfileIds.has(normalizedProfileId)) {
+      return `${path}.groupMonitor must not contain duplicate profile ID '${profileId}'`;
+    }
+    seenProfileIds.add(normalizedProfileId);
+    if (profile.label !== undefined && typeof profile.label !== "string") {
+      return `${profilePath}.label must be a string when present`;
+    }
+    for (const columnProperty of [
+      "blockColumn",
+      "unitColumn",
+      "groupColumn",
+      "bookletColumn"
+    ]) {
+      if (
+        profile[columnProperty] !== undefined &&
+        (typeof profile[columnProperty] !== "string" ||
+          !["show", "hide"].includes(profile[columnProperty]))
+      ) {
+        return `${profilePath}.${columnProperty} must be show or hide`;
+      }
+    }
+    if (
+      profile.bookletStatesColumns !== undefined &&
+      typeof profile.bookletStatesColumns !== "string"
+    ) {
+      return `${profilePath}.bookletStatesColumns must be a string when present`;
+    }
+    if (
+      profile.view !== undefined &&
+      (typeof profile.view !== "string" ||
+        !["full", "medium", "small"].includes(profile.view))
+    ) {
+      return `${profilePath}.view must be full, medium, or small`;
+    }
+    for (const toggleProperty of [
+      "filterPending",
+      "filterLocked",
+      "autoselectNextBlock"
+    ]) {
+      if (
+        profile[toggleProperty] !== undefined &&
+        (typeof profile[toggleProperty] !== "string" ||
+          !["yes", "no"].includes(profile[toggleProperty]))
+      ) {
+        return `${profilePath}.${toggleProperty} must be yes or no`;
+      }
+    }
+    if (profile.filters === undefined) {
+      continue;
+    }
+    if (!Array.isArray(profile.filters)) {
+      return `${profilePath}.filters must be an array when present`;
+    }
+    for (const [filterIndex, filterValue] of profile.filters.entries()) {
+      const filterPath = `${profilePath}.filters[${filterIndex}]`;
+      const filter = asTesttakersJsonObject(filterValue);
+      if (!filter) {
+        return `${filterPath} must be an object`;
+      }
+      const unsupportedFilterProperty = findUnsupportedJsonProperty(filter, [
+        "label",
+        "field",
+        "type",
+        "value",
+        "subValue",
+        "not"
+      ]);
+      if (unsupportedFilterProperty) {
+        return `${filterPath}.${unsupportedFilterProperty} is not supported`;
+      }
+      for (const stringProperty of ["label", "value", "subValue"]) {
+        if (
+          filter[stringProperty] !== undefined &&
+          typeof filter[stringProperty] !== "string"
+        ) {
+          return `${filterPath}.${stringProperty} must be a string when present`;
+        }
+      }
+      if (
+        filter.field !== undefined &&
+        (typeof filter.field !== "string" ||
+          !(testtakersJsonMonitorFilterFields as readonly string[]).includes(
+            filter.field
+          ))
+      ) {
+        return `${filterPath}.field must be a supported monitor filter field`;
+      }
+      if (
+        filter.type !== undefined &&
+        (typeof filter.type !== "string" ||
+          !["equal", "substring", "regex"].includes(filter.type))
+      ) {
+        return `${filterPath}.type must be equal, substring, or regex`;
+      }
+      if (filter.not !== undefined && typeof filter.not !== "boolean") {
+        return `${filterPath}.not must be a boolean when present`;
+      }
+    }
+  }
+  return null;
+};
+
 const looksLikeTesttakersJsonFileName = (sourceFileName: string): boolean =>
   /^testtakers?(?:[-_.]|$)/i.test(
     sourceFileName.split(/[\\/]/).at(-1) ?? sourceFileName
@@ -2555,7 +2852,62 @@ const inspectTesttakersJsonRosterDocument = (
     };
   }
 
-  const groupsValue = (parsed as Record<string, unknown>).groups;
+  const root = parsed as Record<string, unknown>;
+  const unsupportedRootProperty = findUnsupportedJsonProperty(root, [
+    "metadata",
+    "customTexts",
+    "profiles",
+    "groups"
+  ]);
+  if (unsupportedRootProperty) {
+    return {
+      status: "invalid",
+      reason: `$.${unsupportedRootProperty} is not supported`
+    };
+  }
+  const metadata = asTesttakersJsonObject(root.metadata);
+  if (!metadata) {
+    return {
+      status: "invalid",
+      reason: "$.metadata must be an object"
+    };
+  }
+  const unsupportedMetadataProperty = findUnsupportedJsonProperty(metadata, [
+    "description"
+  ]);
+  if (unsupportedMetadataProperty) {
+    return {
+      status: "invalid",
+      reason: `$.metadata.${unsupportedMetadataProperty} is not supported`
+    };
+  }
+  if (
+    metadata.description !== undefined &&
+    typeof metadata.description !== "string"
+  ) {
+    return {
+      status: "invalid",
+      reason: "$.metadata.description must be a string when present"
+    };
+  }
+  if (
+    root.customTexts !== undefined &&
+    !asTesttakersJsonObject(root.customTexts)
+  ) {
+    return {
+      status: "invalid",
+      reason: "$.customTexts must be an object when present"
+    };
+  }
+  const monitorProfileError = validateTesttakersJsonMonitorProfiles(
+    root.profiles,
+    "$.profiles"
+  );
+  if (monitorProfileError) {
+    return { status: "invalid", reason: monitorProfileError };
+  }
+
+  const groupsValue = root.groups;
   if (!Array.isArray(groupsValue) || groupsValue.length === 0) {
     return {
       status: "invalid",
@@ -2565,6 +2917,8 @@ const inspectTesttakersJsonRosterDocument = (
 
   const bookletIds = new Set<string>();
   const groups: TesttakersRosterStructure["groups"] = [];
+  const seenGroupIds = new Set<string>();
+  const seenLoginNames = new Set<string>();
   for (const [groupIndex, groupValue] of groupsValue.entries()) {
     if (
       typeof groupValue !== "object" ||
@@ -2577,12 +2931,72 @@ const inspectTesttakersJsonRosterDocument = (
       };
     }
     const group = groupValue as Record<string, unknown>;
+    const unsupportedGroupProperty = findUnsupportedJsonProperty(group, [
+      "id",
+      "label",
+      "validTo",
+      "validFrom",
+      "validFor",
+      "assetAssignment",
+      "logins"
+    ]);
+    if (unsupportedGroupProperty) {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].${unsupportedGroupProperty} is not supported`
+      };
+    }
     const groupId = typeof group.id === "string" ? group.id.trim() : "";
     if (!groupId) {
       return {
         status: "invalid",
         reason: `$.groups[${groupIndex}].id must be a non-empty string`
       };
+    }
+    const normalizedGroupId = groupId.toLocaleLowerCase("en-US");
+    if (seenGroupIds.has(normalizedGroupId)) {
+      return {
+        status: "invalid",
+        reason: `$.groups must not contain duplicate group ID '${groupId}'`
+      };
+    }
+    seenGroupIds.add(normalizedGroupId);
+    if (typeof group.label !== "string") {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].label must be a string`
+      };
+    }
+    for (const accessProperty of ["validFrom", "validTo"]) {
+      const accessValue = group[accessProperty];
+      if (
+        accessValue !== undefined &&
+        (typeof accessValue !== "string" ||
+          !/^\d{1,2}\/\d{1,2}\/\d{2,4}\D\d{1,2}:\d{2}$/.test(accessValue))
+      ) {
+        return {
+          status: "invalid",
+          reason: `$.groups[${groupIndex}].${accessProperty} must use dd/mm/yyyy hh:mm`
+        };
+      }
+    }
+    if (
+      group.validFor !== undefined &&
+      (typeof group.validFor !== "number" ||
+        !Number.isInteger(group.validFor) ||
+        group.validFor < 1)
+    ) {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].validFor must be an integer of at least 1`
+      };
+    }
+    const groupAssetError = validateTesttakersJsonAssetAssignments(
+      group.assetAssignment,
+      `$.groups[${groupIndex}].assetAssignment`
+    );
+    if (groupAssetError) {
+      return { status: "invalid", reason: groupAssetError };
     }
     if (!Array.isArray(group.logins) || group.logins.length === 0) {
       return {
@@ -2605,6 +3019,21 @@ const inspectTesttakersJsonRosterDocument = (
         };
       }
       const login = loginValue as Record<string, unknown>;
+      const unsupportedLoginProperty = findUnsupportedJsonProperty(login, [
+        "name",
+        "pw",
+        "mode",
+        "booklets",
+        "profiles",
+        "assetAssignment",
+        "viewSettings"
+      ]);
+      if (unsupportedLoginProperty) {
+        return {
+          status: "invalid",
+          reason: `${loginPath}.${unsupportedLoginProperty} is not supported`
+        };
+      }
       const loginName = typeof login.name === "string" ? login.name.trim() : "";
       const loginMode = typeof login.mode === "string" ? login.mode.trim() : "";
       const supportedLoginMode =
@@ -2620,10 +3049,30 @@ const inspectTesttakersJsonRosterDocument = (
           reason: `${loginPath}.name must be a non-empty string`
         };
       }
+      const normalizedLoginName = loginName.toLocaleLowerCase("en-US");
+      if (seenLoginNames.has(normalizedLoginName)) {
+        return {
+          status: "invalid",
+          reason: `$.groups must not contain duplicate login name '${loginName}'`
+        };
+      }
+      seenLoginNames.add(normalizedLoginName);
       if (!supportedLoginMode) {
         return {
           status: "invalid",
           reason: `${loginPath}.mode must be a supported Testtakers login mode`
+        };
+      }
+      if (login.pw !== undefined && typeof login.pw !== "string") {
+        return {
+          status: "invalid",
+          reason: `${loginPath}.pw must be a string when present`
+        };
+      }
+      if (login.booklets !== undefined && login.profiles !== undefined) {
+        return {
+          status: "invalid",
+          reason: `${loginPath} must not define both booklets and profiles`
         };
       }
       if (login.booklets !== undefined && !Array.isArray(login.booklets)) {
@@ -2645,15 +3094,97 @@ const inspectTesttakersJsonRosterDocument = (
               reason: `${bookletPath} must be an object`
             };
           }
-          const bookletId = (bookletValue as Record<string, unknown>).id;
+          const booklet = bookletValue as Record<string, unknown>;
+          const unsupportedBookletProperty = findUnsupportedJsonProperty(
+            booklet,
+            ["id", "codes", "state"]
+          );
+          if (unsupportedBookletProperty) {
+            return {
+              status: "invalid",
+              reason: `${bookletPath}.${unsupportedBookletProperty} is not supported`
+            };
+          }
+          const bookletId = booklet.id;
           if (typeof bookletId !== "string" || !bookletId.trim()) {
             return {
               status: "invalid",
               reason: `${bookletPath}.id must be a non-empty string`
             };
           }
+          if (booklet.codes !== undefined && typeof booklet.codes !== "string") {
+            return {
+              status: "invalid",
+              reason: `${bookletPath}.codes must be a string when present`
+            };
+          }
+          if (booklet.state !== undefined && typeof booklet.state !== "string") {
+            return {
+              status: "invalid",
+              reason: `${bookletPath}.state must be a string when present`
+            };
+          }
           bookletIds.add(bookletId.trim());
         }
+      }
+      if (login.profiles !== undefined) {
+        if (!Array.isArray(login.profiles)) {
+          return {
+            status: "invalid",
+            reason: `${loginPath}.profiles must be an array when present`
+          };
+        }
+        const seenProfileReferences = new Set<string>();
+        for (const [profileIndex, profileValue] of login.profiles.entries()) {
+          const profilePath = `${loginPath}.profiles[${profileIndex}]`;
+          const profile = asTesttakersJsonObject(profileValue);
+          if (!profile) {
+            return {
+              status: "invalid",
+              reason: `${profilePath} must be an object`
+            };
+          }
+          const unsupportedProfileProperty = findUnsupportedJsonProperty(
+            profile,
+            ["id"]
+          );
+          if (unsupportedProfileProperty) {
+            return {
+              status: "invalid",
+              reason: `${profilePath}.${unsupportedProfileProperty} is not supported`
+            };
+          }
+          const profileId =
+            typeof profile.id === "string" ? profile.id.trim() : "";
+          if (!profileId) {
+            return {
+              status: "invalid",
+              reason: `${profilePath}.id must be a non-empty string`
+            };
+          }
+          const normalizedProfileId = profileId.toLocaleLowerCase("en-US");
+          if (seenProfileReferences.has(normalizedProfileId)) {
+            return {
+              status: "invalid",
+              reason: `${loginPath}.profiles must not reference profile ID '${profileId}' more than once`
+            };
+          }
+          seenProfileReferences.add(normalizedProfileId);
+        }
+      }
+      const loginAssetError = validateTesttakersJsonAssetAssignments(
+        login.assetAssignment,
+        `${loginPath}.assetAssignment`
+      );
+      if (loginAssetError) {
+        return { status: "invalid", reason: loginAssetError };
+      }
+      const viewSettingsError = validateTesttakersJsonViewSettings(
+        login.viewSettings,
+        `${loginPath}.viewSettings`
+      );
+      if (viewSettingsError) {
+        return { status: "invalid", reason: viewSettingsError };
       }
       loginNames.push(loginName);
     }

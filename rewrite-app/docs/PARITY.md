@@ -176,14 +176,18 @@ XML/JSON workspace ZIP through activation, authentication, and repeated import.
 Latest P0 Testtakers JSON validation closure: unambiguous current-schema roster
 documents are structurally inspected before dependency discovery or roster
 parsing. Standalone packages and JSON entries anywhere in a ZIP now reject an
-invalid root, empty groups/logins, missing group/login IDs, unsupported login
-modes, malformed Booklet arrays, and missing Booklet IDs with the stable
-`source_document_testtakers_json_invalid` diagnostic and an exact JSON path.
-Direct roster intake returns `participant_roster_json_invalid` for the same
-failures. Generic runtime JSON and the older nested participant JSON format stay
-separate from current Testtakers detection. Memory and SQLite API gates prove
-that rejected documents create neither a content release, participant or
-operational-login rows, nor a roster-import activity event.
+invalid root, missing metadata, unknown schema properties, empty or duplicate
+groups/logins, missing group/login IDs and labels, unsupported login modes,
+invalid access-window fields, malformed or conflicting Booklet/Profile
+assignments, duplicate/unknown asset slots, invalid ViewSettings/code-input
+values, and malformed Group-Monitor profiles or filters. The stable
+`source_document_testtakers_json_invalid` diagnostic carries an exact JSON path;
+direct roster intake returns `participant_roster_json_invalid` for the same
+failures. The supported Booklet `state` compatibility extension remains
+explicit, while generic runtime JSON and the older nested participant JSON
+format stay separate from current Testtakers detection. Memory and SQLite API
+gates prove that rejected documents create neither a content release,
+participant or operational-login rows, nor a roster-import activity event.
 
 Latest P0 Testtakers-schema closure: the byte-exact original
 `Testtakers_withoutSyscheck.xml` E2E roster extends the pinned corpus with the
