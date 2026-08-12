@@ -1763,7 +1763,7 @@ export class ParticipantViewFacade {
   get canSignIn(): boolean {
     return Boolean(
       !this.hasControllerError &&
-      this.workspace.workspaceKey.trim() &&
+      (this.workspace.workspaceKey.trim() || this.isLegacyShortLinkEntry()) &&
       this.runtime.loginKey.trim() &&
       (!this.participantCodeRequired || this.runtime.participantCode.trim())
     );
@@ -2635,9 +2635,7 @@ export class ParticipantViewFacade {
   ): void {
     if (
       globalThis.window == null ||
-      new URLSearchParams(globalThis.window.location.search).get(
-        "legacyShortLink"
-      ) !== "true"
+      !this.isLegacyShortLinkEntry()
     ) {
       return;
     }
@@ -2649,6 +2647,15 @@ export class ParticipantViewFacade {
         {},
         { includeOrigin: false }
       )
+    );
+  }
+
+  private isLegacyShortLinkEntry(): boolean {
+    return (
+      globalThis.window != null &&
+      new URLSearchParams(globalThis.window.location.search).get(
+        "legacyShortLink"
+      ) === "true"
     );
   }
 

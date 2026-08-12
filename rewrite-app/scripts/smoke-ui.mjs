@@ -1643,13 +1643,6 @@ try {
     .filter({ hasText: "UI Workspace Selection" })
     .waitFor();
   await brandedParticipantPage
-    .locator("#participantRouteStartOrResumeButton")
-    .filter({ hasText: "UI Workspace Resume" })
-    .waitFor();
-  await brandedParticipantPage
-    .locator("#participantRouteStartOrResumeButton")
-    .click();
-  await brandedParticipantPage
     .locator("#participantRouteCompleteButton")
     .filter({ hasText: "UI Booklet Complete" })
     .waitFor();
@@ -5986,7 +5979,7 @@ try {
     ([expectedSessionId, expectedDisplayName, expectedRunId]) =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
-      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+      document.querySelector("#participantRouteDisplayName")?.textContent?.trim() ===
         expectedDisplayName &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "running" &&
@@ -6100,14 +6093,19 @@ try {
     .locator("#participantStarterScrollButton")
     .waitFor({ state: "detached" });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
-  await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
-  await fillAndCommitUntilValue("#participantLoginKey", participantReviewLoginKey);
-  await fillAndCommitUntilValue(
-    "#participantRouteGroupKey",
-    "group:participant-entry-review"
+  await page.goto(`${baseUrl}/#/${encodeURIComponent(participantReviewLoginKey)}`, {
+    waitUntil: "domcontentloaded"
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "signed_in" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        "no run yet" &&
+      document.querySelector("#participantRouteEntry") != null,
+    undefined,
+    { timeout: 15_000 }
   );
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
   await page.locator("#participantRouteDownloadReviewsButton").waitFor();
   const emptyParticipantReviewResponse = page.waitForResponse(
     response =>
@@ -6214,7 +6212,9 @@ try {
       )
   );
   await page.locator("#participantRouteClearSessionButton").click();
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.goto(`${baseUrl}/#/${encodeURIComponent(participantReviewLoginKey)}`, {
+    waitUntil: "domcontentloaded"
+  });
   await page.locator("#participantRouteDownloadReviewsButton").waitFor();
   const participantReviewDownloadPromise = page.waitForEvent("download");
   await page.locator("#participantRouteDownloadReviewsButton").click();
@@ -6324,8 +6324,7 @@ try {
         const participantSession = item?.participantSession;
         return (
           participantSession?.loginKey === protectedParticipantLoginKey &&
-          participantSession?.groupKey === protectedParticipantGroupKey &&
-          participantSession?.status === "signed_in"
+          participantSession?.groupKey === protectedParticipantGroupKey
         );
       })
   );
@@ -6336,18 +6335,34 @@ try {
     })?.participantSession?.participantSessionId;
   assert.ok(
     protectedParticipantSessionId,
-    "UI smoke expected protected participant Sign In to create a signed-in session."
+    "UI smoke expected protected participant Sign In to create a participant session."
+  );
+  const protectedParticipantStartedPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${protectedParticipantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      payload.currentRunState.testRun?.status === "running"
   );
   await expectInputValue("#participantRouteSessionId", protectedParticipantSessionId);
   await page.waitForFunction(
-    ([expectedSessionId, expectedDisplayName]) =>
+    ([expectedSessionId, expectedDisplayName, expectedRunId]) =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
-      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+      document.querySelector("#participantRouteDisplayName")?.textContent?.trim() ===
         expectedDisplayName &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "signed_in",
-    [protectedParticipantSessionId, protectedParticipantDisplayName],
+        "running" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteEntry") == null,
+    [
+      protectedParticipantSessionId,
+      protectedParticipantDisplayName,
+      protectedParticipantStartedPayload.currentRunState.testRun.testRunId
+    ],
     { timeout: 15_000 }
   );
   assert.equal(
@@ -6479,23 +6494,32 @@ try {
     codedParticipantSessionId,
     "UI smoke expected the second participant code to create a scoped session."
   );
+  const codedParticipantStartedPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${codedParticipantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      payload.currentRunState.testRun?.status === "running"
+  );
+  const codedParticipantRunId =
+    codedParticipantStartedPayload.currentRunState.testRun.testRunId;
   await expectInputValue("#participantRouteSessionId", codedParticipantSessionId);
-  await page
-    .locator("#participantCustomLoginSubtitle")
-    .filter({ hasText: "Project Test Selection" })
-    .waitFor();
-  await page
-    .locator("#participantRouteStartOrResumeButton")
-    .filter({ hasText: "Open Project Test" })
-    .waitFor();
-  await page
-    .locator("#participantBookletSelectionPrompt")
-    .filter({ hasText: "Choose the available project test." })
-    .waitFor();
+  await page.waitForFunction(
+    expectedRunId =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteEntry") == null,
+    codedParticipantRunId,
+    { timeout: 15_000 }
+  );
   assert.equal(
     await page.locator("#participantCodeKeypad").count(),
     0,
-    "Participant code keypad should close after a successful code challenge."
+    "A successful code challenge should close the keypad and open the only assigned Booklet."
   );
   const persistedAfterParticipantCode = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
@@ -6512,6 +6536,62 @@ try {
     applicationThemeBeforeCodedParticipant,
     "Leaving the participant session should restore the application theme."
   );
+
+  logStep("participant-entry-legacy-short-link-code");
+  const codedLegacyContext = await browser.newContext();
+  const codedLegacyPage = await codedLegacyContext.newPage();
+  await codedLegacyPage.goto(
+    `${baseUrl}/#/${encodeURIComponent(codedParticipantLoginKey)}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await codedLegacyPage.locator("#participantCodeKeypad").waitFor({ timeout: 15_000 });
+  await codedLegacyPage.locator("#participantCodeKeypadValue-4").click();
+  await codedLegacyPage.locator("#participantCodeKeypadValue-5").click();
+  await codedLegacyPage.locator("#participantCodeKeypadValue-6").click();
+  await codedLegacyPage.waitForURL(url =>
+    url.pathname.endsWith("/participant") &&
+    Boolean(url.searchParams.get("participantSessionId")) &&
+    url.searchParams.get("legacyShortLink") == null &&
+    url.searchParams.get("loginKey") == null &&
+    url.hash === ""
+  );
+  const codedLegacySessionId = new URL(codedLegacyPage.url()).searchParams.get(
+    "participantSessionId"
+  );
+  assert.ok(
+    codedLegacySessionId,
+    "The legacy code link should be replaced with an opaque participant session link."
+  );
+  const codedLegacyStartedPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${codedLegacySessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      payload.currentRunState.testRun?.status === "running"
+  );
+  await codedLegacyPage.waitForFunction(
+    expectedRunId =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteEntry") == null,
+    codedLegacyStartedPayload.currentRunState.testRun.testRunId,
+    { timeout: 15_000 }
+  );
+  assert.equal(
+    await codedLegacyPage.evaluate(() => {
+      const persisted = JSON.parse(
+        localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}"
+      );
+      return Object.hasOwn(persisted, "participantCode");
+    }),
+    false,
+    "Legacy-link participant codes must not be persisted in shell localStorage."
+  );
+  await codedLegacyContext.close();
   stopAfter("participant-entry-second-code");
 
   logStep("participant-entry-url");
