@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, inject } from "@angular/core";
+import { Component, ElementRef, ViewChild, inject, signal } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
@@ -239,6 +239,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
         <p id="participantCodePrompt" class="hint" *ngIf="view.participantCodeRequired">
           {{ view.customText('login_codeInputPrompt', 'This login requires the second code assigned by the test supervisor.') }}
         </p>
+        <div
+          #participantStarterBottomSentinel
+          id="participantStarterBottomSentinel"
+          class="participant-starter-bottom-sentinel"
+          aria-hidden="true"
+        ></div>
         <div class="actions">
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In
@@ -261,6 +267,18 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           role="status"
         >{{ view.reviewDownloadFeedback }}</p>
       </article>
+
+      <button
+        *ngIf="!view.isParticipantPlayerFocused && showStarterScrollButton()"
+        id="participantStarterScrollButton"
+        class="secondary participant-starter-scroll-button"
+        type="button"
+        aria-controls="participantStarterBottomSentinel"
+        (click)="scrollToStarterBottom()"
+      >
+        <span>Unten geht es weiter</span>
+        <strong aria-hidden="true">↓</strong>
+      </button>
 
       <article class="card" id="participantRoutePlayer">
         <input
@@ -1003,6 +1021,29 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  readonly showStarterScrollButton = signal(false);
+  private starterBottomElement: HTMLElement | null = null;
+  private readonly starterScrollObserver =
+    typeof IntersectionObserver === "undefined"
+      ? null
+      : new IntersectionObserver(([entry]) => {
+          this.showStarterScrollButton.set(Boolean(entry && !entry.isIntersecting));
+        });
+
+  @ViewChild("participantStarterBottomSentinel")
+  set participantStarterBottomSentinel(
+    element: ElementRef<HTMLElement> | undefined
+  ) {
+    if (this.starterBottomElement) {
+      this.starterScrollObserver?.unobserve(this.starterBottomElement);
+    }
+    this.starterBottomElement = element?.nativeElement ?? null;
+    if (this.starterBottomElement) {
+      this.starterScrollObserver?.observe(this.starterBottomElement);
+    } else {
+      this.showStarterScrollButton.set(false);
+    }
+  }
 
   get preventBrowserNavigation(): boolean {
     return this.view.preventBrowserNavigation;
@@ -1010,6 +1051,13 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
 
   notifyBrowserNavigationPrevented(): void {
     this.view.notifyBrowserNavigationPrevented();
+  }
+
+  scrollToStarterBottom(): void {
+    this.starterBottomElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
   }
 
   ngOnInit(): void {
@@ -1028,6 +1076,7 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.starterScrollObserver?.disconnect();
     this.view.destroy();
   }
 }

@@ -2751,7 +2751,7 @@ export class ParticipantViewFacade {
       })
     );
     if (download.statusCode === 204 || download.blob.size === 0) {
-      this.reviewDownloadFeedback = "No comments available.";
+      this.reviewDownloadFeedback = "Keine Kommentare verfügbar.";
       return;
     }
     const filename = download.filename ?? "testcenter-reviews.csv";

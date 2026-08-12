@@ -6024,6 +6024,29 @@ try {
     }
   );
   await page.locator("#participantRouteClearSessionButton").click();
+  await page.setViewportSize({ width: 800, height: 300 });
+  await page.evaluate(() => window.scrollTo({ top: 0 }));
+  await page.waitForFunction(() => {
+    const sentinel = document.querySelector("#participantStarterBottomSentinel");
+    return (
+      sentinel instanceof HTMLElement &&
+      sentinel.getBoundingClientRect().top > window.innerHeight
+    );
+  });
+  await page.locator("#participantStarterScrollButton").waitFor();
+  await page.locator("#participantStarterScrollButton").click();
+  await page.waitForFunction(() => {
+    const sentinel = document.querySelector("#participantStarterBottomSentinel");
+    if (!(sentinel instanceof HTMLElement)) {
+      return false;
+    }
+    const bounds = sentinel.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+  });
+  await page
+    .locator("#participantStarterScrollButton")
+    .waitFor({ state: "detached" });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
   await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
   await fillAndCommitUntilValue("#participantLoginKey", participantReviewLoginKey);
@@ -6042,7 +6065,7 @@ try {
   await emptyParticipantReviewResponse;
   await page
     .locator("#participantRouteReviewDownloadFeedback")
-    .filter({ hasText: "No comments available." })
+    .filter({ hasText: "Keine Kommentare verfügbar." })
     .waitFor();
   await page.getByRole("button", { name: "Start Or Resume" }).click();
   await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
