@@ -4256,7 +4256,12 @@ try {
       .locator(".record-card")
       .filter({ hasText: adminSessionId })
       .getByRole("button", { name: "Add To Batch" })
-      .click({ force: true });
+      .evaluate(element => {
+        if (!(element instanceof HTMLButtonElement)) {
+          throw new Error("Admin session batch action must be a button.");
+        }
+        element.click();
+      });
     await page
       .locator("app-record-collection")
       .filter({
