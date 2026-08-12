@@ -173,6 +173,18 @@ XML and reject a missing ID with `source_document_testtakers_booklet_missing`.
 Memory API gates cover both the loose JSON → Booklet → Unit graph and a mixed
 XML/JSON workspace ZIP through activation, authentication, and repeated import.
 
+Latest P0 Testtakers JSON validation closure: unambiguous current-schema roster
+documents are structurally inspected before dependency discovery or roster
+parsing. Standalone packages and JSON entries anywhere in a ZIP now reject an
+invalid root, empty groups/logins, missing group/login IDs, unsupported login
+modes, malformed Booklet arrays, and missing Booklet IDs with the stable
+`source_document_testtakers_json_invalid` diagnostic and an exact JSON path.
+Direct roster intake returns `participant_roster_json_invalid` for the same
+failures. Generic runtime JSON and the older nested participant JSON format stay
+separate from current Testtakers detection. Memory and SQLite API gates prove
+that rejected documents create neither a content release, participant or
+operational-login rows, nor a roster-import activity event.
+
 Latest P0 Testtakers-schema closure: the byte-exact original
 `Testtakers_withoutSyscheck.xml` E2E roster extends the pinned corpus with the
 15.2 generation, nine participant accounts, four monitor accounts, no profiles,
@@ -771,6 +783,10 @@ Loose roster imports resolve those Booklets and their transitive Unit resources
 into one immutable package before importing participants; missing Booklets stop
 both loose and prebuilt-ZIP imports with
 `source_document_testtakers_booklet_missing`, before any roster mutation.
+Structurally invalid current JSON rosters stop earlier with
+`source_document_testtakers_json_invalid` (or
+`participant_roster_json_invalid` on direct intake), likewise before any
+workspace roster mutation.
 
 Latest current-schema intake closure: Unit declarations using either the legacy
 `testcenter-unit-xml` or current `unit-xml` W3ID path select the same pinned

@@ -2497,46 +2497,112 @@ type TesttakersJsonRosterDocument = {
   bookletIds: string[];
 };
 
-const readTesttakersJsonRosterDocument = (
-  sourceDocument: string
-): TesttakersJsonRosterDocument | null => {
+type TesttakersJsonRosterInspection =
+  | { status: "not_testtakers" }
+  | { status: "invalid"; reason: string }
+  | { status: "valid"; document: TesttakersJsonRosterDocument };
+
+const looksLikeTesttakersJsonFileName = (sourceFileName: string): boolean =>
+  /^testtakers?(?:[-_.]|$)/i.test(
+    sourceFileName.split(/[\\/]/).at(-1) ?? sourceFileName
+  );
+
+const inspectTesttakersJsonRosterDocument = (
+  sourceDocument: string,
+  sourceFileName = ""
+): TesttakersJsonRosterInspection => {
+  const fileNameIdentifiesRoster =
+    looksLikeTesttakersJsonFileName(sourceFileName);
   let parsed: unknown;
   try {
     parsed = JSON.parse(sourceDocument);
   } catch {
-    return null;
+    return fileNameIdentifiesRoster
+      ? { status: "invalid", reason: "the document is not valid JSON" }
+      : { status: "not_testtakers" };
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return null;
+
+  const isObjectRoot =
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  const parsedRoot = isObjectRoot
+    ? (parsed as Record<string, unknown>)
+    : null;
+  const groupsCandidate = parsedRoot?.groups;
+  const hasGroupsProperty = Boolean(
+    parsedRoot && Object.prototype.hasOwnProperty.call(parsedRoot, "groups")
+  );
+  const hasMetadataProperty = Boolean(
+    parsedRoot && Object.prototype.hasOwnProperty.call(parsedRoot, "metadata")
+  );
+  const hasCurrentSchemaMarker =
+    hasGroupsProperty &&
+    (hasMetadataProperty ||
+      (Array.isArray(groupsCandidate) &&
+        groupsCandidate.some(
+          groupValue =>
+            typeof groupValue === "object" &&
+            groupValue !== null &&
+            !Array.isArray(groupValue) &&
+            Object.prototype.hasOwnProperty.call(groupValue, "logins")
+        )));
+  if (!fileNameIdentifiesRoster && !hasCurrentSchemaMarker) {
+    return { status: "not_testtakers" };
+  }
+  if (!isObjectRoot) {
+    return {
+      status: "invalid",
+      reason: "the document root must be an object"
+    };
   }
 
   const groupsValue = (parsed as Record<string, unknown>).groups;
   if (!Array.isArray(groupsValue) || groupsValue.length === 0) {
-    return null;
+    return {
+      status: "invalid",
+      reason: "$.groups must be a non-empty array"
+    };
   }
 
   const bookletIds = new Set<string>();
-  const groups = groupsValue.map(groupValue => {
+  const groups: TesttakersRosterStructure["groups"] = [];
+  for (const [groupIndex, groupValue] of groupsValue.entries()) {
     if (
       typeof groupValue !== "object" ||
       groupValue === null ||
       Array.isArray(groupValue)
     ) {
-      return null;
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}] must be an object`
+      };
     }
     const group = groupValue as Record<string, unknown>;
     const groupId = typeof group.id === "string" ? group.id.trim() : "";
-    if (!groupId || !Array.isArray(group.logins) || group.logins.length === 0) {
-      return null;
+    if (!groupId) {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].id must be a non-empty string`
+      };
+    }
+    if (!Array.isArray(group.logins) || group.logins.length === 0) {
+      return {
+        status: "invalid",
+        reason: `$.groups[${groupIndex}].logins must be a non-empty array`
+      };
     }
 
-    const loginNames = group.logins.map(loginValue => {
+    const loginNames: string[] = [];
+    for (const [loginIndex, loginValue] of group.logins.entries()) {
+      const loginPath = `$.groups[${groupIndex}].logins[${loginIndex}]`;
       if (
         typeof loginValue !== "object" ||
         loginValue === null ||
         Array.isArray(loginValue)
       ) {
-        return null;
+        return {
+          status: "invalid",
+          reason: `${loginPath} must be an object`
+        };
       }
       const login = loginValue as Record<string, unknown>;
       const loginName = typeof login.name === "string" ? login.name.trim() : "";
@@ -2548,38 +2614,98 @@ const readTesttakersJsonRosterDocument = (
         ["monitor-group", "monitor-study", "sys-check-login"].includes(
           loginMode
         );
-      if (!loginName || !supportedLoginMode) {
-        return null;
+      if (!loginName) {
+        return {
+          status: "invalid",
+          reason: `${loginPath}.name must be a non-empty string`
+        };
       }
-      if (Array.isArray(login.booklets)) {
-        for (const bookletValue of login.booklets) {
+      if (!supportedLoginMode) {
+        return {
+          status: "invalid",
+          reason: `${loginPath}.mode must be a supported Testtakers login mode`
+        };
+      }
+      if (login.booklets !== undefined && !Array.isArray(login.booklets)) {
+        return {
+          status: "invalid",
+          reason: `${loginPath}.booklets must be an array when present`
+        };
+      }
+      if (login.booklets) {
+        for (const [bookletIndex, bookletValue] of login.booklets.entries()) {
+          const bookletPath = `${loginPath}.booklets[${bookletIndex}]`;
           if (
             typeof bookletValue !== "object" ||
             bookletValue === null ||
             Array.isArray(bookletValue)
           ) {
-            continue;
+            return {
+              status: "invalid",
+              reason: `${bookletPath} must be an object`
+            };
           }
           const bookletId = (bookletValue as Record<string, unknown>).id;
-          if (typeof bookletId === "string" && bookletId.trim()) {
-            bookletIds.add(bookletId.trim());
+          if (typeof bookletId !== "string" || !bookletId.trim()) {
+            return {
+              status: "invalid",
+              reason: `${bookletPath}.id must be a non-empty string`
+            };
           }
+          bookletIds.add(bookletId.trim());
         }
       }
-      return loginName;
-    });
-    if (loginNames.some(loginName => !loginName)) {
-      return null;
+      loginNames.push(loginName);
     }
-    return { groupId, loginNames: loginNames as string[] };
-  });
-  if (groups.some(group => !group)) {
-    return null;
+    groups.push({ groupId, loginNames });
   }
   return {
-    structure: { groups: groups as TesttakersRosterStructure["groups"] },
-    bookletIds: [...bookletIds]
+    status: "valid",
+    document: {
+      structure: { groups },
+      bookletIds: [...bookletIds]
+    }
   };
+};
+
+const readTesttakersJsonRosterDocument = (
+  sourceDocument: string
+): TesttakersJsonRosterDocument | null => {
+  const inspection = inspectTesttakersJsonRosterDocument(sourceDocument);
+  return inspection.status === "valid" ? inspection.document : null;
+};
+
+const inspectParticipantRosterJsonSource = (
+  rosterSource: ParticipantRosterSource
+): TesttakersJsonRosterInspection => {
+  if (typeof rosterSource === "string") {
+    const trimmedSource = rosterSource.trimStart();
+    if (!trimmedSource.startsWith("{")) {
+      return { status: "not_testtakers" };
+    }
+    try {
+      const parsed = JSON.parse(rosterSource) as unknown;
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        !Object.prototype.hasOwnProperty.call(parsed, "groups")
+      ) {
+        return { status: "not_testtakers" };
+      }
+    } catch {
+      return { status: "invalid", reason: "the document is not valid JSON" };
+    }
+    return inspectTesttakersJsonRosterDocument(rosterSource);
+  }
+
+  if (
+    Array.isArray(rosterSource) ||
+    !Object.prototype.hasOwnProperty.call(rosterSource, "groups")
+  ) {
+    return { status: "not_testtakers" };
+  }
+  return inspectTesttakersJsonRosterDocument(JSON.stringify(rosterSource));
 };
 
 const collectTesttakersBookletReferences = (
@@ -17014,14 +17140,28 @@ const validateZipXmlEntries = (
       manifestExtraction.zipBuffer,
       entry
     );
-    const rosterDocument = sourceDocument
-      ? readTesttakersJsonRosterDocument(sourceDocument)
-      : null;
-    if (!rosterDocument) {
+    const rosterInspection = sourceDocument
+      ? inspectTesttakersJsonRosterDocument(sourceDocument, entry.fileName)
+      : looksLikeTesttakersJsonFileName(entry.fileName)
+        ? {
+            status: "invalid" as const,
+            reason: "the ZIP entry could not be read"
+          }
+        : { status: "not_testtakers" as const };
+    if (rosterInspection.status === "invalid") {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_testtakers_json_invalid",
+          `Testtakers JSON ZIP entry '${entry.fileName}' is structurally invalid: ${rosterInspection.reason}.`
+        )
+      );
+      continue;
+    }
+    if (rosterInspection.status !== "valid") {
       continue;
     }
     testtakersBookletReferences.push(
-      ...rosterDocument.bookletIds.map(bookletId => ({
+      ...rosterInspection.document.bookletIds.map(bookletId => ({
         bookletId,
         sourceFileName: entry.fileName
       }))
@@ -17638,11 +17778,25 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     normalizedFileName.endsWith(".json") ||
     looksLikeJsonDocument
   ) {
-    try {
+    const rosterInspection = inspectTesttakersJsonRosterDocument(
+      decodedSourceDocument,
+      sourcePackage.fileName
+    );
+    if (rosterInspection.status === "invalid") {
       return {
-        runtimeSnapshot: normalizeParsedJsonContentStructure(
-          JSON.parse(decodedSourceDocument)
-        ),
+        runtimeSnapshot: null,
+        diagnostics: [
+          createImportDiagnostic(
+            "source_document_testtakers_json_invalid",
+            `Testtakers JSON source package '${sourcePackage.fileName}' is structurally invalid: ${rosterInspection.reason}.`
+          )
+        ]
+      };
+    }
+    try {
+      const parsedJson = JSON.parse(decodedSourceDocument);
+      return {
+        runtimeSnapshot: normalizeParsedJsonContentStructure(parsedJson),
         diagnostics: []
       };
     } catch {
@@ -22053,6 +22207,20 @@ export const createFirstSliceServices = (
     const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
 
     for (const rosterDocument of input.rosterDocuments) {
+      const jsonInspection = inspectParticipantRosterJsonSource(
+        rosterDocument.rosterText
+      );
+      if (jsonInspection.status === "invalid") {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_json_invalid",
+          `Participant roster '${rosterDocument.sourceFileName}' is structurally invalid Testtakers JSON: ${jsonInspection.reason}.`,
+          {
+            sourceFileName: rosterDocument.sourceFileName,
+            reason: jsonInspection.reason
+          }
+        );
+      }
       if (
         typeof rosterDocument.rosterText === "string" &&
         rosterDocument.rosterText.trimStart().startsWith("<")

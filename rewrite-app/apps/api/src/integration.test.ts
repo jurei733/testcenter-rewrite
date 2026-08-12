@@ -21479,6 +21479,191 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
   assert.equal(missingZipImport.body.stagedContentRelease, null);
 });
 
+test("Testtakers JSON imports reject malformed structures before workspace mutation", async () => {
+  const tenantKey = "integration-tenant-invalid-testtakers-json";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+
+  const malformedPackageCases = [
+    {
+      workspaceKey: "invalid-testtakers-json-standalone",
+      fileName: "Testtakers-invalid-booklet.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        groups: [
+          {
+            id: "invalid-booklet-group",
+            label: "Invalid booklet group",
+            logins: [
+              {
+                name: "invalid-booklet-login",
+                mode: "run-hot-return",
+                booklets: [{}]
+              }
+            ]
+          }
+        ]
+      }),
+      expectedReason: "$.groups[0].logins[0].booklets[0].id"
+    },
+    {
+      workspaceKey: "invalid-testtakers-json-zip",
+      fileName: "invalid-testtakers-json.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createZipBase64([
+        {
+          fileName: "imsmanifest.xml",
+          content: [
+            '<manifest identifier="invalid-testtakers-json">',
+            "  <resources>",
+            '    <resource identifier="BOOKLET.INVALID-ROSTER" href="Booklet.xml" />',
+            '    <resource identifier="ROSTER.INVALID" href="config/Participants.json" />',
+            "  </resources>",
+            "</manifest>"
+          ].join("\n")
+        },
+        {
+          fileName: "Booklet.xml",
+          content: [
+            "<Booklet>",
+            "  <Metadata><Id>BOOKLET.INVALID-ROSTER</Id><Label>Invalid roster</Label></Metadata>",
+            "  <Units />",
+            "</Booklet>"
+          ].join("\n")
+        },
+        {
+          fileName: "config/Participants.json",
+          content: JSON.stringify({
+            groups: [
+              {
+                id: "unsupported-mode-group",
+                label: "Unsupported mode group",
+                logins: [
+                  {
+                    name: "unsupported-mode-login",
+                    mode: "run-unknown",
+                    booklets: [{ id: "BOOKLET.INVALID-ROSTER" }]
+                  }
+                ]
+              }
+            ]
+          })
+        }
+      ])}`,
+      expectedReason: "$.groups[0].logins[0].mode"
+    }
+  ];
+
+  for (const malformedCase of malformedPackageCases) {
+    await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+      method: "POST",
+      body: {
+        workspaceKey: malformedCase.workspaceKey,
+        displayName: malformedCase.workspaceKey
+      }
+    });
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${malformedCase.workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: malformedCase.fileName,
+          mediaType: malformedCase.mediaType,
+          sourceDocument: malformedCase.sourceDocument
+        }
+      }
+    );
+    assert.equal(upload.status, 201, malformedCase.fileName);
+
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; message: string }>;
+      };
+      stagedContentRelease: null;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${malformedCase.workspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: { sourcePackageId: upload.body.sourcePackage.sourcePackageId }
+      }
+    );
+    assert.equal(importResult.status, 201, malformedCase.fileName);
+    assert.equal(importResult.body.importJob.status, "failed", malformedCase.fileName);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === "source_document_testtakers_json_invalid" &&
+          diagnostic.message.includes(malformedCase.expectedReason)
+      ),
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+
+    const roster = await requestJson<{
+      items: unknown[];
+      operationalLoginCandidates: unknown[];
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${malformedCase.workspaceKey}/participant-roster`
+    );
+    assert.deepEqual(roster.body.items, []);
+    assert.deepEqual(roster.body.operationalLoginCandidates, []);
+
+    const activities = await requestJson<{ items: unknown[] }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${malformedCase.workspaceKey}/activity-events?eventType=participant_roster_imported`
+    );
+    assert.deepEqual(activities.body.items, []);
+  }
+
+  const directWorkspaceKey = "invalid-testtakers-json-direct";
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey: directWorkspaceKey, displayName: directWorkspaceKey }
+  });
+  const directImport = await requestJson<{
+    error: string;
+    details: { reason: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${directWorkspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: {
+          groups: [
+            {
+              id: "direct-invalid-group",
+              logins: [{ name: "direct-invalid-login", mode: "run-unknown" }]
+            }
+          ]
+        }
+      }
+    }
+  );
+  assert.equal(directImport.status, 400);
+  assert.equal(directImport.body.error, "participant_roster_json_invalid");
+  assert.equal(
+    directImport.body.details.reason,
+    "$.groups[0].logins[0].mode must be a supported Testtakers login mode"
+  );
+
+  const directRoster = await requestJson<{
+    items: unknown[];
+    operationalLoginCandidates: unknown[];
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${directWorkspaceKey}/participant-roster`
+  );
+  assert.deepEqual(directRoster.body.items, []);
+  assert.deepEqual(directRoster.body.operationalLoginCandidates, []);
+  const directActivities = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${directWorkspaceKey}/activity-events?eventType=participant_roster_imported`
+  );
+  assert.deepEqual(directActivities.body.items, []);
+});
+
 test("original Testcenter compatibility corpus assembles loose dependency files", async () => {
   type AdaptiveDependencyPackage = {
     bookletFixture: string;
