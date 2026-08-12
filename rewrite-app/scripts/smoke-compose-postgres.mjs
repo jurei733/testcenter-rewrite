@@ -466,7 +466,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const participantMatrixCsvText = await participantMatrixCsv.text();
   if (
     !participantMatrixCsvText.startsWith(
-      "tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,"
+      "tenantKey,workspaceKey,generatedAt,loginKey,groupKey,groupLabel,displayName,"
     ) ||
     !participantMatrixCsvText.includes('"student-demo"') ||
     !participantMatrixCsvText.includes('"group:student-demo"') ||
