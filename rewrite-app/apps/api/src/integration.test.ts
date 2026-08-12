@@ -21427,22 +21427,28 @@ test("original Testcenter compatibility corpus resolves Testtakers booklet depen
       content: [
         '<manifest identifier="missing-testtakers-booklet">',
         "  <resources>",
-        '    <resource identifier="ROSTER.MISSING" href="Testtakers.xml" />',
+        '    <resource identifier="ROSTER.MISSING" href="Testtakers.json" />',
         "  </resources>",
         "</manifest>"
       ].join("\n")
     },
     {
-      fileName: "Testtakers.xml",
-      content: [
-        "<Testtakers>",
-        '  <Group id="missing-zip-booklet" label="Missing ZIP booklet">',
-        '    <Login name="missing-zip-booklet-login">',
-        "      <Booklet>BOOKLET.NOT-IN-ZIP</Booklet>",
-        "    </Login>",
-        "  </Group>",
-        "</Testtakers>"
-      ].join("\n")
+      fileName: "Testtakers.json",
+      content: JSON.stringify({
+        groups: [
+          {
+            id: "missing-zip-booklet",
+            label: "Missing ZIP booklet",
+            logins: [
+              {
+                name: "missing-zip-booklet-login",
+                mode: "run-hot-return",
+                booklets: [{ id: "BOOKLET.NOT-IN-ZIP" }]
+              }
+            ]
+          }
+        ]
+      })
     }
   ]);
   const missingZipUpload = await requestJson<{

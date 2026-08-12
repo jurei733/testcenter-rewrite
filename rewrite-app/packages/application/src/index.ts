@@ -17003,6 +17003,30 @@ const validateZipXmlEntries = (
       });
     }
   }
+  for (const entry of manifestExtraction.entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !entry.fileName.toLowerCase().endsWith(".json")
+    ) {
+      continue;
+    }
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    const rosterDocument = sourceDocument
+      ? readTesttakersJsonRosterDocument(sourceDocument)
+      : null;
+    if (!rosterDocument) {
+      continue;
+    }
+    testtakersBookletReferences.push(
+      ...rosterDocument.bookletIds.map(bookletId => ({
+        bookletId,
+        sourceFileName: entry.fileName
+      }))
+    );
+  }
   const reportedMissingBookletIds = new Set<string>();
   for (const reference of testtakersBookletReferences) {
     const bookletIdentityKey = reference.bookletId.toLowerCase();

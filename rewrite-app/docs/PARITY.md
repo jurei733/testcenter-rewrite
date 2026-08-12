@@ -168,6 +168,8 @@ assembled archive. Manifestless Original-style workspace ZIPs discover mixed
 XML and JSON rosters in arbitrary folders, persist participant and operational
 logins together, retain the source filenames in import/audit read models, and
 keep every participant, monitor, and system-check password out of responses.
+JSON roster Booklet references pass the same package-wide existence check as
+XML and reject a missing ID with `source_document_testtakers_booklet_missing`.
 Memory API gates cover both the loose JSON → Booklet → Unit graph and a mixed
 XML/JSON workspace ZIP through activation, authentication, and repeated import.
 
