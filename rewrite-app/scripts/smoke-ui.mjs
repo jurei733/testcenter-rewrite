@@ -672,7 +672,7 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
-  const waitForRouteTarget = async selector => {
+  const waitForRouteTarget = async (selector, recover = null) => {
     const target = page.locator(selector);
     const mounted = await target
       .waitFor({ state: "visible", timeout: 5_000 })
@@ -680,6 +680,9 @@ try {
       .catch(() => false);
     if (!mounted) {
       await page.reload({ waitUntil: "domcontentloaded" });
+      if (recover) {
+        await recover();
+      }
     }
     await target.waitFor({ state: "visible", timeout: 30_000 });
     return target;
@@ -8411,21 +8414,27 @@ try {
     .filter({ hasText: "Leave simulation task?" })
     .waitFor();
   await page.waitForTimeout(250);
+  const simulationCompleteResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/api/v1/participant/test-runs/${encodeURIComponent(simulationRunId)}/complete`
+      )
+  );
   await page.locator("#participantConfirmationContinueButton").click();
+  const simulationCompleteResponse = await simulationCompleteResponsePromise;
+  assert.equal(simulationCompleteResponse.status(), 200);
   logStep("participant-custom-leave-confirmation");
   stopAfter("participant-custom-leave-confirmation");
-  await page
-    .locator("#participantRouteStatus")
-    .filter({ hasText: "completed" })
-    .waitFor({ timeout: 15_000 });
-  const completedSimulationState = await (
-    await sendSmokeJson(
-      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
-        simulationSessionId
-      )}/current-state`,
-      { method: "GET" }
-    )
-  ).json();
+  const completedSimulationState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+      simulationSessionId
+    )}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.testRunId === simulationRunId &&
+      payload.currentRunState.testRun.status === "running" &&
+      payload.currentRunState.testRun.currentUnitKey === null
+  );
   assert.equal(completedSimulationState.currentRunState?.testRun?.testRunId, simulationRunId);
   assert.equal(completedSimulationState.currentRunState?.testRun?.status, "running");
   assert.equal(completedSimulationState.currentRunState?.testRun?.currentUnitKey, null);
@@ -13468,7 +13477,21 @@ try {
     .getByRole("button", { name: "Prepare Monitor Account" })
     .click();
   await page.waitForURL(/\/app\/ops$/);
-  await waitForRouteTarget("#adminCreateUsername");
+  await waitForRouteTarget("#adminCreateUsername", async () => {
+    const signInButton = page.locator("#adminSignInButton");
+    const signedOut = await signInButton
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!signedOut) {
+      return;
+    }
+    await fillAndCommitUntilValue("#adminUsername", adminUsername);
+    await fillAndCommitUntilValue("#adminPassword", adminPassword);
+    await clickAction("Sign In");
+    await waitForInputMinLength("#adminSessionToken", 20);
+    smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  });
   await expectInputValue("#adminCreateUsername", groupMonitorUsername);
   assert.equal(
     (await page.locator("#adminCreateRole option:checked").textContent())?.trim(),
