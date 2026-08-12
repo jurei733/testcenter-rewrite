@@ -495,11 +495,32 @@ try {
   );
   await restoredIntroPlayerFrame
     .locator("#demoPlayerAnswer")
-    .waitFor({ timeout: 15_000 });
-  assert.equal(
-    await restoredIntroPlayerFrame.locator("#demoPlayerAnswer").inputValue(),
-    "Intro answer from smoke"
-  );
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await restoredIntroPlayerFrame
+    .locator("#demoPlayerAnswer")
+    .evaluate(
+      (input, expectedValue) =>
+        new Promise((resolve, reject) => {
+          const deadline = Date.now() + 15_000;
+          const check = () => {
+            if (input.value === expectedValue) {
+              resolve(undefined);
+              return;
+            }
+            if (Date.now() >= deadline) {
+              reject(
+                new Error(
+                  `Expected restored demo answer '${expectedValue}', received '${input.value}'.`
+                )
+              );
+              return;
+            }
+            setTimeout(check, 50);
+          };
+          check();
+        }),
+      "Intro answer from smoke"
+    );
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForFunction(
     expectedSessionId =>

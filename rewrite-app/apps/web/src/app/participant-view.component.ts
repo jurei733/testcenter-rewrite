@@ -584,7 +584,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                   id="participantRouteUnitResponse"
                   name="participantRouteUnitResponse"
                   [disabled]="!view.player.canSaveProgress"
-                  [(ngModel)]="view.runtime.currentUnitResponse"
+                  [ngModel]="view.runtime.currentUnitResponse"
+                  (ngModelChange)="view.updateCurrentTextResponse($event)"
                   (change)="view.persistState()"
                   placeholder="Write the participant response for this unit."
                 ></textarea>

@@ -6615,27 +6615,6 @@ try {
     )}`,
     { waitUntil: "networkidle" }
   );
-  await page.waitForTimeout(1_000);
-  process.stdout.write(
-    `ui_smoke_reentry_state=${JSON.stringify(
-      await page.evaluate(() => ({
-        session: document
-          .querySelector("#participantRouteSessionLabel")
-          ?.textContent?.trim(),
-        status: document
-          .querySelector("#participantRouteStatus")
-          ?.textContent?.trim(),
-        unit: document
-          .querySelector("#participantRouteUnitKey")
-          ?.textContent?.trim(),
-        response: document.querySelector("#participantRouteUnitResponse")?.value,
-        overview: document
-          .querySelector("#participantRouteUnitOverview")
-          ?.textContent?.trim(),
-        entryVisible: document.querySelector("#participantRouteEntry") != null
-      }))
-    )}\n`
-  );
   await page.waitForFunction(
     ([expectedSessionId, expectedUnitKey, expectedResponse]) =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===

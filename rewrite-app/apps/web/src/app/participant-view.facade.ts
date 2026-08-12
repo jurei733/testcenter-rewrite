@@ -396,6 +396,7 @@ export class ParticipantViewFacade {
   private veronaSaveBufferDueAtMs: number | null = null;
   private currentStateRefreshSequence = 0;
   private currentStateAppliedRefreshSequence = 0;
+  private currentTextDraftIdentity: string | null = null;
   private readonly navigationAdvisory = signal<{
     title: string;
     message: string;
@@ -504,6 +505,16 @@ export class ParticipantViewFacade {
 
   persistState(): void {
     this.viewState.persistShellState();
+  }
+
+  updateCurrentTextResponse(response: string): void {
+    this.runtime.currentUnitResponse = response;
+    const currentState = this.readCurrentRunState();
+    const unitKey = currentState?.currentUnit.unitKey;
+    this.currentTextDraftIdentity =
+      currentState && unitKey
+        ? `${currentState.testRun.testRunId}\u0000${unitKey}`
+        : null;
   }
 
   startFromEntryParameters(parameters: ParticipantEntryParameters): void {
@@ -3866,6 +3877,7 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitResponse =
       optimisticResponse ??
       (unitKey ? this.effectiveUnitResponse(currentState, unitKey) : "");
+    this.currentTextDraftIdentity = null;
   }
 
   private shouldPreserveCurrentTextDraft(
@@ -3883,6 +3895,8 @@ export class ParticipantViewFacade {
     }
     const draft = this.runtime.currentUnitResponse;
     return (
+      this.currentTextDraftIdentity ===
+        `${currentState.testRun.testRunId}\u0000${unitKey}` &&
       draft !== this.effectiveUnitResponse(currentState, unitKey) &&
       draft !== this.effectiveUnitResponse(incomingState, unitKey)
     );
