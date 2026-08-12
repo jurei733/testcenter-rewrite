@@ -16,6 +16,7 @@ export type ParsedParticipantRosterEntry = {
   loginKey: string;
   executionMode?: ParticipantExecutionMode;
   groupKey: string;
+  groupLabel?: string | null;
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
@@ -125,6 +126,7 @@ const rosterHeaderAliases = {
     "class",
     "classname"
   ]),
+  groupLabel: new Set(["grouplabel", "groupdisplaylabel", "classlabel"]),
   bookletKey: new Set([
     "bookletkey",
     "booklet",
@@ -163,6 +165,7 @@ const rosterHeaderAliases = {
 type RosterDelimitedHeader = {
   loginKey: number;
   groupKey: number | null;
+  groupLabel: number | null;
   bookletKey: number | null;
   displayName: number | null;
   password: number | null;
@@ -200,6 +203,7 @@ const readRosterDelimitedHeader = (
   return {
     loginKey: loginKeyIndex,
     groupKey: findRosterHeaderIndex(values, rosterHeaderAliases.groupKey),
+    groupLabel: findRosterHeaderIndex(values, rosterHeaderAliases.groupLabel),
     bookletKey: findRosterHeaderIndex(values, rosterHeaderAliases.bookletKey),
     displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName),
     password: findRosterHeaderIndex(values, rosterHeaderAliases.password),
@@ -263,6 +267,9 @@ const parseDelimitedRosterRows = (
     const groupKey = header
       ? readRosterDelimitedValue(values, header.groupKey)
       : normalizeRosterTextValue(values[1]);
+    const groupLabel = header
+      ? readRosterDelimitedValue(values, header.groupLabel)
+      : null;
     const bookletKey = header
       ? readRosterDelimitedValue(values, header.bookletKey)
       : normalizeRosterTextValue(values[2]);
@@ -292,6 +299,7 @@ const parseDelimitedRosterRows = (
       {
         loginKey,
         groupKey: groupKey || `group:${loginKey}`,
+        ...(groupLabel ? { groupLabel } : {}),
         bookletKey,
         displayName,
         ...(executionMode ? { executionMode } : {}),
@@ -622,6 +630,11 @@ const mergeParsedParticipantRosterEntries = (
       ...existingEntry,
       ...bookletAssignment,
       groupKey: entry.groupKey || existingEntry.groupKey,
+      ...(entry.groupLabel
+        ? { groupLabel: entry.groupLabel }
+        : existingEntry.groupLabel
+          ? { groupLabel: existingEntry.groupLabel }
+          : {}),
       displayName: entry.displayName ?? existingEntry.displayName,
       ...((existingEntry.bookletAssignments || entry.bookletAssignments)
         ? {
@@ -1075,6 +1088,7 @@ const parseParticipantRosterJsonValue = (
     candidate: unknown,
     context: {
       groupKey: string | null;
+      groupLabel: string | null;
       bookletKey: string | null;
       validFrom: string | null;
       validTo: string | null;
@@ -1129,6 +1143,9 @@ const parseParticipantRosterJsonValue = (
         "class",
         "className"
       ) ?? context.groupKey;
+    const groupLabel =
+      readJsonRosterString(objectValue, "groupLabel", "groupDisplayLabel", "classLabel") ??
+      context.groupLabel;
     const bookletKey =
       readJsonRosterString(
         objectValue,
@@ -1194,6 +1211,7 @@ const parseParticipantRosterJsonValue = (
         loginKey,
         ...(executionMode ? { executionMode } : {}),
         groupKey: groupKey || `group:${loginKey}`,
+        ...(groupLabel ? { groupLabel } : {}),
         ...withAdditionalBookletKeys([
           bookletKey,
           ...bookletAssignments.map(assignment => assignment.bookletKey)
@@ -1231,6 +1249,7 @@ const parseParticipantRosterJsonValue = (
 
     const childContext = {
       groupKey,
+      groupLabel,
       bookletKey,
       validFrom,
       validTo,
@@ -1287,6 +1306,16 @@ const parseParticipantRosterJsonValue = (
               "ref"
             ) ?? groupKey
           : groupKey,
+        groupLabel: childObject
+          ? readJsonRosterString(
+              childObject,
+              "groupLabel",
+              "groupDisplayLabel",
+              "classLabel",
+              "displayLabel",
+              "label"
+            ) ?? groupLabel
+          : groupLabel,
         bookletKey,
         validFrom,
         validTo,
@@ -1305,6 +1334,7 @@ const parseParticipantRosterJsonValue = (
       const childObject = asRosterObject(childValue);
       visit(childValue, {
         groupKey,
+        groupLabel,
         bookletKey: childObject
           ? readJsonRosterString(
               childObject,
@@ -1330,6 +1360,7 @@ const parseParticipantRosterJsonValue = (
 
   visit(parsed, {
     groupKey: null,
+    groupLabel: null,
     bookletKey: null,
     validFrom: null,
     validTo: null,
@@ -1538,6 +1569,15 @@ const parseParticipantRosterXmlText = (
     "name",
     "label"
   );
+  const groupLabelContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "groupLabel",
+    "groupDisplayLabel",
+    "classLabel",
+    "displayLabel",
+    "label"
+  );
   const groupAssetAssignmentRanges =
     collectXmlGroupAssetAssignmentRanges(rosterText);
   const bookletContextRanges = collectXmlRosterContextRanges(
@@ -1645,6 +1685,23 @@ const parseParticipantRosterXmlText = (
         ) ??
         readXmlChildText(content, "groupKey", "group", "groupId", "groupName", "class")
     ) ?? findNearestXmlRosterContextValue(groupContextRanges, entryOffset);
+    const groupLabel = normalizeRosterTextValue(
+      readXmlAttribute(
+        attributes,
+        "groupLabel",
+        "groupDisplayLabel",
+        "classLabel"
+      ) ??
+        readXmlChildAttribute(
+          content,
+          "group|groupRef|group-ref|class|classRef|class-ref",
+          "groupLabel",
+          "groupDisplayLabel",
+          "classLabel",
+          "displayLabel",
+          "label"
+        )
+    ) ?? findNearestXmlRosterContextValue(groupLabelContextRanges, entryOffset);
     const bookletKey = normalizeRosterTextValue(
       readXmlAttribute(
         attributes,
@@ -1726,6 +1783,7 @@ const parseParticipantRosterXmlText = (
       loginKey,
       ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
+      ...(groupLabel ? { groupLabel } : {}),
       ...withAdditionalBookletKeys([
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
@@ -1796,6 +1854,10 @@ const parseParticipantRosterXmlText = (
           "className"
         )
       ) ?? findNearestXmlRosterContextValue(groupContextRanges, entryOffset);
+    const groupLabel = findNearestXmlRosterContextValue(
+      groupLabelContextRanges,
+      entryOffset
+    );
     const bookletKey = normalizeRosterTextValue(
       readXmlAttribute(
         attributes,
@@ -1865,6 +1927,7 @@ const parseParticipantRosterXmlText = (
       loginKey,
       ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
+      ...(groupLabel ? { groupLabel } : {}),
       ...withAdditionalBookletKeys([
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
@@ -2054,6 +2117,14 @@ const parseOriginalTestcenterOperationalLoginsJsonValue = (
       "groupId",
       "key"
     );
+    const groupLabel = readJsonRosterString(
+      group,
+      "groupLabel",
+      "groupDisplayLabel",
+      "classLabel",
+      "displayLabel",
+      "label"
+    );
     const groupAssets = readJsonAssetAssignments(group);
     const validFrom = readJsonRosterString(group, "validFrom", "valid-from");
     const validTo = readJsonRosterString(group, "validTo", "valid-to");
@@ -2126,6 +2197,7 @@ const parseOriginalTestcenterOperationalLoginsJsonValue = (
           loginMode:
             loginMode as OriginalTestcenterOperationalLoginCandidate["loginMode"],
           groupKey,
+          ...(groupLabel ? { groupLabel } : {}),
           passwordRequired: Boolean(
             readJsonRosterString(
               login,
@@ -2185,6 +2257,15 @@ export const parseOriginalTestcenterOperationalLogins = (
     "name",
     "label"
   );
+  const groupLabelContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "groupLabel",
+    "groupDisplayLabel",
+    "classLabel",
+    "displayLabel",
+    "label"
+  );
   const groupAssetAssignmentRanges =
     collectXmlGroupAssetAssignmentRanges(rosterText);
   const validFromContextRanges = collectXmlRosterContextRanges(
@@ -2239,6 +2320,10 @@ export const parseOriginalTestcenterOperationalLogins = (
       groupContextRanges,
       entryOffset
     );
+    const groupLabel = findNearestXmlRosterContextValue(
+      groupLabelContextRanges,
+      entryOffset
+    );
     const validFrom = findNearestXmlRosterContextValue(
       validFromContextRanges,
       entryOffset
@@ -2288,6 +2373,7 @@ export const parseOriginalTestcenterOperationalLogins = (
       loginKey,
       loginMode: loginMode as OriginalTestcenterOperationalLoginMode,
       groupKey,
+      ...(groupLabel ? { groupLabel } : {}),
       passwordRequired: Boolean(password),
       profileIds: uniqueProfileIds,
       monitorProfiles: uniqueProfileIds.flatMap(profileId => {

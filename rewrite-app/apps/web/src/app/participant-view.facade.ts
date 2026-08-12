@@ -926,7 +926,9 @@ export class ParticipantViewFacade {
       detail: currentState.booklet.displayLabel,
       displayNameLabel,
       loginLabel: currentState.participantSession.loginKey,
-      groupLabel: currentState.participantSession.groupKey,
+      groupLabel:
+        currentState.participantRosterEntry?.groupLabel?.trim() ||
+        currentState.participantSession.groupKey,
       sessionLabel: currentState.participantSession.participantSessionId,
       sessionEntryLink: this.createParticipantSessionEntryLink(),
       bookletLabel: currentState.booklet.displayLabel,

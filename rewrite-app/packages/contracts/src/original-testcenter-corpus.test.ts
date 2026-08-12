@@ -2106,6 +2106,7 @@ test("original Testcenter compatibility corpus pins official group monitoring se
     loginKey: "GM-1",
     loginMode: "monitor-group",
     groupKey: "filter-profiles",
+    groupLabel: "Filter-Profiles",
     passwordRequired: true,
     profileIds: ["all", "small"],
     monitorProfiles: [

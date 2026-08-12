@@ -480,6 +480,9 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.group_label === null || row.group_label === undefined
+            ? {}
+            : { groupLabel: String(row.group_label) }),
           bookletKey:
             row.booklet_key === null || row.booklet_key === undefined
               ? null
@@ -1433,6 +1436,13 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE application_settings
         ADD COLUMN asset_assignments_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 53,
+    name: "add_participant_group_labels",
+    sql: `
+      ALTER TABLE participant_roster_entries ADD COLUMN group_label TEXT;
     `
   }
 ];
@@ -2549,7 +2559,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -2617,12 +2627,13 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             execution_mode = excluded.execution_mode,
             group_key = excluded.group_key,
+            group_label = excluded.group_label,
             booklet_key = excluded.booklet_key,
             booklet_keys_json = excluded.booklet_keys_json,
             booklet_state_presets_json = excluded.booklet_state_presets_json,
@@ -2644,6 +2655,7 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.loginKey,
           participantRosterEntry.executionMode ?? null,
           participantRosterEntry.groupKey,
+          participantRosterEntry.groupLabel?.trim() || null,
           participantRosterEntry.bookletKey,
           participantRosterEntry.bookletKeys?.length
             ? JSON.stringify(participantRosterEntry.bookletKeys)

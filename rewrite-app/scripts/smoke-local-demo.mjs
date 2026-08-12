@@ -386,6 +386,10 @@ try {
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"
   );
+  assert.equal(
+    (await page.locator("#participantRouteGroupLabel").textContent())?.trim(),
+    "Demo Group"
+  );
   const progressTrack = page.locator(".participant-progress .progress-track");
   assert.equal(await progressTrack.getAttribute("role"), "progressbar");
   assert.equal(
@@ -594,7 +598,7 @@ try {
         ?.textContent?.includes("Demo Student") &&
       document
         .querySelector("#participantRosterExportPreview")
-        ?.textContent?.includes("student-demo"),
+        ?.textContent?.includes("Demo Group"),
     undefined,
     { timeout: 15_000 }
   );
@@ -613,7 +617,7 @@ try {
         ?.textContent?.includes("student-demo") &&
       document
         .querySelector("#participantSessionsExportPreview")
-        ?.textContent?.includes("group:student-demo"),
+        ?.textContent?.includes("Demo Group"),
     undefined,
     { timeout: 15_000 }
   );
@@ -866,6 +870,7 @@ try {
   const demoGroup = studyMonitor.studyMonitorSummary.groups.find(
     group => group.groupKey === "group:student-demo"
   );
+  assert.equal(demoGroup?.groupLabel, "Demo Group");
   assert.equal(demoGroup?.testRunCount ?? 0, 0);
   assert.equal(demoGroup?.responseCount ?? 0, 0);
 
@@ -889,6 +894,7 @@ try {
     await filteredParticipantMatrixCsvResponse.text();
   assert.match(filteredParticipantMatrixCsv, /tenantKey,workspaceKey,generatedAt,loginKey/);
   assert.match(filteredParticipantMatrixCsv, /student-demo/);
+  assert.match(filteredParticipantMatrixCsv, /Demo Group/);
   assert.match(filteredParticipantMatrixCsv, /unit-intro/);
   assert.match(filteredParticipantMatrixCsv, /not_started/);
   assert.equal(filteredParticipantMatrixCsv.trim().split("\n").length, 2);

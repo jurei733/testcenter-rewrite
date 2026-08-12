@@ -1693,6 +1693,34 @@ const normalizeWorkspaceDisplayName = (value: unknown): string => {
   return displayName;
 };
 
+const resolveParticipantGroupLabel = (
+  rosterEntry: Pick<ParticipantRosterEntry, "groupKey" | "groupLabel"> | null | undefined,
+  fallbackGroupKey: string
+): string => rosterEntry?.groupLabel?.trim() || fallbackGroupKey;
+
+const buildParticipantGroupLabels = (
+  rosterEntries: ParticipantRosterEntry[]
+): Map<string, string> => {
+  const labels = new Map<string, string>();
+  for (const rosterEntry of [...rosterEntries].sort(
+    (left, right) =>
+      right.importedAt.localeCompare(left.importedAt) ||
+      left.loginKey.localeCompare(right.loginKey)
+  )) {
+    const existingLabel = labels.get(rosterEntry.groupKey);
+    if (
+      existingLabel === undefined ||
+      (existingLabel === rosterEntry.groupKey && rosterEntry.groupLabel?.trim())
+    ) {
+      labels.set(
+        rosterEntry.groupKey,
+        resolveParticipantGroupLabel(rosterEntry, rosterEntry.groupKey)
+      );
+    }
+  }
+  return labels;
+};
+
 const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
   if (value === undefined || value === null) {
     return {};
@@ -6712,6 +6740,7 @@ const listGroupResultsForWorkspace = (input: {
   tenantKey: string;
   workspaceKey: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   reviews: WorkspaceReview[];
   testLogs: ParticipantTestLog[];
@@ -6721,6 +6750,9 @@ const listGroupResultsForWorkspace = (input: {
       participantSession.participantSessionId,
       participantSession
     ])
+  );
+  const groupLabels = buildParticipantGroupLabels(
+    input.participantRosterEntries
   );
   const reviewsByTestRunId = new Map<string, number>();
   for (const review of input.reviews) {
@@ -6780,9 +6812,7 @@ const listGroupResultsForWorkspace = (input: {
         tenantKey: input.tenantKey,
         workspaceKey: input.workspaceKey,
         groupKey,
-        // The rewrite roster currently stores a stable group key but no separate
-        // group label, so use the key as the lossless operator-facing fallback.
-        groupLabel: groupKey,
+        groupLabel: groupLabels.get(groupKey) ?? groupKey,
         bookletsStarted: rows.length,
         numUnitsMin: Math.min(...responseCounts),
         numUnitsMax: Math.max(...responseCounts),
@@ -7270,6 +7300,7 @@ const formatParticipantRosterCsv = (input: {
     "loginKey",
     "executionMode",
     "groupKey",
+    "groupLabel",
     "bookletKey",
     "displayName",
     "passwordRequired",
@@ -7299,6 +7330,7 @@ const formatParticipantRosterCsv = (input: {
         item.loginKey,
         normalizeParticipantExecutionMode(item.executionMode),
         item.groupKey,
+        resolveParticipantGroupLabel(item, item.groupKey),
         item.bookletKey ?? "",
         item.displayName ?? "",
         item.passwordRequired ? "true" : "false",
@@ -7329,6 +7361,7 @@ const formatParticipantSessionsCsv = (input: {
     "participantSessionId",
     "loginKey",
     "groupKey",
+    "groupLabel",
     "executionMode",
     "sessionStatus",
     "createdAt",
@@ -7353,6 +7386,10 @@ const formatParticipantSessionsCsv = (input: {
         item.participantSession.participantSessionId,
         item.participantSession.loginKey,
         item.participantSession.groupKey,
+        resolveParticipantGroupLabel(
+          item.participantRosterEntry,
+          item.participantSession.groupKey
+        ),
         normalizeParticipantExecutionMode(
           item.latestTestRun?.executionMode ??
             item.participantSession.executionMode ??
@@ -7428,7 +7465,7 @@ const formatStudyMonitorCsv = (
     ...summary.groups.map(group => ({
       section: "group",
       key: group.groupKey,
-      label: group.groupKey,
+      label: group.groupLabel,
       groupKey: group.groupKey,
       expectedParticipantCount: group.expectedParticipantCount,
       rosterEntryCount: group.rosterEntryCount,
@@ -7515,6 +7552,7 @@ const formatStudyMonitorParticipantMatrixCsv = (
     "generatedAt",
     "loginKey",
     "groupKey",
+    "groupLabel",
     "displayName",
     "rosterBookletKey",
     "participantSessionId",
@@ -7540,6 +7578,7 @@ const formatStudyMonitorParticipantMatrixCsv = (
         matrix.generatedAt,
         row.loginKey,
         row.groupKey,
+        row.groupLabel,
         row.displayName ?? "",
         row.rosterBookletKey ?? "",
         row.participantSessionId ?? "",
@@ -7572,6 +7611,7 @@ const formatStudyMonitorRunCsv = (
     "participantSessionId",
     "loginKey",
     "groupKey",
+    "groupLabel",
     "displayName",
     "bookletKey",
     "bookletLabel",
@@ -7600,6 +7640,10 @@ const formatStudyMonitorRunCsv = (
         detail.participantSession?.participantSessionId ?? "",
         detail.participantSession?.loginKey ?? "",
         detail.participantSession?.groupKey ?? "",
+        resolveParticipantGroupLabel(
+          detail.participantRosterEntry,
+          detail.participantSession?.groupKey ?? ""
+        ),
         detail.participantRosterEntry?.displayName ?? "",
         detail.bookletKey,
         detail.bookletLabel,
@@ -21053,7 +21097,7 @@ const buildStudyMonitorAttentionItems = (input: {
     items.push({
       subjectType: "group",
       key: group.groupKey,
-      label: group.groupKey,
+      label: group.groupLabel,
       score,
       missingResponseCount: 0,
       unexpectedResponseCount: 0,
@@ -21115,6 +21159,9 @@ const buildStudyMonitorSummary = (input: {
 }): WorkspaceStudyMonitorSummary => {
   const latestRunsBySessionId = getLatestTestRunByParticipantSessionId(input.testRuns);
   const testRunsBySessionId = new Map<string, TestRun[]>();
+  const groupLabels = buildParticipantGroupLabels(
+    input.participantRosterEntries
+  );
   for (const testRun of input.testRuns) {
     const sessionRuns = testRunsBySessionId.get(testRun.participantSessionId) ?? [];
     sessionRuns.push(normalizeTestRun(testRun));
@@ -21131,6 +21178,7 @@ const buildStudyMonitorSummary = (input: {
       testRunsBySessionId.get(participantSession.participantSessionId) ?? [];
     const group = groupsByKey.get(groupKey) ?? {
       groupKey,
+      groupLabel: groupLabels.get(groupKey) ?? groupKey,
       expectedParticipantCount: 0,
       rosterEntryCount: 0,
       participantSessionCount: 0,
@@ -21193,6 +21241,7 @@ const buildStudyMonitorSummary = (input: {
     const groupKey = rosterEntry.groupKey || "unknown-group";
     const group = groupsByKey.get(groupKey) ?? {
       groupKey,
+      groupLabel: groupLabels.get(groupKey) ?? groupKey,
       expectedParticipantCount: 0,
       rosterEntryCount: 0,
       participantSessionCount: 0,
@@ -21207,6 +21256,7 @@ const buildStudyMonitorSummary = (input: {
     };
 
     group.rosterEntryCount += 1;
+    group.groupLabel = groupLabels.get(groupKey) ?? groupKey;
     if (!sessionLoginKeys.has(rosterEntry.loginKey)) {
       group.expectedParticipantCount += 1;
       group.notStartedCount += 1;
@@ -21335,6 +21385,7 @@ const buildStudyMonitorParticipantMatrix = (input: {
   const createRows = (inputRow: {
     loginKey: string;
     groupKey: string;
+    groupLabel: string;
     displayName: string | null;
     rosterBookletKey: string | null;
     participantSession: ParticipantSession | null;
@@ -21377,6 +21428,7 @@ const buildStudyMonitorParticipantMatrix = (input: {
         workspaceKey: input.workspaceKey,
         loginKey: inputRow.loginKey,
         groupKey: inputRow.groupKey,
+        groupLabel: inputRow.groupLabel,
         displayName: inputRow.displayName,
         rosterBookletKey: inputRow.rosterBookletKey,
         participantSessionId:
@@ -21418,6 +21470,10 @@ const buildStudyMonitorParticipantMatrix = (input: {
     return createRows({
       loginKey: participantSession.loginKey,
       groupKey: participantSession.groupKey,
+      groupLabel: resolveParticipantGroupLabel(
+        rosterEntry,
+        participantSession.groupKey
+      ),
       displayName: rosterEntry?.displayName ?? null,
       rosterBookletKey: rosterEntry?.bookletKey ?? null,
       participantSession,
@@ -21436,6 +21492,10 @@ const buildStudyMonitorParticipantMatrix = (input: {
       return createRows({
         loginKey: rosterEntry.loginKey,
         groupKey: rosterEntry.groupKey,
+        groupLabel: resolveParticipantGroupLabel(
+          rosterEntry,
+          rosterEntry.groupKey
+        ),
         displayName: rosterEntry.displayName,
         rosterBookletKey: rosterEntry.bookletKey,
         participantSession: null,
@@ -21523,6 +21583,13 @@ const buildStudyMonitorParticipantDetail = (input: {
     workspaceKey: input.workspaceKey,
     loginKey,
     groupKey: rosterEntry?.groupKey ?? sessions[0]?.groupKey ?? null,
+    groupLabel:
+      rosterEntry || sessions[0]
+        ? resolveParticipantGroupLabel(
+            rosterEntry,
+            rosterEntry?.groupKey ?? sessions[0]?.groupKey ?? ""
+          )
+        : null,
     displayName: rosterEntry?.displayName ?? null,
     rosterBookletKey: rosterEntry?.bookletKey ?? null,
     generatedAt: input.generatedAt,
@@ -21652,6 +21719,10 @@ const buildStudyMonitorGroupDetail = (input: {
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
     groupKey: input.groupKey,
+    groupLabel: resolveParticipantGroupLabel(
+      groupRosterEntries[0],
+      input.groupKey
+    ),
     generatedAt: input.generatedAt,
     expectedParticipantCount: groupParticipantSessions.length + rosterOnlyCount,
     rosterEntryCount: groupRosterEntries.length,
@@ -22925,6 +22996,9 @@ export const createFirstSliceServices = (
           existingEntry?.executionMode ??
           defaultParticipantExecutionMode,
         groupKey: parsedEntry.groupKey,
+        ...(parsedEntry.groupLabel?.trim()
+          ? { groupLabel: parsedEntry.groupLabel.trim() }
+          : {}),
         bookletKey: parsedEntry.bookletKey,
         ...(parsedEntry.bookletKeys?.length
           ? { bookletKeys: parsedEntry.bookletKeys }
@@ -27286,11 +27360,16 @@ export const createFirstSliceServices = (
         );
         const [
           participantSessions,
+          participantRosterEntries,
           testRuns,
           reviews,
           testLogs
         ] = await Promise.all([
           repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantRosterEntriesByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           ),
@@ -27312,6 +27391,7 @@ export const createFirstSliceServices = (
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           reviews,
           testLogs

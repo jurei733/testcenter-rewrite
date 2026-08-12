@@ -467,6 +467,9 @@ const mapParticipantRosterEntry = (
               ? undefined
               : (String(row.execution_mode) as ParticipantRosterEntry["executionMode"]),
           groupKey: String(row.group_key),
+          ...(row.group_label === null || row.group_label === undefined
+            ? {}
+            : { groupLabel: String(row.group_label) }),
           bookletKey:
             row.booklet_key === null || row.booklet_key === undefined
               ? null
@@ -1361,6 +1364,14 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE application_settings
         ADD COLUMN IF NOT EXISTS asset_assignments_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `
+  },
+  {
+    version: 47,
+    name: "add_participant_group_labels",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN IF NOT EXISTS group_label TEXT;
     `
   }
 ];
@@ -2380,7 +2391,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -2429,12 +2440,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await pool.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, group_label, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, view_settings_json, asset_assignments_json, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           execution_mode = EXCLUDED.execution_mode,
           group_key = EXCLUDED.group_key,
+          group_label = EXCLUDED.group_label,
           booklet_key = EXCLUDED.booklet_key,
           booklet_keys_json = EXCLUDED.booklet_keys_json,
           booklet_state_presets_json = EXCLUDED.booklet_state_presets_json,
@@ -2455,6 +2467,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.loginKey,
           participantRosterEntry.executionMode ?? null,
           participantRosterEntry.groupKey,
+          participantRosterEntry.groupLabel?.trim() || null,
           participantRosterEntry.bookletKey,
           participantRosterEntry.bookletKeys?.length
             ? JSON.stringify(participantRosterEntry.bookletKeys)

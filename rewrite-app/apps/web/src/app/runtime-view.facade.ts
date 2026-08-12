@@ -88,6 +88,10 @@ type RuntimeEntryLink = {
   url: string;
 };
 
+const participantGroupLabel = (
+  value: { groupKey: string; groupLabel?: string | null }
+): string => value.groupLabel?.trim() || value.groupKey;
+
 type MonitorBlockNavigationTarget = NonNullable<
   OpenMonitorRun["blockNavigationTargets"]
 >[number];
@@ -898,7 +902,10 @@ export class RuntimeViewFacade {
             ),
             {
               label: "Group",
-              value: item.participantSession.groupKey
+              value: participantGroupLabel({
+                groupKey: item.participantSession.groupKey,
+                groupLabel: item.participantRosterEntry?.groupLabel
+              })
             },
             {
               label: "Roster Booklet",
@@ -982,7 +989,10 @@ export class RuntimeViewFacade {
           ),
           {
             label: "Group",
-            value: detail.participantSession.groupKey
+            value: participantGroupLabel({
+              groupKey: detail.participantSession.groupKey,
+              groupLabel: detail.participantRosterEntry?.groupLabel
+            })
           },
           {
             label: "Roster Booklet",
@@ -1298,12 +1308,15 @@ export class RuntimeViewFacade {
           headline: candidate.loginKey,
           subline: candidate.loginMode,
           badges: [
-            candidate.groupKey ?? "group missing",
+            candidate.groupLabel?.trim() ?? candidate.groupKey ?? "group missing",
             candidate.passwordRequired ? "password protected" : "passwordless"
           ],
           rows: [
             { label: "Original Mode", value: candidate.loginMode },
-            { label: "Original Group", value: candidate.groupKey ?? "none" },
+            {
+              label: "Original Group",
+              value: candidate.groupLabel?.trim() ?? candidate.groupKey ?? "none"
+            },
             {
               label: "Migration",
               value:
@@ -1358,13 +1371,13 @@ export class RuntimeViewFacade {
           headline: entry.displayName ?? entry.loginKey,
           subline: entry.loginKey,
           badges: [
-            entry.groupKey,
+            participantGroupLabel(entry),
             entry.bookletKey ?? "default booklet",
             `${assignmentKeys.length} assignment${assignmentKeys.length === 1 ? "" : "s"}`
           ],
           rows: [
             { label: "Login", value: entry.loginKey },
-            { label: "Group", value: entry.groupKey },
+            { label: "Group", value: participantGroupLabel(entry) },
             { label: "Booklet", value: entry.bookletKey ?? "active release default" },
             {
               label: "Booklet Assignments",
@@ -1509,7 +1522,7 @@ export class RuntimeViewFacade {
           headline: entry.loginKey,
           subline: entry.displayName ?? entry.participantRosterEntryId,
           badges: [
-            entry.groupKey,
+            participantGroupLabel(entry),
             entry.bookletKey ?? "default booklet",
             `${assignmentKeys.length} assignment${assignmentKeys.length === 1 ? "" : "s"}`,
             statePresets.length > 0
@@ -1524,7 +1537,7 @@ export class RuntimeViewFacade {
           ],
           rows: [
             { label: "Display Name", value: entry.displayName ?? "none" },
-            { label: "Group", value: entry.groupKey },
+            { label: "Group", value: participantGroupLabel(entry) },
             { label: "Booklet", value: entry.bookletKey ?? "active release default" },
             {
               label: "Booklet Assignments",
@@ -1611,7 +1624,7 @@ export class RuntimeViewFacade {
               : "No non-escalating account mapping is available yet",
             badges: [
               candidate.loginMode,
-              candidate.groupKey ?? "group missing",
+              candidate.groupLabel?.trim() ?? candidate.groupKey ?? "group missing",
               candidate.passwordRequired ? "password protected" : "passwordless",
               ...(candidate.unresolvedProfileIds.length > 0
                 ? ["profile reference missing"]
@@ -1619,7 +1632,10 @@ export class RuntimeViewFacade {
             ],
             rows: [
               { label: "Original Mode", value: candidate.loginMode },
-              { label: "Original Group", value: candidate.groupKey ?? "none" },
+              {
+                label: "Original Group",
+                value: candidate.groupLabel?.trim() ?? candidate.groupKey ?? "none"
+              },
               {
                 label: "Profiles",
                 value:
@@ -2721,7 +2737,10 @@ export class RuntimeViewFacade {
             `state ${monitorState}`,
             `controller ${controllerState.toLowerCase()}`,
             openRun.locked ? "test locked" : "test unlocked",
-            openRun.groupKey,
+            participantGroupLabel({
+              groupKey: openRun.groupKey,
+              groupLabel: openRun.participantRosterEntry?.groupLabel
+            }),
             openRun.executionMode,
             openRun.bookletAssignmentKey,
             ...(openRun.bookletError
@@ -2760,7 +2779,13 @@ export class RuntimeViewFacade {
               bookletKey: openRun.bookletKey
             }),
             ...(displaySettings.groupColumn === "show"
-              ? [{ label: this.monitorText("gm_col_groupName"), value: openRun.groupKey }]
+              ? [{
+                  label: this.monitorText("gm_col_groupName"),
+                  value: participantGroupLabel({
+                    groupKey: openRun.groupKey,
+                    groupLabel: openRun.participantRosterEntry?.groupLabel
+                  })
+                }]
               : []),
             ...(displaySettings.view === "small"
               ? []
@@ -2933,7 +2958,12 @@ export class RuntimeViewFacade {
         groups: new Set<string>(),
         runCount: 0
       };
-      current.groups.add(openRun.groupKey);
+      current.groups.add(
+        participantGroupLabel({
+          groupKey: openRun.groupKey,
+          groupLabel: openRun.participantRosterEntry?.groupLabel
+        })
+      );
       current.runCount += 1;
       booklets.set(key, current);
     }
@@ -3039,6 +3069,12 @@ export class RuntimeViewFacade {
     return [...runsByGroup.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([groupKey, openRuns]) => {
+        const groupLabel = participantGroupLabel({
+          groupKey,
+          groupLabel: openRuns.find(openRun =>
+            Boolean(openRun.participantRosterEntry?.groupLabel?.trim())
+          )?.participantRosterEntry?.groupLabel
+        });
         const participantCount = new Set(
           openRuns.map(openRun => openRun.loginKey)
         ).size;
@@ -3080,8 +3116,8 @@ export class RuntimeViewFacade {
           .sort((left, right) => right.localeCompare(left))[0];
 
         return {
-          headline: groupKey,
-          subline: `${participantCount} participant${participantCount === 1 ? "" : "s"} · ${openRuns.length} visible run${openRuns.length === 1 ? "" : "s"}`,
+          headline: groupLabel,
+          subline: `${groupKey} · ${participantCount} participant${participantCount === 1 ? "" : "s"} · ${openRuns.length} visible run${openRuns.length === 1 ? "" : "s"}`,
           badges: [
             `${runningCount} running`,
             `${pausedCount} paused`,
@@ -5488,7 +5524,10 @@ export class RuntimeViewFacade {
             resolveOpenMonitorRunSuperState(openRun)
           );
         case "group":
-          return openRun.groupKey;
+          return participantGroupLabel({
+            groupKey: openRun.groupKey,
+            groupLabel: openRun.participantRosterEntry?.groupLabel
+          });
         case "participant":
           return openRun.participantRosterEntry?.displayName ?? openRun.loginKey;
         case "booklet":

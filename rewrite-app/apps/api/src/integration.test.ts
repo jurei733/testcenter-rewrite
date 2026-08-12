@@ -6552,11 +6552,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,groupLabel,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
     );
     assert.match(
       rosterCsvText,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","run-hot-return","group:student-demo","booklet:demo","Demo Student","false"/
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","run-hot-return","group:student-demo","Demo Group","booklet:demo","Demo Student","false"/
     );
 
     const participantSignIn = await requestJsonAt<{
@@ -7203,12 +7203,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(participantSessionsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       participantSessionsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,/
+      /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,groupLabel,executionMode,sessionStatus,/
     );
     assert.match(
       participantSessionsCsv.body,
       new RegExp(
-        `"demo-tenant","demo-workspace","${participantSignIn.body.participantSession.participantSessionId}","student-demo","group:student-demo","run-hot-return"`
+        `"demo-tenant","demo-workspace","${participantSignIn.body.participantSession.participantSessionId}","student-demo","group:student-demo","Demo Group","run-hot-return"`
       )
     );
 
@@ -7392,7 +7392,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         {
           subjectType: "group",
           key: "group:student-demo",
-          label: "group:student-demo",
+          label: "Demo Group",
           score: 10,
           missingResponseCount: 0,
           unexpectedResponseCount: 0,
@@ -7566,7 +7566,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.match(
       studyMonitorCsv.body,
-      /"demo-tenant","demo-workspace","group","group:student-demo","group:student-demo","group:student-demo"/
+      /"demo-tenant","demo-workspace","group","group:student-demo","Demo Group","group:student-demo"/
     );
     assert.match(
       studyMonitorCsv.body,
@@ -7590,15 +7590,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.match(
       studyMonitorParticipantMatrixCsv.body,
-      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
+      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,groupLabel,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
     );
     assert.match(
       studyMonitorParticipantMatrixCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-intro","Introduction","true","true","[^"]+","0","[^"]+"/
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Group","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-intro","Introduction","true","true","[^"]+","0","[^"]+"/
     );
     assert.match(
       studyMonitorParticipantMatrixCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-finish","Finish","true","false","0","0","[^"]+"/
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Group","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-finish","Finish","true","false","0","0","[^"]+"/
     );
 
     const studyMonitorRunCsv = await requestTextAt(
@@ -7615,15 +7615,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorRunCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       studyMonitorRunCsv.body,
-      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
+      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,groupLabel,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Group","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Group","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
     );
 
     const filteredStudyMonitorParticipantMatrixCsv = await requestTextAt(
@@ -7639,7 +7639,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredStudyMonitorParticipantMatrixCsv.status, 200);
     assert.match(
       filteredStudyMonitorParticipantMatrixCsv.body,
-      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
+      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,groupLabel,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
     );
     assert.match(filteredStudyMonitorParticipantMatrixCsv.body, /booklet:demo/);
     assert.match(filteredStudyMonitorParticipantMatrixCsv.body, /unit-intro/);
@@ -7960,6 +7960,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const studyMonitorGroup = await requestJsonAt<{
       studyMonitorGroup: {
         groupKey: string;
+        groupLabel: string;
         participantSessionCount: number;
         testRunCount: number;
         notStartedCount: number;
@@ -8000,6 +8001,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(studyMonitorGroup.status, 200);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.groupKey, "group:student-demo");
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.groupLabel, "Demo Group");
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.participantSessionCount, 1);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.testRunCount, 1);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.notStartedCount, 0);
@@ -8470,7 +8472,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       tenantKey: "demo-tenant",
       workspaceKey: "demo-workspace",
       groupKey: "group:student-demo",
-      groupLabel: "group:student-demo",
+      groupLabel: "Demo Group",
       bookletsStarted: 1,
       numUnitsMin: 2,
       numUnitsMax: 2,
@@ -16148,6 +16150,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       loginKey: string;
       loginMode: string;
       groupKey: string | null;
+      groupLabel?: string | null;
       passwordRequired: boolean;
       profileIds: string[];
       monitorProfiles: unknown[];
@@ -20052,6 +20055,7 @@ test("original Testcenter compatibility corpus imports and starts the current ST
     items: Array<{
       loginKey: string;
       groupKey: string;
+      groupLabel?: string | null;
       bookletKey: string | null;
       executionMode?: string;
       passwordRequired: boolean;
@@ -20789,6 +20793,7 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
       loginKey: string;
       loginMode: string;
       groupKey: string | null;
+      groupLabel?: string | null;
       passwordRequired: boolean;
     }>;
   }>(
@@ -26058,7 +26063,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(studyMonitorTimerCsv.status, 200);
   assert.match(
     studyMonitorTimerCsv.body,
-    /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
+    /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,groupLabel,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
   );
   assert.match(studyMonitorTimerCsv.body, /Timed Block/);
 
@@ -35632,6 +35637,7 @@ test("workspace participant roster imports current canonical Testtakers JSON", a
       loginKey: "current-json-student",
       executionMode: "run-hot-return",
       groupKey: "current-group",
+      groupLabel: "Current Group",
       bookletKey: "BOOKLET.CURRENT-1",
       bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
       bookletAssignments: [
@@ -35664,6 +35670,7 @@ test("workspace participant roster imports current canonical Testtakers JSON", a
       loginKey: "current-json-monitor",
       loginMode: "monitor-group",
       groupKey: "current-group",
+      groupLabel: "Current Group",
       passwordRequired: true,
       profileIds: ["current-profile"],
       monitorProfiles: [
@@ -35745,6 +35752,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       participantRosterEntryId: string;
       loginKey: string;
       groupKey: string;
+      groupLabel?: string | null;
       bookletKey: string | null;
       bookletKeys?: string[];
       bookletStatePresets?: Record<string, Record<string, string>>;
@@ -35762,9 +35770,9 @@ test("workspace participant roster can be imported, updated, and listed", async 
     method: "POST",
     body: {
       rosterText: [
-        "loginKey,groupKey,bookletKey,displayName",
-        "roster-a,group:alpha,booklet:starter,Ada Alpha",
-        "roster-b,,booklet:starter,Ben Default",
+        "loginKey,groupKey,groupLabel,bookletKey,displayName",
+        "roster-a,group:alpha,Alpha Group,booklet:starter,Ada Alpha",
+        "roster-b,,,booklet:starter,Ben Default",
         "# ignored comment"
       ].join("\n")
     }
@@ -35776,6 +35784,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.deepEqual(initialImport.body.operationalLoginCandidates, []);
   assert.equal(initialImport.body.items.length, 2);
   assert.equal(initialImport.body.items[0]?.loginKey, "roster-a");
+  assert.equal(initialImport.body.items[0]?.groupLabel, "Alpha Group");
   assert.equal(initialImport.body.items[0]?.passwordRequired, false);
   assert.equal(initialImport.body.items[1]?.groupKey, "group:roster-b");
   assert.equal(initialImport.body.items[1]?.displayName, "Ben Default");
@@ -35914,6 +35923,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       loginKey: "test-group-monitor",
       loginMode: "monitor-group",
       groupKey: "sample_group",
+      groupLabel: "Primary Sample Group",
       passwordRequired: true,
       profileIds: [],
       monitorProfiles: [],
@@ -35929,6 +35939,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     item => item.loginKey === "test"
   );
   assert.equal(testcenterLogin?.groupKey, "sample_group");
+  assert.equal(testcenterLogin?.groupLabel, "Primary Sample Group");
   assert.equal(testcenterLogin?.bookletKey, "BOOKLET.SAMPLE-1");
   assert.deepEqual(testcenterLogin?.bookletKeys, [
     "BOOKLET.SAMPLE-1",
@@ -35967,6 +35978,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
           groups: [
             {
               groupKey: "group:json",
+              groupLabel: "JSON Group",
               booklets: [
                 {
                   bookletKey: "booklet:json",
@@ -35993,10 +36005,12 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(jsonImport.body.updatedCount, 0);
   const jsonRosterF = jsonImport.body.items.find(item => item.loginKey === "roster-f");
   assert.equal(jsonRosterF?.groupKey, "group:json");
+  assert.equal(jsonRosterF?.groupLabel, "JSON Group");
   assert.equal(jsonRosterF?.bookletKey, "booklet:json");
   assert.equal(jsonRosterF?.displayName, "Faye JSON");
   const jsonRosterG = jsonImport.body.items.find(item => item.loginKey === "roster-g");
   assert.equal(jsonRosterG?.groupKey, "group:json");
+  assert.equal(jsonRosterG?.groupLabel, "JSON Group");
   assert.equal(jsonRosterG?.bookletKey, "booklet:json-override");
   assert.equal(jsonRosterG?.displayName, "Gus JSON");
 
@@ -36106,47 +36120,47 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,groupLabel,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","run-hot-return","group:updated","booklet:updated","Ada Updated","false","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","run-hot-return","group:updated","group:updated","booklet:updated","Ada Updated","false","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","run-hot-return","group:alias-a","booklet:alias-a","Ada Alias","true"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","run-hot-return","group:alias-a","group:alias-a","booklet:alias-a","Ada Alias","true"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-c","run-hot-return","group:xml","booklet:xml","Cara XML"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-c","run-hot-return","group:xml","group:xml","booklet:xml","Cara XML"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","run-hot-return","group:nested","booklet:nested","Eve Nested"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","run-hot-return","group:nested","group:nested","booklet:nested","Eve Nested"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","run-hot-return","sample_group","BOOKLET\.SAMPLE-1",""/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","run-hot-return","sample_group","Primary Sample Group","BOOKLET\.SAMPLE-1",""/
   );
   assert.doesNotMatch(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test-group-monitor","sample_group","",""/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test-group-monitor","sample_group","Primary Sample Group","",""/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-f","run-hot-return","group:json","booklet:json","Faye JSON"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-f","run-hot-return","group:json","JSON Group","booklet:json","Faye JSON"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","run-hot-return","group:json","booklet:json-override","Gus JSON"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","run-hot-return","group:json","JSON Group","booklet:json-override","Gus JSON"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-h","run-hot-return","group:native-json","booklet:native-json","Hana Native"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-h","run-hot-return","group:native-json","group:native-json","booklet:native-json","Hana Native"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-i","run-hot-return","group:native-json","booklet:native-json","Ivan Native"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-i","run-hot-return","group:native-json","group:native-json","booklet:native-json","Ivan Native"/
   );
 
   const metricsResponse = await requestJson<{
@@ -37724,7 +37738,7 @@ test("workspace participant-session list shows latest run and active release", a
   assert.equal(participantSessionsCsv.status, 200);
   assert.match(
     participantSessionsCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName,validUntil\n/
+    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,groupLabel,executionMode,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName,validUntil\n/
   );
   assert.match(participantSessionsCsv.body, /booklet:session/);
   assert.equal(participantSessionsCsv.body.trim().split("\n").length, 2);

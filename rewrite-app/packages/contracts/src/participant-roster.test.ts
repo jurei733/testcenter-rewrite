@@ -62,6 +62,7 @@ describe("parseParticipantRosterText", () => {
           loginKey: "current-student",
           executionMode: "run-hot-return",
           groupKey: "current-group",
+          groupLabel: "Current Group",
           bookletKey: "BOOKLET.CURRENT-1",
           bookletKeys: ["BOOKLET.CURRENT-1", "BOOKLET.CURRENT-2"],
           bookletAssignments: [
@@ -156,6 +157,7 @@ describe("parseParticipantRosterText", () => {
         loginKey: "current-monitor",
         loginMode: "monitor-group",
         groupKey: "current-group",
+        groupLabel: "Current Group",
         passwordRequired: true,
         profileIds: ["current-profile", "missing"],
         monitorProfiles: [
@@ -410,6 +412,7 @@ describe("parseParticipantRosterText", () => {
           loginKey: "test",
           executionMode: "run-hot-return",
           groupKey: "sample_group",
+          groupLabel: "Primary Sample Group",
           bookletKey: "BOOKLET.SAMPLE-1",
           bookletKeys: ["BOOKLET.SAMPLE-1", "BOOKLET.SAMPLE-2"],
           bookletAssignments: [
@@ -436,6 +439,7 @@ describe("parseParticipantRosterText", () => {
           loginKey: "test-review",
           executionMode: "run-review",
           groupKey: "sample_group",
+          groupLabel: "Primary Sample Group",
           bookletKey: "BOOKLET.REVIEW",
           bookletAssignments: [
             {
@@ -701,11 +705,12 @@ describe("parseParticipantRosterText", () => {
 
     assert.deepEqual(
       parseParticipantRosterText(
-        "login,group,valid-from,valid-to,valid-for\ncsv-window,csv-group,2026-01-01T08:00:00Z,2026-01-01T09:00:00Z,15"
+        "login,group,groupLabel,valid-from,valid-to,valid-for\ncsv-window,csv-group,CSV Group,2026-01-01T08:00:00Z,2026-01-01T09:00:00Z,15"
       )[0],
       {
         loginKey: "csv-window",
         groupKey: "csv-group",
+        groupLabel: "CSV Group",
         bookletKey: null,
         displayName: null,
         validFrom: "2026-01-01T08:00:00Z",

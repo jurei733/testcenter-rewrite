@@ -376,6 +376,8 @@ export type ParticipantRosterEntry = {
   loginKey: string;
   executionMode?: ParticipantExecutionMode;
   groupKey: string;
+  /** Authored Original Testtakers Group/@label; the key remains the stable scope. */
+  groupLabel?: string | null;
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
@@ -555,6 +557,8 @@ export type OperationalLoginMigrationCandidate = {
   loginKey: string;
   loginMode: "monitor-group" | "monitor-study" | "sys-check-login";
   groupKey: string | null;
+  /** Authored label for the candidate's Original Testtakers group. */
+  groupLabel?: string | null;
   passwordRequired: boolean;
   profileIds: string[];
   monitorProfiles: MonitorViewProfile[];
@@ -1426,6 +1430,7 @@ export type WorkspaceOverview = {
 
 export type WorkspaceStudyMonitorGroup = {
   groupKey: string;
+  groupLabel: string;
   expectedParticipantCount: number;
   rosterEntryCount: number;
   participantSessionCount: number;
@@ -1543,6 +1548,7 @@ export type WorkspaceStudyMonitorParticipantMatrixRow = {
   workspaceKey: string;
   loginKey: string;
   groupKey: string;
+  groupLabel: string;
   displayName: string | null;
   rosterBookletKey: string | null;
   participantSessionId: string | null;
@@ -1578,6 +1584,7 @@ export type WorkspaceStudyMonitorParticipantDetail = {
   workspaceKey: string;
   loginKey: string;
   groupKey: string | null;
+  groupLabel: string | null;
   displayName: string | null;
   rosterBookletKey: string | null;
   generatedAt: string;
@@ -1596,6 +1603,7 @@ export type WorkspaceStudyMonitorGroupDetail = {
   tenantKey: string;
   workspaceKey: string;
   groupKey: string;
+  groupLabel: string;
   generatedAt: string;
   expectedParticipantCount: number;
   rosterEntryCount: number;

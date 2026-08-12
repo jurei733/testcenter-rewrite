@@ -373,8 +373,8 @@ const bootstrapLocalDemoState = async (input: {
       tenantKey: localDemoBootstrap.tenantKey,
       workspaceKey: localDemoBootstrap.workspaceKey,
       rosterText: [
-        "loginKey,groupKey,bookletKey,displayName",
-        `${localDemoBootstrap.participantLoginKey},group:student-demo,booklet:demo,Demo Student`
+        "loginKey,groupKey,groupLabel,bookletKey,displayName",
+        `${localDemoBootstrap.participantLoginKey},group:student-demo,Demo Group,booklet:demo,Demo Student`
       ].join("\n")
     });
   }

@@ -345,7 +345,7 @@ export class WorkspaceViewFacade {
           ],
           rows: [
             { label: "Login", value: row.loginKey },
-            { label: "Group", value: row.groupKey },
+            { label: "Group", value: row.groupLabel },
             { label: "Roster Booklet", value: row.rosterBookletKey ?? "none" },
             { label: "Unit", value: row.unitKey || "none" },
             { label: "Expected", value: row.expected ? "yes" : "no" },
@@ -388,7 +388,7 @@ export class WorkspaceViewFacade {
     return [
       {
         headline: detail.displayName ?? detail.loginKey,
-        subline: `${detail.groupKey ?? "no group"} in ${detail.rosterBookletKey ?? "no assigned booklet"}`,
+        subline: `${detail.groupLabel ?? detail.groupKey ?? "no group"} in ${detail.rosterBookletKey ?? "no assigned booklet"}`,
         badges: [
           `${detail.participantSessionCount} session(s)`,
           `${detail.testRunCount} run(s)`,
@@ -397,7 +397,10 @@ export class WorkspaceViewFacade {
         ],
         rows: [
           { label: "Login", value: detail.loginKey },
-          { label: "Group", value: detail.groupKey ?? "none" },
+          {
+            label: "Group",
+            value: detail.groupLabel ?? detail.groupKey ?? "none"
+          },
           { label: "Display Name", value: detail.displayName ?? "none" },
           { label: "Roster Booklet", value: detail.rosterBookletKey ?? "none" },
           {
@@ -556,8 +559,8 @@ export class WorkspaceViewFacade {
         ]
       },
       ...summary.groups.map(group => ({
-        headline: group.groupKey,
-        subline: `${group.expectedParticipantCount} expected, ${group.participantSessionCount} session(s)`,
+        headline: group.groupLabel,
+        subline: `${group.groupKey} · ${group.expectedParticipantCount} expected, ${group.participantSessionCount} session(s)`,
         badges: [
           `${group.notStartedCount} not started`,
           `${group.runningCount} running`,
@@ -869,7 +872,7 @@ export class WorkspaceViewFacade {
         }
         const activeRunCount = group.runningCount + group.pausedCount;
         items.push({
-          headline: group.groupKey,
+          headline: group.groupLabel,
           subline: `${group.notStartedCount} waiting, ${activeRunCount} active run(s)`,
           badges: [
             "group",
@@ -996,7 +999,7 @@ export class WorkspaceViewFacade {
           ],
           rows: [
             { label: "Login", value: row.loginKey },
-            { label: "Group", value: row.groupKey },
+            { label: "Group", value: row.groupLabel },
             { label: "Unit", value: row.unitKey || "none" },
             { label: "Booklet", value: row.bookletKey ?? "none" },
             { label: "Test Run", value: row.testRunId ?? "none" },
@@ -1027,12 +1030,15 @@ export class WorkspaceViewFacade {
       subline: rosterEntry.loginKey,
       badges: [
         "not started",
-        rosterEntry.groupKey,
+        rosterEntry.groupLabel?.trim() || rosterEntry.groupKey,
         rosterEntry.bookletKey ?? "default booklet"
       ],
       rows: [
         { label: "Login", value: rosterEntry.loginKey },
-        { label: "Group", value: rosterEntry.groupKey },
+        {
+          label: "Group",
+          value: rosterEntry.groupLabel?.trim() || rosterEntry.groupKey
+        },
         { label: "Booklet", value: rosterEntry.bookletKey ?? "none" },
         { label: "Display Name", value: rosterEntry.displayName ?? "none" },
         {
@@ -1105,7 +1111,7 @@ export class WorkspaceViewFacade {
         subline: rosterEntry.loginKey,
         badges: [
           "roster entry",
-          rosterEntry.groupKey,
+          rosterEntry.groupLabel?.trim() || rosterEntry.groupKey,
           detail.testRuns.some(
             item => item.participantSession?.loginKey === rosterEntry.loginKey
           )
@@ -1114,7 +1120,10 @@ export class WorkspaceViewFacade {
         ],
         rows: [
           { label: "Login", value: rosterEntry.loginKey },
-          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Group",
+            value: rosterEntry.groupLabel?.trim() || rosterEntry.groupKey
+          },
           {
             label: "Display Name",
             value: rosterEntry.displayName ?? "none"
@@ -1194,7 +1203,13 @@ export class WorkspaceViewFacade {
               label: "Display Name",
               value: item.participantRosterEntry?.displayName ?? "none"
             },
-            { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
+            {
+              label: "Group",
+              value:
+                item.participantRosterEntry?.groupLabel?.trim() ||
+                item.participantSession?.groupKey ||
+                "unknown group"
+            },
             ...this.participantSessionLinkRows(
               item.participantSession?.participantSessionId,
               {
@@ -1237,8 +1252,8 @@ export class WorkspaceViewFacade {
 
     return [
       {
-        headline: detail.groupKey,
-        subline: `${detail.expectedParticipantCount} expected, ${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
+        headline: detail.groupLabel,
+        subline: `${detail.groupKey} · ${detail.expectedParticipantCount} expected, ${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
         badges: [
           `${detail.runningCount} running`,
           `${detail.pausedCount} paused`,
@@ -1290,7 +1305,10 @@ export class WorkspaceViewFacade {
         ],
         rows: [
           { label: "Login", value: rosterEntry.loginKey },
-          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Group",
+            value: rosterEntry.groupLabel?.trim() || rosterEntry.groupKey
+          },
           {
             label: "Booklet",
             value: rosterEntry.bookletKey ?? "none"
@@ -1500,7 +1518,10 @@ export class WorkspaceViewFacade {
         badges: ["roster expected", "missing", rosterEntry.bookletKey ?? "no booklet"],
         rows: [
           { label: "Login", value: rosterEntry.loginKey },
-          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Group",
+            value: rosterEntry.groupLabel?.trim() || rosterEntry.groupKey
+          },
           {
             label: "Booklet",
             value: rosterEntry.bookletKey ?? "none"
@@ -1558,7 +1579,10 @@ export class WorkspaceViewFacade {
             },
             {
               label: "Group",
-              value: item.participantSession?.groupKey ?? "unknown group"
+              value:
+                item.participantRosterEntry?.groupLabel?.trim() ||
+                item.participantSession?.groupKey ||
+                "unknown group"
             },
             ...this.participantSessionLinkRows(
               item.participantSession?.participantSessionId,
@@ -1640,7 +1664,13 @@ export class WorkspaceViewFacade {
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
           { label: "Login", value: participantLogin },
-          { label: "Group", value: detail.participantSession?.groupKey ?? "none" },
+          {
+            label: "Group",
+            value:
+              detail.participantRosterEntry?.groupLabel?.trim() ||
+              detail.participantSession?.groupKey ||
+              "none"
+          },
           { label: "Booklet", value: detail.bookletKey },
           { label: "Current Unit", value: detail.testRun.currentUnitKey ?? "none" },
           {
