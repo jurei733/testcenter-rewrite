@@ -866,6 +866,19 @@ Structurally invalid current JSON rosters stop earlier with
 `participant_roster_json_invalid` on direct intake), likewise before any
 workspace roster mutation.
 
+Latest tenant-wide Testtakers identity closure: matching the Original
+`WorkspaceDAO::getGlobalIds()` upload boundary, every case-insensitive Group ID
+and Login name declared by a valid standalone XML/current JSON roster or a
+Testtakers entry in a prebuilt ZIP is reserved across all workspaces of the
+same tenant. Upload, retry, and replacement paths fail with stable login- or
+group-specific conflicts that identify the existing file and workspace, while
+another tenant remains isolated. Rejected and deleted packages do not reserve
+identities; a successfully accepted replacement supersedes its prior source,
+and immutable generated dependency packages do not double-count their retained
+root files. API gates cover cross-workspace XML/JSON/ZIP conflicts,
+case-insensitive matching, accepted replacement lineage, active-version
+attribution, and tenant isolation.
+
 Latest current-schema intake closure: Unit declarations using either the legacy
 `testcenter-unit-xml` or current `unit-xml` W3ID path select the same pinned
 generation-aware compatibility profile. Current 18.0 Testtakers

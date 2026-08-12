@@ -17301,6 +17301,65 @@ const extractTesttakersRosterDocumentsFromZipSourcePackage = (
   return rosterDocuments;
 };
 
+type TesttakersRosterIdentityValues = {
+  groupIds: Map<string, string>;
+  loginNames: Map<string, string>;
+};
+
+const collectTesttakersRosterIdentityValues = (
+  sourcePackage: SourcePackage
+): TesttakersRosterIdentityValues | null => {
+  const rosterDocuments = extractTesttakersRosterDocumentsFromZipSourcePackage(
+    sourcePackage
+  );
+  if (rosterDocuments.length === 0) {
+    const sourceDocument = readPersistedSourceText(sourcePackage);
+    if (sourceDocument !== null) {
+      const xmlStructure = readTesttakersRosterStructure(sourceDocument);
+      const jsonStructure = readTesttakersJsonRosterDocument(sourceDocument)
+        ?.structure;
+      if (xmlStructure || jsonStructure) {
+        rosterDocuments.push({
+          sourceFileName: sourcePackage.fileName,
+          rosterText: sourceDocument
+        });
+      }
+    }
+  }
+  if (rosterDocuments.length === 0) {
+    return null;
+  }
+
+  const groupIds = new Map<string, string>();
+  const loginNames = new Map<string, string>();
+  for (const rosterDocument of rosterDocuments) {
+    if (typeof rosterDocument.rosterText !== "string") {
+      continue;
+    }
+    const structure =
+      readTesttakersRosterStructure(rosterDocument.rosterText) ??
+      readTesttakersJsonRosterDocument(rosterDocument.rosterText)?.structure;
+    if (!structure) {
+      continue;
+    }
+    for (const group of structure.groups) {
+      const normalizedGroupId = group.groupId.toLocaleLowerCase("en-US");
+      if (normalizedGroupId && !groupIds.has(normalizedGroupId)) {
+        groupIds.set(normalizedGroupId, group.groupId);
+      }
+      for (const loginName of group.loginNames) {
+        const normalizedLoginName = loginName.toLocaleLowerCase("en-US");
+        if (normalizedLoginName && !loginNames.has(normalizedLoginName)) {
+          loginNames.set(normalizedLoginName, loginName);
+        }
+      }
+    }
+  }
+  return groupIds.size > 0 || loginNames.size > 0
+    ? { groupIds, loginNames }
+    : null;
+};
+
 const createManifestlessZipAssemblyManifest = (
   zipBuffer: Buffer,
   entries: ZipEntry[]
@@ -22436,6 +22495,147 @@ export const createFirstSliceServices = (
       summary: input.summary,
       details: input.details ?? {}
     });
+  };
+
+  const assertTenantTesttakersIdentitiesAvailable = async (input: {
+    workspace: Workspace;
+    sourcePackage: SourcePackage;
+    excludedSourcePackageIds?: string[];
+  }): Promise<void> => {
+    const incomingIdentities = collectTesttakersRosterIdentityValues(
+      input.sourcePackage
+    );
+    if (!incomingIdentities) {
+      return;
+    }
+
+    const excludedSourcePackageIds = new Set(
+      input.excludedSourcePackageIds ?? []
+    );
+    const tenantWorkspaces = (
+      await repository.listWorkspacesByTenantId(input.workspace.tenantId)
+    ).sort((left, right) => left.workspaceKey.localeCompare(right.workspaceKey));
+    const workspaceSources = await Promise.all(
+      tenantWorkspaces.map(async workspace => {
+        const [sourcePackages, activityEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+        const sourcePackageById = new Map(
+          sourcePackages.map(sourcePackage => [
+            sourcePackage.sourcePackageId,
+            sourcePackage
+          ])
+        );
+        const generatedSourcePackageIds = new Set(
+          activityEvents.flatMap(activityEvent =>
+            activityEvent.eventType === "source_package_assembled"
+              ? [activityEvent.subjectId]
+              : []
+          )
+        );
+        const replacementLineageExcludedSourcePackageIds = new Set<string>();
+        const supersededSourcePackageIds = new Set<string>();
+        for (const activityEvent of activityEvents) {
+          if (activityEvent.eventType !== "source_package_replaced") {
+            continue;
+          }
+          const replacementSourcePackageId =
+            typeof activityEvent.details.replacementSourcePackageId === "string"
+              ? activityEvent.details.replacementSourcePackageId
+              : null;
+          if (
+            replacementSourcePackageId &&
+            excludedSourcePackageIds.has(replacementSourcePackageId)
+          ) {
+            replacementLineageExcludedSourcePackageIds.add(
+              activityEvent.subjectId
+            );
+          }
+          if (
+            replacementSourcePackageId &&
+            sourcePackageById.get(replacementSourcePackageId)?.status ===
+              "accepted"
+          ) {
+            supersededSourcePackageIds.add(activityEvent.subjectId);
+          }
+        }
+        return sourcePackages
+          .filter(
+            sourcePackage =>
+              sourcePackage.status !== "rejected" &&
+              !excludedSourcePackageIds.has(sourcePackage.sourcePackageId) &&
+              !replacementLineageExcludedSourcePackageIds.has(
+                sourcePackage.sourcePackageId
+              ) &&
+              !generatedSourcePackageIds.has(sourcePackage.sourcePackageId) &&
+              !supersededSourcePackageIds.has(sourcePackage.sourcePackageId)
+          )
+          .sort(
+            (left, right) =>
+              left.fileName.localeCompare(right.fileName) ||
+              left.sourcePackageId.localeCompare(right.sourcePackageId)
+          )
+          .map(sourcePackage => ({ workspace, sourcePackage }));
+      })
+    );
+
+    for (const { workspace, sourcePackage } of workspaceSources.flat()) {
+      const existingIdentities = collectTesttakersRosterIdentityValues(
+        sourcePackage
+      );
+      if (!existingIdentities) {
+        continue;
+      }
+      for (const [normalizedLoginName, loginName] of
+        incomingIdentities.loginNames) {
+        const existingLoginName =
+          existingIdentities.loginNames.get(normalizedLoginName);
+        if (existingLoginName) {
+          throw new FirstSliceError(
+            409,
+            "source_package_testtakers_login_duplicate",
+            `Testtakers login '${loginName}' is already declared in '${sourcePackage.fileName}' on workspace '${workspace.displayName}'. Login names must be unique case-insensitively across a tenant.`,
+            {
+              loginName,
+              existingLoginName,
+              conflictingSourcePackageId: sourcePackage.sourcePackageId,
+              conflictingFileName: sourcePackage.fileName,
+              conflictingWorkspaceKey: workspace.workspaceKey,
+              sameWorkspace:
+                workspace.workspaceId === input.workspace.workspaceId
+            }
+          );
+        }
+      }
+      for (const [normalizedGroupId, groupId] of incomingIdentities.groupIds) {
+        const existingGroupId = existingIdentities.groupIds.get(
+          normalizedGroupId
+        );
+        if (existingGroupId) {
+          throw new FirstSliceError(
+            409,
+            "source_package_testtakers_group_duplicate",
+            `Testtakers group '${groupId}' is already declared in '${sourcePackage.fileName}' on workspace '${workspace.displayName}'. Group ids must be unique case-insensitively across a tenant.`,
+            {
+              groupId,
+              existingGroupId,
+              conflictingSourcePackageId: sourcePackage.sourcePackageId,
+              conflictingFileName: sourcePackage.fileName,
+              conflictingWorkspaceKey: workspace.workspaceKey,
+              sameWorkspace:
+                workspace.workspaceId === input.workspace.workspaceId
+            }
+          );
+        }
+      }
+    }
   };
 
   const requireAttachmentAccess = async (input: {
@@ -28547,6 +28747,10 @@ export const createFirstSliceServices = (
             `${identityConflict} in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
           );
         }
+        await assertTenantTesttakersIdentitiesAvailable({
+          workspace,
+          sourcePackage
+        });
         const veronaPlayerResourceId =
           readStandaloneVeronaPlayerResourceId(sourcePackage);
         const duplicateVeronaPlayer = veronaPlayerResourceId
@@ -28743,6 +28947,11 @@ export const createFirstSliceServices = (
           status: "uploaded"
         };
 
+        await assertTenantTesttakersIdentitiesAvailable({
+          workspace,
+          sourcePackage: updatedSourcePackage,
+          excludedSourcePackageIds: [sourcePackage.sourcePackageId]
+        });
         await repository.saveSourcePackage(updatedSourcePackage);
         const result = await createImportJobWithRelease({
           tenantKey: input.tenantKey,
@@ -28813,6 +29022,11 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
+        await assertTenantTesttakersIdentitiesAvailable({
+          workspace,
+          sourcePackage: replacementSourcePackage,
+          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId]
+        });
         await repository.saveSourcePackage(replacementSourcePackage);
         const result = await createImportJobWithRelease({
           tenantKey: input.tenantKey,

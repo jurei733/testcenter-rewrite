@@ -16647,6 +16647,16 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
   assert.equal(replacement.body.replacementSourcePackage.status, "uploaded");
   assert.equal(replacement.body.importJob.status, "completed");
 
+  const packageRosterDocument = rosterDocument
+    .replace(
+      /(<Group\b[^>]*\bid=")([^"]+)/g,
+      (_match, prefix: string, groupId: string) => `${prefix}package-${groupId}`
+    )
+    .replace(
+      /(<Login\b[^>]*\bname=")([^"]+)/g,
+      (_match, prefix: string, loginName: string) =>
+        `${prefix}package-${loginName}`
+    );
   const zipPayload = createZipBase64([
     {
       fileName: "export/imsmanifest.xml",
@@ -16684,13 +16694,16 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     },
     {
       fileName: "export/CY_Logins_SM.xml",
-      content: rosterDocument
+      content: packageRosterDocument
     },
     {
       fileName: "export/renamed-session-logins.xml",
-      content: rosterDocument
-        .replace('id="login-variants"', 'id="LOGIN-VARIANTS"')
-        .replace('name="SM-1"', 'name="sm-1"')
+      content: packageRosterDocument
+        .replace(
+          'id="package-login-variants"',
+          'id="PACKAGE-LOGIN-VARIANTS"'
+        )
+        .replace('name="package-SM-1"', 'name="PACKAGE-sm-1"')
     },
     {
       fileName: "export/players/verona-player-simple-6.0.html",
@@ -17039,6 +17052,313 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     ["../escape.bin", "/absolute.bin", "C:/drive.bin", "export\\backslash.bin"]
   );
   assert.equal(unsafePathImport.body.stagedContentRelease, null);
+});
+
+test("original Testcenter compatibility corpus keeps Testtakers identities unique across tenant workspaces", async () => {
+  const tenantKey = "integration-tenant-global-testtakers-identities";
+  const firstWorkspaceKey = "integration-workspace-testtakers-identities-a";
+  const secondWorkspaceKey = "integration-workspace-testtakers-identities-b";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  for (const workspaceKey of [firstWorkspaceKey, secondWorkspaceKey]) {
+    const workspace = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces`,
+      {
+        method: "POST",
+        body: { workspaceKey, displayName: workspaceKey }
+      }
+    );
+    assert.equal(workspace.status, 201);
+  }
+
+  const originalRoster = [
+    "<Testtakers>",
+    '  <Group id="shared-original-group">',
+    '    <Login mode="monitor-study" name="shared-original-login" />',
+    "  </Group>",
+    "</Testtakers>"
+  ].join("\n");
+  const originalUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${firstWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "original-testtakers.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+      }
+    }
+  );
+  assert.equal(originalUpload.status, 201);
+
+  const duplicateLoginZip = createZipBase64([
+    {
+      fileName: "rosters/duplicate-login.xml",
+      content: originalRoster
+        .replace("shared-original-group", "different-group")
+        .replace("shared-original-login", "SHARED-ORIGINAL-LOGIN")
+    }
+  ]);
+  const duplicateLogin = await requestJson<{
+    error: string;
+    details: {
+      loginName: string;
+      conflictingWorkspaceKey: string;
+      sameWorkspace: boolean;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "duplicate-login.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${duplicateLoginZip}`
+      }
+    }
+  );
+  assert.equal(duplicateLogin.status, 409);
+  assert.equal(
+    duplicateLogin.body.error,
+    "source_package_testtakers_login_duplicate"
+  );
+  assert.equal(duplicateLogin.body.details.loginName, "SHARED-ORIGINAL-LOGIN");
+  assert.equal(
+    duplicateLogin.body.details.conflictingWorkspaceKey,
+    firstWorkspaceKey
+  );
+  assert.equal(duplicateLogin.body.details.sameWorkspace, false);
+
+  const duplicateGroup = await requestJson<{
+    error: string;
+    details: {
+      groupId: string;
+      conflictingWorkspaceKey: string;
+      sameWorkspace: boolean;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "duplicate-group.json",
+        mediaType: "application/json",
+        sourceDocument: {
+          metadata: { description: "Duplicate group boundary" },
+          groups: [
+            {
+              id: "SHARED-ORIGINAL-GROUP",
+              label: "Duplicate group boundary",
+              logins: [
+                {
+                  name: "different-login",
+                  mode: "monitor-study"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  );
+  assert.equal(duplicateGroup.status, 409);
+  assert.equal(
+    duplicateGroup.body.error,
+    "source_package_testtakers_group_duplicate"
+  );
+  assert.equal(duplicateGroup.body.details.groupId, "SHARED-ORIGINAL-GROUP");
+  assert.equal(
+    duplicateGroup.body.details.conflictingWorkspaceKey,
+    firstWorkspaceKey
+  );
+  assert.equal(duplicateGroup.body.details.sameWorkspace, false);
+
+  const replacementZip = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: [
+        "<manifest><resources>",
+        '  <resource identifier="BOOKLET.IDENTITY-REPLACEMENT" href="Booklet.xml" />',
+        '  <resource identifier="UNIT.IDENTITY-REPLACEMENT" href="Unit.xml" />',
+        '  <resource identifier="ROSTER.IDENTITY-REPLACEMENT" href="Testtakers.xml" />',
+        "</resources></manifest>"
+      ].join("\n")
+    },
+    {
+      fileName: "export/Booklet.xml",
+      content: [
+        "<Booklet>",
+        "  <Metadata><Id>BOOKLET.IDENTITY-REPLACEMENT</Id><Label>Identity replacement</Label></Metadata>",
+        '  <Units><Unit id="UNIT.IDENTITY-REPLACEMENT" label="Identity replacement" /></Units>',
+        "</Booklet>"
+      ].join("\n")
+    },
+    {
+      fileName: "export/Unit.xml",
+      content: [
+        "<Unit>",
+        "  <Metadata><Id>UNIT.IDENTITY-REPLACEMENT</Id><Label>Identity replacement</Label></Metadata>",
+        "</Unit>"
+      ].join("\n")
+    },
+    {
+      fileName: "export/Testtakers.xml",
+      content: originalRoster.replace(
+        "</Testtakers>",
+        "  <!-- replacement roster -->\n</Testtakers>"
+      )
+    }
+  ]);
+  const failedReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string; status: string };
+    importJob: { status: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${firstWorkspaceKey}/source-packages/${originalUpload.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-testtakers.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+      }
+    }
+  );
+  assert.equal(failedReplacement.status, 201);
+  assert.equal(failedReplacement.body.importJob.status, "failed");
+  assert.equal(
+    failedReplacement.body.replacementSourcePackage.status,
+    "rejected"
+  );
+
+  const replacement = await requestJson<{
+    sourcePackage: { sourcePackageId: string; status: string };
+    importJob: { status: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${firstWorkspaceKey}/source-packages/${failedReplacement.body.replacementSourcePackage.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-testtakers.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${replacementZip}`
+      }
+    }
+  );
+  assert.equal(replacement.status, 200);
+  assert.equal(
+    replacement.body.importJob.status,
+    "completed",
+    JSON.stringify(replacement.body)
+  );
+  assert.equal(replacement.body.sourcePackage.status, "accepted");
+
+  const duplicateAfterReplacement = await requestJson<{
+    error: string;
+    details: { conflictingSourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "duplicate-after-replacement.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+      }
+    }
+  );
+  assert.equal(duplicateAfterReplacement.status, 409);
+  assert.equal(
+    duplicateAfterReplacement.body.error,
+    "source_package_testtakers_login_duplicate"
+  );
+  assert.equal(
+    duplicateAfterReplacement.body.details.conflictingSourcePackageId,
+    replacement.body.sourcePackage.sourcePackageId
+  );
+
+  const distinctRoster = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "distinct-testtakers.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+          .replace("shared-original-group", "distinct-group")
+          .replace("shared-original-login", "distinct-login")
+      }
+    }
+  );
+  assert.equal(distinctRoster.status, 201);
+
+  const deletedRoster = await requestJson<{
+    report: { deleted: Array<{ sourcePackageId: string }> };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-package-deletions`,
+    {
+      method: "POST",
+      body: {
+        items: [
+          {
+            sourcePackageId: distinctRoster.body.sourcePackage.sourcePackageId,
+            confirmation: "distinct-testtakers.xml"
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(deletedRoster.status, 200);
+  assert.deepEqual(
+    deletedRoster.body.report.deleted.map(item => item.sourcePackageId),
+    [distinctRoster.body.sourcePackage.sourcePackageId]
+  );
+  const reuploadedRoster = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${secondWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "distinct-testtakers.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+          .replace("shared-original-group", "distinct-group")
+          .replace("shared-original-login", "distinct-login")
+      }
+    }
+  );
+  assert.equal(reuploadedRoster.status, 201);
+
+  const isolatedTenantKey = `${tenantKey}-isolated`;
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey: isolatedTenantKey, displayName: isolatedTenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${isolatedTenantKey}/workspaces`, {
+    method: "POST",
+    body: {
+      workspaceKey: firstWorkspaceKey,
+      displayName: firstWorkspaceKey
+    }
+  });
+  const isolatedTenantRoster = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${isolatedTenantKey}/workspaces/${firstWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "isolated-tenant-testtakers.xml",
+        mediaType: "application/xml",
+        sourceDocument: originalRoster
+      }
+    }
+  );
+  assert.equal(isolatedTenantRoster.status, 201);
 });
 
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
