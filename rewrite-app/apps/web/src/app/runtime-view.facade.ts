@@ -5460,7 +5460,7 @@ export class RuntimeViewFacade {
 
     switch (state) {
       case "paused":
-        return hsl(hue, colorful ? 45 : 0, 90);
+        return colorful ? hsl(hue, 45, 90) : "rgb(230, 230, 230)";
       case "pending":
       case "locked":
         return stripes(
