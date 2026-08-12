@@ -6607,28 +6607,10 @@ try {
   );
   logStep("participant-entry-reentry");
   await page.goto(
-    `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
-      workspaceKey
-    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
-      participantRouteGroupKey
-    )}&bookletKey=${encodeURIComponent(
-      participantRouteBookletKey
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      participantRouteSessionId
     )}`,
     { waitUntil: "networkidle" }
-  );
-  await page.waitForFunction(
-    expectedSessionId =>
-      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
-        expectedSessionId &&
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "running" &&
-      document.querySelector("#participantRouteEntry") == null,
-    participantRouteSessionId,
-    { timeout: 15_000 }
-  );
-  await clickSelectorAction(
-    "Refresh Current State",
-    "#participantRouteRefreshCurrentStateButton"
   );
   await page.waitForFunction(
     ([expectedSessionId, expectedUnitKey, expectedResponse]) =>
