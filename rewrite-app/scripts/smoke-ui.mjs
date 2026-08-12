@@ -650,8 +650,21 @@ try {
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
     await waitForNotBusy(`${name}-before-click`);
     const button = page.locator(selector);
-    await button.scrollIntoViewIfNeeded();
-    await button.click();
+    await button.waitFor({ state: "visible", timeout: 15_000 });
+    await page.waitForFunction(
+      targetSelector => {
+        const element = document.querySelector(targetSelector);
+        return element instanceof HTMLButtonElement && !element.disabled;
+      },
+      selector,
+      { timeout: 15_000 }
+    );
+    await button.evaluate(element => {
+      if (!(element instanceof HTMLButtonElement)) {
+        throw new Error("Expected selector action target to be a button.");
+      }
+      element.click();
+    });
     const startedBusy = await waitForBusy(`${name}-after-click`);
     if (!startedBusy) {
       await page.waitForTimeout(150);
@@ -5470,6 +5483,10 @@ try {
     "Add To Delete Batch",
     uploadedSourceFileName
   );
+  await page
+    .locator("#sourcePackageDeletionSelection")
+    .filter({ hasText: "1 file(s) selected" })
+    .waitFor({ timeout: 15_000 });
   await clickCardAction(
     "Source Packages",
     "Add To Delete Batch",
@@ -8433,7 +8450,10 @@ try {
     false,
     "Simulation responses must not survive in local storage."
   );
-  await page.locator("#participantRouteStartOrResumeButton").click();
+  await clickSelectorAction(
+    "resume completed simulation",
+    "#participantRouteStartOrResumeButton"
+  );
   await page
     .locator("#participantRouteStatus")
     .filter({ hasText: "running" })
@@ -10835,7 +10855,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       aspectParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
