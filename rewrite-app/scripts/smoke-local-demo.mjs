@@ -270,7 +270,6 @@ try {
   );
 
   await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
-  await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(
     () => {
       const status = document
@@ -286,10 +285,14 @@ try {
   const firstParticipantSessionId = await page
     .locator("#participantRouteSessionId")
     .inputValue();
-  assert.equal(await page.locator("#participantWorkspaceKey").inputValue(), "demo-workspace");
-  assert.equal(await page.locator("#participantLoginKey").inputValue(), "student-demo");
-  assert.equal(await page.locator("#participantRouteGroupKey").inputValue(), "group:student-demo");
-  assert.equal(await page.locator("#participantRouteBookletKey").inputValue(), "booklet:demo");
+  for (const starterField of [
+    "#participantWorkspaceKey",
+    "#participantLoginKey",
+    "#participantRouteGroupKey",
+    "#participantRouteBookletKey"
+  ]) {
+    assert.equal(await page.locator(starterField).count(), 0);
+  }
   await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
   await page.waitForFunction(
     expectedSessionId => {
@@ -307,14 +310,6 @@ try {
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"
   );
-  assert.equal(
-    (await page.locator("#participantRouteUnitDescription").textContent())?.trim(),
-    "Demo introduction task"
-  );
-  assert.equal(
-    (await page.locator("#participantRouteUnitContent").textContent())?.trim(),
-    "Describe what you see in the demo introduction."
-  );
   const progressTrack = page.locator(".participant-progress .progress-track");
   assert.equal(await progressTrack.getAttribute("role"), "progressbar");
   assert.equal(
@@ -328,18 +323,34 @@ try {
     await progressTrack.getAttribute("aria-valuetext"),
     "0 / 3 responses saved"
   );
-  const introUnitChip = page.locator('[data-unit-key="unit-intro"]');
+  const introUnitChip = page.locator('[data-unit-key="unit-intro"]').first();
   await introUnitChip.waitFor({ timeout: 15_000 });
   assert.equal(await introUnitChip.getAttribute("aria-current"), "step");
   assert.equal(
     await introUnitChip.getAttribute("aria-label"),
-    "Unit 1: Introduction, current, unanswered"
+    "Unit 1: Introduction, current, unanswered, available"
   );
   assert.equal(
     await introUnitChip.getAttribute("title"),
-    "Unit 1: Introduction, current, unanswered"
+    "Unit 1: Introduction, current, unanswered, available"
   );
-  await page.locator("#participantRouteUnitResponse").fill("Intro answer from smoke");
+  assert.equal(await page.locator("#participantRouteUnitResponse").count(), 0);
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 15_000 });
+  const introPlayerFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await introPlayerFrame
+    .locator("#demoPlayerTitle")
+    .filter({ hasText: "Welcome to the interactive demo" })
+    .waitFor({ timeout: 15_000 });
+  await introPlayerFrame
+    .locator("#demoPlayerAnswer")
+    .fill("Intro answer from smoke");
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "saved" })
+    .waitFor({ timeout: 15_000 });
 
   await page.locator("#participantRouteNextUnitButton").click();
   await page.waitForFunction(
@@ -352,22 +363,61 @@ try {
     { timeout: 15_000 }
   );
   assert.equal(
-    await page.locator('[data-unit-key="unit-practice"]').getAttribute("aria-current"),
+    await page
+      .locator('[data-unit-key="unit-practice"]')
+      .first()
+      .getAttribute("aria-current"),
     "step"
   );
   assert.equal(
-    await page.locator('[data-unit-key="unit-intro"]').getAttribute("aria-label"),
-    "Unit 1: Introduction, not current, answered"
+    await page
+      .locator('[data-unit-key="unit-intro"]')
+      .first()
+      .getAttribute("aria-label"),
+    "Unit 1: Introduction, not current, answered, available"
   );
+  await page
+    .frameLocator("#participantVeronaPlayerFrame")
+    .locator("#demoPlayerTitle")
+    .filter({ hasText: "Practice response persistence" })
+    .waitFor({ timeout: 15_000 });
   await page.locator("#participantRoutePreviousUnitButton").click();
   await page.waitForFunction(
     () =>
       document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
-        "unit-intro" &&
-      document.querySelector("#participantRouteUnitResponse")?.value ===
-        "Intro answer from smoke",
+        "unit-intro",
     undefined,
     { timeout: 15_000 }
+  );
+  const restoredIntroPlayerFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredIntroPlayerFrame
+    .locator("#demoPlayerAnswer")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await restoredIntroPlayerFrame.locator("#demoPlayerAnswer").inputValue(),
+    "Intro answer from smoke"
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(
+    expectedSessionId =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteSessionId")?.value ===
+        expectedSessionId,
+    firstParticipantSessionId,
+    { timeout: 15_000 }
+  );
+  const reloadedIntroPlayerFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await reloadedIntroPlayerFrame
+    .locator("#demoPlayerAnswer")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await reloadedIntroPlayerFrame.locator("#demoPlayerAnswer").inputValue(),
+    "Intro answer from smoke"
   );
 
   await page.goto(`${baseUrl}/app/ops`, { waitUntil: "networkidle" });
@@ -416,7 +466,7 @@ try {
   adminSessionToken = await page.locator("#adminSessionToken").inputValue();
   assert.ok(adminSessionToken.length > 0);
 
-  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.locator("#runtimeUnitResponse").waitFor({ timeout: 15_000 });
   const runtimeSummaryCards = page
     .getByRole("list", { name: "Operational summary cards" })
@@ -449,8 +499,9 @@ try {
       document
         .querySelector("#playerPreviewUnitResponseText")
         ?.textContent?.includes("Intro answer from smoke") &&
-      document.querySelector("#runtimeUnitResponse")?.value ===
-        "Intro answer from smoke",
+      document
+        .querySelector("#runtimeUnitResponse")
+        ?.value?.includes("Intro answer from smoke"),
     undefined,
     { timeout: 15_000 }
   );
@@ -608,23 +659,22 @@ try {
     { timeout: 15_000 }
   );
 
-  const deleteReviewDialog = new Promise((resolvePromise, reject) => {
-    page.once("dialog", async dialog => {
-      try {
-        assert.match(dialog.message(), /Delete review '.+' from this workspace\?/);
-        await dialog.accept();
-        resolvePromise(undefined);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
   await clickCardAction(
     "Review Action Queue",
     "Apply Suggestion",
     "Delete selected review"
   );
-  await deleteReviewDialog;
+  const deleteReviewConfirmation = page.locator("#globalConfirmationDialog");
+  await deleteReviewConfirmation.waitFor({ timeout: 15_000 });
+  assert.match(
+    (await deleteReviewConfirmation
+      .locator("#globalConfirmationMessage")
+      .textContent()) ?? "",
+    /Delete review '.+' from this workspace\?/
+  );
+  await deleteReviewConfirmation
+    .locator("#globalConfirmationConfirmButton")
+    .click();
   await page.getByText("Review Deleted").waitFor({ timeout: 15_000 });
   await page
     .locator("app-record-collection")
@@ -659,6 +709,32 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "domcontentloaded" });
+  const logDownloadPromise = page.waitForEvent("download");
+  await page.locator("#exportWorkspaceLogCsvButton").click();
+  const logDownload = await logDownloadPromise;
+  assert.equal(
+    logDownload.suggestedFilename(),
+    "demo-workspace-test-logs.csv"
+  );
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#workspaceLogExportPreview")
+        ?.textContent?.includes(
+          "groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry"
+        ) &&
+      document
+        .querySelector("#workspaceLogExportPreview")
+        ?.textContent?.includes("DEMO_ANSWER_CHANGED") &&
+      document
+        .querySelector("#workspaceLogExportPreview")
+        ?.textContent?.includes("answered"),
+    undefined,
+    { timeout: 15_000 }
+  );
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
+
   await page.locator("#groupKey").fill("group:student-demo");
   await page.locator("#groupKey").dispatchEvent("change");
   await page.waitForFunction(
@@ -666,11 +742,21 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /Type 'group:student-demo'/);
-    await dialog.accept("group:student-demo");
-  });
   await page.getByRole("button", { name: "Delete Group Results" }).click();
+  const deleteGroupResultsConfirmation = page.locator("#globalConfirmationDialog");
+  await deleteGroupResultsConfirmation.waitFor({ timeout: 15_000 });
+  assert.match(
+    (await deleteGroupResultsConfirmation
+      .locator("#globalConfirmationMessage")
+      .textContent()) ?? "",
+    /Delete all collected test runs for group 'group:student-demo'\?/
+  );
+  await deleteGroupResultsConfirmation
+    .locator("#globalConfirmationVerificationInput")
+    .fill("group:student-demo");
+  await deleteGroupResultsConfirmation
+    .locator("#globalConfirmationConfirmButton")
+    .click();
   await page.getByText("Group Results Deleted").waitFor({ timeout: 15_000 });
   const remainingResponses = await fetch(
     `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?groupKey=${encodeURIComponent("group:student-demo")}&limit=10`,
@@ -685,7 +771,7 @@ try {
   });
   assert.equal(remainingResponses.items.length, 0);
 
-  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Refresh Study Monitor" }).click();
   await page
     .getByRole("heading", { name: "Study Monitor", exact: true })
@@ -766,18 +852,6 @@ try {
     { timeout: 15_000 }
   );
 
-  const logDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
-  const logDownload = await logDownloadPromise;
-  assert.equal(logDownload.suggestedFilename(), "demo-workspace-logs.csv");
-  await page.waitForFunction(
-    () =>
-      document
-        .querySelector("#workspaceLogExportPreview")
-        ?.textContent?.includes("test_run_progress_saved"),
-    undefined,
-    { timeout: 15_000 }
-  );
   const staleParticipantSessionId = "00000000-0000-4000-8000-000000000000";
   await page.evaluate(staleSessionId => {
     const storageKey = "testcenter-rewrite-app-shell";
@@ -792,7 +866,9 @@ try {
       })
     );
   }, staleParticipantSessionId);
-  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}${demoParticipantPath}`, {
+    waitUntil: "domcontentloaded"
+  });
   await page.waitForFunction(
     staleSessionId => {
       const status = document

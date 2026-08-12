@@ -6615,6 +6615,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           displayLabel: string | null;
           description?: string | null;
           content?: string | null;
+          player?: {
+            playerKey: string;
+            html: string;
+          } | null;
+          unitDefinition?: string | null;
+          unitDefinitionType?: string | null;
         };
         bookletUnits: Array<{
           unitKey: string;
@@ -6647,6 +6653,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(
       currentState.body.currentRunState.currentUnit.content,
       "Describe what you see in the demo introduction."
+    );
+    assert.equal(
+      currentState.body.currentRunState.currentUnit.player?.playerKey,
+      "testcenter-demo-player@1.0"
+    );
+    assert.match(
+      currentState.body.currentRunState.currentUnit.player?.html ?? "",
+      /Verona API 6 demo unit/
+    );
+    assert.match(
+      currentState.body.currentRunState.currentUnit.unitDefinition ?? "",
+      /Welcome to the interactive demo/
+    );
+    assert.equal(
+      currentState.body.currentRunState.currentUnit.unitDefinitionType,
+      "application/vnd.testcenter.demo+json"
     );
     assert.equal(
       currentState.body.currentRunState.bookletUnits[1]?.content,

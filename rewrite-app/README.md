@@ -181,8 +181,12 @@ The local start also fills `APP_BUILD_SHA` from Git and `APP_BUILD_TIMESTAMP` fr
 
 - platform admin: `demo-admin` / `demo-admin-password`
 - tenant/workspace: `demo-tenant` / `demo-workspace`
-- active demo content release with a three-unit demo booklet
+- active demo content release with a three-unit, Verona API 6-backed demo booklet
 - participant entry URL: `http://127.0.0.1:4310/participant?tenantKey=demo-tenant&workspaceKey=demo-workspace&loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo`
+
+The demo Player uses the same sandboxed handshake, autosave, Unit navigation,
+and reload restoration path as imported production Verona packages. It does not
+need an external Player download or any file from `test-fixtures/`.
 
 If the local database already has an admin user or active demo release, the bootstrap leaves the existing state in place.
 

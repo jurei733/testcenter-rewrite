@@ -48,6 +48,15 @@ Unit navigation 29–33, Page navigation 34–39, and toolbar, timer, and silent
 presentation 40–51. Together with the original four-booklet package, the
 complete locally available legacy/current BookletConfig matrix is now gated.
 
+Latest local-first presentation closure: a clean `npm run start:local` no longer
+seeds a text-response-only placeholder assessment. Its three-Unit demo package
+now contains a self-contained, metadata-valid Verona API 6 Player and distinct
+Unit definitions. The production Angular host performs the real sandboxed
+handshake, persists Player state through its normal autosave path, navigates
+between Player-backed Units, and restores the response after both return
+navigation and a full browser reload. The local browser smoke proves that path
+without depending on test fixtures, external downloads, or network access.
+
 Latest P0 Participant pause-boundary closure: participant-authored pauses and
 monitor-authored pauses now persist as distinct run states across memory, file,
 SQLite, and PostgreSQL. A monitor pause removes the Verona iframe and every

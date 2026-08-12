@@ -440,6 +440,52 @@ export const parseVeronaUnitResponse = (
   }
 };
 
+const hasMeaningfulVeronaDataPart = (
+  value: unknown,
+  valueType: "string" | "json" | undefined
+): boolean => {
+  if (valueType === "json" && typeof value === "string") {
+    try {
+      return hasMeaningfulVeronaDataPart(JSON.parse(value), undefined);
+    } catch {
+      return value.trim().length > 0;
+    }
+  }
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.some(item => hasMeaningfulVeronaDataPart(item, undefined));
+  }
+  const record = asRecord(value);
+  return record
+    ? Object.values(record).some(item =>
+        hasMeaningfulVeronaDataPart(item, undefined)
+      )
+    : false;
+};
+
+export const hasMeaningfulVeronaResponse = (
+  value: string | null | undefined
+): boolean => {
+  const parsed = parseVeronaUnitResponse(value);
+  if (!parsed) {
+    return Boolean(value?.trim());
+  }
+  if (
+    parsed.unitState.responseProgress === "some" ||
+    parsed.unitState.responseProgress === "complete"
+  ) {
+    return true;
+  }
+  return Object.entries(parsed.unitState.dataParts ?? {}).some(([key, content]) =>
+    hasMeaningfulVeronaDataPart(content, parsed.dataPartValueTypes?.[key])
+  );
+};
+
 export const readVeronaPlayerApiVersion = (value: unknown): string | null => {
   const message = asRecord(value);
   const metadata = asRecord(message?.metadata);

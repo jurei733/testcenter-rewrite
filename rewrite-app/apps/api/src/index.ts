@@ -6,6 +6,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { basename, extname, relative, resolve } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
+import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
+
 import {
   createFirstSliceServices,
   type FirstSliceError,
@@ -316,10 +318,9 @@ const localDemoBootstrap = {
   tenantKey: "demo-tenant",
   workspaceKey: "demo-workspace",
   participantLoginKey: "student-demo",
-  sourceFileName: "demo-assessment.xml",
-  sourceMediaType: "application/xml",
-  sourceDocument:
-    '<assessment><booklet key="booklet:demo" label="Demo Booklet"><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><unit key="unit-intro" label="Introduction"><description>Demo introduction task</description><prompt>Describe what you see in the demo introduction.</prompt></unit><unit key="unit-practice" label="Practice"><prompt>Save a practice response.</prompt></unit><unit key="unit-finish" label="Finish"><prompt>Complete the demo test.</prompt></unit></booklet></assessment>'
+  sourceFileName: localDemoSourcePackage.fileName,
+  sourceMediaType: localDemoSourcePackage.mediaType,
+  sourceDocument: localDemoSourcePackage.sourceDocument
 } as const;
 
 const bootstrapLocalDemoState = async (input: {

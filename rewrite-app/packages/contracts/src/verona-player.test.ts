@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  hasMeaningfulVeronaResponse,
   isSupportedVeronaPlayerApiVersion,
   mergeVeronaUnitResponse,
   normalizeVeronaStateLogEntries,
@@ -14,6 +15,57 @@ import {
   resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
+
+test("Verona response presence ignores empty host envelopes", () => {
+  assert.equal(hasMeaningfulVeronaResponse(""), false);
+  assert.equal(hasMeaningfulVeronaResponse("  "), false);
+  assert.equal(hasMeaningfulVeronaResponse("legacy response"), true);
+  assert.equal(
+    hasMeaningfulVeronaResponse(serializeVeronaUnitResponse({ unitState: {} })),
+    false
+  );
+  assert.equal(
+    hasMeaningfulVeronaResponse(
+      serializeVeronaUnitResponse({
+        unitState: {
+          dataParts: { answer: "" },
+          responseProgress: "none"
+        }
+      })
+    ),
+    false
+  );
+  assert.equal(
+    hasMeaningfulVeronaResponse(
+      serializeVeronaUnitResponse({
+        unitState: {
+          dataParts: { answer: { value: "" } },
+          responseProgress: "none"
+        }
+      })
+    ),
+    false
+  );
+  assert.equal(
+    hasMeaningfulVeronaResponse(
+      serializeVeronaUnitResponse({
+        unitState: {
+          dataParts: { answer: { value: 0 } },
+          responseProgress: "none"
+        }
+      })
+    ),
+    true
+  );
+  assert.equal(
+    hasMeaningfulVeronaResponse(
+      serializeVeronaUnitResponse({
+        unitState: { responseProgress: "some" }
+      })
+    ),
+    true
+  );
+});
 
 test("Verona response envelopes normalize and restore player state", () => {
   const serialized = serializeVeronaUnitResponse({

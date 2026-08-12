@@ -28,6 +28,7 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import {
   type ParticipantCustomTextKey,
+  hasMeaningfulVeronaResponse,
   isBookletPlayerEndAllowed,
   mergeParticipantCustomTextScopes,
   parseVeronaUnitResponse,
@@ -818,7 +819,7 @@ export class ParticipantViewFacade {
     });
     const draftStateLabel = this.getDraftStateLabel({
       canSaveProgress: availableActions.includes("save_progress"),
-      hasSavedResponse: savedUnitResponse.length > 0,
+      hasSavedResponse: hasMeaningfulVeronaResponse(savedUnitResponse),
       hasUnsavedResponse,
       isComplete
     });
@@ -3910,14 +3911,8 @@ export class ParticipantViewFacade {
     currentState: ParticipantCurrentRunStateResponse["currentRunState"],
     unitKey: string
   ): boolean {
-    return (
-      this.ephemeralUnitResponses
-        .get(currentState.testRun.testRunId)
-        ?.has(unitKey) === true ||
-      Object.prototype.hasOwnProperty.call(
-        currentState.testRun.unitResponses,
-        unitKey
-      )
+    return hasMeaningfulVeronaResponse(
+      this.effectiveUnitResponse(currentState, unitKey)
     );
   }
 
@@ -3994,7 +3989,7 @@ export class ParticipantViewFacade {
 
     const draftAddsCurrentResponse =
       args.currentUnitKey.length > 0 &&
-      args.currentDraft.length > 0 &&
+      hasMeaningfulVeronaResponse(args.currentDraft) &&
       !args.unitItems.some(
         unit => unit.unitKey === args.currentUnitKey && unit.hasResponse
       );
