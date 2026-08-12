@@ -2133,20 +2133,50 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
-    this.queuedVeronaLogs.push({
+    const batch: ParticipantTestLogBatch & { testRunId: string } = {
       testRunId: currentState.testRun.testRunId,
       unitKey: null,
       originalUnitId: null,
       entries
-    });
-    this.saveVeronaResponse({
-      testRunId: currentState.testRun.testRunId,
-      unitKey: currentState.currentUnit.unitKey ?? "",
-      response: this.runtime.currentUnitResponse,
-      unitDataChanged: false,
-      unitStateChanged: false,
-      playerStateChanged: false
-    });
+    };
+    if (
+      this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
+    ) {
+      this.queuedVeronaLogs.push(batch);
+      this.saveVeronaResponse({
+        testRunId: this.pendingVeronaSave.testRunId,
+        unitKey: this.pendingVeronaSave.unitKey,
+        response: this.pendingVeronaSave.response,
+        unitDataChanged: false,
+        unitStateChanged: false,
+        playerStateChanged: false
+      });
+      return;
+    }
+
+    const deliveryId =
+      globalThis.crypto?.randomUUID?.() ??
+      `testlog-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    void this.requestState
+      .request<SaveParticipantTestLogsResponse>(
+        "Participant Test Logs",
+        "POST",
+        resolveRoutePath(productionApiRoutes.participant.saveTestLogs, {
+          testRunId: currentState.testRun.testRunId
+        }),
+        {
+          deliveryId,
+          logs: [{
+            unitKey: batch.unitKey,
+            originalUnitId: batch.originalUnitId,
+            entries: batch.entries
+          }]
+        } satisfies SaveParticipantTestLogsRequest,
+        { quiet: true }
+      )
+      .catch(() => {
+        this.queuedVeronaLogs.push(batch);
+      });
   }
 
   retryVeronaSave(): void {
