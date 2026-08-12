@@ -1863,6 +1863,7 @@ export class OpsViewFacade {
         this.adminSessionBatchSelection.add(adminSessionId);
       }
       this.adminSessionBatchResult = null;
+      this.uiState.renderVersion.update(version => version + 1);
       return;
     }
     if (!adminUserId || !adminSessionId) {
