@@ -394,6 +394,8 @@ export class ParticipantViewFacade {
   private veronaForegroundSaveSettlement = false;
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
+  private currentStateRefreshSequence = 0;
+  private currentStateAppliedRefreshSequence = 0;
   private readonly navigationAdvisory = signal<{
     title: string;
     message: string;
@@ -3399,6 +3401,7 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const refreshSequence = ++this.currentStateRefreshSequence;
     const loadStartedAtMs = Date.now();
     try {
       let payload =
@@ -3420,6 +3423,12 @@ export class ParticipantViewFacade {
         this.loadedBookletAssets()?.testRunId !== testRunId
       ) {
         payload = await this.loadBookletAssets(payload);
+      }
+      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+        return;
+      }
+      this.currentStateAppliedRefreshSequence = refreshSequence;
+      if (payload.currentRunState.bookletAssets) {
         this.recordLoadedBookletAssets(payload, testRunId);
       }
       const currentStateViewPayload = payload.currentRunState.bookletAssets
