@@ -8024,7 +8024,7 @@ try {
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
     )}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   const resumedVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await resumedVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
