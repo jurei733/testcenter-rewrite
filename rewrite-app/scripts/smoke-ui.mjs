@@ -1653,6 +1653,9 @@ try {
     .locator("#participantRouteCompleteButton")
     .filter({ hasText: "UI Booklet Complete" })
     .waitFor();
+  await brandedParticipantPage
+    .locator("#participantRouteEntry")
+    .waitFor({ state: "detached" });
   assert.equal(
     await brandedParticipantPage.locator("#participantRouteEntry").count(),
     0,
@@ -4313,12 +4316,7 @@ try {
       .locator(".record-card")
       .filter({ hasText: adminSessionId })
       .getByRole("button", { name: "Add To Batch" })
-      .evaluate(element => {
-        if (!(element instanceof HTMLButtonElement)) {
-          throw new Error("Admin session batch action must be a button.");
-        }
-        element.click();
-      });
+      .dispatchEvent("click");
     await page
       .locator("app-record-collection")
       .filter({
@@ -4407,12 +4405,7 @@ try {
           has: page.getByRole("heading", { name: username, exact: true })
         })
         .getByRole("button", { name: "Add To Batch", exact: true })
-        .evaluate(element => {
-          if (!(element instanceof HTMLButtonElement)) {
-            throw new Error("Admin user batch action must be a button.");
-          }
-          element.click();
-        });
+        .dispatchEvent("click");
       await selectedAdminAccounts
         .filter({ hasText: adminUserId })
         .waitFor({ timeout: 15_000 });
