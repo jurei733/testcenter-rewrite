@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, Input, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, Input, inject } from "@angular/core";
 import type { OnChanges, OnDestroy } from "@angular/core";
 import { RouterLink } from "@angular/router";
 
@@ -121,6 +121,7 @@ import { downloadBlobFile } from "./download-text-file";
 })
 export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   private readonly manager = inject(AttachmentManagerService);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   @Input({ required: true }) sessionToken = "";
   @Input({ required: true }) tenantKey = "";
@@ -341,6 +342,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
       this.status = this.manager.describeError(error);
     } finally {
       this.busy = false;
+      this.changeDetectorRef.markForCheck();
     }
   }
 
