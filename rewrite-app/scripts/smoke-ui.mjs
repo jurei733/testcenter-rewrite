@@ -15947,6 +15947,7 @@ try {
   }
   await page.unroute(monitorOpenRunsRoute);
   await selectAndCommit("#monitorProfile", "all");
+  await clickAction("Clear Open Run Filters");
   await page.locator("#monitorApplyScopeButton").click();
   await waitForNotBusy("group-monitor-booklet-error-copy-restore");
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
