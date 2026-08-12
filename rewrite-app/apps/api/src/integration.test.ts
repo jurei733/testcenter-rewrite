@@ -91,26 +91,49 @@ const IBM037_TO_LATIN1 = Buffer.from(
   "AAECA5wJhn+XjY4LDA0ODxAREhOdhQiHGBmSjxwdHh+AgYKDhAoXG4iJiouMBQYHkJEWk5SVlgSYmZqbFBWeGiCg4uTg4ePl5/GiLjwoK3wm6err6O3u7+zfISQqKTusLS/CxMDBw8XH0aYsJV8+P/jJysvIzc7PzGA6I0AnPSLYYWJjZGVmZ2hpq7vw/f6xsGprbG1ub3Bxcqq65rjGpLV+c3R1dnd4eXqhv9Dd3q5eo6W3qae2vL2+W12vqLTXe0FCQ0RFRkdISa309vLz9X1KS0xNTk9QUVK5+/z5+v9c91NUVVZXWFlastTW0tPVMDEyMzQ1Njc4ObPb3Nnanw==",
   "base64"
 );
+const IBM037_TO_UNICODE = Buffer.from(
+  IBM037_TO_LATIN1.toString("latin1"),
+  "utf16le"
+);
+const IBM273_TO_UNICODE = Buffer.from(
+  "AAABAAIAAwCcAAkAhgB/AJcAjQCOAAsADAANAA4ADwAQABEAEgATAJ0AhQAIAIcAGAAZAJIAjwAcAB0AHgAfAIAAgQCCAIMAhAAKABcAGwCIAIkAigCLAIwABQAGAAcAkACRABYAkwCUAJUAlgAEAJgAmQCaAJsAFAAVAJ4AGgAgAKAA4gB7AOAA4QDjAOUA5wDxAMQALgA8ACgAKwAhACYA6QDqAOsA6ADtAO4A7wDsAH4A3AAkACoAKQA7AF4ALQAvAMIAWwDAAMEAwwDFAMcA0QD2ACwAJQBfAD4APwD4AMkAygDLAMgAzQDOAM8AzABgADoAIwCnACcAPQAiANgAYQBiAGMAZABlAGYAZwBoAGkAqwC7APAA/QD+ALEAsABqAGsAbABtAG4AbwBwAHEAcgCqALoA5gC4AMYApAC1AN8AcwB0AHUAdgB3AHgAeQB6AKEAvwDQAN0A3gCuAKIAowClALcAqQBAALYAvAC9AL4ArAB8AD4gqAC0ANcA5ABBAEIAQwBEAEUARgBHAEgASQCtAPQApgDyAPMA9QD8AEoASwBMAE0ATgBPAFAAUQBSALkA+wB9APkA+gD/ANYA9wBTAFQAVQBWAFcAWABZAFoAsgDUAFwA0gDTANUAMAAxADIAMwA0ADUANgA3ADgAOQCzANsAXQDZANoAnwA=",
+  "base64"
+);
 
-const encodeIbm037 = (value: string): Buffer => {
-  const latin1ToIbm037 = new Int16Array(256).fill(-1);
-  for (const [encodedByte, decodedByte] of IBM037_TO_LATIN1.entries()) {
-    latin1ToIbm037[decodedByte] = encodedByte;
+const encodeEbcdic = (
+  value: string,
+  mapping: Buffer,
+  replacesCurrencyWithEuro = false
+): Buffer => {
+  const unicodeToEbcdic = new Int16Array(0x10000).fill(-1);
+  for (let encodedByte = 0; encodedByte < 256; encodedByte += 1) {
+    unicodeToEbcdic[mapping.readUInt16LE(encodedByte * 2)] = encodedByte;
+  }
+  if (replacesCurrencyWithEuro) {
+    unicodeToEbcdic[0x20ac] = 0x9f;
   }
   const encodedBytes = Buffer.alloc(value.length);
   for (let index = 0; index < value.length; index += 1) {
     const codePoint = value.charCodeAt(index);
-    assert.ok(codePoint <= 0xff, "IBM037 fixture text must be Latin-1");
-    const encodedByte = latin1ToIbm037[codePoint]!;
+    const encodedByte = unicodeToEbcdic[codePoint]!;
     assert.notEqual(
       encodedByte,
       -1,
-      `IBM037 fixture cannot encode U+${codePoint.toString(16)}`
+      `EBCDIC fixture cannot encode U+${codePoint.toString(16)}`
     );
     encodedBytes[index] = encodedByte;
   }
   return encodedBytes;
 };
+
+const encodeIbm037 = (value: string): Buffer =>
+  encodeEbcdic(value, IBM037_TO_UNICODE);
+const encodeIbm273 = (value: string): Buffer =>
+  encodeEbcdic(value, IBM273_TO_UNICODE);
+const encodeIbm1140 = (value: string): Buffer =>
+  encodeEbcdic(value, IBM037_TO_UNICODE, true);
+const encodeIbm1141 = (value: string): Buffer =>
+  encodeEbcdic(value, IBM273_TO_UNICODE, true);
 
 const createZipBase64 = (
   entries: ZipFixtureEntry[],
@@ -13367,6 +13390,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const ibm037BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM037"')
     .replace("<Label>Sample booklet</Label>", "<Label>Prüfung für Köln</Label>");
+  const ibm273BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM273"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Größe für Köln: §</Label>");
+  const ibm1141BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM01141"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Preis 12 € in Köln</Label>");
+  const ibm1140BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM01140"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Price 12 €</Label>");
   const percentEncodedLatin1Booklet = Array.from(
     Buffer.from(latin1BookletXml, "latin1"),
     byte => `%${byte.toString(16).padStart(2, "0")}`
@@ -13456,6 +13488,21 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "ibm037-original-booklet.xml",
       bytes: encodeIbm037(ibm037BookletXml),
       displayLabel: "Prüfung für Köln"
+    },
+    {
+      fileName: "ibm273-original-booklet.xml",
+      bytes: encodeIbm273(ibm273BookletXml),
+      displayLabel: "Größe für Köln: §"
+    },
+    {
+      fileName: "ibm1141-original-booklet.xml",
+      bytes: encodeIbm1141(ibm1141BookletXml),
+      displayLabel: "Preis 12 € in Köln"
+    },
+    {
+      fileName: "ibm1140-original-booklet.xml",
+      bytes: encodeIbm1140(ibm1140BookletXml),
+      displayLabel: "Price 12 €"
     },
     {
       fileName: "decoded-iso-8859-1-original-booklet.xml",
@@ -23573,8 +23620,8 @@ test("source document import extracts encoded IMS manifest from base64 ZIP packa
   const ebcdicZipPayload = createZipBase64([
     {
       fileName: "export/imsmanifest.xml",
-      content: encodeIbm037(
-        `<?xml version="1.0" encoding="EBCDIC-CP-US"?>
+      content: encodeIbm1141(
+        `<?xml version="1.0" encoding="IBM01141"?>
         <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
           <organizations default="ORG-EBCDIC">
             <organization identifier="ORG-EBCDIC">

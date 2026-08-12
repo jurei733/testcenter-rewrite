@@ -2382,13 +2382,65 @@ const IBM037_TO_LATIN1 = Buffer.from(
   "base64"
 );
 
-const decodeIbm037Bytes = (bytes: Buffer): string => {
-  const decodedBytes = Buffer.allocUnsafe(bytes.length);
+const IBM037_TO_UNICODE = Buffer.from(
+  IBM037_TO_LATIN1.toString("latin1"),
+  "utf16le"
+);
+const IBM273_TO_UNICODE = Buffer.from(
+  "AAABAAIAAwCcAAkAhgB/AJcAjQCOAAsADAANAA4ADwAQABEAEgATAJ0AhQAIAIcAGAAZAJIAjwAcAB0AHgAfAIAAgQCCAIMAhAAKABcAGwCIAIkAigCLAIwABQAGAAcAkACRABYAkwCUAJUAlgAEAJgAmQCaAJsAFAAVAJ4AGgAgAKAA4gB7AOAA4QDjAOUA5wDxAMQALgA8ACgAKwAhACYA6QDqAOsA6ADtAO4A7wDsAH4A3AAkACoAKQA7AF4ALQAvAMIAWwDAAMEAwwDFAMcA0QD2ACwAJQBfAD4APwD4AMkAygDLAMgAzQDOAM8AzABgADoAIwCnACcAPQAiANgAYQBiAGMAZABlAGYAZwBoAGkAqwC7APAA/QD+ALEAsABqAGsAbABtAG4AbwBwAHEAcgCqALoA5gC4AMYApAC1AN8AcwB0AHUAdgB3AHgAeQB6AKEAvwDQAN0A3gCuAKIAowClALcAqQBAALYAvAC9AL4ArAB8AD4gqAC0ANcA5ABBAEIAQwBEAEUARgBHAEgASQCtAPQApgDyAPMA9QD8AEoASwBMAE0ATgBPAFAAUQBSALkA+wB9APkA+gD/ANYA9wBTAFQAVQBWAFcAWABZAFoAsgDUAFwA0gDTANUAMAAxADIAMwA0ADUANgA3ADgAOQCzANsAXQDZANoAnwA=",
+  "base64"
+);
+
+const decodeEbcdicBytes = (
+  bytes: Buffer,
+  mapping: Buffer,
+  replacesCurrencyWithEuro = false
+): string => {
+  const decodedBytes = Buffer.allocUnsafe(bytes.length * 2);
   for (let index = 0; index < bytes.length; index += 1) {
-    decodedBytes[index] = IBM037_TO_LATIN1[bytes[index]!]!;
+    const encodedByte = bytes[index]!;
+    decodedBytes.writeUInt16LE(
+      replacesCurrencyWithEuro && encodedByte === 0x9f
+        ? 0x20ac
+        : mapping.readUInt16LE(encodedByte * 2),
+      index * 2
+    );
   }
-  return decodedBytes.toString("latin1");
+  return decodedBytes.toString("utf16le");
 };
+
+const IBM037_ENCODING_NAMES = [
+  "037",
+  "cp037",
+  "csibm037",
+  "ebcdic-cp-ca",
+  "ebcdic-cp-nl",
+  "ebcdic-cp-us",
+  "ebcdic-cp-wt",
+  "ibm037",
+  "ibm039"
+];
+const IBM273_ENCODING_NAMES = ["273", "cp273", "csibm273", "ibm273"];
+const IBM1140_ENCODING_NAMES = [
+  "cp1140",
+  "ibm01140",
+  "ibm1140",
+  "ccsid01140"
+];
+const IBM1141_ENCODING_NAMES = [
+  "cp1141",
+  "ibm01141",
+  "ibm1141",
+  "ccsid01141"
+];
+
+const isSupportedEbcdicEncodingName = (normalizedEncoding: string): boolean =>
+  [
+    ...IBM037_ENCODING_NAMES,
+    ...IBM273_ENCODING_NAMES,
+    ...IBM1140_ENCODING_NAMES,
+    ...IBM1141_ENCODING_NAMES
+  ].includes(normalizedEncoding);
 
 const decodeSourceTextBytesWithDeclaredEncoding = (
   bytes: Buffer,
@@ -2407,20 +2459,17 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
   ) {
     return new TextDecoder("windows-1252").decode(bytes);
   }
-  if (
-    [
-      "037",
-      "cp037",
-      "csibm037",
-      "ebcdic-cp-ca",
-      "ebcdic-cp-nl",
-      "ebcdic-cp-us",
-      "ebcdic-cp-wt",
-      "ibm037",
-      "ibm039"
-    ].includes(normalizedEncoding)
-  ) {
-    return decodeIbm037Bytes(bytes);
+  if (IBM037_ENCODING_NAMES.includes(normalizedEncoding)) {
+    return decodeEbcdicBytes(bytes, IBM037_TO_UNICODE);
+  }
+  if (IBM273_ENCODING_NAMES.includes(normalizedEncoding)) {
+    return decodeEbcdicBytes(bytes, IBM273_TO_UNICODE);
+  }
+  if (IBM1140_ENCODING_NAMES.includes(normalizedEncoding)) {
+    return decodeEbcdicBytes(bytes, IBM037_TO_UNICODE, true);
+  }
+  if (IBM1141_ENCODING_NAMES.includes(normalizedEncoding)) {
+    return decodeEbcdicBytes(bytes, IBM273_TO_UNICODE, true);
   }
   if (
     [
@@ -2489,8 +2538,25 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
         return decodeUtf32Bytes(encodedBytes, "little-endian");
       case "utf-32be":
         return decodeUtf32Bytes(encodedBytes, "big-endian");
-      case "ibm037":
-        return decodeIbm037Bytes(encodedBytes);
+      case "ibm037": {
+        const declarationProbe = decodeEbcdicBytes(
+          encodedBytes,
+          IBM037_TO_UNICODE
+        );
+        const declaredEncoding = readDeclaredXmlEncoding(declarationProbe);
+        if (
+          declaredEncoding &&
+          isSupportedEbcdicEncodingName(
+            normalizeSourceTextEncodingName(declaredEncoding)
+          )
+        ) {
+          return decodeSourceTextBytesWithDeclaredEncoding(
+            encodedBytes,
+            declaredEncoding
+          )!;
+        }
+        return declarationProbe;
+      }
     }
   }
 
@@ -8072,17 +8138,7 @@ const isXmlEncodingCompatibleWithDetectedBytes = (
         "iso-10646-ucs-4"
       ].includes(normalizedDeclaredEncoding);
     case "ibm037":
-      return [
-        "037",
-        "cp037",
-        "csibm037",
-        "ebcdic-cp-ca",
-        "ebcdic-cp-nl",
-        "ebcdic-cp-us",
-        "ebcdic-cp-wt",
-        "ibm037",
-        "ibm039"
-      ].includes(normalizedDeclaredEncoding);
+      return isSupportedEbcdicEncodingName(normalizedDeclaredEncoding);
   }
 };
 
