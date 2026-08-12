@@ -64,6 +64,8 @@ export async function createSourcePackageAction(
   );
 
   host.setSourcePackageId(payload.sourcePackage.sourcePackageId);
+  host.setImportJobId("");
+  host.setContentReleaseId("");
   host.persistShellState();
   host.rememberActivity(
     "Source Package Created",

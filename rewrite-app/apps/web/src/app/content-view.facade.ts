@@ -1107,7 +1107,9 @@ export class ContentViewFacade {
           this.content.contentReleaseId.trim() === item.contentRelease.contentReleaseId,
         actionLabel: "Select + Load",
         actionPayload: {
-          contentReleaseId: item.contentRelease.contentReleaseId
+          contentReleaseId: item.contentRelease.contentReleaseId,
+          importJobId: item.importJob?.importJobId ?? "",
+          sourcePackageId: item.sourcePackage?.sourcePackageId ?? ""
         }
       }))
     ];
@@ -2204,6 +2206,10 @@ export class ContentViewFacade {
       return;
     }
 
+    if (this.content.sourcePackageId.trim() !== sourcePackageId) {
+      this.content.importJobId = "";
+      this.content.contentReleaseId = "";
+    }
     this.content.sourcePackageId = sourcePackageId;
     this.content.sourcePackageDeletionReadinessView =
       'Use "Deletion Readiness".';
@@ -2241,6 +2247,12 @@ export class ContentViewFacade {
     }
 
     this.content.contentReleaseId = contentReleaseId;
+    if (item.actionPayload?.importJobId?.trim()) {
+      this.content.importJobId = item.actionPayload.importJobId.trim();
+    }
+    if (item.actionPayload?.sourcePackageId?.trim()) {
+      this.content.sourcePackageId = item.actionPayload.sourcePackageId.trim();
+    }
     this.persistState();
     this.viewState.onActionAsync(async () => {
       await this.contentService.loadContentReleaseActivationReadiness();

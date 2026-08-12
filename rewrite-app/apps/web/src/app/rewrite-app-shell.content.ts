@@ -101,20 +101,35 @@ export function applyContentReads(
   );
 
   const selectedSourcePackageId = host.getSourcePackageId();
-  host.setSourcePackageId(
+  const resolvedSourcePackageId =
     payload.sourcePackages.items.some(
       item => item.sourcePackage.sourcePackageId === selectedSourcePackageId
     )
       ? selectedSourcePackageId
       : payload.sourcePackages.items[0]?.sourcePackage.sourcePackageId ??
-          selectedSourcePackageId
+          selectedSourcePackageId;
+  host.setSourcePackageId(resolvedSourcePackageId);
+
+  const relatedImportJobs = payload.importJobs.items.filter(
+    item => item.sourcePackage?.sourcePackageId === resolvedSourcePackageId
   );
+  const selectedImportJobId = host.getImportJobId();
   host.setImportJobId(
-    payload.importJobs.items[0]?.importJob.importJobId ?? host.getImportJobId()
+    relatedImportJobs.some(item => item.importJob.importJobId === selectedImportJobId)
+      ? selectedImportJobId
+      : relatedImportJobs[0]?.importJob.importJobId ?? ""
   );
+
+  const relatedContentReleases = payload.contentReleases.items.filter(
+    item => item.sourcePackage?.sourcePackageId === resolvedSourcePackageId
+  );
+  const selectedContentReleaseId = host.getContentReleaseId();
   host.setContentReleaseId(
-    payload.contentReleases.items[0]?.contentRelease.contentReleaseId ??
-      host.getContentReleaseId()
+    relatedContentReleases.some(
+      item => item.contentRelease.contentReleaseId === selectedContentReleaseId
+    )
+      ? selectedContentReleaseId
+      : relatedContentReleases[0]?.contentRelease.contentReleaseId ?? ""
   );
 
   const latestActivity = payload.workspaceActivity.items[0]?.activityEvent;
