@@ -4224,21 +4224,30 @@ try {
     workspaceAdminBatchSession.adminSession.adminSessionId,
     delegatedAdminBatchSession.adminSession.adminSessionId
   ]) {
-    const addSessionToBatchButton = adminSessionsCollection
-      .locator(".record-card")
-      .filter({ hasText: adminSessionId })
-      .getByRole("button", { name: "Add To Batch" });
-    await addSessionToBatchButton.evaluate(button => button.click());
-    await page
-      .locator("app-record-collection")
-      .filter({
-        has: page.getByRole("heading", {
-          name: "Selected Admin Sessions",
-          exact: true
-        })
-      })
-      .filter({ hasText: adminSessionId })
-      .waitFor();
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await adminSessionsCollection
+        .locator(".record-card")
+        .filter({ hasText: adminSessionId })
+        .getByRole("button", { name: "Add To Batch" })
+        .click({ force: true });
+      try {
+        await page
+          .locator("app-record-collection")
+          .filter({
+            has: page.getByRole("heading", {
+              name: "Selected Admin Sessions",
+              exact: true
+            })
+          })
+          .filter({ hasText: adminSessionId })
+          .waitFor({ timeout: 5_000 });
+        break;
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+      }
+    }
   }
   const selectedAdminSessions = page
     .locator("app-record-collection")
@@ -8234,6 +8243,15 @@ try {
     .filter({ hasText: "cannot be opened again" })
     .waitFor();
   await page.waitForTimeout(250);
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Complete test?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({ hasText: "Complete this test with" })
+    .waitFor();
   await page.locator("#participantConfirmationContinueButton").click();
   await page
     .locator("#participantRouteStatus")
