@@ -728,6 +728,9 @@ export type ParticipantRuntimePort = {
     optionKey: string;
   }): Promise<TestRun>;
   listReviews(input: { testRunId: string }): Promise<WorkspaceReview[]>;
+  exportReviewsCsv(input: {
+    participantSessionId: string;
+  }): Promise<string | null>;
   createReview(input: {
     testRunId: string;
     unitKey?: string | null;
@@ -15283,6 +15286,59 @@ const buildOriginalReviewReportRows = (input: {
   return { rows, categoryColumns };
 };
 
+const formatParticipantReviewCsv = (input: {
+  participantSession: ParticipantSession;
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+  contentReleases: ContentRelease[];
+}): string | null => {
+  const reviewReport = buildOriginalReviewReportRows({
+    participantSessions: [input.participantSession],
+    participantRosterEntries: input.participantRosterEntries,
+    testRuns: input.testRuns,
+    reviews: input.reviews,
+    contentReleases: input.contentReleases,
+    groupKeys: [input.participantSession.groupKey]
+  });
+  if (reviewReport.rows.length === 0) {
+    return null;
+  }
+  const columns = [
+    "groupname",
+    "loginname",
+    "code",
+    "bookletname",
+    "unitname",
+    "priority",
+    ...reviewReport.categoryColumns,
+    "reviewtime",
+    "page",
+    "pagelabel",
+    "originalUnitId",
+    "userAgent",
+    "reviewer",
+    "entry",
+    "unitlabel",
+    "bookletlabel"
+  ];
+  const rows = reviewReport.rows
+    .map(row =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key,
+          key.startsWith("category_") ? (value ? "TRUE" : "FALSE") : value
+        ])
+      )
+    )
+    .sort((left, right) =>
+      String(left.reviewtime ?? "").localeCompare(
+        String(right.reviewtime ?? "")
+      )
+    );
+  return formatOriginalReviewReportCsv(columns, rows);
+};
+
 const createOriginalResultArchive = (input: {
   tenantKey: string;
   workspaceKey: string;
@@ -29633,6 +29689,55 @@ export const createFirstSliceServices = (
               right.updatedAt.localeCompare(left.updatedAt) ||
               right.reviewId.localeCompare(left.reviewId)
           );
+      },
+      async exportReviewsCsv(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
+        const participantSession = await requireAccessibleParticipantSession(
+          participantSessionId
+        );
+        const executionMode = resolveParticipantExecutionMode(
+          participantSession.executionMode
+        );
+        if (!executionMode.canReview) {
+          throw new FirstSliceError(
+            403,
+            "participant_review_not_allowed",
+            `Execution mode '${executionMode.mode}' does not allow participant reviews.`
+          );
+        }
+        const [workspaceReviews, participantRosterEntries, testRuns, contentReleases] =
+          await Promise.all([
+            repository.listWorkspaceReviewsByWorkspace(
+              participantSession.tenantId,
+              participantSession.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              participantSession.tenantId,
+              participantSession.workspaceId
+            ),
+            repository.listTestRunsByParticipantSessionId(participantSessionId),
+            repository.listContentReleasesByWorkspace(
+              participantSession.tenantId,
+              participantSession.workspaceId
+            )
+          ]);
+        const sessionTestRunIds = new Set(testRuns.map(testRun => testRun.testRunId));
+        const reviews = workspaceReviews.filter(
+          review =>
+            review.participantSessionId === participantSessionId &&
+            sessionTestRunIds.has(review.testRunId)
+        );
+        return formatParticipantReviewCsv({
+          participantSession,
+          participantRosterEntries: participantRosterEntries.filter(
+            entry => entry.loginKey === participantSession.loginKey
+          ),
+          testRuns,
+          reviews,
+          contentReleases
+        });
       },
       async createReview(input) {
         const { participantSession, testRun, contentRelease } =

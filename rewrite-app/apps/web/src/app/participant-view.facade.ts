@@ -39,7 +39,10 @@ import {
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import {
+  defaultParticipantExecutionMode,
+  participantExecutionModeDefinitions,
   participantCodeInputTypes,
+  type ParticipantExecutionMode,
   type ParticipantCodeInputType,
   type ParticipantRosterEntry,
   type ParticipantViewSettings,
@@ -49,6 +52,7 @@ import {
 } from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
+import { downloadBlobFile } from "./download-text-file";
 import {
   createParticipantSaveOutboxEntry,
   discardParticipantSaveOutboxForRun,
@@ -322,6 +326,8 @@ export class ParticipantViewFacade {
   editingReviewUnitKey: string | null = null;
   editingReviewPage: number | null = null;
   reviewFeedback = "";
+  reviewDownloadFeedback = "";
+  private participantCanReview = false;
   adaptiveStateFeedback = "";
   adaptiveStateChangePending = "";
   readonly reviewPriorityOptions = [
@@ -1842,6 +1848,21 @@ export class ParticipantViewFacade {
     );
   }
 
+  get canDownloadParticipantReviews(): boolean {
+    return Boolean(
+      this.runtime.participantSessionId.trim() &&
+      (this.readCurrentRunState()?.executionMode.canReview ??
+        this.participantCanReview)
+    );
+  }
+
+  downloadParticipantReviews(): void {
+    if (!this.canDownloadParticipantReviews) {
+      return;
+    }
+    this.viewState.onActionAsync(() => this.downloadParticipantReviewsInternal());
+  }
+
   get adaptiveStates(): ParticipantCurrentRunStateResponse["currentRunState"]["adaptiveStates"] {
     return this.readCurrentRunState()?.adaptiveStates ?? [];
   }
@@ -2527,6 +2548,7 @@ export class ParticipantViewFacade {
     }
 
     this.syncParticipantSessionFields(payload.participantSession);
+    this.reviewDownloadFeedback = "";
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRuntimeBooklets(payload.booklets);
     this.runtime.testRunId = "";
@@ -2569,6 +2591,8 @@ export class ParticipantViewFacade {
     this.participantReviews = [];
     this.resetReviewEditor();
     this.reviewFeedback = "";
+    this.reviewDownloadFeedback = "";
+    this.participantCanReview = false;
     this.adaptiveStateFeedback = "";
     this.adaptiveStateChangePending = "";
     this.pendingVeronaSave = null;
@@ -2698,6 +2722,26 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+  }
+
+  private async downloadParticipantReviewsInternal(): Promise<void> {
+    const participantSessionId = this.runtime.participantSessionId.trim();
+    if (!participantSessionId) {
+      return;
+    }
+    const download = await this.requestState.requestDownload(
+      "Participant Review CSV Download",
+      resolveRoutePath(productionApiRoutes.participant.exportReviewsCsv, {
+        participantSessionId
+      })
+    );
+    if (download.statusCode === 204 || download.blob.size === 0) {
+      this.reviewDownloadFeedback = "No comments available.";
+      return;
+    }
+    const filename = download.filename ?? "testcenter-reviews.csv";
+    downloadBlobFile({ filename, blob: download.blob });
+    this.reviewDownloadFeedback = `Reviews downloaded as ${filename}.`;
   }
 
   private async resumeSessionInternal(options: { quiet?: boolean } = {}): Promise<void> {
@@ -3318,6 +3362,8 @@ export class ParticipantViewFacade {
       this.participantReviews = [];
       this.resetReviewEditor();
       this.reviewFeedback = "";
+      this.reviewDownloadFeedback = "";
+      this.participantCanReview = false;
       return;
     }
     const payload =
@@ -3746,10 +3792,15 @@ export class ParticipantViewFacade {
     participantSessionId: string;
     loginKey: string;
     groupKey: string;
+    executionMode?: ParticipantExecutionMode;
   }): void {
     this.runtime.participantSessionId = participantSession.participantSessionId;
     this.runtime.loginKey = participantSession.loginKey;
     this.runtime.groupKey = participantSession.groupKey;
+    this.participantCanReview =
+      participantExecutionModeDefinitions[
+        participantSession.executionMode ?? defaultParticipantExecutionMode
+      ].canReview;
   }
 
   private syncCurrentRunState(

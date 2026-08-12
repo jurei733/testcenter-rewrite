@@ -34887,6 +34887,11 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     review.currentRunState.availableActions.includes("change_state_options"),
     true
   );
+  const emptyParticipantReviewCsv = await requestText(
+    `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews.csv`
+  );
+  assert.equal(emptyParticipantReviewCsv.status, 204);
+  assert.equal(emptyParticipantReviewCsv.body, "");
   const invalidParticipantReviewPriority = await requestJson<{ error: string }>(
     `/api/v1/participant/test-runs/${review.testRunId}/reviews`,
     {
@@ -35053,6 +35058,11 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   );
   assert.equal(deniedDemoReview.status, 403);
   assert.equal(deniedDemoReview.body.error, "participant_review_not_allowed");
+  const deniedDemoReviewCsv = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${demo.participantSessionId}/exports/reviews.csv`
+  );
+  assert.equal(deniedDemoReviewCsv.status, 403);
+  assert.equal(deniedDemoReviewCsv.body.error, "participant_review_not_allowed");
   const reviewSave = await requestJson<{
     testRun: {
       currentUnitKey: string | null;
@@ -35193,6 +35203,28 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(trialReview.status, 201);
   assert.equal(trialReview.body.review.testRunId, trial.testRunId);
   assert.equal(trialReview.body.review.reviewerId, "mode-trial");
+  const reviewParticipantCsv = await requestText(
+    `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews.csv`
+  );
+  assert.equal(reviewParticipantCsv.status, 200);
+  assert.match(reviewParticipantCsv.contentType ?? "", /^text\/csv/);
+  assert.match(reviewParticipantCsv.body, /^groupname;loginname;code;/);
+  assert.match(reviewParticipantCsv.body, /category_general/);
+  assert.match(reviewParticipantCsv.body, /"mode-review"/);
+  assert.match(reviewParticipantCsv.body, /"Retained across review re-entry"/);
+  assert.doesNotMatch(reviewParticipantCsv.body, /"mode-trial"/);
+  assert.doesNotMatch(reviewParticipantCsv.body, /"Trial participant review"/);
+  const trialParticipantCsv = await requestText(
+    `/api/v1/participant/sessions/${trial.participantSessionId}/exports/reviews.csv`
+  );
+  assert.equal(trialParticipantCsv.status, 200);
+  assert.match(trialParticipantCsv.body, /"mode-trial"/);
+  assert.match(trialParticipantCsv.body, /"Trial participant review"/);
+  assert.doesNotMatch(trialParticipantCsv.body, /"mode-review"/);
+  assert.doesNotMatch(
+    trialParticipantCsv.body,
+    /"Retained across review re-entry"/
+  );
   const trialOpenRuns = await requestJson<{
     items: Array<{ testRunId: string; executionMode: string }>;
   }>(
@@ -38311,6 +38343,9 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         eventStream: string;
         issueRunCommand: string;
       };
+      participant: {
+        exportReviewsCsv: string;
+      };
     };
   };
 
@@ -38447,6 +38482,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.workspace.exportLogCsv, /logs\.csv/);
   assert.match(manifest.routes.workspace.exportReviewCsv, /reviews\.csv/);
+  assert.match(manifest.routes.participant.exportReviewsCsv, /reviews\.csv/);
   assert.match(manifest.routes.workspace.listReviews, /reviews/);
   assert.match(manifest.routes.workspace.deleteGroupResults, /results\/groups/);
   assert.equal(

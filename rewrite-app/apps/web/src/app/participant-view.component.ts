@@ -245,8 +245,21 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </button>
           <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">{{ view.customText('login_testResumeButtonLabel', 'Start Or Resume') }}</button>
           <button id="participantRouteRefreshCurrentStateButton" class="ghost" type="button" [disabled]="!view.canRefreshCurrentState" (click)="view.refreshCurrentState()">Refresh Current State</button>
+          <button
+            *ngIf="view.canDownloadParticipantReviews"
+            id="participantRouteDownloadReviewsButton"
+            class="ghost"
+            type="button"
+            (click)="view.downloadParticipantReviews()"
+          >Reviews downloaden</button>
           <button id="participantRouteClearSessionButton" class="ghost" type="button" [disabled]="!view.player.canClearSession" (click)="view.clearSession()">Leave Session</button>
         </div>
+        <p
+          *ngIf="view.reviewDownloadFeedback"
+          id="participantRouteReviewDownloadFeedback"
+          class="hint"
+          role="status"
+        >{{ view.reviewDownloadFeedback }}</p>
       </article>
 
       <article class="card" id="participantRoutePlayer">

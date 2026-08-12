@@ -1993,6 +1993,9 @@ const selectAdaptiveStatePattern = createRoutePattern(
 const participantReviewListPattern = createRoutePattern(
   productionApiRoutes.participant.listReviews
 );
+const participantReviewCsvExportPattern = createRoutePattern(
+  productionApiRoutes.participant.exportReviewsCsv
+);
 const participantReviewDetailPattern = createRoutePattern(
   productionApiRoutes.participant.updateReview
 );
@@ -3082,6 +3085,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.participant.selectAdaptiveState
     ],
     ["GET", participantReviewListPattern, productionApiRoutes.participant.listReviews],
+    [
+      "GET",
+      participantReviewCsvExportPattern,
+      productionApiRoutes.participant.exportReviewsCsv
+    ],
     ["POST", participantReviewListPattern, productionApiRoutes.participant.createReview],
     ["PATCH", participantReviewDetailPattern, productionApiRoutes.participant.updateReview],
     ["DELETE", participantReviewDetailPattern, productionApiRoutes.participant.deleteReview],
@@ -7775,6 +7783,39 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       const participantReviewListMatch =
         participantReviewListPattern.exec(pathname);
+      const participantReviewCsvExportMatch =
+        participantReviewCsvExportPattern.exec(pathname);
+      if (
+        request.method === "GET" &&
+        participantReviewCsvExportMatch?.groups
+      ) {
+        const participantSessionId = decodeRouteGroup(
+          participantReviewCsvExportMatch.groups.participantSessionId
+        );
+        if (!participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_session_id",
+            "participantSessionId is required."
+          );
+          return;
+        }
+        const csv = await services.participantRuntime.exportReviewsCsv({
+          participantSessionId
+        });
+        if (csv === null) {
+          response.writeHead(204, {
+            ...securityHeaders,
+            "cache-control": "no-cache",
+            "content-length": "0"
+          });
+          endResponse(response);
+          return;
+        }
+        sendCsv(response, 200, "testcenter-reviews.csv", csv);
+        return;
+      }
       if (request.method === "GET" && participantReviewListMatch?.groups) {
         const testRunId = decodeRouteGroup(
           participantReviewListMatch.groups.testRunId

@@ -6018,6 +6018,19 @@ try {
     "#participantRouteGroupKey",
     "group:participant-entry-review"
   );
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.locator("#participantRouteDownloadReviewsButton").waitFor();
+  const emptyParticipantReviewResponse = page.waitForResponse(
+    response =>
+      response.url().includes("/exports/reviews.csv") &&
+      response.status() === 204
+  );
+  await page.locator("#participantRouteDownloadReviewsButton").click();
+  await emptyParticipantReviewResponse;
+  await page
+    .locator("#participantRouteReviewDownloadFeedback")
+    .filter({ hasText: "No comments available." })
+    .waitFor();
   await page.getByRole("button", { name: "Start Or Resume" }).click();
   await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
   await page
@@ -6111,6 +6124,32 @@ try {
           item?.comment === "Updated whole-test review comment"
       )
   );
+  await page.locator("#participantRouteClearSessionButton").click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.locator("#participantRouteDownloadReviewsButton").waitFor();
+  const participantReviewDownloadPromise = page.waitForEvent("download");
+  await page.locator("#participantRouteDownloadReviewsButton").click();
+  const participantReviewDownload = await participantReviewDownloadPromise;
+  assert.equal(
+    participantReviewDownload.suggestedFilename(),
+    "testcenter-reviews.csv"
+  );
+  const participantReviewDownloadPath = resolve(
+    ".data/ui-smoke-participant-reviews.csv"
+  );
+  await participantReviewDownload.saveAs(participantReviewDownloadPath);
+  const participantReviewCsv = await readFile(
+    participantReviewDownloadPath,
+    "utf8"
+  );
+  await rm(participantReviewDownloadPath, { force: true });
+  assert.match(participantReviewCsv, /^\uFEFFgroupname;loginname;code;/);
+  assert.match(participantReviewCsv, /"student-entry-review"/);
+  assert.match(participantReviewCsv, /"Updated whole-test review comment"/);
+  assert.match(participantReviewCsv, /category_content/);
+  assert.match(participantReviewCsv, /category_tech/);
+  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
   await page
     .locator(`.participant-review-item[data-review-id="${participantReviewId}"]`)
     .getByRole("button", { name: "Delete" })

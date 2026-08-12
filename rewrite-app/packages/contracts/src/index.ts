@@ -282,6 +282,8 @@ export const productionApiRoutes = {
     selectAdaptiveState:
       "/api/v1/participant/test-runs/:testRunId/adaptive-states/:stateKey",
     listReviews: "/api/v1/participant/test-runs/:testRunId/reviews",
+    exportReviewsCsv:
+      "/api/v1/participant/sessions/:participantSessionId/exports/reviews.csv",
     createReview: "/api/v1/participant/test-runs/:testRunId/reviews",
     updateReview:
       "/api/v1/participant/test-runs/:testRunId/reviews/:reviewId",
