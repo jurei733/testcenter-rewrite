@@ -6665,6 +6665,28 @@ try {
     .locator("#participantRouteDraftDetail")
     .filter({ hasText: "Complete Test saves this draft before closing" })
     .waitFor();
+  process.stdout.write(
+    `ui_smoke_completion_readiness=${JSON.stringify(
+      await page.evaluate(() => ({
+        draftLabel: document
+          .querySelector("#participantRouteDraftLabel")
+          ?.textContent?.trim(),
+        draftDetail: document
+          .querySelector("#participantRouteDraftDetail")
+          ?.textContent?.trim(),
+        readinessLabel: document
+          .querySelector("#participantRouteCompletionReadinessLabel")
+          ?.textContent?.trim(),
+        readinessDetail: document
+          .querySelector("#participantRouteCompletionReadinessDetail")
+          ?.textContent?.trim(),
+        unitOverview: document
+          .querySelector("#participantRouteUnitOverview")
+          ?.textContent?.trim(),
+        response: document.querySelector("#participantRouteUnitResponse")?.value
+      }))
+    )}\n`
+  );
   await page
     .locator("#participantRouteCompletionReadinessLabel")
     .filter({ hasText: "Ready to complete" })
