@@ -15533,6 +15533,43 @@ test("original Testcenter compatibility corpus imports representative booklets",
       starterCompanion: "start.webp"
     }
   );
+  const assignedRosterAssetDeletion = await requestJson<{
+    error: string;
+    details: {
+      rosterReferenceCount: number;
+      rosterReferences: Array<{
+        loginKey: string;
+        source: string;
+        slots: string[];
+      }>;
+    };
+  }>(
+    `/api/v1/admin/application-assets?applicationAssetId=${encodeURIComponent(schoolAsset.applicationAssetId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${assetAdminSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(assignedRosterAssetDeletion.status, 409);
+  assert.equal(
+    assignedRosterAssetDeletion.body.error,
+    "application_asset_in_use"
+  );
+  assert.equal(
+    assignedRosterAssetDeletion.body.details.rosterReferenceCount >= 1,
+    true
+  );
+  assert.equal(
+    assignedRosterAssetDeletion.body.details.rosterReferences.some(
+      reference =>
+        reference.loginKey === "asset-participant" &&
+        reference.source === "participant" &&
+        reference.slots.includes("logo")
+    ),
+    true
+  );
   const invalidRosterFacetCases = [
     {
       label: "future Testtakers schema version",

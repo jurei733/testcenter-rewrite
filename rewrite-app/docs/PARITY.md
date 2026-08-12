@@ -763,7 +763,8 @@ and lets a login replace individual slots. The effective filename map survives
 all persistent roster adapters. The protected global registry, public image
 delivery, global slot defaults, Participant override precedence, and all eight
 Angular presentation targets are now implemented. Registry replacement keeps
-stable identities, and deletion refuses assets still assigned globally.
+stable identities, and deletion refuses assets still assigned globally or by
+persisted participant and operational roster entries across workspaces.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |

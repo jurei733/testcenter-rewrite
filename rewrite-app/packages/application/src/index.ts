@@ -23183,12 +23183,70 @@ export const createFirstSliceServices = (
         ).flatMap(([slot, originalName]) =>
           originalName === applicationAsset.originalName ? [slot] : []
         );
-        if (assignedSlots.length > 0) {
+        const tenants = await repository.listTenants();
+        const scopedWorkspaces = (
+          await Promise.all(
+            tenants.map(async tenant =>
+              (await repository.listWorkspacesByTenantId(tenant.tenantId)).map(
+                workspace => ({ tenant, workspace })
+              )
+            )
+          )
+        ).flat();
+        const rosterReferences = (
+          await Promise.all(
+            scopedWorkspaces.map(async ({ tenant, workspace }) => {
+              const [participants, operationalLogins] = await Promise.all([
+                repository.listParticipantRosterEntriesByWorkspace(
+                  tenant.tenantId,
+                  workspace.workspaceId
+                ),
+                repository.listOperationalLoginMigrationCandidatesByWorkspace(
+                  tenant.tenantId,
+                  workspace.workspaceId
+                )
+              ]);
+              return [
+                ...participants.map(entry => ({
+                  source: "participant" as const,
+                  loginKey: entry.loginKey,
+                  assetAssignments: entry.assetAssignments ?? {}
+                })),
+                ...operationalLogins.map(entry => ({
+                  source: "operational" as const,
+                  loginKey: entry.loginKey,
+                  assetAssignments: entry.assetAssignments ?? {}
+                }))
+              ].flatMap(entry => {
+                const slots = Object.entries(entry.assetAssignments).flatMap(
+                  ([slot, originalName]) =>
+                    originalName === applicationAsset.originalName ? [slot] : []
+                );
+                return slots.length > 0
+                  ? [
+                      {
+                        tenantKey: tenant.tenantKey,
+                        workspaceKey: workspace.workspaceKey,
+                        loginKey: entry.loginKey,
+                        source: entry.source,
+                        slots
+                      }
+                    ]
+                  : [];
+              });
+            })
+          )
+        ).flat();
+        if (assignedSlots.length > 0 || rosterReferences.length > 0) {
           throw new FirstSliceError(
             409,
             "application_asset_in_use",
-            `Application asset '${applicationAsset.originalName}' is assigned to application settings.`,
-            { assignedSlots }
+            `Application asset '${applicationAsset.originalName}' is still assigned.`,
+            {
+              assignedSlots,
+              rosterReferenceCount: rosterReferences.length,
+              rosterReferences: rosterReferences.slice(0, 50)
+            }
           );
         }
         await repository.deleteApplicationAsset(
