@@ -18247,6 +18247,10 @@ try {
     (await readFile(allAttachmentPagesPath)).subarray(0, 5).toString("ascii"),
     "%PDF-"
   );
+  await attachmentManager
+    .locator("#attachmentManagerStatus")
+    .filter({ hasText: "capture QR page(s) downloaded" })
+    .waitFor();
   const selectedAttachmentPageDownloadPromise = page.waitForEvent("download");
   await attachmentManager
     .locator("#downloadSelectedAttachmentPageButton")
