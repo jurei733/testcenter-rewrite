@@ -96,6 +96,10 @@ app-root {
   margin-bottom: 22px;
 }
 
+.hero.is-home-hero {
+  grid-template-columns: 1fr;
+}
+
 .hero-panel,
 .card {
   background: var(--panel);
@@ -177,6 +181,13 @@ h1 {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 18px;
+}
+
+.workspace > *,
+.stack,
+.home-stage,
+.card {
+  min-width: 0;
 }
 
 .view-nav {

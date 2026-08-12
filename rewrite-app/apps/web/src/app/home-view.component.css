@@ -1,0 +1,93 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.application-start-view {
+  display: grid;
+  gap: 24px;
+  padding: clamp(24px, 4vw, 40px);
+}
+
+.application-start-view header {
+  max-width: 760px;
+}
+
+.application-start-view h2 {
+  margin: 14px 0 10px;
+  font-size: clamp(30px, 5vw, 48px);
+  line-height: 1;
+}
+
+.application-start-view p {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 17px;
+}
+
+.application-start-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.application-start-option {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+  min-width: 0;
+  min-height: 220px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(215, 235, 231, 0.54)
+  );
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.application-start-option:hover,
+.application-start-option:focus-visible {
+  border-color: rgba(31, 92, 84, 0.48);
+  box-shadow: 0 16px 34px rgba(31, 92, 84, 0.12);
+  transform: translateY(-2px);
+}
+
+.application-start-option-index {
+  color: var(--accent);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.application-start-option strong {
+  font-size: 24px;
+}
+
+.application-start-option > span:not(.application-start-option-index) {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.application-start-option em {
+  color: var(--secondary);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 860px) {
+  .application-start-options {
+    grid-template-columns: 1fr;
+  }
+
+  .application-start-option {
+    min-height: 0;
+  }
+}

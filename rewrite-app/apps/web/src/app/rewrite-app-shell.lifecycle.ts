@@ -86,6 +86,7 @@ export async function refreshShellActiveViewData(
       return;
     }
     if (
+      host.activeView === "home" ||
       host.activeView === "participant" ||
       host.activeView === "system-check"
     ) {

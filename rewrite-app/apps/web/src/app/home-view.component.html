@@ -1,0 +1,33 @@
+<article id="applicationStartView" class="card application-start-view">
+  <header>
+    <span class="eyebrow">Choose a path</span>
+    <h2>Ready for assessment delivery</h2>
+    <p>
+      Start or resume a participant test, run a device check, or open the
+      protected operator workspace.
+    </p>
+  </header>
+
+  <section class="application-start-options" aria-label="Application entry points">
+    <a id="startParticipantEntry" class="application-start-option" routerLink="/participant">
+      <span class="application-start-option-index">01</span>
+      <strong>Participant</strong>
+      <span>Enter an assigned test or resume an existing session.</span>
+      <em>Open participant entry</em>
+    </a>
+
+    <a id="startSystemCheck" class="application-start-option" routerLink="/system-check">
+      <span class="application-start-option-index">02</span>
+      <strong>System Check</strong>
+      <span>Verify this device, network, questionnaire, and Player setup.</span>
+      <em>Open system check</em>
+    </a>
+
+    <a id="startOperatorAccess" class="application-start-option" routerLink="/ops">
+      <span class="application-start-option-index">03</span>
+      <strong>Operator</strong>
+      <span>Sign in to administer content, participants, monitoring, and results.</span>
+      <em>{{ app.hasAdminSession ? "Open operator console" : "Open operator sign-in" }}</em>
+    </a>
+  </section>
+</article>

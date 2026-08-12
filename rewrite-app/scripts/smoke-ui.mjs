@@ -791,15 +791,18 @@ try {
       .waitFor({ timeout: 15_000 });
   };
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
-  await page.waitForURL(/\/app\/workspace$/);
+  await page.waitForURL(/\/app\/home$/);
   await page.waitForSelector("h1");
+  await page.locator("#applicationStartView").waitFor();
+  await waitForNotBusy("initial-load");
+  assert.equal(await page.locator("#authModeBadge").count(), 0);
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   await page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Workspace Action Queue" })
     })
     .waitFor();
-  await waitForNotBusy("initial-load");
   await page.waitForFunction(
     ([expectedPort, expectedAuthMode]) => {
       const authMode = document.querySelector("#authModeBadge")?.textContent?.trim();

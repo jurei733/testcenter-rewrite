@@ -69,7 +69,7 @@ export class RewriteAppViewStateService {
       this.refreshOperationalDiagnostics
     );
     this.syncMonitorEventStream();
-    void this.refreshOperationalDiagnostics(true);
+    this.onActionAsync(() => this.refreshOperationalDiagnostics(true));
   }
 
   destroy(): void {

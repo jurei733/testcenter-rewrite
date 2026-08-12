@@ -6,6 +6,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 export type AppView =
+  | "home"
   | "workspace"
   | "content"
   | "runtime"

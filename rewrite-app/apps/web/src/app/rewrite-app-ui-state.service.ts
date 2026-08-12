@@ -29,7 +29,7 @@ export class RewriteAppUiStateService {
   readonly ops = createInitialShellOpsState();
   readonly runtime = createInitialShellRuntimeState();
 
-  activeView: AppView = "workspace";
+  activeView: AppView = "home";
   showRawDebug = false;
   autoRefreshHandle: number | null = null;
   foregroundRequestDepth = 0;

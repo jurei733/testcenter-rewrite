@@ -41,12 +41,20 @@ export class AppShellFacade {
   readonly runtime = this.uiState.runtime;
 
   private readonly adminViews = [
+    { id: "home", label: "Start", link: "/home" },
     { id: "workspace", label: "Workspace", link: "/workspace" },
     { id: "content", label: "Content", link: "/content" },
     { id: "runtime", label: "Runtime", link: "/runtime" },
     { id: "participant", label: "Participant", link: "/participant" },
     { id: "system-check", label: "System Check", link: "/system-check" },
     { id: "ops", label: "Diagnostics", link: "/ops" }
+  ] as const;
+
+  private readonly publicViews = [
+    { id: "home", label: "Start", link: "/home" },
+    { id: "participant", label: "Participant", link: "/participant" },
+    { id: "system-check", label: "System Check", link: "/system-check" },
+    { id: "ops", label: "Operator Sign-In", link: "/ops" }
   ] as const;
 
   private readonly monitorViews = [
@@ -59,6 +67,9 @@ export class AppShellFacade {
   ] as const;
 
   get views(): ReadonlyArray<{ id: AppView; label: string; link: string }> {
+    if (this.operatorAccess.mode === "signed_out") {
+      return this.publicViews;
+    }
     if (this.operatorAccess.isSystemCheckOnly) {
       return this.systemCheckViews;
     }

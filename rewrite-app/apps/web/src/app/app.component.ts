@@ -16,6 +16,7 @@ import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
 
 const routeViews: AppView[] = [
+  "home",
   "workspace",
   "content",
   "runtime",
@@ -74,6 +75,46 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
+  get isHomeView(): boolean {
+    return this.app.activeView === "home";
+  }
+
+  get operatorHeroEyebrow(): string {
+    if (this.isHomeView) {
+      return "Assessment delivery";
+    }
+    if (this.app.isMonitorOnlySession || this.app.isReadOnlyAdminSession) {
+      return this.app.operatorAccessLabel;
+    }
+    return "Operator workspace";
+  }
+
+  get operatorHeroTitle(): string {
+    if (this.isHomeView) {
+      return "Run, Monitor, And Manage Assessments.";
+    }
+    if (this.app.isMonitorOnlySession) {
+      return "Monitor The Active Test Session.";
+    }
+    if (this.app.isReadOnlyAdminSession) {
+      return "Inspect The Workspace Without Changing It.";
+    }
+    return "Operate The Assessment Workspace.";
+  }
+
+  get operatorHeroDetail(): string {
+    if (this.isHomeView) {
+      return "Choose a participant, system-check, or protected operator entry point. The application keeps each workflow focused while sharing one production runtime.";
+    }
+    if (this.app.isMonitorOnlySession) {
+      return "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls.";
+    }
+    if (this.app.isReadOnlyAdminSession) {
+      return "This workspace administrator session can inspect operational data and exports. Changes require an RW role assignment.";
+    }
+    return "Manage workspace content, participant delivery, monitoring, results, and operational diagnostics from the protected Angular console.";
+  }
+
   get isParticipantHeaderHidden(): boolean {
     return (
       this.app.activeView === "participant" &&
@@ -99,9 +140,10 @@ export class AppComponent implements OnInit, OnDestroy {
     window.addEventListener("offline", this.offlineListener);
     void this.applicationSettings.load().catch(() => undefined);
     const initialView = this.getInitialViewFromLocation();
-    this.app.init(initialView);
-    if (!initialView && (this.router.url === "/" || this.router.url === "")) {
-      await this.router.navigateByUrl(`/${this.app.getPersistedView()}`, {
+    const isApplicationRoot = this.router.url === "/" || this.router.url === "";
+    this.app.init(initialView ?? (isApplicationRoot ? "home" : null));
+    if (!initialView && isApplicationRoot) {
+      await this.router.navigateByUrl("/home", {
         replaceUrl: true
       });
     }

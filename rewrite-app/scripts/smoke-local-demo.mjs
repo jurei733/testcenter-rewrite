@@ -165,10 +165,33 @@ try {
     }
   };
 
+  const initialUnauthorizedResponses = [];
+  const trackInitialUnauthorizedResponse = response => {
+    if (response.status() === 401) {
+      initialUnauthorizedResponses.push(response.url());
+    }
+  };
+  page.on("response", trackInitialUnauthorizedResponse);
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
-  await page.locator('[data-view-nav="workspace"].is-active').waitFor({
+  await page.waitForURL(/\/app\/home$/);
+  await page.locator("#applicationStartView").waitFor({
     timeout: 15_000
   });
+  page.off("response", trackInitialUnauthorizedResponse);
+  assert.deepEqual(
+    initialUnauthorizedResponses,
+    [],
+    "The public application start must not probe protected operator routes."
+  );
+  await page.locator('[data-view-nav="home"].is-active').waitFor();
+  assert.equal(
+    await page.locator('[data-view-nav="workspace"]').count(),
+    0,
+    "Signed-out navigation must not advertise protected workspace administration."
+  );
+  await page.getByRole("link", { name: "Open participant entry" }).waitFor();
+  await page.getByRole("link", { name: "Open system check" }).waitFor();
+  await page.getByRole("link", { name: "Open operator sign-in" }).waitFor();
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
   const demoParticipantPath = `/participant?${new URLSearchParams({
     tenantKey: "demo-tenant",
@@ -202,6 +225,24 @@ try {
     (await page.locator("#localDemoBuildDetail").textContent())?.trim() ?? "",
     /^Build .+/
   );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#applicationStartView").waitFor({ timeout: 15_000 });
+  const mobileStartDimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    bodyHeight: document.body.scrollHeight
+  }));
+  assert.equal(
+    mobileStartDimensions.scrollWidth,
+    mobileStartDimensions.clientWidth,
+    "The public application start must not overflow the mobile viewport."
+  );
+  assert.ok(
+    mobileStartDimensions.bodyHeight < 3_500,
+    `The public application start must stay focused; got ${mobileStartDimensions.bodyHeight}px.`
+  );
+  await page.setViewportSize({ width: 1280, height: 720 });
   await demoAdminLink.click();
   await page.waitForURL(/\/app\/ops$/);
   await page.locator('[data-view-nav="ops"].is-active').waitFor({

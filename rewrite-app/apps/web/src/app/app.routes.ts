@@ -7,7 +7,12 @@ import {
 import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
 export const appRoutes: Routes = [
-  { path: "", pathMatch: "full", redirectTo: "workspace" },
+  { path: "", pathMatch: "full", redirectTo: "home" },
+  {
+    path: "home",
+    loadComponent: () =>
+      import("./home-view.component").then(module => module.HomeViewComponent)
+  },
   {
     path: "workspace",
     loadComponent: () =>
@@ -68,5 +73,5 @@ export const appRoutes: Routes = [
       import("./ops-view.component").then(module => module.OpsViewComponent),
     canActivate: [rejectSystemCheckOperator]
   },
-  { path: "**", redirectTo: "workspace" }
+  { path: "**", redirectTo: "home" }
 ];

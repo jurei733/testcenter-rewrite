@@ -238,7 +238,7 @@
   </ng-container>
 
   <ng-template #operatorShell>
-    <section class="hero">
+    <section class="hero" [class.is-home-hero]="isHomeView">
       <div class="hero-panel">
         <div class="application-brand operator-brand">
           <img
@@ -249,15 +249,9 @@
           />
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
         </div>
-        <span class="eyebrow">{{ app.isMonitorOnlySession || app.isReadOnlyAdminSession ? app.operatorAccessLabel : "Rewrite App Frontend Start" }}</span>
-        <h1>{{ app.isMonitorOnlySession ? "Monitor The Active Test Session." : app.isReadOnlyAdminSession ? "Inspect The Workspace Without Changing It." : "Operate The First Slice Without Leaving The Browser." }}</h1>
-        <p class="lead">
-          {{ app.isMonitorOnlySession
-            ? "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls."
-            : app.isReadOnlyAdminSession
-              ? "This workspace administrator session can inspect operational data and exports. Changes require an RW role assignment."
-            : "This Angular app now runs as routed frontend surface for workspace setup, content intake, participant runtime, and operator diagnostics." }}
-        </p>
+        <span class="eyebrow">{{ operatorHeroEyebrow }}</span>
+        <h1>{{ operatorHeroTitle }}</h1>
+        <p class="lead">{{ operatorHeroDetail }}</p>
         <section
           id="localDemoStartupCard"
           class="local-demo-startup"
@@ -298,7 +292,7 @@
           </div>
         </section>
       </div>
-      <div class="hero-panel status-grid">
+      <div class="hero-panel status-grid" *ngIf="!isHomeView">
         <div class="status-pill">
           <strong>Storage</strong>
           <span>{{ app.ops.storageKind }}</span>
@@ -434,31 +428,37 @@
       >Sign out</button>
     </nav>
 
-    <section class="workspace app-layout">
-      <div class="stack">
-        <app-live-context [sections]="app.liveContextSections"></app-live-context>
+    <main class="home-stage" *ngIf="isHomeView; else operationalWorkspace">
+      <router-outlet></router-outlet>
+    </main>
 
-        <router-outlet></router-outlet>
-      </div>
+    <ng-template #operationalWorkspace>
+      <section class="workspace app-layout">
+        <div class="stack">
+          <app-live-context [sections]="app.liveContextSections"></app-live-context>
 
-      <div class="stack">
-        <article class="card result">
-          <header>
-            <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
-            <span id="responseMeta">{{ app.responseMeta() }}</span>
-          </header>
-          <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
-          <ng-template #lastResponsePreview>
-            <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
-          </ng-template>
-        </article>
+          <router-outlet></router-outlet>
+        </div>
 
-        <article class="card view-grid">
-          <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
-          <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
-        </article>
-      </div>
-    </section>
+        <div class="stack">
+          <article class="card result">
+            <header>
+              <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
+              <span id="responseMeta">{{ app.responseMeta() }}</span>
+            </header>
+            <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
+            <ng-template #lastResponsePreview>
+              <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
+            </ng-template>
+          </article>
+
+          <article class="card view-grid">
+            <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
+            <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
+          </article>
+        </div>
+      </section>
+    </ng-template>
   </ng-template>
   <footer class="application-footer">
     <span>{{ applicationSettings.settings().appTitle }}</span>
