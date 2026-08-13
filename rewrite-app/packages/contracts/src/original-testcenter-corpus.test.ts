@@ -258,6 +258,43 @@ type OriginalTestcenterCorpus = {
       unitSha256: string;
     };
   }>;
+  currentOriginalAdaptivePackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklet: PinnedOriginalFixture & {
+      bookletKey: string;
+      unitKeys: string[];
+      defaultStates: Record<string, string>;
+      professionalStates: Record<string, string>;
+      professionalVisibleUnitKeys: string[];
+      advancedStates: Record<string, string>;
+      advancedVisibleUnitKeys: string[];
+      bonusReviewStates: Record<string, string>;
+      bonusReviewVisibleUnitKeys: string[];
+    };
+    unit: PinnedOriginalFixture & { unitKey: string };
+    codingScheme: PinnedOriginalFixture & {
+      encoding: "base64";
+      version: string;
+    };
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+      playerModuleId: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+    };
+    roster: PinnedOriginalFixture & {
+      groupKey: string;
+      participants: Array<[loginKey: string, executionMode: string]>;
+      assignments: Record<string, string[]>;
+    };
+    routingResponses: {
+      professional: Array<{ id: string; status: string; value: unknown }>;
+      advanced: Array<{ id: string; status: string; value: unknown }>;
+    };
+  };
   currentOriginalStarsPackage: {
     family: string;
     sourceRepository: string;
@@ -919,6 +956,121 @@ test("original Testcenter compatibility corpus pins independent official player 
     starsDefinition.interactionParameters.options.buttons.map(button => button.text),
     ["A", "B", "C", "D"]
   );
+});
+
+test("original Testcenter compatibility corpus pins the current adaptive system-test graph", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const adaptive = corpus.currentOriginalAdaptivePackage;
+  assert.equal(
+    adaptive.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(adaptive.sourceDirectory, "sampledata/system-test/adaptive");
+
+  const bookletDocument = readFileSync(
+    resolve(corpusRoot, adaptive.booklet.fixture)
+  );
+  const unitDocument = readFileSync(resolve(corpusRoot, adaptive.unit.fixture));
+  const codingSchemeDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, adaptive.codingScheme.fixture), "utf8").trim(),
+    "base64"
+  );
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, adaptive.player.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  const rosterDocument = readFileSync(resolve(corpusRoot, adaptive.roster.fixture));
+  for (const [document, fixture] of [
+    [bookletDocument, adaptive.booklet],
+    [unitDocument, adaptive.unit],
+    [codingSchemeDocument, adaptive.codingScheme],
+    [playerDocument, adaptive.player],
+    [rosterDocument, adaptive.roster]
+  ] as const) {
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+  }
+  assert.ok(adaptive.booklet.sourcePath.startsWith(`${adaptive.sourceDirectory}/`));
+  assert.ok(adaptive.roster.sourcePath.startsWith(`${adaptive.sourceDirectory}/`));
+
+  const bookletXml = bookletDocument.toString("utf8");
+  assert.match(bookletXml, /testcenter-booklet-xml\/18\.0/);
+  assert.match(bookletXml, /<Id>CY-Bklt_Adap-1<\/Id>/);
+  assert.match(bookletXml, /<Config key="toolbar_show_unit_list">TRUE<\/Config>/);
+  assert.deepEqual(adaptive.booklet.defaultStates, {
+    level: "beginner",
+    bonus: "no"
+  });
+  assert.deepEqual(adaptive.booklet.professionalStates, {
+    level: "professional",
+    bonus: "no"
+  });
+  assert.deepEqual(adaptive.booklet.professionalVisibleUnitKeys, [
+    "decision-unit",
+    "professional-unit"
+  ]);
+  assert.deepEqual(adaptive.booklet.advancedStates, {
+    level: "advanced",
+    bonus: "no"
+  });
+  assert.deepEqual(adaptive.booklet.advancedVisibleUnitKeys, [
+    "decision-unit",
+    "advanced-unit"
+  ]);
+  assert.deepEqual(adaptive.booklet.bonusReviewStates, {
+    level: "beginner",
+    bonus: "yes"
+  });
+  assert.deepEqual(adaptive.booklet.bonusReviewVisibleUnitKeys, [
+    "decision-unit",
+    "beginner-unit",
+    "bonus-unit"
+  ]);
+  assert.deepEqual(
+    Array.from(bookletXml.matchAll(/<Unit\b[^>]*\balias="([^"]+)"/g), match => match[1]),
+    adaptive.booklet.unitKeys
+  );
+
+  const unitXml = unitDocument.toString("utf8");
+  assert.match(unitXml, /<Id>UNIT\.SAMPLE-2<\/Id>/);
+  assert.match(unitXml, /player="verona-player-simple@6\.0"/);
+  assert.match(unitXml, /schemeType="iqb@3\.0"/);
+  const codingScheme = JSON.parse(codingSchemeDocument.toString("utf8")) as {
+    version: string;
+    variableCodings: unknown[];
+  };
+  assert.equal(codingScheme.version, adaptive.codingScheme.version);
+  assert.equal(codingScheme.variableCodings.length, 7);
+
+  const playerHtml = playerDocument.toString("utf8");
+  assert.match(playerHtml, /"id"\s*:\s*"verona-player-simple"/);
+  assert.match(playerHtml, /"version"\s*:\s*"6\.0\.5"/);
+  assert.match(playerHtml, /"specVersion"\s*:\s*"6\.0"/);
+
+  const roster = parseParticipantRosterText(rosterDocument.toString("utf8"));
+  assert.deepEqual(
+    roster.map(entry => [entry.loginKey, entry.executionMode]),
+    adaptive.roster.participants
+  );
+  assert.ok(roster.every(entry => entry.groupKey === adaptive.roster.groupKey));
+  assert.ok(roster.every(entry => entry.password === "123"));
+  for (const entry of roster) {
+    assert.deepEqual(
+      entry.bookletAssignments?.map(assignment => assignment.assignmentKey),
+      adaptive.roster.assignments[entry.loginKey]
+    );
+  }
+  assert.deepEqual(roster[1]?.bookletAssignments?.map(assignment => assignment.statePreset), [
+    { bonus: "yes" },
+    { bonus: "no" }
+  ]);
 });
 
 test("original Testcenter compatibility corpus pins the current STARS system-test graph", () => {

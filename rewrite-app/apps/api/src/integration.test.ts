@@ -17732,6 +17732,360 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus executes the current adaptive package and all official routes", async () => {
+  type AdaptivePackage = {
+    booklet: {
+      fixture: string;
+      bookletKey: string;
+      unitKeys: string[];
+      defaultStates: Record<string, string>;
+      professionalStates: Record<string, string>;
+      professionalVisibleUnitKeys: string[];
+      advancedStates: Record<string, string>;
+      advancedVisibleUnitKeys: string[];
+      bonusReviewStates: Record<string, string>;
+      bonusReviewVisibleUnitKeys: string[];
+    };
+    unit: { fixture: string; unitKey: string };
+    codingScheme: { fixture: string; version: string };
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      groupKey: string;
+      participants: Array<[loginKey: string, executionMode: string]>;
+      assignments: Record<string, string[]>;
+    };
+    routingResponses: {
+      professional: Array<{ id: string; status: string; value: unknown }>;
+      advanced: Array<{ id: string; status: string; value: unknown }>;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentOriginalAdaptivePackage: AdaptivePackage };
+  const expectation = corpus.currentOriginalAdaptivePackage;
+  const bookletDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.booklet.fixture),
+    "utf8"
+  );
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.unit.fixture),
+    "utf8"
+  );
+  const codingSchemeDocument = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.codingScheme.fixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  ).toString("utf8");
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
+  );
+  const rosterDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+    "utf8"
+  );
+  const packagePayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${expectation.booklet.bookletKey}" href="booklets/CY_Bklt_Adap-1.xml" />
+            <resource identifier="${expectation.unit.unitKey}" href="units/Unit2.xml" />
+            <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
+            <resource identifier="${expectation.player.playerKey}" href="players/verona-player-simple-6.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/CY_Bklt_Adap-1.xml",
+      content: bookletDocument
+    },
+    { fileName: "export/units/Unit2.xml", content: unitDocument },
+    {
+      fileName: "export/schemes/coding-scheme.vocs.json",
+      content: codingSchemeDocument
+    },
+    {
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: playerDocument
+    }
+  ]);
+
+  const tenantKey = "integration-tenant-current-original-adaptive";
+  const workspaceKey = "integration-workspace-current-original-adaptive";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "current-original-adaptive.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${packagePayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const imported = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ severity: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(
+    imported.body.importJob.status,
+    "completed",
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.equal(
+    imported.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false
+  );
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const snapshot = release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = snapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === expectation.booklet.bookletKey
+  );
+  assert.ok(booklet);
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.unitKey),
+    expectation.booklet.unitKeys
+  );
+  assert.ok(
+    booklet.unitEntries.every(
+      unit =>
+        unit.playerKey === expectation.player.playerKey &&
+        unit.codingScheme?.version === expectation.codingScheme.version &&
+        unit.codingScheme.variableCodings.length === 7
+    )
+  );
+  assert.deepEqual(snapshot.playerEntries, [
+    { playerKey: expectation.player.playerKey, html: playerDocument }
+  ]);
+
+  const activated = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activated.status, 200);
+  const roster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      groupKey: string;
+      executionMode?: string;
+      bookletAssignments?: Array<{
+        assignmentKey: string;
+        statePreset: Record<string, string>;
+      }>;
+      validationWarnings: unknown[];
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: rosterDocument }
+  });
+  assert.equal(roster.status, 201);
+  assert.deepEqual(
+    roster.body.items.map(entry => [entry.loginKey, entry.executionMode]),
+    expectation.roster.participants
+  );
+  assert.ok(
+    roster.body.items.every(
+      entry =>
+        entry.groupKey === expectation.roster.groupKey &&
+        entry.validationWarnings.length === 0
+    )
+  );
+  for (const entry of roster.body.items) {
+    assert.deepEqual(
+      entry.bookletAssignments?.map(assignment => assignment.assignmentKey),
+      expectation.roster.assignments[entry.loginKey]
+    );
+  }
+
+  const signIn = async (loginKey: string) => {
+    const result = await requestJson<{
+      participantSession: { participantSessionId: string };
+      booklets: Array<{ bookletKey: string; status: string }>;
+    }>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey, password: "123" }
+    });
+    assert.equal(result.status, 200);
+    return result.body;
+  };
+  const readState = (participantSessionId: string) =>
+    requestJson<{
+      currentRunState: {
+        testRun: {
+          bookletStates: Record<string, string>;
+          bookletStateOverrides: Record<string, string>;
+        };
+        bookletUnits: Array<{ unitKey: string }>;
+        navigation: { nextUnitKey: string | null };
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  const unitResponse = (
+    responses: Array<{ id: string; status: string; value: unknown }>
+  ) =>
+    JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        unitStateDataType: "iqb-standard@1.0",
+        presentationProgress: "complete",
+        responseProgress: "complete",
+        dataParts: { responses: JSON.stringify(responses) }
+      }
+    });
+
+  const hotRestart = await signIn("Adap-1");
+  assert.deepEqual(
+    hotRestart.booklets.map(bookletCandidate => [
+      bookletCandidate.bookletKey,
+      bookletCandidate.status
+    ]),
+    [[expectation.booklet.bookletKey, "available"]]
+  );
+  const hotRestartSessionId = hotRestart.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${hotRestartSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.booklet.bookletKey }
+  });
+  assert.equal(resumed.status, 200);
+  assert.deepEqual(resumed.body.testRun.bookletStates, expectation.booklet.defaultStates);
+  const defaultState = await readState(hotRestartSessionId);
+  assert.deepEqual(
+    defaultState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "beginner-unit"]
+  );
+
+  const saveRoute = async (
+    responses: Array<{ id: string; status: string; value: unknown }>
+  ) => {
+    const saved = await requestJson<{
+      testRun: { bookletStates: Record<string, string> };
+    }>(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey: "decision-unit",
+        status: "running",
+        unitResponse: unitResponse(responses)
+      }
+    });
+    assert.equal(saved.status, 200);
+    return saved.body.testRun.bookletStates;
+  };
+  assert.deepEqual(
+    await saveRoute(expectation.routingResponses.professional),
+    expectation.booklet.professionalStates
+  );
+  const professionalState = await readState(hotRestartSessionId);
+  assert.deepEqual(
+    professionalState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.booklet.professionalVisibleUnitKeys
+  );
+  assert.equal(professionalState.body.currentRunState.navigation.nextUnitKey, "professional-unit");
+
+  assert.deepEqual(
+    await saveRoute(expectation.routingResponses.advanced),
+    expectation.booklet.advancedStates
+  );
+  const advancedState = await readState(hotRestartSessionId);
+  assert.deepEqual(
+    advancedState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.booklet.advancedVisibleUnitKeys
+  );
+  assert.equal(advancedState.body.currentRunState.navigation.nextUnitKey, "advanced-unit");
+
+  const review = await signIn("Adap-2");
+  assert.deepEqual(
+    review.booklets.map(bookletCandidate => bookletCandidate.bookletKey),
+    expectation.roster.assignments["Adap-2"]
+  );
+  const reviewSessionId = review.participantSession.participantSessionId;
+  const reviewRun = await requestJson<{
+    testRun: {
+      testRunId: string;
+      bookletStates: Record<string, string>;
+      presetBookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${reviewSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.roster.assignments["Adap-2"]![0] }
+  });
+  assert.equal(reviewRun.status, 200);
+  assert.deepEqual(
+    reviewRun.body.testRun.bookletStates,
+    expectation.booklet.bonusReviewStates
+  );
+  assert.deepEqual(reviewRun.body.testRun.presetBookletStates, { bonus: "yes" });
+  const reviewPresetState = await readState(reviewSessionId);
+  assert.deepEqual(
+    reviewPresetState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.booklet.bonusReviewVisibleUnitKeys
+  );
+
+  for (const [stateKey, optionKey] of [
+    ["level", "advanced"],
+    ["bonus", "no"]
+  ] as const) {
+    const overridden = await requestJson<{
+      testRun: { bookletStateOverrides: Record<string, string> };
+    }>(`/api/v1/participant/test-runs/${reviewRun.body.testRun.testRunId}/adaptive-states/${stateKey}`, {
+      method: "POST",
+      body: { optionKey }
+    });
+    assert.equal(overridden.status, 200);
+  }
+  const overriddenReviewState = await readState(reviewSessionId);
+  assert.deepEqual(
+    overriddenReviewState.body.currentRunState.testRun.bookletStates,
+    expectation.booklet.advancedStates
+  );
+  assert.deepEqual(
+    overriddenReviewState.body.currentRunState.testRun.bookletStateOverrides,
+    expectation.booklet.advancedStates
+  );
+  assert.deepEqual(
+    overriddenReviewState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.booklet.advancedVisibleUnitKeys
+  );
+});
+
 test("original Testcenter compatibility corpus executes the complete official Booklet Config package", async () => {
   type BookletExpectation = {
     fixture: string;

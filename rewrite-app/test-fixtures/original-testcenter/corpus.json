@@ -845,6 +845,83 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "currentOriginalAdaptivePackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/adaptive",
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Adap-1.xml",
+      "sourcePath": "sampledata/system-test/adaptive/CY_Bklt_Adap-1.xml",
+      "sha256": "a6dbb9c24367cb78cb857e5f2d2a023a950e85ae85a62c8d7b9b0d04d20d557a",
+      "bookletKey": "CY-Bklt_Adap-1",
+      "unitKeys": [
+        "decision-unit",
+        "professional-unit",
+        "advanced-unit",
+        "beginner-unit",
+        "bonus-unit"
+      ],
+      "defaultStates": { "level": "beginner", "bonus": "no" },
+      "professionalStates": { "level": "professional", "bonus": "no" },
+      "professionalVisibleUnitKeys": ["decision-unit", "professional-unit"],
+      "advancedStates": { "level": "advanced", "bonus": "no" },
+      "advancedVisibleUnitKeys": ["decision-unit", "advanced-unit"],
+      "bonusReviewStates": { "level": "beginner", "bonus": "yes" },
+      "bonusReviewVisibleUnitKeys": ["decision-unit", "beginner-unit", "bonus-unit"]
+    },
+    "unit": {
+      "fixture": "units/adaptive-Unit2.xml",
+      "sourcePath": "sampledata/Unit2.xml",
+      "sha256": "3ac0c809c26e3c3c7fbdf35b7f1b3ac696c2d718fed8c3cd5024c77da3209780",
+      "unitKey": "UNIT.SAMPLE-2"
+    },
+    "codingScheme": {
+      "fixture": "schemes/coding-scheme.vocs.json.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/coding-scheme.vocs.json",
+      "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f",
+      "version": "3.0"
+    },
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple@6.0",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "6.0.5",
+      "playerApiVersion": "6.0"
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Adap.xml",
+      "sourcePath": "sampledata/system-test/adaptive/CY_Logins_Adap.xml",
+      "sha256": "545b6f7d6ea01a7ae9a33568a1be4c6632e974491a3a9cf97686816bc1f06d90",
+      "groupKey": "login-adap",
+      "participants": [
+        ["Adap-1", "run-hot-restart"],
+        ["Adap-2", "run-review"]
+      ],
+      "assignments": {
+        "Adap-1": ["CY-Bklt_Adap-1"],
+        "Adap-2": [
+          "CY-Bklt_Adap-1#bonus:yes",
+          "CY-Bklt_Adap-1#bonus:no"
+        ]
+      }
+    },
+    "routingResponses": {
+      "professional": [
+        { "id": "var3", "status": "VALUE_CHANGED", "value": "3" },
+        { "id": "var4", "status": "VALUE_CHANGED", "value": "3" }
+      ],
+      "advanced": [
+        { "id": "var1", "status": "VALUE_CHANGED", "value": "a" },
+        { "id": "var2", "status": "VALUE_CHANGED", "value": "anything" },
+        { "id": "var3", "status": "VALUE_CHANGED", "value": "" },
+        { "id": "var4", "status": "VALUE_CHANGED", "value": "" }
+      ]
+    }
+  },
   "codingSchemePackages": [
     {
       "family": "solver-alias-chain",
