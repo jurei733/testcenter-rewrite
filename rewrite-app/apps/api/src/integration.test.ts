@@ -7294,7 +7294,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(missingLaunchIdentity.status, 400);
     assert.equal(
       missingLaunchIdentity.body.error,
-      "participant_workspace_key_required"
+      "participant_login_key_required"
     );
 
     const invalidLaunchBooklet = await requestJsonAt<{ error: string }>(
@@ -36720,7 +36720,7 @@ test("participant sign-in reuses an open session for the active release", async 
   assert.equal(blankSignIn.status, 400);
   assert.equal(blankSignIn.body.error, "participant_login_key_required");
 
-  const blankWorkspaceSignIn = await requestJson<{ error: string }>(
+  const shortLinkUnknownSignIn = await requestJson<{ error: string }>(
     "/api/v1/participant/auth/sign-in",
     {
       method: "POST",
@@ -36731,10 +36731,10 @@ test("participant sign-in reuses an open session for the active release", async 
     }
   );
 
-  assert.equal(blankWorkspaceSignIn.status, 400);
+  assert.equal(shortLinkUnknownSignIn.status, 401);
   assert.equal(
-    blankWorkspaceSignIn.body.error,
-    "participant_workspace_key_required"
+    shortLinkUnknownSignIn.body.error,
+    "participant_login_invalid"
   );
 
   const invalidTenantSignIn = await requestJson<{ error: string }>(
