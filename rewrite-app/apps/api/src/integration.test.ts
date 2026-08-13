@@ -19758,7 +19758,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     saveResponses: boolean;
     forceTimeRestrictions: boolean;
     forceNaviRestrictions: boolean;
-    presetCode: boolean;
+    showCode: boolean;
     showTimeLeft: boolean;
     showUnitMenu: boolean;
     receiveRemoteCommands: boolean;
@@ -20070,6 +20070,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
               testletKey: string;
               displayLabel: string;
               prompt: string;
+              visibleCode: string | null;
             } | null;
           };
         };
@@ -20092,30 +20093,41 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     assert.equal(demo.currentRunState.executionMode.saveResponses, false);
     assert.equal(demo.currentRunState.executionMode.forceTimeRestrictions, false);
     assert.equal(demo.currentRunState.executionMode.forceNaviRestrictions, false);
-    assert.equal(demo.currentRunState.executionMode.presetCode, true);
+    assert.equal(demo.currentRunState.executionMode.showCode, true);
     assert.equal(
       demo.currentRunState.booklet.policy.navigation.unitMenuEnabled,
       false
     );
     assert.equal(demo.currentRunState.booklet.policy.timing.showTimeLeft, false);
-    assert.deepEqual(demo.testRun.unlockedTestletKeys, ["Tslt1"]);
+    assert.deepEqual(demo.testRun.unlockedTestletKeys, []);
     assert.deepEqual(demo.testRun.testletTimers, {});
-    assert.equal(demo.currentRunState.navigation.nextTestletGate, null);
+    assert.deepEqual(demo.currentRunState.navigation.nextTestletGate, {
+      testletKey: "Tslt1",
+      displayLabel: "Aufgabenblock",
+      prompt: "Bitte gib das Freigabewort ein.",
+      visibleCode: "Hase"
+    });
 
     const review = await start("Test_Ctrl-2", "Cy-Bklt_TC-2");
     assert.equal(review.currentRunState.executionMode.mode, "run-review");
     assert.equal(review.currentRunState.executionMode.monitorable, false);
     assert.equal(review.currentRunState.executionMode.canReview, true);
     assert.equal(review.currentRunState.executionMode.saveResponses, false);
-    assert.equal(review.currentRunState.executionMode.presetCode, true);
+    assert.equal(review.currentRunState.executionMode.showCode, true);
     assert.equal(
       review.currentRunState.booklet.policy.navigation.unitMenuEnabled,
       true
     );
     assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
     assert.equal(review.currentRunState.availableActions.includes("review"), true);
-    assert.deepEqual(review.testRun.unlockedTestletKeys, ["Tslt1"]);
+    assert.deepEqual(review.testRun.unlockedTestletKeys, []);
     assert.deepEqual(review.testRun.testletTimers, {});
+    assert.deepEqual(review.currentRunState.navigation.nextTestletGate, {
+      testletKey: "Tslt1",
+      displayLabel: "Aufgabenblock",
+      prompt: "Bitte gib das Freigabewort ein.",
+      visibleCode: "Hase"
+    });
 
     const hotReturn = await start("Test_Ctrl-3", "Cy-Bklt_TC-3");
     assert.equal(hotReturn.currentRunState.executionMode.mode, "run-hot-return");
@@ -20124,13 +20136,14 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     assert.equal(hotReturn.currentRunState.executionMode.saveResponses, true);
     assert.equal(hotReturn.currentRunState.executionMode.forceTimeRestrictions, true);
     assert.equal(hotReturn.currentRunState.executionMode.forceNaviRestrictions, true);
-    assert.equal(hotReturn.currentRunState.executionMode.presetCode, false);
+    assert.equal(hotReturn.currentRunState.executionMode.showCode, false);
     assert.deepEqual(hotReturn.testRun.unlockedTestletKeys, []);
     assert.deepEqual(hotReturn.testRun.testletTimers, {});
     assert.deepEqual(hotReturn.currentRunState.navigation.nextTestletGate, {
       testletKey: "Tslt1",
       displayLabel: "Aufgabenblock",
-      prompt: "Bitte gib das Freigabewort ein."
+      prompt: "Bitte gib das Freigabewort ein.",
+      visibleCode: null
     });
     const savedHotReturn = await requestJsonAt<{
       testRun: { unitResponses: Record<string, string> };
@@ -27497,7 +27510,8 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
   assert.deepEqual(initialState.body.currentRunState.navigation.nextTestletGate, {
     testletKey: entryTestletKey,
     displayLabel: "Entry Block",
-    prompt: "Enter the initial block code."
+    prompt: "Enter the initial block code.",
+    visibleCode: null
   });
   assert.equal(
     JSON.stringify(initialState.body.currentRunState.booklet.testlets).includes(
@@ -27547,7 +27561,8 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
   assert.deepEqual(stateBeforeUnlock.body.currentRunState.navigation.nextTestletGate, {
     testletKey,
     displayLabel: "Protected Block",
-    prompt: "Enter the supervisor-provided block code."
+    prompt: "Enter the supervisor-provided block code.",
+    visibleCode: null
   });
   assert.equal(
     JSON.stringify(stateBeforeUnlock.body.currentRunState.booklet.testlets).includes(
@@ -37255,7 +37270,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
           saveResponses: boolean;
           forceTimeRestrictions: boolean;
           forceNaviRestrictions: boolean;
-          presetCode: boolean;
+          showCode: boolean;
           showTimeLeft: boolean;
           showUnitMenu: boolean;
           receiveRemoteCommands: boolean;
@@ -37278,6 +37293,12 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
           forwardDeniedReasons: string[];
           backwardAdvisoryReasons: string[];
           forwardAdvisoryReasons: string[];
+          nextTestletGate: {
+            testletKey: string;
+            displayLabel: string;
+            prompt: string;
+            visibleCode: string | null;
+          } | null;
         };
       };
     }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
@@ -37308,22 +37329,53 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     saveResponses: false,
     forceTimeRestrictions: false,
     forceNaviRestrictions: false,
-    presetCode: true,
+    showCode: true,
     showTimeLeft: false,
     showUnitMenu: false,
     receiveRemoteCommands: false,
     canChangeStateOptions: true
   });
-  assert.deepEqual(demo.testRun.unlockedTestletKeys, [protectedTestletKey]);
+  assert.deepEqual(demo.testRun.unlockedTestletKeys, []);
   assert.deepEqual(demo.testRun.testletTimers, {});
-  assert.deepEqual(demo.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(demo.currentRunState.navigation.forwardDeniedReasons, [
+    "testlet_code_required"
+  ]);
   assert.deepEqual(demo.currentRunState.navigation.forwardAdvisoryReasons, [
     "response_incomplete"
   ]);
+  assert.deepEqual(demo.currentRunState.navigation.nextTestletGate, {
+    testletKey: protectedTestletKey,
+    displayLabel: "Protected Testlet",
+    prompt: "Supervisor code",
+    visibleCode: "Mode-Code"
+  });
   assert.equal(
     demo.currentRunState.availableActions.includes("change_state_options"),
     true
   );
+  const blockedDemoNavigation = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+  });
+  assert.equal(blockedDemoNavigation.status, 409);
+  assert.equal(blockedDemoNavigation.body.error, "booklet_navigation_denied");
+  assert.deepEqual(blockedDemoNavigation.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+  const unlockedDemo = await requestJson<{
+    testRun: { unlockedTestletKeys: string[]; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${demo.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(unlockedDemo.status, 200);
+  assert.deepEqual(unlockedDemo.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
+  ]);
+  assert.equal(unlockedDemo.body.testRun.currentUnitKey, "UNIT.PROTECTED");
   const demoTimedNavigation = await requestJson<{
     testRun: {
       currentUnitKey: string | null;
@@ -37497,10 +37549,29 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     route: "alternate"
   });
   assert.deepEqual(reopenedDemo.body.testRun.unitResponses, {});
-  assert.deepEqual(reopenedDemo.body.testRun.unlockedTestletKeys, [
-    protectedTestletKey
-  ]);
+  assert.deepEqual(reopenedDemo.body.testRun.unlockedTestletKeys, []);
   assert.deepEqual(reopenedDemo.body.testRun.testletTimers, {});
+  const reopenedDemoState = await requestJson<{
+    currentRunState: {
+      navigation: {
+        forwardDeniedReasons: string[];
+        nextTestletGate: { visibleCode: string | null } | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${demo.participantSessionId}/current-state`);
+  assert.deepEqual(
+    reopenedDemoState.body.currentRunState.navigation.forwardDeniedReasons,
+    ["testlet_code_required"]
+  );
+  assert.equal(
+    reopenedDemoState.body.currentRunState.navigation.nextTestletGate?.visibleCode,
+    "Mode-Code"
+  );
+  const reopenedDemoUnlock = await requestJson(
+    `/api/v1/participant/test-runs/${demo.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(reopenedDemoUnlock.status, 200);
   const demoAtFinish = await requestJson<{
     testRun: { currentUnitKey: string | null };
   }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
@@ -37556,7 +37627,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(demoAfterCompletion.body.currentRunState.testRun.unitResponses, {});
   assert.deepEqual(
     demoAfterCompletion.body.currentRunState.testRun.unlockedTestletKeys,
-    [protectedTestletKey]
+    []
   );
   assert.deepEqual(demoAfterCompletion.body.currentRunState.testRun.testletTimers, {});
   assert.deepEqual(
@@ -37586,17 +37657,33 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(review.currentRunState.executionMode.saveResponses, false);
   assert.equal(review.currentRunState.executionMode.forceNaviRestrictions, false);
   assert.equal(review.currentRunState.executionMode.forceTimeRestrictions, false);
-  assert.equal(review.currentRunState.executionMode.presetCode, true);
+  assert.equal(review.currentRunState.executionMode.showCode, true);
   assert.equal(
     review.currentRunState.booklet.policy.navigation.unitMenuEnabled,
     true
   );
   assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
-  assert.deepEqual(review.testRun.unlockedTestletKeys, [protectedTestletKey]);
+  assert.deepEqual(review.testRun.unlockedTestletKeys, []);
   assert.deepEqual(review.testRun.testletTimers, {});
-  assert.deepEqual(review.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(review.currentRunState.navigation.forwardDeniedReasons, [
+    "testlet_code_required"
+  ]);
   assert.deepEqual(review.currentRunState.navigation.forwardAdvisoryReasons, [
     "response_incomplete"
+  ]);
+  assert.equal(
+    review.currentRunState.navigation.nextTestletGate?.visibleCode,
+    "Mode-Code"
+  );
+  const unlockedReview = await requestJson<{
+    testRun: { unlockedTestletKeys: string[]; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${review.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(unlockedReview.status, 200);
+  assert.deepEqual(unlockedReview.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
   ]);
   assert.equal(review.currentRunState.availableActions.includes("review"), true);
   assert.equal(
@@ -37804,7 +37891,12 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(reviewSave.status, 200);
   assert.equal(reviewSave.body.testRun.currentUnitKey, "UNIT.FINISH");
   assert.deepEqual(reviewSave.body.testRun.unitResponses, {});
-  assert.deepEqual(reviewSave.body.testRun.testletTimers, {});
+  assert.equal(
+    Object.keys(reviewSave.body.testRun.testletTimers ?? {}).includes(
+      protectedTestletKey
+    ),
+    true
+  );
   const retainedReview = await requestJson<{
     review: { reviewId: string };
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`, {
@@ -37827,9 +37919,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(reopenedReview.body.testRun.testRunId, review.testRunId);
   assert.equal(reopenedReview.body.testRun.currentUnitKey, "UNIT.INTRO");
   assert.deepEqual(reopenedReview.body.testRun.unitResponses, {});
-  assert.deepEqual(reopenedReview.body.testRun.unlockedTestletKeys, [
-    protectedTestletKey
-  ]);
+  assert.deepEqual(reopenedReview.body.testRun.unlockedTestletKeys, []);
   assert.deepEqual(reopenedReview.body.testRun.testletTimers, {});
   const reviewsAfterReentry = await requestJson<{
     items: Array<{ reviewId: string; comment: string }>;
@@ -37872,9 +37962,25 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     true
   );
   assert.equal(trial.currentRunState.booklet.policy.timing.showTimeLeft, true);
-  assert.deepEqual(trial.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(trial.currentRunState.navigation.forwardDeniedReasons, [
+    "testlet_code_required"
+  ]);
   assert.deepEqual(trial.currentRunState.navigation.forwardAdvisoryReasons, [
     "response_incomplete"
+  ]);
+  assert.equal(
+    trial.currentRunState.navigation.nextTestletGate?.visibleCode,
+    "Mode-Code"
+  );
+  const unlockedTrial = await requestJson<{
+    testRun: { unlockedTestletKeys: string[]; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${trial.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(unlockedTrial.status, 200);
+  assert.deepEqual(unlockedTrial.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
   ]);
   const trialSave = await requestJson<{
     testRun: {
@@ -37961,8 +38067,12 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(simulation.currentRunState.executionMode.saveResponses, false);
   assert.equal(simulation.currentRunState.executionMode.forceNaviRestrictions, true);
   assert.equal(simulation.currentRunState.executionMode.forceTimeRestrictions, true);
-  assert.equal(simulation.currentRunState.executionMode.presetCode, false);
+  assert.equal(simulation.currentRunState.executionMode.showCode, false);
   assert.deepEqual(simulation.testRun.unlockedTestletKeys, []);
+  assert.equal(
+    simulation.currentRunState.navigation.nextTestletGate?.visibleCode,
+    null
+  );
   const blockedSimulationNavigation = await requestJson<{
     error: string;
     details?: { deniedReasons?: string[] };

@@ -92,7 +92,7 @@ export type ParticipantExecutionModeDefinition = {
   saveResponses: boolean;
   forceTimeRestrictions: boolean;
   forceNaviRestrictions: boolean;
-  presetCode: boolean;
+  showCode: boolean;
   showTimeLeft: boolean;
   showUnitMenu: boolean;
   receiveRemoteCommands: boolean;
@@ -123,7 +123,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: false,
     forceTimeRestrictions: false,
     forceNaviRestrictions: false,
-    presetCode: true,
+    showCode: true,
     showTimeLeft: false,
     showUnitMenu: false,
     receiveRemoteCommands: false,
@@ -138,7 +138,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: true,
     forceTimeRestrictions: true,
     forceNaviRestrictions: true,
-    presetCode: false,
+    showCode: false,
     showTimeLeft: false,
     showUnitMenu: false,
     receiveRemoteCommands: true,
@@ -153,7 +153,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: true,
     forceTimeRestrictions: true,
     forceNaviRestrictions: true,
-    presetCode: false,
+    showCode: false,
     showTimeLeft: false,
     showUnitMenu: false,
     receiveRemoteCommands: true,
@@ -168,7 +168,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: false,
     forceTimeRestrictions: false,
     forceNaviRestrictions: false,
-    presetCode: true,
+    showCode: true,
     showTimeLeft: true,
     showUnitMenu: true,
     receiveRemoteCommands: false,
@@ -183,7 +183,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: true,
     forceTimeRestrictions: false,
     forceNaviRestrictions: false,
-    presetCode: true,
+    showCode: true,
     showTimeLeft: true,
     showUnitMenu: true,
     receiveRemoteCommands: false,
@@ -199,7 +199,7 @@ export const participantExecutionModeDefinitions: Record<
     saveResponses: false,
     forceTimeRestrictions: true,
     forceNaviRestrictions: true,
-    presetCode: false,
+    showCode: false,
     showTimeLeft: false,
     showUnitMenu: false,
     receiveRemoteCommands: false,
@@ -1415,6 +1415,7 @@ export type ParticipantCurrentRunState = {
       testletKey: string;
       displayLabel: string;
       prompt: string;
+      visibleCode: string | null;
     } | null;
   };
   availableActions: Array<

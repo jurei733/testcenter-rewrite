@@ -19502,25 +19502,19 @@ const resolveVisibleBookletUnits = (
 
 const resetNonSavingTestRunForEntry = (input: {
   booklet: ContentReleaseBookletEntry | undefined;
-  executionMode: ParticipantExecutionModeDefinition;
   testRun: TestRun;
   timestamp: string;
 }): TestRun => {
   // The original keeps these values only in Unit/Test-state buffers when
   // saveResponses is disabled. Returning to the starter therefore reopens the
   // same database test with its launch-equivalent, response-free state.
-  const resetUnlockedTestletKeys = input.executionMode.presetCode
-    ? input.booklet?.testletEntries
-        ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
-        .map(testlet => testlet.testletKey) ?? []
-    : [];
   const resetEvaluationRun = withEvaluatedBookletStates(input.booklet, {
     ...input.testRun,
     status: "running",
     locked: false,
     currentUnitKey: null,
     unitResponses: {},
-    unlockedTestletKeys: resetUnlockedTestletKeys,
+    unlockedTestletKeys: [],
     monitorNavigationUnlocked: false,
     testletTimers: {},
     lockedTestletKeys: [],
@@ -19532,16 +19526,14 @@ const resetNonSavingTestRunForEntry = (input: {
     input.booklet,
     resetEvaluationRun
   )[0];
-  const firstUnitRequiresCode =
-    input.executionMode.forceNaviRestrictions &&
-    !input.executionMode.presetCode &&
-    (firstVisibleUnit?.testletPath ?? []).some(testletKey =>
+  const firstUnitRequiresCode = (firstVisibleUnit?.testletPath ?? []).some(
+    testletKey =>
       Boolean(
         input.booklet?.testletEntries?.find(
           testlet => testlet.testletKey === testletKey
         )?.restrictions?.codeToEnter?.code
       )
-    );
+  );
 
   return {
     ...resetEvaluationRun,
@@ -19727,7 +19719,12 @@ const findTestletCodeGate = (input: {
         return {
           testletKey: testlet.testletKey,
           displayLabel: testlet.displayLabel,
-          prompt: testlet.restrictions.codeToEnter.prompt
+          prompt: testlet.restrictions.codeToEnter.prompt,
+          visibleCode: resolveParticipantExecutionMode(
+            input.testRun.executionMode
+          ).showCode
+            ? testlet.restrictions.codeToEnter.code
+            : null
         };
       }
     }
@@ -20562,7 +20559,7 @@ const resolveBookletNavigationState = (
         : currentResponse.trim()
           ? "complete"
           : "none";
-  const restrictionsBypassed =
+  const navigationRestrictionsBypassed =
     testRun.monitorNavigationUnlocked || !executionMode.forceNaviRestrictions;
   const backwardCompletenessReasons = bookletNavigationDeniedReasons({
     policy: completenessPolicy,
@@ -20576,10 +20573,10 @@ const resolveBookletNavigationState = (
     presentationProgress,
     responseProgress
   });
-  const backwardDeniedReasons = restrictionsBypassed
+  const backwardDeniedReasons = navigationRestrictionsBypassed
     ? []
     : [...backwardCompletenessReasons];
-  const forwardDeniedReasons = restrictionsBypassed
+  const forwardDeniedReasons = navigationRestrictionsBypassed
     ? []
     : [...forwardCompletenessReasons];
   const backwardAdvisoryReasons = executionMode.forceNaviRestrictions
@@ -20614,7 +20611,7 @@ const resolveBookletNavigationState = (
     previousUnitIndex >= 0 ? units[previousUnitIndex]?.unitKey ?? null : null;
   const nextUnitKey =
     nextUnitIndex >= 0 ? units[nextUnitIndex]?.unitKey ?? null : null;
-  const nextTestletGate = restrictionsBypassed
+  const nextTestletGate = testRun.monitorNavigationUnlocked
     ? null
     : findTestletCodeGate({
         booklet,
@@ -20645,7 +20642,7 @@ const resolveBookletNavigationState = (
   ) {
     backwardDeniedReasons.push("testlet_time_leave_forbidden");
   }
-  const remainingTestletGate = restrictionsBypassed
+  const remainingTestletGate = testRun.monitorNavigationUnlocked
     ? null
     : findTestletCodeGate({
         booklet,
@@ -20730,22 +20727,6 @@ const requireBookletNavigationAllowed = (input: {
   if (!targetIsVisible) {
     deniedReasons.push("adaptive_unit_hidden");
   }
-  if (!executionMode.forceNaviRestrictions) {
-    if (deniedReasons.length > 0) {
-      throw new FirstSliceError(
-        409,
-        "booklet_navigation_denied",
-        `Unit '${input.targetUnitKey}' is not part of the active booklet route.`,
-        {
-          currentUnitKey,
-          targetUnitKey: input.targetUnitKey,
-          direction,
-          deniedReasons
-        }
-      );
-    }
-    return;
-  }
   const directTestletGate =
     direction === "forward"
       ? findTestletCodeGate({
@@ -20760,6 +20741,23 @@ const requireBookletNavigationAllowed = (input: {
     !deniedReasons.includes("testlet_code_required")
   ) {
     deniedReasons.push("testlet_code_required");
+  }
+  if (!executionMode.forceNaviRestrictions) {
+    if (deniedReasons.length > 0) {
+      throw new FirstSliceError(
+        409,
+        "booklet_navigation_denied",
+        `Unit '${input.targetUnitKey}' is not part of the active booklet route.`,
+        {
+          currentUnitKey,
+          targetUnitKey: input.targetUnitKey,
+          direction,
+          deniedReasons,
+          ...(directTestletGate ? { testletGate: directTestletGate } : {})
+        }
+      );
+    }
+    return;
   }
   const closedTimedTestlet = findClosedTimedTestlet(
     booklet,
@@ -30497,11 +30495,7 @@ export const createFirstSliceServices = (
           locked: false,
           currentUnitKey: null,
           unitResponses: {},
-          unlockedTestletKeys: executionMode.presetCode
-            ? selectedBooklet.testletEntries
-                ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
-                .map(testlet => testlet.testletKey) ?? []
-            : [],
+          unlockedTestletKeys: [],
           monitorNavigationUnlocked: false,
           testletTimers: {},
           lockedTestletKeys: [],
@@ -30514,10 +30508,7 @@ export const createFirstSliceServices = (
           selectedBooklet,
           initialTestRun
         )[0];
-        const firstUnitRequiresCode =
-          executionMode.forceNaviRestrictions &&
-          !executionMode.presetCode &&
-          (firstUnit?.testletPath ?? []).some(
+        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
           testletKey =>
             Boolean(
               selectedBooklet.testletEntries?.find(
@@ -30625,7 +30616,6 @@ export const createFirstSliceServices = (
             );
             const resetRun = resetNonSavingTestRunForEntry({
               booklet,
-              executionMode,
               testRun: normalizedExistingRun,
               timestamp: now()
             });
@@ -31546,7 +31536,6 @@ export const createFirstSliceServices = (
           ? completedRun
           : resetNonSavingTestRunForEntry({
               booklet,
-              executionMode,
               testRun: completedRun,
               timestamp
             });

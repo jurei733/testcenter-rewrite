@@ -830,6 +830,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <span>{{ view.customText('booklet_codeToEnterTitle', 'Protected Block') }}</span>
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
               <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', gate.prompt || 'Enter the block code supplied by the test supervisor.') }}</p>
+              <p
+                *ngIf="gate.visibleCode as visibleCode"
+                id="participantRouteTestletVisibleCode"
+                class="participant-testlet-visible-code"
+                role="status"
+              >Das Freigabewort lautet <strong>{{ visibleCode }}</strong>.</p>
               <small id="participantRouteTestletGateWarning">{{ view.customText('booklet_codeToEnterWarning', 'Letters are entered in uppercase automatically.') }}</small>
             </div>
             <label *ngIf="!view.usesParticipantCodeKeypad">

@@ -9118,6 +9118,16 @@ try {
     }).toString()}`,
     { waitUntil: "domcontentloaded" }
   );
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: `Das Freigabewort lautet ${veronaTestletCode}.` })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockCode").inputValue(),
+    ""
+  );
+  await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
+  await page.locator("#participantRouteTestletUnlockButton").click();
   const advisoryVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await advisoryVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
   await page.waitForTimeout(1_500);
@@ -13098,6 +13108,17 @@ try {
         .locator("#participantRouteTestletGateLabel")
         .filter({ hasText: "Aufgabenblock" })
         .waitFor();
+      if (executionMode === "run-demo" || executionMode === "run-review") {
+        await page
+          .locator("#participantRouteTestletVisibleCode")
+          .filter({ hasText: "Das Freigabewort lautet Hase." })
+          .waitFor();
+      } else {
+        assert.equal(
+          await page.locator("#participantRouteTestletVisibleCode").count(),
+          0
+        );
+      }
       await page.locator("#participantRouteTestletUnlockCode").fill("hase");
       await page.locator("#participantRouteTestletUnlockButton").click();
     } else {
@@ -13139,7 +13160,17 @@ try {
     .filter({ hasText: "run-demo" })
     .waitFor();
   assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
-  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockCode").inputValue(),
+    ""
+  );
+  await expectButtonSelectorDisabled("#participantRouteNextUnitButton");
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
@@ -13193,7 +13224,12 @@ try {
       Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
   );
   assert.equal(resetDemoState.currentRunState.executionMode.saveResponses, false);
-  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
   await reopenedDemoController.frame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .waitFor({ timeout: 15_000 });
@@ -13215,7 +13251,16 @@ try {
     .waitFor();
   await page.locator("#participantRouteUnitRail").waitFor();
   await page.locator("#participantRouteReviewPanel").waitFor();
-  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockCode").inputValue(),
+    ""
+  );
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
@@ -13293,7 +13338,12 @@ try {
       Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
   );
   assert.equal(resetReviewState.currentRunState.executionMode.saveResponses, false);
-  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
   await reopenedReviewController.frame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .waitFor({ timeout: 15_000 });
@@ -13329,6 +13379,10 @@ try {
     .locator("#participantRouteTestletGatePrompt")
     .filter({ hasText: "Bitte gib das Freigabewort ein." })
     .waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletVisibleCode").count(),
+    0
+  );
   await page.locator("#participantRouteTestletUnlockCode").fill("hase");
   assert.equal(
     await page.locator("#participantRouteTestletUnlockCode").inputValue(),
@@ -13725,13 +13779,13 @@ try {
     loginKey: "Test_Ctrl-13",
     executionMode: "run-demo",
     forceTimeRestrictions: false,
-    requiresCode: false
+    requiresCode: true
   });
   const reviewTimedController = await enterOriginalControllerTimedTestlet({
     loginKey: "Test_Ctrl-14",
     executionMode: "run-review",
     forceTimeRestrictions: false,
-    requiresCode: false
+    requiresCode: true
   });
   await page
     .locator("#participantRouteTimerLifecycleMessage")

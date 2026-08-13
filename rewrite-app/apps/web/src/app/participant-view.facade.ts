@@ -138,6 +138,7 @@ type ParticipantPlayerState = {
     testletKey: string;
     displayLabel: string;
     prompt: string;
+    visibleCode: string | null;
   } | null;
   testletTimer: {
     testletKey: string;

@@ -2290,6 +2290,17 @@ pre {
   color: var(--muted);
 }
 
+.participant-testlet-gate .participant-testlet-visible-code {
+  border-left: 0.25rem solid var(--accent);
+  padding: 0.55rem 0.7rem;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.participant-testlet-gate .participant-testlet-visible-code strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.08em;
+}
+
 @media (max-width: 760px) {
   .participant-testlet-timer {
     grid-template-columns: 1fr;
