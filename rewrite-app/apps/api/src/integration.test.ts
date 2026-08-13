@@ -30270,6 +30270,175 @@ test("original Testcenter compatibility corpus preserves adaptive Mean evaluatio
   );
 });
 
+test("original Testcenter compatibility corpus preserves adaptive esoteric value comparisons", async () => {
+  const tenantKey = "integration-tenant-adaptive-esoteric-values";
+  const workspaceKey = "integration-workspace-adaptive-esoteric-values";
+  const bookletKey = "BOOKLET.ADAPTIVE.ESOTERIC-VALUES";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-adaptive-esoteric-values.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Adaptive Esoteric Values</Label></Metadata>
+          <States>
+            <State id="valid-values" label="Valid values">
+              <Option id="matched" label="Matched">
+                <If><Value of="null-value" from="decision-unit"/><Is equal="null"/></If>
+                <If><Value of="boolean-value" from="decision-unit"/><Is equal="false"/></If>
+                <If><Value of="number-array" from="decision-unit"/><Is equal="[0,2,3]"/></If>
+                <If><Value of="string-array" from="decision-unit"/><Is equal="[&quot;an&quot;,&quot;array&quot;,&quot;s&quot;,&quot;string&quot;,&quot;this&quot;]"/></If>
+                <If>
+                  <Sum><Value of="nan-source" from="decision-unit"/></Sum>
+                  <Is equal="NaN"/>
+                </If>
+                <If>
+                  <Sum><Value of="infinity-source" from="decision-unit"/></Sum>
+                  <Is equal="Infinity"/>
+                </If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+            <State id="malformed-object" label="Malformed object">
+              <Option id="empty" label="Incorrect empty-string coercion">
+                <If><Value of="object-value" from="decision-unit"/><Is equal=""/></If>
+              </Option>
+              <Option id="preserved" label="Preserved"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.ESOTERIC.DECISION" alias="decision-unit" label="Decision Unit"/>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "adaptive-esoteric-participant" }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    "valid-values": "pending",
+    "malformed-object": "preserved"
+  });
+
+  const unitResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: {
+        responses: JSON.stringify([
+          { id: "null-value", status: "VALUE_CHANGED", value: null },
+          { id: "boolean-value", status: "VALUE_CHANGED", value: false },
+          { id: "number-array", status: "VALUE_CHANGED", value: [0, 2, 3] },
+          {
+            id: "string-array",
+            status: "VALUE_CHANGED",
+            value: ["this", "s", "an", "string", "array"]
+          },
+          { id: "nan-source", status: "VALUE_CHANGED", value: "not-a-number" },
+          { id: "infinity-source", status: "VALUE_CHANGED", value: "Infinity" },
+          {
+            id: "object-value",
+            status: "VALUE_CHANGED",
+            value: { malformed: true }
+          }
+        ])
+      }
+    }
+  });
+  const saved = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse
+    }
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.testRun.bookletStates, {
+    "valid-values": "matched",
+    "malformed-object": "preserved"
+  });
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      testRun: { bookletStates: Record<string, string> };
+      adaptiveStates: Array<{
+        stateKey: string;
+        optionKey: string;
+        automaticOptionKey: string;
+      }>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(currentState.status, 200);
+  assert.deepEqual(currentState.body.currentRunState.testRun.bookletStates, {
+    "valid-values": "matched",
+    "malformed-object": "preserved"
+  });
+  assert.deepEqual(
+    currentState.body.currentRunState.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey,
+      state.automaticOptionKey
+    ]),
+    [
+      ["valid-values", "matched", "matched"],
+      ["malformed-object", "preserved", "preserved"]
+    ]
+  );
+});
+
 test("original Testcenter compatibility corpus limits adaptive responses to exact IQB-standard major 1", async () => {
   const tenantKey = "integration-tenant-adaptive-iqb-standard-version";
   const workspaceKey = "integration-workspace-adaptive-iqb-standard-version";

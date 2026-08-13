@@ -19047,8 +19047,13 @@ const adaptiveValueAsNumber = (value: unknown): number => {
   return truncate(Number(value));
 };
 
-const adaptiveValueAsComparable = (value: unknown): string | number => {
-  if (value === null) {
+const adaptiveValueAsComparable = (value: unknown): unknown => {
+  // Match IqbVariableUtil.variableValueAsComparable at runtime, including its
+  // deliberately shallow handling of malformed Player values. The Original
+  // converts nullish values and arrays/booleans, but leaves every other value
+  // untouched; coercing an object to an empty string could otherwise activate
+  // an authored `Value equal=""` route.
+  if (value == null) {
     return "null";
   }
   if (Array.isArray(value)) {
@@ -19057,7 +19062,7 @@ const adaptiveValueAsComparable = (value: unknown): string | number => {
   if (typeof value === "boolean") {
     return value ? "true" : "false";
   }
-  return typeof value === "number" || typeof value === "string" ? value : "";
+  return value;
 };
 
 const collectAdaptiveVariableKeys = (
@@ -19304,7 +19309,7 @@ const evaluateAdaptiveStates = (
   };
   const conditionSatisfied = (condition: BookletStateCondition): boolean => {
     const source = condition.source;
-    let value: string | number;
+    let value: unknown;
     if (
       source.type === "Code" ||
       source.type === "Value" ||
@@ -19367,7 +19372,10 @@ const evaluateAdaptiveStates = (
     switch (condition.expression.type) {
       case "equal":
         return value === expected ||
-          (Number.isNaN(value) && Number.isNaN(expected));
+          (typeof value === "number" &&
+            typeof expected === "number" &&
+            Number.isNaN(value) &&
+            Number.isNaN(expected));
       case "notEqual":
         return value !== expected;
       case "greaterThan":
