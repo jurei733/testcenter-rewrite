@@ -61,6 +61,20 @@ Starter views, an intersection-driven `Unten geht es weiter` control mirrors the
 Original's long-list affordance, scrolls the remaining actions into view, and
 disappears as soon as its bottom sentinel is visible.
 
+The running Participant view now mirrors the Original logo-to-Starter path
+without signing the participant out. The header logo and `Return to tests`
+action first settle the active Verona draft; saving modes require an accessible
+confirmation, become durably resumable at the same Unit, and record the
+Original-compatible `CONTROLLER=TERMINATED` state; an operator-paused run keeps
+its monitor pause and records `CONTROLLER=TERMINATED_PAUSED`. Demo, Review, and
+Simulation return the same run to their response-free launch state. Active
+timed-block and leave-once rules remain server-authoritative: forbidden timed
+exits stay in the Player, confirmations apply the authored timer/lock transition, and
+`lock_test_on_termination` reaches the Starter only after the durable whole-test
+lock is visible. The Starter then refreshes its in-progress/locked card from the
+server and can resume the same run; `Leave Session` remains the separate local
+sign-out action.
+
 Participant-authored and monitor-authored pauses are distinct durable states.
 A monitor pause removes the active Player and fallback response controls, cannot
 be bypassed through Participant Resume or session re-entry, and waits for an
@@ -508,6 +522,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/participant/sessions/{participantSessionId}/runtime-state`
 - `GET /api/v1/participant/sessions/{participantSessionId}/current-state`
 - `POST /api/v1/participant/starter:launch`
+- `POST /api/v1/participant/test-runs/:testRunId/return-to-starter`
 - `POST /api/v1/participant/test-runs/{testRunId}/save-progress`
 - `GET /api/v1/participant/test-runs/{testRunId}/reviews`
 - `POST /api/v1/participant/test-runs/{testRunId}/reviews`
@@ -641,6 +656,7 @@ The added read side now makes the first slice inspectable:
 - participant roster imports now carry original group-level `validFrom`, `validTo`, and `validFor` access windows through XML, JSON, and header-mapped CSV; scheduled and expired logins are rejected with stable 401/410 errors, relative validity starts with the first saved participant session and cannot be reset by closing a run or changing releases, the earlier relative/absolute deadline wins, persisted runtime access is rechecked, and roster/session cards plus CSV exports expose the non-secret timing policy
 - participant sign-in now rejects tenant-less workspace keys that exist in multiple tenants, forcing callers to provide `tenantKey` instead of silently binding to the wrong workspace
 - participant launch/resume can now carry an explicit `tenantKey` and `bookletKey`, and `POST /api/v1/participant/starter:launch` can sign in by tenant/workspace/login/group and start the selected booklet in one request
+- running participants can return to the Starter through the application logo or explicit action without losing their signed-in session. `POST /api/v1/participant/test-runs/:testRunId/return-to-starter` settles saving modes as resumable paused runs, resets non-saving modes for their next response-free attempt, enforces timed/leave/termination locks server-side, and returns the refreshed Starter projection atomically
 - participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses, and status/response-only saves retain the current unit for player clients that do not repeat the unit key on every save
 - participant current-state can now deliver imported Verona player HTML and exact inline or referenced unit definitions; the Angular participant route runs supported Verona 2–6 players in a sandboxed frame, exposes accessible queued, indeterminate-loading, and exact 100%-loaded host milestones with original per-login custom texts, exchanges start/state/navigation/runtime-error messages, merges separately reported unit/player state, persists the versioned envelope through coalescing autosave with visible retry, and restores it after session reload. Loading progress stays truthful to the in-browser `srcdoc` lifecycle instead of fabricating byte percentages for Player HTML and Unit definitions already resident in current state. A typed in-memory state avoids repeatedly parsing production-sized definitions, while foreground navigation pauses eager autosave and keeps separate Prev/Next controls independent from the optional unit menu. Browser smoke records the exact loading-phase order and executes the pinned original Verona 6 adaptive sample, the provenance-pinned official `verona-player-simple` 1.0.1/API-2, 2.1.0/API-3, 4.0.0/API-4, and 5.2.0/API-5 releases with their generation-specific state restoration, the independent official ABI 3.3.0 scripted-survey Player/API-2 with text and radio answer restoration, the independent official DAN 3.0.0 visual-assessment Player/API-2.1 with positioned multiline-text and multiple-choice restoration, and the byte-exact original IQB Aspect 2.12.3 player across its complete three-unit 17.4 booklet. Legacy data-part value kinds are retained so object-valued Simple-Player state plus ABI's JSON-string `allResponses` and DAN's JSON-string `all` state round-trip without Player-specific rewriting; the gates also render all four images from the 16.17 MB Aspect Voud definition, navigate forward/backward, and confirm restoration after reload
 - original `.itcr.zip` resource packages nested in import bundles are extracted with per-entry and aggregate size limits into immutable releases, served only through participant-session resource URLs, and exposed to Verona players through `playerConfig.directDownloadUrl`; full, single-range, and bounded multi-range responses carry exact lengths, `Accept-Ranges`/`Content-Range`, `multipart/byteranges`, controlled `206`/`416` semantics, and CORS-exposed range headers. Resource preflights explicitly allow `Range`, so an originless sandboxed player can use multi-range media requests. The same pinned original package can be uploaded separately beside a loose Booklet, Unit, definition, and Player: automatic workspace dependency resolution now has a cross-store gate proving immutable five-file lineage, nested extraction, participant current-state delivery, byte-exact retrieval, and range retrieval. The browser smoke gate independently verifies the prebuilt-package path plus single- and multi-range retrieval

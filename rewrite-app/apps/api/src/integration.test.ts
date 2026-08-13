@@ -9519,6 +9519,55 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       false
     );
 
+    const returnToStarterDuringMonitorPause = await requestJsonAt<{
+      testRun: { status: string; pauseSource?: string };
+      runtimeState: {
+        runtimeStatus: string;
+        availableAction: string;
+        latestTestRun: { status: string; pauseSource?: string } | null;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/return-to-starter`,
+      { method: "POST" }
+    );
+    assert.equal(returnToStarterDuringMonitorPause.status, 200);
+    assert.equal(returnToStarterDuringMonitorPause.body.testRun.status, "paused");
+    assert.equal(
+      returnToStarterDuringMonitorPause.body.testRun.pauseSource,
+      "monitor"
+    );
+    assert.equal(
+      returnToStarterDuringMonitorPause.body.runtimeState.runtimeStatus,
+      "in_progress"
+    );
+    assert.equal(
+      returnToStarterDuringMonitorPause.body.runtimeState.availableAction,
+      "resume"
+    );
+    assert.equal(
+      returnToStarterDuringMonitorPause.body.runtimeState.latestTestRun
+        ?.pauseSource,
+      "monitor"
+    );
+
+    const testLogsAfterPausedStarterReturn = await requestJsonAt<{
+      items: Array<{ testLog: { logKey: string; logContent: string } }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs",
+      { headers: { authorization } }
+    );
+    assert.equal(testLogsAfterPausedStarterReturn.status, 200);
+    assert.equal(
+      testLogsAfterPausedStarterReturn.body.items.some(
+        item =>
+          item.testLog.logKey === "CONTROLLER" &&
+          item.testLog.logContent === "TERMINATED_PAUSED"
+      ),
+      true
+    );
+
     const participantResumeDuringMonitorPause = await requestJsonAt<{
       error: string;
     }>(
@@ -35234,7 +35283,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.equal(completed.body.testRun.status, "completed");
 });
 
-test("lock_test_on_termination keeps a completed participant flow monitor-unlockable", async () => {
+test("returning to the starter applies lock_test_on_termination before exposing starter state", async () => {
   const tenantKey = "integration-tenant-termination-lock";
   const workspaceKey = "integration-workspace-termination-lock";
   const bookletKey = "BOOKLET.TERMINATION.LOCK";
@@ -35306,7 +35355,8 @@ test("lock_test_on_termination keeps a completed participant flow monitor-unlock
       currentUnitKey: string | null;
       completedAt: string | null;
     };
-  }>(`/api/v1/participant/test-runs/${testRunId}/complete`, {
+    runtimeState: { runtimeStatus: string; availableAction: string };
+  }>(`/api/v1/participant/test-runs/${testRunId}/return-to-starter`, {
     method: "POST",
     body: {}
   });
@@ -35315,6 +35365,8 @@ test("lock_test_on_termination keeps a completed participant flow monitor-unlock
   assert.equal(terminated.body.testRun.locked, true);
   assert.equal(terminated.body.testRun.currentUnitKey, unitKey);
   assert.equal(terminated.body.testRun.completedAt, null);
+  assert.equal(terminated.body.runtimeState.runtimeStatus, "locked");
+  assert.equal(terminated.body.runtimeState.availableAction, "none");
 
   const lockedRuntime = await requestJson<{
     runtimeState: { runtimeStatus: string; availableAction: string };
@@ -37481,6 +37533,48 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       ?.remainingSeconds,
     interruptedDemoTimer?.remainingSeconds
   );
+  const demoStarterReturn = await requestJson<{
+    testRun: {
+      testRunId: string;
+      status: string;
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, unknown>;
+    };
+    runtimeState: {
+      runtimeStatus: string;
+      availableAction: string;
+      booklets: Array<{ status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/return-to-starter`, {
+    method: "POST",
+    body: {
+      responseUnitKey: "UNIT.PROTECTED",
+      unitResponse: "Ephemeral demo response",
+      transientUnitResponses: {
+        "UNIT.PROTECTED": "Ephemeral demo response"
+      }
+    }
+  });
+  assert.equal(demoStarterReturn.status, 200);
+  assert.equal(demoStarterReturn.body.testRun.testRunId, demo.testRunId);
+  assert.equal(demoStarterReturn.body.testRun.status, "running");
+  assert.equal(demoStarterReturn.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.deepEqual(demoStarterReturn.body.testRun.unitResponses, {});
+  assert.deepEqual(demoStarterReturn.body.testRun.unlockedTestletKeys, []);
+  assert.deepEqual(demoStarterReturn.body.testRun.testletTimers, {});
+  assert.equal(demoStarterReturn.body.runtimeState.runtimeStatus, "in_progress");
+  assert.equal(demoStarterReturn.body.runtimeState.availableAction, "resume");
+  assert.deepEqual(
+    demoStarterReturn.body.runtimeState.booklets.map(booklet => booklet.status),
+    ["in_progress"]
+  );
+  const demoUnlockAfterStarterReturn = await requestJson(
+    `/api/v1/participant/test-runs/${demo.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(demoUnlockAfterStarterReturn.status, 200);
   assert.equal(demo.currentRunState.adaptiveStates[0]?.stateKey, "route");
   assert.equal(demo.currentRunState.adaptiveStates[0]?.optionKey, "basic");
   assert.equal(
@@ -37959,8 +38053,16 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       unlockedTestletKeys?: string[];
       testletTimers?: Record<string, unknown>;
     };
-  }>(`/api/v1/participant/sessions/${review.participantSessionId}/resume`, {
-    method: "POST"
+    runtimeState: { runtimeStatus: string; availableAction: string };
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/return-to-starter`, {
+    method: "POST",
+    body: {
+      responseUnitKey: "UNIT.FINISH",
+      unitResponse: "Review response must remain ephemeral",
+      transientUnitResponses: {
+        "UNIT.FINISH": "Review response must remain ephemeral"
+      }
+    }
   });
   assert.equal(reopenedReview.status, 200);
   assert.equal(reopenedReview.body.testRun.testRunId, review.testRunId);
@@ -37968,6 +38070,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(reopenedReview.body.testRun.unitResponses, {});
   assert.deepEqual(reopenedReview.body.testRun.unlockedTestletKeys, []);
   assert.deepEqual(reopenedReview.body.testRun.testletTimers, {});
+  assert.equal(reopenedReview.body.runtimeState.runtimeStatus, "in_progress");
+  assert.equal(reopenedReview.body.runtimeState.availableAction, "resume");
   const reviewsAfterReentry = await requestJson<{
     items: Array<{ reviewId: string; comment: string }>;
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
@@ -38406,13 +38510,111 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(visibleTrialRun.body.studyMonitorRun.reviewCount, 1);
 
   const hotReturnRun = await requestJson<{
-    testRun: { testRunId: string };
+    testRun: { testRunId: string; currentUnitKey: string | null };
   }>(
     `/api/v1/participant/sessions/${hotReturnFirst.body.participantSession.participantSessionId}/resume`,
     { method: "POST" }
   );
+  const hotReturnStarter = await requestJson<{
+    testRun: {
+      testRunId: string;
+      status: string;
+      currentUnitKey: string | null;
+      completedAt: string | null;
+    };
+    runtimeState: {
+      runtimeStatus: string;
+      availableAction: string;
+      booklets: Array<{ status: string }>;
+    };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(hotReturnStarter.status, 200);
+  assert.equal(
+    hotReturnStarter.body.testRun.testRunId,
+    hotReturnRun.body.testRun.testRunId
+  );
+  assert.equal(hotReturnStarter.body.testRun.status, "paused");
+  assert.equal(
+    hotReturnStarter.body.testRun.currentUnitKey,
+    hotReturnRun.body.testRun.currentUnitKey
+  );
+  assert.equal(hotReturnStarter.body.testRun.completedAt, null);
+  assert.equal(hotReturnStarter.body.runtimeState.runtimeStatus, "in_progress");
+  assert.equal(hotReturnStarter.body.runtimeState.availableAction, "resume");
+  assert.deepEqual(
+    hotReturnStarter.body.runtimeState.booklets.map(booklet => booklet.status),
+    ["in_progress"]
+  );
+  const resumedHotReturn = await requestJson<{
+    testRun: { testRunId: string; status: string; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/resume`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(resumedHotReturn.status, 200);
+  assert.equal(
+    resumedHotReturn.body.testRun.testRunId,
+    hotReturnRun.body.testRun.testRunId
+  );
+  assert.equal(resumedHotReturn.body.testRun.status, "running");
+  assert.equal(
+    resumedHotReturn.body.testRun.currentUnitKey,
+    hotReturnRun.body.testRun.currentUnitKey
+  );
+  const unlockedHotReturn = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/testlets/${protectedTestletKey}/unlock`,
+    { method: "POST", body: { code: "mode-code" } }
+  );
+  assert.equal(unlockedHotReturn.status, 200);
+  assert.equal(unlockedHotReturn.body.testRun.currentUnitKey, "UNIT.INTRO");
+  const hotReturnAtProtected = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        currentUnitKey: "UNIT.PROTECTED",
+        responseUnitKey: "UNIT.INTRO",
+        unitResponse: JSON.stringify({
+          kind: "verona_unit_state",
+          version: 1,
+          unitState: {
+            presentationProgress: "complete",
+            responseProgress: "complete"
+          }
+        }),
+        status: "running"
+      }
+    }
+  );
+  assert.equal(hotReturnAtProtected.status, 200);
+  assert.equal(hotReturnAtProtected.body.testRun.currentUnitKey, "UNIT.PROTECTED");
+  const blockedHotReturnStarter = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(blockedHotReturnStarter.status, 409);
+  assert.equal(
+    blockedHotReturnStarter.body.error,
+    "booklet_starter_return_denied"
+  );
+  assert.deepEqual(blockedHotReturnStarter.body.details?.deniedReasons, [
+    "testlet_time_leave_forbidden"
+  ]);
   const hotReturnState = await requestJson<{
-    currentRunState: { availableActions: string[] };
+    currentRunState: {
+      availableActions: string[];
+      currentUnit: { unitKey: string | null };
+    };
   }>(
     `/api/v1/participant/sessions/${hotReturnFirst.body.participantSession.participantSessionId}/current-state`
   );
@@ -38421,6 +38623,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       "change_state_options"
     ),
     false
+  );
+  assert.equal(
+    hotReturnState.body.currentRunState.currentUnit.unitKey,
+    "UNIT.PROTECTED"
   );
   const deniedHotStateChange = await requestJson<{ error: string }>(
     `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/adaptive-states/route`,

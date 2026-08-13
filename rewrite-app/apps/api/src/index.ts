@@ -132,6 +132,8 @@ import {
   type ResumeParticipantSessionRequest,
   type ResumeTestRunResponse,
   type ResumeParticipantSessionResponse,
+  type ReturnTestRunToStarterRequest,
+  type ReturnTestRunToStarterResponse,
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
   type ReplaceSourcePackageRequest,
@@ -2046,6 +2048,9 @@ const resumeSessionPattern = createRoutePattern(
 const resumeRunPattern = createRoutePattern(
   productionApiRoutes.participant.resumeRun
 );
+const returnToStarterPattern = createRoutePattern(
+  productionApiRoutes.participant.returnToStarter
+);
 const completeRunPattern = createRoutePattern(
   productionApiRoutes.participant.completeRun
 );
@@ -3239,6 +3244,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", unlockTestletPattern, productionApiRoutes.participant.unlockTestlet],
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
+    [
+      "POST",
+      returnToStarterPattern,
+      productionApiRoutes.participant.returnToStarter
+    ],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
     ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
     ["GET", monitorEventStreamPattern, productionApiRoutes.monitor.eventStream],
@@ -8181,6 +8191,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           testRunId
         });
         sendJson<ResumeTestRunResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const returnToStarterMatch = returnToStarterPattern.exec(pathname);
+      if (request.method === "POST" && returnToStarterMatch?.groups) {
+        const testRunId = decodeRouteGroup(
+          returnToStarterMatch.groups.testRunId
+        );
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+
+        const body =
+          await readOptionalRequestJsonBody<ReturnTestRunToStarterRequest>();
+        const testRun = await services.participantRuntime.returnToStarter({
+          testRunId,
+          responseUnitKey: body?.responseUnitKey,
+          unitResponse: body?.unitResponse,
+          transientUnitResponses: body?.transientUnitResponses,
+          confirmTestletTimeLeave: body?.confirmTestletTimeLeave,
+          confirmTestletLeaveLock: body?.confirmTestletLeaveLock
+        });
+        const runtimeState = await services.participantRuntime.getRuntimeState({
+          participantSessionId: testRun.participantSessionId
+        });
+        sendJson<ReturnTestRunToStarterResponse>(response, 200, {
+          testRun,
+          runtimeState
+        });
         return;
       }
 

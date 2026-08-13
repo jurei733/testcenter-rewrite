@@ -37,6 +37,19 @@
   flex: 0 0 auto;
 }
 
+.application-logo-button {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.application-logo-button:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 4px;
+}
+
 .participant-topbar h1 {
   margin: 10px 0 0;
   font-size: clamp(30px, 7vw, 52px);

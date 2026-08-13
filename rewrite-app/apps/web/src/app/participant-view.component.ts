@@ -362,6 +362,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               (click)="view.copySessionEntryLink(view.player.sessionEntryLink)"
             >{{ view.isSessionEntryLinkCopied(view.player.sessionEntryLink) ? "Copied" : "Copy Session Link" }}</button>
             <button
+              id="participantRouteReturnToStarterButton"
+              class="secondary"
+              type="button"
+              (click)="view.returnToStarter()"
+            >Return to tests</button>
+            <button
               *ngIf="view.player.canClearSession"
               id="participantRouteClearSessionButton"
               class="ghost"

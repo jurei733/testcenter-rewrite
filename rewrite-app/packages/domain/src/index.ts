@@ -268,6 +268,7 @@ export type WorkspaceActivityEventType =
   | "testlet_leave_lock_activated"
   | "test_run_progress_saved"
   | "test_run_resumed"
+  | "test_run_returned_to_starter"
   | "test_run_locked"
   | "test_run_completed"
   | "monitor_run_command_issued"
@@ -300,6 +301,7 @@ export const workspaceActivityEventTypes = [
   "testlet_leave_lock_activated",
   "test_run_progress_saved",
   "test_run_resumed",
+  "test_run_returned_to_starter",
   "test_run_locked",
   "test_run_completed",
   "monitor_run_command_issued",

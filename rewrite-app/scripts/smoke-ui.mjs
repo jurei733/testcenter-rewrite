@@ -6635,6 +6635,63 @@ try {
     { timeout: 15_000 }
   );
   await page.locator("#participantRouteReloadButton").waitFor();
+  await page.locator("#participantRouteReturnToStarterButton").waitFor();
+  await page.locator("#participantApplicationLogoButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Return to test selection?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({ hasText: "saved progress" })
+    .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page.locator("#participantConfirmationBackdrop").waitFor({
+    state: "detached"
+  });
+  await page.waitForFunction(
+    expectedRunId =>
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteEntry") == null,
+    participantEntryStartedRunId
+  );
+  await page.locator("#participantApplicationLogoButton").click();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "signed_in" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        "no run yet" &&
+      document.querySelector("#participantRouteEntry") != null,
+    undefined,
+    { timeout: 15_000 }
+  );
+  const starterRuntimeState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/runtime-state`,
+    payload =>
+      payload?.runtimeState?.latestTestRun?.testRunId ===
+        participantEntryStartedRunId &&
+      payload.runtimeState.latestTestRun.status === "paused" &&
+      payload.runtimeState.runtimeStatus === "in_progress" &&
+      payload.runtimeState.availableAction === "resume"
+  );
+  assert.deepEqual(
+    starterRuntimeState.runtimeState.booklets.map(booklet => booklet.status),
+    ["in_progress"]
+  );
+  await page.locator("#participantRouteStartOrResumeButton").click();
+  await page.waitForFunction(
+    expectedRunId =>
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteEntry") == null,
+    participantEntryStartedRunId,
+    { timeout: 15_000 }
+  );
   stopAfter("participant-entry-start-after-sign-in");
 
   logStep("participant-entry-review-comments");

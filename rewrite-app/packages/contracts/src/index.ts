@@ -306,6 +306,8 @@ export const productionApiRoutes = {
       "/api/v1/participant/test-runs/:testRunId/testlets/:testletKey/unlock",
     resumeSession: "/api/v1/participant/sessions/:participantSessionId/resume",
     resumeRun: "/api/v1/participant/test-runs/:testRunId/resume",
+    returnToStarter:
+      "/api/v1/participant/test-runs/:testRunId/return-to-starter",
     completeRun: "/api/v1/participant/test-runs/:testRunId/complete"
   },
   monitor: {
@@ -942,6 +944,8 @@ export type CompleteTestRunRequest = {
   confirmTestletLeaveLock?: boolean;
 };
 
+export type ReturnTestRunToStarterRequest = CompleteTestRunRequest;
+
 export type CreateTenantResponse = {
   tenant: Tenant;
 };
@@ -1405,6 +1409,11 @@ export type ResumeParticipantSessionResponse = {
 
 export type ResumeTestRunResponse = {
   testRun: TestRun;
+};
+
+export type ReturnTestRunToStarterResponse = {
+  testRun: TestRun;
+  runtimeState: ParticipantRuntimeState;
 };
 
 export type CompleteTestRunResponse = {

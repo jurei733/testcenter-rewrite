@@ -16,6 +16,8 @@ import type {
   ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
+  ReturnTestRunToStarterRequest,
+  ReturnTestRunToStarterResponse,
   SaveTestRunProgressRequest,
   SaveTestRunProgressResponse,
   SaveParticipantTestLogsRequest,
@@ -429,7 +431,9 @@ export class ParticipantViewFacade {
     this.queuePendingVeronaSaveForBackgroundDelivery();
   };
   private readonly leaveSessionListener = (): void => {
-    this.clearSession();
+    if (this.isParticipantPlayerFocused) {
+      this.returnToStarter();
+    }
   };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
     this.refreshCurrentStateInternal(true);
@@ -2524,6 +2528,15 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() => this.completeRunWithConfirmation());
   }
 
+  returnToStarter(): void {
+    if (!this.isParticipantPlayerFocused) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.returnToStarterWithConfirmation()
+    );
+  }
+
   resolveConfirmation(confirmed: boolean): void {
     const resolve = this.confirmationResolver;
     this.confirmationResolver = null;
@@ -2640,6 +2653,80 @@ export class ParticipantViewFacade {
       return;
     }
     await this.completeRunInternal(
+      confirmTestletTimeLeave,
+      confirmTestletLeaveLock
+    );
+  }
+
+  private async returnToStarterWithConfirmation(): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (!currentState) {
+      return;
+    }
+    if (
+      currentState.executionMode.saveResponses &&
+      !(await this.requestConfirmation({
+        title: "Return to test selection?",
+        message: "Your saved progress will remain available.",
+        cancelLabel: "Continue working",
+        confirmLabel: "Return to tests"
+      }))
+    ) {
+      return;
+    }
+
+    const timer = this.player.testletTimer;
+    if (
+      currentState.executionMode.forceTimeRestrictions &&
+      timer?.leave === "forbidden"
+    ) {
+      this.clearNavigationAdvisory();
+      this.navigationAdvisory.set({
+        title: this.customText(
+          "booklet_warningLeaveTimerBlockTitle",
+          "Leave timed block?"
+        ),
+        message: this.customText(
+          "booklet_warningLeaveTimerBlockTextPrompt",
+          `The timed block "${timer.displayLabel}" cannot be left while its timer is active.`
+        )
+      });
+      return;
+    }
+    const confirmTestletTimeLeave =
+      currentState.executionMode.forceTimeRestrictions &&
+      timer?.leave === "confirm";
+    if (
+      confirmTestletTimeLeave &&
+      !(await this.requestConfirmation({
+        title: this.customText(
+          "booklet_warningLeaveTimerBlockTitle",
+          "Leave timed block?"
+        ),
+        message: this.customText(
+          "booklet_warningLeaveTimerBlockTextPrompt",
+          `Leave the timed block "${timer.displayLabel}" and close it permanently?`
+        ),
+        cancelLabel: "Stay here",
+        confirmLabel: "Leave anyway"
+      }))
+    ) {
+      return;
+    }
+    const confirmTestletLeaveLock = this.player.leaveLock?.confirm === true;
+    if (
+      confirmTestletLeaveLock &&
+      !(await this.requestConfirmation({
+        title: this.leaveLockConfirmationTitle(this.player.leaveLock),
+        message: this.leaveLockConfirmationText(this.player.leaveLock),
+        cancelLabel: "Stay here",
+        confirmLabel: "Leave anyway"
+      }))
+    ) {
+      return;
+    }
+
+    await this.returnToStarterInternal(
       confirmTestletTimeLeave,
       confirmTestletLeaveLock
     );
@@ -3452,6 +3539,74 @@ export class ParticipantViewFacade {
         true
       );
     }
+  }
+
+  private async returnToStarterInternal(
+    confirmTestletTimeLeave: boolean,
+    confirmTestletLeaveLock: boolean
+  ): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (!currentState) {
+      return;
+    }
+    const saveResponses = currentState.executionMode.saveResponses;
+    const settledVeronaResponse =
+      await this.settleVeronaAutoSaveBeforeForegroundAction();
+    await this.saveCurrentDraftBeforeCompleteInternal(settledVeronaResponse);
+
+    const payload =
+      await this.requestState.request<ReturnTestRunToStarterResponse>(
+        "Participant Return To Starter",
+        "POST",
+        resolveRoutePath(productionApiRoutes.participant.returnToStarter, {
+          testRunId: this.runtime.testRunId.trim()
+        }),
+        {
+          responseUnitKey: saveResponses
+            ? undefined
+            : this.runtime.currentUnitKey.trim() || undefined,
+          unitResponse: saveResponses
+            ? undefined
+            : this.runtime.currentUnitResponse,
+          transientUnitResponses: saveResponses
+            ? undefined
+            : this.ephemeralUnitResponseRecord(
+                this.runtime.testRunId.trim()
+              ),
+          confirmTestletTimeLeave,
+          confirmTestletLeaveLock
+        } satisfies ReturnTestRunToStarterRequest
+      );
+
+    this.participantEvents.stop();
+    discardParticipantSaveOutboxForRun(payload.testRun.testRunId);
+    this.pendingVeronaSave = null;
+    this.optimisticVeronaResponse = null;
+    this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
+    this.currentRunState = null;
+    this.activeControllerError.set(null);
+    this.loadedBookletAssets.set(null);
+    this.runtime.testRunId = "";
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentUnitResponse = "";
+    this.syncParticipantSessionFields(payload.runtimeState.participantSession);
+    this.syncParticipantRosterEntry(payload.runtimeState.participantRosterEntry);
+    this.syncRuntimeBooklets(payload.runtimeState.booklets);
+    this.syncParticipantHeaderVisibility();
+    this.runtime.currentRunStateView = prettyPrintJson(
+      {
+        status: "participant_returned_to_starter",
+        testRun: payload.testRun,
+        runtimeState: payload.runtimeState
+      },
+      this.runtime.currentRunStateView
+    );
+    this.runtime.runtimeMonitorView = prettyPrintJson(
+      payload,
+      this.runtime.runtimeMonitorView
+    );
+    this.resetTimerLifecyclePresentation();
+    this.persistState();
   }
 
   private async saveCurrentDraftBeforeCompleteInternal(

@@ -767,6 +767,14 @@ export type ParticipantRuntimePort = {
     code: string;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
+  returnToStarter(input: {
+    testRunId: string;
+    responseUnitKey?: string | null;
+    unitResponse?: string | null;
+    transientUnitResponses?: Record<string, string>;
+    confirmTestletTimeLeave?: boolean;
+    confirmTestletLeaveLock?: boolean;
+  }): Promise<TestRun>;
   completeRun(input: {
     testRunId: string;
     responseUnitKey?: string | null;
@@ -31409,6 +31417,257 @@ export const createFirstSliceServices = (
           }
         });
         return effectiveRun;
+      },
+      async returnToStarter(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(testRunId);
+
+        if (!storedTestRun) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found.`
+          );
+        }
+
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
+
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: normalizeTestRun(storedTestRun),
+          timestamp
+        });
+        requireParticipantTestRunUnlocked(testRun);
+        if (testRun.status === "completed") {
+          return testRun;
+        }
+
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
+        );
+        const executionMode = resolveParticipantExecutionMode(
+          testRun.executionMode
+        );
+        const responseUnitKey =
+          input.responseUnitKey === undefined
+            ? testRun.currentUnitKey
+            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        if (responseUnitKey) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            responseUnitKey
+          );
+        }
+        const transientUnitResponses = normalizeTransientUnitResponses(
+          input.transientUnitResponses
+        );
+        if (
+          executionMode.saveResponses &&
+          Object.keys(transientUnitResponses).length > 0
+        ) {
+          throw new FirstSliceError(
+            400,
+            "transient_unit_responses_not_allowed",
+            "transientUnitResponses are only accepted for non-saving execution modes."
+          );
+        }
+        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            transientUnitKey
+          );
+        }
+        const hasTransientEvaluation =
+          !executionMode.saveResponses &&
+          (Object.keys(transientUnitResponses).length > 0 ||
+            Boolean(responseUnitKey && unitResponse != null));
+        const returnEvaluationRun = hasTransientEvaluation
+          ? withEvaluatedBookletStates(booklet, {
+              ...testRun,
+              unitResponses: {
+                ...testRun.unitResponses,
+                ...transientUnitResponses,
+                ...(responseUnitKey && unitResponse != null
+                  ? { [responseUnitKey]: unitResponse }
+                  : {})
+              }
+            })
+          : testRun;
+        const leavingTimedTestlet = resolveLeavingTimedTestlet(
+          booklet,
+          returnEvaluationRun,
+          null
+        );
+        const leavePolicy =
+          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+        if (
+          executionMode.forceTimeRestrictions &&
+          leavePolicy === "forbidden"
+        ) {
+          throw new FirstSliceError(
+            409,
+            "booklet_starter_return_denied",
+            `Run '${testRunId}' cannot return to the starter while the active timed block forbids leaving.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: ["testlet_time_leave_forbidden"]
+            }
+          );
+        }
+        if (
+          executionMode.forceTimeRestrictions &&
+          leavePolicy === "confirm" &&
+          !input.confirmTestletTimeLeave
+        ) {
+          throw new FirstSliceError(
+            409,
+            "booklet_starter_return_denied",
+            `Run '${testRunId}' cannot return to the starter without confirming that the active timed block will be closed.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: ["testlet_time_leave_confirmation_required"]
+            }
+          );
+        }
+        const leavingLock = executionMode.forceNaviRestrictions
+          ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
+          : null;
+        if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {
+          throw new FirstSliceError(
+            409,
+            "booklet_starter_return_denied",
+            `Run '${testRunId}' cannot return to the starter without confirming that the active leave lock will be applied.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: ["testlet_leave_confirmation_required"]
+            }
+          );
+        }
+
+        const timeAdjustedRun =
+          leavingTimedTestlet &&
+          (leavePolicy === "allowed" ||
+            (executionMode.forceTimeRestrictions &&
+              leavePolicy === "confirm" &&
+              input.confirmTestletTimeLeave))
+            ? cancelTestletTimerAfterLeave(
+                returnEvaluationRun,
+                leavingTimedTestlet.testletKey,
+                timestamp
+              )
+            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+              ? interruptTestletTimerAfterLeave(
+                  returnEvaluationRun,
+                  leavingTimedTestlet.testletKey,
+                  timestamp
+                )
+              : returnEvaluationRun;
+        const returnBaseRun = leavingLock
+          ? activateCurrentLeaveLock(timeAdjustedRun, leavingLock)
+          : timeAdjustedRun;
+        const lockOnTermination =
+          executionMode.monitorable &&
+          booklet?.policy?.completion.lockOnTermination === true;
+        const returnedRun = executionMode.saveResponses
+          ? normalizeTestRun({
+              ...transitionTestletTimersForRunStatus(
+                returnBaseRun,
+                "paused",
+                timestamp
+              ),
+              locked: lockOnTermination,
+              updatedAt: timestamp,
+              completedAt: null
+            })
+          : resetNonSavingTestRunForEntry({
+              booklet,
+              testRun: returnBaseRun,
+              timestamp
+            });
+
+        await repository.saveTestRun(returnedRun);
+        if (executionMode.saveResponses) {
+          const returnedStateEntries: ParticipantTestLogEntryInput[] = [];
+          if (testletTimerStateChanged(testRun, returnedRun)) {
+            returnedStateEntries.push(
+              buildTestletTimeLeftTestStateEntry(returnedRun, timestamp)
+            );
+          }
+          if (leavingLock) {
+            returnedStateEntries.push(
+              buildLeaveLockTestStateEntry({
+                booklet,
+                testRun: returnedRun,
+                leaveLock: leavingLock,
+                timestamp: Date.parse(timestamp)
+              })
+            );
+          }
+          returnedStateEntries.push({
+            key: "CONTROLLER",
+            timeStamp: Date.parse(timestamp),
+            content: lockOnTermination
+              ? "LOCKED"
+              : testRun.status === "paused" && testRun.pauseSource === "monitor"
+                ? "TERMINATED_PAUSED"
+                : "TERMINATED"
+          });
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
+              testRun: returnedRun,
+              batches: [{ entries: returnedStateEntries }]
+            })
+          );
+        }
+
+        await recordWorkspaceActivity({
+          tenantId: returnedRun.tenantId,
+          workspaceId: returnedRun.workspaceId,
+          eventType: lockOnTermination
+            ? "test_run_locked"
+            : "test_run_returned_to_starter",
+          subjectType: "test_run",
+          subjectId: returnedRun.testRunId,
+          summary: lockOnTermination
+            ? `Run '${returnedRun.testRunId}' locked after participant termination.`
+            : `Run '${returnedRun.testRunId}' returned to the participant starter.`,
+          details: {
+            currentUnitKey: returnedRun.currentUnitKey,
+            lockOnTermination,
+            executionMode: executionMode.mode
+          }
+        });
+        if (leavingLock) {
+          await recordWorkspaceActivity({
+            tenantId: returnedRun.tenantId,
+            workspaceId: returnedRun.workspaceId,
+            eventType: "testlet_leave_lock_activated",
+            subjectType: "test_run",
+            subjectId: returnedRun.testRunId,
+            summary:
+              leavingLock.scope === "testlet"
+                ? `Block '${leavingLock.testlet.testletKey}' locked while returning to the starter.`
+                : `Unit '${leavingLock.unit.unitKey}' locked while returning to the starter.`,
+            details: {
+              scope: leavingLock.scope,
+              testletKey: leavingLock.testlet.testletKey,
+              unitKey: leavingLock.unit.unitKey,
+              reason: "participant_starter_return"
+            }
+          });
+        }
+
+        return returnedRun;
       },
       async completeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);

@@ -191,12 +191,20 @@
       class="participant-topbar"
     >
       <div class="application-brand">
-        <img
-          id="applicationLogo"
-          class="application-logo"
-          [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
-          [alt]="applicationSettings.settings().appTitle + ' logo'"
-        />
+        <button
+          id="participantApplicationLogoButton"
+          class="application-logo-button"
+          type="button"
+          aria-label="Return to test selection"
+          (click)="leaveParticipantSession()"
+        >
+          <img
+            id="applicationLogo"
+            class="application-logo"
+            [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
+            [alt]="applicationSettings.settings().appTitle + ' logo'"
+          />
+        </button>
         <div>
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
           <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
