@@ -19288,7 +19288,13 @@ const evaluateAdaptiveStates = (
         value = values.reduce((sum: number, item: number) => sum + item, 0);
       } else if (aggregation.type === "Mean") {
         value = values.length > 0
-          ? values.reduce((sum: number, item: number) => sum + item, 0) / values.length
+          // Preserve the Original aggregator's evaluation order. Dividing each
+          // summand before adding can differ from dividing the final sum at the
+          // six-decimal truncation boundary used by adaptive comparisons.
+          ? values.reduce(
+              (mean: number, item: number) => mean + item / values.length,
+              0
+            )
           : Number.NaN;
       } else {
         const sorted = [...values].sort((left, right) => left - right);

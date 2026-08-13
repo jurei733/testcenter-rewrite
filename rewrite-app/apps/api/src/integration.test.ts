@@ -29552,6 +29552,161 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   );
 });
 
+test("original Testcenter compatibility corpus preserves adaptive Mean evaluation order", async () => {
+  const tenantKey = "integration-tenant-adaptive-mean-order";
+  const workspaceKey = "integration-workspace-adaptive-mean-order";
+  const bookletKey = "BOOKLET.ADAPTIVE.MEAN-ORDER";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-adaptive-mean-order.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Adaptive Mean Order</Label></Metadata>
+          <States>
+            <State id="mean-route" label="Mean route">
+              <Option id="original" label="Original evaluation order">
+                <If>
+                  <Mean>
+                    <Value of="first" from="decision-unit"/>
+                    <Value of="second" from="decision-unit"/>
+                    <Value of="third" from="decision-unit"/>
+                  </Mean>
+                  <Is equal="754.86914"/>
+                </If>
+              </Option>
+              <Option id="sum-first" label="Sum-first evaluation order">
+                <If>
+                  <Mean>
+                    <Value of="first" from="decision-unit"/>
+                    <Value of="second" from="decision-unit"/>
+                    <Value of="third" from="decision-unit"/>
+                  </Mean>
+                  <Is equal="754.869141"/>
+                </If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.MEAN.DECISION" alias="decision-unit" label="Decision Unit"/>
+            <Testlet id="original-block">
+              <Restrictions><Show if="mean-route" is="original"/></Restrictions>
+              <Unit id="UNIT.MEAN.ORIGINAL" alias="original-route" label="Original Route"/>
+            </Testlet>
+            <Testlet id="sum-first-block">
+              <Restrictions><Show if="mean-route" is="sum-first"/></Restrictions>
+              <Unit id="UNIT.MEAN.SUM-FIRST" alias="sum-first-route" label="Sum-first Route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="mean-route" is="pending"/></Restrictions>
+              <Unit id="UNIT.MEAN.PENDING" alias="pending-route" label="Pending Route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "adaptive-mean-order-participant" }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    "mean-route": "pending"
+  });
+
+  const unitResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: {
+        responses: JSON.stringify([
+          { id: "first", status: "VALUE_CHANGED", value: 310.433898 },
+          { id: "second", status: "VALUE_CHANGED", value: 979.473635 },
+          { id: "third", status: "VALUE_CHANGED", value: 974.69989 }
+        ])
+      }
+    }
+  });
+  const saved = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse
+    }
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.testRun.bookletStates, {
+    "mean-route": "original"
+  });
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "original-route"]
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "original-route"
+  );
+});
+
 test("original coding schemes derive adaptive variables server-side", async () => {
   const tenantKey = "integration-tenant-adaptive-coding";
   const workspaceKey = "integration-workspace-adaptive-coding";
