@@ -2657,7 +2657,8 @@ try {
       '"Smoke PDF Viewer"',
       '"Netzwerktyp nach Leistung"',
       '"smoke-5g"',
-      '"42.5"'
+      '"42.5"',
+      "System check answer"
     ]) {
       assert.match(systemCheckReportCsv, new RegExp(expectedValue));
     }
@@ -2747,6 +2748,28 @@ try {
       await readFile(systemCheckReportJsonPath, "utf8")
     );
     assert.equal(exportedSystemCheckReports.length, 2);
+    const savedSystemCheckReport = exportedSystemCheckReports.find(
+      report => report.title === "UI Smoke System Check"
+    );
+    assert.ok(
+      savedSystemCheckReport,
+      "UI smoke expected the participant-saved report in the JSON export."
+    );
+    assert.deepEqual(savedSystemCheckReport.unit, []);
+    assert.equal(savedSystemCheckReport.responses?.length, 1);
+    assert.equal(savedSystemCheckReport.responses[0]?.id, "answers");
+    assert.match(
+      savedSystemCheckReport.responses[0]?.content ?? "",
+      /System check answer/
+    );
+    assert.equal(
+      savedSystemCheckReport.responses[0]?.responseType,
+      "iqb-standard@1.3"
+    );
+    assert.equal(
+      Number.isFinite(savedSystemCheckReport.responses[0]?.ts),
+      true
+    );
     assert.ok(
       exportedSystemCheckReports.some(
         report =>

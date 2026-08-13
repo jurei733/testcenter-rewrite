@@ -62,6 +62,47 @@ type ThroughputResult = {
   repetitions: number;
 };
 
+type SystemCheckUnitResponse = {
+  dataParts: Record<string, string>;
+  responseType: string;
+};
+
+const readSystemCheckUnitResponse = (
+  value: string
+): SystemCheckUnitResponse | null => {
+  try {
+    const parsed = JSON.parse(value) as {
+      kind?: unknown;
+      unitState?: {
+        dataParts?: unknown;
+        unitStateDataType?: unknown;
+      };
+    };
+    if (
+      parsed.kind !== "verona_unit_state" ||
+      typeof parsed.unitState?.dataParts !== "object" ||
+      parsed.unitState.dataParts === null ||
+      Array.isArray(parsed.unitState.dataParts)
+    ) {
+      return null;
+    }
+    const dataParts = Object.fromEntries(
+      Object.entries(parsed.unitState.dataParts).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string"
+      )
+    );
+    return {
+      dataParts,
+      responseType:
+        typeof parsed.unitState.unitStateDataType === "string"
+          ? parsed.unitState.unitStateDataType
+          : ""
+    };
+  } catch {
+    return null;
+  }
+};
+
 @Component({
   selector: "app-system-check-view",
   standalone: true,
@@ -367,6 +408,7 @@ type ThroughputResult = {
                 <div *ngFor="let entry of report.network"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
                 <div *ngFor="let entry of report.questionnaire"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
                 <div *ngFor="let entry of report.unit"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngIf="hasReportResponses(report.responses)"><dt>Responses</dt><dd>{{ formatReportResponses(report.responses) }}</dd></div>
               </dl>
             </section>
             <small *ngIf="!hasAdminSession">Sign in under Diagnostics first.</small>
@@ -447,8 +489,6 @@ export class SystemCheckViewComponent implements OnInit {
   networkStatusMessage = "Measurement has not started.";
   networkBusy = false;
   unitResponse = "";
-  unitStartedAt = 0;
-  unitLoadingTimeMs: number | null = null;
   reportTitle = "System Check Report";
   reportKey = "";
   systemCheckUsername = "";
@@ -556,8 +596,7 @@ export class SystemCheckViewComponent implements OnInit {
     return (
       this.environmentEntries.length +
       this.networkEntries.length +
-      this.questionnaireEntries.length +
-      this.unitEntries.length
+      this.questionnaireEntries.length
     );
   }
 
@@ -578,28 +617,6 @@ export class SystemCheckViewComponent implements OnInit {
           (value === undefined || value === null || value === "" || value === false)
       }];
     });
-  }
-
-  get unitEntries(): SystemCheckReportEntry[] {
-    if (!this.systemCheck?.unit) {
-      return [];
-    }
-    return [
-      {
-        id: "loading-time",
-        type: "unit/player",
-        label: "loading time",
-        value: this.unitLoadingTimeMs,
-        warning: !this.systemCheck.unit.playerHtml
-      },
-      {
-        id: "unit-response",
-        type: "unit/player",
-        label: "unit response",
-        value: this.unitResponse,
-        warning: false
-      }
-    ];
   }
 
   get hasAdminSession(): boolean {
@@ -743,7 +760,6 @@ export class SystemCheckViewComponent implements OnInit {
         ? "Network measurement is skipped by configuration."
         : "Measurement has not started.";
       this.unitResponse = "";
-      this.unitLoadingTimeMs = null;
       this.savedReport = null;
       this.operatorReports = [];
       this.step = "welcome";
@@ -760,9 +776,6 @@ export class SystemCheckViewComponent implements OnInit {
   setStep(step: SystemCheckStep): void {
     if (!this.steps.includes(step)) return;
     this.step = step;
-    if (step === "unit" && !this.unitStartedAt) {
-      this.unitStartedAt = performance.now();
-    }
   }
 
   previousStep(): void {
@@ -1060,9 +1073,17 @@ export class SystemCheckViewComponent implements OnInit {
 
   onUnitResponse(response: string): void {
     this.unitResponse = response;
-    if (this.unitLoadingTimeMs == null && this.unitStartedAt) {
-      this.unitLoadingTimeMs = Math.round(performance.now() - this.unitStartedAt);
+  }
+
+  hasReportResponses(responses: unknown): boolean {
+    if (Array.isArray(responses)) {
+      return responses.length > 0;
     }
+    return responses !== null && responses !== undefined && responses !== "";
+  }
+
+  formatReportResponses(responses: unknown): string {
+    return JSON.stringify(responses);
   }
 
   downloadReport(): void {
@@ -1398,14 +1419,24 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   private reportPayload(includeKey: boolean): SaveSystemCheckReportRequest {
+    const parsedResponse = readSystemCheckUnitResponse(this.unitResponse);
+    const responseTimestamp = Date.now();
+    const responses = Object.entries(parsedResponse?.dataParts ?? {}).map(
+      ([id, content]) => ({
+        id,
+        content,
+        ts: responseTimestamp,
+        responseType: parsedResponse?.responseType ?? ""
+      })
+    );
     return {
       ...(includeKey ? { keyPhrase: this.reportKey } : {}),
       title: this.reportTitle,
-      responses: this.unitResponse,
+      responses,
       environment: this.environmentEntries,
       network: this.networkEntries,
       questionnaire: this.questionnaireEntries,
-      unit: this.unitEntries
+      unit: []
     };
   }
 
