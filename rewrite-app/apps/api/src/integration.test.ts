@@ -19150,7 +19150,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
   }
 });
 
-test("original Testcenter compatibility corpus executes the complete official Test Controller package", async () => {
+test("original Testcenter compatibility corpus executes the current 18.0 Test Controller package", async () => {
   type SystemBooklet = {
     fixture: string;
     bookletKey: string;
@@ -19172,6 +19172,21 @@ test("original Testcenter compatibility corpus executes the complete official Te
       }>;
     };
   };
+  type CurrentTestControllerPackage = {
+    booklets: Array<[fixture: string, bookletKey: string, sha256: string]>;
+    units: Array<[fixture: string, unitKey: string]>;
+    player: {
+      fixture: string;
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: {
+      fixture: string;
+      encoding: "base64";
+      participantCount: number;
+      assignmentPackageIndex: number;
+    };
+  };
   type ExecutionModeState = {
     mode: string;
     alwaysNewSession: boolean;
@@ -19191,15 +19206,23 @@ test("original Testcenter compatibility corpus executes the complete official Te
   ) as {
     systemBooklets: SystemBooklet[];
     testControllerPackages: TestControllerPackage[];
+    currentOriginalTestControllerPackage: CurrentTestControllerPackage;
   };
-  const expectation = corpus.testControllerPackages[0];
+  const expectation = corpus.currentOriginalTestControllerPackage;
+  const assignments =
+    corpus.testControllerPackages[expectation.roster.assignmentPackageIndex];
   assert.ok(expectation);
-  const booklets = expectation.bookletKeys.map(bookletKey => {
-    const booklet = corpus.systemBooklets.find(
+  assert.ok(assignments);
+  const booklets = expectation.booklets.map(([fixture, bookletKey], index) => {
+    const metadata = corpus.systemBooklets.find(
       candidate => candidate.bookletKey === bookletKey
     );
-    assert.ok(booklet, `Missing official Controller booklet ${bookletKey}`);
-    return booklet;
+    assert.ok(metadata, `Missing official Controller metadata ${bookletKey}`);
+    return {
+      ...metadata,
+      fixture,
+      packagePath: `booklets/CY_Bklt_TC-${index + 1}.xml`
+    };
   });
   assert.equal(booklets.length, 17);
 
@@ -19252,29 +19275,35 @@ test("original Testcenter compatibility corpus executes the complete official Te
 
     const bookletDocuments = booklets.map(booklet => ({
       ...booklet,
-      content: readFileSync(
-        resolve(originalTestcenterCorpusRoot, booklet.fixture),
-        "utf8"
-      )
+      content: Buffer.from(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, booklet.fixture),
+          "utf8"
+        ).trim(),
+        "base64"
+      ).toString("utf8")
     }));
-    const unitDocuments = expectation.units.map(([fixture, unitKey]) => ({
+    const unitDocuments = expectation.units.map(([fixture, unitKey], index) => ({
       fixture,
       unitKey,
-      content: readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8")
+      packagePath: `units/CY_Unit${index + 100}.xml`,
+      content: Buffer.from(
+        readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
+        "base64"
+      ).toString("utf8")
     }));
-    const playerDocument = readFileSync(
-      resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
-      "utf8"
+    const playerDocument = readBrotliBase64Fixture(
+      resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
     );
     const manifestResources = [
       ...booklets.map(
         booklet =>
-          `<resource identifier="${booklet.bookletKey}" href="${booklet.fixture}" />`
+          `<resource identifier="${booklet.bookletKey}" href="${booklet.packagePath}" />`
       ),
       ...unitDocuments.map(
-        unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.packagePath}" />`
       ),
-      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+      `<resource identifier="${expectation.player.playerKey}" href="players/verona-player-simple-6.0.html" />`
     ].join("\n");
     const zipPayload = createZipBase64([
       {
@@ -19286,15 +19315,15 @@ test("original Testcenter compatibility corpus executes the complete official Te
         `
       },
       ...bookletDocuments.map(booklet => ({
-        fileName: `export/${booklet.fixture}`,
+        fileName: `export/${booklet.packagePath}`,
         content: booklet.content
       })),
       ...unitDocuments.map(unit => ({
-        fileName: `export/${unit.fixture}`,
+        fileName: `export/${unit.packagePath}`,
         content: unit.content
       })),
       {
-        fileName: `export/${expectation.player.fixture}`,
+        fileName: "export/players/verona-player-simple-6.0.html",
         content: playerDocument
       }
     ]);
@@ -19414,12 +19443,12 @@ test("original Testcenter compatibility corpus executes the complete official Te
       { method: "POST", body: { rosterText: rosterXml } }
     );
     assert.equal(rosterImport.status, 201);
-    assert.equal(rosterImport.body.items.length, 26);
+    assert.equal(rosterImport.body.items.length, expectation.roster.participantCount);
     assert.deepEqual(rosterImport.body.operationalLoginCandidates, []);
     const rosterByLoginKey = new Map(
       rosterImport.body.items.map(item => [item.loginKey, item])
     );
-    for (const group of expectation.roster.groups) {
+    for (const group of assignments.roster.groups) {
       for (const [loginKey, executionMode, bookletKey] of group.participants) {
         const participant = rosterByLoginKey.get(loginKey);
         assert.ok(participant);

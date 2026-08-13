@@ -2142,6 +2142,50 @@
       }
     }
   ],
+  "currentOriginalTestControllerPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/test-controller",
+    "booklets": [
+      ["booklets/system-test/current-CY_Bklt_TC-1.xml.base64", "Cy-Bklt_TC-1", "25e61d60623fb7b697eb527880a565a5f1cb3c5736feec3908384ce2498eac6e"],
+      ["booklets/system-test/current-CY_Bklt_TC-2.xml.base64", "Cy-Bklt_TC-2", "75d7a74957bcea8deba11e18318ec9a893d050a815b592da0d7b354413d8f95a"],
+      ["booklets/system-test/current-CY_Bklt_TC-3.xml.base64", "Cy-Bklt_TC-3", "7ca882ba232ed77b6fc2c95231d62404dbc45ec998e10600b664e829791eace8"],
+      ["booklets/system-test/current-CY_Bklt_TC-4.xml.base64", "Cy-Bklt_TC-4", "4c1fe8496543f323dface2755c988230f529ae30f283509ac970254362939d53"],
+      ["booklets/system-test/current-CY_Bklt_TC-5.xml.base64", "Cy-Bklt_TC-5", "361b91dd042c13b6e12eb907301c1bca5be5340d24a781d95c7980999e7d9d29"],
+      ["booklets/system-test/current-CY_Bklt_TC-6.xml.base64", "Cy-Bklt_TC-6", "c75b3be5969d4ad867b5e207a48c38f45c00fe85ecb044fbb1bf17d0cb2626dc"],
+      ["booklets/system-test/current-CY_Bklt_TC-7.xml.base64", "Cy-Bklt_TC-7", "615f5ecfc739bc05a5481e6b15849e7c2d7a1e21fd98d048d6ec1228720ade08"],
+      ["booklets/system-test/current-CY_Bklt_TC-8.xml.base64", "Cy-Bklt_TC-8", "d8e56baf298a1067159c39f54c164c18f3426bfadb702b472330e8bcca0a0651"],
+      ["booklets/system-test/current-CY_Bklt_TC-9.xml.base64", "Cy-Bklt_TC-9", "1dac4dd1a206d7b608dc818ed872a95e81da37337f30aed743f52e71b29b56a5"],
+      ["booklets/system-test/current-CY_Bklt_TC-10.xml.base64", "Cy-Bklt_TC-10", "712d4094ccecadd2521d2165d89e29e1bb089e118d568123acf502e0c627e908"],
+      ["booklets/system-test/current-CY_Bklt_TC-11.xml.base64", "Cy-Bklt_TC-11", "78375558b5a64fdcb7507037b8f47990f2885e59a3cf14c111f858ccf176c995"],
+      ["booklets/system-test/current-CY_Bklt_TC-12.xml.base64", "Cy-Bklt_TC-12", "7b6cdb7b9c05b32484d0d8cc107e013f2e879e2c24e3a2d1ba2f2b1a677d948d"],
+      ["booklets/system-test/current-CY_Bklt_TC-13.xml.base64", "Cy-Bklt_TC-13", "68e731e8d7744454959b67f68780bddf2d86f4b624091b6f350801c3696ab6f6"],
+      ["booklets/system-test/current-CY_Bklt_TC-14.xml.base64", "Cy-Bklt_TC-14", "20db96771605d24912f72fe2fa4fbeed501aa2e99aa0ba0849f6562d3422fc35"],
+      ["booklets/system-test/current-CY_Bklt_TC-15.xml.base64", "Cy-Bklt_TC-15", "b1da9cb0a1933d631aa1b152548e6fb6fbc9637d68099f99cb8efe9880bbc637"],
+      ["booklets/system-test/current-CY_Bklt_TC-16.xml.base64", "Cy-Bklt_TC-16", "9d6e56c1326f392e139e392135b833fc04488994fc075a89dec3cc38a72e993b"],
+      ["booklets/system-test/current-CY_Bklt_TC-17.xml.base64", "Cy-Bklt_TC-17", "8c8e4a2345dabcda42ace09e85fda3846d42d1d8f8c06a2217521793735704b7"]
+    ],
+    "units": [
+      ["units/current-CY_Unit100.xml.base64", "CY-Unit.Sample-100"],
+      ["units/current-CY_Unit101.xml.base64", "CY-Unit.Sample-101"],
+      ["units/current-CY_Unit102.xml.base64", "CY-Unit.Sample-102"],
+      ["units/current-CY_Unit103.xml.base64", "CY-Unit.Sample-103"],
+      ["units/current-CY_Unit104.xml.base64", "CY-Unit.Sample-104"]
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_TestController.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Logins_TestController.xml",
+      "sha256": "ef034d26eead64ab6583cae6aa83daa35d177651115407a6a9a1df8eef214962",
+      "participantCount": 26,
+      "assignmentPackageIndex": 0
+    }
+  },
   "testControllerPackages": [
     {
       "bookletKeys": [

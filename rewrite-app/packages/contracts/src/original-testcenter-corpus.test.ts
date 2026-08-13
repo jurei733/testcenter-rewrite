@@ -126,6 +126,23 @@ type OriginalTestcenterCorpus = {
       ]>;
     };
   }>;
+  currentOriginalTestControllerPackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklets: Array<[fixture: string, bookletKey: string, sha256: string]>;
+    units: Array<[fixture: string, unitKey: string]>;
+    player: {
+      fixture: string;
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      participantCount: number;
+      assignmentPackageIndex: number;
+    };
+  };
   testControllerPackages: Array<{
     bookletKeys: string[];
     units: Array<[fixture: string, unitKey: string]>;
@@ -2624,6 +2641,70 @@ test("original Testcenter compatibility corpus pins official group monitoring se
     customTexts: {},
     unresolvedProfileIds: []
   });
+});
+
+test("original Testcenter compatibility corpus pins the current 18.0 Test Controller package", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const current = corpus.currentOriginalTestControllerPackage;
+  const assignments = corpus.testControllerPackages[current.roster.assignmentPackageIndex];
+  assert.ok(assignments);
+  assert.equal(
+    current.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(current.sourceDirectory, "sampledata/system-test/test-controller");
+  assert.deepEqual(
+    current.booklets.map(([, bookletKey]) => bookletKey),
+    Array.from({ length: 17 }, (_, index) => `Cy-Bklt_TC-${index + 1}`)
+  );
+  for (const [fixture, bookletKey, sha256] of current.booklets) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, fixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(createHash("sha256").update(document).digest("hex"), sha256);
+    assert.match(document.toString("utf8"), /testcenter-booklet-xml\/18\.0/);
+    assert.match(document.toString("utf8"), new RegExp(`<Id>${bookletKey}<\\/Id>`));
+  }
+  assert.deepEqual(
+    current.units.map(([, unitKey]) => unitKey),
+    Array.from({ length: 5 }, (_, index) => `CY-Unit.Sample-${index + 100}`)
+  );
+  assert.equal(current.player.playerKey, "verona-player-simple-6.0");
+
+  const rosterBuffer = Buffer.from(
+    readFileSync(resolve(corpusRoot, current.roster.fixture), "utf8").trim(),
+    current.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterBuffer).digest("hex"),
+    current.roster.sha256,
+    current.roster.sourcePath
+  );
+  assert.match(rosterBuffer.toString("utf8"), /testcenter-testtaker-xml\/18\.0/);
+  const participants = parseParticipantRosterText(rosterBuffer.toString("utf8"));
+  const expectedParticipants = assignments.roster.groups.flatMap(group =>
+    group.participants.map(([loginKey, executionMode, bookletKey]) => ({
+      loginKey,
+      executionMode,
+      bookletKey,
+      groupKey: group.groupKey
+    }))
+  );
+  assert.equal(participants.length, current.roster.participantCount);
+  assert.deepEqual(parseOriginalTestcenterOperationalLogins(rosterBuffer.toString("utf8")), []);
+  for (const expectation of expectedParticipants) {
+    const participant = participants.find(
+      candidate => candidate.loginKey === expectation.loginKey
+    );
+    assert.ok(participant, expectation.loginKey);
+    assert.equal(participant.groupKey, expectation.groupKey);
+    assert.equal(participant.executionMode, expectation.executionMode);
+    assert.equal(participant.bookletKey, expectation.bookletKey);
+    assert.equal(participant.password, "123");
+  }
 });
 
 test("original Testcenter compatibility corpus pins the complete official Test Controller roster", () => {
