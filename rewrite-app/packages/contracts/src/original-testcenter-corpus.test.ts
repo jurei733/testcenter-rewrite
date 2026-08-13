@@ -5,6 +5,10 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { brotliDecompressSync } from "node:zlib";
 
+import { CodingSchemeFactory } from "@iqb/responses";
+import { CodingScheme } from "@iqbspecs/coding-scheme";
+import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
+
 import {
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText
@@ -2715,6 +2719,124 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     1,
     331
   ]);
+});
+
+test("original Testcenter compatibility corpus executes current IQB response coding", () => {
+  type CodingCorpus = {
+    format: string;
+    version: number;
+    sourceRepository: string;
+    sourceTag: string;
+    sourceCommit: string;
+    license: string;
+    caseCount: number;
+    fileCount: number;
+    archiveEncoding: string;
+    archiveSha256: string;
+    files: Array<{ path: string; sizeBytes: number; sha256: string }>;
+    archiveBase64: string;
+  };
+  const corpus = JSON.parse(
+    readFileSync(
+      resolve(corpusRoot, "responses-5.2.2-corpus.json"),
+      "utf8"
+    )
+  ) as CodingCorpus;
+  assert.deepEqual(
+    {
+      format: corpus.format,
+      version: corpus.version,
+      sourceRepository: corpus.sourceRepository,
+      sourceTag: corpus.sourceTag,
+      sourceCommit: corpus.sourceCommit,
+      license: corpus.license,
+      caseCount: corpus.caseCount,
+      fileCount: corpus.fileCount,
+      archiveEncoding: corpus.archiveEncoding
+    },
+    {
+      format: "iqb-responses-coding-corpus",
+      version: 1,
+      sourceRepository: "https://github.com/iqb-berlin/responses",
+      sourceTag: "5.2.2",
+      sourceCommit: "11057f5213ea9a2def998da33d9a2692b63db2e5",
+      license: "CC0-1.0",
+      caseCount: 75,
+      fileCount: 188,
+      archiveEncoding: "brotli-base64"
+    }
+  );
+  const archive = brotliDecompressSync(
+    Buffer.from(corpus.archiveBase64, "base64")
+  );
+  assert.equal(
+    createHash("sha256").update(archive).digest("hex"),
+    corpus.archiveSha256
+  );
+  const decoded = JSON.parse(archive.toString("utf8")) as {
+    files: Array<{ path: string; contentBase64: string }>;
+  };
+  assert.equal(decoded.files.length, corpus.fileCount);
+  const documents = new Map(
+    decoded.files.map(file => [
+      file.path,
+      Buffer.from(file.contentBase64, "base64")
+    ])
+  );
+  assert.deepEqual(
+    [...documents.keys()].sort(),
+    corpus.files.map(file => file.path).sort()
+  );
+  for (const file of corpus.files) {
+    const content = documents.get(file.path);
+    assert.ok(content, file.path);
+    assert.equal(content.length, file.sizeBytes, file.path);
+    assert.equal(
+      createHash("sha256").update(content).digest("hex"),
+      file.sha256,
+      file.path
+    );
+  }
+  const inputPaths = [...documents.keys()]
+    .filter(path => path.endsWith("_input.json"))
+    .sort();
+  assert.equal(inputPaths.length, corpus.caseCount);
+  for (const inputPath of inputPaths) {
+    const directory = inputPath.slice(0, inputPath.lastIndexOf("/"));
+    const schemeDocument = documents.get(`${directory}/coding-scheme.json`);
+    const inputDocument = documents.get(inputPath);
+    const outcomeDocument = documents.get(
+      inputPath.replace(/_input\.json$/, "_outcome.json")
+    );
+    assert.ok(schemeDocument, inputPath);
+    assert.ok(inputDocument, inputPath);
+    assert.ok(outcomeDocument, inputPath);
+    const variableCodings = new CodingScheme(
+      JSON.parse(schemeDocument.toString("utf8"))
+    ).variableCodings;
+    const actual = JSON.parse(
+      JSON.stringify(
+        CodingSchemeFactory.code(
+          JSON.parse(inputDocument.toString("utf8")) as IqbResponse[],
+          variableCodings
+        )
+      )
+    );
+    assert.deepEqual(
+      actual,
+      JSON.parse(outcomeDocument.toString("utf8")),
+      inputPath
+    );
+  }
+  for (const currentOnlyCase of [
+    "test/coding/circular-dependency/01_input.json",
+    "test/coding/derive/UNIQUE_VALUES_INTENDED_INCOMPLETE/01_input.json",
+    "test/coding/rules/matching/05_input.json",
+    "test/coding/take-empty-as-valid/01_input.json",
+    "test/coding/unknown-response-id/01_input.json"
+  ]) {
+    assert.ok(documents.has(currentOnlyCase), currentOnlyCase);
+  }
 });
 
 test("original Testcenter compatibility corpus pins current passwordless group monitoring semantics", () => {

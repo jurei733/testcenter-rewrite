@@ -14,8 +14,9 @@ import type {
   Document as XmlDocument,
   Element as XmlElement
 } from "@xmldom/xmldom";
-import { CodingScheme } from "@iqb/responses";
-import type { Response as IqbResponse } from "@iqb/responses";
+import { CodingSchemeFactory } from "@iqb/responses";
+import { CodingScheme } from "@iqbspecs/coding-scheme";
+import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
 
 import {
   adminPasswordPolicy,
@@ -16992,7 +16993,15 @@ const parseUnitCodingSchemeDocument = (
         Array.isArray(variableCoding.codes)
     );
     return structurallyUsable
-      ? { status: "valid", codingScheme }
+      ? {
+          status: "valid",
+          codingScheme: {
+            ...(codingScheme.version ? { version: codingScheme.version } : {}),
+            variableCodings: normalizedScheme.variableCodings as unknown as Array<
+              Record<string, unknown>
+            >
+          }
+        }
       : { status: "invalid" };
   } catch {
     return { status: "invalid" };
@@ -19066,6 +19075,26 @@ const resolveAdaptiveVariables = (
   testRun: TestRun
 ): Map<string, Map<string, AdaptiveResponseVariable>> => {
   const trackedVariablesByUnitKey = collectAdaptiveVariableKeys(booklet);
+  for (const unitEntry of booklet.unitEntries) {
+    const trackedVariableKeys = trackedVariablesByUnitKey.get(unitEntry.unitKey);
+    if (!unitEntry.codingScheme || !trackedVariableKeys?.size) {
+      continue;
+    }
+    try {
+      const variableCodings = new CodingScheme(
+        unitEntry.codingScheme
+      ).variableCodings;
+      for (const baseVariableKey of CodingSchemeFactory.getBaseVarsList(
+        [...trackedVariableKeys],
+        variableCodings
+      )) {
+        trackedVariableKeys.add(baseVariableKey);
+      }
+    } catch {
+      // Import validation rejects invalid schemes. Keep the condition variables
+      // usable for staged legacy data if an older snapshot still contains one.
+    }
+  }
   const variablesByUnitKey = new Map(
     [...trackedVariablesByUnitKey].map(([unitKey, variableKeys]) => [
       unitKey,
@@ -19117,6 +19146,9 @@ const resolveAdaptiveVariables = (
           ) {
             continue;
           }
+          if (!trackedVariablesByUnitKey.get(unitKey)?.has(value.id)) {
+            continue;
+          }
           // Original Testcenter tracks adaptive responses by variable ID, not by
           // subform. Preserve its data-part order: a later repeated ID replaces
           // the earlier subform value before server-side coding and routing.
@@ -19159,10 +19191,13 @@ const resolveAdaptiveVariables = (
     }
     const variables = variablesByUnitKey.get(unitEntry.unitKey) ?? new Map();
     try {
-      const codingScheme = new CodingScheme(unitEntry.codingScheme);
-      const baseVariableKeys = codingScheme.getBaseVarsList([
-        ...trackedVariableKeys
-      ]);
+      const variableCodings = new CodingScheme(
+        unitEntry.codingScheme
+      ).variableCodings;
+      const baseVariableKeys = CodingSchemeFactory.getBaseVarsList(
+        [...trackedVariableKeys],
+        variableCodings
+      );
       const baseVariableKeySet = new Set(baseVariableKeys);
       const suppliedResponses =
         suppliedResponsesByUnitKey.get(unitEntry.unitKey) ?? [];
@@ -19188,31 +19223,13 @@ const resolveAdaptiveVariables = (
               }) satisfies IqbResponse
           )
       ];
-      const injectableVariableKeys = new Set(
-        codingScheme.variableCodings
-          .filter(
-            variableCoding =>
-              variableCoding.sourceType !== "BASE" &&
-              variableCoding.sourceType !== "BASE_NO_VALUE"
-          )
-          .flatMap(variableCoding => [
-            variableCoding.id,
-            variableCoding.alias || variableCoding.id
-          ])
-      );
-      // IQB-standard Player state may already contain a manually coded or
-      // externally injected derived response. Keep only values that were
-      // actually supplied by the Player and belong to this coding scheme;
-      // launch-time UNSET placeholders must not suppress normal derivation.
-      const injectedResponses = suppliedResponses.filter(
-        response =>
-          !baseVariableKeySet.has(response.id) &&
-          injectableVariableKeys.has(response.id)
-      );
-      for (const codedVariable of codingScheme.code([
-        ...baseResponses,
-        ...injectedResponses
-      ])) {
+      // The current Original feeds only tracked base variables into the coder.
+      // Player-supplied derived values remain persisted for restoration but
+      // cannot override server-side derivation or adaptive routing.
+      for (const codedVariable of CodingSchemeFactory.code(
+        baseResponses,
+        variableCodings
+      )) {
         if (!trackedVariableKeys.has(codedVariable.id)) {
           continue;
         }

@@ -68,6 +68,17 @@ variant. Their fixtures remain byte-for-byte identical to tag `3.6.0`, and the
 same 18-booklet Participant package executes every route in memory, file, and
 SQLite.
 
+`responses-5.2.2-corpus.json` separately pins the coding stack used by the
+current Original Testcenter at responses commit
+`11057f5213ea9a2def998da33d9a2692b63db2e5`. Its deterministic Brotli archive
+contains all 188 current coding documents and all 75 executable inputs and
+outcomes; the manifest records every path, byte length, and SHA-256. The gate
+normalizes every scheme through `@iqbspecs/coding-scheme` 3.4.1 and executes it
+with `@iqb/responses` 5.2.2. This preserves the historical 3.6.0 generation for
+regression comparison while also covering circular dependencies, intended-
+incomplete uniqueness, the fifth matching case, accepted empty values, unknown
+response IDs, and the current numeric-null and intended-incomplete behavior.
+
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
 all 17 original Test-Controller system booklets, all four original

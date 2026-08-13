@@ -17,5 +17,10 @@
   },
   "dependencies": {
     "@testcenter-rewrite-app/domain": "0.0.0"
+  },
+  "devDependencies": {
+    "@iqb/responses": "5.2.2",
+    "@iqbspecs/coding-scheme": "3.4.1",
+    "@iqbspecs/response": "2.0.0"
   }
 }

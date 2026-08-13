@@ -9,8 +9,9 @@ import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
 import { PDFDocument } from "pdf-lib";
-import { CodingScheme } from "@iqb/responses";
-import type { Response as IqbResponse } from "@iqb/responses";
+import { CodingSchemeFactory } from "@iqb/responses";
+import { CodingScheme } from "@iqbspecs/coding-scheme";
+import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
 import {
   adminPasswordPolicy,
   type ListSourcePackagesResponse
@@ -33066,6 +33067,7 @@ test("original Testcenter compatibility corpus executes official IQB rule, deriv
     const primaryCaseId =
       codingPackage.inputFixture.match(/case(\d+)-input\.json$/)?.[1] ??
       "01";
+    const variableCodings = new CodingScheme(scheme).variableCodings;
     const cases = [
       {
         caseId: primaryCaseId.padStart(2, "0"),
@@ -33087,6 +33089,34 @@ test("original Testcenter compatibility corpus executes official IQB rule, deriv
           "utf8"
         )
       ) as CodingResponse[];
+      const baseVariableKeys = CodingSchemeFactory.getBaseVarsList(
+        officialOutcome.map(variable => variable.id),
+        variableCodings
+      );
+      const baseVariableKeySet = new Set(baseVariableKeys);
+      const suppliedBaseResponses = inputResponses.filter(response =>
+        baseVariableKeySet.has(response.id)
+      ) as IqbResponse[];
+      const suppliedBaseVariableKeys = new Set(
+        suppliedBaseResponses.map(response => response.id)
+      );
+      const expectedCodingInput = [
+        ...suppliedBaseResponses,
+        ...baseVariableKeys
+          .filter(variableKey => !suppliedBaseVariableKeys.has(variableKey))
+          .map(
+            variableKey =>
+              ({
+                id: variableKey,
+                status: "UNSET",
+                value: null
+              }) satisfies IqbResponse
+          )
+      ];
+      const runtimeOutcome = CodingSchemeFactory.code(
+        expectedCodingInput,
+        variableCodings
+      );
       const officialVariableIds = officialOutcome
         .map(variable => variable.id)
         .sort();
@@ -33110,17 +33140,26 @@ test("original Testcenter compatibility corpus executes official IQB rule, deriv
       return {
         ...testCase,
         caseKey: `case${testCase.caseId}`,
-        expectedStates: {
-          [stateKey]: `case${testCase.caseId}`
-        },
         inputResponses,
+        expectedCodingInput,
         officialOutcome,
         routingOutcome:
           family === "subform-responses"
-            ? [...new Map(officialOutcome.map(response => [response.id, response])).values()]
-            : officialOutcome
+            ? [...new Map(runtimeOutcome.map(response => [response.id, response])).values()]
+            : runtimeOutcome
       };
     });
+    for (const testCase of cases) {
+      const firstMatchingCase = cases.find(
+        candidate =>
+          JSON.stringify(candidate.routingOutcome) ===
+          JSON.stringify(testCase.routingOutcome)
+      );
+      assert.ok(firstMatchingCase);
+      testCase.expectedStates = {
+        [stateKey]: firstMatchingCase.caseKey
+      };
+    }
     assert.equal(cases.length, caseCount);
     return {
       family,
@@ -33452,27 +33491,35 @@ test("original Testcenter compatibility corpus executes official IQB rule, deriv
             unitResponse: rawPlayerResponse
           }
         });
-      const originalCoding = CodingScheme.prototype.code;
+      const originalCoding = CodingSchemeFactory.code;
       let capturedCodingInput: IqbResponse[] | null = null;
-      if (family.family === "subform-responses") {
-        CodingScheme.prototype.code = function (responses): IqbResponse[] {
+      if (
+        family.family === "subform-responses" ||
+        family.family === "rule-injected-variables"
+      ) {
+        CodingSchemeFactory.code = function (
+          responses,
+          variableCodings,
+          options
+        ): IqbResponse[] {
           capturedCodingInput = structuredClone(responses);
-          return originalCoding.call(this, responses);
+          return originalCoding.call(this, responses, variableCodings, options);
         };
       }
       let saveResult: Awaited<ReturnType<typeof saveProgress>>;
       try {
         saveResult = await saveProgress();
       } finally {
-        CodingScheme.prototype.code = originalCoding;
+        CodingSchemeFactory.code = originalCoding;
       }
-      if (family.family === "subform-responses") {
+      if (
+        family.family === "subform-responses" ||
+        family.family === "rule-injected-variables"
+      ) {
         assert.deepEqual(
           capturedCodingInput,
-          testCase.inputResponses.filter(
-            response => response.id !== "activeQuestionIndex"
-          ),
-          "ordered subform responses must reach the IQB coder before adaptive last-write selection"
+          testCase.expectedCodingInput,
+          `${family.family} must pass only ordered tracked Base responses to the IQB coder`
         );
       }
       assert.equal(saveResult.status, 200);
@@ -33492,7 +33539,9 @@ test("original Testcenter compatibility corpus executes official IQB rule, deriv
           navigation: { nextUnitKey: string | null };
         };
       }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
-      const routeUnitKey = `${family.slug}-${testCase.caseKey}-route`;
+      const selectedCaseKey = testCase.expectedStates[family.stateKey];
+      assert.ok(selectedCaseKey);
+      const routeUnitKey = `${family.slug}-${selectedCaseKey}-route`;
       assert.deepEqual(
         currentState.body.currentRunState.bookletUnits.map(
           unit => unit.unitKey
