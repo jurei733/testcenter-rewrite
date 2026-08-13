@@ -13788,6 +13788,73 @@ try {
     requiresCode: true
   });
   await page
+    .locator(
+      '#participantRouteUnitRail [data-unit-key="CY-Unit.Sample-104"]'
+    )
+    .click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-104" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(await page.locator("#participantConfirmationTitle").count(), 0);
+  await page
+    .locator(".participant-navigation-notice p")
+    .filter({
+      hasText:
+        "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+    })
+    .waitFor();
+  const reviewInterruptedState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${reviewTimedController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-104" &&
+      payload.currentRunState.testRun.testletTimers?.Tslt1?.status === "paused" &&
+      payload.currentRunState.testRun.testletTimers.Tslt1.expiresAt === null
+  );
+  const reviewInterruptedSeconds =
+    reviewInterruptedState.currentRunState.testRun.testletTimers.Tslt1
+      .remainingSeconds;
+  assert.ok(
+    Number.isInteger(reviewInterruptedSeconds) && reviewInterruptedSeconds > 0
+  );
+  await new Promise(resolve => setTimeout(resolve, 1_200));
+  const reviewStillInterruptedResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${reviewTimedController.participantSessionId}/current-state`,
+    { method: "GET" }
+  );
+  assert.equal(reviewStillInterruptedResponse.status, 200);
+  const reviewStillInterruptedState =
+    await reviewStillInterruptedResponse.json();
+  assert.equal(
+    reviewStillInterruptedState.currentRunState.testRun.testletTimers.Tslt1
+      .status,
+    "paused"
+  );
+  assert.equal(
+    reviewStillInterruptedState.currentRunState.testRun.testletTimers.Tslt1
+      .remainingSeconds,
+    reviewInterruptedSeconds
+  );
+  await page
+    .locator(
+      '#participantRouteUnitRail [data-unit-key="CY-Unit.Sample-101"]'
+    )
+    .click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${reviewTimedController.participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+        "CY-Unit.Sample-101" &&
+      payload.currentRunState.testRun.testletTimers?.Tslt1?.status === "running" &&
+      payload.currentRunState.testRun.testletTimers.Tslt1.remainingSeconds ===
+        reviewInterruptedSeconds
+  );
+  await page
     .locator("#participantRouteTimerLifecycleMessage")
     .filter({ hasText: "ended" })
     .waitFor({ timeout: 20_000 });

@@ -1497,24 +1497,71 @@ export class ParticipantViewFacade {
   }
 
   private presentNavigationAdvisory(
-    direction: "forward" | "backward"
+    direction: "forward" | "backward",
+    targetUnitKey: string | null | undefined = undefined
   ): void {
     this.clearNavigationAdvisory();
     const currentState = this.readCurrentRunState();
     if (!currentState || currentState.booklet.policy.display.silentMode) {
       return;
     }
-    const reasons =
-      direction === "backward"
+    const reasons = [
+      ...(direction === "backward"
         ? currentState.navigation.backwardAdvisoryReasons ?? []
-        : currentState.navigation.forwardAdvisoryReasons ?? [];
-    const detail = this.describeNavigationReasons(reasons);
-    if (!detail) {
+        : currentState.navigation.forwardAdvisoryReasons ?? [])
+    ];
+    const resolvedTargetUnitKey =
+      targetUnitKey === undefined
+        ? direction === "backward"
+          ? currentState.navigation.previousUnitKey
+          : currentState.navigation.nextUnitKey
+        : targetUnitKey;
+    const activeTimer = currentState.activeTestletTimer;
+    const targetTestletPath =
+      currentState.bookletUnits.find(
+        unit => unit.unitKey === resolvedTargetUnitKey
+      )?.testletPath ?? [];
+    if (
+      activeTimer &&
+      !currentState.executionMode.forceTimeRestrictions &&
+      !targetTestletPath.includes(activeTimer.testletKey)
+    ) {
+      const timerReason =
+        activeTimer.leave === "forbidden"
+          ? "testlet_time_leave_forbidden"
+          : activeTimer.leave === "confirm"
+            ? "testlet_time_leave_confirmation_required"
+            : null;
+      if (timerReason && !reasons.includes(timerReason)) {
+        reasons.push(timerReason);
+      }
+    }
+    const timerMessage = reasons.includes(
+      "testlet_time_leave_confirmation_required"
+    )
+      ? "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt."
+      : reasons.includes("testlet_time_leave_forbidden")
+        ? "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+        : "";
+    const remainingReasons = reasons.filter(
+      reason =>
+        reason !== "testlet_time_leave_confirmation_required" &&
+        reason !== "testlet_time_leave_forbidden"
+    );
+    const detail = this.describeNavigationReasons(remainingReasons);
+    if (!timerMessage && !detail) {
       return;
     }
     this.navigationAdvisory.set({
       title: "Test mode: navigation remains available",
-      message: `In an enforced test, this action would be blocked. ${detail}`
+      message: [
+        timerMessage,
+        detail
+          ? `In an enforced test, this action would be blocked. ${detail}`
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" ")
     });
     this.navigationAdvisoryTimeout =
       globalThis.window?.setTimeout(() => {
@@ -2280,7 +2327,8 @@ export class ParticipantViewFacade {
         unit => unit.unitKey === unitKey
       );
       this.presentNavigationAdvisory(
-        targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward"
+        targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward",
+        unitKey
       );
       this.viewState.onActionAsync(() =>
         this.goToPlayerUnitInternal(`#${unitKey}`)
@@ -2296,7 +2344,12 @@ export class ParticipantViewFacade {
         break;
       case "first": {
         if (this.player.canGoPreviousUnit) {
-          this.presentNavigationAdvisory("backward");
+          this.presentNavigationAdvisory(
+            "backward",
+            this.player.unitItems.find(
+              unit => !unit.isCurrent && !unit.isLocked
+            )?.unitKey
+          );
           this.viewState.onActionAsync(() =>
             this.goToPlayerUnitInternal("first")
           );
@@ -2305,7 +2358,12 @@ export class ParticipantViewFacade {
       }
       case "last": {
         if (this.player.canGoNextUnit) {
-          this.presentNavigationAdvisory("forward");
+          this.presentNavigationAdvisory(
+            "forward",
+            [...this.player.unitItems]
+              .reverse()
+              .find(unit => !unit.isCurrent && !unit.isLocked)?.unitKey
+          );
           this.viewState.onActionAsync(() =>
             this.goToPlayerUnitInternal("last")
           );
@@ -2351,7 +2409,8 @@ export class ParticipantViewFacade {
     const targetIndex =
       currentState?.bookletUnits.findIndex(unit => unit.unitKey === unitKey) ?? -1;
     this.presentNavigationAdvisory(
-      targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward"
+      targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward",
+      unitKey
     );
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal(unitKey));
   }
@@ -2377,7 +2436,7 @@ export class ParticipantViewFacade {
     if (!player.canComplete) {
       return;
     }
-    this.presentNavigationAdvisory("forward");
+    this.presentNavigationAdvisory("forward", null);
     this.viewState.onActionAsync(() => this.completeRunWithConfirmation());
   }
 
@@ -2452,7 +2511,9 @@ export class ParticipantViewFacade {
 
   private async completeRunWithConfirmation(): Promise<void> {
     const player = this.player;
-    const confirmTestletTimeLeave = player.testletTimer?.leave === "confirm";
+    const confirmTestletTimeLeave =
+      (this.readCurrentRunState()?.executionMode.forceTimeRestrictions ?? true) &&
+      player.testletTimer?.leave === "confirm";
     if (
       confirmTestletTimeLeave &&
       !(await this.requestConfirmation({
@@ -3124,7 +3185,9 @@ export class ParticipantViewFacade {
         activeTimer != null &&
         !targetTestletPath.includes(activeTimer.testletKey);
       const confirmTestletTimeLeave =
-        leavesActiveTimedBlock && activeTimer.leave === "confirm";
+        (currentState?.executionMode.forceTimeRestrictions ?? true) &&
+        leavesActiveTimedBlock &&
+        activeTimer.leave === "confirm";
       if (
         confirmTestletTimeLeave &&
         !(await this.requestConfirmation({

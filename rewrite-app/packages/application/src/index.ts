@@ -20156,6 +20156,32 @@ const cancelTestletTimerAfterLeave = (
   });
 };
 
+const interruptTestletTimerAfterLeave = (
+  testRun: TestRun,
+  testletKey: string,
+  timestamp: string
+): TestRun => {
+  const timer = testRun.testletTimers?.[testletKey];
+  if (!timer || (timer.status !== "running" && timer.status !== "paused")) {
+    return testRun;
+  }
+  return normalizeTestRun({
+    ...testRun,
+    testletTimers: {
+      ...(testRun.testletTimers ?? {}),
+      [testletKey]: {
+        ...timer,
+        status: "paused",
+        remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
+        expiresAt: null,
+        updatedAt: timestamp,
+        endedAt: null
+      }
+    },
+    updatedAt: timestamp
+  });
+};
+
 const applyMonitorGoto = (input: {
   contentRelease: ContentRelease;
   testRun: TestRun;
@@ -20585,6 +20611,25 @@ const resolveBookletNavigationState = (
   const forwardAdvisoryReasons = executionMode.forceNaviRestrictions
     ? []
     : forwardCompletenessReasons;
+  const addTimerAdvisory = (
+    reasons: string[],
+    targetUnitKey: string | null
+  ): void => {
+    if (executionMode.forceTimeRestrictions) {
+      return;
+    }
+    const leave = resolveLeavingTimedTestlet(booklet, testRun, targetUnitKey)
+      ?.restrictions?.timeMax?.leave;
+    const reason =
+      leave === "forbidden"
+        ? "testlet_time_leave_forbidden"
+        : leave === "confirm"
+          ? "testlet_time_leave_confirmation_required"
+          : null;
+    if (reason && !reasons.includes(reason)) {
+      reasons.push(reason);
+    }
+  };
   const isUnitInaccessible = (unitKey: string | null): boolean =>
     executionMode.forceNaviRestrictions &&
     (isUnitLeaveLocked(booklet, testRun, unitKey) ||
@@ -20611,6 +20656,8 @@ const resolveBookletNavigationState = (
     previousUnitIndex >= 0 ? units[previousUnitIndex]?.unitKey ?? null : null;
   const nextUnitKey =
     nextUnitIndex >= 0 ? units[nextUnitIndex]?.unitKey ?? null : null;
+  addTimerAdvisory(backwardAdvisoryReasons, previousUnitKey);
+  addTimerAdvisory(forwardAdvisoryReasons, nextUnitKey);
   const nextTestletGate = testRun.monitorNavigationUnlocked
     ? null
     : findTestletCodeGate({
@@ -20661,6 +20708,9 @@ const resolveBookletNavigationState = (
     remainingTestletGate == null &&
     (!executionMode.forceTimeRestrictions ||
       !isLeavingForbiddenTimedTestlet(booklet, testRun, null));
+  if (canComplete) {
+    addTimerAdvisory(forwardAdvisoryReasons, null);
+  }
   const canPlayerEnd =
     canComplete &&
     isBookletPlayerEndAllowed(policy.navigation.playerEnd, isLastUnit);
@@ -30856,21 +30906,30 @@ export const createFirstSliceServices = (
             confirmTestletTimeLeave: input.confirmTestletTimeLeave,
             confirmTestletLeaveLock: input.confirmTestletLeaveLock
           });
-          const leavingTimedTestlet = executionMode.forceTimeRestrictions
-            ? resolveLeavingTimedTestlet(
-                booklet,
-                testRun,
-                nextCurrentUnitKey
-              )
-            : null;
+          const leavingTimedTestlet = resolveLeavingTimedTestlet(
+            booklet,
+            testRun,
+            nextCurrentUnitKey
+          );
           const leavePolicy =
             leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
           if (
             leavingTimedTestlet &&
             (leavePolicy === "allowed" ||
-              (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
+              (executionMode.forceTimeRestrictions &&
+                leavePolicy === "confirm" &&
+                input.confirmTestletTimeLeave))
           ) {
             navigationTestRun = cancelTestletTimerAfterLeave(
+              navigationTestRun,
+              leavingTimedTestlet.testletKey,
+              timestamp
+            );
+          } else if (
+            leavingTimedTestlet &&
+            !executionMode.forceTimeRestrictions
+          ) {
+            navigationTestRun = interruptTestletTimerAfterLeave(
               navigationTestRun,
               leavingTimedTestlet.testletKey,
               timestamp
@@ -31437,12 +31496,15 @@ export const createFirstSliceServices = (
                 }
               })
             : testRun;
-        const leavingTimedTestlet = executionMode.forceTimeRestrictions
-          ? resolveLeavingTimedTestlet(booklet, completionEvaluationRun, null)
-          : null;
+        const leavingTimedTestlet = resolveLeavingTimedTestlet(
+          booklet,
+          completionEvaluationRun,
+          null
+        );
         const leavePolicy =
           leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
         if (
+          executionMode.forceTimeRestrictions &&
           leavePolicy === "confirm" &&
           !input.confirmTestletTimeLeave
         ) {
@@ -31480,12 +31542,20 @@ export const createFirstSliceServices = (
         const timeAdjustedCompletionRun =
           leavingTimedTestlet &&
           (leavePolicy === "allowed" ||
-            (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
+            (executionMode.forceTimeRestrictions &&
+              leavePolicy === "confirm" &&
+              input.confirmTestletTimeLeave))
             ? cancelTestletTimerAfterLeave(
                 completionEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
+            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+              ? interruptTestletTimerAfterLeave(
+                  completionEvaluationRun,
+                  leavingTimedTestlet.testletKey,
+                  timestamp
+                )
             : completionEvaluationRun;
         const completionBaseRun = leavingLock
           ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
@@ -31516,6 +31586,8 @@ export const createFirstSliceServices = (
                 "paused",
                 timestamp
               )
+            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+              ? completionBaseRun
             : closeRunningTestletTimers(completionBaseRun, timestamp)),
           status: lockOnTermination ? "paused" : "completed",
           locked: lockOnTermination,

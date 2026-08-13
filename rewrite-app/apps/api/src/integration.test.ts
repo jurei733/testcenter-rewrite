@@ -37408,6 +37408,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     currentRunState: {
       activeTestletTimer: { testletKey: string; status: string } | null;
       executionMode: { forceTimeRestrictions: boolean };
+      navigation: { forwardAdvisoryReasons: string[] };
     };
   }>(`/api/v1/participant/sessions/${demo.participantSessionId}/current-state`);
   assert.deepEqual(demoTimedState.body.currentRunState.activeTestletTimer, {
@@ -37419,10 +37420,21 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     demoTimedState.body.currentRunState.executionMode.forceTimeRestrictions,
     false
   );
+  assert.deepEqual(
+    demoTimedState.body.currentRunState.navigation.forwardAdvisoryReasons,
+    ["response_incomplete", "testlet_time_leave_forbidden"]
+  );
   const demoLeftTimedBlock = await requestJson<{
     testRun: {
       currentUnitKey: string | null;
-      testletTimers?: Record<string, { status: string }>;
+      testletTimers?: Record<
+        string,
+        {
+          status: string;
+          remainingSeconds: number;
+          expiresAt: string | null;
+        }
+      >;
     };
   }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
     method: "POST",
@@ -37430,9 +37442,44 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   });
   assert.equal(demoLeftTimedBlock.status, 200);
   assert.equal(demoLeftTimedBlock.body.testRun.currentUnitKey, "UNIT.INTRO");
+  const interruptedDemoTimer =
+    demoLeftTimedBlock.body.testRun.testletTimers?.[protectedTestletKey];
+  assert.equal(interruptedDemoTimer?.status, "paused");
+  assert.equal(interruptedDemoTimer?.expiresAt, null);
+  assert.ok(
+    Number.isInteger(interruptedDemoTimer?.remainingSeconds) &&
+      (interruptedDemoTimer?.remainingSeconds ?? 0) > 0 &&
+      (interruptedDemoTimer?.remainingSeconds ?? 0) <= 300
+  );
+  const resumedDemoTimer = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<
+        string,
+        {
+          status: string;
+          remainingSeconds: number;
+          expiresAt: string | null;
+        }
+      >;
+    };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+  });
+  assert.equal(resumedDemoTimer.status, 200);
+  assert.equal(resumedDemoTimer.body.testRun.currentUnitKey, "UNIT.PROTECTED");
   assert.equal(
-    demoLeftTimedBlock.body.testRun.testletTimers?.[protectedTestletKey]?.status,
+    resumedDemoTimer.body.testRun.testletTimers?.[protectedTestletKey]?.status,
     "running"
+  );
+  assert.ok(
+    resumedDemoTimer.body.testRun.testletTimers?.[protectedTestletKey]?.expiresAt
+  );
+  assert.equal(
+    resumedDemoTimer.body.testRun.testletTimers?.[protectedTestletKey]
+      ?.remainingSeconds,
+    interruptedDemoTimer?.remainingSeconds
   );
   assert.equal(demo.currentRunState.adaptiveStates[0]?.stateKey, "route");
   assert.equal(demo.currentRunState.adaptiveStates[0]?.optionKey, "basic");
@@ -38012,6 +38059,50 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     trialSave.body.testRun.testletTimers?.[protectedTestletKey]
       ?.durationSeconds,
     300
+  );
+  const interruptedTrialTimer = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<
+        string,
+        { status: string; remainingSeconds: number; expiresAt: string | null }
+      >;
+    };
+  }>(`/api/v1/participant/test-runs/${trial.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.FINISH", status: "running" }
+  });
+  const pausedTrialTimer =
+    interruptedTrialTimer.body.testRun.testletTimers?.[protectedTestletKey];
+  assert.equal(interruptedTrialTimer.body.testRun.currentUnitKey, "UNIT.FINISH");
+  assert.equal(pausedTrialTimer?.status, "paused");
+  assert.equal(pausedTrialTimer?.expiresAt, null);
+  assert.ok((pausedTrialTimer?.remainingSeconds ?? 0) > 0);
+  const resumedTrialTimer = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<
+        string,
+        { status: string; remainingSeconds: number; expiresAt: string | null }
+      >;
+    };
+  }>(`/api/v1/participant/test-runs/${trial.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+  });
+  assert.equal(resumedTrialTimer.body.testRun.currentUnitKey, "UNIT.PROTECTED");
+  assert.equal(
+    resumedTrialTimer.body.testRun.testletTimers?.[protectedTestletKey]?.status,
+    "running"
+  );
+  assert.equal(
+    resumedTrialTimer.body.testRun.testletTimers?.[protectedTestletKey]
+      ?.remainingSeconds,
+    pausedTrialTimer?.remainingSeconds
+  );
+  assert.ok(
+    resumedTrialTimer.body.testRun.testletTimers?.[protectedTestletKey]
+      ?.expiresAt
   );
   const trialReview = await requestJson<{
     review: { reviewId: string; testRunId: string; reviewerId: string };

@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   assessBrowserCompatibility,
   browserMatchesSupportedList,
+  originalTestcenterSupportedBrowsers,
   parseBrowserUserAgent,
   projectTestcenterLoadEnvironment
 } from "./browser-compatibility.js";
@@ -19,6 +20,22 @@ const referenceSupportedBrowsers = [
   "safari 17.3",
   "safari 17.2"
 ];
+
+test("current Original Testcenter browser support list remains byte-pinned", () => {
+  assert.deepEqual(originalTestcenterSupportedBrowsers, [
+    "chrome 151",
+    "chrome 150",
+    "edge 151",
+    "edge 150",
+    "firefox 153",
+    "firefox 152",
+    "firefox 140",
+    "ios_saf 26.4",
+    "ios_saf 26.3",
+    "safari 26.4",
+    "safari 26.3"
+  ]);
+});
 
 test("original browser policy accepts listed and newer browser versions", () => {
   const supportedUserAgents = [
