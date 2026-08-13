@@ -933,6 +933,38 @@ try {
   );
   await waitForNotBusy("initial-load");
   assert.equal(await page.locator("#authModeBadge").count(), 0);
+  logStep("central-bug-report");
+  await page.goto(
+    `${baseUrl}/app/home?login=browser-secret#private-fragment`,
+    { waitUntil: "networkidle" }
+  );
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error(
+        "runtime token=top-secret at https://example.test/unit?password=hidden#fragment"
+      );
+    }, 0);
+  });
+  await page.locator("#bugReportDialog").waitFor();
+  const bugReportText = await page.locator("#bugReportText").innerText();
+  assert.match(bugReportText, /runtime token=\[REDACTED\]/);
+  assert.match(bugReportText, /https:\/\/example\.test\/unit/);
+  assert.doesNotMatch(
+    bugReportText,
+    /top-secret|browser-secret|password=hidden|private-fragment|#fragment/
+  );
+  assert.equal(
+    await page.locator("#bugReportSubmitButton").count(),
+    0,
+    "Direct report submission should stay hidden without server credentials."
+  );
+  const bugReportDownloadPromise = page.waitForEvent("download");
+  await page.locator("#bugReportDownloadButton").click();
+  const bugReportDownload = await bugReportDownloadPromise;
+  assert.equal(bugReportDownload.suggestedFilename(), "bug-report.txt");
+  await page.locator("#bugReportCloseButton").click();
+  await page.locator("#bugReportDialog").waitFor({ state: "detached" });
+  stopAfter("central-bug-report");
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   if (operatorAuthRequired) {
     await page.waitForURL(url => {

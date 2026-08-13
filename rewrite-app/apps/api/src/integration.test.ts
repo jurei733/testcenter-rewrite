@@ -685,6 +685,99 @@ after(async () => {
   await closeServer(server);
 });
 
+test("bug-report endpoints keep direct delivery disabled without server credentials", async () => {
+  const isolated = await createIsolatedServer({
+    BUG_REPORT_GITHUB_REPOSITORY: "",
+    BUG_REPORT_GITHUB_TOKEN: ""
+  });
+  try {
+    const configResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/system/bug-report`
+    );
+    assert.equal(configResponse.status, 200);
+    assertSecurityHeaders(configResponse);
+    assert.deepEqual(await configResponse.json(), {
+      enabled: false,
+      target: null
+    });
+
+    const submitResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/system/bug-reports`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "Runtime error",
+          tag: "Runtime Error",
+          report: "sanitized report"
+        })
+      }
+    );
+    assert.equal(submitResponse.status, 503);
+    assert.deepEqual(await submitResponse.json(), {
+      error: "bug_report_not_configured",
+      message:
+        "Direct bug-report submission is not configured. Download the report instead."
+    });
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("bug-report configuration exposes the target but keeps its token server-only", async () => {
+  const isolated = await createIsolatedServer({
+    BUG_REPORT_GITHUB_REPOSITORY: "example/testcenter-reports",
+    BUG_REPORT_GITHUB_TOKEN: "server-only-secret"
+  });
+  try {
+    const configResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/system/bug-report`
+    );
+    assert.deepEqual(await configResponse.json(), {
+      enabled: true,
+      target: "example/testcenter-reports"
+    });
+
+    const runtimeConfigResponse = await fetch(
+      `${isolated.baseUrl}/diagnostics/config`
+    );
+    const runtimeConfigText = await runtimeConfigResponse.text();
+    assert.doesNotMatch(runtimeConfigText, /server-only-secret/);
+    assert.match(
+      runtimeConfigText,
+      /"bugReportGithubTokenPresent":\s*true/
+    );
+
+    await fetch(`${isolated.baseUrl}/healthz?login=must-not-reach-logs`);
+    const diagnosticsResponse = await fetch(
+      `${isolated.baseUrl}/diagnostics/runtime`
+    );
+    const diagnosticsText = await diagnosticsResponse.text();
+    assert.doesNotMatch(diagnosticsText, /must-not-reach-logs/);
+    assert.match(diagnosticsText, /"path": "\/healthz"/);
+
+    const invalidSubmitResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/system/bug-reports`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "Runtime error\nInjected title",
+          tag: "Runtime Error",
+          report: "sanitized report"
+        })
+      }
+    );
+    assert.equal(invalidSubmitResponse.status, 400);
+    assert.equal(
+      (await invalidSubmitResponse.json() as { error: string }).error,
+      "invalid_bug_report"
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("system-check speed-test endpoints transfer exact package sizes", async () => {
   const download = await fetch(`${baseUrl}/speed-test/random-package/4096`, {
     cache: "no-store"

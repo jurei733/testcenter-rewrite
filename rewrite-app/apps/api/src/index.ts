@@ -16,6 +16,9 @@ import {
   firstSliceUseCases
 } from "@testcenter-rewrite-app/application";
 import {
+  BUG_REPORT_MAX_REPORT_LENGTH,
+  BUG_REPORT_MAX_TAG_LENGTH,
+  BUG_REPORT_MAX_TITLE_LENGTH,
   type AdminSignInRequest,
   type AdminSignInResponse,
   type AdminSignOutResponse,
@@ -31,6 +34,7 @@ import {
   type AssignAdminRoleResponse,
   type BootstrapAdminUserRequest,
   type BootstrapAdminUserResponse,
+  type BugReportConfigResponse,
   type CompleteTestRunRequest,
   type CompleteTestRunResponse,
   type CreateAdminUserRequest,
@@ -146,6 +150,8 @@ import {
   type SaveParticipantTestLogsResponse,
   type SelectParticipantAdaptiveStateRequest,
   type SelectParticipantAdaptiveStateResponse,
+  type SubmitBugReportRequest,
+  type SubmitBugReportResponse,
   type UnlockParticipantTestletRequest,
   type UnlockParticipantTestletResponse,
   type ParticipantSignInRequest,
@@ -175,6 +181,7 @@ import {
   type PublicAdminSession,
   type PublicAdminUser,
   type AdminUserDirectoryItem,
+  redactBugReportText,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import {
@@ -522,6 +529,17 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_BOOTSTRAP_DEMO",
     false
   );
+  const bugReportGithubRepository =
+    process.env.BUG_REPORT_GITHUB_REPOSITORY?.trim() || null;
+  const bugReportGithubToken = process.env.BUG_REPORT_GITHUB_TOKEN?.trim() || null;
+  if (
+    bugReportGithubRepository &&
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(bugReportGithubRepository)
+  ) {
+    throw new Error(
+      "BUG_REPORT_GITHUB_REPOSITORY must use the 'owner/repository' format."
+    );
+  }
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
   const services = createFirstSliceServices({
@@ -589,8 +607,16 @@ const createApiRuntime = async () => {
           process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS
         ),
         appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
-        appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP)
+        appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP),
+        bugReportGithubRepositoryPresent: Boolean(bugReportGithubRepository),
+        bugReportGithubTokenPresent: Boolean(bugReportGithubToken)
       }
+    },
+    bugReport: {
+      enabled: Boolean(bugReportGithubRepository && bugReportGithubToken),
+      repository: bugReportGithubRepository,
+      token: bugReportGithubToken,
+      submissionWindows: new Map<string, BugReportSubmissionWindow>()
     },
     repositoryConfig,
     repository,
@@ -680,6 +706,15 @@ const DEFAULT_ADMIN_LOGIN_MAX_FAILURES = 5;
 const DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 const DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES = 5;
 const DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
+const BUG_REPORT_SUBMISSION_WINDOW_MS = 10 * 60 * 1_000;
+const BUG_REPORT_MAX_SUBMISSIONS_PER_WINDOW = 3;
+const BUG_REPORT_MAX_CLIENT_WINDOWS = 10_000;
+const BUG_REPORT_GITHUB_TIMEOUT_MS = 10_000;
+
+type BugReportSubmissionWindow = {
+  startedAt: number;
+  count: number;
+};
 
 type RuntimeMetrics = {
   startedAt: string;
@@ -2586,6 +2621,93 @@ const serveFrontendRequest = async (
   return true;
 };
 
+const validateBugReportRequest = (
+  body: unknown
+): SubmitBugReportRequest | null => {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const candidate = body as Partial<SubmitBugReportRequest>;
+  const title = typeof candidate.title === "string" ? candidate.title.trim() : "";
+  const tag = typeof candidate.tag === "string" ? candidate.tag.trim() : "";
+  const report =
+    typeof candidate.report === "string" ? candidate.report.trim() : "";
+  if (
+    !title ||
+    title.length > BUG_REPORT_MAX_TITLE_LENGTH ||
+    /[\r\n]/.test(title) ||
+    !tag ||
+    tag.length > BUG_REPORT_MAX_TAG_LENGTH ||
+    !/^[\p{L}\p{N} ._-]+$/u.test(tag) ||
+    !report ||
+    report.length > BUG_REPORT_MAX_REPORT_LENGTH
+  ) {
+    return null;
+  }
+  return { title, tag, report };
+};
+
+const consumeBugReportSubmission = (
+  windows: Map<string, BugReportSubmissionWindow>,
+  clientKey: string,
+  now = Date.now()
+): number | null => {
+  const current = windows.get(clientKey);
+  if (!current || now - current.startedAt >= BUG_REPORT_SUBMISSION_WINDOW_MS) {
+    if (!current && windows.size >= BUG_REPORT_MAX_CLIENT_WINDOWS) {
+      for (const [key, window] of windows) {
+        if (now - window.startedAt >= BUG_REPORT_SUBMISSION_WINDOW_MS) {
+          windows.delete(key);
+        }
+      }
+      if (windows.size >= BUG_REPORT_MAX_CLIENT_WINDOWS) {
+        return Math.ceil(BUG_REPORT_SUBMISSION_WINDOW_MS / 1_000);
+      }
+    }
+    windows.set(clientKey, { startedAt: now, count: 1 });
+    return null;
+  }
+  if (current.count >= BUG_REPORT_MAX_SUBMISSIONS_PER_WINDOW) {
+    return Math.max(
+      1,
+      Math.ceil((current.startedAt + BUG_REPORT_SUBMISSION_WINDOW_MS - now) / 1_000)
+    );
+  }
+  current.count += 1;
+  return null;
+};
+
+const publishBugReport = async (input: {
+  repository: string;
+  token: string;
+  request: SubmitBugReportRequest;
+}): Promise<string> => {
+  const githubResponse = await fetch(
+    `https://api.github.com/repos/${input.repository}/issues`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "testcenter-rewrite",
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      body: JSON.stringify({
+        title: input.request.title,
+        body: redactBugReportText(input.request.report),
+        labels: ["Testcenter", input.request.tag]
+      }),
+      signal: AbortSignal.timeout(BUG_REPORT_GITHUB_TIMEOUT_MS)
+    }
+  );
+  const payload = await githubResponse.json() as { html_url?: unknown };
+  if (!githubResponse.ok || typeof payload.html_url !== "string") {
+    throw new Error(`GitHub issue creation failed with HTTP ${githubResponse.status}.`);
+  }
+  return payload.html_url;
+};
+
 const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   if (method === "GET" && (pathname === "/" || pathname === "/app")) {
     return "GET /app";
@@ -2625,6 +2747,20 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.system.getRuntimeConfig) {
     return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
+  }
+
+  if (
+    method === "GET" &&
+    pathname === productionApiRoutes.system.getBugReportConfig
+  ) {
+    return `GET ${productionApiRoutes.system.getBugReportConfig}`;
+  }
+
+  if (
+    method === "POST" &&
+    pathname === productionApiRoutes.system.submitBugReport
+  ) {
+    return `POST ${productionApiRoutes.system.submitBugReport}`;
   }
 
   if (
@@ -3793,9 +3929,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     const method = request.method ?? "UNKNOWN";
     const effectiveMethod = method === "HEAD" ? "GET" : method;
     const metrics = runtime.metrics;
+    const requestPathname = new URL(
+      request.url ?? "/",
+      "http://127.0.0.1"
+    ).pathname;
     const routeLabel = resolveMetricsRouteLabel(
       effectiveMethod,
-      new URL(request.url ?? "/", "http://127.0.0.1").pathname
+      requestPathname
     );
 
     response.setHeader("x-request-id", requestId);
@@ -3814,7 +3954,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         requestId,
         method,
         route: routeLabel,
-        path: request.url ?? null,
+        path: requestPathname,
         statusCode: response.statusCode,
         durationMs: Number(durationMs.toFixed(3)),
         storageKind: runtime.repositoryConfig.kind
@@ -4066,6 +4206,84 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             environment: runtime.config.environment
           }
         });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.system.getBugReportConfig
+      ) {
+        response.setHeader("cache-control", "no-store");
+        sendJson<BugReportConfigResponse>(response, 200, {
+          enabled: runtime.bugReport.enabled,
+          target: runtime.bugReport.enabled
+            ? runtime.bugReport.repository
+            : null
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.system.submitBugReport
+      ) {
+        const repository = runtime.bugReport.repository;
+        const token = runtime.bugReport.token;
+        if (!runtime.bugReport.enabled || !repository || !token) {
+          sendError(
+            response,
+            503,
+            "bug_report_not_configured",
+            "Direct bug-report submission is not configured. Download the report instead."
+          );
+          return;
+        }
+        const bugReportRequest = validateBugReportRequest(
+          await readRequestJsonBody<unknown>()
+        );
+        if (!bugReportRequest) {
+          sendError(
+            response,
+            400,
+            "invalid_bug_report",
+            "Bug report title, tag, or report content is invalid."
+          );
+          return;
+        }
+        const retryAfterSeconds = consumeBugReportSubmission(
+          runtime.bugReport.submissionWindows,
+          request.socket.remoteAddress ?? "unknown"
+        );
+        if (retryAfterSeconds !== null) {
+          response.setHeader("retry-after", String(retryAfterSeconds));
+          sendError(
+            response,
+            429,
+            "bug_report_rate_limited",
+            "Too many bug reports were submitted from this client. Try again later.",
+            { retryAfterSeconds }
+          );
+          return;
+        }
+        try {
+          const issueUrl = await publishBugReport({
+            repository,
+            token,
+            request: bugReportRequest
+          });
+          sendJson<SubmitBugReportResponse>(response, 201, {
+            success: true,
+            message: "Bericht gesendet, vielen Dank!",
+            issueUrl
+          });
+        } catch {
+          sendError(
+            response,
+            502,
+            "bug_report_delivery_failed",
+            "The bug report could not be delivered. Download it and contact support."
+          );
+        }
         return;
       }
 

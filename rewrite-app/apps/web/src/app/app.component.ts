@@ -9,6 +9,8 @@ import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
+import { BugReportDialogComponent } from "./bug-report-dialog.component";
+import { BugReportService } from "./bug-report.service";
 import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
 import { LiveContextComponent } from "./live-context.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
@@ -35,6 +37,7 @@ const routeViews: AppView[] = [
     RouterLinkActive,
     SummaryCardsComponent,
     ActivityFeedComponent,
+    BugReportDialogComponent,
     ConfirmationDialogComponent,
     LiveContextComponent
   ],
@@ -45,6 +48,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
+  readonly bugReports = inject(BugReportService);
   readonly participantShell = inject(ParticipantShellStateService);
   readonly isOffline = signal(!navigator.onLine);
   requiredAdminPassword = "";
@@ -142,6 +146,13 @@ export class AppComponent implements OnInit, OnDestroy {
   leaveParticipantSession(): void {
     this.participantShell.setHeaderHidden(false);
     globalThis.dispatchEvent(new CustomEvent("participant-leave-session"));
+  }
+
+  openErrorReport(): void {
+    this.bugReports.openForMessage(
+      this.app.errorMessage() ?? "Unknown application error",
+      this.app.ops.buildRef
+    );
   }
 
   get isAttachmentCaptureView(): boolean {

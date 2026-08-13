@@ -94,6 +94,19 @@ export type {
   ParsedParticipantRosterEntry,
   ParticipantRosterSource
 } from "./participant-roster.js";
+export {
+  BUG_REPORT_MAX_REPORT_LENGTH,
+  BUG_REPORT_MAX_TAG_LENGTH,
+  BUG_REPORT_MAX_TITLE_LENGTH,
+  buildBugReportText,
+  redactBugReportText
+} from "./bug-report.js";
+export type {
+  BugReportConfigResponse,
+  BugReportContext,
+  SubmitBugReportRequest,
+  SubmitBugReportResponse
+} from "./bug-report.js";
 
 export const productionApiRoutes = {
   admin: {
@@ -305,6 +318,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/:testRunId/commands"
   },
   system: {
+    getBugReportConfig: "/api/v1/system/bug-report",
+    submitBugReport: "/api/v1/system/bug-reports",
     getApplicationSettings: "/api/v1/system/application-settings",
     getApplicationAsset: "/api/v1/system/application-assets",
     getRuntimeDiagnostics: "/diagnostics/runtime",
@@ -1530,6 +1545,8 @@ export type GetRuntimeConfigResponse = {
       httpKeepAliveTimeoutMsPresent: boolean;
       appBuildShaPresent: boolean;
       appBuildTimestampPresent: boolean;
+      bugReportGithubRepositoryPresent: boolean;
+      bugReportGithubTokenPresent: boolean;
     };
   };
 };

@@ -5,6 +5,7 @@
 >
   <span hidden>{{ app.renderVersion() }}</span>
   <app-confirmation-dialog></app-confirmation-dialog>
+  <app-bug-report-dialog></app-bug-report-dialog>
   <section
     id="globalApplicationWarning"
     class="application-warning-banner"
@@ -230,6 +231,13 @@
         {{ app.activeRequestLabel() }} is in progress.
       </span>
       <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+      <button
+        *ngIf="app.errorMessage()"
+        class="ghost"
+        type="button"
+        data-open-bug-report
+        (click)="openErrorReport()"
+      >Fehlerbericht</button>
     </section>
 
     <main class="participant-stage">
@@ -354,6 +362,13 @@
         {{ app.activeRequestLabel() }} is in progress.
       </span>
       <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+      <button
+        *ngIf="app.errorMessage()"
+        class="ghost"
+        type="button"
+        data-open-bug-report
+        (click)="openErrorReport()"
+      >Fehlerbericht</button>
     </section>
 
     <nav class="view-nav" aria-label="Application Views">
