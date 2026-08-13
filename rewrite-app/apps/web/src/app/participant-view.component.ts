@@ -932,7 +932,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               class="participant-unit-navigation-label"
               aria-live="polite"
             >{{ view.player.unitNavigationLabel }}</span>
-            <button *ngIf="view.player.showPreviousUnitControl" id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
+            <button *ngIf="view.player.showPreviousUnitControl" id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canRequestPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
             <nav
               *ngIf="view.player.showUnitNavigationList"
               id="participantRouteUnitNavigationList"
@@ -953,7 +953,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (click)="view.goToUnit(unit.unitKey)"
               >{{ unit.navigationLabel }}</button>
             </nav>
-            <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
+            <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canRequestNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>
             <button id="participantRouteCompleteButton" class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">{{ view.customText('login_testEndButtonLabel', 'Complete Test') }}</button>

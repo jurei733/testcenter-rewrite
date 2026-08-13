@@ -123,6 +123,8 @@ type ParticipantPlayerState = {
   showNextUnitControl: boolean;
   canGoPreviousUnit: boolean;
   canGoNextUnit: boolean;
+  canRequestPreviousUnit: boolean;
+  canRequestNextUnit: boolean;
   canResumeRun: boolean;
   canComplete: boolean;
   canReview: boolean;
@@ -750,6 +752,8 @@ export class ParticipantViewFacade {
         showNextUnitControl: true,
         canGoPreviousUnit: false,
         canGoNextUnit: false,
+        canRequestPreviousUnit: false,
+        canRequestNextUnit: false,
         canResumeRun: false,
         canComplete: false,
         canReview: false,
@@ -953,6 +957,11 @@ export class ParticipantViewFacade {
       : null;
     const navigationDenial = this.describeNavigationDenial(currentState);
     const navigationAdvisory = this.navigationAdvisory();
+    const persistentNavigationDenial =
+      nextUnitKey == null ||
+      !this.canRequestUnitNavigation(forwardDeniedReasons)
+        ? navigationDenial
+        : "";
     const unitNavigationLabelMode =
       policy.navigation.unitLabel ?? "index";
     const unitNavigationLabel =
@@ -1041,6 +1050,16 @@ export class ParticipantViewFacade {
       canGoNextUnit:
         !hasControllerError &&
         canNavigateUnits && nextUnitKey != null && forwardDeniedReasons.length === 0,
+      canRequestPreviousUnit:
+        !hasControllerError &&
+        canNavigateUnits &&
+        previousUnitKey != null &&
+        this.canRequestUnitNavigation(backwardDeniedReasons),
+      canRequestNextUnit:
+        !hasControllerError &&
+        canNavigateUnits &&
+        nextUnitKey != null &&
+        this.canRequestUnitNavigation(forwardDeniedReasons),
       canResumeRun: !hasControllerError && availableActions.includes("resume"),
       canComplete:
         !hasControllerError &&
@@ -1064,7 +1083,7 @@ export class ParticipantViewFacade {
       hasUnsavedResponse,
       navigationNoticeTitle: policy.display.silentMode
         ? ""
-        : navigationDenial
+        : persistentNavigationDenial
           ? this.customText(
               "booklet_msgNavigationDeniedTitle",
               "This unit cannot be left yet"
@@ -1072,7 +1091,7 @@ export class ParticipantViewFacade {
           : navigationAdvisory?.title ?? "",
       navigationNotice: policy.display.silentMode
         ? ""
-        : navigationDenial || navigationAdvisory?.message || "",
+        : persistentNavigationDenial || navigationAdvisory?.message || "",
       nextTestletGate: currentState.navigation.nextTestletGate,
       testletTimer,
       timerLifecycleEvent,
@@ -1494,6 +1513,45 @@ export class ParticipantViewFacade {
       );
     }
     return "";
+  }
+
+  private canRequestUnitNavigation(reasons: readonly string[]): boolean {
+    return reasons.every(reason =>
+      reason === "presentation_incomplete" ||
+      reason === "response_incomplete" ||
+      reason === "testlet_time_leave_forbidden"
+    );
+  }
+
+  private presentNavigationDenial(
+    direction: "forward" | "backward"
+  ): void {
+    this.clearNavigationAdvisory();
+    const currentState = this.readCurrentRunState();
+    if (!currentState || currentState.booklet.policy.display.silentMode) {
+      return;
+    }
+    const reasons =
+      direction === "backward"
+        ? currentState.navigation.backwardDeniedReasons
+        : currentState.navigation.forwardDeniedReasons;
+    const message = this.describeNavigationReasons(reasons);
+    if (!message) {
+      return;
+    }
+    this.navigationAdvisory.set({
+      title: this.customText(
+        "booklet_msgNavigationDeniedTitle",
+        "This unit cannot be left yet"
+      ),
+      message
+    });
+    this.uiState.renderVersion.update(version => version + 1);
+    this.navigationAdvisoryTimeout =
+      globalThis.window?.setTimeout(() => {
+        this.navigationAdvisoryTimeout = null;
+        this.navigationAdvisory.set(null);
+      }, 8_000) ?? null;
   }
 
   private presentNavigationAdvisory(
@@ -2379,7 +2437,20 @@ export class ParticipantViewFacade {
   }
 
   goToPreviousUnit(): void {
+    if (!this.player.canRequestPreviousUnit) {
+      return;
+    }
+    const deniedReasons =
+      this.readCurrentRunState()?.navigation.backwardDeniedReasons ?? [];
+    if (
+      deniedReasons.length > 0 &&
+      this.canRequestUnitNavigation(deniedReasons)
+    ) {
+      this.presentNavigationDenial("backward");
+      return;
+    }
     if (!this.player.canGoPreviousUnit) {
+      this.presentNavigationDenial("backward");
       return;
     }
 
@@ -2388,7 +2459,20 @@ export class ParticipantViewFacade {
   }
 
   goToNextUnit(): void {
+    if (!this.player.canRequestNextUnit) {
+      return;
+    }
+    const deniedReasons =
+      this.readCurrentRunState()?.navigation.forwardDeniedReasons ?? [];
+    if (
+      deniedReasons.length > 0 &&
+      this.canRequestUnitNavigation(deniedReasons)
+    ) {
+      this.presentNavigationDenial("forward");
+      return;
+    }
     if (!this.player.canGoNextUnit) {
+      this.presentNavigationDenial("forward");
       return;
     }
 

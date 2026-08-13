@@ -13014,6 +13014,20 @@ try {
         );
       }
     );
+  const waitForOriginalControllerCompletenessAllowed = async (
+    controller,
+    direction
+  ) =>
+    pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
+      payload => {
+        const reasons =
+          direction === "forward"
+            ? payload?.currentRunState?.navigation?.forwardDeniedReasons
+            : payload?.currentRunState?.navigation?.backwardDeniedReasons;
+        return Array.isArray(reasons) && reasons.length === 0;
+      }
+    );
   const assertOriginalControllerCompletenessDenied = async (
     controller,
     targetUnitKey,
@@ -13056,13 +13070,24 @@ try {
     if (policy === "off") {
       await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
     } else {
-      await expectButtonSelectorDisabled("#participantRouteNextUnitButton");
+      await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
+      assert.equal(
+        await page.locator("#participantRouteNavigationNotice").count(),
+        0
+      );
+      await page.locator("#participantRouteNextUnitButton").click();
+      await page.locator("#participantRouteNavigationNotice").waitFor();
+      await page
+        .locator("#participantRouteUnitKey")
+        .filter({ hasText: "CY-Unit.Sample-101" })
+        .waitFor();
       await assertOriginalControllerCompletenessDenied(
         controller,
         secondUnitKey,
         "forward"
       );
       await completeOriginalControllerUnit(frame);
+      await waitForOriginalControllerCompletenessAllowed(controller, "forward");
       await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
     }
 
@@ -13073,13 +13098,20 @@ try {
       .waitFor({ timeout: 15_000 });
 
     if (policy === "always") {
-      await expectButtonSelectorDisabled("#participantRoutePreviousUnitButton");
+      await expectButtonSelectorEnabled("#participantRoutePreviousUnitButton");
+      await page.locator("#participantRoutePreviousUnitButton").click();
+      await page.locator("#participantRouteNavigationNotice").waitFor();
+      await page
+        .locator("#participantRouteUnitKey")
+        .filter({ hasText: secondUnitKey })
+        .waitFor();
       await assertOriginalControllerCompletenessDenied(
         controller,
         "CY-Unit.Sample-101",
         "backward"
       );
       await completeOriginalControllerUnit(frame);
+      await waitForOriginalControllerCompletenessAllowed(controller, "backward");
     }
     await expectButtonSelectorEnabled("#participantRoutePreviousUnitButton");
     await page.locator("#participantRoutePreviousUnitButton").click();
@@ -13627,23 +13659,37 @@ try {
     .waitFor({ timeout: 15_000 });
   assert.equal(
     await page.locator("#participantRouteNextUnitButton").isDisabled(),
-    true
+    false
   );
   assert.equal(
     await completionControllerFrame.locator("#next-unit").isDisabled(),
     true
   );
+  assert.equal(
+    await page.locator("#participantRouteNavigationNotice").count(),
+    0
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page.locator("#participantRouteNavigationNotice").waitFor();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor();
   await completionControllerFrame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .check();
   assert.equal(
     await page.locator("#participantRouteNextUnitButton").isDisabled(),
-    true
+    false
   );
-  await completionControllerFrame.locator("#next-page").click();
+  await completionControllerFrame.locator("#next-page").dispatchEvent("click");
   await completionControllerFrame
     .getByText("Presentation complete", { exact: true })
     .waitFor();
+  await waitForOriginalControllerCompletenessAllowed(
+    completionController,
+    "forward"
+  );
   await page
     .locator("#participantRouteNextUnitButton")
     .waitFor({ state: "visible", timeout: 15_000 });
@@ -13655,6 +13701,9 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await completionControllerFrame
+    .locator("#next-unit")
+    .click({ trial: true, timeout: 15_000 });
   assert.equal(
     await completionControllerFrame.locator("#next-unit").isEnabled(),
     true
@@ -14010,11 +14059,17 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
     .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteNavigationNotice").count(),
+    0
+  );
+  await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
+  await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteNavigationNotice")
     .filter({ hasText: "cannot be left before its time expires" })
     .waitFor();
-  await expectButtonSelectorDisabled("#participantRouteNextUnitButton");
+  await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
   const forbiddenLeaveResponse = await fetch(
     `${baseUrl}/api/v1/participant/test-runs/${forbiddenLeaveController.testRunId}/save-progress`,
     {
