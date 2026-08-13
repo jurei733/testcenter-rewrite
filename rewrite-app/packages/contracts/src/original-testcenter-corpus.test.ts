@@ -84,6 +84,31 @@ type OriginalTestcenterCorpus = {
       >;
     }
   >;
+  currentOriginalBookletConfigPackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    bookletKeys: string[];
+    currentBookletOverrides: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        bookletKey: string;
+      }
+    >;
+    units: Array<[fixture: string, unitKey: string, sha256: string]>;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      groupKey: string;
+      participantCount: number;
+      loginPrefix: string;
+      password: string;
+      executionMode: string;
+    };
+  };
   bookletConfigPackages: Array<{
     bookletKeys: string[];
     units: Array<[fixture: string, unitKey: string]>;
@@ -2512,6 +2537,127 @@ test("original Testcenter compatibility corpus pins the complete official Test C
     Array.from(new Set(participants.map(participant => participant.executionMode))).sort(),
     ["run-demo", "run-hot-restart", "run-hot-return", "run-review"]
   );
+});
+
+test("original Testcenter compatibility corpus pins the current 51-account Booklet Config package", () => {
+  type BookletFixture = PinnedOriginalFixture & { bookletKey: string };
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus & {
+    booklets: BookletFixture[];
+    systemBooklets: BookletFixture[];
+  };
+  const bookletConfig = corpus.currentOriginalBookletConfigPackage;
+  assert.equal(
+    bookletConfig.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(
+    bookletConfig.sourceDirectory,
+    "sampledata/system-test/booklet-config"
+  );
+  assert.deepEqual(
+    bookletConfig.bookletKeys,
+    Array.from(
+      { length: 51 },
+      (_, index) => `Cy-Bklt_BkltConfig-${index + 1}`
+    )
+  );
+
+  const currentBooklets = new Map<string, Buffer>();
+  for (const booklet of bookletConfig.currentBookletOverrides) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, booklet.fixture), "utf8").trim(),
+      booklet.encoding
+    );
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      booklet.sha256,
+      booklet.sourcePath
+    );
+    currentBooklets.set(booklet.bookletKey, document);
+  }
+  const unchangedBooklets = [...corpus.booklets, ...corpus.systemBooklets]
+    .filter(booklet => bookletConfig.bookletKeys.slice(4).includes(booklet.bookletKey));
+  assert.equal(unchangedBooklets.length, 47);
+  for (const booklet of unchangedBooklets) {
+    const document = readFileSync(resolve(corpusRoot, booklet.fixture));
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      booklet.sha256,
+      booklet.sourcePath
+    );
+    currentBooklets.set(booklet.bookletKey, document);
+  }
+  assert.deepEqual(
+    Array.from(currentBooklets.keys()).sort((left, right) =>
+      Number(left.split("-").at(-1)) - Number(right.split("-").at(-1))
+    ),
+    bookletConfig.bookletKeys
+  );
+
+  const firstFour = bookletConfig.currentBookletOverrides.map(booklet =>
+    currentBooklets.get(booklet.bookletKey)?.toString("utf8")
+  );
+  assert.match(firstFour[0] ?? "", /<Config key="ask_for_fullscreen">OFF<\/Config>/);
+  assert.doesNotMatch(firstFour[0] ?? "", /TimeMax/);
+  assert.match(firstFour[1] ?? "", /<Config key="ask_for_fullscreen">ON<\/Config>/);
+  assert.match(firstFour[2] ?? "", /<Config key="browserBehaviour">standard<\/Config>/);
+  assert.match(firstFour[3] ?? "", /<Config key="browserBehaviour">preventNav<\/Config>/);
+  for (const [index, document] of firstFour.entries()) {
+    assert.match(document ?? "", /testcenter-booklet-xml\/18\.0/);
+    assert.match(
+      document ?? "",
+      new RegExp(`<Id>Cy-Bklt_BkltConfig-${index + 1}<\\/Id>`)
+    );
+  }
+
+  for (const [fixture, unitKey, sha256] of bookletConfig.units) {
+    const unitDocument = Buffer.from(
+      readFileSync(resolve(corpusRoot, fixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(createHash("sha256").update(unitDocument).digest("hex"), sha256);
+    assert.match(unitDocument.toString("utf8"), /unit-xml\/17\.4/);
+    assert.match(
+      unitDocument.toString("utf8"),
+      new RegExp(`<Id>${unitKey.replaceAll(".", "\\.")}<\\/Id>`)
+    );
+  }
+
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, bookletConfig.player.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    bookletConfig.player.sha256,
+    bookletConfig.player.sourcePath
+  );
+  assert.match(playerDocument.toString("utf8"), /"version"\s*:\s*"6\.0\.5"/);
+
+  const rosterBuffer = Buffer.from(
+    readFileSync(resolve(corpusRoot, bookletConfig.roster.fixture), "utf8").trim(),
+    bookletConfig.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterBuffer).digest("hex"),
+    bookletConfig.roster.sha256,
+    bookletConfig.roster.sourcePath
+  );
+  const participants = parseParticipantRosterText(rosterBuffer.toString("utf8"));
+  assert.equal(participants.length, bookletConfig.roster.participantCount);
+  assert.deepEqual(parseOriginalTestcenterOperationalLogins(rosterBuffer.toString("utf8")), []);
+  for (const [index, participant] of participants.entries()) {
+    const suffix = index + 1;
+    assert.equal(participant.loginKey, `${bookletConfig.roster.loginPrefix}${suffix}`);
+    assert.equal(participant.groupKey, bookletConfig.roster.groupKey);
+    assert.equal(participant.password, bookletConfig.roster.password);
+    assert.equal(participant.executionMode, bookletConfig.roster.executionMode);
+    assert.equal(participant.bookletKey, `Cy-Bklt_BkltConfig-${suffix}`);
+  }
 });
 
 test("original Testcenter compatibility corpus pins the complete official Booklet Config roster", () => {

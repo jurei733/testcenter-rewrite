@@ -18790,6 +18790,366 @@ test("original Testcenter compatibility corpus executes the complete official Bo
   }
 });
 
+test("original Testcenter compatibility corpus executes the current 51-account Booklet Config package", async () => {
+  type BookletFixture = {
+    fixture: string;
+    bookletKey: string;
+  };
+  type CurrentBookletConfigPackage = {
+    bookletKeys: string[];
+    currentBookletOverrides: Array<{
+      fixture: string;
+      encoding: "base64";
+      bookletKey: string;
+    }>;
+    units: Array<[fixture: string, unitKey: string, sha256: string]>;
+    player: {
+      fixture: string;
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: {
+      fixture: string;
+      encoding: "base64";
+      groupKey: string;
+      participantCount: number;
+      loginPrefix: string;
+      password: string;
+      executionMode: string;
+    };
+  };
+  type RuntimePolicy = {
+    navigation: { browserNavigation: string };
+    display: { fullscreenPrompt: boolean };
+  };
+
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    booklets: BookletFixture[];
+    systemBooklets: BookletFixture[];
+    currentOriginalBookletConfigPackage: CurrentBookletConfigPackage;
+  };
+  const expectation = corpus.currentOriginalBookletConfigPackage;
+  const overrideByKey = new Map(
+    expectation.currentBookletOverrides.map(booklet => [booklet.bookletKey, booklet])
+  );
+  const pinnedBookletByKey = new Map(
+    [...corpus.booklets, ...corpus.systemBooklets].map(booklet => [booklet.bookletKey, booklet])
+  );
+  const bookletDocuments = expectation.bookletKeys.map((bookletKey, index) => {
+    const override = overrideByKey.get(bookletKey);
+    const pinned = pinnedBookletByKey.get(bookletKey);
+    assert.ok(override || pinned, `Missing current Booklet Config fixture ${bookletKey}`);
+    return {
+      bookletKey,
+      fileName: `booklets/CY_Bklt_BkltConfig_${index + 1}.xml`,
+      content: override
+        ? Buffer.from(
+            readFileSync(
+              resolve(originalTestcenterCorpusRoot, override.fixture),
+              "utf8"
+            ).trim(),
+            override.encoding
+          ).toString("utf8")
+        : readFileSync(
+            resolve(originalTestcenterCorpusRoot, pinned!.fixture),
+            "utf8"
+          )
+    };
+  });
+  const unitDocuments = expectation.units.map(([fixture, unitKey], index) => ({
+    unitKey,
+    fileName: `units/CY_Unit${index + 100}.xml`,
+    content: Buffer.from(
+      readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
+      "base64"
+    ).toString("utf8")
+  }));
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
+  );
+  const playerFileName = "players/verona-player-simple-6.0.html";
+
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.current-original-booklet-config`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.current-original-booklet-config.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+
+  try {
+    const tenantKey = "integration-tenant-current-original-booklet-config";
+    const workspaceKey = "integration-workspace-current-original-booklet-config";
+    assert.equal(
+      (
+        await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", {
+          method: "POST",
+          body: { tenantKey, displayName: tenantKey }
+        })
+      ).status,
+      201
+    );
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces`,
+          {
+            method: "POST",
+            body: { workspaceKey, displayName: workspaceKey }
+          }
+        )
+      ).status,
+      201
+    );
+
+    const manifestResources = [
+      ...bookletDocuments.map(
+        booklet =>
+          `<resource identifier="${booklet.bookletKey}" href="${booklet.fileName}" />`
+      ),
+      ...unitDocuments.map(
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.fileName}" />`
+      ),
+      `<resource identifier="${expectation.player.playerKey}" href="${playerFileName}" />`
+    ].join("\n");
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>${manifestResources}</resources>
+          </manifest>
+        `,
+        compressionMethod: 8
+      },
+      ...bookletDocuments.map(booklet => ({
+        fileName: `export/${booklet.fileName}`,
+        content: booklet.content,
+        compressionMethod: 8 as const
+      })),
+      ...unitDocuments.map(unit => ({
+        fileName: `export/${unit.fileName}`,
+        content: unit.content,
+        compressionMethod: 8 as const
+      })),
+      {
+        fileName: `export/${playerFileName}`,
+        content: playerDocument,
+        compressionMethod: 8
+      }
+    ]);
+    const sourcePackage = await requestJsonAt<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: "current-original-booklet-config.zip",
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${zipPayload}`
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201);
+    const imported = await requestJsonAt<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+      }
+    );
+    assert.equal(
+      imported.body.importJob.status,
+      "completed",
+      JSON.stringify(imported.body.importJob.diagnostics)
+    );
+    assert.deepEqual(imported.body.importJob.diagnostics, []);
+    const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+    assert.ok(contentReleaseId);
+
+    const release = await requestJsonAt<{
+      contentReleaseDetail: {
+        contentRelease: {
+          runtimeSnapshot: {
+            bookletEntries: Array<{
+              bookletKey: string;
+              policy: RuntimePolicy;
+              unitEntries: Array<{ unitKey: string; playerKey?: string }>;
+            }>;
+            playerEntries?: Array<{ playerKey: string; html: string }>;
+          };
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+    );
+    const runtimeSnapshot =
+      release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+    assert.equal(runtimeSnapshot.bookletEntries.length, 51);
+    assert.deepEqual(
+      new Set(runtimeSnapshot.bookletEntries.map(booklet => booklet.bookletKey)),
+      new Set(expectation.bookletKeys)
+    );
+    assert.deepEqual(
+      new Set(
+        runtimeSnapshot.bookletEntries.flatMap(booklet =>
+          booklet.unitEntries.map(unit => unit.unitKey)
+        )
+      ),
+      new Set([
+        "CY-Unit.Sample-101",
+        "CY-Unit.Sample-102",
+        "CY-Unit.Sample-104",
+        "cpy",
+        "xyz"
+      ])
+    );
+    assert.ok(
+      runtimeSnapshot.bookletEntries.every(booklet =>
+        booklet.unitEntries.every(unit => unit.playerKey === expectation.player.playerKey)
+      )
+    );
+    assert.equal(
+      runtimeSnapshot.bookletEntries.find(
+        booklet => booklet.bookletKey === "Cy-Bklt_BkltConfig-1"
+      )?.policy.display.fullscreenPrompt,
+      false
+    );
+    assert.equal(
+      runtimeSnapshot.bookletEntries.find(
+        booklet => booklet.bookletKey === "Cy-Bklt_BkltConfig-2"
+      )?.policy.display.fullscreenPrompt,
+      true
+    );
+    assert.equal(
+      runtimeSnapshot.bookletEntries.find(
+        booklet => booklet.bookletKey === "Cy-Bklt_BkltConfig-3"
+      )?.policy.navigation.browserNavigation,
+      "standard"
+    );
+    assert.equal(
+      runtimeSnapshot.bookletEntries.find(
+        booklet => booklet.bookletKey === "Cy-Bklt_BkltConfig-4"
+      )?.policy.navigation.browserNavigation,
+      "prevent"
+    );
+    assert.deepEqual(runtimeSnapshot.playerEntries, [
+      { playerKey: expectation.player.playerKey, html: playerDocument }
+    ]);
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+          { method: "POST", body: { activatedByActorId: "current-booklet-config-gate" } }
+        )
+      ).status,
+      200
+    );
+
+    const rosterXml = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+        "utf8"
+      ).trim(),
+      expectation.roster.encoding
+    ).toString("utf8");
+    const rosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        executionMode?: string;
+        bookletKey: string | null;
+        passwordRequired: boolean;
+        validationWarnings: Array<{ code: string }>;
+      }>;
+      operationalLoginCandidates: unknown[];
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      { method: "POST", body: { rosterText: rosterXml } }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.equal(rosterImport.body.items.length, expectation.roster.participantCount);
+    assert.deepEqual(rosterImport.body.operationalLoginCandidates, []);
+    const rosterByLoginKey = new Map(
+      rosterImport.body.items.map(participant => [participant.loginKey, participant])
+    );
+    for (let suffix = 1; suffix <= expectation.roster.participantCount; suffix += 1) {
+      const loginKey = `${expectation.roster.loginPrefix}${suffix}`;
+      const participant = rosterByLoginKey.get(loginKey);
+      assert.ok(participant, loginKey);
+      assert.equal(participant.loginKey, `${expectation.roster.loginPrefix}${suffix}`);
+      assert.equal(participant.groupKey, expectation.roster.groupKey);
+      assert.equal(participant.executionMode, expectation.roster.executionMode);
+      assert.equal(participant.bookletKey, `Cy-Bklt_BkltConfig-${suffix}`);
+      assert.equal(participant.passwordRequired, true);
+      assert.deepEqual(participant.validationWarnings, []);
+    }
+
+    for (const suffix of [1, 27, 51]) {
+      const loginKey = `${expectation.roster.loginPrefix}${suffix}`;
+      const bookletKey = `Cy-Bklt_BkltConfig-${suffix}`;
+      const signIn = await requestJsonAt<{
+        participantSession: {
+          participantSessionId: string;
+          executionMode?: string;
+        };
+        booklets: Array<{ bookletKey: string }>;
+      }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: {
+          tenantKey,
+          workspaceKey,
+          loginKey,
+          password: expectation.roster.password
+        }
+      });
+      assert.equal(signIn.status, 200);
+      assert.equal(
+        signIn.body.participantSession.executionMode,
+        expectation.roster.executionMode
+      );
+      assert.deepEqual(
+        signIn.body.booklets.map(booklet => booklet.bookletKey),
+        [bookletKey]
+      );
+      const resumed = await requestJsonAt<{ testRun: { bookletKey: string } }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
+        { method: "POST", body: { bookletKey } }
+      );
+      assert.equal(resumed.status, 200);
+      assert.equal(resumed.body.testRun.bookletKey, bookletKey);
+    }
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("original Testcenter compatibility corpus executes the complete official Test Controller package", async () => {
   type SystemBooklet = {
     fixture: string;
