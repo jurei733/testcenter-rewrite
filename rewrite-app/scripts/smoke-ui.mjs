@@ -2262,6 +2262,17 @@ try {
         width: { configurable: true, value: 799 },
         height: { configurable: true, value: 599 }
       });
+      Object.defineProperties(window.navigator, {
+        userAgent: {
+          configurable: true,
+          value:
+            "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014; arm64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36"
+        },
+        plugins: {
+          configurable: true,
+          value: [{ name: "Smoke PDF Viewer" }]
+        }
+      });
     });
     await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").click();
     await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
@@ -2297,9 +2308,34 @@ try {
     assert.equal(await screenResolutionEntry.evaluate(node =>
       node.classList.contains("has-warning")
     ), true);
+    for (const [id, expectedValue] of [
+      ["CPU-Architektur", "arm64"],
+      ["Gerätemodell", "SM-S918B"],
+      ["Gerätetyp", "mobile"],
+      ["Gerätehersteller", "Samsung"],
+      ["Browser", "Chrome"],
+      ["Browser-Version", "120"],
+      ["Betriebsystem", "Android"],
+      ["Betriebsystem-Version", "13"],
+      ["browser-plugins", "Smoke PDF Viewer"]
+    ]) {
+      await page
+        .locator(`#systemCheckEnvironment-${id}`)
+        .filter({ hasText: expectedValue })
+        .waitFor();
+    }
+    for (const id of [
+      "cookieEnabled",
+      "language",
+      "hardwareConcurrency"
+    ]) {
+      await page.locator(`#systemCheckEnvironment-${id}`).waitFor();
+    }
     await page.evaluate(() => {
       delete window.screen.width;
       delete window.screen.height;
+      delete window.navigator.userAgent;
+      delete window.navigator.plugins;
     });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Network" }).waitFor();
@@ -2364,6 +2400,8 @@ try {
       .locator(".system-check-operator")
       .filter({ hasText: "UI Smoke System Check" })
       .filter({ hasText: "System check answer" })
+      .filter({ hasText: "SM-S918B" })
+      .filter({ hasText: "Smoke PDF Viewer" })
       .waitFor({ timeout: 15_000 });
     await expectButtonSelectorEnabled("#exportSystemCheckReportsButton");
     const systemCheckReportDownloadPromise = page.waitForEvent("download");
@@ -2373,6 +2411,23 @@ try {
       systemCheckReportDownload.suggestedFilename(),
       `${systemCheckWorkspaceKey}-system-check-reports.csv`
     );
+    const systemCheckReportCsvPath = await systemCheckReportDownload.path();
+    assert.ok(
+      systemCheckReportCsvPath,
+      "UI smoke expected a temporary path for the system-check CSV export."
+    );
+    const systemCheckReportCsv = await readFile(
+      systemCheckReportCsvPath,
+      "utf8"
+    );
+    for (const expectedValue of [
+      '"Browser-Version"',
+      '"CPU-Architektur"',
+      '"SM-S918B"',
+      '"Smoke PDF Viewer"'
+    ]) {
+      assert.match(systemCheckReportCsv, new RegExp(expectedValue));
+    }
     await expectButtonSelectorEnabled("#importSystemCheckReportButton");
     await expectButtonSelectorEnabled("#importSystemCheckReportDirectoryButton");
     const originalSystemCheckReportPath = resolve(

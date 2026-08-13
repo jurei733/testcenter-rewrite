@@ -3,6 +3,7 @@ import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
+import UAParser from "ua-parser-js";
 
 import {
   productionApiRoutes,
@@ -751,33 +752,59 @@ export class SystemCheckViewComponent implements OnInit {
 
   async captureEnvironment(): Promise<void> {
     const userAgent = navigator.userAgent;
-    const browser = /Edg\//.test(userAgent)
-      ? "Edge"
-      : /Firefox\//.test(userAgent)
-        ? "Firefox"
-        : /Chrome\//.test(userAgent)
-          ? "Chrome"
-          : /Safari\//.test(userAgent)
-            ? "Safari"
-            : "Unknown";
-    const os = /Windows/i.test(userAgent)
-      ? "Windows"
-      : /Android/i.test(userAgent)
-        ? "Android"
-        : /iPhone|iPad/i.test(userAgent)
-          ? "iOS/iPadOS"
-          : /Mac OS/i.test(userAgent)
-            ? "macOS"
-            : /Linux/i.test(userAgent)
-              ? "Linux"
-              : "Unknown";
+    const userAgentInfo = new UAParser(userAgent).getResult();
     const browserTimeZone =
       Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
     const clientTime = Date.now();
     const screenWidth = screen.width;
     const screenHeight = screen.height;
-    const entries = [
-      this.entry("os", "environment", "Betriebssystem", os),
+    const entries: SystemCheckReportEntry[] = [];
+    const appendUserAgentEntry = (
+      id: string,
+      label: string,
+      value: string | undefined
+    ): void => {
+      if (value) {
+        entries.push(this.entry(id, "environment", label, value));
+      }
+    };
+    appendUserAgentEntry(
+      "CPU-Architektur",
+      "CPU-Architektur",
+      userAgentInfo.cpu.architecture
+    );
+    appendUserAgentEntry(
+      "Gerätemodell",
+      "Gerätemodell",
+      userAgentInfo.device.model
+    );
+    appendUserAgentEntry(
+      "Gerätetyp",
+      "Gerätetyp",
+      userAgentInfo.device.type
+    );
+    appendUserAgentEntry(
+      "Gerätehersteller",
+      "Gerätehersteller",
+      userAgentInfo.device.vendor
+    );
+    appendUserAgentEntry("Browser", "Browser", userAgentInfo.browser.name);
+    appendUserAgentEntry(
+      "Browser-Version",
+      "Browser-Version",
+      userAgentInfo.browser.major
+    );
+    appendUserAgentEntry(
+      "Betriebsystem",
+      "Betriebsystem",
+      userAgentInfo.os.name
+    );
+    appendUserAgentEntry(
+      "Betriebsystem-Version",
+      "Betriebsystem-Version",
+      userAgentInfo.os.version
+    );
+    entries.push(
       this.entry(
         "screen-resolution",
         "environment",
@@ -785,9 +812,8 @@ export class SystemCheckViewComponent implements OnInit {
         `${screenWidth} x ${screenHeight}`,
         screenWidth < 800 || screenHeight < 600
       ),
-      this.entry("browser", "environment", "Browser", browser),
       this.entry(
-        "cookies",
+        "cookieEnabled",
         "environment",
         "Browser-Cookies aktiviert",
         navigator.cookieEnabled
@@ -799,7 +825,7 @@ export class SystemCheckViewComponent implements OnInit {
         navigator.language
       ),
       this.entry(
-        "cores",
+        "hardwareConcurrency",
         "environment",
         "CPU-Kerne",
         navigator.hardwareConcurrency || "unknown"
@@ -810,7 +836,21 @@ export class SystemCheckViewComponent implements OnInit {
         "Fenster-Größe",
         `${window.innerWidth} x ${window.innerHeight}`
       )
-    ];
+    );
+    const pluginNames = Array.from(
+      navigator.plugins ?? [],
+      plugin => plugin.name
+    ).filter(Boolean);
+    if (pluginNames.length > 0) {
+      entries.push(
+        this.entry(
+          "browser-plugins",
+          "environment",
+          "Browser-Plugins",
+          pluginNames.join(", ")
+        )
+      );
+    }
     try {
       const { payload } = await this.api.send<GetSystemTimeResponse>(
         "GET",
@@ -824,7 +864,7 @@ export class SystemCheckViewComponent implements OnInit {
           "time-difference",
           "environment",
           "Zeitabweichung",
-          timeDifferenceSeconds,
+          timeDifferenceSeconds.toString(10),
           timeDifferenceSeconds >= 60
         ),
         this.entry(
@@ -853,7 +893,9 @@ export class SystemCheckViewComponent implements OnInit {
         )
       );
     }
-    this.environmentEntries = entries;
+    this.environmentEntries = entries.sort((left, right) =>
+      left.label > right.label ? 1 : -1
+    );
   }
 
   async runNetworkCheck(): Promise<void> {

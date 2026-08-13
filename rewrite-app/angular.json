@@ -44,6 +44,9 @@
             "styles": [
               "apps/web/src/styles.css"
             ],
+            "allowedCommonJsDependencies": [
+              "ua-parser-js"
+            ],
             "baseHref": "/app/"
           },
           "configurations": {
