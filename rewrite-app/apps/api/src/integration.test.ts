@@ -29991,7 +29991,7 @@ test("original Testcenter compatibility corpus preserves adaptive Mean evaluatio
   );
 });
 
-test("original Testcenter compatibility corpus limits adaptive responses to IQB-standard major 1", async () => {
+test("original Testcenter compatibility corpus limits adaptive responses to exact IQB-standard major 1", async () => {
   const tenantKey = "integration-tenant-adaptive-iqb-standard-version";
   const workspaceKey = "integration-workspace-adaptive-iqb-standard-version";
   const bookletKey = "BOOKLET.ADAPTIVE.IQB-STANDARD-VERSION";
@@ -30133,6 +30133,16 @@ test("original Testcenter compatibility corpus limits adaptive responses to IQB-
     "iqb-standard@2.0"
   );
   assert.deepEqual(versionTwo, {
+    bookletStates: { route: "pending" },
+    unitKeys: ["decision-unit", "pending-route"],
+    nextUnitKey: "pending-route"
+  });
+
+  const uppercaseVersionOne = await runVersion(
+    "adaptive-iqb-standard-version-uppercase",
+    "IQB-STANDARD@1.1"
+  );
+  assert.deepEqual(uppercaseVersionOne, {
     bookletStates: { route: "pending" },
     unitKeys: ["decision-unit", "pending-route"],
     nextUnitKey: "pending-route"
