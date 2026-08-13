@@ -519,6 +519,14 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/monitor/open-runs/commands`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/monitor/open-runs/{testRunId}/commands`
 
+The System Check network stage now mirrors the Original browser-profile
+boundary: it checks `connection`, `mozConnection`, and `webkitConnection` in
+order, records only available round-trip/type/downlink fields, emits the exact
+warning entry when no profile API exists, and classifies failed measurements as
+`unstable`. The production Chromium gate covers both the unavailable and
+vendor-prefixed paths, then follows the measured profile through saved report
+detail and semicolon CSV export.
+
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/listed/revoked/exported as CSV without exposing tokens, targeted session revoke protects against accidentally revoking the active session, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and permanently delete delegated accounts while preventing self-disable, self-delete, or self platform-role revoke lockouts; matching both directions of the Original Superadmin permission editor, the Angular directory exposes effective inherited/direct RO/RW access as workspace-to-admin and admin-to-workspace matrices, with every direct change routed through the same delegation and audit boundary; disabling an account formally revokes every active session, while deletion atomically removes every role and session and retains a complete audit snapshot with exact deletion counts

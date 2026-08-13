@@ -169,7 +169,11 @@ type ThroughputResult = {
             <strong id="systemCheckNetworkRating">{{ networkRating }}</strong>
           </div>
           <dl class="system-check-results" *ngIf="networkEntries.length > 0">
-            <div *ngFor="let entry of networkEntries"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            <div
+              *ngFor="let entry of networkEntries"
+              [id]="'systemCheckNetwork-' + entry.id"
+              [class.has-warning]="entry.warning"
+            ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
           </dl>
           <button id="runSystemCheckNetworkButton" class="primary" type="button" [disabled]="networkBusy" (click)="runNetworkCheck()">
             {{ networkBusy ? 'Measuring…' : networkEntries.length ? 'Measure Again' : 'Run Network Check' }}
@@ -938,27 +942,83 @@ export class SystemCheckViewComponent implements OnInit {
         downloadRating,
         uploadRating
       );
-      const connection = (navigator as Navigator & { connection?: BrowserConnection })
-        .connection;
-      this.networkEntries = [
+      const navigatorWithConnection = navigator as Navigator & {
+        connection?: BrowserConnection;
+        mozConnection?: BrowserConnection;
+        webkitConnection?: BrowserConnection;
+      };
+      const connection =
+        navigatorWithConnection.connection ||
+        navigatorWithConnection.mozConnection ||
+        navigatorWithConnection.webkitConnection;
+      const networkEntries = [
         this.entry("nw-download", "network", "Downloadgeschwindigkeit", this.humanReadableBitsPerSecond(download.bytesPerSecond)),
         this.entry("nw-download-needed", "network", "Downloadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.downloadSpeed.min)),
         this.entry("nw-download-evaluation", "network", "Downloadbewertung", downloadRating, downloadRating === "insufficient" || downloadRating === "unstable"),
         this.entry("nw-upload", "network", "Uploadgeschwindigkeit", this.humanReadableBitsPerSecond(upload.bytesPerSecond)),
         this.entry("nw-upload-needed", "network", "Uploadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.uploadSpeed.min)),
         this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient" || uploadRating === "unstable"),
-        this.entry("latency", "network", "RoundTrip in Ms", average.toFixed(1), average >= 400),
-        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient" || this.networkRating === "unstable"),
-        this.entry("bnni-effective-network-type", "network", "Netzwerktyp nach Leistung", connection?.effectiveType ?? "not available"),
-        this.entry("bnni-downlink", "network", "Downlink MB/s", connection?.downlink ?? "not available"),
-        this.entry("bnni-roundtrip", "network", "Browser RoundTrip in Ms", connection?.rtt ?? "not available"),
-        this.entry("bnni-network-type", "network", "Netzwerktyp", connection?.type ?? "not available")
+        this.entry("latency", "network", "Anwendungs-Latenz in Ms", average.toFixed(1), average >= 400),
+        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient" || this.networkRating === "unstable")
       ];
+      if (connection) {
+        if (connection.rtt) {
+          networkEntries.push(
+            this.entry(
+              "bnni-roundtrip",
+              "network",
+              "RoundTrip in Ms",
+              connection.rtt.toString()
+            )
+          );
+        }
+        if (connection.effectiveType) {
+          networkEntries.push(
+            this.entry(
+              "bnni-effective-network-type",
+              "network",
+              "Netzwerktyp nach Leistung",
+              connection.effectiveType
+            )
+          );
+        }
+        if (connection.type) {
+          networkEntries.push(
+            this.entry(
+              "bnni-network-type",
+              "network",
+              "Netzwerktyp",
+              connection.type
+            )
+          );
+        }
+        if (connection.downlink) {
+          networkEntries.push(
+            this.entry(
+              "bnni-downlink",
+              "network",
+              "Downlink MB/s",
+              connection.downlink.toString()
+            )
+          );
+        }
+      } else {
+        networkEntries.push(
+          this.entry(
+            "bnni-fail",
+            "network",
+            "Netzwerkprofil des Browsers",
+            "nicht verfügbar",
+            true
+          )
+        );
+      }
+      this.networkEntries = networkEntries;
       this.networkStatusMessage = `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
     } catch (error) {
-      this.networkRating = "insufficient";
+      this.networkRating = "unstable";
       this.networkEntries = [
-        this.entry("nw-overall", "network", "Gesamtbewertung", "insufficient", true)
+        this.entry("nw-overall", "network", "Gesamtbewertung", "unstable", true)
       ];
       this.networkStatusMessage = "Network measurement failed.";
       this.errorMessage = error instanceof Error ? error.message : String(error);

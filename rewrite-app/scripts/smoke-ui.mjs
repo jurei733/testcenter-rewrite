@@ -1731,15 +1731,27 @@ try {
   await brandedParticipantPage
     .locator("#participantLoginKey")
     .fill("ui-custom-text-login");
+  const customTextCurrentStateResponsePromise =
+    brandedParticipantPage.waitForResponse(response =>
+      response.request().method() === "GET" &&
+      response.url().includes("/api/v1/participant/sessions/") &&
+      response.url().endsWith("/current-state") &&
+      response.status() === 200
+    );
   await brandedParticipantPage.locator("#participantRouteSignInButton").click();
+  const customTextCurrentStateResponse =
+    await customTextCurrentStateResponsePromise;
+  const customTextCurrentState = await customTextCurrentStateResponse.json();
+  assert.equal(
+    customTextCurrentState.currentRunState?.participantRosterEntry?.customTexts
+      ?.login_subtitle,
+    "UI Workspace Selection",
+    "Participant current state must carry the imported workspace login subtitle."
+  );
   await brandedParticipantPage.waitForFunction(() => {
     const sessionId = document.querySelector("#participantRouteSessionId");
     return sessionId instanceof HTMLInputElement && sessionId.value.length > 0;
   });
-  await brandedParticipantPage
-    .locator("#participantCustomLoginSubtitle")
-    .filter({ hasText: "UI Workspace Selection" })
-    .waitFor();
   await brandedParticipantPage
     .locator("#participantRouteCompleteButton")
     .filter({ hasText: "UI Booklet Complete" })
@@ -2271,6 +2283,10 @@ try {
         plugins: {
           configurable: true,
           value: [{ name: "Smoke PDF Viewer" }]
+        },
+        connection: {
+          configurable: true,
+          value: null
         }
       });
     });
@@ -2355,6 +2371,56 @@ try {
       .filter({ hasText: "Downloadgeschwindigkeit" })
       .filter({ hasText: "Uploadgeschwindigkeit" })
       .waitFor();
+    const missingBrowserNetworkProfile = page.locator(
+      "#systemCheckNetwork-bnni-fail"
+    );
+    await missingBrowserNetworkProfile
+      .filter({ hasText: "Netzwerkprofil des Browsers" })
+      .filter({ hasText: "nicht verfügbar" })
+      .waitFor();
+    assert.equal(await missingBrowserNetworkProfile.evaluate(node =>
+      node.classList.contains("has-warning")
+    ), true);
+    await page.evaluate(() => {
+      Object.defineProperty(window.navigator, "mozConnection", {
+        configurable: true,
+        value: {
+          downlink: 42.5,
+          effectiveType: "smoke-5g",
+          rtt: 37,
+          type: "wifi"
+        }
+      });
+    });
+    await page.locator("#runSystemCheckNetworkButton").click();
+    await page
+      .locator("#runSystemCheckNetworkButton")
+      .filter({ hasText: "Measuring…" })
+      .waitFor();
+    await page
+      .locator("#systemCheckNetworkStatus")
+      .filter({ hasText: "Measurement complete after" })
+      .waitFor({ timeout: 45_000 });
+    for (const [id, expectedValue] of [
+      ["bnni-roundtrip", "37"],
+      ["bnni-effective-network-type", "smoke-5g"],
+      ["bnni-network-type", "wifi"],
+      ["bnni-downlink", "42.5"]
+    ]) {
+      await page
+        .locator(`#systemCheckNetwork-${id}`)
+        .filter({ hasText: expectedValue })
+        .waitFor();
+    }
+    assert.equal(await page.locator("#systemCheckNetwork-bnni-fail").count(), 0);
+    assert.equal(
+      await page.locator(".system-check-results", { hasText: "not available" }).count(),
+      0
+    );
+    await page.evaluate(() => {
+      delete window.navigator.connection;
+      delete window.navigator.mozConnection;
+    });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await page
@@ -2402,6 +2468,8 @@ try {
       .filter({ hasText: "System check answer" })
       .filter({ hasText: "SM-S918B" })
       .filter({ hasText: "Smoke PDF Viewer" })
+      .filter({ hasText: "smoke-5g" })
+      .filter({ hasText: "42.5" })
       .waitFor({ timeout: 15_000 });
     await expectButtonSelectorEnabled("#exportSystemCheckReportsButton");
     const systemCheckReportDownloadPromise = page.waitForEvent("download");
@@ -2424,7 +2492,10 @@ try {
       '"Browser-Version"',
       '"CPU-Architektur"',
       '"SM-S918B"',
-      '"Smoke PDF Viewer"'
+      '"Smoke PDF Viewer"',
+      '"Netzwerktyp nach Leistung"',
+      '"smoke-5g"',
+      '"42.5"'
     ]) {
       assert.match(systemCheckReportCsv, new RegExp(expectedValue));
     }
