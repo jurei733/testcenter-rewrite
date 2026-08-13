@@ -217,7 +217,6 @@ type ThroughputResult = {
               </label>
             </ng-container>
           </div>
-          <p class="validation-message" *ngIf="questionnaireIssue">{{ questionnaireIssue }}</p>
         </article>
 
         <article class="card" *ngIf="step === 'unit'">
@@ -247,6 +246,16 @@ type ThroughputResult = {
 
         <article class="card" *ngIf="step === 'report'">
           <h2>Report</h2>
+          <section
+            id="systemCheckQuestionnaireWarnings"
+            class="system-check-notice has-warning"
+            *ngIf="unansweredRequiredQuestions.length > 0"
+          >
+            <strong>{{ customText('syscheck_questionsRequiredMessage', 'Bitte prüfen Sie die Eingaben (unvollständig):') }}</strong>
+            <ul>
+              <li *ngFor="let question of unansweredRequiredQuestions">{{ question.prompt }}</li>
+            </ul>
+          </section>
           <p>The report contains {{ reportEntryCount }} measured or answered values.</p>
           <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
           <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
@@ -373,7 +382,6 @@ type ThroughputResult = {
     fieldset { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; }
     .choice-row { display: flex; grid-template-columns: none; align-items: center; gap: 10px; color: var(--ink); }
     .choice-row input { width: auto; }
-    .validation-message { color: var(--accent) !important; font-weight: 700; }
     .system-check-notice, .system-check-operator { margin-top: 18px; padding: 18px; border-radius: var(--radius-lg); background: var(--secondary-soft); }
     .system-check-operator { background: rgba(27,36,48,.05); }
     .system-check-operator ol { display: grid; gap: 8px; padding-left: 24px; }
@@ -431,7 +439,6 @@ export class SystemCheckViewComponent implements OnInit {
   busy = false;
   systemCheckAuthenticationBusy = false;
   errorMessage = "";
-  questionnaireIssue = "";
 
   async ngOnInit(): Promise<void> {
     this.viewState.setActiveView("system-check");
@@ -498,9 +505,6 @@ export class SystemCheckViewComponent implements OnInit {
     if (this.step === "network") {
       return this.networkEntries.length > 0 && !this.networkBusy;
     }
-    if (this.step === "questionnaire") {
-      return this.requiredQuestionsAnswered;
-    }
     return !this.busy;
   }
 
@@ -511,14 +515,15 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   get requiredQuestionsAnswered(): boolean {
-    return (
-      this.systemCheck?.questions
-        .filter(question => question.required && question.type !== "header")
-        .every(question => {
-          const value = this.answers[question.id];
-          return question.type === "check" ? value === true : String(value ?? "").trim();
-        }) ?? true
-    );
+    return this.unansweredRequiredQuestions.length === 0;
+  }
+
+  get unansweredRequiredQuestions() {
+    return (this.systemCheck?.questions ?? []).filter(question => {
+      if (!question.required || question.type === "header") return false;
+      const value = this.answers[question.id];
+      return value === undefined || value === null || value === "" || value === false;
+    });
   }
 
   get reportEntryCount(): number {
@@ -542,7 +547,9 @@ export class SystemCheckViewComponent implements OnInit {
         label: question.prompt,
         value:
           typeof value === "boolean" ? value : String(value ?? ""),
-        warning: question.required && !value
+        warning:
+          question.required &&
+          (value === undefined || value === null || value === "" || value === false)
       }];
     });
   }
@@ -589,8 +596,9 @@ export class SystemCheckViewComponent implements OnInit {
 
   get canSaveReport(): boolean {
     return (
-      this.isSystemCheckSession ||
-      (this.reportTitle.trim() !== "" && this.reportKey.trim() !== "")
+      this.requiredQuestionsAnswered &&
+      (this.isSystemCheckSession ||
+        (this.reportTitle.trim() !== "" && this.reportKey.trim() !== ""))
     );
   }
 
@@ -713,7 +721,6 @@ export class SystemCheckViewComponent implements OnInit {
       this.unitLoadingTimeMs = null;
       this.savedReport = null;
       this.operatorReports = [];
-      this.questionnaireIssue = "";
       this.step = "welcome";
       await this.captureEnvironment();
     });
@@ -722,7 +729,6 @@ export class SystemCheckViewComponent implements OnInit {
   chooseAnother(): void {
     this.systemCheck = null;
     this.step = "welcome";
-    this.questionnaireIssue = "";
     this.errorMessage = "";
   }
 
@@ -740,16 +746,7 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   nextStep(): void {
-    if (!this.canContinue) {
-      if (this.step === "questionnaire") {
-        this.questionnaireIssue = this.customText(
-          "syscheck_questionsRequiredMessage",
-          "Please complete all required questions."
-        );
-      }
-      return;
-    }
-    this.questionnaireIssue = "";
+    if (!this.canContinue) return;
     const next = this.steps[this.stepIndex + 1];
     if (next) this.setStep(next);
   }

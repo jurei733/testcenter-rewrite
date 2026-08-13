@@ -527,6 +527,13 @@ warning entry when no profile API exists, and classifies failed measurements as
 vendor-prefixed paths, then follows the measured profile through saved report
 detail and semicolon CSV export.
 
+Required System Check questions now follow the Original report-stage workflow:
+participants may continue past an incomplete questionnaire, the report lists
+each unanswered required prompt with the configured
+`syscheck_questionsRequiredMessage`, and report saving remains disabled until
+the participant goes back and completes those answers. Production Chromium
+gates both the anonymous save-key and dedicated system-check-login paths.
+
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/listed/revoked/exported as CSV without exposing tokens, targeted session revoke protects against accidentally revoking the active session, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and permanently delete delegated accounts while preventing self-disable, self-delete, or self platform-role revoke lockouts; matching both directions of the Original Superadmin permission editor, the Angular directory exposes effective inherited/direct RO/RW access as workspace-to-admin and admin-to-workspace matrices, with every direct change routed through the same delegation and audit boundary; disabling an account formally revokes every active session, while deletion atomically removes every role and session and retains a complete audit snapshot with exact deletion counts

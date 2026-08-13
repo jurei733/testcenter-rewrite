@@ -786,6 +786,13 @@ Production Chromium proves the unavailable profile first, repeats measurement
 through `mozConnection`, and verifies the four Original IDs and values through
 the durable report detail and semicolon CSV export.
 
+Latest P1 System Check required-question closure: matching the Original, an
+incomplete questionnaire no longer traps the participant. The report renders
+the configured `syscheck_questionsRequiredMessage`, lists only unanswered
+required prompts, and disables report saving until those answers are corrected
+through Back navigation. Production Chromium gates the incomplete report,
+correction, and successful save for anonymous-key and dedicated-login flows.
+
 Latest participant-review export closure: the Participant starter now mirrors
 the Original `Reviews downloaden` flow. Its route accepts only the opaque
 participant session, rechecks `canReview` server-side, intersects reviews with

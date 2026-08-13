@@ -2426,6 +2426,23 @@ try {
     await page
       .getByRole("heading", { name: "UI authored heading", exact: true })
       .waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
+    await page
+      .locator("#systemCheckQuestionnaireWarnings")
+      .filter({ hasText: "Eingabefeld" })
+      .waitFor();
+    assert.equal(
+      await page.locator("#systemCheckQuestionnaireWarnings li").count(),
+      1
+    );
+    await expectButtonSelectorDisabled("#saveSystemCheckReportButton");
+    await page.locator("#systemCheckBackButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.locator("#systemCheckBackButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");
     await selectAndCommit("#systemCheckQuestion-3", "Option B");
     await fillAndCommit("#systemCheckQuestion-4", "Browser flow verified");
@@ -2455,6 +2472,7 @@ try {
       .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
+    assert.equal(await page.locator("#systemCheckQuestionnaireWarnings").count(), 0);
     await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check");
     await fillAndCommit("#systemCheckReportKey", "saveme");
     await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
@@ -2640,12 +2658,6 @@ try {
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await expectButtonSelectorEnabled("#systemCheckNextButton");
-    await page.locator("#systemCheckNextButton").click();
-    await page
-      .locator(".validation-message")
-      .filter({ hasText: "Please complete all required questions." })
-      .waitFor();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
     await selectAndCommit("#systemCheckQuestion-3", "Option A");
     await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
@@ -14338,13 +14350,17 @@ try {
     .waitFor();
   await advanceProtectedSystemCheck("Environment", "2 / 4");
   await advanceProtectedSystemCheck("Questionnaire", "3 / 4");
-  await page.locator("#systemCheckNextButton").click();
+  await advanceProtectedSystemCheck("Report", "4 / 4");
   await page
-    .locator(".validation-message")
-    .filter({ hasText: "Please complete all required questions." })
+    .locator("#systemCheckQuestionnaireWarnings")
+    .filter({ hasText: "Assigned device" })
     .waitFor();
+  await expectButtonSelectorDisabled("#saveSystemCheckReportButton");
+  await page.locator("#systemCheckBackButton").click();
+  await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
   await fillAndCommit("#systemCheckQuestion-device", "Protected UI device");
   await advanceProtectedSystemCheck("Report", "4 / 4");
+  assert.equal(await page.locator("#systemCheckQuestionnaireWarnings").count(), 0);
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Report", exact: true }) })
