@@ -2619,6 +2619,8 @@ try {
     );
     assert.equal(await page.locator("#systemCheckReportTitle").count(), 0);
     assert.equal(await page.locator("#systemCheckReportKey").count(), 0);
+    assert.equal(await page.locator("#downloadSystemCheckReportButton").count(), 0);
+    await expectButtonSelectorEnabled("#cancelSystemCheckReportButton");
     await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
     await page.locator("#saveSystemCheckReportButton").click();
     await page.locator("#systemCheckSaveReportBackdrop").waitFor();
@@ -2908,6 +2910,38 @@ try {
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await expectButtonSelectorEnabled("#systemCheckNextButton");
+    await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
+    await selectAndCommit("#systemCheckQuestion-3", "Option A");
+    await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
+    await page.locator("#systemCheckQuestion-5").check();
+    await page.getByRole("radio", { name: "Option B", exact: true }).check();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
+    assert.equal(await page.locator("#downloadSystemCheckReportButton").count(), 0);
+    await expectButtonSelectorEnabled("#cancelSystemCheckReportButton");
+    await page.locator("#cancelSystemCheckReportButton").click();
+    await page.waitForURL(/\/app\/home$/);
+    await page.goto(
+      `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+        systemCheckTenantKey
+      )}&workspaceKey=${encodeURIComponent(
+        systemCheckWorkspaceKey
+      )}&checkId=${encodeURIComponent("syscheck-2")}`,
+      { waitUntil: "networkidle" }
+    );
+    await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    const resumedSecondSystemCheckPlayerFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
+    await fillVeronaAnswerAndWaitForHost(
+      resumedSecondSystemCheckPlayerFrame,
+      "#var1",
+      "Second system check answer"
+    );
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
     await selectAndCommit("#systemCheckQuestion-3", "Option A");
     await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
@@ -14627,6 +14661,8 @@ try {
     .waitFor();
   assert.equal(await page.locator("#systemCheckReportTitle").count(), 0);
   assert.equal(await page.locator("#systemCheckReportKey").count(), 0);
+  assert.equal(await page.locator("#downloadSystemCheckReportButton").count(), 0);
+  await expectButtonSelectorEnabled("#cancelSystemCheckReportButton");
   const protectedSystemCheckSaveResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "POST" &&

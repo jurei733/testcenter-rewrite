@@ -30,7 +30,7 @@ import type {
   WorkspaceSystemCheck
 } from "@testcenter-rewrite-app/domain";
 
-import { downloadBlobFile, downloadTextFile } from "./download-text-file";
+import { downloadBlobFile } from "./download-text-file";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
@@ -335,8 +335,8 @@ const readSystemCheckUnitResponse = (
           </section>
           <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
           <div class="actions">
-            <button id="downloadSystemCheckReportButton" class="secondary" type="button" (click)="downloadReport()">Download JSON</button>
             <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !canSaveReport" (click)="startReportSave()">Bericht senden</button>
+            <button id="cancelSystemCheckReportButton" class="secondary" type="button" [disabled]="busy" (click)="cancelSystemCheckReport()">System-Check abbrechen</button>
           </div>
           <section class="system-check-operator" *ngIf="!isSystemCheckSession">
             <h3>Operator report access</h3>
@@ -1091,14 +1091,6 @@ export class SystemCheckViewComponent implements OnInit {
     return JSON.stringify(responses);
   }
 
-  downloadReport(): void {
-    downloadTextFile({
-      filename: `${this.systemCheck?.checkId ?? "system-check"}-report.json`,
-      mediaType: "application/json;charset=UTF-8",
-      text: `${JSON.stringify(this.reportPayload(false), null, 2)}\n`
-    });
-  }
-
   startReportSave(): void {
     if (!this.canSaveReport) {
       return;
@@ -1108,6 +1100,14 @@ export class SystemCheckViewComponent implements OnInit {
       return;
     }
     this.reportSaveDialogOpen = true;
+  }
+
+  async cancelSystemCheckReport(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.reportSaveDialogOpen = false;
+    await this.router.navigate(["/home"]);
   }
 
   closeReportSaveDialog(): void {
