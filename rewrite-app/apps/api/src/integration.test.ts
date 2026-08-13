@@ -30027,6 +30027,15 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
               </Option>
               <Option id="pending" label="Pending"/>
             </State>
+            <State id="status-route" label="Response status route">
+              <Option id="unset" label="Unset">
+                <If>
+                  <Status of="answer" from="decision-unit"/>
+                  <Is equal="UNSET"/>
+                </If>
+              </Option>
+              <Option id="other" label="Other"/>
+            </State>
           </States>
           <Units>
             <Unit id="UNIT.VERSION.DECISION" alias="decision-unit" label="Decision Unit"/>
@@ -30065,7 +30074,11 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
   );
   assert.equal(activation.status, 200);
 
-  const runVersion = async (loginKey: string, responseType: string) => {
+  const runVersion = async (
+    loginKey: string,
+    responseType: string,
+    responseStatus = "VALUE_CHANGED"
+  ) => {
     const signIn = await requestJson<{
       participantSession: { participantSessionId: string };
     }>("/api/v1/participant/auth/sign-in", {
@@ -30081,7 +30094,10 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
       body: { bookletKey }
     });
     assert.equal(resume.status, 200);
-    assert.deepEqual(resume.body.testRun.bookletStates, { route: "pending" });
+    assert.deepEqual(resume.body.testRun.bookletStates, {
+      route: "pending",
+      "status-route": "unset"
+    });
 
     const unitResponse = JSON.stringify({
       kind: "verona_unit_state",
@@ -30092,7 +30108,7 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
         responseProgress: "complete",
         dataParts: {
           responses: JSON.stringify([
-            { id: "answer", status: "VALUE_CHANGED", value: "route-me" }
+            { id: "answer", status: responseStatus, value: "route-me" }
           ])
         }
       }
@@ -30133,7 +30149,7 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
     "iqb-standard@2.0"
   );
   assert.deepEqual(versionTwo, {
-    bookletStates: { route: "pending" },
+    bookletStates: { route: "pending", "status-route": "unset" },
     unitKeys: ["decision-unit", "pending-route"],
     nextUnitKey: "pending-route"
   });
@@ -30143,9 +30159,20 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
     "IQB-STANDARD@1.1"
   );
   assert.deepEqual(uppercaseVersionOne, {
-    bookletStates: { route: "pending" },
+    bookletStates: { route: "pending", "status-route": "unset" },
     unitKeys: ["decision-unit", "pending-route"],
     nextUnitKey: "pending-route"
+  });
+
+  const emptyStatusVersionOne = await runVersion(
+    "adaptive-iqb-standard-version-empty-status",
+    "iqb-standard@1.1",
+    ""
+  );
+  assert.deepEqual(emptyStatusVersionOne, {
+    bookletStates: { route: "answered", "status-route": "other" },
+    unitKeys: ["decision-unit", "answered-route"],
+    nextUnitKey: "answered-route"
   });
 
   const versionOne = await runVersion(
@@ -30153,7 +30180,7 @@ test("original Testcenter compatibility corpus limits adaptive responses to exac
     "iqb-standard@1.1"
   );
   assert.deepEqual(versionOne, {
-    bookletStates: { route: "answered" },
+    bookletStates: { route: "answered", "status-route": "other" },
     unitKeys: ["decision-unit", "answered-route"],
     nextUnitKey: "answered-route"
   });

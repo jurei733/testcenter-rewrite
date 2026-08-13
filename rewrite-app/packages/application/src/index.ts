@@ -19286,7 +19286,9 @@ const evaluateAdaptiveStates = (
       } else if (source.type === "Value") {
         value = adaptiveValueAsComparable(variable.value);
       } else if (source.type === "Status") {
-        value = variable.status || source.defaultValue || "UNSET";
+        value = variable.status ??
+          adaptiveStatusOrder.find(status => status === source.defaultValue) ??
+          "UNSET";
       } else {
         value = variable.score ?? adaptiveValueAsNumber(source.defaultValue);
       }
