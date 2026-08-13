@@ -925,6 +925,12 @@ try {
   await page.waitForURL(/\/app\/home$/);
   await page.waitForSelector("h1");
   await page.locator("#applicationStartView").waitFor();
+  await page.locator("#startSystemCheck").waitFor();
+  assert.equal(
+    await page.locator("#startProtectedSystemCheck").count(),
+    0,
+    "An installation without system-check accounts should expose the anonymous System Check entry."
+  );
   await waitForNotBusy("initial-load");
   assert.equal(await page.locator("#authModeBadge").count(), 0);
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
@@ -13928,11 +13934,15 @@ try {
     .filter({ hasText: "system_check" })
     .filter({ hasText: "45 minute(s) after first sign-in" })
     .waitFor();
-  await page.goto(
-    `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
-      tenantKey
-    )}&workspaceKey=${encodeURIComponent(workspaceKey)}`
+  await page.goto(`${baseUrl}/app/home`, { waitUntil: "domcontentloaded" });
+  await page.locator("#startProtectedSystemCheck").waitFor();
+  assert.equal(
+    await page.locator("#startSystemCheck").count(),
+    0,
+    "A configured system-check account must remove the anonymous System Check entry."
   );
+  await page.locator("#startProtectedSystemCheck").click();
+  await page.waitForURL(/\/app\/system-check$/);
   await page.locator("#systemCheckLoginRequiredStatus").waitFor();
   assert.equal(await page.locator("#loadSystemChecksButton").count(), 0);
   await fillAndCommit("#systemCheckUsername", systemCheckUsername);

@@ -57,6 +57,16 @@
   transform: translateY(-2px);
 }
 
+.application-start-option-status:hover {
+  border-color: var(--line);
+  box-shadow: none;
+  transform: none;
+}
+
+.application-start-option-status button {
+  justify-self: start;
+}
+
 .application-start-option-index {
   color: var(--accent);
   font-family: "Avenir Next", "Segoe UI", sans-serif;

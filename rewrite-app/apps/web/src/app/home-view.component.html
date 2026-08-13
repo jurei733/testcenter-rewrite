@@ -16,17 +16,43 @@
       <em>Open participant entry</em>
     </a>
 
-    <a id="startSystemCheck" class="application-start-option" routerLink="/system-check">
-      <span class="application-start-option-index">02</span>
-      <strong>System Check</strong>
-      <span>Verify this device, network, questionnaire, and Player setup.</span>
-      <em>Open system check</em>
-    </a>
+    @if (systemCheckEntryState() === "anonymous_key") {
+      <a id="startSystemCheck" class="application-start-option" routerLink="/system-check">
+        <span class="application-start-option-index">02</span>
+        <strong>System Check</strong>
+        <span>Verify this device, network, questionnaire, and Player setup.</span>
+        <em>Open system check</em>
+      </a>
+    } @else if (systemCheckEntryState() === "login_required") {
+      <a id="startProtectedSystemCheck" class="application-start-option" routerLink="/system-check">
+        <span class="application-start-option-index">02</span>
+        <strong>System Check Account</strong>
+        <span>This installation uses assigned system-check accounts; anonymous checks are disabled.</span>
+        <em>Sign in to system check</em>
+      </a>
+    } @else {
+      <section
+        id="systemCheckEntryStatus"
+        class="application-start-option application-start-option-status"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="application-start-option-index">02</span>
+        <strong>System Check</strong>
+        @if (systemCheckEntryState() === "loading") {
+          <span>Checking whether anonymous device checks are available…</span>
+          <em>Please wait</em>
+        } @else {
+          <span>The system-check entry mode could not be loaded.</span>
+          <button id="retrySystemCheckEntry" class="ghost" type="button" (click)="loadSystemCheckAccess()">Try again</button>
+        }
+      </section>
+    }
 
     <a id="startOperatorAccess" class="application-start-option" routerLink="/ops">
       <span class="application-start-option-index">03</span>
       <strong>Operator</strong>
-      <span>Sign in to administer content, participants, monitoring, and results.</span>
+      <span>Sign in to administer content, participants, monitoring, and results. Dedicated system-check accounts can also use their focused entry above.</span>
       <em>{{ app.hasAdminSession ? "Open operator console" : "Open operator sign-in" }}</em>
     </a>
   </section>
