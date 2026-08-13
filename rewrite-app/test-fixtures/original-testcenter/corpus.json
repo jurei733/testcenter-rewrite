@@ -2555,6 +2555,104 @@
       ]
     }
   },
+  "currentOriginalAspectPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/aspect",
+    "booklets": [
+      {
+        "fixture": "booklets/aspect-current-booklet1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/booklet1.xml",
+        "sha256": "42cec20a4e2e943402844d4e5c315abec1d2f3cfcf687c40364ac105bf0c4243",
+        "bookletKey": "booklet1",
+        "unitKeys": ["testcenter-sample1", "testcenter-sample2", "testcenter-sample3"]
+      },
+      {
+        "fixture": "booklets/aspect-current-booklet2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/booklet2.xml",
+        "sha256": "ae17d6eaa42978fdfb33b70cbc868c5f98c2a43bd1401a5423074580fb77a840",
+        "bookletKey": "booklet2",
+        "unitKeys": ["testcenter-sample1", "testcenterTEST4", "testcenter-sample3"]
+      }
+    ],
+    "units": [
+      {
+        "fixture": "units/aspect-current-testcenter-sample1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample1.xml",
+        "sha256": "2c0116db583f9d2a52eb8e7542f3e646637298afe1c7839681479f3838c8be2c",
+        "unitKey": "testcenter-sample1",
+        "definitionFixture": "definitions/aspect-current-testcenter-sample1.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample1.voud",
+        "definitionSha256": "03b24c4ce44b86cfb489eb82cc9668815563693d1660c7971648fcc7ba7903ff",
+        "metadataReferenceFixture": "definitions/aspect-testcenter-sample1.vomd.base64"
+      },
+      {
+        "fixture": "units/aspect-current-testcenter-sample2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample2.xml",
+        "sha256": "d0d30adb409316fbd1a7c4de9aa9cd0e467d97b1b27ab23a486e7d405f200950",
+        "unitKey": "testcenter-sample2",
+        "definitionFixture": "definitions/aspect-testcenter-sample2.voud.br.base64",
+        "definitionEncoding": "brotli-base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample2.voud",
+        "definitionSha256": "c7af813cca325099fa7659cb7b2c5dd01a8e35cc2f3c96cf937c9769d05b6fa8"
+      },
+      {
+        "fixture": "units/aspect-current-testcenter-sample3.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample3.xml",
+        "sha256": "7d95fbd7b21b0342e6b1b64e9fbb679bc3016bebe64d6de51656bfed50e96db1",
+        "unitKey": "testcenter-sample3",
+        "definitionFixture": "definitions/aspect-current-testcenter-sample3.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample3.voud",
+        "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a",
+        "metadataReferenceFixture": "definitions/aspect-testcenter-sample3.vomd.base64"
+      },
+      {
+        "fixture": "units/aspect-current-testcenterTEST4.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenterTEST4.xml",
+        "sha256": "b30c8e3e5c5059baf01cfba559fdd4407d471f3ca34382c604e442f357ade31c",
+        "unitKey": "testcenterTEST4",
+        "definitionFixture": "definitions/aspect-current-testcenterTEST4.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenterTEST4.voud",
+        "definitionSha256": "2d09ee890615a5543be3ff98b998a69b21db505b4d14717fdce91981415cd204"
+      }
+    ],
+    "player": {
+      "fixture": "players/iqb-player-aspect-2.12.3.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/aspect/iqb-player-aspect-2.12.3.html",
+      "sha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5",
+      "playerKey": "iqb-player-aspect@2.12"
+    },
+    "roster": {
+      "fixture": "rosters/aspect-testtaker1-current.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/aspect/testtaker1.xml",
+      "sha256": "f6560783a32a30392ad5e0287ade5e7eac50d83a652db04acf94536ce424f967",
+      "groupKey": "TestTakerGroup_d4v9z",
+      "participantLoginKeys": ["testuser1", "testuser2", "testuser3", "testuser-review"],
+      "operationalLoginKeys": ["testuser-monitor"],
+      "assignments": {
+        "testuser1": ["booklet1", "booklet2"],
+        "testuser2": ["booklet1"],
+        "testuser3": ["booklet1"],
+        "testuser-review": ["booklet1"]
+      },
+      "accessCodes": {
+        "testuser1": ["xxx", "yyy", "11111"],
+        "testuser2": ["xxx", "yyy", "111"],
+        "testuser3": ["xxx", "yyy", "11111"]
+      }
+    }
+  },
   "playerPackages": [
     {
       "bookletFixture": "booklets/booklet-17.4.xml",

@@ -295,6 +295,41 @@ type OriginalTestcenterCorpus = {
       advanced: Array<{ id: string; status: string; value: unknown }>;
     };
   };
+  currentOriginalAspectPackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklets: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        bookletKey: string;
+        unitKeys: string[];
+      }
+    >;
+    units: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        unitKey: string;
+        definitionFixture: string;
+        definitionEncoding: "utf8" | "base64" | "brotli-base64";
+        definitionSourcePath: string;
+        definitionSha256: string;
+        metadataReferenceFixture?: string;
+      }
+    >;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      groupKey: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      assignments: Record<string, string[]>;
+      accessCodes: Record<string, string[]>;
+    };
+  };
   currentOriginalStarsPackage: {
     family: string;
     sourceRepository: string;
@@ -1071,6 +1106,122 @@ test("original Testcenter compatibility corpus pins the current adaptive system-
     { bonus: "yes" },
     { bonus: "no" }
   ]);
+});
+
+test("original Testcenter compatibility corpus pins the current Aspect sample graph", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const aspect = corpus.currentOriginalAspectPackage;
+  assert.equal(
+    aspect.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(aspect.sourceDirectory, "sampledata/aspect");
+
+  const readEncodedFixture = (
+    fixture: string,
+    encoding: "utf8" | "base64" | "brotli-base64"
+  ): Buffer => {
+    const document = readFileSync(resolve(corpusRoot, fixture));
+    if (encoding === "utf8") return document;
+    const decoded = Buffer.from(document.toString("utf8").trim(), "base64");
+    return encoding === "brotli-base64"
+      ? brotliDecompressSync(decoded)
+      : decoded;
+  };
+  for (const booklet of aspect.booklets) {
+    const document = readEncodedFixture(booklet.fixture, booklet.encoding);
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      booklet.sha256,
+      booklet.sourcePath
+    );
+    const xml = document.toString("utf8");
+    assert.match(xml, new RegExp(`<Id>${booklet.bookletKey}</Id>`));
+    assert.deepEqual(
+      Array.from(xml.matchAll(/<Unit\b[^>]*\bid="([^"]+)"/g), match => match[1]),
+      booklet.unitKeys
+    );
+  }
+  const firstBooklet = readEncodedFixture(
+    aspect.booklets[0]!.fixture,
+    aspect.booklets[0]!.encoding
+  ).toString("utf8");
+  assert.match(firstBooklet, /testcenter-booklet-xml\/18\.0/);
+  assert.match(firstBooklet, /<CodeToEnter code="sample">/);
+  assert.match(firstBooklet, /<TimeMax minutes="1"\s*\/>/);
+
+  for (const unit of aspect.units) {
+    const unitDocument = readEncodedFixture(unit.fixture, unit.encoding);
+    assert.equal(
+      createHash("sha256").update(unitDocument).digest("hex"),
+      unit.sha256,
+      unit.sourcePath
+    );
+    assert.match(unitDocument.toString("utf8"), new RegExp(`<Id>${unit.unitKey}</Id>`));
+    const definitionDocument = readEncodedFixture(
+      unit.definitionFixture,
+      unit.definitionEncoding
+    );
+    assert.equal(
+      createHash("sha256").update(definitionDocument).digest("hex"),
+      unit.definitionSha256,
+      unit.definitionSourcePath
+    );
+  }
+  const playerDocument = readEncodedFixture(
+    aspect.player.fixture,
+    aspect.player.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    aspect.player.sha256,
+    aspect.player.sourcePath
+  );
+
+  const rosterDocument = readEncodedFixture(
+    aspect.roster.fixture,
+    aspect.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterDocument).digest("hex"),
+    aspect.roster.sha256,
+    aspect.roster.sourcePath
+  );
+  const rosterXml = rosterDocument.toString("utf8");
+  const participants = parseParticipantRosterText(rosterXml);
+  assert.deepEqual(
+    participants.map(entry => entry.loginKey),
+    aspect.roster.participantLoginKeys
+  );
+  for (const entry of participants) {
+    assert.equal(entry.groupKey, aspect.roster.groupKey);
+    assert.deepEqual(
+      entry.bookletAssignments?.map(assignment => assignment.bookletKey),
+      aspect.roster.assignments[entry.loginKey]
+    );
+    const expectedCodes = aspect.roster.accessCodes[entry.loginKey];
+    if (expectedCodes) {
+      assert.ok(
+        entry.bookletAssignments?.every(assignment =>
+          expectedCodes.every(code => assignment.accessCodes?.includes(code))
+        )
+      );
+    }
+  }
+  assert.deepEqual(participants.find(entry => entry.loginKey === "testuser2")?.viewSettings, {
+    theme: "Sekundar",
+    codeInput: { type: "keypad-symbols-alt", length: 3 }
+  });
+  assert.deepEqual(participants.find(entry => entry.loginKey === "testuser3")?.viewSettings, {
+    theme: "Sekundar",
+    codeInput: { type: "keypad-symbols", length: 5 }
+  });
+  assert.deepEqual(
+    parseOriginalTestcenterOperationalLogins(rosterXml).map(entry => entry.loginKey),
+    aspect.roster.operationalLoginKeys
+  );
 });
 
 test("original Testcenter compatibility corpus pins the current STARS system-test graph", () => {

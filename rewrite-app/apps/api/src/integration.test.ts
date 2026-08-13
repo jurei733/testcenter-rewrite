@@ -21734,6 +21734,301 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
   assert.equal(reviewSignIn.body.participantSession.executionMode, "run-review");
 });
 
+test("original Testcenter compatibility corpus imports the current two-booklet Aspect package", async () => {
+  type CurrentAspectPackage = {
+    booklets: Array<{
+      fixture: string;
+      bookletKey: string;
+      unitKeys: string[];
+    }>;
+    units: Array<{
+      fixture: string;
+      unitKey: string;
+      definitionFixture: string;
+      definitionEncoding: "utf8" | "base64" | "brotli-base64";
+      metadataReferenceFixture?: string;
+    }>;
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      groupKey: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      assignments: Record<string, string[]>;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentOriginalAspectPackage: CurrentAspectPackage };
+  const expectation = corpus.currentOriginalAspectPackage;
+  const readBase64Fixture = (fixture: string): string =>
+    Buffer.from(
+      readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
+      "base64"
+    ).toString("utf8");
+  const booklets = expectation.booklets.map(booklet => ({
+    ...booklet,
+    document: readBase64Fixture(booklet.fixture)
+  }));
+  const units = expectation.units.map(unit => ({
+    ...unit,
+    document: readBase64Fixture(unit.fixture),
+    definition:
+      unit.definitionEncoding === "brotli-base64"
+        ? readBrotliBase64Fixture(
+            resolve(originalTestcenterCorpusRoot, unit.definitionFixture)
+          )
+        : unit.definitionEncoding === "base64"
+          ? readBase64Fixture(unit.definitionFixture)
+          : readFileSync(
+              resolve(originalTestcenterCorpusRoot, unit.definitionFixture),
+              "utf8"
+            ),
+    metadataReference: unit.metadataReferenceFixture
+      ? Buffer.from(
+          readFileSync(
+            resolve(originalTestcenterCorpusRoot, unit.metadataReferenceFixture),
+            "utf8"
+          ).trim(),
+          "base64"
+        ).toString("utf8")
+      : null
+  }));
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
+  );
+  const zipPayload = createZipBase64(
+    [
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              ${booklets
+                .map(
+                  booklet =>
+                    `<resource identifier="${booklet.bookletKey}" href="booklets/${booklet.bookletKey}.xml" />`
+                )
+                .join("\n              ")}
+              ${units
+                .flatMap(unit => [
+                  `<resource identifier="${unit.unitKey}" href="units/${unit.unitKey}.xml" />`,
+                  `<resource identifier="${unit.unitKey}.voud" href="units/${unit.unitKey}.voud" />`,
+                  ...(unit.metadataReference === null
+                    ? []
+                    : [
+                        `<resource identifier="${unit.unitKey}.vomd" href="units/${unit.unitKey}.vomd" />`
+                      ])
+                ])
+                .join("\n              ")}
+              <resource identifier="${expectation.player.playerKey}" href="players/iqb-player-aspect-2.12.3.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      ...booklets.map(booklet => ({
+        fileName: `export/booklets/${booklet.bookletKey}.xml`,
+        content: booklet.document
+      })),
+      ...units.flatMap(unit => [
+        {
+          fileName: `export/units/${unit.unitKey}.xml`,
+          content: unit.document
+        },
+        {
+          fileName: `export/units/${unit.unitKey}.voud`,
+          content: unit.definition
+        },
+        ...(unit.metadataReference === null
+          ? []
+          : [
+              {
+                fileName: `export/units/${unit.unitKey}.vomd`,
+                content: unit.metadataReference
+              }
+            ])
+      ]),
+      {
+        fileName: "export/players/iqb-player-aspect-2.12.3.html",
+        content: playerDocument
+      }
+    ],
+    { compressionMethod: 8 }
+  );
+
+  const tenantKey = "integration-tenant-current-original-aspect";
+  const workspaceKey = "integration-workspace-current-original-aspect";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "current-original-aspect.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const imported = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(
+    imported.body.importJob.status,
+    "completed",
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.equal(
+    imported.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false
+  );
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const snapshot = release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  assert.deepEqual(
+    snapshot.bookletEntries.map(booklet => [
+      booklet.bookletKey,
+      booklet.unitEntries.map(unit => unit.unitKey)
+    ]),
+    expectation.booklets.map(booklet => [booklet.bookletKey, booklet.unitKeys])
+  );
+  for (const booklet of snapshot.bookletEntries) {
+    assert.ok(
+      booklet.unitEntries.every(unit => {
+        const expectedUnit = units.find(candidate => candidate.unitKey === unit.unitKey);
+        return (
+          unit.playerKey === expectation.player.playerKey &&
+          unit.unitDefinition === expectedUnit?.definition.trim()
+        );
+      })
+    );
+  }
+  const activated = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activated.status, 200);
+
+  const rosterDocument = readBase64Fixture(expectation.roster.fixture);
+  const roster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      groupKey: string;
+      bookletKeys?: string[];
+      viewSettings?: {
+        theme?: string;
+        codeInput?: { type: string; length: number };
+      };
+      validationWarnings: unknown[];
+    }>;
+    operationalLoginCandidates: Array<{ loginKey: string }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: rosterDocument }
+  });
+  assert.equal(roster.status, 201);
+  assert.deepEqual(
+    roster.body.items.map(entry => entry.loginKey).sort(),
+    [...expectation.roster.participantLoginKeys].sort()
+  );
+  assert.ok(
+    roster.body.items.every(
+      entry =>
+        entry.groupKey === expectation.roster.groupKey &&
+        entry.validationWarnings.length === 0
+    )
+  );
+  assert.deepEqual(
+    roster.body.operationalLoginCandidates.map(entry => entry.loginKey),
+    expectation.roster.operationalLoginKeys
+  );
+  assert.deepEqual(
+    roster.body.items.find(entry => entry.loginKey === "testuser1")?.bookletKeys,
+    expectation.roster.assignments.testuser1
+  );
+  assert.deepEqual(
+    roster.body.items.find(entry => entry.loginKey === "testuser2")?.viewSettings,
+    { theme: "Sekundar", codeInput: { type: "keypad-symbols-alt", length: 3 } }
+  );
+
+  const missingCode = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "testuser1" }
+    }
+  );
+  assert.equal(missingCode.status, 409);
+  assert.equal(missingCode.body.error, "participant_code_required");
+  const signedIn = await requestJson<{
+    participantSession: { participantSessionId: string; participantCode: string };
+    booklets: Array<{ sourceBookletKey: string }>;
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "testuser1",
+      participantCode: "xxx"
+    }
+  });
+  assert.equal(signedIn.status, 200);
+  assert.equal(signedIn.body.participantSession.participantCode, "xxx");
+  assert.deepEqual(
+    signedIn.body.booklets.map(booklet => booklet.sourceBookletKey),
+    ["booklet1", "booklet2"]
+  );
+  const resumed = await requestJson<{
+    testRun: { bookletKey: string };
+  }>(
+    `/api/v1/participant/sessions/${signedIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet2" } }
+  );
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.bookletKey, "booklet2");
+  const state = await requestJson<{
+    currentRunState: { bookletUnits: Array<{ unitKey: string }> };
+  }>(
+    `/api/v1/participant/sessions/${signedIn.body.participantSession.participantSessionId}/current-state`
+  );
+  assert.deepEqual(
+    state.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.booklets.find(booklet => booklet.bookletKey === "booklet2")?.unitKeys
+  );
+});
+
 test("original Testcenter compatibility corpus assembles complete loose Aspect metadata references", async () => {
   type PlayerUnitPackage = {
     unitKey: string;
