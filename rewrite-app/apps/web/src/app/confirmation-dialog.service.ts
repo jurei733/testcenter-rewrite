@@ -12,6 +12,7 @@ export type ConfirmationDialogRequest = {
   message: string;
   confirmLabel: string;
   cancelLabel?: string;
+  showCancel?: boolean;
   tone?: ConfirmationDialogTone;
   verification?: ConfirmationDialogVerification;
 };
@@ -22,6 +23,7 @@ export type ActiveConfirmationDialog = {
   message: string;
   confirmLabel: string;
   cancelLabel: string;
+  showCancel: boolean;
   tone: ConfirmationDialogTone;
   verification: ConfirmationDialogVerification | null;
 };
@@ -49,6 +51,7 @@ export class ConfirmationDialogService {
         message: request.message,
         confirmLabel: request.confirmLabel,
         cancelLabel: request.cancelLabel ?? "Cancel",
+        showCancel: request.showCancel ?? true,
         tone: request.tone ?? "danger",
         verification: request.verification ?? null
       });

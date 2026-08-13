@@ -2617,11 +2617,78 @@ try {
       ),
       false
     );
-    await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check");
-    await fillAndCommit("#systemCheckReportKey", "saveme");
+    assert.equal(await page.locator("#systemCheckReportTitle").count(), 0);
+    assert.equal(await page.locator("#systemCheckReportKey").count(), 0);
     await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
     await page.locator("#saveSystemCheckReportButton").click();
-    await page.locator("#systemCheckSavedReportStatus").waitFor({ timeout: 15_000 });
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor();
+    assert.equal(
+      await page.locator("#systemCheckSaveReportKey").evaluate(
+        node => node === document.activeElement
+      ),
+      true
+    );
+    await fillAndCommit("#systemCheckSaveReportKey", "sa");
+    await fillAndCommit("#systemCheckSaveReportId", "UI");
+    await expectButtonSelectorDisabled("#systemCheckSaveReportConfirmButton");
+    await page.locator("#systemCheckSaveReportPasswordToggle").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#systemCheckSaveReportKey")?.getAttribute("type") ===
+        "text"
+    );
+    assert.equal(
+      await page.locator("#systemCheckSaveReportKey").getAttribute("type"),
+      "text"
+    );
+    await page.keyboard.press("Escape");
+    await page
+      .locator("#systemCheckSaveReportBackdrop")
+      .waitFor({ state: "detached" });
+    assert.equal(
+      await page.locator("#saveSystemCheckReportButton").evaluate(
+        node => node === document.activeElement
+      ),
+      true
+    );
+    await page.locator("#saveSystemCheckReportButton").click();
+    await fillAndCommit("#systemCheckSaveReportKey", "saveme");
+    await fillAndCommit("#systemCheckSaveReportId", "UI Smoke System Check");
+    await expectButtonSelectorEnabled("#systemCheckSaveReportConfirmButton");
+    await page.locator("#systemCheckSaveReportConfirmButton").click();
+    await page
+      .locator("#globalConfirmationTitle")
+      .filter({ hasText: "Bericht gespeichert" })
+      .waitFor();
+    await page
+      .locator("#globalConfirmationMessage")
+      .filter({ hasText: "erfolgreich gespeichert" })
+      .waitFor();
+    assert.equal(await page.locator("#globalConfirmationCancelButton").count(), 0);
+    await page.locator("#globalConfirmationConfirmButton").click();
+    await page.waitForURL(/\/app\/home$/);
+    await page.goto(
+      `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+        systemCheckTenantKey
+      )}&workspaceKey=${encodeURIComponent(
+        systemCheckWorkspaceKey
+      )}&checkId=${encodeURIComponent("SYSCHECK.SAMPLE")}`,
+      { waitUntil: "networkidle" }
+    );
+    await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Network", exact: true }).waitFor();
+    await page.locator("#runSystemCheckNetworkButton").click();
+    await page
+      .locator("#systemCheckNetworkStatus")
+      .filter({ hasText: "Measurement complete after" })
+      .waitFor({ timeout: 45_000 });
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
     await page.locator("#loadSystemCheckReportsButton").click();
     await page
@@ -2848,11 +2915,33 @@ try {
     await page.getByRole("radio", { name: "Option B", exact: true }).check();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
-    await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check 2");
-    await fillAndCommit("#systemCheckReportKey", "saveme");
     await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
     await page.locator("#saveSystemCheckReportButton").click();
-    await page.locator("#systemCheckSavedReportStatus").waitFor({ timeout: 15_000 });
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor();
+    await fillAndCommit("#systemCheckSaveReportKey", "saveme");
+    await fillAndCommit("#systemCheckSaveReportId", "UI Smoke System Check 2");
+    await page.locator("#systemCheckSaveReportConfirmButton").click();
+    await page
+      .locator("#globalConfirmationTitle")
+      .filter({ hasText: "Bericht gespeichert" })
+      .waitFor();
+    await page.locator("#globalConfirmationConfirmButton").click();
+    await page.waitForURL(/\/app\/home$/);
+    await page.goto(
+      `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+        systemCheckTenantKey
+      )}&workspaceKey=${encodeURIComponent(
+        systemCheckWorkspaceKey
+      )}&checkId=${encodeURIComponent("syscheck-2")}`,
+      { waitUntil: "networkidle" }
+    );
+    await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
     await page.locator("#loadSystemCheckReportsButton").click();
     const secondSystemCheckReportDetail = page.locator(
@@ -14556,13 +14645,31 @@ try {
     systemCheckUsername,
     "A dedicated system-check session must force the saved report title to its login name."
   );
-  await page.locator("#systemCheckSavedReportStatus").waitFor();
+  await page
+    .locator("#globalConfirmationTitle")
+    .filter({ hasText: "Bericht gespeichert" })
+    .waitFor();
+  assert.equal(await page.locator("#globalConfirmationCancelButton").count(), 0);
+  await page.locator("#globalConfirmationConfirmButton").click();
+  await page.waitForURL(/\/app\/home$/);
   await page.evaluate(() => {
     window.history.pushState({}, "", "/app/runtime");
     window.dispatchEvent(new PopStateEvent("popstate"));
   });
   await page.waitForURL(/\/app\/system-check$/);
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .locator("#systemCheckSignedInUser")
+    .filter({ hasText: systemCheckUsername })
+    .waitFor();
+  await expectButtonSelectorEnabled("#systemCheckSignOutButton");
+  const protectedSystemCheckSignOutResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-out")
+  );
   await page.locator("#systemCheckSignOutButton").click();
+  assert.equal((await protectedSystemCheckSignOutResponsePromise).status(), 200);
   await page.locator("#systemCheckSignInButton").waitFor();
   await page.locator("#systemCheckLoginRequiredStatus").waitFor();
   await page.goto(`${baseUrl}/app/ops`);

@@ -53,6 +53,7 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
         </label>
         <div class="actions">
           <button
+            *ngIf="dialog.showCancel"
             #cancelButton
             id="globalConfirmationCancelButton"
             class="secondary"
@@ -160,6 +161,8 @@ export class ConfirmationDialogComponent
     this.verificationValue = "";
     if (this.confirmation.dialog()?.verification) {
       this.verificationInput?.nativeElement.focus();
+    } else if (!this.confirmation.dialog()?.showCancel) {
+      this.confirmButton?.nativeElement.focus();
     } else {
       this.cancelButton?.nativeElement.focus();
     }

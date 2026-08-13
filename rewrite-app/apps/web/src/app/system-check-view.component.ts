@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import UAParser from "ua-parser-js";
 
 import {
@@ -38,6 +38,10 @@ import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
+import {
+  SystemCheckSaveReportDialogComponent,
+  type SystemCheckSaveReportDialogResult
+} from "./system-check-save-report-dialog.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 type SystemCheckStep =
@@ -106,7 +110,12 @@ const readSystemCheckUnitResponse = (
 @Component({
   selector: "app-system-check-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SystemCheckSaveReportDialogComponent,
+    VeronaPlayerHostComponent
+  ],
   template: `
     <div class="stack system-check-shell">
       <article class="card system-check-hero">
@@ -324,21 +333,11 @@ const readSystemCheckUnitResponse = (
               ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
             </dl>
           </section>
-          <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
           <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
-          <div class="form-grid" *ngIf="check.canSave && !isSystemCheckSession">
-            <label>{{ customText('syscheck_report_id', 'Report title') }}<input id="systemCheckReportTitle" [(ngModel)]="reportTitle" /></label>
-            <label>Report key<input id="systemCheckReportKey" type="password" autocomplete="off" [(ngModel)]="reportKey" /></label>
-          </div>
-          <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutPassword', 'Enter the system-check key supplied by the project operator to save this report.') }}</p>
           <div class="actions">
             <button id="downloadSystemCheckReportButton" class="secondary" type="button" (click)="downloadReport()">Download JSON</button>
-            <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !canSaveReport" (click)="saveReport()">Save Report</button>
+            <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !canSaveReport" (click)="startReportSave()">Bericht senden</button>
           </div>
-          <section class="system-check-notice" *ngIf="savedReport">
-            <strong id="systemCheckSavedReportStatus">Report saved</strong>
-            <p>{{ savedReport.systemCheckReportId }} · {{ savedReport.createdAt }}</p>
-          </section>
           <section class="system-check-operator" *ngIf="!isSystemCheckSession">
             <h3>Operator report access</h3>
             <p>Signed-in workspace operators can inspect report distributions, migrate original Testcenter JSON reports, export legacy-compatible files, or delete reports for selected checks.</p>
@@ -422,6 +421,15 @@ const readSystemCheckUnitResponse = (
         </div>
       </ng-container>
 
+      <app-system-check-save-report-dialog
+        *ngIf="reportSaveDialogOpen"
+        [aboutPassword]="customText('syscheck_report_aboutPassword', 'Nur berechtigten Personen ist das Speichern erlaubt. Bitte geben Sie unten das System-Check-Kennwort ein, das Sie von der Projektleitung erhalten haben!')"
+        [aboutReportId]="customText('syscheck_report_aboutReportId', 'Die ermittelten bzw. eingegebenen Informationen werden in der Datenbank so gespeichert, dass eine zusammenfassende Auswertung für eine bestimmte Studie möglich ist. Um den Bericht einem bestimmten Projekt oder einer Studie zuordnen zu können, geben Sie bitte einen kurzen Text ein, der dann als Titel für den Bericht verwendet wird!')"
+        [reportIdLabel]="customText('syscheck_report_id', 'Schul-ID')"
+        (cancel)="closeReportSaveDialog()"
+        (save)="submitAnonymousReport($event)"
+      ></app-system-check-save-report-dialog>
+
       <section class="status-banner is-error" *ngIf="errorMessage" role="alert">
         <strong>System Check</strong><span>{{ errorMessage }}</span>
       </section>
@@ -468,6 +476,7 @@ const readSystemCheckUnitResponse = (
 })
 export class SystemCheckViewComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly api = inject(RewriteAppApiService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
@@ -491,11 +500,11 @@ export class SystemCheckViewComponent implements OnInit {
   unitResponse = "";
   reportTitle = "System Check Report";
   reportKey = "";
+  reportSaveDialogOpen = false;
   systemCheckUsername = "";
   systemCheckPassword = "";
   systemCheckAccessMode: SystemCheckAccessMode = "anonymous_key";
   authorizedSystemCheckScopes: SystemCheckAuthorizedScope[] = [];
-  savedReport: SystemCheckReport | null = null;
   operatorReports: SystemCheckReport[] = [];
   operatorStatistics: SystemCheckReportStatistics[] = [];
   selectedOperatorCheckIds: string[] = [];
@@ -638,11 +647,7 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   get canSaveReport(): boolean {
-    return (
-      this.requiredQuestionsAnswered &&
-      (this.isSystemCheckSession ||
-        (this.reportTitle.trim() !== "" && this.reportKey.trim() !== ""))
-    );
+    return this.requiredQuestionsAnswered;
   }
 
   async signInSystemCheck(): Promise<void> {
@@ -760,7 +765,7 @@ export class SystemCheckViewComponent implements OnInit {
         ? "Network measurement is skipped by configuration."
         : "Measurement has not started.";
       this.unitResponse = "";
-      this.savedReport = null;
+      this.reportSaveDialogOpen = false;
       this.operatorReports = [];
       this.step = "welcome";
       await this.captureEnvironment();
@@ -1094,11 +1099,38 @@ export class SystemCheckViewComponent implements OnInit {
     });
   }
 
+  startReportSave(): void {
+    if (!this.canSaveReport) {
+      return;
+    }
+    if (this.isSystemCheckSession) {
+      void this.saveReport();
+      return;
+    }
+    this.reportSaveDialogOpen = true;
+  }
+
+  closeReportSaveDialog(): void {
+    this.reportSaveDialogOpen = false;
+    globalThis.queueMicrotask(() => {
+      globalThis.document
+        ?.querySelector<HTMLButtonElement>("#saveSystemCheckReportButton")
+        ?.focus();
+    });
+  }
+
+  submitAnonymousReport(result: SystemCheckSaveReportDialogResult): void {
+    this.reportTitle = result.title;
+    this.reportKey = result.key;
+    this.closeReportSaveDialog();
+    void this.saveReport();
+  }
+
   async saveReport(): Promise<void> {
     const check = this.systemCheck;
     if (!check) return;
     await this.run(async () => {
-      const { payload } = await this.api.send<SaveSystemCheckReportResponse>(
+      await this.api.send<SaveSystemCheckReportResponse>(
         "POST",
         this.workspaceRoute(productionApiRoutes.workspace.saveSystemCheckReport, {
           checkId: check.checkId
@@ -1106,8 +1138,17 @@ export class SystemCheckViewComponent implements OnInit {
         this.reportPayload(!this.isSystemCheckSession),
         this.isSystemCheckSession ? this.adminHeaders : undefined
       );
-      this.savedReport = payload.report;
       this.reportKey = "";
+      await this.confirmation.confirm({
+        title: "Bericht gespeichert",
+        message:
+          "Der Bericht wurde erfolgreich gespeichert. Sie werden nach der Bestätigung weitergeleitet.",
+        confirmLabel: "Verstanden",
+        showCancel: false,
+        tone: "primary"
+      });
+      await new Promise(resolve => globalThis.setTimeout(resolve, 500));
+      await this.router.navigate(["/home"]);
     });
   }
 
