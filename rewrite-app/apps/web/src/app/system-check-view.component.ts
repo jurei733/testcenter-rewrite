@@ -142,7 +142,7 @@ type ThroughputResult = {
             <div><dt>Network</dt><dd>{{ check.skipNetwork ? 'Skipped by configuration' : 'Measured' }}</dd></div>
             <div><dt>Questions</dt><dd>{{ interactiveQuestionCount }}</dd></div>
             <div><dt>Player item</dt><dd>{{ check.unit ? check.unit.unitKey : 'Not configured' }}</dd></div>
-            <div><dt>Report</dt><dd>{{ check.canSave ? isSystemCheckSession ? 'Authorized by system-check login' : 'Can be saved with report key' : 'Local download only' }}</dd></div>
+            <div><dt>Report</dt><dd>{{ check.canSave ? isSystemCheckSession ? 'Authorized by system-check login' : 'Can be saved with report key' : 'Not configured' }}</dd></div>
           </dl>
           <h3>Ermitteln von Systemdaten (Betriebssystem, Browser)</h3>
           <p>Values available to the browser are captured automatically. No fingerprint is retained until the report is saved.</p>
@@ -505,7 +505,7 @@ export class SystemCheckViewComponent implements OnInit {
       ...(this.systemCheck.skipNetwork ? [] : ["network" as const]),
       ...(this.systemCheck.unit ? ["unit" as const] : []),
       ...(this.interactiveQuestionCount > 0 ? ["questionnaire" as const] : []),
-      "report"
+      ...(this.systemCheck.canSave ? ["report" as const] : [])
     ];
   }
 
@@ -535,6 +535,7 @@ export class SystemCheckViewComponent implements OnInit {
 
   get nextButtonDisabled(): boolean {
     if (this.busy) return true;
+    if (this.stepIndex >= this.steps.length - 1) return true;
     return this.step === "network" &&
       (this.networkEntries.length === 0 || this.networkBusy);
   }

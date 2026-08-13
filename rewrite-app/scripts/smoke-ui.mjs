@@ -2257,6 +2257,41 @@ try {
       secondSystemCheckImport.importJob?.sourcePackageId,
       secondSystemCheckSourcePackageId
     );
+    const noSaveSystemCheckId = "SYS-CHECK-NO-SAVE";
+    const noSaveSystemCheckSourceResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
+      {
+        body: {
+          fileName: "NoSaveSysCheck.xml",
+          mediaType: "application/xml",
+          sourceDocument: [
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_SysCheck.xsd">',
+            "  <Metadata>",
+            `    <Id>${noSaveSystemCheckId}</Id>`,
+            "    <Label>System Check Without Report</Label>",
+            "  </Metadata>",
+            '  <Config skipnetwork="true">',
+            '    <Q id="device" type="string" prompt="Assigned device"/>',
+            "  </Config>",
+            "</SysCheck>"
+          ].join("\n")
+        }
+      }
+    );
+    const noSaveSystemCheckSource = await noSaveSystemCheckSourceResponse.json();
+    const noSaveSystemCheckSourcePackageId =
+      noSaveSystemCheckSource.sourcePackage?.sourcePackageId;
+    assert.ok(
+      noSaveSystemCheckSourcePackageId,
+      "UI smoke expected a source package id for the no-save system check."
+    );
+    const noSaveSystemCheckImportResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/import-jobs`,
+      { body: { sourcePackageId: noSaveSystemCheckSourcePackageId } }
+    );
+    const noSaveSystemCheckImport = await noSaveSystemCheckImportResponse.json();
+    assert.equal(noSaveSystemCheckImport.importJob?.status, "completed");
     await page.goto(
       `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
         systemCheckTenantKey
@@ -2268,7 +2303,48 @@ try {
     await page.getByRole("heading", { name: "Choose a system check" }).waitFor();
     await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").waitFor();
     await page.locator("[data-system-check-id='syscheck-2']").waitFor();
-    assert.equal(await page.locator(".system-check-option").count(), 2);
+    await page
+      .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
+      .waitFor();
+    assert.equal(await page.locator(".system-check-option").count(), 3);
+    await page
+      .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
+      .click();
+    await page
+      .getByRole("heading", { name: "System Check Without Report" })
+      .waitFor();
+    await page
+      .locator("#systemCheckStepStatus")
+      .filter({ hasText: "1 / 2" })
+      .waitFor();
+    await page
+      .locator(".system-check-facts")
+      .filter({ hasText: "ReportNot configured" })
+      .waitFor();
+    assert.equal(
+      await page
+        .locator(".system-check-steps")
+        .getByRole("button", { name: "Report", exact: true })
+        .count(),
+      0
+    );
+    assert.equal(
+      await page.locator("#downloadSystemCheckReportButton").count(),
+      0
+    );
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page
+      .locator("#systemCheckStepStatus")
+      .filter({ hasText: "2 / 2" })
+      .waitFor();
+    await expectButtonSelectorDisabled("#systemCheckNextButton");
+    assert.equal(
+      await page.locator("#downloadSystemCheckReportButton").count(),
+      0
+    );
+    await page.getByRole("button", { name: "Choose Another Check" }).click();
+    await page.getByRole("heading", { name: "Choose a system check" }).waitFor();
     await page.evaluate(() => {
       Object.defineProperties(window.screen, {
         width: { configurable: true, value: 799 },
