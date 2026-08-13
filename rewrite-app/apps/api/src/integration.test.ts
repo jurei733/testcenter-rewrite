@@ -29991,6 +29991,164 @@ test("original Testcenter compatibility corpus preserves adaptive Mean evaluatio
   );
 });
 
+test("original Testcenter compatibility corpus limits adaptive responses to IQB-standard major 1", async () => {
+  const tenantKey = "integration-tenant-adaptive-iqb-standard-version";
+  const workspaceKey = "integration-workspace-adaptive-iqb-standard-version";
+  const bookletKey = "BOOKLET.ADAPTIVE.IQB-STANDARD-VERSION";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-adaptive-iqb-standard-version.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata>
+            <Id>${bookletKey}</Id>
+            <Label>Adaptive IQB-standard Version</Label>
+          </Metadata>
+          <States>
+            <State id="route" label="Response route">
+              <Option id="answered" label="Answered">
+                <If>
+                  <Value of="answer" from="decision-unit"/>
+                  <Is equal="route-me"/>
+                </If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.VERSION.DECISION" alias="decision-unit" label="Decision Unit"/>
+            <Testlet id="answered-block">
+              <Restrictions><Show if="route" is="answered"/></Restrictions>
+              <Unit id="UNIT.VERSION.ANSWERED" alias="answered-route" label="Answered Route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="route" is="pending"/></Restrictions>
+              <Unit id="UNIT.VERSION.PENDING" alias="pending-route" label="Pending Route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+
+  const runVersion = async (loginKey: string, responseType: string) => {
+    const signIn = await requestJson<{
+      participantSession: { participantSessionId: string };
+    }>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey }
+    });
+    assert.equal(signIn.status, 200);
+    const participantSessionId = signIn.body.participantSession.participantSessionId;
+    const resume = await requestJson<{
+      testRun: { testRunId: string; bookletStates: Record<string, string> };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+      method: "POST",
+      body: { bookletKey }
+    });
+    assert.equal(resume.status, 200);
+    assert.deepEqual(resume.body.testRun.bookletStates, { route: "pending" });
+
+    const unitResponse = JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        unitStateDataType: responseType,
+        presentationProgress: "complete",
+        responseProgress: "complete",
+        dataParts: {
+          responses: JSON.stringify([
+            { id: "answer", status: "VALUE_CHANGED", value: "route-me" }
+          ])
+        }
+      }
+    });
+    const saved = await requestJson<{
+      testRun: {
+        bookletStates: Record<string, string>;
+        unitResponses: Record<string, string>;
+      };
+    }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey: "decision-unit",
+        status: "running",
+        unitResponse
+      }
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.testRun.unitResponses["decision-unit"], unitResponse);
+    const currentState = await requestJson<{
+      currentRunState: {
+        bookletUnits: Array<{ unitKey: string }>;
+        navigation: { nextUnitKey: string | null };
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+    assert.equal(currentState.status, 200);
+    return {
+      bookletStates: saved.body.testRun.bookletStates,
+      unitKeys: currentState.body.currentRunState.bookletUnits.map(
+        unit => unit.unitKey
+      ),
+      nextUnitKey: currentState.body.currentRunState.navigation.nextUnitKey
+    };
+  };
+
+  const versionTwo = await runVersion(
+    "adaptive-iqb-standard-version-2",
+    "iqb-standard@2.0"
+  );
+  assert.deepEqual(versionTwo, {
+    bookletStates: { route: "pending" },
+    unitKeys: ["decision-unit", "pending-route"],
+    nextUnitKey: "pending-route"
+  });
+
+  const versionOne = await runVersion(
+    "adaptive-iqb-standard-version-1",
+    "iqb-standard@1.1"
+  );
+  assert.deepEqual(versionOne, {
+    bookletStates: { route: "answered" },
+    unitKeys: ["decision-unit", "answered-route"],
+    nextUnitKey: "answered-route"
+  });
+});
+
 test("original coding schemes derive adaptive variables server-side", async () => {
   const tenantKey = "integration-tenant-adaptive-coding";
   const workspaceKey = "integration-workspace-adaptive-coding";

@@ -18995,6 +18995,13 @@ const adaptiveStatusOrder = [
   "CODING_COMPLETE"
 ];
 
+// Keep adaptive routing on the same IQB response generation as the current
+// Original Testcenter. Its package-level compatibility range is min=1/max=1;
+// other generations remain available to the Player for persistence/restoration
+// but must not affect Booklet State selection.
+const adaptiveIqbStandardResponseMajorMin = 1;
+const adaptiveIqbStandardResponseMajorMax = 1;
+
 const adaptiveValueAsNumber = (value: unknown): number => {
   const truncate = (numberValue: number): number =>
     Math.floor(numberValue * 1_000_000) / 1_000_000;
@@ -19076,10 +19083,16 @@ const resolveAdaptiveVariables = (
   const suppliedResponsesByUnitKey = new Map<string, IqbResponse[]>();
   for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
     const parsedResponse = parseVeronaUnitResponse(response);
+    const iqbStandardVersionMatch =
+      parsedResponse?.unitState.unitStateDataType?.match(
+        /iqb-standard@(\d+)/i
+      );
+    const iqbStandardMajor = Number(iqbStandardVersionMatch?.[1]);
     if (
-      !parsedResponse?.unitState.unitStateDataType?.match(
-        /^iqb-standard@\d+(?:\.\d+)*$/i
-      )
+      !parsedResponse ||
+      !iqbStandardVersionMatch ||
+      iqbStandardMajor < adaptiveIqbStandardResponseMajorMin ||
+      iqbStandardMajor > adaptiveIqbStandardResponseMajorMax
     ) {
       continue;
     }
