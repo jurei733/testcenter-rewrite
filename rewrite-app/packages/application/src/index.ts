@@ -2452,10 +2452,24 @@ const ICONV_XML_ENCODING_NAMES = new Map<string, string>([
   ["iso-ir-226", "iso-8859-16"],
   ["latin10", "iso-8859-16"],
   ["l10", "iso-8859-16"],
+  ["437", "cp437"],
+  ["cp437", "cp437"],
+  ["ibm437", "cp437"],
+  ["cspc8codepage437", "cp437"],
   ["850", "cp850"],
   ["cp850", "cp850"],
   ["ibm850", "cp850"],
-  ["cspc850multilingual", "cp850"]
+  ["cspc850multilingual", "cp850"],
+  ["852", "cp852"],
+  ["cp852", "cp852"],
+  ["ibm852", "cp852"],
+  ["cspcp852", "cp852"],
+  ["858", "cp858"],
+  ["cp858", "cp858"],
+  ["ibm00858", "cp858"],
+  ["ibm858", "cp858"],
+  ["ccsid00858", "cp858"],
+  ["pc-multilingual-850+euro", "cp858"]
 ]);
 
 const isSupportedEbcdicEncodingName = (normalizedEncoding: string): boolean =>

@@ -13603,6 +13603,39 @@ test("original Testcenter compatibility corpus imports representative booklets",
       "<Label>Sample booklet</Label>",
       "<Label>Größe für Köln</Label>"
     );
+  const cp437BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM437"')
+    .replace(
+      "<Label>Sample booklet</Label>",
+      "<Label>Größe für Köln</Label>"
+    );
+  const cp852BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM852"')
+    .replace(
+      "<Label>Sample booklet</Label>",
+      "<Label>Příliš žluťoučký kůň</Label>"
+    );
+  const cp858BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="IBM00858"')
+    .replace("<Label>Sample booklet</Label>", "<Label>Preis 12 €</Label>");
+  const windows1251BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="Windows-1251"')
+    .replace(
+      "<Label>Sample booklet</Label>",
+      "<Label>Проверка Москвы</Label>"
+    );
+  const shiftJisBookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="Shift_JIS"')
+    .replace("<Label>Sample booklet</Label>", "<Label>東京の試験</Label>");
+  const gb18030BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="GB18030"')
+    .replace("<Label>Sample booklet</Label>", "<Label>北京测试</Label>");
+  const big5BookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="Big5"')
+    .replace("<Label>Sample booklet</Label>", "<Label>臺北測試</Label>");
+  const eucKrBookletXml = validBookletXml
+    .replace(/encoding=["']utf-8["']/i, 'encoding="EUC-KR"')
+    .replace("<Label>Sample booklet</Label>", "<Label>서울 시험</Label>");
   const ibm037BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM037"')
     .replace("<Label>Sample booklet</Label>", "<Label>Prüfung für Köln</Label>");
@@ -13709,6 +13742,46 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fileName: "cp850-original-booklet.xml",
       bytes: iconv.encode(cp850BookletXml, "cp850"),
       displayLabel: "Größe für Köln"
+    },
+    {
+      fileName: "cp437-original-booklet.xml",
+      bytes: iconv.encode(cp437BookletXml, "cp437"),
+      displayLabel: "Größe für Köln"
+    },
+    {
+      fileName: "cp852-original-booklet.xml",
+      bytes: iconv.encode(cp852BookletXml, "cp852"),
+      displayLabel: "Příliš žluťoučký kůň"
+    },
+    {
+      fileName: "cp858-original-booklet.xml",
+      bytes: iconv.encode(cp858BookletXml, "cp858"),
+      displayLabel: "Preis 12 €"
+    },
+    {
+      fileName: "windows-1251-original-booklet.xml",
+      bytes: iconv.encode(windows1251BookletXml, "windows-1251"),
+      displayLabel: "Проверка Москвы"
+    },
+    {
+      fileName: "shift-jis-original-booklet.xml",
+      bytes: iconv.encode(shiftJisBookletXml, "shift_jis"),
+      displayLabel: "東京の試験"
+    },
+    {
+      fileName: "gb18030-original-booklet.xml",
+      bytes: iconv.encode(gb18030BookletXml, "gb18030"),
+      displayLabel: "北京测试"
+    },
+    {
+      fileName: "big5-original-booklet.xml",
+      bytes: iconv.encode(big5BookletXml, "big5"),
+      displayLabel: "臺北測試"
+    },
+    {
+      fileName: "euc-kr-original-booklet.xml",
+      bytes: iconv.encode(eucKrBookletXml, "euc-kr"),
+      displayLabel: "서울 시험"
     },
     {
       fileName: "ibm037-original-booklet.xml",
