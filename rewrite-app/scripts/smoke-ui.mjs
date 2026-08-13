@@ -2296,8 +2296,10 @@ try {
       .locator("#systemCheckIntroText")
       .filter({ hasText: "UI smoke readiness introduction" })
       .waitFor();
-    await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Environment" }).waitFor();
+    await page
+      .locator("#systemCheckStepStatus")
+      .filter({ hasText: "1 / 5" })
+      .waitFor();
     const timeDifferenceEntry = page.locator(
       "#systemCheckEnvironment-time-difference"
     );
@@ -2422,12 +2424,32 @@ try {
       delete window.navigator.mozConnection;
     });
     await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: "API 6.0" })
+      .waitFor({ timeout: 15_000 });
+    const systemCheckPlayerFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
+    await fillVeronaAnswerAndWaitForHost(
+      systemCheckPlayerFrame,
+      "#var1",
+      "System check answer"
+    );
+    await page
+      .locator("#participantVeronaPlayerStatus")
+      .filter({ hasText: "running" })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator("#participantVeronaPageNavigationPrompt")
+      .filter({ hasText: "UI system-check pages:" })
+      .waitFor({ timeout: 15_000 });
+    await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await page
       .getByRole("heading", { name: "UI authored heading", exact: true })
       .waitFor();
-    await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await page
@@ -2456,36 +2478,12 @@ try {
     );
     await expectButtonSelectorDisabled("#saveSystemCheckReportButton");
     await page.locator("#systemCheckBackButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
-    await page.locator("#systemCheckBackButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");
     await selectAndCommit("#systemCheckQuestion-3", "Option B");
     await fillAndCommit("#systemCheckQuestion-4", "Browser flow verified");
     await page.locator("#systemCheckQuestion-5").check();
     await page.getByRole("radio", { name: "Option A", exact: true }).check();
-    await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
-    await page
-      .locator("#participantVeronaPlayerVersion")
-      .filter({ hasText: "API 6.0" })
-      .waitFor({ timeout: 15_000 });
-    const systemCheckPlayerFrame = page.frameLocator(
-      "#participantVeronaPlayerFrame"
-    );
-    await fillVeronaAnswerAndWaitForHost(
-      systemCheckPlayerFrame,
-      "#var1",
-      "System check answer"
-    );
-    await page
-      .locator("#participantVeronaPlayerStatus")
-      .filter({ hasText: "running" })
-      .waitFor({ timeout: 15_000 });
-    await page
-      .locator("#participantVeronaPageNavigationPrompt")
-      .filter({ hasText: "UI system-check pages:" })
-      .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     assert.equal(await page.locator("#systemCheckQuestionnaireWarnings").count(), 0);
@@ -2676,22 +2674,12 @@ try {
       .waitFor();
     await page
       .locator("#systemCheckStepStatus")
-      .filter({ hasText: "1 / 5" })
+      .filter({ hasText: "1 / 4" })
       .waitFor();
     assert.equal(
       await page.getByRole("button", { name: "Network", exact: true }).count(),
       0
     );
-    await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Environment" }).waitFor();
-    await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
-    await expectButtonSelectorEnabled("#systemCheckNextButton");
-    await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
-    await selectAndCommit("#systemCheckQuestion-3", "Option A");
-    await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
-    await page.locator("#systemCheckQuestion-5").check();
-    await page.getByRole("radio", { name: "Option B", exact: true }).check();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Player and unit" }).waitFor();
     await page
@@ -2710,6 +2698,14 @@ try {
       .locator("#participantVeronaPlayerStatus")
       .filter({ hasText: "running" })
       .waitFor({ timeout: 15_000 });
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await expectButtonSelectorEnabled("#systemCheckNextButton");
+    await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
+    await selectAndCommit("#systemCheckQuestion-3", "Option A");
+    await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
+    await page.locator("#systemCheckQuestion-5").check();
+    await page.getByRole("radio", { name: "Option B", exact: true }).check();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check 2");
@@ -14375,11 +14371,11 @@ try {
   };
   await page
     .locator("#systemCheckStepStatus")
-    .filter({ hasText: "1 / 4" })
+    .filter({ hasText: "1 / 3" })
     .waitFor();
-  await advanceProtectedSystemCheck("Environment", "2 / 4");
-  await advanceProtectedSystemCheck("Questionnaire", "3 / 4");
-  await advanceProtectedSystemCheck("Report", "4 / 4");
+  await page.locator("#systemCheckEnvironment-screen-resolution").waitFor();
+  await advanceProtectedSystemCheck("Questionnaire", "2 / 3");
+  await advanceProtectedSystemCheck("Report", "3 / 3");
   await page
     .locator("#systemCheckQuestionnaireWarnings")
     .filter({ hasText: "Assigned device" })
@@ -14388,7 +14384,7 @@ try {
   await page.locator("#systemCheckBackButton").click();
   await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
   await fillAndCommit("#systemCheckQuestion-device", "Protected UI device");
-  await advanceProtectedSystemCheck("Report", "4 / 4");
+  await advanceProtectedSystemCheck("Report", "3 / 3");
   assert.equal(await page.locator("#systemCheckQuestionnaireWarnings").count(), 0);
   await page
     .locator("#systemCheckReportQuestionnaire")

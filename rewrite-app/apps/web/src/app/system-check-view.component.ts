@@ -42,10 +42,9 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 type SystemCheckStep =
   | "welcome"
-  | "environment"
   | "network"
-  | "questionnaire"
   | "unit"
+  | "questionnaire"
   | "report";
 
 type BrowserConnection = {
@@ -73,7 +72,7 @@ type ThroughputResult = {
         <div>
           <span class="eyebrow">Device readiness</span>
           <h2>Check this device before testing</h2>
-          <p>Environment, network, questionnaire and the configured Verona item are collected in one report.</p>
+          <p>Environment, network, the configured Verona item and questionnaire are collected in one report.</p>
         </div>
         <strong id="systemCheckStepStatus">{{ stepNumber }} / {{ steps.length }} · {{ stepLabel }}</strong>
       </article>
@@ -145,10 +144,7 @@ type ThroughputResult = {
             <div><dt>Player item</dt><dd>{{ check.unit ? check.unit.unitKey : 'Not configured' }}</dd></div>
             <div><dt>Report</dt><dd>{{ check.canSave ? isSystemCheckSession ? 'Authorized by system-check login' : 'Can be saved with report key' : 'Local download only' }}</dd></div>
           </dl>
-        </article>
-
-        <article class="card" *ngIf="step === 'environment'">
-          <h2>Environment</h2>
+          <h3>Ermitteln von Systemdaten (Betriebssystem, Browser)</h3>
           <p>Values available to the browser are captured automatically. No fingerprint is retained until the report is saved.</p>
           <dl class="system-check-results">
             <div
@@ -506,10 +502,9 @@ export class SystemCheckViewComponent implements OnInit {
     }
     return [
       "welcome",
-      "environment",
       ...(this.systemCheck.skipNetwork ? [] : ["network" as const]),
-      ...(this.interactiveQuestionCount > 0 ? ["questionnaire" as const] : []),
       ...(this.systemCheck.unit ? ["unit" as const] : []),
+      ...(this.interactiveQuestionCount > 0 ? ["questionnaire" as const] : []),
       "report"
     ];
   }
@@ -697,10 +692,9 @@ export class SystemCheckViewComponent implements OnInit {
   stepName(step: SystemCheckStep): string {
     return {
       welcome: "Start",
-      environment: "Environment",
       network: "Network",
-      questionnaire: "Questions",
       unit: "Player",
+      questionnaire: "Questions",
       report: "Report"
     }[step];
   }
