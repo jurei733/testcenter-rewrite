@@ -2257,6 +2257,12 @@ try {
     await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").waitFor();
     await page.locator("[data-system-check-id='syscheck-2']").waitFor();
     assert.equal(await page.locator(".system-check-option").count(), 2);
+    await page.evaluate(() => {
+      Object.defineProperties(window.screen, {
+        width: { configurable: true, value: 799 },
+        height: { configurable: true, value: 599 }
+      });
+    });
     await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").click();
     await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
     await page
@@ -2284,6 +2290,17 @@ try {
     assert.equal(await timeZoneEntry.evaluate(node =>
       node.classList.contains("has-warning")
     ), true);
+    const screenResolutionEntry = page.locator(
+      "#systemCheckEnvironment-screen-resolution"
+    );
+    await screenResolutionEntry.filter({ hasText: "799 x 599" }).waitFor();
+    assert.equal(await screenResolutionEntry.evaluate(node =>
+      node.classList.contains("has-warning")
+    ), true);
+    await page.evaluate(() => {
+      delete window.screen.width;
+      delete window.screen.height;
+    });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Network" }).waitFor();
     await page.locator("#runSystemCheckNetworkButton").click();

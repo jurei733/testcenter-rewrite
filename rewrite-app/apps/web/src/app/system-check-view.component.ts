@@ -774,13 +774,16 @@ export class SystemCheckViewComponent implements OnInit {
     const browserTimeZone =
       Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
     const clientTime = Date.now();
+    const screenWidth = screen.width;
+    const screenHeight = screen.height;
     const entries = [
       this.entry("os", "environment", "Betriebssystem", os),
       this.entry(
-        "screen",
+        "screen-resolution",
         "environment",
         "Bildschirm-Auflösung",
-        `${screen.width} x ${screen.height}`
+        `${screenWidth} x ${screenHeight}`,
+        screenWidth < 800 || screenHeight < 600
       ),
       this.entry("browser", "environment", "Browser", browser),
       this.entry(
@@ -802,7 +805,7 @@ export class SystemCheckViewComponent implements OnInit {
         navigator.hardwareConcurrency || "unknown"
       ),
       this.entry(
-        "viewport",
+        "screen-size",
         "environment",
         "Fenster-Größe",
         `${window.innerWidth} x ${window.innerHeight}`
