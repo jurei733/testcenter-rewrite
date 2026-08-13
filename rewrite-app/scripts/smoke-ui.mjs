@@ -8066,16 +8066,34 @@ try {
     ),
     new Set(["", "none", "complete"])
   );
+  const isRuntimeLoadCompleteLog = item => {
+    try {
+      const browserVersion = JSON.parse(
+        item.testLog?.logContent ?? "null"
+      )?.browserVersion;
+      return (
+        typeof browserVersion === "string" && browserVersion !== "90.0.4430.93"
+      );
+    } catch {
+      return false;
+    }
+  };
   const veronaLoadCompleteLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey
     )}&testRunId=${encodeURIComponent(veronaTestRunId)}&logKey=LOADCOMPLETE`,
-    payload => Array.isArray(payload?.items) && payload.items.length === 1
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(isRuntimeLoadCompleteLog)
   );
-  assert.equal(veronaLoadCompleteLogs.items[0]?.testLog?.unitKey, null);
-  assert.equal(veronaLoadCompleteLogs.items[0]?.testLog?.originalUnitId, null);
+  const veronaLoadCompleteLog = veronaLoadCompleteLogs.items.find(
+    isRuntimeLoadCompleteLog
+  );
+  assert.ok(veronaLoadCompleteLog);
+  assert.equal(veronaLoadCompleteLog.testLog?.unitKey, null);
+  assert.equal(veronaLoadCompleteLog.testLog?.originalUnitId, null);
   const veronaLoadEnvironment = JSON.parse(
-    veronaLoadCompleteLogs.items[0].testLog.logContent
+    veronaLoadCompleteLog.testLog.logContent
   );
   assert.equal(veronaLoadEnvironment.browserName, "Chrome");
   assert.match(veronaLoadEnvironment.browserVersion, /^\d+(?:\.\d+)+$/);
@@ -13934,6 +13952,41 @@ try {
     .filter({ hasText: "system_check" })
     .filter({ hasText: "45 minute(s) after first sign-in" })
     .waitFor();
+  const protectedSystemCheckId = "SYS-CHECK-PROTECTED";
+  const protectedSystemCheckSourceResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "ProtectedSysCheck.xml",
+        mediaType: "application/xml",
+        sourceDocument: [
+          '<?xml version="1.0" encoding="utf-8"?>',
+          '<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_SysCheck.xsd">',
+          "  <Metadata>",
+          `    <Id>${protectedSystemCheckId}</Id>`,
+          "    <Label>Protected Account System Check</Label>",
+          "  </Metadata>",
+          '  <Config savekey="not-disclosed" skipnetwork="true">',
+          '    <Q id="device" type="string" prompt="Assigned device" required="true"/>',
+          "  </Config>",
+          "</SysCheck>"
+        ].join("\n")
+      }
+    }
+  );
+  const protectedSystemCheckSource = await protectedSystemCheckSourceResponse.json();
+  const protectedSystemCheckSourcePackageId =
+    protectedSystemCheckSource.sourcePackage?.sourcePackageId;
+  assert.ok(
+    protectedSystemCheckSourcePackageId,
+    "Protected system-check smoke expected a source package id."
+  );
+  const protectedSystemCheckImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    { body: { sourcePackageId: protectedSystemCheckSourcePackageId } }
+  );
+  const protectedSystemCheckImport = await protectedSystemCheckImportResponse.json();
+  assert.equal(protectedSystemCheckImport.importJob?.status, "completed");
   await page.goto(`${baseUrl}/app/home`, { waitUntil: "domcontentloaded" });
   await page.locator("#startProtectedSystemCheck").waitFor();
   assert.equal(
@@ -13977,6 +14030,72 @@ try {
     .locator("#systemCheckSignedInUser")
     .filter({ hasText: systemCheckUsername })
     .waitFor();
+  await page
+    .locator("#systemCheckIntroText")
+    .filter({ hasText: "This check verifies whether the current device is ready" })
+    .waitFor();
+  await page
+    .locator(".system-check-facts")
+    .filter({ hasText: "Authorized by system-check login" })
+    .waitFor();
+  const advanceProtectedSystemCheck = async (expectedHeading, expectedStep) => {
+    const stepStatus = page.locator("#systemCheckStepStatus");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const previousStatus = (await stepStatus.innerText()).trim();
+      await page.locator("#systemCheckNextButton").click();
+      try {
+        await page
+          .getByRole("heading", { name: expectedHeading, exact: true })
+          .waitFor({ timeout: 5_000 });
+        await stepStatus.filter({ hasText: expectedStep }).waitFor();
+        return;
+      } catch (error) {
+        const currentStatus = (await stepStatus.innerText()).trim();
+        if (currentStatus !== previousStatus || attempt === 2) {
+          throw error;
+        }
+      }
+    }
+  };
+  await page
+    .locator("#systemCheckStepStatus")
+    .filter({ hasText: "1 / 4" })
+    .waitFor();
+  await advanceProtectedSystemCheck("Environment", "2 / 4");
+  await advanceProtectedSystemCheck("Questionnaire", "3 / 4");
+  await page.locator("#systemCheckNextButton").click();
+  await page
+    .locator(".validation-message")
+    .filter({ hasText: "Please complete all required questions." })
+    .waitFor();
+  await fillAndCommit("#systemCheckQuestion-device", "Protected UI device");
+  await advanceProtectedSystemCheck("Report", "4 / 4");
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Report", exact: true }) })
+    .filter({ hasText: `The report will be saved as ${systemCheckUsername}.` })
+    .waitFor();
+  assert.equal(await page.locator("#systemCheckReportTitle").count(), 0);
+  assert.equal(await page.locator("#systemCheckReportKey").count(), 0);
+  const protectedSystemCheckSaveResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().includes(
+        `/system-checks/${encodeURIComponent(protectedSystemCheckId)}/reports`
+      )
+  );
+  await page.locator("#saveSystemCheckReportButton").click();
+  const protectedSystemCheckSaveResponse =
+    await protectedSystemCheckSaveResponsePromise;
+  assert.equal(protectedSystemCheckSaveResponse.status(), 201);
+  const protectedSystemCheckSavePayload =
+    await protectedSystemCheckSaveResponse.json();
+  assert.equal(
+    protectedSystemCheckSavePayload.report?.title,
+    systemCheckUsername,
+    "A dedicated system-check session must force the saved report title to its login name."
+  );
+  await page.locator("#systemCheckSavedReportStatus").waitFor();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/app/runtime");
     window.dispatchEvent(new PopStateEvent("popstate"));
