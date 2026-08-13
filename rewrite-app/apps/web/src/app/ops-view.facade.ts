@@ -261,6 +261,9 @@ export class OpsViewFacade {
   applicationIntroHtmlDraft = defaultApplicationSettings.introHtml;
   applicationLegalNoticeHtmlDraft =
     defaultApplicationSettings.legalNoticeHtml;
+  applicationPrivacyNoticeDraft = defaultApplicationSettings.privacyNotice;
+  applicationAccessibilityNoticeDraft =
+    defaultApplicationSettings.accessibilityNotice;
   readonly applicationThemeOptions = applicationThemeNames;
   applicationCustomTextDrafts: Record<string, string> = {};
   applicationCustomTextNewKey = "";
@@ -340,6 +343,10 @@ export class OpsViewFacade {
     return (
       encoder.encode(this.applicationIntroHtmlDraft.trim()).length <= 100_000 &&
       encoder.encode(this.applicationLegalNoticeHtmlDraft.trim()).length <=
+        100_000 &&
+      encoder.encode(this.applicationPrivacyNoticeDraft.trim()).length <=
+        100_000 &&
+      encoder.encode(this.applicationAccessibilityNoticeDraft.trim()).length <=
         100_000
     );
   }
@@ -931,6 +938,8 @@ export class OpsViewFacade {
           themeName: this.applicationThemeDraft,
           introHtml: this.applicationIntroHtmlDraft,
           legalNoticeHtml: this.applicationLegalNoticeHtmlDraft,
+          privacyNotice: this.applicationPrivacyNoticeDraft,
+          accessibilityNotice: this.applicationAccessibilityNoticeDraft,
           customTexts: this.normalizedApplicationCustomTexts(),
           assetAssignments: this.normalizedApplicationAssetAssignments(),
           globalWarningText: this.applicationWarningTextDraft,
@@ -4017,6 +4026,8 @@ export class OpsViewFacade {
     this.applicationThemeDraft = settings.themeName;
     this.applicationIntroHtmlDraft = settings.introHtml;
     this.applicationLegalNoticeHtmlDraft = settings.legalNoticeHtml;
+    this.applicationPrivacyNoticeDraft = settings.privacyNotice;
+    this.applicationAccessibilityNoticeDraft = settings.accessibilityNotice;
     this.applicationCustomTextDrafts = { ...settings.customTexts };
     this.applicationAssetAssignmentsDraft = { ...settings.assetAssignments };
     this.applicationCustomTextNewKey = "";

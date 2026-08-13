@@ -1036,6 +1036,8 @@ export type ApplicationSettingsPort = {
     themeName?: ApplicationSettings["themeName"];
     introHtml?: string;
     legalNoticeHtml?: string;
+    privacyNotice?: string;
+    accessibilityNotice?: string;
     customTexts?: Record<string, string>;
     assetAssignments?: ApplicationSettings["assetAssignments"];
     globalWarningText?: string | null;
@@ -5050,14 +5052,18 @@ const MAX_APPLICATION_CONTENT_HTML_BYTES = 100_000;
 
 const normalizeApplicationContentHtml = (
   value: unknown,
-  field: "intro" | "legal_notice"
+  field:
+    | "intro"
+    | "legal_notice"
+    | "privacy_notice"
+    | "accessibility_notice"
 ): string => {
   const html = String(value ?? "").trim();
   if (Buffer.byteLength(html, "utf8") > MAX_APPLICATION_CONTENT_HTML_BYTES) {
     throw new FirstSliceError(
       400,
       `application_${field}_html_too_large`,
-      `Application ${field === "intro" ? "intro" : "legal notice"} HTML must not exceed ${MAX_APPLICATION_CONTENT_HTML_BYTES} UTF-8 bytes.`,
+      `Application ${field.replaceAll("_", " ")} HTML must not exceed ${MAX_APPLICATION_CONTENT_HTML_BYTES} UTF-8 bytes.`,
       { maxBytes: MAX_APPLICATION_CONTENT_HTML_BYTES }
     );
   }
@@ -24725,6 +24731,20 @@ export const createFirstSliceServices = (
                   input.legalNoticeHtml,
                   "legal_notice"
                 ),
+          privacyNotice:
+            input.privacyNotice === undefined
+              ? previousSettings.privacyNotice
+              : normalizeApplicationContentHtml(
+                  input.privacyNotice,
+                  "privacy_notice"
+                ),
+          accessibilityNotice:
+            input.accessibilityNotice === undefined
+              ? previousSettings.accessibilityNotice
+              : normalizeApplicationContentHtml(
+                  input.accessibilityNotice,
+                  "accessibility_notice"
+                ),
           customTexts:
             input.customTexts === undefined
               ? previousSettings.customTexts
@@ -24818,6 +24838,27 @@ export const createFirstSliceServices = (
             ),
             nextLegalNoticeHtmlBytes: Buffer.byteLength(
               updatedSettings.legalNoticeHtml,
+              "utf8"
+            ),
+            privacyNoticeChanged:
+              previousSettings.privacyNotice !== updatedSettings.privacyNotice,
+            previousPrivacyNoticeBytes: Buffer.byteLength(
+              previousSettings.privacyNotice,
+              "utf8"
+            ),
+            nextPrivacyNoticeBytes: Buffer.byteLength(
+              updatedSettings.privacyNotice,
+              "utf8"
+            ),
+            accessibilityNoticeChanged:
+              previousSettings.accessibilityNotice !==
+              updatedSettings.accessibilityNotice,
+            previousAccessibilityNoticeBytes: Buffer.byteLength(
+              previousSettings.accessibilityNotice,
+              "utf8"
+            ),
+            nextAccessibilityNoticeBytes: Buffer.byteLength(
+              updatedSettings.accessibilityNotice,
               "utf8"
             ),
             previousCustomLogo:

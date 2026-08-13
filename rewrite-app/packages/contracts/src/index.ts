@@ -826,6 +826,8 @@ export type UpdateApplicationSettingsRequest = {
   themeName?: ApplicationSettings["themeName"];
   introHtml?: string;
   legalNoticeHtml?: string;
+  privacyNotice?: string;
+  accessibilityNotice?: string;
   customTexts?: Record<string, string>;
   assetAssignments?: ApplicationSettings["assetAssignments"];
   globalWarningText?: string | null;

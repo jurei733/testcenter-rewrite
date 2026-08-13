@@ -4405,6 +4405,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             themeName: body.themeName,
             introHtml: body.introHtml,
             legalNoticeHtml: body.legalNoticeHtml,
+            privacyNotice: body.privacyNotice,
+            accessibilityNotice: body.accessibilityNotice,
             customTexts: body.customTexts,
             assetAssignments: body.assetAssignments,
             globalWarningText: body.globalWarningText,

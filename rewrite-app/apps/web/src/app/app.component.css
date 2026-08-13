@@ -98,6 +98,13 @@
   font-weight: 700;
 }
 
+.application-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
 .application-warning-banner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

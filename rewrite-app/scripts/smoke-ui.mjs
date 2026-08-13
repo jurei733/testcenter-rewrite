@@ -1386,7 +1386,11 @@ try {
   const configuredIntroHtml =
     '<p id="uiConfiguredIntro">Welcome to the <strong>UI smoke assessment</strong>.</p><img id="uiIntroSanitizerProbe" src="missing-intro.png" onerror="document.body.dataset.introUnsafe=\'true\'">';
   const configuredLegalNoticeHtml =
-    '<h3 id="uiConfiguredLegalHeading">UI Smoke Provider</h3><p>Privacy contact: <a id="uiConfiguredPrivacyLink" href="mailto:privacy@example.test" onclick="document.body.dataset.legalUnsafe=\'true\'">privacy@example.test</a></p>';
+    '<h3 id="uiConfiguredLegalHeading">UI Smoke Provider</h3><p>Provider contact: <a href="mailto:provider@example.test" onclick="document.body.dataset.legalUnsafe=\'true\'">provider@example.test</a></p>';
+  const configuredPrivacyNotice =
+    '<h3 id="uiConfiguredPrivacyHeading">UI Smoke Privacy</h3><p>Privacy contact: <a href="mailto:privacy@example.test" onclick="document.body.dataset.privacyUnsafe=\'true\'">privacy@example.test</a></p>';
+  const configuredAccessibilityNotice =
+    '<h3 id="uiConfiguredAccessibilityHeading">UI Smoke Accessibility</h3><p>Accessibility contact: <a href="mailto:accessibility@example.test" onclick="document.body.dataset.accessibilityUnsafe=\'true\'">accessibility@example.test</a></p>';
   await page.locator("#applicationLogoInput").setInputFiles({
     name: "ui-smoke-logo.png",
     mimeType: "image/png",
@@ -1435,6 +1439,14 @@ try {
   await fillAndCommit(
     "#applicationLegalNoticeHtmlInput",
     configuredLegalNoticeHtml
+  );
+  await fillAndCommit(
+    "#applicationPrivacyNoticeInput",
+    configuredPrivacyNotice
+  );
+  await fillAndCommit(
+    "#applicationAccessibilityNoticeInput",
+    configuredAccessibilityNotice
   );
   await fillAndCommit(
     "#applicationWarningTextInput",
@@ -1490,6 +1502,14 @@ try {
   assert.equal(
     configuredSettingsPayload.applicationSettings.legalNoticeHtml,
     configuredLegalNoticeHtml
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.privacyNotice,
+    configuredPrivacyNotice
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.accessibilityNotice,
+    configuredAccessibilityNotice
   );
   assert.deepEqual(configuredSettingsPayload.applicationSettings.customTexts, {
     gm_menu_filter: "UI Global Hidden Sessions",
@@ -1648,11 +1668,51 @@ try {
   assert.equal(
     await brandedParticipantPage
       .locator(
-        '#applicationLegalNoticeContent a[href="mailto:privacy@example.test"]'
+        '#applicationLegalNoticeContent a[href="mailto:provider@example.test"]'
       )
       .getAttribute("onclick"),
     null,
     "Configured legal HTML must pass through Angular sanitization."
+  );
+  await brandedParticipantPage
+    .getByRole("link", { name: "Back to participant entry" })
+    .click();
+  await brandedParticipantPage.waitForURL(/\/app\/participant$/);
+  await brandedParticipantPage.locator("#applicationPrivacyNoticeLink").click();
+  await brandedParticipantPage.waitForURL(/\/app\/privacy$/);
+  await brandedParticipantPage
+    .locator("#applicationPrivacyNoticeContent h3")
+    .filter({ hasText: "UI Smoke Privacy" })
+    .waitFor();
+  assert.equal(
+    await brandedParticipantPage
+      .locator(
+        '#applicationPrivacyNoticeContent a[href="mailto:privacy@example.test"]'
+      )
+      .getAttribute("onclick"),
+    null,
+    "Configured privacy HTML must pass through Angular sanitization."
+  );
+  await brandedParticipantPage
+    .getByRole("link", { name: "Back to participant entry" })
+    .click();
+  await brandedParticipantPage.waitForURL(/\/app\/participant$/);
+  await brandedParticipantPage
+    .locator("#applicationAccessibilityNoticeLink")
+    .click();
+  await brandedParticipantPage.waitForURL(/\/app\/accessibility$/);
+  await brandedParticipantPage
+    .locator("#applicationAccessibilityNoticeContent h3")
+    .filter({ hasText: "UI Smoke Accessibility" })
+    .waitFor();
+  assert.equal(
+    await brandedParticipantPage
+      .locator(
+        '#applicationAccessibilityNoticeContent a[href="mailto:accessibility@example.test"]'
+      )
+      .getAttribute("onclick"),
+    null,
+    "Configured accessibility HTML must pass through Angular sanitization."
   );
   await brandedParticipantPage
     .getByRole("link", { name: "Back to participant entry" })
@@ -1704,6 +1764,8 @@ try {
   await fillAndCommit("#applicationTitleInput", "IQB-Testcenter");
   await fillAndCommit("#applicationIntroHtmlInput", "");
   await fillAndCommit("#applicationLegalNoticeHtmlInput", "");
+  await fillAndCommit("#applicationPrivacyNoticeInput", "");
+  await fillAndCommit("#applicationAccessibilityNoticeInput", "");
   await page.locator("#applicationThemeSelect").selectOption({ label: "Primar" });
   await page.locator("#resetApplicationLogoButton").click();
   await page.locator("#resetApplicationCustomTextsButton").click();

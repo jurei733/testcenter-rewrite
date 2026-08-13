@@ -3021,6 +3021,8 @@ test("platform application settings are public, durable, validated, and audited"
       themeName: string;
       introHtml: string;
       legalNoticeHtml: string;
+      privacyNotice: string;
+      accessibilityNotice: string;
       customTexts: Record<string, string>;
       assetAssignments: Record<string, string>;
       globalWarningText: string | null;
@@ -3036,6 +3038,8 @@ test("platform application settings are public, durable, validated, and audited"
     themeName: "Primar",
     introHtml: "",
     legalNoticeHtml: "",
+    privacyNotice: "",
+    accessibilityNotice: "",
     customTexts: {},
     assetAssignments: {},
     globalWarningText: null,
@@ -3212,6 +3216,40 @@ test("platform application settings are public, durable, validated, and audited"
     "application_legal_notice_html_too_large"
   );
 
+  const invalidPrivacyNotice = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        privacyNotice: "x".repeat(100_001)
+      }
+    }
+  );
+  assert.equal(invalidPrivacyNotice.status, 400);
+  assert.equal(
+    invalidPrivacyNotice.body.error,
+    "application_privacy_notice_html_too_large"
+  );
+
+  const invalidAccessibilityNotice = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        accessibilityNotice: "x".repeat(100_001)
+      }
+    }
+  );
+  assert.equal(invalidAccessibilityNotice.status, 400);
+  assert.equal(
+    invalidAccessibilityNotice.body.error,
+    "application_accessibility_notice_html_too_large"
+  );
+
   const invalidCustomTexts = await requestJson<{ error: string }>(
     "/api/v1/admin/application-settings",
     {
@@ -3281,6 +3319,10 @@ test("platform application settings are public, durable, validated, and audited"
     '<p>Welcome to the <strong>configured assessment</strong>.</p>';
   const configuredLegalNoticeHtml =
     '<h3>Provider</h3><p>Assessment Institute · <a href="mailto:privacy@example.test">Privacy contact</a></p>';
+  const configuredPrivacyNotice =
+    "<h3>Privacy</h3><p>Data processing information.</p>";
+  const configuredAccessibilityNotice =
+    "<h3>Accessibility</h3><p>Accessibility contact and status.</p>";
 
   const updatedSettings = await requestJson<{
     applicationSettings: {
@@ -3289,6 +3331,8 @@ test("platform application settings are public, durable, validated, and audited"
       themeName: string;
       introHtml: string;
       legalNoticeHtml: string;
+      privacyNotice: string;
+      accessibilityNotice: string;
       customTexts: Record<string, string>;
       assetAssignments: Record<string, string>;
       globalWarningText: string | null;
@@ -3305,6 +3349,8 @@ test("platform application settings are public, durable, validated, and audited"
       themeName: "Sekundar",
       introHtml: `  ${configuredIntroHtml}  `,
       legalNoticeHtml: `  ${configuredLegalNoticeHtml}  `,
+      privacyNotice: `  ${configuredPrivacyNotice}  `,
+      accessibilityNotice: `  ${configuredAccessibilityNotice}  `,
       customTexts: {
         login_subtitle: "  Global test selection  ",
         login_testResumeButtonLabel: "Begin"
@@ -3328,6 +3374,14 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(
     updatedSettings.body.applicationSettings.legalNoticeHtml,
     configuredLegalNoticeHtml
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.privacyNotice,
+    configuredPrivacyNotice
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.accessibilityNotice,
+    configuredAccessibilityNotice
   );
   assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
     login_subtitle: "Global test selection",
@@ -3401,6 +3455,22 @@ test("platform application settings are public, durable, validated, and audited"
     settingsAudit.body.items[0]?.details["nextLegalNoticeHtmlBytes"],
     Buffer.byteLength(configuredLegalNoticeHtml, "utf8")
   );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["privacyNoticeChanged"],
+    true
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextPrivacyNoticeBytes"],
+    Buffer.byteLength(configuredPrivacyNotice, "utf8")
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["accessibilityNoticeChanged"],
+    true
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextAccessibilityNoticeBytes"],
+    Buffer.byteLength(configuredAccessibilityNotice, "utf8")
+  );
   assert.equal(settingsAudit.body.items[0]?.details["nextCustomLogo"], true);
   assert.equal(settingsAudit.body.items[0]?.details["nextCustomTextCount"], 2);
   assert.deepEqual(
@@ -3433,6 +3503,8 @@ test("platform application settings are public, durable, validated, and audited"
         themeName: "Primar",
         introHtml: "",
         legalNoticeHtml: "",
+        privacyNotice: "",
+        accessibilityNotice: "",
         customTexts: {},
         assetAssignments: {},
         globalWarningText: "",
@@ -3446,6 +3518,11 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(resetSettings.body.applicationSettings.themeName, "Primar");
   assert.equal(resetSettings.body.applicationSettings.introHtml, "");
   assert.equal(resetSettings.body.applicationSettings.legalNoticeHtml, "");
+  assert.equal(resetSettings.body.applicationSettings.privacyNotice, "");
+  assert.equal(
+    resetSettings.body.applicationSettings.accessibilityNotice,
+    ""
+  );
   assert.deepEqual(resetSettings.body.applicationSettings.customTexts, {});
   assert.deepEqual(resetSettings.body.applicationSettings.assetAssignments, {});
   assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);

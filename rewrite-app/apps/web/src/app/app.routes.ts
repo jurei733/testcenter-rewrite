@@ -64,9 +64,41 @@ export const appRoutes: Routes = [
   {
     path: "legal-notice",
     loadComponent: () =>
-      import("./legal-notice.component").then(
-        module => module.LegalNoticeComponent
-      )
+      import("./public-info-page.component").then(
+        module => module.PublicInfoPageComponent
+      ),
+    data: {
+      title: "Legal notice",
+      contentKey: "legalNoticeHtml",
+      contentId: "applicationLegalNoticeContent",
+      emptyId: "applicationLegalNoticeEmptyState"
+    }
+  },
+  {
+    path: "privacy",
+    loadComponent: () =>
+      import("./public-info-page.component").then(
+        module => module.PublicInfoPageComponent
+      ),
+    data: {
+      title: "Privacy",
+      contentKey: "privacyNotice",
+      contentId: "applicationPrivacyNoticeContent",
+      emptyId: "applicationPrivacyNoticeEmptyState"
+    }
+  },
+  {
+    path: "accessibility",
+    loadComponent: () =>
+      import("./public-info-page.component").then(
+        module => module.PublicInfoPageComponent
+      ),
+    data: {
+      title: "Accessibility",
+      contentKey: "accessibilityNotice",
+      contentId: "applicationAccessibilityNoticeContent",
+      emptyId: "applicationAccessibilityNoticeEmptyState"
+    }
   },
   {
     path: "ops",

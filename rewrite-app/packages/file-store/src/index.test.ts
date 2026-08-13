@@ -114,6 +114,8 @@ describe("createFileFirstSliceRepository", () => {
         themeName: "Primar",
         introHtml: "",
         legalNoticeHtml: "",
+        privacyNotice: "",
+        accessibilityNotice: "",
         customTexts: {},
         assetAssignments: {},
         globalWarningText: null,
@@ -479,6 +481,8 @@ describe("createFileFirstSliceRepository", () => {
         themeName: "Sekundar",
         introHtml: "<p>Welcome to the assessment.</p>",
         legalNoticeHtml: "<p>Provider: Assessment Institute</p>",
+        privacyNotice: "<p>Privacy contact</p>",
+        accessibilityNotice: "<p>Accessibility statement</p>",
         customTexts: { login_subtitle: "Global start" },
         assetAssignments: {},
         globalWarningText: "Maintenance tonight",
@@ -495,6 +499,8 @@ describe("createFileFirstSliceRepository", () => {
           themeName: "Sekundar",
           introHtml: "<p>Welcome to the assessment.</p>",
           legalNoticeHtml: "<p>Provider: Assessment Institute</p>",
+          privacyNotice: "<p>Privacy contact</p>",
+          accessibilityNotice: "<p>Accessibility statement</p>",
           customTexts: { login_subtitle: "Global start" },
           assetAssignments: {},
           globalWarningText: "Maintenance tonight",
@@ -533,6 +539,8 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(settings?.themeName, "Primar");
       assert.equal(settings?.introHtml, "");
       assert.equal(settings?.legalNoticeHtml, "");
+      assert.equal(settings?.privacyNotice, "");
+      assert.equal(settings?.accessibilityNotice, "");
       assert.deepEqual(settings?.customTexts, {});
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });

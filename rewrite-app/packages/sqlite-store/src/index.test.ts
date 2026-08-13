@@ -334,6 +334,8 @@ test("SQLite preserves global application settings", async () => {
     themeName: "Erwachsene",
     introHtml: "<p>Welcome to the assessment.</p>",
     legalNoticeHtml: "<p>Provider: Assessment Institute</p>",
+    privacyNotice: "<p>Privacy contact</p>",
+    accessibilityNotice: "<p>Accessibility statement</p>",
     customTexts: { login_subtitle: "Global start" },
     assetAssignments: {},
     globalWarningText: "Maintenance tonight",
@@ -348,6 +350,8 @@ test("SQLite preserves global application settings", async () => {
     themeName: "Erwachsene",
     introHtml: "<p>Welcome to the assessment.</p>",
     legalNoticeHtml: "<p>Provider: Assessment Institute</p>",
+    privacyNotice: "<p>Privacy contact</p>",
+    accessibilityNotice: "<p>Accessibility statement</p>",
     customTexts: { login_subtitle: "Global start" },
     assetAssignments: {},
     globalWarningText: "Maintenance tonight",
@@ -431,6 +435,8 @@ test("SQLite adds current defaults to legacy application settings", async () => 
     assert.equal(settings?.themeName, "Primar");
     assert.equal(settings?.introHtml, "");
     assert.equal(settings?.legalNoticeHtml, "");
+    assert.equal(settings?.privacyNotice, "");
+    assert.equal(settings?.accessibilityNotice, "");
     assert.deepEqual(settings?.customTexts, {});
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });

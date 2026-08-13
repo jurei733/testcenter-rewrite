@@ -135,7 +135,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </div>
           <span class="status-pill">Platform admin</span>
         </div>
-        <p>Set the public title, logo, original audience theme, start-page introduction, legal notice, and an optional time-bounded warning shown above every participant and operator view.</p>
+        <p>Set the public title, logo, original audience theme, start-page introduction, separate legal/privacy/accessibility notices, and an optional time-bounded warning shown above every participant and operator view.</p>
         <div class="form-grid">
           <label>
             Application Title
@@ -247,12 +247,42 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               maxlength="100000"
               rows="9"
               [(ngModel)]="view.applicationLegalNoticeHtmlDraft"
-              placeholder="Optional Impressum, privacy, and accessibility information."
+              placeholder="Optional Impressum or provider information."
             ></textarea>
           </label>
           <section class="span-all configured-content-preview" *ngIf="view.applicationLegalNoticeHtmlDraft.trim()">
             <strong>Sanitized legal-notice preview</strong>
             <div id="applicationLegalNoticeHtmlPreview" [innerHTML]="view.applicationLegalNoticeHtmlDraft"></div>
+          </section>
+          <label class="span-all">
+            Privacy Notice HTML
+            <textarea
+              id="applicationPrivacyNoticeInput"
+              name="applicationPrivacyNoticeInput"
+              maxlength="100000"
+              rows="9"
+              [(ngModel)]="view.applicationPrivacyNoticeDraft"
+              placeholder="Optional privacy information."
+            ></textarea>
+          </label>
+          <section class="span-all configured-content-preview" *ngIf="view.applicationPrivacyNoticeDraft.trim()">
+            <strong>Sanitized privacy preview</strong>
+            <div id="applicationPrivacyNoticePreview" [innerHTML]="view.applicationPrivacyNoticeDraft"></div>
+          </section>
+          <label class="span-all">
+            Accessibility Notice HTML
+            <textarea
+              id="applicationAccessibilityNoticeInput"
+              name="applicationAccessibilityNoticeInput"
+              maxlength="100000"
+              rows="9"
+              [(ngModel)]="view.applicationAccessibilityNoticeDraft"
+              placeholder="Optional accessibility information."
+            ></textarea>
+          </label>
+          <section class="span-all configured-content-preview" *ngIf="view.applicationAccessibilityNoticeDraft.trim()">
+            <strong>Sanitized accessibility preview</strong>
+            <div id="applicationAccessibilityNoticePreview" [innerHTML]="view.applicationAccessibilityNoticeDraft"></div>
           </section>
           <details id="applicationCustomTextsEditor" class="span-all application-custom-texts-editor">
             <summary>Custom text overrides ({{ view.applicationCustomTextKeys.length }})</summary>
@@ -314,7 +344,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           Enter a valid local date and time, or leave the expiration empty.
         </p>
         <p *ngIf="!view.applicationContentHtmlValid">
-          Start-page and legal-notice HTML must each stay within 100,000 UTF-8 bytes.
+          Start-page, legal, privacy, and accessibility HTML must each stay within 100,000 UTF-8 bytes.
         </p>
         <p id="applicationLogoError" *ngIf="view.applicationLogoDraftError">{{ view.applicationLogoDraftError }}</p>
         <p id="applicationSettingsStatus">{{ view.applicationSettingsStatus }}</p>

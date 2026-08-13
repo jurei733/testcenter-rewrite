@@ -199,7 +199,7 @@
         />
         <div>
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
-          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isLegalNoticeView ? "Legal Notice" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
         </div>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
@@ -477,6 +477,10 @@
   </ng-template>
   <footer class="application-footer">
     <span>{{ applicationSettings.settings().appTitle }}</span>
-    <a id="applicationLegalNoticeLink" routerLink="/legal-notice">Legal notice · privacy · accessibility</a>
+    <nav aria-label="Public information">
+      <a id="applicationLegalNoticeLink" routerLink="/legal-notice">Legal notice</a>
+      <a id="applicationPrivacyNoticeLink" routerLink="/privacy">Privacy</a>
+      <a id="applicationAccessibilityNoticeLink" routerLink="/accessibility">Accessibility</a>
+    </nav>
   </footer>
 </div>

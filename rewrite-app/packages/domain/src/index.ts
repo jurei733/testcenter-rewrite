@@ -488,8 +488,12 @@ export type ApplicationSettings = {
   themeName: ApplicationThemeName;
   /** Original instance Startseite HTML, rendered through the frontend sanitizer. */
   introHtml: string;
-  /** Original public Impressum/Datenschutz HTML, rendered through the frontend sanitizer. */
+  /** Original public Impressum HTML, rendered through the frontend sanitizer. */
   legalNoticeHtml: string;
+  /** Original public Datenschutz HTML, rendered through the frontend sanitizer. */
+  privacyNotice: string;
+  /** Original public Barrierefreiheit HTML, rendered through the frontend sanitizer. */
+  accessibilityNotice: string;
   customTexts: Record<string, string>;
   assetAssignments: Partial<Record<ApplicationAssetSlotName, string>>;
   globalWarningText: string | null;
@@ -504,6 +508,8 @@ export const defaultApplicationSettings: ApplicationSettings = {
   themeName: "Primar",
   introHtml: "",
   legalNoticeHtml: "",
+  privacyNotice: "",
+  accessibilityNotice: "",
   customTexts: {},
   assetAssignments: {},
   globalWarningText: null,

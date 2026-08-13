@@ -344,6 +344,14 @@ const readStateFromFile = async (
           typeof state.applicationSettings.legalNoticeHtml === "string"
             ? state.applicationSettings.legalNoticeHtml
             : defaultApplicationSettings.legalNoticeHtml,
+        privacyNotice:
+          typeof state.applicationSettings.privacyNotice === "string"
+            ? state.applicationSettings.privacyNotice
+            : defaultApplicationSettings.privacyNotice,
+        accessibilityNotice:
+          typeof state.applicationSettings.accessibilityNotice === "string"
+            ? state.applicationSettings.accessibilityNotice
+            : defaultApplicationSettings.accessibilityNotice,
         globalWarningText: state.applicationSettings.globalWarningText ?? null,
         globalWarningExpiresAt:
           state.applicationSettings.globalWarningExpiresAt ?? null,

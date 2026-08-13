@@ -75,7 +75,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.app.activeView === "participant" ||
       this.app.activeView === "system-check" ||
       this.isAttachmentCaptureView ||
-      this.isLegalNoticeView
+      this.isPublicInfoView
     );
   }
 
@@ -159,8 +159,19 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.router.url.split("?", 1)[0] === "/attachment-capture";
   }
 
-  get isLegalNoticeView(): boolean {
-    return this.router.url.split("?", 1)[0] === "/legal-notice";
+  get isPublicInfoView(): boolean {
+    return ["/legal-notice", "/privacy", "/accessibility"].includes(
+      this.router.url.split("?", 1)[0] ?? ""
+    );
+  }
+
+  get publicInfoTitle(): string {
+    const path = this.router.url.split("?", 1)[0];
+    return path === "/privacy"
+      ? "Privacy"
+      : path === "/accessibility"
+        ? "Accessibility"
+        : "Legal Notice";
   }
 
   async ngOnInit(): Promise<void> {
