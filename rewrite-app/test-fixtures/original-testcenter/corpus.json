@@ -2375,6 +2375,99 @@
       }
     }
   ],
+  "currentOriginalSessionManagementPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/session-management",
+    "booklets": [
+      {
+        "fixture": "booklets/session-management/current-CY_Bklt_SM-1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-1.xml",
+        "sha256": "512013ab97f785133d53ca69121e9f1c1b54da0dec5bc33c01a3d6a3364e5c5c",
+        "bookletKey": "Cy-Bklt_SM-1",
+        "unitKeys": [
+          "CY-Unit.Sample-100",
+          "CY-Unit.Sample-101",
+          "CY-Unit.Sample-102",
+          "CY-Unit.Sample-103",
+          "CY-Unit.Sample-104"
+        ]
+      },
+      {
+        "fixture": "booklets/session-management/current-CY_Bklt_SM-2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-2.xml",
+        "sha256": "f52e8f4e5c95a7f6646eb78c2fd93865e21415196f2c391c76c72d7e8a3f600d",
+        "bookletKey": "Cy-Bklt_SM-2",
+        "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102"]
+      }
+    ],
+    "units": [
+      {
+        "fixture": "units/current-CY_Unit100.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+        "sha256": "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e",
+        "unitKey": "CY-Unit.Sample-100"
+      },
+      {
+        "fixture": "units/current-CY_Unit101.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+        "sha256": "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86",
+        "unitKey": "CY-Unit.Sample-101"
+      },
+      {
+        "fixture": "units/current-CY_Unit102.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+        "sha256": "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e",
+        "unitKey": "CY-Unit.Sample-102"
+      },
+      {
+        "fixture": "units/current-CY_Unit103.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+        "sha256": "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b",
+        "unitKey": "CY-Unit.Sample-103"
+      },
+      {
+        "fixture": "units/current-CY_Unit104.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+        "sha256": "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c",
+        "unitKey": "CY-Unit.Sample-104"
+      }
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_SM.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/session-management/CY_Logins_SM.xml",
+      "sha256": "aba2147ac8994ed577bbda1a65f5653d2d3246c58f2b01f91dddd9170287a644",
+      "participantLoginKeys": [
+        "SM-1",
+        "SM-2",
+        "SM-3",
+        "SM-4",
+        "SM-5",
+        "SM-6",
+        "SM-10",
+        "SM-11",
+        "SM-12",
+        "SM-7",
+        "SM-8",
+        "SM-9"
+      ]
+    }
+  },
   "sessionManagementPackages": [
     {
       "booklets": [

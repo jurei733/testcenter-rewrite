@@ -199,6 +199,32 @@ type OriginalTestcenterCorpus = {
       operationalLoginKeys: string[];
     };
   }>;
+  currentOriginalSessionManagementPackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklets: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        bookletKey: string;
+        unitKeys: string[];
+      }
+    >;
+    units: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        unitKey: string;
+      }
+    >;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      participantLoginKeys: string[];
+    };
+  };
   sessionManagementPackages: Array<{
     booklets: Array<{
       fixture: string;
@@ -2817,6 +2843,106 @@ test("original Testcenter compatibility corpus pins the complete official Bookle
     assert.equal(participant.bookletKey, bookletKey);
     assert.equal(participant.password, "123");
   }
+});
+
+test("original Testcenter compatibility corpus pins current 18.0 session management semantics", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const sessionManagement = corpus.currentOriginalSessionManagementPackage;
+  assert.equal(
+    sessionManagement.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(
+    sessionManagement.sourceDirectory,
+    "sampledata/system-test/session-management"
+  );
+
+  for (const booklet of sessionManagement.booklets) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, booklet.fixture), "utf8").trim(),
+      booklet.encoding
+    );
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      booklet.sha256,
+      booklet.sourcePath
+    );
+    assert.match(document.toString("utf8"), /testcenter-booklet-xml\/18\.0/);
+    assert.match(
+      document.toString("utf8"),
+      new RegExp(`<Id>${booklet.bookletKey}<\\/Id>`)
+    );
+  }
+  assert.deepEqual(
+    sessionManagement.booklets.map(booklet => [booklet.bookletKey, booklet.unitKeys]),
+    [
+      [
+        "Cy-Bklt_SM-1",
+        Array.from({ length: 5 }, (_, index) => `CY-Unit.Sample-${index + 100}`)
+      ],
+      ["Cy-Bklt_SM-2", ["CY-Unit.Sample-101", "CY-Unit.Sample-102"]]
+    ]
+  );
+
+  for (const unit of sessionManagement.units) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, unit.fixture), "utf8").trim(),
+      unit.encoding
+    );
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      unit.sha256,
+      unit.sourcePath
+    );
+    assert.match(document.toString("utf8"), /unit-xml\/17\.4/);
+  }
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, sessionManagement.player.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    sessionManagement.player.sha256,
+    sessionManagement.player.sourcePath
+  );
+  assert.match(playerDocument.toString("utf8"), /"version"\s*:\s*"6\.0\.5"/);
+
+  const rosterDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, sessionManagement.roster.fixture), "utf8").trim(),
+    sessionManagement.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterDocument).digest("hex"),
+    sessionManagement.roster.sha256,
+    sessionManagement.roster.sourcePath
+  );
+  assert.match(rosterDocument.toString("utf8"), /testcenter-testtaker-xml\/18\.0/);
+  const entries = parseParticipantRosterText(rosterDocument.toString("utf8"));
+  assert.deepEqual(
+    entries.map(entry => entry.loginKey),
+    sessionManagement.roster.participantLoginKeys
+  );
+  assert.deepEqual(parseOriginalTestcenterOperationalLogins(rosterDocument.toString("utf8")), []);
+  const entriesByLoginKey = new Map(entries.map(entry => [entry.loginKey, entry]));
+  assert.equal(entriesByLoginKey.get("SM-1")?.password, undefined);
+  assert.equal(entriesByLoginKey.get("SM-2")?.password, "101");
+  assert.deepEqual(entriesByLoginKey.get("SM-3")?.bookletKeys, [
+    "Cy-Bklt_SM-1",
+    "Cy-Bklt_SM-2"
+  ]);
+  assert.deepEqual(
+    entriesByLoginKey.get("SM-5")?.bookletAssignments?.[0]?.accessCodes,
+    ["as_code01"]
+  );
+  assert.equal(entriesByLoginKey.get("SM-7")?.executionMode, "run-hot-return");
+  assert.equal(entriesByLoginKey.get("SM-9")?.executionMode, "run-hot-restart");
+  assert.equal(entriesByLoginKey.get("SM-10")?.validFrom, "1/6/2023 10:00");
+  assert.equal(entriesByLoginKey.get("SM-11")?.validTo, "1/6/2023 10:00");
+  assert.equal(entriesByLoginKey.get("SM-12")?.validForMinutes, 10);
 });
 
 test("original Testcenter compatibility corpus pins official session management semantics", () => {

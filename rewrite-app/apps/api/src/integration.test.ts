@@ -20405,63 +20405,75 @@ test("original Testcenter compatibility corpus executes the current passwordless
   }
 });
 
-test("original Testcenter compatibility corpus executes the official session management package", async () => {
+test("original Testcenter compatibility corpus executes the current 18.0 session management package", async () => {
   type SessionManagementPackage = {
     booklets: Array<{
       fixture: string;
+      encoding: "base64";
+      sourcePath: string;
       bookletKey: string;
       unitKeys: string[];
     }>;
     units: Array<{
       fixture: string;
+      encoding: "base64";
+      sourcePath: string;
       unitKey: string;
     }>;
     player: {
       fixture: string;
+      encoding: "brotli-base64";
+      sourcePath: string;
       playerKey: string;
     };
     roster: {
       fixture: string;
+      encoding: "base64";
       participantLoginKeys: string[];
     };
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
-  ) as { sessionManagementPackages: SessionManagementPackage[] };
-  const expectation = corpus.sessionManagementPackages[0];
+  ) as { currentOriginalSessionManagementPackage: SessionManagementPackage };
+  const expectation = corpus.currentOriginalSessionManagementPackage;
   assert.ok(expectation);
 
   const packageDocuments = [
     ...expectation.booklets.map(booklet => ({
       ...booklet,
       kind: "booklet" as const,
-      content: readFileSync(
-        resolve(originalTestcenterCorpusRoot, booklet.fixture),
-        "utf8"
-      )
+      content: Buffer.from(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, booklet.fixture),
+          "utf8"
+        ).trim(),
+        booklet.encoding
+      ).toString("utf8")
     })),
     ...expectation.units.map(unit => ({
       ...unit,
       kind: "unit" as const,
-      content: readFileSync(
-        resolve(originalTestcenterCorpusRoot, unit.fixture),
-        "utf8"
-      )
+      content: Buffer.from(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, unit.fixture),
+          "utf8"
+        ).trim(),
+        unit.encoding
+      ).toString("utf8")
     }))
   ];
-  const playerDocument = readFileSync(
-    resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
-    "utf8"
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
   );
   const manifestResources = [
     ...expectation.booklets.map(
       booklet =>
-        `<resource identifier="${booklet.bookletKey}" href="${booklet.fixture}" />`
+        `<resource identifier="${booklet.bookletKey}" href="${booklet.sourcePath}" />`
     ),
     ...expectation.units.map(
-      unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+      unit => `<resource identifier="${unit.unitKey}" href="${unit.sourcePath}" />`
     ),
-    `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+    `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.sourcePath}" />`
   ].join("\n");
   const zipPayload = createZipBase64([
     {
@@ -20473,11 +20485,11 @@ test("original Testcenter compatibility corpus executes the official session man
       `
     },
     ...packageDocuments.map(document => ({
-      fileName: `export/${document.fixture}`,
+      fileName: `export/${document.sourcePath}`,
       content: document.content
     })),
     {
-      fileName: `export/${expectation.player.fixture}`,
+      fileName: `export/${expectation.player.sourcePath}`,
       content: playerDocument
     }
   ]);
@@ -20571,10 +20583,13 @@ test("original Testcenter compatibility corpus executes the official session man
   );
   assert.equal(activation.status, 200);
 
-  const rosterXml = readFileSync(
-    resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
-    "utf8"
-  );
+  const rosterXml = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+      "utf8"
+    ).trim(),
+    expectation.roster.encoding
+  ).toString("utf8");
   const rosterImport = await requestJson<{
     items: Array<{
       loginKey: string;
