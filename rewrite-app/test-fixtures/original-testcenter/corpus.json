@@ -819,6 +819,77 @@
       }
     }
   ],
+  "currentOriginalSamplePackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata",
+    "booklet": {
+      "fixture": "booklets/current-Booklet.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/Booklet.xml",
+      "sha256": "31a6b8cbcad9fd7c27165949fbf2abdc6a458ec74f21cc2646904b6f9c078780",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+    },
+    "additionalBooklets": [
+      ["booklets/current-Booklet2.xml.base64", "BOOKLET.SAMPLE-2", "c3e05941047b1d4d6bdc688bdc9fad57356ee61c9384d12d2690fa6e7679e360"],
+      ["booklets/current-Booklet3.xml.base64", "BOOKLET.SAMPLE-3", "af3f5e57a81af63aa06536ee8b158ec6921afb7a59fe6a44125e932788cb627e"]
+    ],
+    "units": [
+      {
+        "fixture": "units/current-Unit.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/Unit.xml",
+        "sha256": "32da70a29cfd8a0b77109a0090570bdc420010920c61bdcfb77c7f039a9f5782",
+        "unitKey": "UNIT.SAMPLE",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      {
+        "fixture": "units/current-Unit2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/Unit2.xml",
+        "sha256": "3ac0c809c26e3c3c7fbdf35b7f1b3ac696c2d718fed8c3cd5024c77da3209780",
+        "unitKey": "UNIT.SAMPLE-2",
+        "playerKey": "verona-player-simple@6.0"
+      }
+    ],
+    "definition": {
+      "fixture": "definitions/SAMPLE_UNITCONTENTS.HTM",
+      "sourcePath": "sampledata/SAMPLE_UNITCONTENTS.HTM",
+      "sha256": "532310b1f4bf1eab6eaaa1603962a39566919b5669974f7b1a7dc2de4316d202"
+    },
+    "codingScheme": {
+      "fixture": "schemes/coding-scheme.vocs.json.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/coding-scheme.vocs.json",
+      "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f"
+    },
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "resourcePackage": {
+      "fixture": "resources/sample_resource_package.itcr.zip.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+      "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e"
+    },
+    "roster": {
+      "fixture": "rosters/current-Testtakers.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/Testtakers.xml",
+      "sha256": "cdc2fdc790e37981258813138f2ad368a681f5101022c2490d0142e23842c23c",
+      "participantLoginKeys": ["test", "test2", "test-review", "test-trial", "test-demo", "test-simulation", "test-no-pw", "test-no-pw-trial", "test-expired", "test-future"],
+      "operationalLoginKeys": ["test-group-monitor", "test-group-monitor-2", "sys-check", "test-study-monitor", "expired-group-monitor", "expired-study-monitor"]
+    },
+    "systemChecks": [
+      ["system-checks/current-SysCheck.xml.base64", "SYSCHECK.SAMPLE", "de11e774f2d0226609658a9b54a382e3896b4fd593464c6b4d43460443c10a83"],
+      ["system-checks/current-CY_SysCheck_2.xml.base64", "syscheck-2", "f69ea71a6eb3dbf9d894f6d7b671b10b21a525ed74997cf354fc6fb47f1a3774"]
+    ]
+  },
   "adaptiveDependencyPackages": [
     {
       "bookletFixture": "booklets/Booklet2.xml",

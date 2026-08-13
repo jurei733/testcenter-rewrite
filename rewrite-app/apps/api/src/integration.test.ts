@@ -22708,37 +22708,52 @@ test("original Testcenter compatibility corpus assembles complete loose Aspect m
   );
 });
 
-test("original Testcenter compatibility corpus executes the complete 17.6 sample package", async () => {
+test("original Testcenter compatibility corpus executes the current root sample package", async () => {
   type PinnedFixture = {
     fixture: string;
     sourcePath: string;
     sha256: string;
-    encoding?: "base64";
+    encoding?: "base64" | "brotli-base64";
   };
   type SamplePackage = {
     booklet: PinnedFixture & {
       bookletKey: string;
       unitKeys: string[];
     };
+    additionalBooklets: Array<
+      [fixture: string, bookletKey: string, sha256: string]
+    >;
     units: Array<PinnedFixture & { unitKey: string; playerKey: string }>;
     definition: PinnedFixture;
     codingScheme: PinnedFixture & { encoding: "base64" };
-    player: PinnedFixture & { playerKey: string };
+    player: PinnedFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
     resourcePackage: PinnedFixture & { encoding: "base64" };
+    roster: PinnedFixture & {
+      encoding: "base64";
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    };
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
-  ) as { samplePackages: SamplePackage[] };
-  const expectation = corpus.samplePackages[0];
+  ) as { currentOriginalSamplePackage: SamplePackage };
+  const expectation = corpus.currentOriginalSamplePackage;
   assert.ok(expectation);
   const readPinnedFixture = (fixture: PinnedFixture): Buffer => {
     const stored = readFileSync(
       resolve(originalTestcenterCorpusRoot, fixture.fixture)
     );
-    const source =
-      fixture.encoding === "base64"
+    const decoded =
+      fixture.encoding === "base64" || fixture.encoding === "brotli-base64"
         ? Buffer.from(stored.toString("utf8").trim(), "base64")
         : stored;
+    const source =
+      fixture.encoding === "brotli-base64"
+        ? brotliDecompressSync(decoded)
+        : decoded;
     assert.equal(
       createHash("sha256").update(source).digest("hex"),
       fixture.sha256,
@@ -22940,20 +22955,74 @@ test("original Testcenter compatibility corpus executes the complete 17.6 sample
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
   );
 
+  for (const [index, [fixture, bookletKey, sha256]] of
+    expectation.additionalBooklets.entries()) {
+    const document = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, fixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    );
+    assert.equal(createHash("sha256").update(document).digest("hex"), sha256);
+    const additionalSource = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `Booklet${index + 2}.xml`,
+        mediaType: "application/xml",
+        sourceDocument: document.toString("utf8")
+      }
+    });
+    assert.equal(additionalSource.status, 201, bookletKey);
+    const additionalImport = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; severity: string }>;
+      };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{ bookletKey: string }>;
+        };
+      } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: {
+        sourcePackageId: additionalSource.body.sourcePackage.sourcePackageId
+      }
+    });
+    assert.equal(
+      additionalImport.body.importJob.status,
+      "completed",
+      JSON.stringify(additionalImport.body.importJob.diagnostics)
+    );
+    assert.equal(
+      additionalImport.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]
+        ?.bookletKey,
+      bookletKey
+    );
+  }
+
   const activation = await requestJson(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
       `/content-releases/${contentReleaseId}/activate`,
     { method: "POST", body: {} }
   );
   assert.equal(activation.status, 200);
-  const originalRoster = readFileSync(
-    resolve(originalTestcenterCorpusRoot, "rosters/Testtakers.xml"),
-    "utf8"
-  );
+  const originalRoster = readPinnedFixture(expectation.roster).toString("utf8");
   const rosterImport = await requestJson<{
     items: Array<{
       loginKey: string;
       validationWarnings: Array<{ code: string }>;
+      viewSettings?: {
+        theme?: string;
+        codeInput?: { type: string; length?: number };
+      };
+    }>;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      monitorBookletVisibility: "visible" | "collapsed" | "hidden";
     }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
@@ -22963,6 +23032,25 @@ test("original Testcenter compatibility corpus executes the complete 17.6 sample
     }
   );
   assert.equal(rosterImport.status, 201);
+  assert.deepEqual(
+    rosterImport.body.items.map(item => item.loginKey).sort(),
+    [...expectation.roster.participantLoginKeys].sort()
+  );
+  assert.deepEqual(
+    rosterImport.body.items.find(item => item.loginKey === "test2")
+      ?.viewSettings,
+    { theme: "Sekundar", codeInput: { type: "keypad-numbers", length: 3 } }
+  );
+  assert.deepEqual(
+    rosterImport.body.operationalLoginCandidates.map(item => item.loginKey).sort(),
+    [...expectation.roster.operationalLoginKeys].sort()
+  );
+  assert.equal(
+    rosterImport.body.operationalLoginCandidates.find(
+      item => item.loginKey === "test-group-monitor-2"
+    )?.monitorBookletVisibility,
+    "hidden"
+  );
   assert.deepEqual(
     rosterImport.body.items.find(item => item.loginKey === "test-no-pw")
       ?.validationWarnings,
@@ -40875,6 +40963,21 @@ test("monitor bulk commands report per-run successes and failures", async () => 
 });
 
 test("original Testcenter compatibility corpus executes both official SysCheck configurations and compatible reports", async () => {
+  type CurrentSamplePackage = {
+    units: Array<{ fixture: string }>;
+    player: { fixture: string };
+    systemChecks: Array<[fixture: string, checkId: string, sha256: string]>;
+  };
+  const currentSamplePackage = (
+    JSON.parse(
+      readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+    ) as { currentOriginalSamplePackage: CurrentSamplePackage }
+  ).currentOriginalSamplePackage;
+  const readCurrentBase64Fixture = (fixture: string): string =>
+    Buffer.from(
+      readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
+      "base64"
+    ).toString("utf8");
   const tenantKey = "system-check-tenant";
   const workspaceKey = "system-check-workspace";
   await requestJson("/api/v1/platform/tenants", {
@@ -40885,9 +40988,8 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     method: "POST",
     body: { workspaceKey, displayName: "System Check Workspace" }
   });
-  const sourceDocument = readFileSync(
-    resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
-    "utf8"
+  const sourceDocument = readCurrentBase64Fixture(
+    currentSamplePackage.systemChecks[0]![0]
   )
     .replace(
       '    <Q id="1"',
@@ -40907,9 +41009,8 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     .replace('skipnetwork="false"', 'skipnetwork="0"')
     .replace('required="true"', 'required="1"')
     .replace('<Q id="3"', '<Q id="3" required="0"');
-  const systemCheckUnitDocument = readFileSync(
-    resolve(originalTestcenterCorpusRoot, "units/Unit2.xml"),
-    "utf8"
+  const systemCheckUnitDocument = readCurrentBase64Fixture(
+    currentSamplePackage.units[1]!.fixture
   ).replace("<Id>UNIT.SAMPLE-2</Id>", "<Id>UNIT.SAMPLE</Id>");
   for (const dependency of [
     {
@@ -40928,12 +41029,8 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     {
       fileName: "verona-player-simple-6.0.html",
       mediaType: "text/html",
-      sourceDocument: readFileSync(
-        resolve(
-          originalTestcenterCorpusRoot,
-          "players/verona-player-simple-6.0.html"
-        ),
-        "utf8"
+      sourceDocument: readBrotliBase64Fixture(
+        resolve(originalTestcenterCorpusRoot, currentSamplePackage.player.fixture)
       )
     }
   ]) {
@@ -40978,12 +41075,8 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     sourcePackage.body.sourcePackage.sourcePackageId
   );
 
-  const secondSystemCheckDocument = readFileSync(
-    resolve(
-      originalTestcenterCorpusRoot,
-      "system-checks/CY_SysCheck_2.xml"
-    ),
-    "utf8"
+  const secondSystemCheckDocument = readCurrentBase64Fixture(
+    currentSamplePackage.systemChecks[1]![0]
   )
     .replace('skipnetwork="true"', 'skipnetwork="1"')
     .replace('required="true"', 'required="1"');

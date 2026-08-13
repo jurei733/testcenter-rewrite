@@ -58,6 +58,41 @@ type OriginalTestcenterCorpus = {
     player: PinnedOriginalFixture & { playerKey: string };
     resourcePackage: PinnedOriginalFixture & { encoding: "base64" };
   }>;
+  currentOriginalSamplePackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklet: PinnedOriginalFixture & {
+      encoding: "base64";
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    additionalBooklets: Array<
+      [fixture: string, bookletKey: string, sha256: string]
+    >;
+    units: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        unitKey: string;
+        playerKey: string;
+      }
+    >;
+    definition: PinnedOriginalFixture;
+    codingScheme: PinnedOriginalFixture & { encoding: "base64" };
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    resourcePackage: PinnedOriginalFixture & { encoding: "base64" };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    };
+    systemChecks: Array<
+      [fixture: string, checkId: string, sha256: string]
+    >;
+  };
   systemChecks: Array<{
     fixture: string;
     sourcePath: string;
@@ -779,6 +814,107 @@ test("original Testcenter compatibility corpus pins the complete 17.6 sample pac
       ["UNIT.SAMPLE-2", "verona-player-simple@6.0"]
     ]
   );
+});
+
+test("original Testcenter compatibility corpus pins the current root sample package", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const current = corpus.currentOriginalSamplePackage;
+  assert.equal(
+    current.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(current.sourceDirectory, "sampledata");
+
+  const decodeFixture = (fixture: PinnedOriginalFixture): Buffer => {
+    const stored = readFileSync(resolve(corpusRoot, fixture.fixture));
+    if (fixture.encoding === "base64") {
+      return Buffer.from(stored.toString("utf8").trim(), "base64");
+    }
+    if (fixture.encoding === "brotli-base64") {
+      return brotliDecompressSync(
+        Buffer.from(stored.toString("utf8").trim(), "base64")
+      );
+    }
+    return stored;
+  };
+  for (const fixture of [
+    current.booklet,
+    ...current.units,
+    current.definition,
+    current.codingScheme,
+    current.player,
+    current.resourcePackage,
+    current.roster
+  ]) {
+    assert.equal(
+      createHash("sha256").update(decodeFixture(fixture)).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+  }
+  assert.match(
+    decodeFixture(current.booklet).toString("utf8"),
+    /testcenter-booklet-xml\/18\.0/
+  );
+  assert.deepEqual(
+    current.booklet.unitKeys,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+  );
+  for (const [fixture, bookletKey, sha256] of current.additionalBooklets) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, fixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(createHash("sha256").update(document).digest("hex"), sha256);
+    assert.match(document.toString("utf8"), /testcenter-booklet-xml\/18\.0/);
+    assert.match(document.toString("utf8"), new RegExp(`<Id>${bookletKey}<\\/Id>`));
+  }
+  for (const unit of current.units) {
+    assert.match(decodeFixture(unit).toString("utf8"), /unit-xml\/17\.4/);
+  }
+  assert.equal(current.player.playerKey, "verona-player-simple-6.0");
+
+  const rosterXml = decodeFixture(current.roster).toString("utf8");
+  assert.match(rosterXml, /testcenter-testtaker-xml\/18\.0/);
+  const participants = parseParticipantRosterText(rosterXml);
+  assert.deepEqual(
+    participants.map(participant => participant.loginKey),
+    current.roster.participantLoginKeys
+  );
+  assert.deepEqual(
+    participants.find(participant => participant.loginKey === "test")
+      ?.viewSettings,
+    {
+      theme: "Primar",
+      codeInput: { type: "text-field", length: 3 }
+    }
+  );
+  assert.deepEqual(
+    participants.find(participant => participant.loginKey === "test2")
+      ?.viewSettings,
+    { theme: "Sekundar", codeInput: { type: "keypad-numbers", length: 3 } }
+  );
+  const operationalLogins = parseOriginalTestcenterOperationalLogins(rosterXml);
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    current.roster.operationalLoginKeys
+  );
+  assert.equal(
+    operationalLogins.find(login => login.loginKey === "test-group-monitor-2")
+      ?.monitorBookletVisibility,
+    "hidden"
+  );
+  for (const [fixture, checkId, sha256] of current.systemChecks) {
+    const document = Buffer.from(
+      readFileSync(resolve(corpusRoot, fixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(createHash("sha256").update(document).digest("hex"), sha256);
+    assert.match(document.toString("utf8"), /testcenter-syscheck-xml\/18\.0/);
+    assert.match(document.toString("utf8"), new RegExp(`<Id>${checkId}<\\/Id>`));
+  }
 });
 
 test("original Testcenter compatibility corpus pins the Aspect player roster", () => {
