@@ -257,6 +257,36 @@ type ThroughputResult = {
             </ul>
           </section>
           <p>The report contains {{ reportEntryCount }} measured or answered values.</p>
+          <section id="systemCheckReportEnvironment" *ngIf="environmentEntries.length > 0">
+            <h3>Computer (Betriebssystem, Browser)</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of environmentEntries"
+                [id]="'systemCheckReportEnvironment-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
+          <section id="systemCheckReportNetwork" *ngIf="networkEntries.length > 0">
+            <h3>Netzwerk/Internetverbindung</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of networkEntries"
+                [id]="'systemCheckReportNetwork-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
+          <section id="systemCheckReportQuestionnaire" *ngIf="questionnaireEntries.length > 0">
+            <h3>Fragen</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of questionnaireEntries"
+                [id]="'systemCheckReportQuestionnaire-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
           <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
           <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
           <div class="form-grid" *ngIf="check.canSave && !isSystemCheckSession">
