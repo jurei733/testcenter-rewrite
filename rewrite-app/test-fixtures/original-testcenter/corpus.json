@@ -3113,6 +3113,136 @@
       "hasSystemCheckLogin": false
     }
   ],
+  "currentE2eFixtures": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "e2e/src/fixtures",
+    "resource": {
+      "fixture": "current-e2e/AnyResource.txt.base64",
+      "sourcePath": "e2e/src/fixtures/AnyResource.txt",
+      "sha256": "6449d85c076433b48eafe83738537c26b3513d007cf42f2d64efbf345b1a0540",
+      "encoding": "base64",
+      "content": "I am some resource."
+    },
+    "validBooklets": [
+      {
+        "fixture": "current-e2e/Booklet.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet.xml",
+        "sha256": "ce363c143e6cd777f25239b60c07cd5899cf338a404eb43648006a8a8aeea69f",
+        "encoding": "base64",
+        "bookletKey": "BOOKLET.SAMPLE-100",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameUnitIDs_Alias.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs_Alias.xml",
+        "sha256": "8dc5156f8b1f7f36143411640c895a043b27881e04bf25a1a5db6d589ccddc84",
+        "encoding": "base64",
+        "bookletKey": "BOOKLET.SAMPLE-1",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "cpy"]
+      }
+    ],
+    "bookletIdentityCollision": {
+      "fixture": "current-e2e/Booklet_sameBookletID.xml.base64",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameBookletID.xml",
+      "sha256": "24b5d2142da624ba15b1970e3fec0018b12e95dfdabf888160e458c44039b947",
+      "encoding": "base64",
+      "collidesWithFixture": "current-e2e/Booklet.xml.base64",
+      "bookletKey": "BOOKLET.SAMPLE-100",
+      "diagnosticCode": "source_package_booklet_id_duplicate"
+    },
+    "roster": {
+      "fixture": "current-e2e/Testtakers_withoutSyscheck.xml.base64",
+      "sourcePath": "e2e/src/fixtures/Testtakers_withoutSyscheck.xml",
+      "sha256": "46a1c5591e39184e94c89eb05dbcec90d6b2f9e8baa1562726e592d74424fffd",
+      "encoding": "base64",
+      "schemaVersion": "18.0",
+      "participantLoginKeys": [
+        "test",
+        "test-review",
+        "test-trial",
+        "test-demo",
+        "test-simulation",
+        "test-no-pw",
+        "test-no-pw-trial",
+        "test-expired",
+        "test-future"
+      ],
+      "operationalLoginKeys": [
+        "test-group-monitor",
+        "test-study-monitor",
+        "expired-group-monitor",
+        "expired-study-monitor"
+      ],
+      "hasSystemCheckLogin": false
+    },
+    "invalidXml": [
+      {
+        "fixture": "current-e2e/Booklet_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_error.xml",
+        "sha256": "5b04ea2e8f0a6e6c5153f30714bc92eb08cd8488fe7112638063cf83e9981ad7",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameTestlets.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameTestlets.xml",
+        "sha256": "76b9a6d4f7bedb663b2a2ba229f2631cde88e4f847ccda94eac9a2231b8393d0",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_testlet_id_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameUnitIDs.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs.xml",
+        "sha256": "42ee2c85c327ef103cf10092d7f054825177a3f575bd920e79e6ac5c11301805",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_unit_key_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtaker_DuplicatedGroup.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedGroup.xml",
+        "sha256": "4104c401c044a4a87716d8b3f1ac4034e189da3a48519210799bd66cf3a8bca8",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_group_id_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtaker_DuplicatedLogin.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedLogin.xml",
+        "sha256": "8bf64187f569e55e7a841231d5f8273af9a84c4d36b32be895aec86f2eddb212",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_login_name_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtakers_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtakers_error.xml",
+        "sha256": "a6a8453e5aa2333cd141cbb7f2ae2f3f67138c01f5d975aa57cd8027ce40748e",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/Unit_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Unit_error.xml",
+        "sha256": "7d6e4c3fdb9d523ffeb0509357288e9dc9ffd68aa70beb3bb8fc80ebee1596a4",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/invalid_SysCheck.xml.base64",
+        "sourcePath": "e2e/src/fixtures/invalid_SysCheck.xml",
+        "sha256": "fc0759ee7a6bbb554be6263ca100f5ef196bbc7a2834bf5816acd3ec6701c630",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      }
+    ]
+  },
   "resourcePackages": [
     {
       "fixture": "resources/sample_resource_package.itcr.zip.base64",

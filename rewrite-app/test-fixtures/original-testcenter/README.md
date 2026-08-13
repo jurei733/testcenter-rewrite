@@ -6,6 +6,16 @@ paths and executable expectations are declared in `corpus.json`. Newer
 package-level additions are pinned independently to their introducing Original
 Testcenter commit so the historical baseline remains reproducible.
 
+The complete current `e2e/src/fixtures` directory is additionally pinned at
+commit `a5a6d25a72990d667300804c337cc5b500b01d2f` as a separate generation. Its
+13 byte-exact files cover both valid 18.0 Booklets, the current
+same-Booklet-ID collision, the 18.0 roster without a SysCheck login, all eight
+malformed XML fixtures, and the standalone text resource. Import and parser
+gates execute the current schema URLs (`testcenter-booklet-xml/18.0`,
+`testcenter-testtaker-xml/18.0`, `testcenter-syscheck-xml/18.0`, and
+`unit-xml/17.4`) across memory, file, and SQLite without replacing the older
+fixtures that preserve historical compatibility boundaries.
+
 The coding-scheme corpus also pins the official MIT-licensed
 `@iqb/responses` 3.6.0 `SOLVER/case1` scheme, input, and expected outcome at
 commit `e04e585e6514e5257ac42f48b629628326471f90`. Those byte-exact fixtures are

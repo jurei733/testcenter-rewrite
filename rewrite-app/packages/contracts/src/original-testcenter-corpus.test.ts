@@ -41,6 +41,42 @@ type OriginalTestcenterCorpus = {
     operationalLoginKeys: string[];
     hasSystemCheckLogin: boolean;
   }>;
+  currentE2eFixtures: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    resource: PinnedOriginalFixture & {
+      encoding: "base64";
+      content: string;
+    };
+    validBooklets: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        bookletKey: string;
+        unitKeys: string[];
+      }
+    >;
+    bookletIdentityCollision: PinnedOriginalFixture & {
+      encoding: "base64";
+      collidesWithFixture: string;
+      bookletKey: string;
+      diagnosticCode: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      schemaVersion: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      hasSystemCheckLogin: boolean;
+    };
+    invalidXml: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        kind: "source-package" | "participant-roster";
+        diagnosticCode: string;
+      }
+    >;
+  };
   resourcePackages: Array<{
     fixture: string;
     sha256: string;
@@ -772,6 +808,93 @@ test("original Testcenter compatibility corpus pins the legacy 15.2 roster witho
     legacyRoster.hasSystemCheckLogin
   );
   assert.ok(operationalLogins.every(login => login.profileIds.length === 0));
+});
+
+test("original Testcenter compatibility corpus pins the current 18.0 E2E fixtures", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const current = corpus.currentE2eFixtures;
+  assert.equal(
+    current.sourceRepository,
+    "https://github.com/iqb-berlin/testcenter"
+  );
+  assert.equal(
+    current.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(current.sourceDirectory, "e2e/src/fixtures");
+
+  const fixtures = [
+    current.resource,
+    ...current.validBooklets,
+    current.bookletIdentityCollision,
+    current.roster,
+    ...current.invalidXml
+  ];
+  assert.equal(fixtures.length, 13);
+  assert.equal(new Set(fixtures.map(fixture => fixture.sourcePath)).size, 13);
+  const readFixture = (fixture: PinnedOriginalFixture): Buffer =>
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, fixture.fixture), "utf8"),
+      "base64"
+    );
+  for (const fixture of fixtures) {
+    assert.equal(fixture.encoding, "base64", fixture.sourcePath);
+    assert.ok(
+      fixture.sourcePath.startsWith(`${current.sourceDirectory}/`),
+      fixture.sourcePath
+    );
+    assert.equal(
+      createHash("sha256").update(readFixture(fixture)).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+  }
+
+  assert.equal(readFixture(current.resource).toString("utf8"), current.resource.content);
+  for (const booklet of current.validBooklets) {
+    const bookletXml = readFixture(booklet).toString("utf8");
+    assert.match(bookletXml, /testcenter-booklet-xml\/18\.0/);
+    assert.match(bookletXml, new RegExp(`<Id>${booklet.bookletKey.replaceAll(".", "\\.")}<\\/Id>`));
+    assert.match(bookletXml, /<Config key="page_navibuttons">FULL<\/Config>/);
+  }
+  const primaryBooklet = current.validBooklets.find(
+    booklet => booklet.fixture === current.bookletIdentityCollision.collidesWithFixture
+  );
+  assert.ok(primaryBooklet);
+  const primaryBookletXml = readFixture(primaryBooklet).toString("utf8");
+  const duplicateBookletXml = readFixture(
+    current.bookletIdentityCollision
+  ).toString("utf8");
+  assert.notEqual(primaryBookletXml, duplicateBookletXml);
+  assert.match(
+    primaryBookletXml,
+    new RegExp(`<Id>${current.bookletIdentityCollision.bookletKey.replaceAll(".", "\\.")}<\\/Id>`)
+  );
+  assert.match(
+    duplicateBookletXml,
+    new RegExp(`<Id>${current.bookletIdentityCollision.bookletKey.replaceAll(".", "\\.")}<\\/Id>`)
+  );
+
+  const rosterXml = readFixture(current.roster).toString("utf8");
+  assert.match(
+    rosterXml,
+    new RegExp(`testcenter-testtaker-xml/${current.roster.schemaVersion}`)
+  );
+  assert.deepEqual(
+    parseParticipantRosterText(rosterXml).map(participant => participant.loginKey),
+    current.roster.participantLoginKeys
+  );
+  const operationalLogins = parseOriginalTestcenterOperationalLogins(rosterXml);
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    current.roster.operationalLoginKeys
+  );
+  assert.equal(
+    operationalLogins.some(login => login.loginMode === "sys-check-login"),
+    current.roster.hasSystemCheckLogin
+  );
 });
 
 test("original Testcenter compatibility corpus pins the complete 17.6 sample package", () => {

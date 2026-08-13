@@ -16341,6 +16341,290 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
 });
 
+test("original Testcenter compatibility corpus executes the current 18.0 E2E fixtures", async () => {
+  type PinnedFixture = {
+    fixture: string;
+    sourcePath: string;
+    sha256: string;
+    encoding: "base64";
+  };
+  type CurrentE2eFixtures = {
+    sourceCommit: string;
+    sourceDirectory: string;
+    resource: PinnedFixture & { content: string };
+    validBooklets: Array<
+      PinnedFixture & {
+        bookletKey: string;
+        unitKeys: string[];
+      }
+    >;
+    bookletIdentityCollision: PinnedFixture & {
+      collidesWithFixture: string;
+      bookletKey: string;
+      diagnosticCode: string;
+    };
+    roster: PinnedFixture & {
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    };
+    invalidXml: Array<
+      PinnedFixture & {
+        kind: "source-package" | "participant-roster";
+        diagnosticCode: string;
+      }
+    >;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentE2eFixtures: CurrentE2eFixtures };
+  const current = corpus.currentE2eFixtures;
+  assert.equal(
+    current.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  const readFixture = (fixture: PinnedFixture): Buffer => {
+    const fixtureBuffer = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, fixture.fixture),
+        "utf8"
+      ),
+      "base64"
+    );
+    assert.equal(
+      createHash("sha256").update(fixtureBuffer).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+    return fixtureBuffer;
+  };
+  const tenantKey = "integration-tenant-current-e2e-fixtures";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+
+  for (const [bookletIndex, bookletFixture] of current.validBooklets.entries()) {
+    const workspaceKey = `integration-workspace-current-e2e-booklet-${bookletIndex + 1}`;
+    const workspace = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces`,
+      {
+        method: "POST",
+        body: { workspaceKey, displayName: workspaceKey }
+      }
+    );
+    assert.equal(workspace.status, 201, bookletFixture.sourcePath);
+    const bookletXml = readFixture(bookletFixture).toString("utf8");
+    const referencedUnitIds = [
+      ...new Set(
+        [...bookletXml.matchAll(/<Unit\b[^>]*\bid\s*=\s*"([^"]+)"/g)]
+          .map(match => match[1]?.trim() ?? "")
+          .filter(Boolean)
+      )
+    ];
+    await uploadMinimalOriginalUnitDependencies(
+      tenantKey,
+      workspaceKey,
+      referencedUnitIds
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: bookletFixture.sourcePath.split("/").at(-1),
+        mediaType: "application/xml",
+        sourceDocument: bookletXml
+      }
+    });
+    assert.equal(sourcePackage.status, 201, bookletFixture.sourcePath);
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{ unitKey: string }>;
+          }>;
+        };
+      } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201, bookletFixture.sourcePath);
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${bookletFixture.sourcePath}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    const importedBooklet =
+      importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.find(
+        booklet => booklet.bookletKey === bookletFixture.bookletKey
+      );
+    assert.ok(importedBooklet, bookletFixture.sourcePath);
+    assert.deepEqual(
+      importedBooklet.unitEntries.map(unit => unit.unitKey),
+      bookletFixture.unitKeys,
+      bookletFixture.sourcePath
+    );
+  }
+
+  const rosterWorkspaceKey = "integration-workspace-current-e2e-roster";
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey: rosterWorkspaceKey, displayName: rosterWorkspaceKey }
+  });
+  const rosterImport = await requestJson<{
+    items: Array<{ loginKey: string }>;
+    operationalLoginCandidates: Array<{ loginKey: string }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${rosterWorkspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: readFixture(current.roster).toString("utf8") }
+  });
+  assert.equal(rosterImport.status, 201, current.roster.sourcePath);
+  assert.deepEqual(
+    rosterImport.body.items.map(entry => entry.loginKey),
+    [...current.roster.participantLoginKeys].sort()
+  );
+  assert.deepEqual(
+    rosterImport.body.operationalLoginCandidates.map(entry => entry.loginKey),
+    current.roster.operationalLoginKeys
+  );
+
+  for (const [invalidIndex, invalidFixture] of current.invalidXml.entries()) {
+    const invalidDocument = readFixture(invalidFixture).toString("utf8");
+    if (invalidFixture.kind === "participant-roster") {
+      const invalidRoster = await requestJson<{
+        error: string;
+        details: { diagnostics: Array<{ code: string }> };
+      }>(`/api/v1/tenants/${tenantKey}/workspaces/${rosterWorkspaceKey}/participant-roster`, {
+        method: "POST",
+        body: { rosterText: invalidDocument }
+      });
+      assert.equal(invalidRoster.status, 400, invalidFixture.sourcePath);
+      assert.equal(invalidRoster.body.error, "participant_roster_xml_invalid");
+      assert.ok(
+        invalidRoster.body.details.diagnostics.some(
+          diagnostic => diagnostic.code === invalidFixture.diagnosticCode
+        ),
+        invalidFixture.sourcePath
+      );
+      continue;
+    }
+    const workspaceKey = `integration-workspace-current-e2e-invalid-${invalidIndex + 1}`;
+    await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+      method: "POST",
+      body: { workspaceKey, displayName: workspaceKey }
+    });
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: invalidFixture.sourcePath.split("/").at(-1),
+        mediaType: "application/xml",
+        sourceDocument: invalidDocument
+      }
+    });
+    assert.equal(sourcePackage.status, 201, invalidFixture.sourcePath);
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201, invalidFixture.sourcePath);
+    assert.equal(
+      importResult.body.importJob.status,
+      "failed",
+      invalidFixture.sourcePath
+    );
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === invalidFixture.diagnosticCode
+      ),
+      invalidFixture.sourcePath
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  const collisionWorkspaceKey = "integration-workspace-current-e2e-collision";
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: {
+      workspaceKey: collisionWorkspaceKey,
+      displayName: collisionWorkspaceKey
+    }
+  });
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    collisionWorkspaceKey,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
+  );
+  const primaryCollisionFixture = current.validBooklets.find(
+    fixture =>
+      fixture.fixture === current.bookletIdentityCollision.collidesWithFixture
+  );
+  assert.ok(primaryCollisionFixture);
+  const primaryUpload = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${collisionWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Booklet.xml",
+        mediaType: "application/xml",
+        sourceDocument: readFixture(primaryCollisionFixture).toString("utf8")
+      }
+    }
+  );
+  assert.equal(primaryUpload.status, 201);
+  const duplicateUpload = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${collisionWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Booklet_sameBookletID.xml",
+        mediaType: "application/xml",
+        sourceDocument: readFixture(
+          current.bookletIdentityCollision
+        ).toString("utf8")
+      }
+    }
+  );
+  assert.equal(duplicateUpload.status, 409);
+  assert.equal(
+    duplicateUpload.body.error,
+    current.bookletIdentityCollision.diagnosticCode
+  );
+
+  const resourceWorkspaceKey = "integration-workspace-current-e2e-resource";
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey: resourceWorkspaceKey, displayName: resourceWorkspaceKey }
+  });
+  const resourceBuffer = readFixture(current.resource);
+  const resourceUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${resourceWorkspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "AnyResource.txt",
+      mediaType: "text/plain",
+      sourceDocument: resourceBuffer.toString("utf8")
+    }
+  });
+  assert.equal(resourceUpload.status, 201);
+  const resourceDownload = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${resourceWorkspaceKey}/source-packages/${resourceUpload.body.sourcePackage.sourcePackageId}/download`
+  );
+  assert.equal(resourceDownload.status, 200);
+  assert.deepEqual(
+    Buffer.from(await resourceDownload.arrayBuffer()),
+    resourceBuffer
+  );
+});
+
 test("original Testcenter compatibility corpus rejects duplicate file identities across files", async () => {
   type BookletIdentityCollision = {
     fixture: string;
