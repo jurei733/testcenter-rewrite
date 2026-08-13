@@ -75,6 +75,7 @@ import {
   type ListReviewsResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
+  type GetSystemTimeResponse,
   type GetApplicationSettingsResponse,
   type GetAttachmentResponse,
   type GetSystemCheckAccessResponse,
@@ -525,6 +526,8 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS",
     DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS
   );
+  const participantAccessTimeZone =
+    process.env.FIRST_SLICE_PARTICIPANT_TIME_ZONE?.trim() || "Europe/Berlin";
   const demoBootstrapEnabled = parseBooleanEnvironmentFlag(
     "FIRST_SLICE_BOOTSTRAP_DEMO",
     false
@@ -546,8 +549,7 @@ const createApiRuntime = async () => {
     repository,
     adminLoginMaxFailures,
     adminLoginFailureWindowMs,
-    participantAccessTimeZone:
-      process.env.FIRST_SLICE_PARTICIPANT_TIME_ZONE ?? "Europe/Berlin",
+    participantAccessTimeZone,
     participantLoginMaxFailures,
     participantLoginFailureWindowMs
   });
@@ -576,6 +578,7 @@ const createApiRuntime = async () => {
         maxFailures: participantLoginMaxFailures,
         failureWindowMs: participantLoginFailureWindowMs
       },
+      participantAccessTimeZone,
       environment: {
         firstSliceStore: store,
         firstSliceFilePresent: Boolean(process.env.FIRST_SLICE_FILE),
@@ -2749,6 +2752,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
   }
 
+  if (method === "GET" && pathname === productionApiRoutes.system.getTime) {
+    return `GET ${productionApiRoutes.system.getTime}`;
+  }
+
   if (
     method === "GET" &&
     pathname === productionApiRoutes.system.getBugReportConfig
@@ -4010,6 +4017,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.system.getTime
+      ) {
+        response.setHeader("cache-control", "no-store");
+        sendJson<GetSystemTimeResponse>(response, 200, {
+          timestamp: Date.now(),
+          timezone: runtime.config.participantAccessTimeZone
+        });
+        return;
+      }
+
       const systemCheckSpeedTestDownloadMatch =
         systemCheckSpeedTestDownloadPattern.exec(pathname);
       if (
@@ -4198,6 +4217,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             adminLoginProtection: runtime.config.adminLoginProtection,
             participantLoginProtection:
               runtime.config.participantLoginProtection,
+            participantAccessTimeZone:
+              runtime.config.participantAccessTimeZone,
             storage: {
               kind: runtime.repositoryConfig.kind,
               location: redactStorageLocation(runtime.repositoryConfig.location),

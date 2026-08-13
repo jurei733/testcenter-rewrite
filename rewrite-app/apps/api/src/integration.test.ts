@@ -14,6 +14,9 @@ import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
 import {
   adminPasswordPolicy,
+  productionApiRoutes,
+  type GetRuntimeConfigResponse,
+  type GetSystemTimeResponse,
   type ListSourcePackagesResponse
 } from "@testcenter-rewrite-app/contracts";
 
@@ -811,6 +814,38 @@ test("system-check speed-test endpoints transfer exact package sizes", async () 
     invalidDownload.body.error,
     "system_check_speed_test_size_unsupported"
   );
+});
+
+test("system time exposes the configured participant timezone without caching", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_PARTICIPANT_TIME_ZONE: "Pacific/Auckland"
+  });
+  try {
+    const beforeRequest = Date.now();
+    const response = await fetch(
+      `${isolated.baseUrl}${productionApiRoutes.system.getTime}`
+    );
+    const afterRequest = Date.now();
+
+    assert.equal(response.status, 200);
+    assertSecurityHeaders(response);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const payload = await response.json() as GetSystemTimeResponse;
+    assert.equal(payload.timezone, "Pacific/Auckland");
+    assert.equal(payload.timestamp >= beforeRequest, true);
+    assert.equal(payload.timestamp <= afterRequest, true);
+
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.getRuntimeConfig
+    );
+    assert.equal(
+      config.body.runtimeConfig.participantAccessTimeZone,
+      "Pacific/Auckland"
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
 });
 
 test("admin bootstrap and bearer session lifecycle", async () => {

@@ -2096,6 +2096,24 @@ try {
     logStep("system-check-report");
     const systemCheckTenantKey = `${tenantKey}-system-check`;
     const systemCheckWorkspaceKey = `${workspaceKey}-system-check`;
+    const systemCheckBrowserTimeZone = await page.evaluate(
+      () => Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown"
+    );
+    const systemCheckServerTimeZone =
+      systemCheckBrowserTimeZone === "Pacific/Kiritimati"
+        ? "America/Adak"
+        : "Pacific/Kiritimati";
+    const systemTimeRoute = "**/api/v1/system/time";
+    await page.route(systemTimeRoute, route =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          timestamp: Date.now() - 120_000,
+          timezone: systemCheckServerTimeZone
+        })
+      })
+    );
     await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
         tenantKey: systemCheckTenantKey,
@@ -2247,6 +2265,25 @@ try {
       .waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Environment" }).waitFor();
+    const timeDifferenceEntry = page.locator(
+      "#systemCheckEnvironment-time-difference"
+    );
+    await timeDifferenceEntry.waitFor();
+    assert.equal(await timeDifferenceEntry.evaluate(node =>
+      node.classList.contains("has-warning")
+    ), true);
+    assert.equal(
+      Number.parseInt(
+        (await timeDifferenceEntry.locator("dd").textContent())?.trim() ?? "",
+        10
+      ) >= 119,
+      true
+    );
+    const timeZoneEntry = page.locator("#systemCheckEnvironment-time-zone");
+    await timeZoneEntry.filter({ hasText: systemCheckBrowserTimeZone }).waitFor();
+    assert.equal(await timeZoneEntry.evaluate(node =>
+      node.classList.contains("has-warning")
+    ), true);
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Network" }).waitFor();
     await page.locator("#runSystemCheckNetworkButton").click();
@@ -2539,6 +2576,7 @@ try {
       .locator("#systemCheckReportOperatorStatus")
       .filter({ hasText: "2 report(s) deleted." })
       .waitFor({ timeout: 15_000 });
+    await page.unroute(systemTimeRoute);
     stopAfter("system-check-report");
 
     await page.evaluate(

@@ -10,6 +10,7 @@ import {
   type GetSystemCheckAccessResponse,
   type GetSystemCheckResponse,
   type GetSystemCheckReportStatisticsResponse,
+  type GetSystemTimeResponse,
   type ListSystemCheckReportsResponse,
   type ListSystemChecksResponse,
   type DeleteSystemCheckReportsResponse,
@@ -149,7 +150,11 @@ type ThroughputResult = {
           <h2>Environment</h2>
           <p>Values available to the browser are captured automatically. No fingerprint is retained until the report is saved.</p>
           <dl class="system-check-results">
-            <div *ngFor="let entry of environmentEntries"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            <div
+              *ngFor="let entry of environmentEntries"
+              [id]="'systemCheckEnvironment-' + entry.id"
+              [class.has-warning]="entry.warning"
+            ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
           </dl>
           <button class="ghost" type="button" (click)="captureEnvironment()">Capture Again</button>
         </article>
@@ -357,7 +362,7 @@ type ThroughputResult = {
     dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
     dd { margin: 6px 0 0; overflow-wrap: anywhere; }
     .network-rating { display: flex; justify-content: space-between; align-items: center; padding: 18px; margin: 16px 0; border-radius: var(--radius-lg); background: var(--secondary-soft); }
-    .network-rating.has-warning, .system-check-notice.has-warning { background: var(--accent-soft); }
+    .network-rating.has-warning, .system-check-notice.has-warning, .system-check-results .has-warning { background: var(--accent-soft); }
     .network-rating strong { font-size: 24px; }
     .system-check-questionnaire { display: grid; gap: 16px; }
     fieldset { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; }
@@ -705,7 +710,7 @@ export class SystemCheckViewComponent implements OnInit {
       this.operatorReports = [];
       this.questionnaireIssue = "";
       this.step = "welcome";
-      this.captureEnvironment();
+      await this.captureEnvironment();
     });
   }
 
@@ -744,7 +749,7 @@ export class SystemCheckViewComponent implements OnInit {
     if (next) this.setStep(next);
   }
 
-  captureEnvironment(): void {
+  async captureEnvironment(): Promise<void> {
     const userAgent = navigator.userAgent;
     const browser = /Edg\//.test(userAgent)
       ? "Edge"
@@ -766,7 +771,10 @@ export class SystemCheckViewComponent implements OnInit {
             : /Linux/i.test(userAgent)
               ? "Linux"
               : "Unknown";
-    this.environmentEntries = [
+    const browserTimeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
+    const clientTime = Date.now();
+    const entries = [
       this.entry("os", "environment", "Betriebssystem", os),
       this.entry(
         "screen",
@@ -800,6 +808,49 @@ export class SystemCheckViewComponent implements OnInit {
         `${window.innerWidth} x ${window.innerHeight}`
       )
     ];
+    try {
+      const { payload } = await this.api.send<GetSystemTimeResponse>(
+        "GET",
+        productionApiRoutes.system.getTime
+      );
+      const timeDifferenceSeconds = Math.round(
+        (clientTime - payload.timestamp) / 1000
+      );
+      entries.push(
+        this.entry(
+          "time-difference",
+          "environment",
+          "Zeitabweichung",
+          timeDifferenceSeconds,
+          timeDifferenceSeconds >= 60
+        ),
+        this.entry(
+          "time-zone",
+          "environment",
+          "Zeitzone",
+          browserTimeZone,
+          browserTimeZone !== payload.timezone
+        )
+      );
+    } catch {
+      entries.push(
+        this.entry(
+          "time-difference",
+          "environment",
+          "Zeitabweichung",
+          "nicht verfügbar",
+          true
+        ),
+        this.entry(
+          "time-zone",
+          "environment",
+          "Zeitzone",
+          browserTimeZone,
+          true
+        )
+      );
+    }
+    this.environmentEntries = entries;
   }
 
   async runNetworkCheck(): Promise<void> {

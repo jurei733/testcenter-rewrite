@@ -318,6 +318,7 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/:testRunId/commands"
   },
   system: {
+    getTime: "/api/v1/system/time",
     getBugReportConfig: "/api/v1/system/bug-report",
     submitBugReport: "/api/v1/system/bug-reports",
     getApplicationSettings: "/api/v1/system/application-settings",
@@ -329,6 +330,11 @@ export const productionApiRoutes = {
     uploadSpeedTestPackage: "/speed-test/random-package"
   }
 } as const;
+
+export type GetSystemTimeResponse = {
+  timestamp: number;
+  timezone: string;
+};
 
 export type CreateTenantRequest = {
   tenantKey: string;
@@ -1524,6 +1530,7 @@ export type GetRuntimeConfigResponse = {
       maxFailures: number;
       failureWindowMs: number;
     };
+    participantAccessTimeZone: string;
     storage: {
       kind: "memory" | "file" | "sqlite" | "postgres";
       location: string | null;
