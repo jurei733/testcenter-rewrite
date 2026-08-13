@@ -2433,6 +2433,18 @@ try {
     });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Network" }).waitFor();
+    const unstableSystemCheckSpeedRoute = route =>
+      route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Synthetic unstable system-check measurement"
+      });
+    const systemCheckSpeedRoutePattern =
+      /\/speed-test\/random-package(?:\/\d+)?(?:\?.*)?$/;
+    await page.route(
+      systemCheckSpeedRoutePattern,
+      unstableSystemCheckSpeedRoute
+    );
     await page.locator("#runSystemCheckNetworkButton").click();
     await page.waitForFunction(
       () => {
@@ -2444,6 +2456,31 @@ try {
       undefined,
       { timeout: 45_000 }
     );
+    await page
+      .locator("#systemCheckNetworkRating")
+      .filter({ hasText: "unstable" })
+      .waitFor();
+    assert.equal(
+      await page.locator(".network-rating").evaluate(node =>
+        node.classList.contains("has-warning")
+      ),
+      true
+    );
+    for (const id of [
+      "nw-download-evaluation",
+      "nw-upload-evaluation",
+      "nw-overall"
+    ]) {
+      const unstableEntry = page.locator(`#systemCheckNetwork-${id}`);
+      await unstableEntry.filter({ hasText: "unstable" }).waitFor();
+      assert.equal(
+        await unstableEntry.evaluate(node =>
+          node.classList.contains("has-warning")
+        ),
+        false,
+        `${id} must retain the Original's non-warning report flag for unstable measurements.`
+      );
+    }
     await page
       .locator(".system-check-results")
       .filter({ hasText: "Downloadgeschwindigkeit" })
@@ -2459,6 +2496,10 @@ try {
     assert.equal(await missingBrowserNetworkProfile.evaluate(node =>
       node.classList.contains("has-warning")
     ), true);
+    await page.unroute(
+      systemCheckSpeedRoutePattern,
+      unstableSystemCheckSpeedRoute
+    );
     await page.evaluate(() => {
       Object.defineProperty(window.navigator, "mozConnection", {
         configurable: true,

@@ -976,12 +976,12 @@ export class SystemCheckViewComponent implements OnInit {
       const networkEntries = [
         this.entry("nw-download", "network", "Downloadgeschwindigkeit", this.humanReadableBitsPerSecond(download.bytesPerSecond)),
         this.entry("nw-download-needed", "network", "Downloadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.downloadSpeed.min)),
-        this.entry("nw-download-evaluation", "network", "Downloadbewertung", downloadRating, downloadRating === "insufficient" || downloadRating === "unstable"),
+        this.entry("nw-download-evaluation", "network", "Downloadbewertung", downloadRating, downloadRating === "insufficient"),
         this.entry("nw-upload", "network", "Uploadgeschwindigkeit", this.humanReadableBitsPerSecond(upload.bytesPerSecond)),
         this.entry("nw-upload-needed", "network", "Uploadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.uploadSpeed.min)),
-        this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient" || uploadRating === "unstable"),
+        this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient"),
         this.entry("latency", "network", "Anwendungs-Latenz in Ms", average.toFixed(1), average >= 400),
-        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient" || this.networkRating === "unstable")
+        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient")
       ];
       if (connection) {
         if (connection.rtt) {
@@ -1040,7 +1040,7 @@ export class SystemCheckViewComponent implements OnInit {
     } catch (error) {
       this.networkRating = "unstable";
       this.networkEntries = [
-        this.entry("nw-overall", "network", "Gesamtbewertung", "unstable", true)
+        this.entry("nw-overall", "network", "Gesamtbewertung", "unstable")
       ];
       this.networkStatusMessage = "Network measurement failed.";
       this.errorMessage = error instanceof Error ? error.message : String(error);
