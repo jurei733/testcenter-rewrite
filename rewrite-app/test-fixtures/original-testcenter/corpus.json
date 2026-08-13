@@ -2241,6 +2241,78 @@
       }
     }
   ],
+  "currentOriginalGroupMonitoringPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/groupmon",
+    "booklet": {
+      "fixture": "booklets/group-monitoring/current-CY_Bklt_GM-1.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/groupmon/CY_Bklt_GM-1.xml",
+      "sha256": "09a079ed04ac347ef90f1ab053bee7f00738983c735fda6a4b3f971b6a53ab3e",
+      "bookletKey": "Cy-Bklt_GM-1",
+      "unitKeys": [
+        "CY-Unit.Sample-100",
+        "CY-Unit.Sample-101",
+        "CY-Unit.Sample-102",
+        "CY-Unit.Sample-103",
+        "CY-Unit.Sample-104"
+      ]
+    },
+    "units": [
+      {
+        "fixture": "units/current-CY_Unit100.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+        "sha256": "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e",
+        "unitKey": "CY-Unit.Sample-100"
+      },
+      {
+        "fixture": "units/current-CY_Unit101.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+        "sha256": "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86",
+        "unitKey": "CY-Unit.Sample-101"
+      },
+      {
+        "fixture": "units/current-CY_Unit102.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+        "sha256": "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e",
+        "unitKey": "CY-Unit.Sample-102"
+      },
+      {
+        "fixture": "units/current-CY_Unit103.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+        "sha256": "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b",
+        "unitKey": "CY-Unit.Sample-103"
+      },
+      {
+        "fixture": "units/current-CY_Unit104.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+        "sha256": "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c",
+        "unitKey": "CY-Unit.Sample-104"
+      }
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_GM.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/groupmon/CY_Logins_GM.xml",
+      "sha256": "b09e694764908728eeb7a874b3c1f7a36f29c6bc5d4b531b60955af9fd54d24b",
+      "participantLoginKeys": ["testtaker-a"],
+      "operationalLoginKeys": ["GM-1"],
+      "monitorPasswordRequired": false
+    }
+  },
   "groupMonitoringPackages": [
     {
       "booklet": {

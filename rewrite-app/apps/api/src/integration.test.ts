@@ -19666,19 +19666,33 @@ test("original Testcenter compatibility corpus executes the complete official Te
   }
 });
 
-test("original Testcenter compatibility corpus executes the official group monitoring package", async () => {
+test("original Testcenter compatibility corpus executes the current passwordless group monitoring package", async () => {
   type GroupMonitoringPackage = {
     booklet: {
       fixture: string;
+      encoding: "base64";
+      sourcePath: string;
       bookletKey: string;
       unitKeys: string[];
     };
-    units: Array<{ fixture: string; unitKey: string }>;
-    player: { fixture: string; playerKey: string };
+    units: Array<{
+      fixture: string;
+      encoding: "base64";
+      sourcePath: string;
+      unitKey: string;
+    }>;
+    player: {
+      fixture: string;
+      encoding: "brotli-base64";
+      sourcePath: string;
+      playerKey: string;
+    };
     roster: {
       fixture: string;
+      encoding: "base64";
       participantLoginKeys: string[];
       operationalLoginKeys: string[];
+      monitorPasswordRequired: boolean;
     };
   };
   type MonitorProfile = {
@@ -19708,8 +19722,8 @@ test("original Testcenter compatibility corpus executes the official group monit
 
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
-  ) as { groupMonitoringPackages: GroupMonitoringPackage[] };
-  const expectation = corpus.groupMonitoringPackages[0];
+  ) as { currentOriginalGroupMonitoringPackage: GroupMonitoringPackage };
+  const expectation = corpus.currentOriginalGroupMonitoringPackage;
   assert.ok(expectation);
 
   const requestedStore = process.env.FIRST_SLICE_STORE;
@@ -19788,27 +19802,32 @@ test("original Testcenter compatibility corpus executes the official group monit
       201
     );
 
-    const bookletDocument = readFileSync(
-      resolve(originalTestcenterCorpusRoot, expectation.booklet.fixture),
-      "utf8"
-    );
+    const bookletDocument = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.booklet.fixture),
+        "utf8"
+      ).trim(),
+      expectation.booklet.encoding
+    ).toString("utf8");
     const unitDocuments = expectation.units.map(unit => ({
       ...unit,
-      content: readFileSync(
-        resolve(originalTestcenterCorpusRoot, unit.fixture),
-        "utf8"
-      )
+      content: Buffer.from(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, unit.fixture),
+          "utf8"
+        ).trim(),
+        unit.encoding
+      ).toString("utf8")
     }));
-    const playerDocument = readFileSync(
-      resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
-      "utf8"
+    const playerDocument = readBrotliBase64Fixture(
+      resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
     );
     const manifestResources = [
-      `<resource identifier="${expectation.booklet.bookletKey}" href="${expectation.booklet.fixture}" />`,
+      `<resource identifier="${expectation.booklet.bookletKey}" href="${expectation.booklet.sourcePath}" />`,
       ...expectation.units.map(
-        unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.sourcePath}" />`
       ),
-      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.sourcePath}" />`
     ].join("\n");
     const zipPayload = createZipBase64([
       {
@@ -19820,15 +19839,15 @@ test("original Testcenter compatibility corpus executes the official group monit
         `
       },
       {
-        fileName: `export/${expectation.booklet.fixture}`,
+        fileName: `export/${expectation.booklet.sourcePath}`,
         content: bookletDocument
       },
       ...unitDocuments.map(unit => ({
-        fileName: `export/${unit.fixture}`,
+        fileName: `export/${unit.sourcePath}`,
         content: unit.content
       })),
       {
-        fileName: `export/${expectation.player.fixture}`,
+        fileName: `export/${expectation.player.sourcePath}`,
         content: playerDocument
       }
     ]);
@@ -19925,10 +19944,13 @@ test("original Testcenter compatibility corpus executes the official group monit
       200
     );
 
-    const rosterXml = readFileSync(
-      resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
-      "utf8"
-    ).replace(
+    const rosterXml = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+        "utf8"
+      ).trim(),
+      expectation.roster.encoding
+    ).toString("utf8").replace(
       '      <Profile id="small" />\n    </Login>',
       '      <Profile id="small" />\n      <ViewSettings monitorBookletVisibility="collapsed" />\n    </Login>'
     );
@@ -19967,7 +19989,10 @@ test("original Testcenter compatibility corpus executes the official group monit
     assert.ok(monitorCandidate);
     assert.equal(monitorCandidate.loginMode, "monitor-group");
     assert.equal(monitorCandidate.groupKey, "filter-profiles");
-    assert.equal(monitorCandidate.passwordRequired, true);
+    assert.equal(
+      monitorCandidate.passwordRequired,
+      expectation.roster.monitorPasswordRequired
+    );
     assert.deepEqual(monitorCandidate.profileIds, ["all", "small"]);
     assert.deepEqual(
       monitorCandidate.monitorProfiles.map(profile => profile.label),

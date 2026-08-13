@@ -145,6 +145,32 @@ type OriginalTestcenterCorpus = {
       }>;
     };
   }>;
+  currentOriginalGroupMonitoringPackage: {
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    booklet: PinnedOriginalFixture & {
+      encoding: "base64";
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    units: Array<
+      PinnedOriginalFixture & {
+        encoding: "base64";
+        unitKey: string;
+      }
+    >;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+    };
+    roster: PinnedOriginalFixture & {
+      encoding: "base64";
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      monitorPasswordRequired: boolean;
+    };
+  };
   groupMonitoringPackages: Array<{
     booklet: {
       fixture: string;
@@ -2387,6 +2413,96 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     1,
     331
   ]);
+});
+
+test("original Testcenter compatibility corpus pins current passwordless group monitoring semantics", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const groupMonitoring = corpus.currentOriginalGroupMonitoringPackage;
+  assert.equal(
+    groupMonitoring.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(groupMonitoring.sourceDirectory, "sampledata/system-test/groupmon");
+
+  const bookletDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, groupMonitoring.booklet.fixture), "utf8").trim(),
+    groupMonitoring.booklet.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(bookletDocument).digest("hex"),
+    groupMonitoring.booklet.sha256,
+    groupMonitoring.booklet.sourcePath
+  );
+  assert.match(bookletDocument.toString("utf8"), /testcenter-booklet-xml\/18\.0/);
+  assert.match(bookletDocument.toString("utf8"), /<Id>Cy-Bklt_GM-1<\/Id>/);
+
+  for (const unit of groupMonitoring.units) {
+    const unitDocument = Buffer.from(
+      readFileSync(resolve(corpusRoot, unit.fixture), "utf8").trim(),
+      unit.encoding
+    );
+    assert.equal(
+      createHash("sha256").update(unitDocument).digest("hex"),
+      unit.sha256,
+      unit.sourcePath
+    );
+    assert.match(unitDocument.toString("utf8"), /unit-xml\/17\.4/);
+    assert.match(
+      unitDocument.toString("utf8"),
+      new RegExp(`<Id>${unit.unitKey.replaceAll(".", "\\.")}<\\/Id>`)
+    );
+  }
+
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, groupMonitoring.player.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    groupMonitoring.player.sha256,
+    groupMonitoring.player.sourcePath
+  );
+  assert.match(playerDocument.toString("utf8"), /"version"\s*:\s*"6\.0\.5"/);
+
+  const rosterDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, groupMonitoring.roster.fixture), "utf8").trim(),
+    groupMonitoring.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterDocument).digest("hex"),
+    groupMonitoring.roster.sha256,
+    groupMonitoring.roster.sourcePath
+  );
+  assert.match(rosterDocument.toString("utf8"), /testcenter-testtaker-xml\/18\.0/);
+  const participants = parseParticipantRosterText(rosterDocument.toString("utf8"));
+  assert.deepEqual(
+    participants.map(participant => participant.loginKey),
+    groupMonitoring.roster.participantLoginKeys
+  );
+  assert.equal(participants[0]?.password, "123");
+  assert.equal(participants[0]?.bookletKey, groupMonitoring.booklet.bookletKey);
+
+  const operationalLogins = parseOriginalTestcenterOperationalLogins(
+    rosterDocument.toString("utf8")
+  );
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    groupMonitoring.roster.operationalLoginKeys
+  );
+  assert.equal(
+    operationalLogins[0]?.passwordRequired,
+    groupMonitoring.roster.monitorPasswordRequired
+  );
+  assert.deepEqual(operationalLogins[0]?.profileIds, ["all", "small"]);
+  assert.deepEqual(
+    operationalLogins[0]?.monitorProfiles.map(profile => profile.profileId),
+    ["all", "small"]
+  );
+  assert.deepEqual(operationalLogins[0]?.unresolvedProfileIds, []);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {
