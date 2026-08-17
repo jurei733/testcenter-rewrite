@@ -1093,6 +1093,8 @@ export type TestRun = {
   locked?: boolean;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
+  /** Original test-wide Verona 6 Player-to-Player communication state. */
+  sharedParameters?: Array<{ key: string; value: string }>;
   unlockedTestletKeys?: string[];
   monitorNavigationUnlocked?: boolean;
   testletTimers?: Record<string, TestletTimerState>;

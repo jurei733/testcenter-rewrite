@@ -549,6 +549,18 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
         unitResponses: JSON.parse(
           String(row.unit_responses_json ?? "{}")
         ) as Record<string, string>,
+        sharedParameters: (() => {
+          try {
+            const parsed = JSON.parse(
+              String(row.shared_parameters_json ?? "[]")
+            );
+            return Array.isArray(parsed)
+              ? (parsed as NonNullable<TestRun["sharedParameters"]>)
+              : [];
+          } catch {
+            return [];
+          }
+        })(),
         presetBookletStates: (() => {
           try {
             const parsed = JSON.parse(
@@ -1390,6 +1402,14 @@ const migrations: PostgresMigration[] = [
         ADD COLUMN IF NOT EXISTS privacy_notice TEXT NOT NULL DEFAULT '';
       ALTER TABLE application_settings
         ADD COLUMN IF NOT EXISTS accessibility_notice TEXT NOT NULL DEFAULT '';
+    `
+  },
+  {
+    version: 49,
+    name: "persist_test_run_shared_parameters",
+    sql: `
+      ALTER TABLE test_runs
+        ADD COLUMN IF NOT EXISTS shared_parameters_json JSONB NOT NULL DEFAULT '[]'::jsonb;
     `
   }
 ];
@@ -2552,7 +2572,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE test_run_id = $1`,
         [testRunId],
@@ -2561,7 +2581,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -2570,7 +2590,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1 AND status != 'completed'
          ORDER BY updated_at ASC
@@ -2581,7 +2601,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -2591,8 +2611,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveTestRun(testRun) {
       await pool.query(
         `INSERT INTO test_runs (
-          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
         ON CONFLICT(test_run_id) DO UPDATE SET
           participant_session_id = EXCLUDED.participant_session_id,
           tenant_id = EXCLUDED.tenant_id,
@@ -2608,6 +2628,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           locked = EXCLUDED.locked,
           current_unit_key = EXCLUDED.current_unit_key,
           unit_responses_json = EXCLUDED.unit_responses_json,
+          shared_parameters_json = EXCLUDED.shared_parameters_json,
           unlocked_testlet_keys_json = EXCLUDED.unlocked_testlet_keys_json,
           monitor_navigation_unlocked = EXCLUDED.monitor_navigation_unlocked,
           testlet_timers_json = EXCLUDED.testlet_timers_json,
@@ -2633,6 +2654,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           testRun.locked === true,
           testRun.currentUnitKey,
           JSON.stringify(testRun.unitResponses),
+          JSON.stringify(testRun.sharedParameters ?? []),
           JSON.stringify(testRun.unlockedTestletKeys ?? []),
           testRun.monitorNavigationUnlocked === true,
           JSON.stringify(testRun.testletTimers ?? {}),

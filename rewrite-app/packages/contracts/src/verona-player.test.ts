@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   hasMeaningfulVeronaResponse,
   isSupportedVeronaPlayerApiVersion,
+  mergeVeronaSharedParameters,
   mergeVeronaUnitResponse,
+  normalizeVeronaSharedParameters,
   normalizeVeronaStateLogEntries,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
@@ -15,6 +17,36 @@ import {
   resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
+
+test("Verona shared parameters normalize and merge by key", () => {
+  assert.deepEqual(
+    normalizeVeronaSharedParameters([
+      { key: " avatar ", value: "blue" },
+      { key: "", value: "ignored" },
+      { key: "empty", value: "" },
+      { key: "avatar", value: "green" },
+      { key: "invalid", value: 7 }
+    ]),
+    [{ key: "avatar", value: "green" }]
+  );
+  assert.deepEqual(
+    mergeVeronaSharedParameters(
+      [
+        { key: "avatar", value: "blue" },
+        { key: "language", value: "de" }
+      ],
+      [
+        { key: "avatar", value: "green" },
+        { key: "difficulty", value: "high" }
+      ]
+    ),
+    [
+      { key: "avatar", value: "green" },
+      { key: "language", value: "de" },
+      { key: "difficulty", value: "high" }
+    ]
+  );
+});
 
 test("Verona response presence ignores empty host envelopes", () => {
   assert.equal(hasMeaningfulVeronaResponse(""), false);

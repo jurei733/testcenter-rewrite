@@ -194,6 +194,7 @@ export type ParticipantVeronaPlayerState = {
   unitDefinitionType: string;
   resourceBasePath: string;
   savedResponse: string;
+  sharedParameters: Array<{ key: string; value: string }>;
   unitNumber: number;
   unitCount: number;
   canGoPrevious: boolean;
@@ -1428,6 +1429,7 @@ export class ParticipantViewFacade {
         this.optimisticVeronaResponse.unitKey === unitKey
           ? this.optimisticVeronaResponse.response
           : this.effectiveUnitResponse(currentState, unitKey),
+      sharedParameters: currentState.testRun.sharedParameters ?? [],
       unitNumber: Math.max(unitIndex + 1, 1),
       unitCount: currentState.bookletUnits.length,
       canGoPrevious: this.player.canGoPreviousUnit,

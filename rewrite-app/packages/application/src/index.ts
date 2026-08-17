@@ -24,6 +24,8 @@ import {
   compileBookletRuntimePolicy,
   isBookletPlayerEndAllowed,
   isSupportedVeronaPlayerApiVersion,
+  mergeVeronaSharedParameters,
+  normalizeVeronaSharedParameters,
   parseVeronaUnitResponse,
   projectVeronaPageState,
   readBookletConfigValues
@@ -6704,6 +6706,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       )
     ),
     unitResponses: testRun.unitResponses ?? {},
+    sharedParameters: normalizeVeronaSharedParameters(testRun.sharedParameters),
     unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
       ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
       : [],
@@ -19473,6 +19476,15 @@ const buildBookletStatesTestStateEntry = (
   content: JSON.stringify(testRun.bookletStates ?? {})
 });
 
+const buildSharedParametersTestStateEntry = (
+  testRun: TestRun,
+  timestamp: string
+): ParticipantTestLogEntryInput => ({
+  key: "SHARED_PARAMETERS",
+  timeStamp: Date.parse(timestamp),
+  content: JSON.stringify(testRun.sharedParameters ?? [])
+});
+
 const hasCompleteBookletStatesSnapshot = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun
@@ -19522,6 +19534,7 @@ const resetNonSavingTestRunForEntry = (input: {
     locked: false,
     currentUnitKey: null,
     unitResponses: {},
+    sharedParameters: [],
     unlockedTestletKeys: [],
     monitorNavigationUnlocked: false,
     testletTimers: {},
@@ -30966,6 +30979,15 @@ export const createFirstSliceServices = (
         ) {
           nextUnitResponses[responseUnitKey] = nextUnitResponse;
         }
+        const reportedSharedParameters =
+          nextUnitResponse == null
+            ? undefined
+            : parseVeronaUnitResponse(nextUnitResponse)?.playerState
+                ?.sharedParameters;
+        const nextSharedParameters = mergeVeronaSharedParameters(
+          navigationTestRun.sharedParameters,
+          reportedSharedParameters
+        );
         const requestedStatus = normalizeTestRunProgressStatus(input.status);
         const nextStatus = monitorPauseActive ? "paused" : requestedStatus;
         const statusAdjustedRun = transitionTestletTimersForRunStatus(
@@ -30985,6 +31007,7 @@ export const createFirstSliceServices = (
               : undefined,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
+          sharedParameters: nextSharedParameters,
           updatedAt: timestamp
         });
         const updatedRun =
@@ -31010,6 +31033,14 @@ export const createFirstSliceServices = (
         ) {
           testStateEntries.push(
             buildBookletStatesTestStateEntry(updatedRun, timestamp)
+          );
+        }
+        if (
+          JSON.stringify(updatedRun.sharedParameters ?? []) !==
+          JSON.stringify(testRun.sharedParameters ?? [])
+        ) {
+          testStateEntries.push(
+            buildSharedParametersTestStateEntry(updatedRun, timestamp)
           );
         }
         if (testletTimerStateChanged(testRun, updatedRun)) {

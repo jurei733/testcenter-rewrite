@@ -106,6 +106,10 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
     locked: true,
     currentUnitKey: "unit-locked",
     unitResponses: {},
+    sharedParameters: [
+      { key: "avatar", value: "green" },
+      { key: "language", value: "de" }
+    ],
     presetBookletStates: {},
     bookletStates: {},
     bookletStateOverrides: {},
@@ -122,6 +126,10 @@ test("SQLite preserves whole-test locks and monitor pauses through every run loo
   await repository.saveTestRun(testRun);
 
   assert.equal((await repository.getTestRunById(testRun.testRunId))?.locked, true);
+  assert.deepEqual(
+    (await repository.getTestRunById(testRun.testRunId))?.sharedParameters,
+    testRun.sharedParameters
+  );
   assert.equal(
     (await repository.getTestRunById(testRun.testRunId))?.pauseSource,
     "monitor"

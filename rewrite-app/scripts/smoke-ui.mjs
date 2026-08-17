@@ -11797,6 +11797,301 @@ try {
     await reloadedSpeedtestFrame.locator('[value="A"]').isChecked(),
     true
   );
+
+  logStep("participant-verona-shared-parameters");
+  const sharedParameterTenantKey = `${tenantKey}-verona-shared-parameters`;
+  const sharedParameterWorkspaceKey =
+    `${workspaceKey}-verona-shared-parameters`;
+  const sharedParameterBookletKey = "shared-parameters-booklet";
+  const sharedParameterFirstUnitKey = "shared-parameters-first";
+  const sharedParameterSecondUnitKey = "shared-parameters-second";
+  const sharedParameterPlayerKey = "shared-parameters-player@6.0";
+  const sharedParameterLoginKey = "student-shared-parameters";
+  const sharedParameterPlayerHtml = `<!doctype html>
+    <html>
+      <body>
+        <p id="sharedParameterDefinition"></p>
+        <pre id="sharedParameterConfig"></pre>
+        <button id="sharedParameterPublish" type="button">Publish shared parameters</button>
+        <button id="sharedParameterNext" type="button">Next unit</button>
+        <script>
+          let activeSessionId = "";
+          let activeDefinition = "";
+          const renderConfig = playerConfig => {
+            document.querySelector("#sharedParameterConfig").textContent =
+              JSON.stringify(playerConfig?.sharedParameters ?? []);
+          };
+          addEventListener("message", event => {
+            const message = event.data;
+            if (message?.type === "vopStartCommand") {
+              activeSessionId = message.sessionId;
+              activeDefinition = message.unitDefinition;
+              document.querySelector("#sharedParameterDefinition").textContent =
+                activeDefinition;
+              renderConfig(message.playerConfig);
+            }
+            if (
+              message?.type === "vopPlayerConfigChangedNotification" &&
+              message.sessionId === activeSessionId
+            ) {
+              renderConfig(message.playerConfig);
+            }
+          });
+          document.querySelector("#sharedParameterPublish").addEventListener("click", () => {
+            const firstUnit = activeDefinition === "publish-blue";
+            parent.postMessage({
+              type: "vopStateChangedNotification",
+              sessionId: activeSessionId,
+              playerState: {
+                sharedParameters: firstUnit
+                  ? [
+                      { key: "avatar", value: "blue" },
+                      { key: "language", value: "de" }
+                    ]
+                  : [
+                      { key: "avatar", value: "red" },
+                      { key: "tool", value: "calculator" }
+                    ]
+              }
+            }, "*");
+          });
+          document.querySelector("#sharedParameterNext").addEventListener("click", () => {
+            parent.postMessage({
+              type: "vopUnitNavigationRequestedNotification",
+              sessionId: activeSessionId,
+              target: "next"
+            }, "*");
+          });
+          parent.postMessage({
+            type: "vopReadyNotification",
+            apiVersion: "6.0"
+          }, "*");
+        <\/script>
+      </body>
+    </html>`;
+  const sharedParameterZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${sharedParameterBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${sharedParameterFirstUnitKey}" href="units/First.xml" />
+            <resource identifier="${sharedParameterSecondUnitKey}" href="units/Second.xml" />
+            <resource identifier="${sharedParameterPlayerKey}" href="players/shared-parameters.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${sharedParameterBookletKey}</Id>
+            <Label>Shared Parameters</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="unit_navibuttons">FULL</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${sharedParameterFirstUnitKey}" label="Publisher" />
+            <Unit id="${sharedParameterSecondUnitKey}" label="Consumer" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/First.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${sharedParameterFirstUnitKey}</Id><Label>Publisher</Label></Metadata>
+          <Definition player="${sharedParameterPlayerKey}"><![CDATA[publish-blue]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/Second.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${sharedParameterSecondUnitKey}</Id><Label>Consumer</Label></Metadata>
+          <Definition player="${sharedParameterPlayerKey}"><![CDATA[publish-red]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/shared-parameters.html",
+      content: sharedParameterPlayerHtml
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: sharedParameterTenantKey,
+      displayName: "Shared Parameters"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${sharedParameterTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: sharedParameterWorkspaceKey,
+        displayName: "Shared Parameters"
+      }
+    }
+  );
+  const sharedParameterWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${sharedParameterTenantKey}` +
+    `/workspaces/${sharedParameterWorkspaceKey}`;
+  const sharedParameterSourceResponse = await sendSmokeJson(
+    `${sharedParameterWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "shared-parameters-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument:
+          `data:application/zip;base64,${sharedParameterZip.toString("base64")}`
+      }
+    }
+  );
+  const sharedParameterSourcePayload =
+    await sharedParameterSourceResponse.json();
+  assert.equal(sharedParameterSourceResponse.status, 201);
+  const sharedParameterImportResponse = await sendSmokeJson(
+    `${sharedParameterWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          sharedParameterSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const sharedParameterImportPayload =
+    await sharedParameterImportResponse.json();
+  assert.equal(
+    sharedParameterImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(sharedParameterImportPayload.importJob.diagnostics)
+  );
+  const sharedParameterReleaseId =
+    sharedParameterImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(sharedParameterReleaseId);
+  await sendSmokeJson(
+    `${sharedParameterWorkspaceApiUrl}/content-releases/${sharedParameterReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${sharedParameterWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: sharedParameterLoginKey,
+          groupKey: "group:shared-parameters",
+          bookletKey: sharedParameterBookletKey,
+          displayName: "Shared Parameters Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: sharedParameterTenantKey,
+      workspaceKey: sharedParameterWorkspaceKey,
+      loginKey: sharedParameterLoginKey,
+      bookletKey: sharedParameterBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 30_000 });
+  let sharedParameterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await sharedParameterFrame
+    .locator("#sharedParameterDefinition")
+    .filter({ hasText: "publish-blue" })
+    .waitFor({ timeout: 30_000 });
+  const sharedParameterSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(sharedParameterSessionId);
+  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  await sharedParameterFrame
+    .locator("#sharedParameterConfig")
+    .filter({ hasText: '"avatar","value":"blue"' })
+    .waitFor({ timeout: 30_000 });
+  const persistedSharedParameterState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${sharedParameterSessionId}/current-state`,
+    payload =>
+      JSON.stringify(payload?.currentRunState?.testRun?.sharedParameters) ===
+      JSON.stringify([
+        { key: "avatar", value: "blue" },
+        { key: "language", value: "de" }
+      ]),
+    30_000
+  );
+  await sharedParameterFrame.locator("#sharedParameterNext").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: sharedParameterSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  sharedParameterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await sharedParameterFrame
+    .locator("#sharedParameterConfig")
+    .filter({ hasText: '"language","value":"de"' })
+    .waitFor({ timeout: 30_000 });
+  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  await sharedParameterFrame
+    .locator("#sharedParameterConfig")
+    .filter({ hasText: '"tool","value":"calculator"' })
+    .waitFor({ timeout: 30_000 });
+  const expectedSharedParameters = [
+    { key: "avatar", value: "red" },
+    { key: "language", value: "de" },
+    { key: "tool", value: "calculator" }
+  ];
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${sharedParameterSessionId}/current-state`,
+    payload =>
+      JSON.stringify(payload?.currentRunState?.testRun?.sharedParameters) ===
+      JSON.stringify(expectedSharedParameters),
+    30_000
+  );
+  const sharedParameterTestRunId =
+    persistedSharedParameterState.currentRunState?.testRun?.testRunId;
+  assert.ok(sharedParameterTestRunId);
+  await pollJsonWithPredicate(
+    `${sharedParameterWorkspaceApiUrl}/test-logs?testRunId=${encodeURIComponent(
+      sharedParameterTestRunId
+    )}&logKey=SHARED_PARAMETERS&limit=20`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.unitKey === null &&
+          item.testLog?.logKey === "SHARED_PARAMETERS" &&
+          item.testLog?.logContent === JSON.stringify(expectedSharedParameters)
+      ),
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      sharedParameterSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 30_000 });
+  sharedParameterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await sharedParameterFrame
+    .locator("#sharedParameterConfig")
+    .filter({ hasText: '"tool","value":"calculator"' })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await sharedParameterFrame.locator("#sharedParameterConfig").textContent(),
+    JSON.stringify(expectedSharedParameters)
+  );
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");

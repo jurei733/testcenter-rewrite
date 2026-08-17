@@ -15,9 +15,15 @@ export type VeronaUnitState = {
   [key: string]: unknown;
 };
 
+export type VeronaSharedParameter = {
+  key: string;
+  value: string;
+};
+
 export type VeronaPlayerState = {
   currentPage?: string | number;
   validPages?: Record<string, string> | Array<{ id: string; label?: string }>;
+  sharedParameters?: VeronaSharedParameter[];
   [key: string]: unknown;
 };
 
@@ -112,6 +118,7 @@ export type VeronaPlayerConfig = {
   unitCount?: number;
   unitTitle: string;
   unitId: string;
+  sharedParameters?: VeronaSharedParameter[];
   startPage?: string | number;
 };
 
@@ -265,6 +272,44 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : null;
+
+export const normalizeVeronaSharedParameters = (
+  value: unknown
+): VeronaSharedParameter[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const normalized = new Map<string, string>();
+  for (const entry of value) {
+    const record = asRecord(entry);
+    const key = typeof record?.key === "string" ? record.key.trim() : "";
+    const parameterValue =
+      typeof record?.value === "string" ? record.value : "";
+    if (key && parameterValue) {
+      normalized.set(key, parameterValue);
+    }
+  }
+  return Array.from(normalized, ([key, parameterValue]) => ({
+    key,
+    value: parameterValue
+  }));
+};
+
+export const mergeVeronaSharedParameters = (
+  previous: unknown,
+  update: unknown
+): VeronaSharedParameter[] => {
+  const merged = new Map(
+    normalizeVeronaSharedParameters(previous).map(parameter => [
+      parameter.key,
+      parameter.value
+    ])
+  );
+  for (const parameter of normalizeVeronaSharedParameters(update)) {
+    merged.set(parameter.key, parameter.value);
+  }
+  return Array.from(merged, ([key, value]) => ({ key, value }));
+};
 
 export const normalizeVeronaStateLogEntries = (
   value: unknown

@@ -37,6 +37,7 @@ import {
   type VeronaPlayerConfig,
   type VeronaPlayerConfigChangedNotification,
   type VeronaPlayerState,
+  type VeronaSharedParameter,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
@@ -241,6 +242,7 @@ export class VeronaPlayerHostComponent
   @Input() unitDefinitionType = "";
   @Input() resourceBasePath = "";
   @Input() savedResponse = "";
+  @Input() sharedParameters: VeronaSharedParameter[] = [];
   @Input() unitNumber = 1;
   @Input() unitCount = 1;
   @Input() canGoPrevious = false;
@@ -444,6 +446,7 @@ export class VeronaPlayerHostComponent
     }
     if (
       changes["resourceBasePath"] ||
+      changes["sharedParameters"] ||
       changes["unitTitle"] ||
       changes["unitNumber"] ||
       changes["unitCount"] ||
@@ -810,6 +813,10 @@ export class VeronaPlayerHostComponent
       unitCount: this.unitCount,
       unitTitle: this.unitTitle,
       unitId: this.unitKey,
+      sharedParameters: this.sharedParameters.map(parameter => ({
+        key: parameter.key,
+        value: parameter.value
+      })),
       ...(startPage != null ? { startPage } : {})
     };
   }

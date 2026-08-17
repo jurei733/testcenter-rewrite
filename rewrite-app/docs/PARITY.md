@@ -616,6 +616,18 @@ drives the original adaptive Booklet from two to three visible Units through
 its Bonus state, keeps the current Player frame mounted, and observes the
 updated count in `vopPlayerConfigChangedNotification`.
 
+Latest P0 Verona shared-parameter closure: matching the current Original
+unithost and Test Controller service, Verona 6
+`playerState.sharedParameters` are normalized and merged by key into durable
+test-wide state, logged as `SHARED_PARAMETERS`, and returned to every Player in
+both `vopStartCommand.playerConfig` and live
+`vopPlayerConfigChangedNotification` updates. Memory, file, and SQLite API
+gates prove overwrite/extension semantics; a production SQLite/Chromium gate
+publishes values in one sandboxed Unit, consumes them in the next, overwrites
+and extends the map, and restores the exact result after reload. SQLite schema
+55 and PostgreSQL schema 49 persist the state independently from per-Unit
+responses.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,
 STARS 0.6.19 choice-interaction, and Speedtest 1.2.0 timed-choice Players. ABI retains its release example

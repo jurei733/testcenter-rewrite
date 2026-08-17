@@ -579,6 +579,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [unitDefinitionType]="verona.unitDefinitionType"
               [resourceBasePath]="verona.resourceBasePath"
               [savedResponse]="verona.savedResponse"
+              [sharedParameters]="verona.sharedParameters"
               [unitNumber]="verona.unitNumber"
               [unitCount]="verona.unitCount"
               [canGoPrevious]="verona.canGoPrevious"

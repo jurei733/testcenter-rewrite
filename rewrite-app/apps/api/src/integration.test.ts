@@ -35124,13 +35124,17 @@ test("original BookletConfig compiles into enforced participant navigation polic
   const unitResponse = (
     presentationProgress: "none" | "some" | "complete",
     responseProgress: "none" | "some" | "complete",
-    currentPage: string
+    currentPage: string,
+    sharedParameters?: Array<{ key: string; value: string }>
   ): string =>
     JSON.stringify({
       kind: "verona_unit_state",
       version: 1,
       unitState: { presentationProgress, responseProgress },
-      playerState: { currentPage }
+      playerState: {
+        currentPage,
+        ...(sharedParameters ? { sharedParameters } : {})
+      }
     });
   const save = (currentUnitKey: string, response?: string) =>
     requestJson<{
@@ -35148,6 +35152,9 @@ test("original BookletConfig compiles into enforced participant navigation polic
   const currentState = () =>
     requestJson<{
       currentRunState: {
+        testRun: {
+          sharedParameters: Array<{ key: string; value: string }>;
+        };
         booklet: {
           policy: {
             navigation: {
@@ -35183,7 +35190,15 @@ test("original BookletConfig compiles into enforced participant navigation polic
     }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
 
   assert.equal(
-    (await save(firstUnitKey, unitResponse("some", "none", "page-2"))).status,
+    (
+      await save(
+        firstUnitKey,
+        unitResponse("some", "none", "page-2", [
+          { key: "avatar", value: "blue" },
+          { key: "language", value: "de" }
+        ])
+      )
+    ).status,
     200
   );
   const blockedState = await currentState();
@@ -35213,6 +35228,10 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.equal(blockedState.body.currentRunState.navigation.canGoNext, false);
   assert.equal(blockedState.body.currentRunState.navigation.canComplete, false);
   assert.equal(blockedState.body.currentRunState.availableActions.includes("complete"), false);
+  assert.deepEqual(blockedState.body.currentRunState.testRun.sharedParameters, [
+    { key: "avatar", value: "blue" },
+    { key: "language", value: "de" }
+  ]);
 
   const blockedForward = await save(secondUnitKey);
   assert.equal(blockedForward.status, 409);
@@ -35230,13 +35249,26 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.equal(blockedCompletion.body.error, "booklet_completion_denied");
 
   assert.equal(
-    (await save(firstUnitKey, unitResponse("complete", "complete", "page-3"))).status,
+    (
+      await save(
+        firstUnitKey,
+        unitResponse("complete", "complete", "page-3", [
+          { key: "avatar", value: "green" },
+          { key: "difficulty", value: "high" }
+        ])
+      )
+    ).status,
     200
   );
   const readyFirstState = await currentState();
   assert.equal(readyFirstState.body.currentRunState.navigation.canGoNext, true);
   assert.equal(readyFirstState.body.currentRunState.navigation.canComplete, true);
   assert.equal(readyFirstState.body.currentRunState.navigation.canPlayerEnd, false);
+  assert.deepEqual(readyFirstState.body.currentRunState.testRun.sharedParameters, [
+    { key: "avatar", value: "green" },
+    { key: "language", value: "de" },
+    { key: "difficulty", value: "high" }
+  ]);
   assert.equal((await save(secondUnitKey)).status, 200);
   const lateFirstResponse = unitResponse("complete", "complete", "page-4");
   const lateFirstSave = await requestJson<{
