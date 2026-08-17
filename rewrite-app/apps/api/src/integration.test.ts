@@ -9400,15 +9400,30 @@ test("local demo bootstrap preserves customized roster state across durable rest
 });
 
 test("monitor command endpoint pauses, resumes, and atomically completes and locks a run", async () => {
-  const isolated = await createIsolatedServer({
-    FIRST_SLICE_STORE: "memory",
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const storagePath = resolve(
+    ".data",
+    `monitor-command-logs-${process.pid}.${isolatedStore === "file" ? "json" : "sqlite"}`
+  );
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_BOOTSTRAP_DEMO: "true",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
-  });
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = storagePath;
+  } else if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = storagePath;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
 
   try {
     const signIn = await requestJsonAt<{
       sessionToken: string;
+      adminUser: { adminUserId: string };
     }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
       method: "POST",
       body: {
@@ -9419,6 +9434,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
 
     assert.equal(signIn.status, 200);
     const authorization = `Bearer ${signIn.body.sessionToken}`;
+    const monitorActorId = signIn.body.adminUser.adminUserId;
 
     const participantSignIn = await requestJsonAt<{
       participantSession: {
@@ -9473,7 +9489,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
 
     assert.equal(pauseCommand.status, 200);
     assert.equal(pauseCommand.body.command.commandType, "pause");
-    assert.equal(pauseCommand.body.command.actorId, "operator-demo");
+    assert.equal(pauseCommand.body.command.actorId, monitorActorId);
     assert.equal(pauseCommand.body.command.previousStatus, "running");
     assert.equal(pauseCommand.body.command.testRun.status, "paused");
     assert.equal(pauseCommand.body.command.testRun.pauseSource, "monitor");
@@ -10000,6 +10016,46 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
     assert.equal(completeCommand.body.command.participantSession.status, "closed");
 
+    const originalMonitorCommandLogs = await requestJsonAt<{
+      items: Array<{
+        testLog: {
+          logKey: string;
+          logContent: string;
+          unitKey: string | null;
+        };
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs?testRunId=${resumed.body.testRun.testRunId}&limit=100`,
+      { headers: { authorization } }
+    );
+    assert.equal(originalMonitorCommandLogs.status, 200);
+    const executedCommandLogs = originalMonitorCommandLogs.body.items.filter(
+      item => item.testLog.logKey === "command executed"
+    );
+    assert.deepEqual(
+      new Set(executedCommandLogs.map(item => item.testLog.logContent)),
+      new Set([
+        "pause",
+        "resume",
+        "goto id unit-finish",
+        "terminate lock"
+      ])
+    );
+    assert.equal(executedCommandLogs.length, 4);
+    const lockedByMonitorLogs = originalMonitorCommandLogs.body.items.filter(
+      item => item.testLog.logKey === "locked by monitor"
+    );
+    assert.deepEqual(
+      lockedByMonitorLogs.map(item => item.testLog.logContent),
+      [monitorActorId, monitorActorId]
+    );
+    assert.ok(
+      [...executedCommandLogs, ...lockedByMonitorLogs].every(
+        item => item.testLog.unitKey === null
+      )
+    );
+
     const repeatCommand = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
@@ -10079,7 +10135,10 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
         "pause"
       ]
     );
-    assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.actorId,
+      monitorActorId
+    );
     assert.equal(
       commandActivity.body.items[0]?.activityEvent.subjectId,
       resumed.body.testRun.testRunId
@@ -10137,6 +10196,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     );
   } finally {
     await closeServer(isolated.server);
+    if (isolatedStore !== "memory") {
+      for (const suffix of ["", "-shm", "-wal", "-journal"]) {
+        rmSync(`${storagePath}${suffix}`, { force: true });
+      }
+    }
   }
 });
 
@@ -21574,6 +21638,7 @@ test("original Testcenter compatibility corpus imports official independent play
     family: string;
     playerFixture: string;
     definitionFixture: string;
+    definitionEncoding: "base64" | "utf8";
     playerSourceUrl: string;
     definitionSourceUrl: string;
     playerSha256: string;
@@ -21590,19 +21655,19 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 4);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 6);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(
       resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
     );
-    const definitionBuffer = Buffer.from(
-      readFileSync(
-        resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
-        "utf8"
-      ).trim(),
-      "base64"
+    const storedDefinition = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
+      "utf8"
     );
+    const definitionBuffer = expectation.definitionEncoding === "base64"
+      ? Buffer.from(storedDefinition.trim(), "base64")
+      : Buffer.from(storedDefinition, "utf8");
     const definitionDocument = definitionBuffer.toString("utf8");
     assert.equal(
       createHash("sha256").update(playerDocument).digest("hex"),
@@ -21614,25 +21679,47 @@ test("original Testcenter compatibility corpus imports official independent play
       expectation.definitionSha256,
       expectation.definitionSourceUrl
     );
-    assert.match(
-      playerDocument,
-      new RegExp(
-        `"${expectation.metadataFormat === "metadata-2.0" ? "id" : "@id"}"\\s*:\\s*"${expectation.playerModuleId}"`
-      )
-    );
-    assert.match(
-      playerDocument,
-      new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`)
-    );
-    assert.match(
-      playerDocument,
-      new RegExp(
-        `"${expectation.metadataFormat === "metadata-2.0" ? "specVersion" : "apiVersion"}"\\s*:\\s*"${expectation.metadataApiVersion}"`
-      )
-    );
+    if (expectation.metadataFormat === "legacy-html-meta") {
+      assert.match(
+        playerDocument,
+        new RegExp(
+          `<meta[^>]+name="application-name"[^>]+content="${expectation.playerModuleId}"`
+        )
+      );
+      assert.match(
+        playerDocument,
+        new RegExp(`data-version="${expectation.playerModuleVersion}"`)
+      );
+      assert.match(
+        playerDocument,
+        new RegExp(`data-api-version="${expectation.playerApiVersion}"`)
+      );
+    } else {
+      const usesCurrentJsonMetadata = expectation.metadataFormat.startsWith(
+        "metadata-"
+      );
+      assert.match(
+        playerDocument,
+        new RegExp(
+          `"${usesCurrentJsonMetadata ? "id" : "@id"}"\\s*:\\s*"${expectation.playerModuleId}"`
+        )
+      );
+      assert.match(
+        playerDocument,
+        new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`)
+      );
+      assert.match(
+        playerDocument,
+        new RegExp(
+          `"${usesCurrentJsonMetadata ? "specVersion" : "apiVersion"}"\\s*:\\s*"${expectation.metadataApiVersion}"`
+        )
+      );
+    }
     if (expectation.metadataFormat === "metadata-2.0") {
       assert.match(playerDocument, /"metadataVersion"\s*:\s*"2\.0"/);
-    } else {
+    } else if (expectation.metadataFormat === "metadata-3.1-with-legacy-extensions") {
+      assert.match(playerDocument, /"metadataVersion"\s*:\s*"3\.1"/);
+    } else if (expectation.metadataFormat === "legacy-jsonld") {
       assert.match(
         playerDocument,
         new RegExp(`data-api-version="${expectation.playerApiVersion}"`)

@@ -1840,6 +1840,36 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
   return value as MonitorRunCommandType;
 };
 
+const formatOriginalMonitorCommandLogContent = (input: {
+  commandType: MonitorRunCommandType;
+  targetUnitKey: string | null;
+  reopenedClosedTestlet: boolean;
+  remainingSeconds: number | null;
+}): string | null => {
+  switch (input.commandType) {
+    case "pause":
+    case "resume":
+      return input.commandType;
+    case "complete":
+      return "terminate";
+    case "complete_and_lock":
+      return "terminate lock";
+    case "goto":
+      return input.targetUnitKey
+        ? [
+            "goto",
+            "id",
+            input.targetUnitKey,
+            input.reopenedClosedTestlet && input.remainingSeconds != null
+              ? `| closed timeblock reopened - new remaining time ${input.remainingSeconds}`
+              : ""
+          ].filter(Boolean).join(" ")
+        : null;
+    default:
+      return null;
+  }
+};
+
 const normalizeMonitorGotoTargetUnitKey = (value: unknown): string => {
   if (typeof value !== "string" || !value.trim()) {
     throw new FirstSliceError(
@@ -32426,6 +32456,34 @@ export const createFirstSliceServices = (
             buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
           );
         }
+        const reopenedClosedTestlet =
+          commandType === "goto" &&
+          adjustedTestletKey != null &&
+          remainingSeconds != null &&
+          previousTimer != null &&
+          (previousTimer.status === "expired" ||
+            previousTimer.status === "cancelled" ||
+            getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0);
+        const originalCommandLogContent = formatOriginalMonitorCommandLogContent({
+          commandType,
+          targetUnitKey,
+          reopenedClosedTestlet,
+          remainingSeconds
+        });
+        if (originalCommandLogContent) {
+          monitorTestLogEntries.push({
+            key: "command executed",
+            timeStamp: Date.parse(issuedAt),
+            content: originalCommandLogContent
+          });
+        }
+        if (commandType === "lock_test" || commandType === "complete_and_lock") {
+          monitorTestLogEntries.push({
+            key: "locked by monitor",
+            timeStamp: Date.parse(issuedAt),
+            content: actorId ?? ""
+          });
+        }
         if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
@@ -32443,13 +32501,10 @@ export const createFirstSliceServices = (
                 timestamp: issuedAt
               });
         if (
-          commandType === "goto" &&
+          reopenedClosedTestlet &&
           adjustedTestletKey &&
           remainingSeconds != null &&
-          previousTimer &&
-          (previousTimer.status === "expired" ||
-            previousTimer.status === "cancelled" ||
-            getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0)
+          previousTimer
         ) {
           const restoredTimer =
             effectiveNextTestRun.testletTimers?.[adjustedTestletKey];

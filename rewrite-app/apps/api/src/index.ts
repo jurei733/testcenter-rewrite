@@ -8467,7 +8467,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             workspaceKey,
             testRunIds: normalizedTestRunIds,
             commandType: body.commandType,
-            actorId: body.actorId,
+            actorId:
+              operatorAdminUserIdByRequest.get(request) ?? body.actorId,
             targetUnitKey: body.targetUnitKey,
             remainingSeconds: body.remainingSeconds
           });
@@ -8523,7 +8524,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey,
           testRunId,
           commandType: body.commandType,
-          actorId: body.actorId,
+          actorId: operatorAdminUserIdByRequest.get(request) ?? body.actorId,
           targetUnitKey: body.targetUnitKey,
           remainingSeconds: body.remainingSeconds
         });
