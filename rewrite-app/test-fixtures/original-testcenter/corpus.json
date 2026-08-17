@@ -2832,6 +2832,31 @@
       "metadataFormat": "metadata-2.0",
       "unitDefinitionType": "stars-unit-definition@0.17",
       "unitStateType": "iqb-standard@1.1"
+    },
+    {
+      "family": "Speedtest timed choice",
+      "playerFixture": "players/verona-player-speedtest-1.2.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/speedtest-example-1.2.0.txt.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-speedtest",
+      "sourceTag": "1.2.0",
+      "sourceCommit": "fce0e23229ab1ca62630f1f6ec15a13fa878b95d",
+      "playerSourcePath": "verona-player-speedtest.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-speedtest/releases/download/1.2.0/verona-player-speedtest-1.2.0.html",
+      "playerSha256": "ae691f8f55e40e1f39dc7a73de5b5ff7aa6dae2bfadaabfb59614784491c18c9",
+      "definitionSourcePath": "test/test.spec.js",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-speedtest/blob/fce0e23229ab1ca62630f1f6ec15a13fa878b95d/test/test.spec.js#L52",
+      "definitionExtraction": "unitDefinition literal from the official load-unit test",
+      "definitionSha256": "63a35e15d8fab6178b0f801ba85e20dcd31b43940e138d94019b8bfc3ea8fff3",
+      "license": "MIT",
+      "playerKey": "verona-player-speedtest-1.2.0",
+      "playerModuleId": "verona-player-speedtest",
+      "playerModuleVersion": "1.2.0",
+      "playerApiVersion": "4",
+      "metadataApiVersion": "5.0",
+      "metadataFormat": "metadata-2.0",
+      "unitStateType": "iqb-standard@1.0"
     }
   ],
   "currentOriginalStarsPackage": {

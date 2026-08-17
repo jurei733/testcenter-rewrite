@@ -401,6 +401,7 @@ type OriginalTestcenterCorpus = {
     definitionSourceCommit?: string;
     definitionSourcePath: string;
     definitionSourceUrl: string;
+    definitionExtraction?: string;
     definitionSha256: string;
     license: string;
     playerKey: string;
@@ -409,7 +410,7 @@ type OriginalTestcenterCorpus = {
     playerApiVersion: string;
     metadataApiVersion: string;
     metadataFormat: string;
-    unitDefinitionType: string;
+    unitDefinitionType?: string;
     unitStateType: string;
     legacyTestbedPackage?: {
       playerFixture: string;
@@ -1192,7 +1193,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 3);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 4);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1348,6 +1349,36 @@ test("original Testcenter compatibility corpus pins independent official player 
     starsDefinition.interactionParameters.options.buttons.map(button => button.text),
     ["A", "B", "C", "D"]
   );
+
+  const speedtest = playersByFamily.get("Speedtest timed choice");
+  assert.ok(speedtest);
+  assert.equal(speedtest.sourceTag, "1.2.0");
+  assert.equal(
+    speedtest.sourceCommit,
+    "fce0e23229ab1ca62630f1f6ec15a13fa878b95d"
+  );
+  assert.equal(
+    speedtest.definitionExtraction,
+    "unitDefinition literal from the official load-unit test"
+  );
+  assert.equal(speedtest.unitDefinitionType, undefined);
+  const speedtestPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, speedtest.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const speedtestDefinition = Buffer.from(
+    readFileSync(resolve(corpusRoot, speedtest.definitionFixture), "utf8").trim(),
+    "base64"
+  ).toString("utf8");
+  assert.match(speedtestPlayerHtml, /"id"\s*:\s*"verona-player-speedtest"/);
+  assert.match(speedtestPlayerHtml, /"version"\s*:\s*"1\.2\.0"/);
+  assert.match(speedtestPlayerHtml, /"specVersion"\s*:\s*"5\.0"/);
+  assert.match(speedtestPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(speedtestPlayerHtml, /apiVersion:\s*"4"/);
+  assert.match(speedtestPlayerHtml, /unitStateDataType:\s*'iqb-standard@1\.0'/);
+  assert.equal(speedtestDefinition, "Dies ist ein Beispielsatz!");
 });
 
 test("original Testcenter compatibility corpus pins the current adaptive system-test graph", () => {

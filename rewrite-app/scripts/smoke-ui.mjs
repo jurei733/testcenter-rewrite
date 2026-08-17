@@ -11510,6 +11510,293 @@ try {
   );
   await restoredStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
   assert.equal(await restoredStarsChoice.isChecked(), true);
+
+  logStep("participant-official-speedtest-player-family");
+  const speedtestPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage => playerPackage.family === "Speedtest timed choice"
+    );
+  assert.ok(
+    speedtestPlayerPackage,
+    "The official Speedtest player fixture should be pinned."
+  );
+  const speedtestTenantKey = `${tenantKey}-verona-speedtest`;
+  const speedtestWorkspaceKey = `${workspaceKey}-verona-speedtest`;
+  const speedtestBookletKey = "speedtest_booklet";
+  const speedtestFirstUnitKey = "unit-0";
+  const speedtestSecondUnitKey = "unit-1";
+  const speedtestLoginKey = "student-official-speedtest";
+  const [speedtestPlayerDocument, speedtestFirstDefinition] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          speedtestPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          speedtestPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+    ]);
+  const speedtestSecondDefinition = "Dies ist der zweite Beispielsatz!";
+  const speedtestPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${speedtestBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${speedtestFirstUnitKey}" href="units/Unit0.xml" />
+            <resource identifier="${speedtestSecondUnitKey}" href="units/Unit1.xml" />
+            <resource identifier="${speedtestPlayerPackage.playerKey}" href="players/verona-player-speedtest-1.2.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${speedtestBookletKey}</Id>
+            <Label>Official Speedtest Player</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="page_navibuttons">OFF</Config>
+            <Config key="unit_navibuttons">FULL</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${speedtestFirstUnitKey}" label="Speedtest 1" />
+            <Unit id="${speedtestSecondUnitKey}" label="Speedtest 2" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit0.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${speedtestFirstUnitKey}</Id>
+            <Label>Speedtest 1</Label>
+          </Metadata>
+          <Definition player="${speedtestPlayerPackage.playerKey}"><![CDATA[${speedtestFirstDefinition}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/Unit1.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${speedtestSecondUnitKey}</Id>
+            <Label>Speedtest 2</Label>
+          </Metadata>
+          <Definition player="${speedtestPlayerPackage.playerKey}"><![CDATA[${speedtestSecondDefinition}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-player-speedtest-1.2.0.html",
+      content: speedtestPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: speedtestTenantKey,
+      displayName: "Official Speedtest Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${speedtestTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: speedtestWorkspaceKey,
+        displayName: "Official Speedtest Player"
+      }
+    }
+  );
+  const speedtestWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${speedtestTenantKey}` +
+    `/workspaces/${speedtestWorkspaceKey}`;
+  const speedtestSourceResponse = await sendSmokeJson(
+    `${speedtestWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-speedtest-1.2.0-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${speedtestPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const speedtestSourcePayload = await speedtestSourceResponse.json();
+  assert.equal(speedtestSourceResponse.status, 201);
+  const speedtestImportResponse = await sendSmokeJson(
+    `${speedtestWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          speedtestSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const speedtestImportPayload = await speedtestImportResponse.json();
+  assert.equal(
+    speedtestImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(speedtestImportPayload.importJob.diagnostics)
+  );
+  const speedtestReleaseId =
+    speedtestImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    speedtestReleaseId,
+    "Official Speedtest import should stage a release."
+  );
+  await sendSmokeJson(
+    `${speedtestWorkspaceApiUrl}/content-releases/${speedtestReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${speedtestWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: speedtestLoginKey,
+          groupKey: "group:official-speedtest",
+          bookletKey: speedtestBookletKey,
+          displayName: "Official Speedtest Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: speedtestTenantKey,
+      workspaceKey: speedtestWorkspaceKey,
+      loginKey: speedtestLoginKey,
+      bookletKey: speedtestBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${speedtestPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const speedtestFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await speedtestFrame
+    .getByText(speedtestFirstDefinition, { exact: true })
+    .waitFor({ timeout: 30_000 });
+  const speedtestParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(speedtestParticipantSessionId);
+  await speedtestFrame.locator('[value="A"]').dispatchEvent("click");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${speedtestParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          speedtestFirstUnitKey
+        ];
+      if (
+        typeof response !== "string" ||
+        payload?.currentRunState?.testRun?.currentUnitKey !==
+          speedtestSecondUnitKey
+      ) return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          speedtestPlayerPackage.unitStateType
+        ) return false;
+        const values = JSON.parse(unitState?.dataParts?.main ?? "null");
+        return (
+          values?.some(
+            value => value?.id === "speedtest" && value?.value === "A"
+          ) &&
+          values?.some(
+            value =>
+              value?.id === "speedtest_time" &&
+              Number.isFinite(value?.value) &&
+              value.value >= 0
+          )
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: speedtestSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  const speedtestSecondFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await speedtestSecondFrame
+    .getByText(speedtestSecondDefinition, { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await speedtestSecondFrame.locator('[value="B"]').dispatchEvent("click");
+  await speedtestSecondFrame
+    .getByText("Weiterblättern nicht möglich.", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${speedtestParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          speedtestSecondUnitKey
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const values = JSON.parse(
+          JSON.parse(response).unitState?.dataParts?.main ?? "null"
+        );
+        return values?.some(
+          value => value?.id === "speedtest" && value?.value === "B"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  const restoredSpeedtestFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredSpeedtestFrame
+    .getByText(speedtestFirstDefinition, { exact: true })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredSpeedtestFrame.locator('[value="A"]').isChecked(),
+    true
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      speedtestParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${speedtestPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const reloadedSpeedtestFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await reloadedSpeedtestFrame
+    .getByText(speedtestFirstDefinition, { exact: true })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await reloadedSpeedtestFrame.locator('[value="A"]').isChecked(),
+    true
+  );
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");

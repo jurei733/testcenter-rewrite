@@ -153,6 +153,15 @@ independent family. STARS declares
 metadata 2.0 and Verona API 6, emits `iqb-standard@1.1` state through its
 JSON-string `responses` data part, and restores the selected option after a
 production Chromium/SQLite reload. The corpus
+also pins the official MIT-licensed Speedtest 1.2.0 Player and the plain-text
+example definition used by its own test suite. Its metadata 2.0 document
+declares Verona spec 5.0 while its runtime handshake deliberately uses API 4;
+the compatibility gates preserve that distinction, persist the selected value
+and elapsed time as `iqb-standard@1.0` state in the JSON-string `main` data
+part, follow the Player's automatic next-Unit request, retain the final-Unit
+navigation denial, and restore the first answer after host navigation and a
+production Chromium/SQLite reload. The release HTML, definition, source tag,
+commit, URLs, SHA-256 values, and license are recorded in `corpus.json`. The corpus
 also pins the complete current Original Testcenter STARS system-test package at
 commit `94b04751abfe024eb1d354c29718f90b4740c4c6`: Player 0.6.40, Unit,
 Voud/Vomd definition, 28-alias Booklet, and four-account Testtakers roster are

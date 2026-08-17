@@ -21454,7 +21454,7 @@ test("original Testcenter compatibility corpus imports the official Verona 2 thr
     playerModuleVersion: string;
     playerApiVersion: string;
     metadataFormat: string;
-    unitDefinitionType: string;
+    unitDefinitionType?: string;
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
@@ -21590,7 +21590,7 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 3);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 4);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(
@@ -21669,7 +21669,7 @@ test("original Testcenter compatibility corpus imports official independent play
         content: `
           <Unit>
             <Metadata><Id>${unitKey}</Id><Label>${expectation.family}</Label></Metadata>
-            <Definition player="${expectation.playerKey}" type="${expectation.unitDefinitionType}"><![CDATA[${definitionDocument}]]></Definition>
+            <Definition player="${expectation.playerKey}"${expectation.unitDefinitionType ? ` type="${expectation.unitDefinitionType}"` : ""}><![CDATA[${definitionDocument}]]></Definition>
           </Unit>
         `
       },
