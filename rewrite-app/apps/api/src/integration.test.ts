@@ -34255,8 +34255,8 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
       expectedMessage: "maintainer.url"
     },
     {
-      name: "v3-lowercase-type",
-      metadataDocument: createVeronaPlayerMetadataV3({ type: "player" }),
+      name: "v3-invalid-type",
+      metadataDocument: createVeronaPlayerMetadataV3({ type: "Player" }),
       expectedCode: "source_document_player_metadata_invalid",
       expectedMessage: "field 'type'"
     },
@@ -34543,6 +34543,138 @@ test("bundled Verona players accept supported metadata generations", async () =>
       ),
       false
     );
+  }
+});
+
+test("official Lottie player imports its metadata 3.1 compatibility extensions with an explicit warning", async () => {
+  const corpus = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, "corpus.json"),
+      "utf8"
+    )
+  ) as {
+    veronaPlayerFamilyPackages: Array<{
+      family: string;
+      playerFixture: string;
+      definitionFixture: string;
+      playerKey: string;
+      metadataCompatibilityWarnings?: string[];
+      requiredResourceId?: string;
+    }>;
+  };
+  const lottie = corpus.veronaPlayerFamilyPackages.find(
+    player => player.family === "Lottie shared-parameter interaction"
+  );
+  assert.ok(lottie);
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, lottie.playerFixture)
+  );
+  const definitionDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, lottie.definitionFixture),
+    "utf8"
+  );
+  const avatarPackage = Buffer.from(
+    createZipBase64([
+      {
+        fileName: "avatar.json",
+        content: JSON.stringify({ animations: [] })
+      }
+    ]),
+    "base64"
+  );
+  const tenantKey = "integration-tenant-official-lottie-player";
+  const workspaceKey = "integration-workspace-official-lottie-player";
+  const bookletKey = "BOOKLET.OFFICIAL.LOTTIE";
+  const unitKey = "UNIT.OFFICIAL.LOTTIE";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${unitKey}" href="units/Unit.xml" />
+            <resource identifier="${lottie.playerKey}" href="players/iqb-player-lottie-1.2.2.html" />
+            <resource identifier="${lottie.requiredResourceId}" href="resources/avatar.itcr.zip" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official Lottie Player</Label></Metadata>
+          <Units><Unit id="${unitKey}" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${unitKey}</Id><Label>Lottie shared parameters</Label></Metadata>
+          <Definition player="${lottie.playerKey}"><![CDATA[${definitionDocument}]]></Definition>
+          <Dependencies><File for="player">${lottie.requiredResourceId}</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/iqb-player-lottie-1.2.2.html",
+      content: playerDocument
+    },
+    {
+      fileName: "export/resources/avatar.itcr.zip",
+      content: avatarPackage
+    }
+  ]);
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-lottie-1.2.2.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string; message: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+  assert.deepEqual(
+    importResult.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    ["source_document_player_metadata_compatibility"]
+  );
+  const compatibilityDiagnostic = importResult.body.importJob.diagnostics[0];
+  assert.equal(compatibilityDiagnostic?.severity, "warning");
+  for (const warning of lottie.metadataCompatibilityWarnings ?? []) {
+    assert.match(compatibilityDiagnostic?.message ?? "", new RegExp(
+      warning.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    ));
   }
 });
 

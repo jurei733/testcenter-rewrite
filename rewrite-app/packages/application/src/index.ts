@@ -16163,6 +16163,7 @@ type VeronaPlayerMetadataValidation =
       version: string;
       specVersion: string;
       metadataVersion: string;
+      compatibilityWarnings?: string[];
     };
 
 const veronaMetadataIdentifierPattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -16408,8 +16409,10 @@ const validateVeronaPlayerMetadataDocument = (
   }
 
   const strict = metadataMajor === 3;
+  const compatibilityWarnings: string[] = [];
   if (strict) {
     const allowedProperties = new Set([
+      "$schema",
       "id",
       "name",
       "type",
@@ -16420,7 +16423,8 @@ const validateVeronaPlayerMetadataDocument = (
       "metadataVersion",
       "dependencies",
       "maintainer",
-      "code"
+      "code",
+      "notSupportedFeatures"
     ]);
     const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
       metadata,
@@ -16432,14 +16436,31 @@ const validateVeronaPlayerMetadataDocument = (
         reason: `player metadata contains unsupported property '${unexpectedProperty}' for metadataVersion '${metadataVersion}'`
       };
     }
+    if (metadata["$schema"] !== undefined) {
+      if (!isVeronaMetadataUri(metadata["$schema"])) {
+        return {
+          status: "invalid",
+          reason: "player metadata field '$schema' must be an absolute URI"
+        };
+      }
+      compatibilityWarnings.push(
+        "retains the legacy '$schema' instance property"
+      );
+    }
   }
 
   const expectedType = strict ? "PLAYER" : "player";
-  if (metadata.type !== expectedType) {
+  const usesLegacyPlayerType = strict && metadata.type === "player";
+  if (metadata.type !== expectedType && !usesLegacyPlayerType) {
     return {
       status: "invalid",
       reason: `player metadata field 'type' must be '${expectedType}' for metadataVersion '${metadataVersion}'`
     };
+  }
+  if (usesLegacyPlayerType) {
+    compatibilityWarnings.push(
+      "uses the legacy lowercase 'player' module type"
+    );
   }
   const id = typeof metadata.id === "string" ? metadata.id : "";
   if (!veronaMetadataIdentifierPattern.test(id)) {
@@ -16489,7 +16510,7 @@ const validateVeronaPlayerMetadataDocument = (
       reason: "player metadata field 'model' must be a string"
     };
   }
-  if (!strict && metadata.notSupportedFeatures !== undefined) {
+  if (metadata.notSupportedFeatures !== undefined) {
     const features = metadata.notSupportedFeatures;
     const supportedFeatures = new Set([
       "focus-notify",
@@ -16511,9 +16532,23 @@ const validateVeronaPlayerMetadataDocument = (
         reason: "player metadata field 'notSupportedFeatures' must be a non-empty unique list of known feature keys"
       };
     }
+    if (strict) {
+      compatibilityWarnings.push(
+        "retains the legacy 'notSupportedFeatures' property"
+      );
+    }
+  }
+  const dependencies =
+    strict && asVeronaMetadataRecord(metadata.dependencies)
+      ? [metadata.dependencies]
+      : metadata.dependencies;
+  if (dependencies !== metadata.dependencies) {
+    compatibilityWarnings.push(
+      "uses a singleton dependency object instead of an array"
+    );
   }
   const dependenciesError = validateVeronaMetadataDependencies(
-    metadata.dependencies,
+    dependencies,
     metadataMajor
   );
   if (dependenciesError) {
@@ -16536,7 +16571,10 @@ const validateVeronaPlayerMetadataDocument = (
     id,
     version,
     specVersion,
-    metadataVersion
+    metadataVersion,
+    ...(compatibilityWarnings.length > 0
+      ? { compatibilityWarnings }
+      : {})
   };
 };
 
@@ -18443,6 +18481,15 @@ const validateZipXmlEntries = (
               )
             );
           } else if (metadata.status === "valid") {
+            if (metadata.compatibilityWarnings?.length) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "source_document_player_metadata_compatibility",
+                  `Verona player ZIP entry '${playerEntry.fileName}' uses supported metadata compatibility extensions: ${metadata.compatibilityWarnings.join("; ")}.`,
+                  "warning"
+                )
+              );
+            }
             const playerReference = parseVeronaPlayerReferenceForMetadata(
               unitDefinition.playerKey,
               metadata.id

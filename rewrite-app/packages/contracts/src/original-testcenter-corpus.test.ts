@@ -388,7 +388,7 @@ type OriginalTestcenterCorpus = {
     playerFixture: string;
     playerEncoding: "brotli-base64";
     definitionFixture: string;
-    definitionEncoding: "base64";
+    definitionEncoding: "base64" | "utf8";
     sourceRepository: string;
     sourceTag: string;
     sourceCommit: string;
@@ -411,7 +411,9 @@ type OriginalTestcenterCorpus = {
     metadataApiVersion: string;
     metadataFormat: string;
     unitDefinitionType?: string;
-    unitStateType: string;
+    unitStateType?: string;
+    metadataCompatibilityWarnings?: string[];
+    requiredResourceId?: string;
     legacyTestbedPackage?: {
       playerFixture: string;
       playerEncoding: "brotli-base64";
@@ -1193,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 4);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 5);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1205,10 +1207,14 @@ test("original Testcenter compatibility corpus pins independent official player 
         "base64"
       )
     );
-    const definitionDocument = Buffer.from(
-      readFileSync(resolve(corpusRoot, player.definitionFixture), "utf8").trim(),
-      "base64"
+    const encodedDefinition = readFileSync(
+      resolve(corpusRoot, player.definitionFixture),
+      "utf8"
     );
+    const definitionDocument =
+      player.definitionEncoding === "base64"
+        ? Buffer.from(encodedDefinition.trim(), "base64")
+        : Buffer.from(encodedDefinition, "utf8");
     assert.equal(
       createHash("sha256").update(playerDocument).digest("hex"),
       player.playerSha256,
@@ -1379,6 +1385,57 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(speedtestPlayerHtml, /apiVersion:\s*"4"/);
   assert.match(speedtestPlayerHtml, /unitStateDataType:\s*'iqb-standard@1\.0'/);
   assert.equal(speedtestDefinition, "Dies ist ein Beispielsatz!");
+
+  const lottie = playersByFamily.get("Lottie shared-parameter interaction");
+  assert.ok(lottie);
+  assert.equal(lottie.sourceTag, "1.2.2");
+  assert.equal(
+    lottie.sourceCommit,
+    "764be685e15f66893ab986428cf62699c26f121e"
+  );
+  assert.equal(lottie.definitionSourceCommit, lottie.sourceCommit);
+  assert.equal(lottie.requiredResourceId, "avatar.itcr.zip");
+  assert.deepEqual(lottie.metadataCompatibilityWarnings, [
+    "retains the legacy '$schema' instance property",
+    "uses the legacy lowercase 'player' module type",
+    "retains the legacy 'notSupportedFeatures' property",
+    "uses a singleton dependency object instead of an array"
+  ]);
+  const lottiePlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, lottie.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const lottieDefinition = JSON.parse(
+    readFileSync(resolve(corpusRoot, lottie.definitionFixture), "utf8")
+  ) as {
+    scenes: Array<{
+      interactionType: string;
+      interactionParameters: {
+        sharedId: string;
+        options: Array<{ value: string }>;
+      };
+    }>;
+  };
+  assert.match(lottiePlayerHtml, /"id"\s*:\s*"iqb-player-lottie"/);
+  assert.match(lottiePlayerHtml, /"version"\s*:\s*"1\.2\.2"/);
+  assert.match(lottiePlayerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(lottiePlayerHtml, /"metadataVersion"\s*:\s*"3\.1"/);
+  assert.match(lottiePlayerHtml, /"dependencies"\s*:\s*\{/);
+  assert.match(lottiePlayerHtml, /vopStateChangedNotification/);
+  assert.match(lottiePlayerHtml, /sharedParameters/);
+  assert.equal(lottieDefinition.scenes[0]?.interactionType, "BUTTONS");
+  assert.equal(
+    lottieDefinition.scenes[0]?.interactionParameters.sharedId,
+    "avatar"
+  );
+  assert.deepEqual(
+    lottieDefinition.scenes[0]?.interactionParameters.options.map(
+      option => option.value
+    ),
+    ["blue", "green"]
+  );
 });
 
 test("original Testcenter compatibility corpus pins the current adaptive system-test graph", () => {

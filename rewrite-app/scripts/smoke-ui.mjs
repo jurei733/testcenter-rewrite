@@ -12092,6 +12092,319 @@ try {
     await sharedParameterFrame.locator("#sharedParameterConfig").textContent(),
     JSON.stringify(expectedSharedParameters)
   );
+
+  logStep("participant-official-lottie-player-family");
+  const lottiePlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "Lottie shared-parameter interaction"
+    );
+  assert.ok(
+    lottiePlayerPackage,
+    "The official Lottie player fixture should be pinned."
+  );
+  const lottieTenantKey = `${tenantKey}-verona-lottie`;
+  const lottieWorkspaceKey = `${workspaceKey}-verona-lottie`;
+  const lottieBookletKey = "lottie-shared-parameter-booklet";
+  const lottieFirstUnitKey = "lottie-avatar-choice";
+  const lottieSecondUnitKey = "lottie-tool-choice";
+  const lottieLoginKey = "student-official-lottie";
+  const [lottiePlayerDocument, lottieFirstDefinitionDocument] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          lottiePlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          lottiePlayerPackage.definitionFixture
+        ),
+        "utf8"
+      )
+    ]);
+  const lottieSecondDefinition = JSON.parse(lottieFirstDefinitionDocument);
+  lottieSecondDefinition.scenes[0].scene = "tool-choice";
+  lottieSecondDefinition.scenes[0].interactionParameters = {
+    sharedId: "tool",
+    options: [
+      {
+        imageSrc: "",
+        label: "Calculator",
+        value: "calculator"
+      },
+      {
+        imageSrc: "",
+        label: "Dictionary",
+        value: "dictionary"
+      }
+    ]
+  };
+  const lottieAvatarPackage = createStoredZipBuffer([
+    {
+      fileName: "avatar.json",
+      content: JSON.stringify({ animations: [] })
+    }
+  ]);
+  const lottiePlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${lottieBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${lottieFirstUnitKey}" href="units/Avatar.xml" />
+            <resource identifier="${lottieSecondUnitKey}" href="units/Tool.xml" />
+            <resource identifier="${lottiePlayerPackage.playerKey}" href="players/iqb-player-lottie-1.2.2.html" />
+            <resource identifier="${lottiePlayerPackage.requiredResourceId}" href="resources/avatar.itcr.zip" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${lottieBookletKey}</Id>
+            <Label>Official Lottie Shared Parameters</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="unit_navibuttons">FULL</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${lottieFirstUnitKey}" label="Avatar choice" />
+            <Unit id="${lottieSecondUnitKey}" label="Tool choice" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Avatar.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${lottieFirstUnitKey}</Id><Label>Avatar choice</Label></Metadata>
+          <Definition player="${lottiePlayerPackage.playerKey}"><![CDATA[${lottieFirstDefinitionDocument}]]></Definition>
+          <Dependencies><File for="player">${lottiePlayerPackage.requiredResourceId}</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/Tool.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${lottieSecondUnitKey}</Id><Label>Tool choice</Label></Metadata>
+          <Definition player="${lottiePlayerPackage.playerKey}"><![CDATA[${JSON.stringify(lottieSecondDefinition)}]]></Definition>
+          <Dependencies><File for="player">${lottiePlayerPackage.requiredResourceId}</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/iqb-player-lottie-1.2.2.html",
+      content: lottiePlayerDocument
+    },
+    {
+      fileName: "export/resources/avatar.itcr.zip",
+      content: lottieAvatarPackage
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: lottieTenantKey,
+      displayName: "Official Lottie Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${lottieTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: lottieWorkspaceKey,
+        displayName: "Official Lottie Player"
+      }
+    }
+  );
+  const lottieWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${lottieTenantKey}` +
+    `/workspaces/${lottieWorkspaceKey}`;
+  const lottieSourceResponse = await sendSmokeJson(
+    `${lottieWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-lottie-1.2.2-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument:
+          `data:application/zip;base64,${lottiePlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const lottieSourcePayload = await lottieSourceResponse.json();
+  assert.equal(lottieSourceResponse.status, 201);
+  const lottieImportResponse = await sendSmokeJson(
+    `${lottieWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: lottieSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const lottieImportPayload = await lottieImportResponse.json();
+  assert.equal(
+    lottieImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(lottieImportPayload.importJob.diagnostics)
+  );
+  assert.deepEqual(
+    lottieImportPayload.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_player_metadata_compatibility"]
+  );
+  assert.equal(
+    lottieImportPayload.importJob.diagnostics[0]?.severity,
+    "warning"
+  );
+  const lottieReleaseId =
+    lottieImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(lottieReleaseId, "Official Lottie import should stage a release.");
+  await sendSmokeJson(
+    `${lottieWorkspaceApiUrl}/content-releases/${lottieReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${lottieWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: lottieLoginKey,
+          groupKey: "group:official-lottie",
+          bookletKey: lottieBookletKey,
+          displayName: "Official Lottie Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  const waitForLottieSharedParameters = expectedParameters =>
+    page.evaluate(
+      expected =>
+        new Promise(resolveMessage => {
+          const timeout = globalThis.setTimeout(() => {
+            globalThis.removeEventListener("message", observeMessage);
+            resolveMessage(false);
+          }, 15_000);
+          const observeMessage = event => {
+            const message = event.data;
+            if (
+              message?.type !== "vopStateChangedNotification" ||
+              JSON.stringify(message.playerState?.sharedParameters ?? []) !==
+                JSON.stringify(expected)
+            ) {
+              return;
+            }
+            globalThis.clearTimeout(timeout);
+            globalThis.removeEventListener("message", observeMessage);
+            resolveMessage(true);
+          };
+          globalThis.addEventListener("message", observeMessage);
+        }),
+      expectedParameters
+    );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: lottieTenantKey,
+      workspaceKey: lottieWorkspaceKey,
+      loginKey: lottieLoginKey,
+      bookletKey: lottieBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${lottiePlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const lottieParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(lottieParticipantSessionId);
+  const lottieResourceResponse = await fetch(
+    `${baseUrl}/api/v1/participant/sessions/${lottieParticipantSessionId}` +
+      "/resources/avatar/avatar.json"
+  );
+  assert.equal(lottieResourceResponse.status, 200);
+  assert.deepEqual(await lottieResourceResponse.json(), { animations: [] });
+  let lottieFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const firstLottieChoice = lottieFrame.locator('[value="blue"]');
+  await firstLottieChoice.waitFor({ state: "attached", timeout: 30_000 });
+  const firstLottieNotification = waitForLottieSharedParameters([
+    { key: "avatar", value: "blue" }
+  ]);
+  await firstLottieChoice.dispatchEvent("click");
+  assert.equal(
+    await firstLottieNotification,
+    true,
+    "Official Lottie should publish its first shared parameter."
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: lottieSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  lottieFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const secondLottieChoice = lottieFrame.locator('[value="calculator"]');
+  await secondLottieChoice.waitFor({ state: "attached", timeout: 30_000 });
+  const secondLottieParameters = [
+    { key: "avatar", value: "blue" },
+    { key: "tool", value: "calculator" }
+  ];
+  const secondLottieNotification = waitForLottieSharedParameters(
+    secondLottieParameters
+  );
+  await secondLottieChoice.dispatchEvent("click");
+  assert.equal(
+    await secondLottieNotification,
+    true,
+    "Official Lottie should retain the previous Unit's shared parameter."
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${lottieParticipantSessionId}/current-state`,
+    payload =>
+      JSON.stringify(payload?.currentRunState?.testRun?.sharedParameters) ===
+      JSON.stringify(secondLottieParameters),
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      lottieParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${lottiePlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  lottieFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const restoredLottieChoice = lottieFrame.locator('[value="dictionary"]');
+  await restoredLottieChoice.waitFor({ state: "attached", timeout: 30_000 });
+  const restoredLottieParameters = [
+    { key: "avatar", value: "blue" },
+    { key: "tool", value: "dictionary" }
+  ];
+  const restoredLottieNotification = waitForLottieSharedParameters(
+    restoredLottieParameters
+  );
+  await restoredLottieChoice.dispatchEvent("click");
+  assert.equal(
+    await restoredLottieNotification,
+    true,
+    "Official Lottie should receive shared parameters after a full reload."
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${lottieParticipantSessionId}/current-state`,
+    payload =>
+      JSON.stringify(payload?.currentRunState?.testRun?.sharedParameters) ===
+      JSON.stringify(restoredLottieParameters),
+    30_000
+  );
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");

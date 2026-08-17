@@ -2857,6 +2857,39 @@
       "metadataApiVersion": "5.0",
       "metadataFormat": "metadata-2.0",
       "unitStateType": "iqb-standard@1.0"
+    },
+    {
+      "family": "Lottie shared-parameter interaction",
+      "playerFixture": "players/iqb-player-lottie-1.2.2.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/lottie-shared-parameters-1.2.2.json",
+      "definitionEncoding": "utf8",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-lottie",
+      "sourceTag": "1.2.2",
+      "sourceCommit": "764be685e15f66893ab986428cf62699c26f121e",
+      "playerSourcePath": "iqb-player-lottie-1.2.2.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-lottie/releases/download/1.2.2/iqb-player-lottie-1.2.2.html",
+      "playerSha256": "6a46febd83579359d943788c9eea3634ec46b55b04507f19448ffa0ca54d43a0",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-lottie",
+      "definitionSourceCommit": "764be685e15f66893ab986428cf62699c26f121e",
+      "definitionSourcePath": "src/player/app/models/unit.model.ts + src/player/app/services/unit.service.ts + src/player/app/components/scene/scene.component.ts",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-lottie/tree/764be685e15f66893ab986428cf62699c26f121e/src/player/app",
+      "definitionExtraction": "minimal executable shared-parameter contract fixture derived from the pinned official UnitData, SceneData, and interaction implementation",
+      "definitionSha256": "8d0ccaa127affc70020c4bd8797f64e8e101a86ec790866c9936a0175c24a952",
+      "license": "MIT",
+      "playerKey": "iqb-player-lottie@1.2",
+      "playerModuleId": "iqb-player-lottie",
+      "playerModuleVersion": "1.2.2",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-3.1-with-legacy-extensions",
+      "metadataCompatibilityWarnings": [
+        "retains the legacy '$schema' instance property",
+        "uses the legacy lowercase 'player' module type",
+        "retains the legacy 'notSupportedFeatures' property",
+        "uses a singleton dependency object instead of an array"
+      ],
+      "requiredResourceId": "avatar.itcr.zip"
     }
   ],
   "currentOriginalStarsPackage": {

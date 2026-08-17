@@ -162,6 +162,18 @@ part, follow the Player's automatic next-Unit request, retain the final-Unit
 navigation denial, and restore the first answer after host navigation and a
 production Chromium/SQLite reload. The release HTML, definition, source tag,
 commit, URLs, SHA-256 values, and license are recorded in `corpus.json`. The corpus
+also pins the official MIT-licensed Lottie 1.2.2 release HTML byte-for-byte and
+a minimal executable definition derived from its pinned `UnitData`, `SceneData`,
+and scene-interaction sources. The Player exercises Verona 6 test-wide shared
+parameters and its required nested `avatar.itcr.zip` resource. Its published
+metadata 3.1 document retains four legacy deviations (`$schema`, lowercase
+`player`, `notSupportedFeatures`, and a singleton dependency object); import
+accepts only those explicitly validated forms and emits a compatibility warning
+that names every deviation. The production Chromium/SQLite gate selects an
+avatar option, follows the Player's automatic next-Unit request, extends the
+shared parameters in the second Unit, and proves exact restoration after reload.
+The release and derived-definition provenance, hashes, source paths, and license
+are recorded in `corpus.json`. The corpus
 also pins the complete current Original Testcenter STARS system-test package at
 commit `94b04751abfe024eb1d354c29718f90b4740c4c6`: Player 0.6.40, Unit,
 Voud/Vomd definition, 28-alias Booklet, and four-account Testtakers roster are
