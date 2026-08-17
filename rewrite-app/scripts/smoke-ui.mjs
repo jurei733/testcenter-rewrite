@@ -14848,9 +14848,6 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  await completionControllerFrame
-    .locator("#next-unit")
-    .click({ trial: true, timeout: 15_000 });
   assert.equal(
     await completionControllerFrame.locator("#next-unit").isEnabled(),
     true
