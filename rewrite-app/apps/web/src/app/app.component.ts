@@ -12,6 +12,7 @@ import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { BugReportDialogComponent } from "./bug-report-dialog.component";
 import { BugReportService } from "./bug-report.service";
 import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { LiveContextComponent } from "./live-context.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
@@ -49,6 +50,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
   readonly bugReports = inject(BugReportService);
+  readonly confirmation = inject(ConfirmationDialogService);
   readonly participantShell = inject(ParticipantShellStateService);
   readonly isOffline = signal(!navigator.onLine);
   requiredAdminPassword = "";

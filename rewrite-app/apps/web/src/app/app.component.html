@@ -4,8 +4,12 @@
   [class.is-participant-page]="isParticipantView"
 >
   <span hidden>{{ app.renderVersion() }}</span>
-  <app-confirmation-dialog></app-confirmation-dialog>
-  <app-bug-report-dialog></app-bug-report-dialog>
+  @defer (when confirmation.dialog() !== null) {
+    <app-confirmation-dialog></app-confirmation-dialog>
+  }
+  @defer (when bugReports.isOpen()) {
+    <app-bug-report-dialog></app-bug-report-dialog>
+  }
   <section
     id="globalApplicationWarning"
     class="application-warning-banner"
