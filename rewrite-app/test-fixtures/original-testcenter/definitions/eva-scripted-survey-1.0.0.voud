@@ -1,0 +1,5 @@
+iqb-scripted::1.0
+title::EVA compatibility survey
+input-text::comment::1::Kommentar
+input-number::score::1::Bewertung::::0::10
+checkbox::approved::0::Freigabe

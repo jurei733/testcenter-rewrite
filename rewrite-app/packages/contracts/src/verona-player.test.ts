@@ -14,6 +14,8 @@ import {
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
   readVeronaPlayerApiVersion,
+  readVeronaLegacyHtmlMetadata,
+  resolveVeronaPlayerApiVersion,
   resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
@@ -389,6 +391,33 @@ test("Verona notifications and supported API versions are validated", () => {
   assert.equal(isSupportedVeronaPlayerApiVersion("2.0"), true);
   assert.equal(isSupportedVeronaPlayerApiVersion("6.9"), true);
   assert.equal(isSupportedVeronaPlayerApiVersion("7.0"), false);
+  const legacyHtml = `<meta data-api-version='2.1.0' content="verona-player-eva" name="application-name" data-version="1.0.0">`;
+  assert.deepEqual(readVeronaLegacyHtmlMetadata(legacyHtml), {
+    id: "verona-player-eva",
+    version: "1.0.0",
+    apiVersion: "2.1.0"
+  });
+  assert.deepEqual(
+    resolveVeronaPlayerApiVersion(
+      { type: "vopReadyNotification", apiVersion: "1.0.0" },
+      legacyHtml
+    ),
+    { version: "2.1.0", correctedLegacyModuleVersion: true }
+  );
+  assert.deepEqual(
+    resolveVeronaPlayerApiVersion(
+      { type: "vopReadyNotification", apiVersion: "7.0" },
+      legacyHtml
+    ),
+    { version: "7.0", correctedLegacyModuleVersion: false }
+  );
+  assert.deepEqual(
+    resolveVeronaPlayerApiVersion(
+      { type: "vopReadyNotification", apiVersion: "1.0.0" },
+      `<meta name="application-name" content="EVA display name" data-version="1.0.0" data-api-version="2.1.0">`
+    ),
+    { version: "1.0.0", correctedLegacyModuleVersion: false }
+  );
   assert.deepEqual(
     parseVeronaIncomingNotification({
       type: "vopStateChangedNotification",

@@ -34546,6 +34546,103 @@ test("bundled Verona players accept supported metadata generations", async () =>
   }
 });
 
+test("official EVA player imports historical HTML metadata as Verona API 2.1", async () => {
+  const corpus = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, "corpus.json"),
+      "utf8"
+    )
+  ) as {
+    veronaPlayerFamilyPackages: Array<{
+      family: string;
+      playerFixture: string;
+      definitionFixture: string;
+      playerKey: string;
+    }>;
+  };
+  const eva = corpus.veronaPlayerFamilyPackages.find(
+    player => player.family === "EVA scripted survey"
+  );
+  assert.ok(eva);
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, eva.playerFixture)
+  );
+  const definitionDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, eva.definitionFixture),
+    "utf8"
+  );
+  const tenantKey = "integration-tenant-official-eva-player";
+  const workspaceKey = "integration-workspace-official-eva-player";
+  const bookletKey = "BOOKLET.OFFICIAL.EVA";
+  const unitKey = "UNIT.OFFICIAL.EVA";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest><resources>
+          <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+          <resource identifier="${unitKey}" href="units/Unit.xml" />
+          <resource identifier="${eva.playerKey}" href="players/verona-player-eva-1.0.0.html" />
+        </resources></manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official EVA</Label></Metadata>
+          <Units><Unit id="${unitKey}" label="EVA survey" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${unitKey}</Id><Label>EVA survey</Label></Metadata>
+          <Definition player="${eva.playerKey}" type="iqb-scripted@1.0"><![CDATA[${definitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-player-eva-1.0.0.html",
+      content: playerDocument
+    }
+  ]);
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-eva-1.0.0.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+});
+
 test("official Lottie player imports its metadata 3.1 compatibility extensions with an explicit warning", async () => {
   const corpus = JSON.parse(
     readFileSync(

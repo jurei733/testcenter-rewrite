@@ -146,9 +146,16 @@ radio answers and restores both after reload. A second independent family pins
 the official DAN 3.0.0 Player release plus the byte-exact `G231mm.voud`
 definition from the official Verona Player Testbed at a fixed commit. Its
 production Chromium gate persists and restores a positioned multiline-text and
-multiple-choice response through DAN's JSON-string `all` data part. The corpus
-adds the official STARS 0.6.19 Player from a fixed Testbed commit and a
-byte-exact radio-button definition from its matching source tag as a third
+multiple-choice response through DAN's JSON-string `all` data part. Another
+independent family pins the official EVA 1.0.0 release byte-for-byte and a
+minimal executable `iqb-scripted@1.0` survey derived from the specification at
+a fixed commit. EVA's historical HTML metadata declares API 2.1, while its
+published Ready notification accidentally reports the module version 1.0.0.
+The host corrects only this exact metadata-backed mismatch; its production
+Chromium/SQLite gate persists and restores EVA's JSON-string `allResponses`
+state. The corpus also adds the official STARS 0.6.19 Player from a fixed
+Testbed commit and a
+byte-exact radio-button definition from its matching source tag as a fourth
 independent family. STARS declares
 metadata 2.0 and Verona API 6, emits `iqb-standard@1.1` state through its
 JSON-string `responses` data part, and restores the selected option after a

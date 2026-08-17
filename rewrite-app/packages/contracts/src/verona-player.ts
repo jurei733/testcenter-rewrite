@@ -538,6 +538,77 @@ export const readVeronaPlayerApiVersion = (value: unknown): string | null => {
   return typeof version === "string" && version.trim() ? version.trim() : null;
 };
 
+export type VeronaLegacyHtmlMetadata = {
+  id: string;
+  version: string;
+  apiVersion: string;
+};
+
+const veronaLegacyModuleIdentifierPattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+const decodeVeronaHtmlAttribute = (value: string): string =>
+  value
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&");
+
+/**
+ * Reads the metadata format used before Verona modules moved to JSON-LD.
+ * Attribute order and quoting are deliberately ignored because historical
+ * release packers emitted both variants.
+ */
+export const readVeronaLegacyHtmlMetadata = (
+  playerHtml: string
+): VeronaLegacyHtmlMetadata | null => {
+  for (const metaMatch of playerHtml.matchAll(/<meta\b([^>]*)>/gi)) {
+    const attributes = new Map<string, string>();
+    for (const attributeMatch of (metaMatch[1] ?? "").matchAll(
+      /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g
+    )) {
+      attributes.set(
+        (attributeMatch[1] ?? "").toLowerCase(),
+        decodeVeronaHtmlAttribute(
+          attributeMatch[2] ?? attributeMatch[3] ?? attributeMatch[4] ?? ""
+        )
+      );
+    }
+    if (attributes.get("name")?.toLowerCase() !== "application-name") {
+      continue;
+    }
+    const id = attributes.get("content")?.trim() ?? "";
+    const version = attributes.get("data-version")?.trim() ?? "";
+    const apiVersion = attributes.get("data-api-version")?.trim() ?? "";
+    return id && version && apiVersion ? { id, version, apiVersion } : null;
+  }
+  return null;
+};
+
+export const resolveVeronaPlayerApiVersion = (
+  readyNotification: unknown,
+  playerHtml: string
+): { version: string | null; correctedLegacyModuleVersion: boolean } => {
+  const reportedVersion = readVeronaPlayerApiVersion(readyNotification);
+  if (reportedVersion && isSupportedVeronaPlayerApiVersion(reportedVersion)) {
+    return { version: reportedVersion, correctedLegacyModuleVersion: false };
+  }
+  const metadata = readVeronaLegacyHtmlMetadata(playerHtml);
+  if (
+    !reportedVersion ||
+    !metadata ||
+    !veronaLegacyModuleIdentifierPattern.test(metadata.id) ||
+    reportedVersion !== metadata.version ||
+    !isSupportedVeronaPlayerApiVersion(metadata.apiVersion)
+  ) {
+    return { version: reportedVersion, correctedLegacyModuleVersion: false };
+  }
+  return {
+    version: metadata.apiVersion,
+    correctedLegacyModuleVersion: true
+  };
+};
+
 export const isSupportedVeronaPlayerApiVersion = (version: string): boolean => {
   const major = Number.parseInt(version.split(".")[0] ?? "", 10);
   return (

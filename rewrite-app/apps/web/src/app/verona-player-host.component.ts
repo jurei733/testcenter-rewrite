@@ -25,7 +25,7 @@ import {
   prepareVeronaUnitStateForPlayer,
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
-  readVeronaPlayerApiVersion,
+  resolveVeronaPlayerApiVersion,
   resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
@@ -661,7 +661,11 @@ export class VeronaPlayerHostComponent
     if (this.status !== "loading" || this.startPlayerRequest != null) {
       return;
     }
-    const apiVersion = readVeronaPlayerApiVersion(notification);
+    const apiResolution = resolveVeronaPlayerApiVersion(
+      notification,
+      this.playerHtml
+    );
+    const apiVersion = apiResolution.version;
     if (!apiVersion) {
       this.fail("The player ready notification does not declare a Verona API version.");
       return;
@@ -677,6 +681,13 @@ export class VeronaPlayerHostComponent
     this.loadingPhase = "complete";
     this.apiVersion = apiVersion;
     this.apiVersionLabel = `API ${apiVersion}`;
+    if (apiResolution.correctedLegacyModuleVersion) {
+      this.persistHostLog({
+        key: "PLAYER",
+        timeStamp: Date.now(),
+        content: `LEGACY_API_VERSION_CORRECTED ${apiVersion}`
+      }, this.savedResponse);
+    }
     this.startPlayerRequest = globalThis.window?.requestAnimationFrame(() => {
       this.startPlayerRequest = null;
       this.startPlayer();

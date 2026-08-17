@@ -1195,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 5);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 6);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1355,6 +1355,33 @@ test("original Testcenter compatibility corpus pins independent official player 
     starsDefinition.interactionParameters.options.buttons.map(button => button.text),
     ["A", "B", "C", "D"]
   );
+
+  const eva = playersByFamily.get("EVA scripted survey");
+  assert.ok(eva);
+  assert.equal(eva.sourceTag, "v1.0.0");
+  assert.equal(
+    eva.sourceCommit,
+    "a704af05e31eff3c45c603cbe664897ba5c372e4"
+  );
+  assert.equal(eva.metadataFormat, "legacy-html-meta");
+  assert.equal(eva.definitionExtraction, "minimal executable survey derived from the pinned official iqb-scripted 1.0 element examples");
+  const evaPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, eva.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const evaDefinition = readFileSync(
+    resolve(corpusRoot, eva.definitionFixture),
+    "utf8"
+  );
+  assert.match(evaPlayerHtml, /content="verona-player-eva"/);
+  assert.match(evaPlayerHtml, /data-version="1\.0\.0"/);
+  assert.match(evaPlayerHtml, /data-api-version="2\.1\.0"/);
+  assert.match(evaPlayerHtml, /apiVersion:this\.playerMetadata\.get\("version"\)/);
+  assert.match(evaDefinition, /^iqb-scripted::1\.0/m);
+  assert.match(evaDefinition, /input-text::comment::1::Kommentar/);
+  assert.match(evaDefinition, /input-number::score::1::Bewertung::::0::10/);
 
   const speedtest = playersByFamily.get("Speedtest timed choice");
   assert.ok(speedtest);

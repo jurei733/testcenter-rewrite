@@ -10794,6 +10794,190 @@ try {
     true
   );
 
+  logStep("participant-official-eva-player-family");
+  const evaPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage => playerPackage.family === "EVA scripted survey"
+    );
+  assert.ok(evaPlayerPackage, "The official EVA player fixture should be pinned.");
+  const evaTenantKey = `${tenantKey}-verona-eva`;
+  const evaWorkspaceKey = `${workspaceKey}-verona-eva`;
+  const evaBookletKey = "BOOKLET.OFFICIAL.EVA-1.0";
+  const evaUnitKey = "UNIT.OFFICIAL.EVA-1.0";
+  const evaLoginKey = "student-official-eva";
+  const evaResponse = "Historische EVA-Antwort";
+  const [evaPlayerDocument, evaDefinitionDocument] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        evaPlayerPackage.playerFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        evaPlayerPackage.definitionFixture
+      ),
+      "utf8"
+    )
+  ]);
+  const evaPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${evaBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${evaUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${evaPlayerPackage.playerKey}" href="players/verona-player-eva-1.0.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${evaBookletKey}</Id><Label>Official EVA scripted survey</Label></Metadata>
+          <Units><Unit id="${evaUnitKey}" label="EVA survey" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${evaUnitKey}</Id><Label>Official EVA survey</Label></Metadata>
+          <Definition player="${evaPlayerPackage.playerKey}" type="${evaPlayerPackage.unitDefinitionType}"><![CDATA[${evaDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-player-eva-1.0.0.html",
+      content: evaPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: { tenantKey: evaTenantKey, displayName: "Official EVA Player" }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${evaTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: evaWorkspaceKey,
+        displayName: "Official EVA Player"
+      }
+    }
+  );
+  const evaWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${evaTenantKey}` +
+    `/workspaces/${evaWorkspaceKey}`;
+  const evaSourceResponse = await sendSmokeJson(
+    `${evaWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-eva-1.0.0-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${evaPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const evaSourcePayload = await evaSourceResponse.json();
+  const evaImportResponse = await sendSmokeJson(
+    `${evaWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: evaSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const evaImportPayload = await evaImportResponse.json();
+  assert.equal(
+    evaImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(evaImportPayload.importJob.diagnostics)
+  );
+  assert.deepEqual(evaImportPayload.importJob.diagnostics, []);
+  const evaReleaseId = evaImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(evaReleaseId, "Official EVA import should stage a release.");
+  await sendSmokeJson(
+    `${evaWorkspaceApiUrl}/content-releases/${evaReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${evaWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: evaLoginKey,
+          groupKey: "group:official-eva",
+          bookletKey: evaBookletKey,
+          displayName: "Official EVA Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: evaTenantKey,
+      workspaceKey: evaWorkspaceKey,
+      loginKey: evaLoginKey,
+      bookletKey: evaBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${evaPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const evaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await evaFrame
+    .getByText("EVA compatibility survey", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  const evaTextInput = evaFrame.locator('input[autocomplete="off"]:not([type="number"])').first();
+  await evaTextInput.fill(evaResponse);
+  await evaFrame.getByText("EVA compatibility survey", { exact: true }).click();
+  const evaParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(evaParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${evaParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[evaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const dataPart = JSON.parse(response).unitState?.dataParts?.allResponses;
+        return JSON.parse(dataPart ?? "null")?.comment === evaResponse;
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      evaParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${evaPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredEvaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await restoredEvaFrame
+    .getByText("EVA compatibility survey", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredEvaFrame
+      .locator('input[autocomplete="off"]:not([type="number"])')
+      .first()
+      .inputValue(),
+    evaResponse
+  );
+
   logStep("participant-official-dan-player-family");
   const danPlayerPackage =
     officialProtocolCorpus.veronaPlayerFamilyPackages.find(

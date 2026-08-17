@@ -28,7 +28,8 @@ import {
   normalizeVeronaSharedParameters,
   parseVeronaUnitResponse,
   projectVeronaPageState,
-  readBookletConfigValues
+  readBookletConfigValues,
+  readVeronaLegacyHtmlMetadata
 } from "@testcenter-rewrite-app/contracts";
 import type {
   AdminAccessWindowErrorDetails,
@@ -16829,6 +16830,34 @@ const validateVeronaPlayerMetadata = (
       );
     });
   if (metadataScripts.length === 0) {
+    const legacyMetadata = readVeronaLegacyHtmlMetadata(playerHtml);
+    if (
+      legacyMetadata &&
+      veronaMetadataIdentifierPattern.test(legacyMetadata.id)
+    ) {
+      if (!veronaMetadataSemverPattern.test(legacyMetadata.version)) {
+        return {
+          status: "invalid",
+          reason: "historical HTML player metadata data-version must use SemVer MAJOR.MINOR.PATCH notation"
+        };
+      }
+      const specVersion = normalizeVeronaMajorMinorVersion(
+        legacyMetadata.apiVersion
+      );
+      if (!specVersion) {
+        return {
+          status: "invalid",
+          reason: "historical HTML player metadata data-api-version must use a numeric Verona version"
+        };
+      }
+      return {
+        status: "valid",
+        id: legacyMetadata.id,
+        version: legacyMetadata.version,
+        specVersion,
+        metadataVersion: "legacy-html-meta"
+      };
+    }
     return { status: "missing" };
   }
 
