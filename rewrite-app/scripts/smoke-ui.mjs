@@ -8836,11 +8836,10 @@ try {
     "Failed Verona saves should remain durable in the browser outbox."
   );
   await page.unroute(veronaSaveProgressUrl, rejectVeronaSave);
-  await page.locator("#participantRouteReloadButton").click({ noWaitAfter: true });
+  await page.locator("#participantRouteReloadButton").click();
   await page.waitForURL(url =>
     url.searchParams.get("participantSessionId") === veronaParticipantSessionId
   );
-  await page.waitForLoadState("networkidle");
   const offlineRecoveredVeronaFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
   );
@@ -9757,6 +9756,13 @@ try {
   assert.equal(
     await page.locator("#participantRouteAdaptiveState-bonus").inputValue(),
     "yes"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantVeronaSaveStatus")?.textContent?.trim() ===
+      "saved",
+    undefined,
+    { timeout: 15_000 }
   );
   logStep("participant-multi-unit-outbox-recovery");
   const originalAdaptiveStateForOutbox = await pollJsonWithPredicate(
@@ -12533,6 +12539,11 @@ try {
     .waitFor();
   await page.locator("#participantRouteClearSessionButton").waitFor();
   await page.locator("#participantStandaloneLogo").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Return to test selection?" })
+    .waitFor();
+  await page.locator("#participantConfirmationContinueButton").click();
   await page.locator("#participantRouteEntry").waitFor();
   await page.locator("#participantApplicationHeader").waitFor();
   assert.equal(await page.locator("#participantStandaloneLogo").count(), 0);
