@@ -137,12 +137,15 @@ as Brotli-compressed base64 and gate metadata import, generation-specific
 Chromium. These fixtures come from the official Player repository rather than
 the pinned Testcenter tree; every source URL, SHA-256, tag, commit, and license
 is recorded in `corpus.json`.
-The corpus additionally pins the official MIT-licensed ABI 3.3.0 scripted-survey
-Player and its release example definition; both are encoded portably without
-changing the release bytes. This independent Player family uses
-Verona API 2.1 with `iqb-scripted@1.0` definitions and string-valued
-`allResponses` key/value state. Its production Chromium gate persists text and
-radio answers and restores both after reload. A second independent family pins
+The corpus additionally pins both the historical official MIT-licensed ABI
+3.3.0 scripted-survey Player and the current official 5.0.0 release with their
+release example definitions; all four artifacts are encoded portably without
+changing the source bytes. Both packages use `iqb-scripted@1.0` definitions.
+ABI 3.3.0 negotiates Verona API 2.1 and retains string-valued `allResponses`
+key/value state, while ABI 5.0.0 declares metadata 2.0/spec 5.0, negotiates
+runtime API 4, and emits an `iqb-standard@1.1` response array through the
+JSON-string `allData` data part. Their production Chromium gates persist text
+and radio answers and restore both after reload. A second independent family pins
 the official DAN 3.0.0 Player release plus the byte-exact `G231mm.voud`
 definition from the official Verona Player Testbed at a fixed commit. Its
 production Chromium gate persists and restores a positioned multiline-text and

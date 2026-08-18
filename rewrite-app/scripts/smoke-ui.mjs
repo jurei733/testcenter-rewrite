@@ -10803,6 +10803,241 @@ try {
     true
   );
 
+  logStep("participant-official-abi-current-release-player-family");
+  const currentAbiPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "ABI current-release scripted survey"
+    );
+  assert.ok(
+    currentAbiPlayerPackage,
+    "The current official ABI player fixture should be pinned."
+  );
+  const currentAbiTenantKey = `${tenantKey}-verona-abi-current`;
+  const currentAbiWorkspaceKey = `${workspaceKey}-verona-abi-current`;
+  const currentAbiBookletKey = "BOOKLET.OFFICIAL.ABI-5.0";
+  const currentAbiUnitKey = "UNIT.OFFICIAL.ABI-5.0";
+  const currentAbiLoginKey = "student-official-abi-current";
+  const currentAbiResponse = "Aktuelle ABI-5-Antwort";
+  const [currentAbiPlayerDocument, currentAbiDefinitionDocument] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentAbiPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentAbiPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      )
+    ]);
+  const currentAbiPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentAbiBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${currentAbiUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${currentAbiPlayerPackage.playerKey}" href="players/Player.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${currentAbiBookletKey}</Id>
+            <Label>Current official ABI scripted survey</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${currentAbiUnitKey}" label="ABI 5 survey" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${currentAbiUnitKey}</Id>
+            <Label>Current official ABI survey</Label>
+          </Metadata>
+          <Definition player="${currentAbiPlayerPackage.playerKey}" type="${currentAbiPlayerPackage.unitDefinitionType}"><![CDATA[${currentAbiDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: currentAbiPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentAbiTenantKey,
+      displayName: "Current Official ABI Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentAbiTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentAbiWorkspaceKey,
+        displayName: "Current Official ABI Player"
+      }
+    }
+  );
+  const currentAbiWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentAbiTenantKey}` +
+    `/workspaces/${currentAbiWorkspaceKey}`;
+  const currentAbiSourceResponse = await sendSmokeJson(
+    `${currentAbiWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-abi-5.0-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${currentAbiPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const currentAbiSourcePayload = await currentAbiSourceResponse.json();
+  const currentAbiImportResponse = await sendSmokeJson(
+    `${currentAbiWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentAbiSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentAbiImportPayload = await currentAbiImportResponse.json();
+  assert.equal(
+    currentAbiImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentAbiImportPayload.importJob.diagnostics)
+  );
+  const currentAbiReleaseId =
+    currentAbiImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(currentAbiReleaseId, "Current ABI import should stage a release.");
+  await sendSmokeJson(
+    `${currentAbiWorkspaceApiUrl}/content-releases/${currentAbiReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${currentAbiWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: currentAbiLoginKey,
+          groupKey: "group:official-abi-current",
+          bookletKey: currentAbiBookletKey,
+          displayName: "Current Official ABI Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: currentAbiTenantKey,
+      workspaceKey: currentAbiWorkspaceKey,
+      loginKey: currentAbiLoginKey,
+      bookletKey: currentAbiBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentAbiPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const currentAbiFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await currentAbiFrame
+    .getByRole("heading", {
+      name: "Abschnitt 1 Basic Elements",
+      exact: true
+    })
+    .waitFor({ timeout: 30_000 });
+  const currentAbiTextInput = currentAbiFrame
+    .locator("input[autocomplete='off']")
+    .first();
+  await currentAbiTextInput.fill(currentAbiResponse);
+  await currentAbiFrame
+    .getByRole("radio", { name: "Choice2", exact: true })
+    .click();
+  const currentAbiParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(currentAbiParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentAbiParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[currentAbiUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const dataPart = JSON.parse(response).unitState?.dataParts?.allData;
+        const answers =
+          typeof dataPart === "string" ? JSON.parse(dataPart) : dataPart;
+        return (
+          Array.isArray(answers) &&
+          answers.some(
+            answer =>
+              answer?.id === "text_var1" &&
+              answer?.value === currentAbiResponse &&
+              answer?.status === "VALUE_CHANGED"
+          ) &&
+          answers.some(
+            answer =>
+              answer?.id === "mc_var1" &&
+              answer?.value === "2" &&
+              answer?.status === "VALUE_CHANGED"
+          )
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentAbiParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentAbiPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredCurrentAbiFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredCurrentAbiFrame
+    .getByRole("heading", {
+      name: "Abschnitt 1 Basic Elements",
+      exact: true
+    })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredCurrentAbiFrame
+      .locator("input[autocomplete='off']")
+      .first()
+      .inputValue(),
+    currentAbiResponse
+  );
+  assert.equal(
+    await restoredCurrentAbiFrame
+      .getByRole("radio", { name: "Choice2", exact: true })
+      .isChecked(),
+    true
+  );
+
   logStep("participant-official-eva-player-family");
   const evaPlayerPackage =
     officialProtocolCorpus.veronaPlayerFamilyPackages.find(

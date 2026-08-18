@@ -1195,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 8);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 9);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1251,6 +1251,49 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(abiPlayerHtml, /data-supported-unit-state-data-types="iqb-key-value@1\.0\.0"/);
   assert.match(abiDefinition, /input-text::text_var1/);
   assert.match(abiDefinition, /multiple-choice::mc_var1/);
+
+  const currentAbi = playersByFamily.get(
+    "ABI current-release scripted survey"
+  );
+  assert.ok(currentAbi);
+  assert.equal(currentAbi.sourceTag, "5.0.0");
+  assert.equal(
+    currentAbi.sourceCommit,
+    "05bcb7ffc4fc99245f74f3089465220ae6285bfe"
+  );
+  assert.equal(currentAbi.definitionSourceCommit, currentAbi.sourceCommit);
+  assert.equal(currentAbi.playerModuleVersion, "5.0.0");
+  assert.equal(currentAbi.playerApiVersion, "4");
+  assert.equal(currentAbi.metadataApiVersion, "5.0");
+  assert.equal(currentAbi.unitDefinitionType, "iqb-scripted@1.0");
+  assert.equal(currentAbi.unitStateType, "iqb-standard@1.1");
+  const currentAbiPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentAbi.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const currentAbiDefinition = readFileSync(
+    resolve(corpusRoot, currentAbi.definitionFixture),
+    "utf8"
+  );
+  assert.match(currentAbiPlayerHtml, /"id"\s*:\s*"iqb-player-abi"/);
+  assert.match(currentAbiPlayerHtml, /"version"\s*:\s*"5\.0\.0"/);
+  assert.match(currentAbiPlayerHtml, /"specVersion"\s*:\s*"5\.0"/);
+  assert.match(currentAbiPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(currentAbiPlayerHtml, /apiVersion:\s*["']4["']/);
+  assert.match(currentAbiPlayerHtml, /iqb-standard@1\.1/);
+  assert.match(
+    currentAbiPlayerHtml,
+    /dataParts\[[^\]]+\.id\]\s*=\s*JSON\.stringify\([^)]*\.variables\)/
+  );
+  assert.match(currentAbiDefinition, /^iqb-scripted::1\.0/m);
+  assert.match(currentAbiDefinition, /input-text::text_var1/);
+  assert.match(currentAbiDefinition, /multiple-choice::mc_var1/);
+  assert.match(currentAbiDefinition, /repeat-start::examineecount/);
 
   const dan = playersByFamily.get("DAN visual assessment");
   assert.ok(dan);
