@@ -396,6 +396,7 @@ type OriginalTestcenterCorpus = {
     playerSourceCommit?: string;
     playerSourcePath: string;
     playerSourceUrl: string;
+    playerByteSize?: number;
     playerSha256: string;
     definitionSourceRepository?: string;
     definitionSourceCommit?: string;
@@ -1195,7 +1196,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 10);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 11);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1294,6 +1295,57 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(currentAbiDefinition, /input-text::text_var1/);
   assert.match(currentAbiDefinition, /multiple-choice::mc_var1/);
   assert.match(currentAbiDefinition, /repeat-start::examineecount/);
+
+  const currentAspect = playersByFamily.get(
+    "Aspect current-release assessment"
+  );
+  assert.ok(currentAspect);
+  assert.equal(
+    currentAspect.sourceTag,
+    "editor/2.12.6+player/2.12.6"
+  );
+  assert.equal(
+    currentAspect.sourceCommit,
+    "b281f3353ee12b3d70d48cdca4a441d569f6763b"
+  );
+  assert.equal(
+    currentAspect.definitionSourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+  assert.equal(currentAspect.playerModuleVersion, "2.12.6");
+  assert.equal(currentAspect.playerByteSize, 3_605_455);
+  assert.equal(currentAspect.playerApiVersion, "6.0");
+  assert.equal(currentAspect.metadataApiVersion, "6.0");
+  assert.equal(currentAspect.unitDefinitionType, "aspect-unit-definition");
+  assert.equal(currentAspect.unitStateType, "iqb-standard@1.0");
+  const currentAspectPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentAspect.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const currentAspectDefinition = Buffer.from(
+    readFileSync(
+      resolve(corpusRoot, currentAspect.definitionFixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  ).toString("utf8");
+  assert.match(currentAspectPlayerHtml, /"id"\s*:\s*"iqb-player-aspect"/);
+  assert.match(currentAspectPlayerHtml, /"version"\s*:\s*"2\.12\.6"/);
+  assert.match(currentAspectPlayerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(currentAspectPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(currentAspectPlayerHtml, /unitStateDataType:"iqb-standard@1\.0"/);
+  assert.match(
+    currentAspectPlayerHtml,
+    /elementCodes:JSON\.stringify\(this\.unitStateService\.getResponses\(\)\)/
+  );
+  assert.match(currentAspectDefinition, /"type":"aspect-unit-definition"/);
+  assert.match(currentAspectDefinition, /"type":"text-field"/);
+  assert.match(currentAspectDefinition, /"type":"radio"/);
 
   const dan = playersByFamily.get("DAN visual assessment");
   assert.ok(dan);

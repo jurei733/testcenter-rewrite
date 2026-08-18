@@ -145,8 +145,15 @@ ABI 3.3.0 negotiates Verona API 2.1 and retains string-valued `allResponses`
 key/value state, while ABI 5.0.0 declares metadata 2.0/spec 5.0, negotiates
 runtime API 4, and emits an `iqb-standard@1.1` response array through the
 JSON-string `allData` data part. Their production Chromium gates persist text
-and radio answers and restore both after reload. A second independent family
-pins both the official DAN 3.0.0 Player and the current official 3.1.0 release
+and radio answers and restore both after reload. The corpus also pins the
+official current Aspect 2.12.6 release byte-for-byte together with the current
+Original Testcenter `testcenter-sample1.voud` definition from its separately
+pinned upstream commit. Aspect declares metadata 2.0/spec 6.0, negotiates
+runtime API 6.0, and emits JSON-string `elementCodes`, `stateVariableCodes`,
+and `geometryVariableCodes` inside `iqb-standard@1.0` state. Its production
+Chromium/SQLite gate persists a text and radio answer plus page state and
+restores both answers after reload. The DAN family pins both the official
+DAN 3.0.0 Player and the current official 3.1.0 release
 plus the byte-exact `G231mm.voud` definition from the official Verona Player
 Testbed at a fixed commit. DAN 3.0.0 uses legacy JSON-LD/API 2.1; the 3.1.0
 release declares metadata 2.0/spec 5.0 and negotiates runtime API 4 while its

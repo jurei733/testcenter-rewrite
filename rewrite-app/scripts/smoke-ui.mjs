@@ -13593,6 +13593,284 @@ try {
       JSON.stringify(restoredLottieParameters),
     30_000
   );
+
+  logStep("participant-official-aspect-current-release-player-family");
+  const currentAspectPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "Aspect current-release assessment"
+    );
+  assert.ok(
+    currentAspectPlayerPackage,
+    "The current official Aspect player fixture should be pinned."
+  );
+  const currentAspectUnitPackage =
+    officialProtocolCorpus.currentOriginalAspectPackage.units.find(
+      unitPackage => unitPackage.unitKey === "testcenter-sample1"
+    );
+  assert.ok(
+    currentAspectUnitPackage,
+    "The current Original Aspect Unit should be pinned."
+  );
+  const currentAspectTenantKey = `${tenantKey}-verona-aspect-current`;
+  const currentAspectWorkspaceKey = `${workspaceKey}-verona-aspect-current`;
+  const currentAspectBookletKey = "BOOKLET.OFFICIAL.ASPECT-2.12.6";
+  const currentAspectUnitKey = currentAspectUnitPackage.unitKey;
+  const currentAspectLoginKey = "student-official-aspect-current";
+  const currentAspectResponse =
+    "Aspect 2.12.6 stellt diese aktuelle Original-Antwort wieder her.";
+  const [
+    currentAspectPlayerDocument,
+    currentAspectUnitDocument,
+    currentAspectDefinitionDocument,
+    currentAspectMetadataDocument
+  ] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentAspectPlayerPackage.playerFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentAspectUnitPackage.fixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentAspectPlayerPackage.definitionFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentAspectUnitPackage.metadataReferenceFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+  ]);
+  const currentAspectPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentAspectBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${currentAspectUnitKey}" href="units/testcenter-sample1.xml" />
+            <resource identifier="testcenter-sample1.voud" href="units/testcenter-sample1.voud" />
+            <resource identifier="testcenter-sample1.vomd" href="units/testcenter-sample1.vomd" />
+            <resource identifier="${currentAspectPlayerPackage.playerKey}" href="players/iqb-player-aspect-2.12.6.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${currentAspectBookletKey}</Id>
+            <Label>Current official Aspect assessment</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${currentAspectUnitKey}" label="Current Aspect assessment" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/testcenter-sample1.xml",
+      content: currentAspectUnitDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample1.voud",
+      content: currentAspectDefinitionDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample1.vomd",
+      content: currentAspectMetadataDocument
+    },
+    {
+      fileName: "export/players/iqb-player-aspect-2.12.6.html",
+      content: currentAspectPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentAspectTenantKey,
+      displayName: "Current Official Aspect Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentAspectTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentAspectWorkspaceKey,
+        displayName: "Current Official Aspect Player"
+      }
+    }
+  );
+  const currentAspectWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentAspectTenantKey}` +
+    `/workspaces/${currentAspectWorkspaceKey}`;
+  const currentAspectSourceResponse = await sendSmokeJson(
+    `${currentAspectWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-aspect-2.12.6-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument:
+          `data:application/zip;base64,${currentAspectPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const currentAspectSourcePayload = await currentAspectSourceResponse.json();
+  assert.equal(currentAspectSourceResponse.status, 201);
+  const currentAspectImportResponse = await sendSmokeJson(
+    `${currentAspectWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentAspectSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentAspectImportPayload = await currentAspectImportResponse.json();
+  assert.equal(
+    currentAspectImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentAspectImportPayload.importJob.diagnostics)
+  );
+  const currentAspectReleaseId =
+    currentAspectImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    currentAspectReleaseId,
+    "Current Aspect import should stage a release."
+  );
+  await sendSmokeJson(
+    `${currentAspectWorkspaceApiUrl}/content-releases/${currentAspectReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${currentAspectWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: currentAspectLoginKey,
+          groupKey: "group:current-official-aspect",
+          bookletKey: currentAspectBookletKey,
+          displayName: "Current Official Aspect Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: currentAspectTenantKey,
+      workspaceKey: currentAspectWorkspaceKey,
+      loginKey: currentAspectLoginKey,
+      bookletKey: currentAspectBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentAspectPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const currentAspectFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await currentAspectFrame.getByText("Unit 1", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  await currentAspectFrame.getByText("Eingabefeld", { exact: true }).waitFor();
+  const currentAspectParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(currentAspectParticipantSessionId);
+  await currentAspectFrame.locator("input").fill(currentAspectResponse);
+  await currentAspectFrame
+    .getByRole("button", { name: "Gehe zu Seite 2", exact: true })
+    .click();
+  await currentAspectFrame.locator("p", { hasText: "Seite 2" }).waitFor();
+  await currentAspectFrame.getByText("Option 2", { exact: true }).click();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentAspectParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          currentAspectUnitKey
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const parsedResponse = JSON.parse(response);
+        const unitState = parsedResponse.unitState;
+        if (
+          unitState?.unitStateDataType !==
+          currentAspectPlayerPackage.unitStateType
+        ) return false;
+        const elementCodes = JSON.parse(unitState.dataParts?.elementCodes);
+        const stateVariableCodes = JSON.parse(
+          unitState.dataParts?.stateVariableCodes
+        );
+        const geometryVariableCodes = JSON.parse(
+          unitState.dataParts?.geometryVariableCodes
+        );
+        const textField = elementCodes.find(
+          elementCode => elementCode.id === "text-field_1"
+        );
+        const radio = elementCodes.find(
+          elementCode => elementCode.id === "radio_1"
+        );
+        return (
+          textField?.status === "VALUE_CHANGED" &&
+          textField.value === currentAspectResponse &&
+          radio?.status === "VALUE_CHANGED" &&
+          radio.value === 2 &&
+          stateVariableCodes.length === 0 &&
+          geometryVariableCodes.length === 0 &&
+          parsedResponse.playerState?.currentPage === "1"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentAspectParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentAspectPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredCurrentAspectFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredCurrentAspectFrame
+    .getByText("Unit 1", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredCurrentAspectFrame.locator("input").inputValue(),
+    currentAspectResponse
+  );
+  await restoredCurrentAspectFrame
+    .getByRole("button", { name: "Gehe zu Seite 2", exact: true })
+    .click();
+  await restoredCurrentAspectFrame
+    .locator("p", { hasText: "Seite 2" })
+    .waitFor();
+  assert.equal(
+    await restoredCurrentAspectFrame.getByRole("radio").nth(1).isChecked(),
+    true
+  );
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");
