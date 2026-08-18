@@ -9782,6 +9782,7 @@ try {
   const currentUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n`;
   const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
   const multiUnitSaveOrder = [];
+  const observedMultiUnitResponses = new Set();
   const recordMultiUnitSaveOrder = request => {
     const requestBody = request.postDataJSON();
     if (
@@ -9789,8 +9790,11 @@ try {
       request.url().endsWith(
         `/participant/test-runs/${originalAdaptiveTestRunId}/save-progress`
       ) &&
-      requestBody?.deliveryId?.startsWith("multi-unit-")
+      (requestBody?.unitResponse === currentUnitOutboxResponse ||
+        requestBody?.unitResponse === otherUnitOutboxResponse) &&
+      !observedMultiUnitResponses.has(requestBody.unitResponse)
     ) {
+      observedMultiUnitResponses.add(requestBody.unitResponse);
       multiUnitSaveOrder.push(requestBody.responseUnitKey);
     }
   };
@@ -11694,6 +11698,218 @@ try {
   );
   await restoredStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
   assert.equal(await restoredStarsChoice.isChecked(), true);
+
+  logStep("participant-official-stars-current-release-player-family");
+  const currentStarsPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "STARS current-release choice interaction"
+    );
+  assert.ok(
+    currentStarsPlayerPackage,
+    "The current official STARS release should be pinned."
+  );
+  const currentStarsTenantKey = `${tenantKey}-verona-stars-current`;
+  const currentStarsWorkspaceKey = `${workspaceKey}-verona-stars-current`;
+  const currentStarsBookletKey = "BOOKLET.OFFICIAL.STARS-0.7.2";
+  const currentStarsUnitKey = "UNIT.OFFICIAL.STARS-0.7.2";
+  const currentStarsLoginKey = "student-official-stars-current";
+  const [currentStarsPlayerDocument, currentStarsDefinitionDocument] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentStarsPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentStarsPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+    ]);
+  const currentStarsPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentStarsBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${currentStarsUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${currentStarsPlayerPackage.playerKey}" href="players/Player.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${currentStarsBookletKey}</Id>
+            <Label>Official STARS 0.7.2 Player</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${currentStarsUnitKey}" label="Current STARS choice" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${currentStarsUnitKey}</Id>
+            <Label>Current STARS choice</Label>
+          </Metadata>
+          <Definition player="${currentStarsPlayerPackage.playerKey}" type="${currentStarsPlayerPackage.unitDefinitionType}"><![CDATA[${currentStarsDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: currentStarsPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentStarsTenantKey,
+      displayName: "Official STARS 0.7.2 Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentStarsWorkspaceKey,
+        displayName: "Official STARS 0.7.2 Player"
+      }
+    }
+  );
+  const currentStarsWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}` +
+    `/workspaces/${currentStarsWorkspaceKey}`;
+  const currentStarsSourceResponse = await sendSmokeJson(
+    `${currentStarsWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-stars-0.7.2-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${currentStarsPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const currentStarsSourcePayload = await currentStarsSourceResponse.json();
+  const currentStarsImportResponse = await sendSmokeJson(
+    `${currentStarsWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentStarsSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentStarsImportPayload = await currentStarsImportResponse.json();
+  assert.equal(
+    currentStarsImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentStarsImportPayload.importJob.diagnostics)
+  );
+  const currentStarsReleaseId =
+    currentStarsImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(currentStarsReleaseId, "Official STARS 0.7.2 should stage a release.");
+  await sendSmokeJson(
+    `${currentStarsWorkspaceApiUrl}/content-releases/${currentStarsReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: currentStarsLoginKey,
+          groupKey: "group:official-stars-current",
+          bookletKey: currentStarsBookletKey,
+          displayName: "Official STARS 0.7.2 Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: currentStarsTenantKey,
+      workspaceKey: currentStarsWorkspaceKey,
+      loginKey: currentStarsLoginKey,
+      bookletKey: currentStarsBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentStarsPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const currentStarsParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(currentStarsParticipantSessionId);
+  const currentStarsFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const currentStarsChoice = currentStarsFrame.locator(
+    '[data-cy="button-2"] input'
+  );
+  await currentStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
+  await currentStarsChoice.dispatchEvent("click");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentStarsParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          currentStarsUnitKey
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          currentStarsPlayerPackage.unitStateType
+        ) return false;
+        const responses = unitState?.dataParts?.responses;
+        if (typeof responses !== "string") return false;
+        return JSON.parse(responses)?.some(
+          value =>
+            value?.id === "BUTTONS" &&
+            value?.status === "VALUE_CHANGED" &&
+            String(value?.value) === "3"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentStarsParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentStarsPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredCurrentStarsChoice = page
+    .frameLocator("#participantVeronaPlayerFrame")
+    .locator('[data-cy="button-2"] input');
+  await restoredCurrentStarsChoice.waitFor({
+    state: "attached",
+    timeout: 30_000
+  });
+  assert.equal(
+    await restoredCurrentStarsChoice.getAttribute("data-selected"),
+    "true"
+  );
 
   logStep("participant-official-speedtest-player-family");
   const speedtestPlayerPackage =

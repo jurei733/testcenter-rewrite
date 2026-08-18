@@ -21655,7 +21655,7 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 6);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 7);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(
@@ -21726,7 +21726,10 @@ test("original Testcenter compatibility corpus imports official independent play
       );
     }
 
-    const packageSuffix = expectation.playerModuleId.replaceAll("iqb-player-", "");
+    const packageSuffix = [
+      expectation.playerModuleId.replaceAll("iqb-player-", ""),
+      expectation.playerModuleVersion.replaceAll(".", "-")
+    ].join("-");
     const bookletKey = `BOOKLET.OFFICIAL.${packageSuffix.toUpperCase()}`;
     const unitKey = `UNIT.OFFICIAL.${packageSuffix.toUpperCase()}`;
     const zipPayload = createZipBase64([

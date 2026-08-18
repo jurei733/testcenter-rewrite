@@ -1195,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 6);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 7);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1353,6 +1353,62 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.equal(starsDefinition.interactionParameters.multiSelect, false);
   assert.deepEqual(
     starsDefinition.interactionParameters.options.buttons.map(button => button.text),
+    ["A", "B", "C", "D"]
+  );
+
+  const currentStars = playersByFamily.get(
+    "STARS current-release choice interaction"
+  );
+  assert.ok(currentStars);
+  assert.equal(currentStars.sourceTag, "0.7.2");
+  assert.equal(
+    currentStars.sourceCommit,
+    "c156efd37536a8e2b182cc9ab470cdb8eaa222f8"
+  );
+  assert.equal(currentStars.definitionSourceCommit, currentStars.sourceCommit);
+  const currentStarsPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentStars.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const currentStarsDefinition = JSON.parse(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentStars.definitionFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    ).toString("utf8")
+  ) as {
+    id: string;
+    version: string;
+    interactionType: string;
+    continueButtonShow: string;
+    interactionParameters: {
+      variableId: string;
+      multiSelect: boolean;
+      options: { buttons: Array<{ text: string }> };
+    };
+  };
+  assert.match(currentStarsPlayerHtml, /"id"\s*:\s*"iqb-player-stars"/);
+  assert.match(currentStarsPlayerHtml, /"version"\s*:\s*"0\.7\.2"/);
+  assert.match(currentStarsPlayerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(currentStarsPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(currentStarsPlayerHtml, /iqb-standard@2\.0/);
+  assert.equal(currentStarsDefinition.id, "stars-unit-definition");
+  assert.equal(currentStarsDefinition.version, "5.3");
+  assert.equal(currentStarsDefinition.interactionType, "BUTTONS");
+  assert.equal(currentStarsDefinition.continueButtonShow, "ON_ANY_RESPONSE");
+  assert.equal(currentStarsDefinition.interactionParameters.variableId, "BUTTONS");
+  assert.equal(currentStarsDefinition.interactionParameters.multiSelect, false);
+  assert.deepEqual(
+    currentStarsDefinition.interactionParameters.options.buttons.map(
+      button => button.text
+    ),
     ["A", "B", "C", "D"]
   );
 

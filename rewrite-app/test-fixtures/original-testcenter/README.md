@@ -159,7 +159,14 @@ byte-exact radio-button definition from its matching source tag as a fourth
 independent family. STARS declares
 metadata 2.0 and Verona API 6, emits `iqb-standard@1.1` state through its
 JSON-string `responses` data part, and restores the selected option after a
-production Chromium/SQLite reload. The corpus
+production Chromium/SQLite reload. A second independent STARS package pins the
+current official 0.7.2 release and its byte-exact BUTTONS option-text definition
+from the same source tag. The metadata-2.0/API-6 Player consumes
+`stars-unit-definition@5.3`, emits `iqb-standard@2.0` through the same
+JSON-string `responses` data part, and restores the selected option after a
+production Chromium/SQLite reload. The release asset, source definition, tag,
+commit, URLs, byte sizes, SHA-256 values, and MIT license are recorded in
+`corpus.json`. The corpus
 also pins the official MIT-licensed Speedtest 1.2.0 Player and the plain-text
 example definition used by its own test suite. Its metadata 2.0 document
 declares Verona spec 5.0 while its runtime handshake deliberately uses API 4;
@@ -188,7 +195,8 @@ all byte-exact. This graph gates the current `unit-xml` W3ID schema URL, nested
 18.0 `ViewSettings` (`theme` and `codeInput`), `iqb-standard@2.0` responses,
 Player navigation to the next alias, and selected-option restoration after a
 production Chromium/SQLite reload. The older 0.6.19 pair remains an independent
-release-family compatibility fixture rather than being replaced by the current
+release-family compatibility fixture, and the official 0.7.2 package remains a
+current upstream-family gate, rather than either being replaced by the current
 Original package. The corpus
 also retains the Testbed's historical metadata-free `IQBVisualUnitPlayerV2.99.2`
 artifact and original `G231mm.xml`; import and production browser gates resolve
