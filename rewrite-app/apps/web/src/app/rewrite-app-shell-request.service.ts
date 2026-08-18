@@ -12,13 +12,16 @@ import {
   finishForegroundShellRequest,
   flushShellRender
 } from "./rewrite-app-shell.request-state";
+import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 import { createShellRequestStateHost } from "./rewrite-app-shell.state-hosts";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppShellRequestService {
   private readonly api = inject(RewriteAppApiService);
+  private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly uiState = inject(RewriteAppUiStateService);
+  private adminSessionResetStarted = false;
 
   requestJson<T = Record<string, unknown>>(
     label: string,
@@ -43,13 +46,17 @@ export class RewriteAppShellRequestService {
     if (!options.quiet) {
       beginForegroundShellRequest(this.createRequestStateHost(), label);
     }
+    const requestHeaders = this.createRequestHeaders(options.headers);
+    const requestAdminSessionToken = this.readBearerToken(
+      requestHeaders.authorization
+    );
 
     try {
       const { statusCode, payload } = await this.api.send<T>(
         method,
         path,
         body,
-        this.createRequestHeaders(options.headers)
+        requestHeaders
       );
       if (!options.quiet) {
         applyForegroundShellResponse(
@@ -62,6 +69,7 @@ export class RewriteAppShellRequestService {
       options.onSuccess?.(payload, statusCode);
       return payload;
     } catch (error) {
+      this.resetInvalidAdminSession(error, requestAdminSessionToken);
       if (!options.quiet) {
         const apiError = this.api.isApiError(error)
           ? error
@@ -83,11 +91,12 @@ export class RewriteAppShellRequestService {
 
   async requestDownload(label: string, path: string): Promise<ApiDownload> {
     beginForegroundShellRequest(this.createRequestStateHost(), label);
+    const requestHeaders = this.createRequestHeaders(undefined);
+    const requestAdminSessionToken = this.readBearerToken(
+      requestHeaders.authorization
+    );
     try {
-      const download = await this.api.download(
-        path,
-        this.createRequestHeaders(undefined)
-      );
+      const download = await this.api.download(path, requestHeaders);
       applyForegroundShellResponse(
         this.createRequestStateHost(),
         label,
@@ -100,6 +109,7 @@ export class RewriteAppShellRequestService {
       );
       return download;
     } catch (error) {
+      this.resetInvalidAdminSession(error, requestAdminSessionToken);
       const apiError = this.api.isApiError(error)
         ? error
         : ({
@@ -156,5 +166,34 @@ export class RewriteAppShellRequestService {
         : {}),
       ...(headers ?? {})
     };
+  }
+
+  private readBearerToken(authorization: string | undefined): string | null {
+    const match = /^Bearer\s+(.+)$/i.exec(authorization?.trim() ?? "");
+    return match?.[1]?.trim() || null;
+  }
+
+  private resetInvalidAdminSession(
+    error: unknown,
+    requestAdminSessionToken: string | null
+  ): void {
+    const activeAdminSessionToken = this.uiState.ops.adminSessionToken.trim();
+    if (
+      this.adminSessionResetStarted ||
+      !requestAdminSessionToken ||
+      requestAdminSessionToken !== activeAdminSessionToken ||
+      !this.api.isApiError(error) ||
+      error.statusCode !== 401 ||
+      error.error !== "admin_session_invalid"
+    ) {
+      return;
+    }
+
+    this.adminSessionResetStarted = true;
+    this.uiState.ops.adminSessionToken = "";
+    this.uiState.ops.adminSessionView = "";
+    this.uiState.ops.adminAccessWindowNotice = "";
+    this.persistence.persistShellState();
+    globalThis.location.reload();
   }
 }

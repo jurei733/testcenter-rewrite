@@ -4873,10 +4873,34 @@ try {
     assert.equal(response.status, 200);
     return response.json();
   };
-  const workspaceAdminBatchSession = await createBatchAdminSession(
-    workspaceAdminUsername,
-    workspaceAdminVoluntaryPassword
+  const invalidSessionContext = await browser.newContext();
+  const invalidSessionPage = await invalidSessionContext.newPage();
+  await invalidSessionPage.goto(`${baseUrl}/app/ops`, {
+    waitUntil: "networkidle"
+  });
+  await invalidSessionPage.locator("#adminUsername").fill(workspaceAdminUsername);
+  await invalidSessionPage
+    .locator("#adminPassword")
+    .fill(workspaceAdminVoluntaryPassword);
+  await invalidSessionPage.locator("#adminSignInButton").click();
+  await invalidSessionPage.waitForFunction(() => {
+    const token = document.querySelector("#adminSessionToken");
+    return token instanceof HTMLInputElement && token.value.length > 20;
+  });
+  const invalidSessionToken = await invalidSessionPage
+    .locator("#adminSessionToken")
+    .inputValue();
+  const invalidSessionCurrentResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/current-session`,
+    { headers: { authorization: `Bearer ${invalidSessionToken}` } }
   );
+  assert.equal(invalidSessionCurrentResponse.status, 200);
+  const invalidSessionCurrent = await invalidSessionCurrentResponse.json();
+  const invalidSessionBrowserSession = {
+    sessionToken: invalidSessionToken,
+    adminSession: invalidSessionCurrent.adminSession
+  };
+  assert.ok(invalidSessionBrowserSession.adminSession?.adminSessionId);
   const delegatedAdminBatchSession = await createBatchAdminSession(
     delegatedWorkspaceAdminUsername,
     delegatedWorkspaceAdminFinalPassword
@@ -4901,7 +4925,7 @@ try {
     "The signed-in admin session must not be available for bulk revocation."
   );
   for (const adminSessionId of [
-    workspaceAdminBatchSession.adminSession.adminSessionId,
+    invalidSessionBrowserSession.adminSession.adminSessionId,
     delegatedAdminBatchSession.adminSession.adminSessionId
   ]) {
     await adminSessionsCollection
@@ -4930,7 +4954,9 @@ try {
     });
   await selectedAdminSessions
     .filter({ hasText: "2 selected admin session(s) will be revoked" })
-    .filter({ hasText: workspaceAdminBatchSession.adminSession.adminSessionId })
+    .filter({
+      hasText: invalidSessionBrowserSession.adminSession.adminSessionId
+    })
     .filter({ hasText: delegatedAdminBatchSession.adminSession.adminSessionId })
     .waitFor();
   await expectButtonSelectorEnabled("#adminBatchRevokeSessionsButton");
@@ -4942,8 +4968,26 @@ try {
   await page.locator("#adminBatchRevokeSessionsButton").click();
   await revokeAdminSessionBatchDialog;
   await waitForNotBusy("admin-session-bulk-revoke");
+  const invalidSessionReloadPromise = invalidSessionPage.waitForNavigation({
+    waitUntil: "domcontentloaded"
+  });
+  await invalidSessionPage.locator("#adminCurrentSessionButton").click();
+  await invalidSessionReloadPromise;
+  await invalidSessionPage.locator("#adminSignInButton").waitFor();
+  assert.equal(
+    await invalidSessionPage.locator("#adminSessionToken").inputValue(),
+    ""
+  );
+  const invalidSessionPersistedState = await invalidSessionPage.evaluate(() =>
+    JSON.parse(
+      window.localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}"
+    )
+  );
+  assert.equal(invalidSessionPersistedState.adminSessionToken, "");
+  assert.equal(invalidSessionPersistedState.adminSessionView, "");
+  await invalidSessionContext.close();
   for (const sessionToken of [
-    workspaceAdminBatchSession.sessionToken,
+    invalidSessionBrowserSession.sessionToken,
     delegatedAdminBatchSession.sessionToken
   ]) {
     const revokedSessionResponse = await fetch(

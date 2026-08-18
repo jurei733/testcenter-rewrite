@@ -3,7 +3,7 @@
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
 and additionally tracks current frontend behavior at
-`90ec58845d8485453045193e6705c96e407a7613` (2026-08-18) plus the complete
+`90ec58845d84d899fb993553d03767c072fdd05c` (2026-08-18) plus the complete
 current 18.0 BookletConfig package at
 `a5a6d25a72990d667300804c337cc5b500b01d2f` (2026-08-12). It is the working
 source for implementation order, not a claim of release parity. Newer
@@ -830,6 +830,19 @@ defaults from `229036f3bf91` also omit the redundant final question. A
 production SQLite/Chromium gate cancels the merged dialog without mutation,
 then approves it once and proves that both the timer cancellation and Unit lock
 arrive in the same atomic return request and paused run.
+
+Latest P1 invalid-operator-session closure: current Original commit
+`8bc420e71df8bb146fd4f0eb6c4fb73255fbcd26` resets stored authentication and
+reloads the application after an invalid session error instead of leaving a
+dead operator surface behind. The
+Rewrite now handles `401 admin_session_invalid` centrally for JSON and download
+requests: only a request carrying the persisted operator token can trigger the
+reset, and the token, stale session projection, and access notice are removed
+from memory and Local Storage before one page reload. The protected
+SQLite/Chromium session-batch gate signs a second browser in as a workspace
+administrator, revokes that exact live session from the platform-admin browser,
+then proves that the affected browser receives the server rejection, reloads to
+operator sign-in, and retains neither token nor stale session data.
 
 Latest production-frontend closure: the Angular root shell no longer imports
 the Workspace, Content, Runtime, and Ops lifecycle before a feature route is
