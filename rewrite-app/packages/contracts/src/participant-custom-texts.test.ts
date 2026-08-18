@@ -84,6 +84,18 @@ test("participant custom-text catalog preserves the complete original key set", 
     originalParticipantCustomTextDefaults.booketlet_continueButtonLockedUnit,
     "Weiter"
   );
+  assert.equal(
+    originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTextPrompt,
+    "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren."
+  );
+  assert.equal(
+    originalParticipantCustomTextDefaults["booklet_warningLeaveTextPrompt-testlet"],
+    "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst."
+  );
+  assert.equal(
+    originalParticipantCustomTextDefaults["booklet_warningLeaveTextPrompt-unit"],
+    "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+  );
 });
 
 test("participant custom-text resolution keeps authored copy and safe fallbacks", () => {

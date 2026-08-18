@@ -7753,6 +7753,9 @@ try {
   const veronaLoginKey = "student-verona-smoke";
   const veronaAdvisoryLoginKey = "student-verona-advisory";
   const veronaSimulationLoginKey = "student-verona-simulation";
+  const veronaMergedReturnBookletKey = "booklet:verona-merged-return";
+  const veronaMergedReturnTestletKey = "testlet:verona-merged-return";
+  const veronaMergedReturnLoginKey = "student-verona-merged-return";
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
   const expectedVeronaResourceRange = expectedVeronaResourceContent.slice(5, 20);
@@ -7986,6 +7989,9 @@ try {
             <resource identifier="${veronaBookletKey}" href="booklets/Booklet.xml">
               <dependency identifierref="${veronaUnitKey}" />
             </resource>
+            <resource identifier="${veronaMergedReturnBookletKey}" href="booklets/MergedReturnBooklet.xml">
+              <dependency identifierref="${veronaUnitKey}" />
+            </resource>
             <resource identifier="${veronaUnitKey}" href="units/Unit.xml" />
             <resource identifier="${veronaPlayerKey}" href="players/verona-smoke.html" />
           </resources>
@@ -8026,6 +8032,30 @@ try {
                 <LockAfterLeaving confirm="true" scope="unit" />
               </Restrictions>
               <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/booklets/MergedReturnBooklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${veronaMergedReturnBookletKey}</Id>
+            <Label>Merged return confirmation</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="toolbar_show_reload_button">TRUE</Config>
+            <Config key="unit_show_time_left">ON</Config>
+          </BookletConfig>
+          <Units>
+            <Testlet id="${veronaMergedReturnTestletKey}" label="Merged return block">
+              <Restrictions>
+                <TimeMax minutes="5" leave="confirm" />
+                <LockAfterLeaving confirm="true" scope="unit" />
+              </Restrictions>
+              <Unit id="${veronaUnitKey}" label="Merged return Unit" />
             </Testlet>
           </Units>
         </Booklet>
@@ -8141,6 +8171,19 @@ try {
               "booklet_warningLeaveTitle-unit": "Leave simulation task?",
               "booklet_warningLeaveTextPrompt-unit":
                 "This simulation task will close after leaving."
+            }
+          },
+          {
+            loginKey: veronaMergedReturnLoginKey,
+            groupKey: "group:verona-smoke",
+            bookletKey: veronaMergedReturnBookletKey,
+            displayName: "Merged Return Participant",
+            executionMode: "run-hot-return",
+            customTexts: {
+              booklet_warningLeaveTimerBlockTextPrompt:
+                "Leaving this timed block also returns to test selection.",
+              "booklet_warningLeaveTextPrompt-unit":
+                "Leaving this task also locks it."
             }
           }
         ]
@@ -9365,6 +9408,100 @@ try {
   await page.locator("#participantConfirmationContinueButton").click();
   const simulationCompleteResponse = await simulationCompleteResponsePromise;
   assert.equal(simulationCompleteResponse.status(), 200);
+
+  logStep("participant-merged-return-confirmation");
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: veronaMergedReturnLoginKey,
+      bookletKey: veronaMergedReturnBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  const mergedReturnFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await mergedReturnFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletTimer")
+    .filter({ hasText: "Merged return block" })
+    .waitFor();
+  await page
+    .locator("#participantRouteLeaveLockLabel")
+    .filter({ hasText: "Merged return Unit" })
+    .waitFor();
+  const mergedReturnRunId = (
+    await page.locator("#participantRouteRunId").textContent()
+  )?.trim();
+  assert.ok(mergedReturnRunId);
+  await page.locator("#participantApplicationLogoButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Return to test selection?" })
+    .waitFor();
+  await page
+    .locator("#participantConfirmationMessage")
+    .filter({
+      hasText: "Leaving this timed block also returns to test selection."
+    })
+    .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page.locator("#participantConfirmationBackdrop").waitFor({
+    state: "detached"
+  });
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "running" })
+    .waitFor();
+
+  await page.locator("#participantApplicationLogoButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Return to test selection?" })
+    .waitFor();
+  const mergedReturnRequestPromise = page.waitForRequest(
+    request =>
+      request.method() === "POST" &&
+      request.url().endsWith(
+        `/api/v1/participant/test-runs/${encodeURIComponent(
+          mergedReturnRunId
+        )}/return-to-starter`
+      )
+  );
+  const mergedReturnResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/api/v1/participant/test-runs/${encodeURIComponent(
+          mergedReturnRunId
+        )}/return-to-starter`
+      )
+  );
+  await page.locator("#participantConfirmationContinueButton").click();
+  const mergedReturnRequest = await mergedReturnRequestPromise;
+  assert.deepEqual(mergedReturnRequest.postDataJSON(), {
+    confirmTestletTimeLeave: true,
+    confirmTestletLeaveLock: true
+  });
+  const mergedReturnResponse = await mergedReturnResponsePromise;
+  assert.equal(mergedReturnResponse.status(), 200);
+  const mergedReturnPayload = await mergedReturnResponse.json();
+  assert.equal(mergedReturnPayload.testRun?.status, "paused");
+  assert.equal(
+    mergedReturnPayload.testRun?.testletTimers?.[
+      veronaMergedReturnTestletKey
+    ]?.status,
+    "cancelled"
+  );
+  assert.deepEqual(mergedReturnPayload.testRun?.lockedUnitKeys, [
+    veronaUnitKey
+  ]);
+  await page.locator("#participantRouteEntry").waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(250);
+  assert.equal(
+    await page.locator("#participantConfirmationBackdrop").count(),
+    0,
+    "Returning through a restriction must not open a second confirmation."
+  );
   logStep("participant-custom-leave-confirmation");
   stopAfter("participant-custom-leave-confirmation");
   const completedSimulationState = await pollJsonWithPredicate(

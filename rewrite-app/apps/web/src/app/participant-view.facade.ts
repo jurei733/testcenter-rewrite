@@ -2665,18 +2665,6 @@ export class ParticipantViewFacade {
     if (!currentState) {
       return;
     }
-    if (
-      currentState.executionMode.saveResponses &&
-      !(await this.requestConfirmation({
-        title: "Return to test selection?",
-        message: "Your saved progress will remain available.",
-        cancelLabel: "Continue working",
-        confirmLabel: "Return to tests"
-      }))
-    ) {
-      return;
-    }
-
     const timer = this.player.testletTimer;
     if (
       currentState.executionMode.forceTimeRestrictions &&
@@ -2698,9 +2686,9 @@ export class ParticipantViewFacade {
     const confirmTestletTimeLeave =
       currentState.executionMode.forceTimeRestrictions &&
       timer?.leave === "confirm";
-    if (
-      confirmTestletTimeLeave &&
-      !(await this.requestConfirmation({
+    const confirmTestletLeaveLock = this.player.leaveLock?.confirm === true;
+    const restrictionConfirmation = confirmTestletTimeLeave
+      ? {
         title: this.customText(
           "booklet_warningLeaveTimerBlockTitle",
           "Leave timed block?"
@@ -2711,20 +2699,31 @@ export class ParticipantViewFacade {
         ),
         cancelLabel: "Stay here",
         confirmLabel: "Leave anyway"
-      }))
-    ) {
-      return;
-    }
-    const confirmTestletLeaveLock = this.player.leaveLock?.confirm === true;
-    if (
-      confirmTestletLeaveLock &&
-      !(await this.requestConfirmation({
+      }
+      : confirmTestletLeaveLock
+        ? {
         title: this.leaveLockConfirmationTitle(this.player.leaveLock),
         message: this.leaveLockConfirmationText(this.player.leaveLock),
         cancelLabel: "Stay here",
         confirmLabel: "Leave anyway"
-      }))
-    ) {
+      }
+        : null;
+    const confirmation = restrictionConfirmation
+      ? {
+          ...restrictionConfirmation,
+          title: currentState.executionMode.saveResponses
+            ? "Return to test selection?"
+            : restrictionConfirmation.title
+        }
+      : currentState.executionMode.saveResponses
+        ? {
+            title: "Return to test selection?",
+            message: "Your saved progress will remain available.",
+            cancelLabel: "Continue working",
+            confirmLabel: "Return to tests"
+          }
+        : null;
+    if (confirmation && !(await this.requestConfirmation(confirmation))) {
       return;
     }
 

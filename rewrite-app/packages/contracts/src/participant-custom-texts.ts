@@ -36,11 +36,11 @@ export const originalParticipantCustomTextDefaults = {
   booklet_unitLoadingPending: "In der Warteschleife",
   booklet_unitLoadingUnknownProgress: "Wird geladen",
   "booklet_warningLeaveTextPrompt-testlet":
-    "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst. Trotzdem weiterblättern?",
+    "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst.",
   "booklet_warningLeaveTextPrompt-unit":
-    "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst. Trotzdem weiterblättern?",
+    "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst.",
   booklet_warningLeaveTimerBlockTextPrompt:
-    "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren. Trotzdem weiterblättern?",
+    "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
   booklet_warningLeaveTimerBlockTitle: "Aufgabenabschnitt verlassen?",
   "booklet_warningLeaveTitle-testlet": "Aufgabenbereich verlassen?",
   "booklet_warningLeaveTitle-unit": "Aufgabe verlassen?",
