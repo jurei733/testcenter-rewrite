@@ -11428,6 +11428,233 @@ try {
     true
   );
 
+  logStep("participant-official-dan-current-release-player-family");
+  const currentDanPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "DAN current-release visual assessment"
+    );
+  assert.ok(
+    currentDanPlayerPackage,
+    "The current official DAN player fixture should be pinned."
+  );
+  const currentDanTenantKey = `${tenantKey}-verona-dan-current`;
+  const currentDanWorkspaceKey = `${workspaceKey}-verona-dan-current`;
+  const currentDanBookletKey = "BOOKLET.OFFICIAL.DAN-3.1";
+  const currentDanUnitKey = "UNIT.OFFICIAL.DAN-3.1";
+  const currentDanLoginKey = "student-official-dan-current";
+  const currentDanResponse =
+    "Der aktuelle DAN-Player stellt diese Antwort wieder her.";
+  const [currentDanPlayerDocument, currentDanDefinitionDocument] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentDanPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentDanPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+    ]);
+  const currentDanPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentDanBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${currentDanUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${currentDanPlayerPackage.playerKey}" href="players/Player.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${currentDanBookletKey}</Id>
+            <Label>Current official DAN visual assessment</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${currentDanUnitKey}" label="Current DAN visual assessment" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${currentDanUnitKey}</Id>
+            <Label>Current official DAN visual assessment</Label>
+          </Metadata>
+          <Definition player="${currentDanPlayerPackage.playerKey}" type="${currentDanPlayerPackage.unitDefinitionType}"><![CDATA[${currentDanDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: currentDanPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentDanTenantKey,
+      displayName: "Current Official DAN Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentDanTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentDanWorkspaceKey,
+        displayName: "Current Official DAN Player"
+      }
+    }
+  );
+  const currentDanWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentDanTenantKey}` +
+    `/workspaces/${currentDanWorkspaceKey}`;
+  const currentDanSourceResponse = await sendSmokeJson(
+    `${currentDanWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-dan-3.1-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${currentDanPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const currentDanSourcePayload = await currentDanSourceResponse.json();
+  const currentDanImportResponse = await sendSmokeJson(
+    `${currentDanWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentDanSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentDanImportPayload = await currentDanImportResponse.json();
+  assert.equal(
+    currentDanImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentDanImportPayload.importJob.diagnostics)
+  );
+  const currentDanReleaseId =
+    currentDanImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(currentDanReleaseId, "Current DAN import should stage a release.");
+  await sendSmokeJson(
+    `${currentDanWorkspaceApiUrl}/content-releases/${currentDanReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${currentDanWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: currentDanLoginKey,
+          groupKey: "group:official-dan-current",
+          bookletKey: currentDanBookletKey,
+          displayName: "Current Official DAN Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: currentDanTenantKey,
+      workspaceKey: currentDanWorkspaceKey,
+      loginKey: currentDanLoginKey,
+      bookletKey: currentDanBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentDanPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const currentDanFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await currentDanFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  const currentDanTextInput = currentDanFrame.locator(
+    "#canvasElement4_textbox"
+  );
+  await currentDanTextInput.pressSequentially(currentDanResponse);
+  await currentDanFrame.locator("#canvasElement14_multipleChoice").click();
+  const currentDanParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(currentDanParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentDanParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[currentDanUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const parsedResponse = JSON.parse(response);
+        if (
+          parsedResponse.unitState?.unitStateDataType !==
+          currentDanPlayerPackage.unitStateType
+        ) {
+          return false;
+        }
+        const all = parsedResponse.unitState?.dataParts?.all;
+        if (typeof all !== "string") return false;
+        const unitStatus = JSON.parse(all);
+        return (
+          unitStatus?.canvasElement4 === currentDanResponse &&
+          unitStatus?.canvasElement14 === "true"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentDanParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${currentDanPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredCurrentDanFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredCurrentDanFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredCurrentDanFrame
+      .locator("#canvasElement4_textbox")
+      .inputValue(),
+    currentDanResponse
+  );
+  assert.equal(
+    await restoredCurrentDanFrame
+      .locator("#canvasElement14_multipleChoice")
+      .isChecked(),
+    true
+  );
+
   logStep("participant-historical-dan-testbed-player");
   const historicalDanPackage = danPlayerPackage.legacyTestbedPackage;
   assert.ok(

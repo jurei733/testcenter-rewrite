@@ -1195,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 9);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 10);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1317,6 +1317,45 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(danDefinition, /"canvasElement4"/);
   assert.match(danDefinition, /"type":"multilineTextbox"/);
   assert.match(danDefinition, /"type":"multipleChoice"/);
+  const currentDan = playersByFamily.get(
+    "DAN current-release visual assessment"
+  );
+  assert.ok(currentDan);
+  assert.equal(currentDan.sourceTag, "3.1.0");
+  assert.equal(
+    currentDan.sourceCommit,
+    "d2d2f4eb668f264d13b84d733cb152cc8a647445"
+  );
+  assert.equal(currentDan.definitionSourceCommit, dan.definitionSourceCommit);
+  assert.equal(currentDan.playerModuleVersion, "3.1.0-beta");
+  assert.equal(currentDan.playerApiVersion, "4");
+  assert.equal(currentDan.metadataApiVersion, "5.0");
+  assert.equal(currentDan.metadataFormat, "metadata-2.0");
+  assert.equal(currentDan.unitDefinitionType, "IQBVisualUnitPlayerV2.1.0");
+  assert.equal(currentDan.unitStateType, "IQBVisualUnitPlayerV2.1.0");
+  assert.equal(currentDan.definitionFixture, dan.definitionFixture);
+  const currentDanPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentDan.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  assert.match(currentDanPlayerHtml, /"id"\s*:\s*"iqb-player-dan"/);
+  assert.match(currentDanPlayerHtml, /"version"\s*:\s*"3\.1\.0-beta"/);
+  assert.match(currentDanPlayerHtml, /"specVersion"\s*:\s*"5\.0"/);
+  assert.match(currentDanPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(currentDanPlayerHtml, /apiVersion:\s*["']4["']/);
+  assert.match(
+    currentDanPlayerHtml,
+    /unitDataType\s*=\s*["']IQBVisualUnitPlayerV2\.1\.0["']/
+  );
+  assert.match(
+    currentDanPlayerHtml,
+    /allResponses\[["']all["']\]\s*=\s*JSON\.stringify\(unitStatus\)/
+  );
   const legacyTestbedPackage = dan.legacyTestbedPackage;
   assert.ok(legacyTestbedPackage);
   const legacyPlayerDocument = brotliDecompressSync(

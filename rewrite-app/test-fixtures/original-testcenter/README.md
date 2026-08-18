@@ -145,10 +145,14 @@ ABI 3.3.0 negotiates Verona API 2.1 and retains string-valued `allResponses`
 key/value state, while ABI 5.0.0 declares metadata 2.0/spec 5.0, negotiates
 runtime API 4, and emits an `iqb-standard@1.1` response array through the
 JSON-string `allData` data part. Their production Chromium gates persist text
-and radio answers and restore both after reload. A second independent family pins
-the official DAN 3.0.0 Player release plus the byte-exact `G231mm.voud`
-definition from the official Verona Player Testbed at a fixed commit. Its
-production Chromium gate persists and restores a positioned multiline-text and
+and radio answers and restore both after reload. A second independent family
+pins both the official DAN 3.0.0 Player and the current official 3.1.0 release
+plus the byte-exact `G231mm.voud` definition from the official Verona Player
+Testbed at a fixed commit. DAN 3.0.0 uses legacy JSON-LD/API 2.1; the 3.1.0
+release declares metadata 2.0/spec 5.0 and negotiates runtime API 4 while its
+embedded module version is `3.1.0-beta`. Both preserve the
+historical `IQBVisualUnitPlayerV2.1.0` definition/state type. Their production
+Chromium gates persist and restore a positioned multiline-text and
 multiple-choice response through DAN's JSON-string `all` data part. Another
 independent family pins the official EVA 1.0.0 release byte-for-byte and a
 minimal executable `iqb-scripted@1.0` survey derived from the specification at

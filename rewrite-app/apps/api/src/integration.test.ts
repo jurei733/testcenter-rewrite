@@ -21655,7 +21655,7 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 9);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 10);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(
