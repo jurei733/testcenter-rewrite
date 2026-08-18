@@ -3055,6 +3055,46 @@
         "uses a singleton dependency object instead of an array"
       ],
       "requiredResourceId": "avatar.itcr.zip"
+    },
+    {
+      "family": "IB ItemBuilder migration study",
+      "playerFixture": "players/verona-player-ib-0.2.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/ib-simple-0.2.0.voud.json",
+      "definitionEncoding": "utf8",
+      "resourceFixture": "resources/IB_SAMPLE_2025.itcr.zip.base64",
+      "resourceEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-ib",
+      "sourceTag": "unreleased-master-snapshot",
+      "sourceCommit": "285e155db7637edfca75191c00c722afe736f510",
+      "playerSourcePath": "src/verona-player-ib-0.2.html",
+      "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-ib/285e155db7637edfca75191c00c722afe736f510/src/verona-player-ib-0.2.html",
+      "playerSha256": "298fc62dd8b0645e21862b678c3d66f77cb17eb4edd6be28a3f89d69c0e24bac",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-ib",
+      "definitionSourceCommit": "285e155db7637edfca75191c00c722afe736f510",
+      "definitionSourcePath": "script/package-builder.js + sample-data/Simple/config.json",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-modules-ib/tree/285e155db7637edfca75191c00c722afe736f510/sample-data/Simple",
+      "definitionExtraction": "exact package-builder Unit definition for the official Simple sample and deterministic package id IB_SAMPLE_2025",
+      "definitionSha256": "25af91a80887b51d69194dcc31ad336622d6489d51d6696a83ea862bdaa1ce7b",
+      "resourceSha256": "e1d27bb1f475ab01b6a7a134ba4279206951adb2a20480bb9cf9c6e10f091e13",
+      "resourceBuild": "deterministic ZIP of the package-builder output with normalized file timestamps and package id IB_SAMPLE_2025",
+      "runtimeSourceRepository": "https://github.com/DIPFtba/CBAItemBuilderSupportedRuntimes",
+      "runtimeSourceCommit": "3b6cd474a76f82087e632ad8de14f6818ad754ca",
+      "runtimeVersion": "9.9.0",
+      "license": "MIT",
+      "playerKey": "verona-player-ib@0.2",
+      "playerModuleId": "verona-player-ib",
+      "playerModuleVersion": "0.2.0",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitStateType": "iqb-standard@1.4",
+      "metadataCompatibilityWarnings": [
+        "the official repository labels this snapshot as a feasibility study rather than a production release",
+        "the upstream package builder references a 0.2.0 filename while publishing the player as 0.2",
+        "the pinned legacy runtime loads inside the host sandbox but rejects the player's opaque null-origin controller messages, so interactive response and state parity are not claimed"
+      ],
+      "requiredResourceId": "IB_SAMPLE_2025.itcr.zip"
     }
   ],
   "currentOriginalStarsPackage": {

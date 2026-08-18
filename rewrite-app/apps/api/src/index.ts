@@ -699,6 +699,15 @@ const securityHeaders = {
   "permissions-policy": "camera=(self), geolocation=(), microphone=()"
 };
 
+// Sandboxed Verona players have an opaque origin and may legitimately embed
+// participant-scoped runtimes or widgets. Keep the other defenses while
+// allowing those resources to be framed by the player.
+const participantResourceSecurityHeaders = {
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "permissions-policy": "camera=(self), geolocation=(), microphone=()"
+};
+
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
@@ -1035,6 +1044,22 @@ const sendAsset = (
 ): void => {
   response.writeHead(statusCode, {
     ...securityHeaders,
+    "content-type": contentType,
+    "cache-control": "no-cache",
+    ...additionalHeaders
+  });
+  endResponse(response, body);
+};
+
+const sendParticipantResourceAsset = (
+  response: ServerResponse,
+  statusCode: number,
+  contentType: string,
+  body: Buffer,
+  additionalHeaders: Record<string, string> = {}
+): void => {
+  response.writeHead(statusCode, {
+    ...participantResourceSecurityHeaders,
     "content-type": contentType,
     "cache-control": "no-cache",
     ...additionalHeaders
@@ -7788,7 +7813,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantResourceMatch = participantResourcePattern.exec(pathname);
       if (request.method === "OPTIONS" && participantResourceMatch?.groups) {
         response.writeHead(204, {
-          ...securityHeaders,
+          ...participantResourceSecurityHeaders,
           "access-control-allow-origin": "*",
           "access-control-allow-methods": "GET, HEAD, OPTIONS",
           "access-control-allow-headers": "range",
@@ -7832,11 +7857,17 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             resourceBody.byteLength
           );
           if (!byteRanges) {
-            sendAsset(response, 416, resource.mediaType, Buffer.alloc(0), {
-              ...resourceHeaders,
-              "content-length": "0",
-              "content-range": `bytes */${resourceBody.byteLength}`
-            });
+            sendParticipantResourceAsset(
+              response,
+              416,
+              resource.mediaType,
+              Buffer.alloc(0),
+              {
+                ...resourceHeaders,
+                "content-length": "0",
+                "content-range": `bytes */${resourceBody.byteLength}`
+              }
+            );
             return;
           }
           if (byteRanges.length > 1) {
@@ -7847,7 +7878,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
               resourceBody,
               byteRanges
             });
-            sendAsset(
+            sendParticipantResourceAsset(
               response,
               206,
               `multipart/byteranges; boundary=${boundary}`,
@@ -7864,15 +7895,21 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             byteRange.start,
             byteRange.end + 1
           );
-          sendAsset(response, 206, resource.mediaType, partialBody, {
-            ...resourceHeaders,
-            "content-length": String(partialBody.byteLength),
-            "content-range":
-              `bytes ${byteRange.start}-${byteRange.end}/${resourceBody.byteLength}`
-          });
+          sendParticipantResourceAsset(
+            response,
+            206,
+            resource.mediaType,
+            partialBody,
+            {
+              ...resourceHeaders,
+              "content-length": String(partialBody.byteLength),
+              "content-range":
+                `bytes ${byteRange.start}-${byteRange.end}/${resourceBody.byteLength}`
+            }
+          );
           return;
         }
-        sendAsset(
+        sendParticipantResourceAsset(
           response,
           200,
           resource.mediaType,

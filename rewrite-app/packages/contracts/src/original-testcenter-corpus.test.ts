@@ -415,6 +415,13 @@ type OriginalTestcenterCorpus = {
     unitStateType?: string;
     metadataCompatibilityWarnings?: string[];
     requiredResourceId?: string;
+    resourceFixture?: string;
+    resourceEncoding?: "base64";
+    resourceSha256?: string;
+    resourceBuild?: string;
+    runtimeSourceRepository?: string;
+    runtimeSourceCommit?: string;
+    runtimeVersion?: string;
     legacyTestbedPackage?: {
       playerFixture: string;
       playerEncoding: "brotli-base64";
@@ -1196,7 +1203,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 11);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 12);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1226,6 +1233,18 @@ test("original Testcenter compatibility corpus pins independent official player 
       player.definitionSha256,
       player.definitionSourceUrl
     );
+    if (player.resourceFixture) {
+      assert.equal(player.resourceEncoding, "base64");
+      const resourceDocument = Buffer.from(
+        readFileSync(resolve(corpusRoot, player.resourceFixture), "utf8").trim(),
+        "base64"
+      );
+      assert.equal(
+        createHash("sha256").update(resourceDocument).digest("hex"),
+        player.resourceSha256,
+        player.resourceFixture
+      );
+    }
     assert.match(player.sourceCommit, /^[a-f0-9]{40}$/);
     assert.equal(player.license, "MIT");
   }
@@ -1736,6 +1755,67 @@ test("original Testcenter compatibility corpus pins independent official player 
     ),
     ["blue", "green"]
   );
+
+  const ib = playersByFamily.get("IB ItemBuilder migration study");
+  assert.ok(ib);
+  assert.equal(ib.sourceTag, "unreleased-master-snapshot");
+  assert.equal(
+    ib.sourceCommit,
+    "285e155db7637edfca75191c00c722afe736f510"
+  );
+  assert.equal(ib.definitionSourceCommit, ib.sourceCommit);
+  assert.equal(ib.playerModuleVersion, "0.2.0");
+  assert.equal(ib.playerApiVersion, "6.0");
+  assert.equal(ib.metadataApiVersion, "6.0");
+  assert.equal(ib.unitDefinitionType, undefined);
+  assert.equal(ib.unitStateType, "iqb-standard@1.4");
+  assert.equal(ib.requiredResourceId, "IB_SAMPLE_2025.itcr.zip");
+  assert.equal(
+    ib.runtimeSourceCommit,
+    "3b6cd474a76f82087e632ad8de14f6818ad754ca"
+  );
+  assert.equal(ib.runtimeVersion, "9.9.0");
+  assert.equal(
+    ib.resourceBuild,
+    "deterministic ZIP of the package-builder output with normalized file timestamps and package id IB_SAMPLE_2025"
+  );
+  assert.deepEqual(ib.metadataCompatibilityWarnings, [
+    "the official repository labels this snapshot as a feasibility study rather than a production release",
+    "the upstream package builder references a 0.2.0 filename while publishing the player as 0.2",
+    "the pinned legacy runtime loads inside the host sandbox but rejects the player's opaque null-origin controller messages, so interactive response and state parity are not claimed"
+  ]);
+  const ibPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, ib.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const ibDefinition = JSON.parse(
+    readFileSync(resolve(corpusRoot, ib.definitionFixture), "utf8")
+  ) as {
+    runtimeVersion: string;
+    item: string;
+    task: string;
+    scope: string;
+    package: string;
+    folder: string;
+  };
+  assert.match(ibPlayerHtml, /"id"\s*:\s*"verona-player-ib"/);
+  assert.match(ibPlayerHtml, /"version"\s*:\s*"0\.2\.0"/);
+  assert.match(ibPlayerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(ibPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(ibPlayerHtml, /unitStateDataType\s*=\s*'iqb-standard@1\.4'/);
+  assert.match(ibPlayerHtml, /playerConfig\.directDownloadUrl/);
+  assert.match(ibPlayerHtml, /getTasksStateReturn/);
+  assert.deepEqual(ibDefinition, {
+    task: "FirstTask",
+    page: "FirstPage",
+    scope: "A",
+    runtimeVersion: "9.9.0",
+    item: "Simple",
+    package: "IB_SAMPLE_2025",
+    folder: "Simple"
+  });
 });
 
 test("original Testcenter compatibility corpus pins the current adaptive system-test graph", () => {

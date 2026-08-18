@@ -27057,6 +27057,12 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
   assert.equal(resourceResponse.headers.get("access-control-allow-origin"), "*");
   assert.equal(resourceResponse.headers.get("accept-ranges"), "bytes");
+  assert.equal(resourceResponse.headers.get("x-frame-options"), null);
+  assert.equal(
+    resourceResponse.headers.get("x-content-type-options"),
+    "nosniff"
+  );
+  assert.equal(resourceResponse.headers.get("referrer-policy"), "no-referrer");
   assert.equal(
     resourceResponse.headers.get("access-control-expose-headers"),
     "accept-ranges, content-length, content-range"
@@ -27071,6 +27077,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     headers: { range: "bytes=5-19" }
   });
   assert.equal(fixedRangeResponse.status, 206);
+  assert.equal(fixedRangeResponse.headers.get("x-frame-options"), null);
   assert.equal(
     fixedRangeResponse.headers.get("content-range"),
     `bytes 5-19/${expectedResourceBytes.byteLength}`

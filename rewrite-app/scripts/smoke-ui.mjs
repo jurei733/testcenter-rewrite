@@ -9593,7 +9593,12 @@ try {
     false,
     "Simulation responses must not survive in local storage."
   );
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      simulationSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
   await page
     .locator("#participantRouteRunId")
     .filter({ hasText: simulationRunId })
@@ -14052,6 +14057,222 @@ try {
     await restoredCurrentAspectFrame.getByRole("radio").nth(1).isChecked(),
     true
   );
+
+  logStep("participant-official-ib-player-family");
+  const ibPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "IB ItemBuilder migration study"
+    );
+  assert.ok(
+    ibPlayerPackage,
+    "The official IB ItemBuilder migration fixture should be pinned."
+  );
+  const ibTenantKey = `${tenantKey}-verona-ib`;
+  const ibWorkspaceKey = `${workspaceKey}-verona-ib`;
+  const ibBookletKey = "BOOKLET.OFFICIAL.IB-0.2";
+  const ibUnitKey = "UNIT.OFFICIAL.IB-SIMPLE";
+  const ibLoginKey = "student-official-ib";
+  const [ibPlayerDocument, ibDefinitionDocument, ibResourcePackage] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          ibPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          ibPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          ibPlayerPackage.resourceFixture
+        ),
+        "utf8"
+      ).then(encoded => Buffer.from(encoded.trim(), "base64"))
+    ]);
+  const ibPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${ibBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${ibUnitKey}" href="units/Simple.xml" />
+            <resource identifier="${ibPlayerPackage.playerKey}" href="players/verona-player-ib-0.2.html" />
+            <resource identifier="${ibPlayerPackage.requiredResourceId}" href="resources/IB_SAMPLE_2025.itcr.zip" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${ibBookletKey}</Id>
+            <Label>Official IB ItemBuilder migration study</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${ibUnitKey}" label="IB Simple sample" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Simple.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${ibUnitKey}</Id>
+            <Label>IB Simple sample</Label>
+          </Metadata>
+          <Definition player="${ibPlayerPackage.playerKey}"><![CDATA[${ibDefinitionDocument}]]></Definition>
+          <Dependencies>
+            <File for="player">${ibPlayerPackage.requiredResourceId}</File>
+          </Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-player-ib-0.2.html",
+      content: ibPlayerDocument
+    },
+    {
+      fileName: "export/resources/IB_SAMPLE_2025.itcr.zip",
+      content: ibResourcePackage
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: ibTenantKey,
+      displayName: "Official IB ItemBuilder Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${ibTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: ibWorkspaceKey,
+        displayName: "Official IB ItemBuilder Player"
+      }
+    }
+  );
+  const ibWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${ibTenantKey}` +
+    `/workspaces/${ibWorkspaceKey}`;
+  const ibSourceResponse = await sendSmokeJson(
+    `${ibWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-ib-0.2-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument:
+          `data:application/zip;base64,${ibPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const ibSourcePayload = await ibSourceResponse.json();
+  assert.equal(ibSourceResponse.status, 201);
+  const ibImportResponse = await sendSmokeJson(
+    `${ibWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: ibSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const ibImportPayload = await ibImportResponse.json();
+  assert.equal(
+    ibImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(ibImportPayload.importJob.diagnostics)
+  );
+  const ibReleaseId = ibImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(ibReleaseId, "Official IB import should stage a release.");
+  await sendSmokeJson(
+    `${ibWorkspaceApiUrl}/content-releases/${ibReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${ibWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: ibLoginKey,
+          groupKey: "group:official-ib",
+          bookletKey: ibBookletKey,
+          displayName: "Official IB ItemBuilder Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  const ibRuntimeScriptResponse = page.waitForResponse(
+    response =>
+      response.url().includes(
+        "/resources/IB_SAMPLE_2025/runtimes/9.9.0/main.220e1b93.js"
+      ) && response.status() === 200,
+    { timeout: 30_000 }
+  );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: ibTenantKey,
+      workspaceKey: ibWorkspaceKey,
+      loginKey: ibLoginKey,
+      bookletKey: ibBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${ibPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const ibRuntimeScript = await ibRuntimeScriptResponse;
+  assert.equal(
+    ibRuntimeScript.headers()["content-type"],
+    "text/javascript; charset=utf-8"
+  );
+  assert.equal(ibRuntimeScript.headers()["x-frame-options"], undefined);
+  const ibOuterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const ibRuntimeFrame = ibOuterFrame.frameLocator("#ib-runtime-host");
+  await ibRuntimeFrame
+    .getByText("TaskPlayer running version 9.9.0")
+    .waitFor({ state: "visible", timeout: 30_000 });
+  await ibRuntimeFrame
+    .getByText("Waiting for controller to start task...")
+    .waitFor({ state: "visible", timeout: 30_000 });
+  const ibParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(ibParticipantSessionId);
+  const ibRuntimeReloadResponse = page.waitForResponse(
+    response =>
+      response.url().includes(
+        "/resources/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html"
+      ) && response.status() === 200,
+    { timeout: 30_000 }
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      ibParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await ibRuntimeReloadResponse;
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${ibPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  await page
+    .frameLocator("#participantVeronaPlayerFrame")
+    .frameLocator("#ib-runtime-host")
+    .getByText("Waiting for controller to start task...")
+    .waitFor({ state: "visible", timeout: 30_000 });
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");
