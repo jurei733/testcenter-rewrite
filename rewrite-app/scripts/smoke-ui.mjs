@@ -1322,6 +1322,11 @@ try {
     .waitFor();
   logStep("application-settings");
   await page.locator("#administrationUsersTab").waitFor();
+  if (await page.locator("#bugReportDialog").count()) {
+    throw new Error(
+      `Unexpected bug report before application settings:\n${await page.locator("#bugReportText").innerText()}`
+    );
+  }
   assert.equal(
     await page.locator("#administrationUsersTab").getAttribute("aria-current"),
     "page"
@@ -12197,6 +12202,327 @@ try {
     await reloadedSpeedtestFrame.locator('[value="A"]').isChecked(),
     true
   );
+
+  logStep("participant-current-speedtest-player-family");
+  const currentSpeedtestPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage =>
+        playerPackage.family === "Speedtest current-release timed choice"
+    );
+  assert.ok(
+    currentSpeedtestPlayerPackage,
+    "The current official Speedtest player fixture should be pinned."
+  );
+  const currentSpeedtestTenantKey = `${tenantKey}-verona-speedtest-current`;
+  const currentSpeedtestWorkspaceKey = `${workspaceKey}-verona-speedtest-current`;
+  const currentSpeedtestBookletKey = "speedtest_current_booklet";
+  const currentSpeedtestFirstUnitKey = "speedtest-current-0";
+  const currentSpeedtestSecondUnitKey = "speedtest-current-1";
+  const currentSpeedtestLoginKey = "student-current-speedtest";
+  const [currentSpeedtestPlayerDocument, currentSpeedtestDefinition] =
+    await Promise.all([
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentSpeedtestPlayerPackage.playerFixture
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter",
+          currentSpeedtestPlayerPackage.definitionFixture
+        ),
+        "utf8"
+      )
+    ]);
+  const currentSpeedtestPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentSpeedtestBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${currentSpeedtestFirstUnitKey}" href="units/Unit0.xml" />
+            <resource identifier="${currentSpeedtestSecondUnitKey}" href="units/Unit1.xml" />
+            <resource identifier="${currentSpeedtestPlayerPackage.playerKey}" href="players/iqb-player-speedtest-3.3.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${currentSpeedtestBookletKey}</Id>
+            <Label>Current Official Speedtest Player</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="page_navibuttons">OFF</Config>
+            <Config key="unit_navibuttons">FULL</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${currentSpeedtestFirstUnitKey}" label="Speedtest current 1" />
+            <Unit id="${currentSpeedtestSecondUnitKey}" label="Speedtest current 2" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit0.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${currentSpeedtestFirstUnitKey}</Id>
+            <Label>Speedtest current 1</Label>
+          </Metadata>
+          <Definition player="${currentSpeedtestPlayerPackage.playerKey}" type="${currentSpeedtestPlayerPackage.unitDefinitionType}"><![CDATA[${currentSpeedtestDefinition}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/Unit1.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${currentSpeedtestSecondUnitKey}</Id>
+            <Label>Speedtest current 2</Label>
+          </Metadata>
+          <Definition player="${currentSpeedtestPlayerPackage.playerKey}" type="${currentSpeedtestPlayerPackage.unitDefinitionType}"><![CDATA[${currentSpeedtestDefinition}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/iqb-player-speedtest-3.3.0.html",
+      content: currentSpeedtestPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentSpeedtestTenantKey,
+      displayName: "Current Official Speedtest Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentSpeedtestTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentSpeedtestWorkspaceKey,
+        displayName: "Current Official Speedtest Player"
+      }
+    }
+  );
+  const currentSpeedtestWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentSpeedtestTenantKey}` +
+    `/workspaces/${currentSpeedtestWorkspaceKey}`;
+  const currentSpeedtestSourceResponse = await sendSmokeJson(
+    `${currentSpeedtestWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-speedtest-3.3.0-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${currentSpeedtestPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const currentSpeedtestSourcePayload =
+    await currentSpeedtestSourceResponse.json();
+  assert.equal(currentSpeedtestSourceResponse.status, 201);
+  const currentSpeedtestImportResponse = await sendSmokeJson(
+    `${currentSpeedtestWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentSpeedtestSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentSpeedtestImportPayload =
+    await currentSpeedtestImportResponse.json();
+  assert.equal(
+    currentSpeedtestImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentSpeedtestImportPayload.importJob.diagnostics)
+  );
+  const currentSpeedtestReleaseId =
+    currentSpeedtestImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    currentSpeedtestReleaseId,
+    "Current official Speedtest import should stage a release."
+  );
+  await sendSmokeJson(
+    `${currentSpeedtestWorkspaceApiUrl}/content-releases/${currentSpeedtestReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${currentSpeedtestWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: currentSpeedtestLoginKey,
+          groupKey: "group:current-official-speedtest",
+          bookletKey: currentSpeedtestBookletKey,
+          displayName: "Current Official Speedtest Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: currentSpeedtestTenantKey,
+      workspaceKey: currentSpeedtestWorkspaceKey,
+      loginKey: currentSpeedtestLoginKey,
+      bookletKey: currentSpeedtestBookletKey
+    }).toString()}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({
+      hasText: `API ${currentSpeedtestPlayerPackage.playerApiVersion}`
+    })
+    .waitFor({ timeout: 30_000 });
+  const currentSpeedtestFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await currentSpeedtestFrame
+    .getByText("Frage 1", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  const currentSpeedtestParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(currentSpeedtestParticipantSessionId);
+  await currentSpeedtestFrame
+    .getByRole("button", { name: "falsch", exact: true })
+    .dispatchEvent("click");
+  await currentSpeedtestFrame
+    .getByText("Frage 2", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentSpeedtestParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          currentSpeedtestFirstUnitKey
+        ];
+      if (
+        typeof response !== "string" ||
+        payload?.currentRunState?.testRun?.currentUnitKey !==
+          currentSpeedtestFirstUnitKey
+      ) return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          currentSpeedtestPlayerPackage.unitStateType
+        ) return false;
+        const question = JSON.parse(
+          unitState?.dataParts?.question_0 ?? "null"
+        );
+        const activeQuestion = JSON.parse(
+          unitState?.dataParts?.activeQuestionIndex ?? "null"
+        );
+        return (
+          question?.some(
+            value =>
+              value?.id === "value" &&
+              value?.status === "CODING_COMPLETE" &&
+              value?.value === 1 &&
+              value?.code === 1 &&
+              value?.score === 1
+          ) &&
+          question?.some(
+            value =>
+              value?.id === "time" &&
+              value?.status === "VALUE_CHANGED" &&
+              Number.isFinite(value?.value) &&
+              value.value >= 0
+          ) &&
+          activeQuestion?.some(
+            value =>
+              value?.id === "activeQuestionIndex" && value?.value === 0
+          )
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentSpeedtestParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({
+      hasText: `API ${currentSpeedtestPlayerPackage.playerApiVersion}`
+    })
+    .waitFor({ timeout: 30_000 });
+  const restoredCurrentSpeedtestFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredCurrentSpeedtestFrame
+    .getByText("Frage 2", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await restoredCurrentSpeedtestFrame
+    .getByRole("button", { name: "antwort2", exact: true })
+    .dispatchEvent("click");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentSpeedtestParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          currentSpeedtestFirstUnitKey
+        ];
+      if (
+        typeof response !== "string" ||
+        payload?.currentRunState?.testRun?.currentUnitKey !==
+          currentSpeedtestSecondUnitKey
+      ) return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        const firstQuestion = JSON.parse(
+          unitState?.dataParts?.question_0 ?? "null"
+        );
+        const secondQuestion = JSON.parse(
+          unitState?.dataParts?.question_1 ?? "null"
+        );
+        const sums = JSON.parse(unitState?.dataParts?.sums ?? "null");
+        return (
+          firstQuestion?.some(
+            value => value?.id === "value" && value?.value === 1
+          ) &&
+          secondQuestion?.some(
+            value =>
+              value?.id === "value" &&
+              value?.value === 1 &&
+              value?.code === 0 &&
+              value?.score === 0
+          ) &&
+          sums?.some(
+            value => value?.id === "total_correct" && value?.value === 1
+          ) &&
+          sums?.some(
+            value => value?.id === "total_wrong" && value?.value === 1
+          )
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: currentSpeedtestSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  await page
+    .frameLocator("#participantVeronaPlayerFrame")
+    .getByText("Frage 1", { exact: true })
+    .waitFor({ timeout: 30_000 });
 
   logStep("participant-verona-shared-parameters");
   const sharedParameterTenantKey = `${tenantKey}-verona-shared-parameters`;

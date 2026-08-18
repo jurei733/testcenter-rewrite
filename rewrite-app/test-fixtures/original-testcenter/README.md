@@ -167,15 +167,22 @@ JSON-string `responses` data part, and restores the selected option after a
 production Chromium/SQLite reload. The release asset, source definition, tag,
 commit, URLs, byte sizes, SHA-256 values, and MIT license are recorded in
 `corpus.json`. The corpus
-also pins the official MIT-licensed Speedtest 1.2.0 Player and the plain-text
-example definition used by its own test suite. Its metadata 2.0 document
-declares Verona spec 5.0 while its runtime handshake deliberately uses API 4;
-the compatibility gates preserve that distinction, persist the selected value
-and elapsed time as `iqb-standard@1.0` state in the JSON-string `main` data
-part, follow the Player's automatic next-Unit request, retain the final-Unit
-navigation denial, and restore the first answer after host navigation and a
-production Chromium/SQLite reload. The release HTML, definition, source tag,
-commit, URLs, SHA-256 values, and license are recorded in `corpus.json`. The corpus
+also pins both the historical official MIT-licensed Speedtest 1.2.0 Player and
+the current official 3.3.0 release. The historical package retains the
+plain-text example definition used by its own test suite; its metadata 2.0
+document declares Verona spec 5.0 while its runtime handshake deliberately
+uses API 4. The current package negotiates Verona API 5.2 and uses a
+source-derived executable JSON definition that preserves the official
+`speedtest-unit-defintion` payload typo, package definition version 2.1.0, and
+published `speedtest-unit-definition@1.0.0` metadata declaration. Its
+production Chromium/SQLite gate persists independently reported JSON-string
+`question_0`, `question_1`, `sums`, and `activeQuestionIndex` data parts as
+`iqb-standard@1.0`, resumes on the next unanswered question after reload, and
+follows automatic navigation to the next Unit. The historical gate continues
+to preserve its selected value and elapsed time in JSON-string `main`, its
+automatic forward request, final-Unit navigation denial, and reload restore.
+Both release assets, definitions, tags, commits, URLs, byte sizes, SHA-256
+values, and licenses are recorded in `corpus.json`. The corpus
 also pins the official MIT-licensed Lottie 1.2.2 release HTML byte-for-byte and
 a minimal executable definition derived from its pinned `UnitData`, `SceneData`,
 and scene-interaction sources. The Player exercises Verona 6 test-wide shared

@@ -1195,7 +1195,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 7);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 8);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -1468,6 +1468,89 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(speedtestPlayerHtml, /apiVersion:\s*"4"/);
   assert.match(speedtestPlayerHtml, /unitStateDataType:\s*'iqb-standard@1\.0'/);
   assert.equal(speedtestDefinition, "Dies ist ein Beispielsatz!");
+
+  const currentSpeedtest = playersByFamily.get(
+    "Speedtest current-release timed choice"
+  );
+  assert.ok(currentSpeedtest);
+  assert.equal(currentSpeedtest.sourceTag, "3.3.0");
+  assert.equal(
+    currentSpeedtest.sourceCommit,
+    "89d15006f3daa68bb5f26355b6f298cd12b8a993"
+  );
+  assert.equal(
+    currentSpeedtest.definitionSourceCommit,
+    currentSpeedtest.sourceCommit
+  );
+  assert.equal(
+    currentSpeedtest.definitionExtraction,
+    "minimal executable two-question definition derived from the pinned official UnitService defaults, package definition version, and CSV parser expectations"
+  );
+  assert.equal(
+    currentSpeedtest.unitDefinitionType,
+    "speedtest-unit-definition@1.0.0"
+  );
+  const currentSpeedtestPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, currentSpeedtest.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const currentSpeedtestDefinition = JSON.parse(
+    readFileSync(
+      resolve(corpusRoot, currentSpeedtest.definitionFixture),
+      "utf8"
+    )
+  ) as {
+    type: string;
+    version: string;
+    layout: string;
+    questionType: string;
+    answerType: string;
+    questions: Array<{
+      text: string;
+      answers: Array<{ text: string }>;
+      correctAnswer: number;
+    }>;
+  };
+  assert.match(
+    currentSpeedtestPlayerHtml,
+    /"id"\s*:\s*"iqb-player-speedtest"/
+  );
+  assert.match(currentSpeedtestPlayerHtml, /"version"\s*:\s*"3\.3\.0"/);
+  assert.match(currentSpeedtestPlayerHtml, /"specVersion"\s*:\s*"5\.2"/);
+  assert.match(
+    currentSpeedtestPlayerHtml,
+    /"metadataVersion"\s*:\s*"2\.0"/
+  );
+  assert.match(currentSpeedtestPlayerHtml, /iqb-standard@1\.0/);
+  assert.equal(currentSpeedtestDefinition.type, "speedtest-unit-defintion");
+  assert.equal(currentSpeedtestDefinition.version, "2.1.0");
+  assert.equal(currentSpeedtestDefinition.layout, "column");
+  assert.equal(currentSpeedtestDefinition.questionType, "text");
+  assert.equal(currentSpeedtestDefinition.answerType, "text");
+  assert.deepEqual(
+    currentSpeedtestDefinition.questions.map(question => ({
+      text: question.text,
+      answers: question.answers.map(answer => answer.text),
+      correctAnswer: question.correctAnswer
+    })),
+    [
+      {
+        text: "Frage 1",
+        answers: ["richtig", "falsch"],
+        correctAnswer: 1
+      },
+      {
+        text: "Frage 2",
+        answers: ["antwort 1", "antwort2"],
+        correctAnswer: 2
+      }
+    ]
+  );
 
   const lottie = playersByFamily.get("Lottie shared-parameter interaction");
   assert.ok(lottie);

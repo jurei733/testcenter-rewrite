@@ -1,0 +1,26 @@
+{
+  "type": "speedtest-unit-defintion",
+  "version": "2.1.0",
+  "buttonWidth": 350,
+  "questions": [
+    {
+      "text": "Frage 1",
+      "answers": [
+        { "text": "richtig" },
+        { "text": "falsch" }
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "text": "Frage 2",
+      "answers": [
+        { "text": "antwort 1" },
+        { "text": "antwort2" }
+      ],
+      "correctAnswer": 2
+    }
+  ],
+  "layout": "column",
+  "questionType": "text",
+  "answerType": "text"
+}
