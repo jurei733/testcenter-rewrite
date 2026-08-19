@@ -3409,17 +3409,36 @@ export class ParticipantViewFacade {
           false
         );
       }
-      await this.saveProgressInternal(
-        "running",
-        targetUnitKey,
-        currentState?.executionMode.saveResponses
-          ? undefined
-          : settledVeronaResponse?.response ?? this.runtime.currentUnitResponse,
-        confirmTestletTimeLeave,
-        confirmTestletLeaveLock,
-        true,
-        currentState?.executionMode.saveResponses ? undefined : currentUnitKey
-      );
+      try {
+        await this.saveProgressInternal(
+          "running",
+          targetUnitKey,
+          currentState?.executionMode.saveResponses
+            ? undefined
+            : settledVeronaResponse?.response ?? this.runtime.currentUnitResponse,
+          confirmTestletTimeLeave,
+          confirmTestletLeaveLock,
+          true,
+          currentState?.executionMode.saveResponses ? undefined : currentUnitKey
+        );
+      } catch (error) {
+        if (
+          !this.requestState.isApiError(error) ||
+          error.error !== "booklet_navigation_denied"
+        ) {
+          throw error;
+        }
+        const direction =
+          error.details &&
+          typeof error.details === "object" &&
+          "direction" in error.details &&
+          error.details.direction === "backward"
+            ? "backward"
+            : "forward";
+        await this.refreshCurrentStateInternal(true);
+        this.requestState.clearErrorMessage();
+        this.presentNavigationDenial(direction);
+      }
     } finally {
       this.veronaForegroundSaveSettlement = false;
       if (

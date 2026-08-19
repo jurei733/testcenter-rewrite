@@ -81,14 +81,17 @@ response IDs, and the current numeric-null and intended-incomplete behavior.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
-all 17 original Test-Controller system booklets, all four original
+all 17 historical Test-Controller system booklets, all four original
 BookletConfig variants, the adaptive `Booklet2.xml` + `Unit2.xml` + coding
 scheme + Verona 6 player dependency set, and the complete official
 Session-Management package with two booklets, five units, the legacy
 `verona-player-simple-6.0` reference, and all 12 original participant logins.
 That package gates password-free and password-protected entry, ordered
 multi-booklet assignment, second codes, access windows, and hot-return versus
-hot-restart re-entry. The official Group-Monitoring booklet and roster add the
+hot-restart re-entry. The independently pinned current Test-Controller package
+contains all 27 upstream 18.0 Booklets, five shared Units, Verona 6.0.5, and the
+exact 36-login roster, including the split Demo, Review-code, and completeness
+variants. The official Group-Monitoring booklet and roster add the
 original participant plus scoped monitor login, both imported view profiles,
 group isolation, and the pause/resume/go-to/lock/unlock command path. The corpus
 also pins the byte-exact official `CY_SysCheck_2.xml` beside the sample system

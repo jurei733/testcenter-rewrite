@@ -15655,45 +15655,73 @@ try {
       }
     }
   );
-  const testControllerFixtures = Array.from({ length: 17 }, (_, index) => ({
-    fixture: `booklets/system-test/CY_Bklt_TC-${index + 1}.xml`,
-    bookletKey: `Cy-Bklt_TC-${index + 1}`
-  }));
-  const testControllerUnitFixtures = Array.from({ length: 5 }, (_, index) => ({
-    fixture: `units/CY_Unit10${index}.xml`,
-    unitKey: `CY-Unit.Sample-10${index}`
-  }));
-  const [testControllerDocuments, testControllerUnitDocuments] =
+  const currentTestControllerPackage =
+    officialProtocolCorpus.currentOriginalTestControllerPackage;
+  const testControllerFixtures = currentTestControllerPackage.booklets.map(
+    ([fixture, bookletKey]) => ({
+      fixture,
+      bookletKey,
+      packagePath: `booklets/${bookletKey.replace("Cy-Bklt_", "CY_Bklt_")}.xml`
+    })
+  );
+  const testControllerUnitFixtures = currentTestControllerPackage.units.map(
+    ([fixture, unitKey], index) => ({
+      fixture,
+      unitKey,
+      packagePath: `units/CY_Unit${index + 100}.xml`
+    })
+  );
+  const [
+    testControllerDocuments,
+    testControllerUnitDocuments,
+    testControllerPlayerDocument
+  ] =
     await Promise.all([
       Promise.all(
         testControllerFixtures.map(async fixture => ({
           ...fixture,
-          content: await readFile(
-            resolve(originalCorpusRoot, fixture.fixture),
-            "utf8"
-          )
+          content: Buffer.from(
+            (
+              await readFile(
+                resolve(originalCorpusRoot, fixture.fixture),
+                "utf8"
+              )
+            ).trim(),
+            "base64"
+          ).toString("utf8")
         }))
       ),
       Promise.all(
         testControllerUnitFixtures.map(async fixture => ({
           ...fixture,
-          content: await readFile(
-            resolve(originalCorpusRoot, fixture.fixture),
-            "utf8"
-          )
+          content: Buffer.from(
+            (
+              await readFile(
+                resolve(originalCorpusRoot, fixture.fixture),
+                "utf8"
+              )
+            ).trim(),
+            "base64"
+          ).toString("utf8")
         }))
+      ),
+      readBrotliBase64Text(
+        resolve(
+          originalCorpusRoot,
+          currentTestControllerPackage.player.fixture
+        )
       )
     ]);
   const testControllerManifestResources = [
     ...testControllerFixtures.map(
       fixture =>
-        `<resource identifier="${fixture.bookletKey}" href="${fixture.fixture}" />`
+        `<resource identifier="${fixture.bookletKey}" href="${fixture.packagePath}" />`
     ),
     ...testControllerUnitFixtures.map(
       fixture =>
-        `<resource identifier="${fixture.unitKey}" href="${fixture.fixture}" />`
+        `<resource identifier="${fixture.unitKey}" href="${fixture.packagePath}" />`
     ),
-    `<resource identifier="${bookletConfigPlayerKey}" href="${bookletConfigPlayerFixture}" />`
+    `<resource identifier="${currentTestControllerPackage.player.playerKey}" href="players/verona-player-simple-6.0.html" />`
   ].join("\n");
   const testControllerZip = createStoredZipBuffer([
     {
@@ -15705,16 +15733,16 @@ try {
       `
     },
     ...testControllerDocuments.map(document => ({
-      fileName: `export/${document.fixture}`,
+      fileName: `export/${document.packagePath}`,
       content: document.content
     })),
     ...testControllerUnitDocuments.map(document => ({
-      fileName: `export/${document.fixture}`,
+      fileName: `export/${document.packagePath}`,
       content: document.content
     })),
     {
-      fileName: `export/${bookletConfigPlayerFixture}`,
-      content: bookletConfigPlayerDocument
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: testControllerPlayerDocument
     }
   ]);
   const testControllerSourcePackageResponse = await sendSmokeJson(
@@ -15760,7 +15788,7 @@ try {
             await readFile(
               resolve(
                 originalCorpusRoot,
-                "rosters/CY_Logins_TestController.xml.base64"
+                currentTestControllerPackage.roster.fixture
               ),
               "utf8"
             )
@@ -15771,7 +15799,10 @@ try {
     }
   );
   const testControllerRosterPayload = await testControllerRosterResponse.json();
-  assert.equal(testControllerRosterPayload.items.length, 26);
+  assert.equal(
+    testControllerRosterPayload.items.length,
+    currentTestControllerPackage.roster.participantCount
+  );
   assert.deepEqual(
     testControllerRosterPayload.items
       .filter(item => ["Test_Ctrl-3", "Test_Ctrl-23"].includes(item.loginKey))
@@ -15830,7 +15861,8 @@ try {
   };
   const waitForOriginalControllerCompletenessDenial = async (
     controller,
-    direction
+    direction,
+    deniedReasons
   ) =>
     pollJsonWithPredicate(
       `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
@@ -15840,8 +15872,9 @@ try {
             ? payload?.currentRunState?.navigation?.forwardDeniedReasons
             : payload?.currentRunState?.navigation?.backwardDeniedReasons;
         return (
-          reasons?.includes("presentation_incomplete") === true &&
-          reasons.includes("response_incomplete")
+          Array.isArray(reasons) &&
+          reasons.length === deniedReasons.length &&
+          deniedReasons.every(reason => reasons.includes(reason))
         );
       }
     );
@@ -15862,9 +15895,14 @@ try {
   const assertOriginalControllerCompletenessDenied = async (
     controller,
     targetUnitKey,
-    direction
+    direction,
+    deniedReasons
   ) => {
-    await waitForOriginalControllerCompletenessDenial(controller, direction);
+    await waitForOriginalControllerCompletenessDenial(
+      controller,
+      direction,
+      deniedReasons
+    );
     const response = await fetch(
       `${baseUrl}/api/v1/participant/test-runs/${controller.testRunId}/save-progress`,
       {
@@ -15877,16 +15915,14 @@ try {
     const payload = await response.json();
     assert.equal(payload.error, "booklet_navigation_denied");
     assert.equal(payload.details?.direction, direction);
-    assert.deepEqual(payload.details?.deniedReasons, [
-      "presentation_incomplete",
-      "response_incomplete"
-    ]);
+    assert.deepEqual(payload.details?.deniedReasons, deniedReasons);
   };
   const runOriginalControllerCompletenessCase = async ({
     loginKey,
     bookletKey,
     secondUnitKey,
-    policy
+    policy,
+    deniedReasons = ["presentation_incomplete", "response_incomplete"]
   }) => {
     const controller = await openOriginalTestController(loginKey, bookletKey);
     assert.ok(controller.testRunId);
@@ -15915,7 +15951,8 @@ try {
       await assertOriginalControllerCompletenessDenied(
         controller,
         secondUnitKey,
-        "forward"
+        "forward",
+        deniedReasons
       );
       await completeOriginalControllerUnit(frame);
       await waitForOriginalControllerCompletenessAllowed(controller, "forward");
@@ -15939,7 +15976,8 @@ try {
       await assertOriginalControllerCompletenessDenied(
         controller,
         "CY-Unit.Sample-101",
-        "backward"
+        "backward",
+        deniedReasons
       );
       await completeOriginalControllerUnit(frame);
       await waitForOriginalControllerCompletenessAllowed(controller, "backward");
@@ -16014,15 +16052,15 @@ try {
   };
 
   const demoController = await openOriginalTestController(
-    "Test_Ctrl-1",
-    "Cy-Bklt_TC-1"
+    "Test_Ctrl-1b",
+    "Cy-Bklt_TC-1b"
   );
   assert.ok(demoController.testRunId);
   await page
     .locator("#participantRouteExecutionMode")
     .filter({ hasText: "run-demo" })
     .waitFor();
-  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  await page.locator("#participantRouteUnitRail").waitFor();
   await page
     .locator("#participantRouteTestletVisibleCode")
     .filter({ hasText: "Das Freigabewort lautet Hase." })
@@ -16065,8 +16103,8 @@ try {
     true
   );
   const reopenedDemoController = await openOriginalTestController(
-    "Test_Ctrl-1",
-    "Cy-Bklt_TC-1"
+    "Test_Ctrl-1b",
+    "Cy-Bklt_TC-1b"
   );
   assert.equal(
     reopenedDemoController.participantSessionId,
@@ -16104,8 +16142,8 @@ try {
   );
 
   const reviewController = await openOriginalTestController(
-    "Test_Ctrl-2",
-    "Cy-Bklt_TC-2"
+    "Test_Ctrl-2a",
+    "Cy-Bklt_TC-2a"
   );
   assert.ok(reviewController.testRunId);
   await page
@@ -16114,16 +16152,8 @@ try {
     .waitFor();
   await page.locator("#participantRouteUnitRail").waitFor();
   await page.locator("#participantRouteReviewPanel").waitFor();
-  await page
-    .locator("#participantRouteTestletVisibleCode")
-    .filter({ hasText: "Das Freigabewort lautet Hase." })
-    .waitFor();
-  assert.equal(
-    await page.locator("#participantRouteTestletUnlockCode").inputValue(),
-    ""
-  );
-  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
-  await page.locator("#participantRouteTestletUnlockButton").click();
+  assert.equal(await page.locator("#participantRouteTestletGateLabel").count(), 0);
+  await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
@@ -16179,8 +16209,8 @@ try {
     true
   );
   const reopenedReviewController = await openOriginalTestController(
-    "Test_Ctrl-2",
-    "Cy-Bklt_TC-2"
+    "Test_Ctrl-2a",
+    "Cy-Bklt_TC-2a"
   );
   assert.equal(
     reopenedReviewController.participantSessionId,
@@ -16201,12 +16231,8 @@ try {
       Object.keys(payload.currentRunState.testRun.testletTimers ?? {}).length === 0
   );
   assert.equal(resetReviewState.currentRunState.executionMode.saveResponses, false);
-  await page
-    .locator("#participantRouteTestletVisibleCode")
-    .filter({ hasText: "Das Freigabewort lautet Hase." })
-    .waitFor();
-  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
-  await page.locator("#participantRouteTestletUnlockButton").click();
+  assert.equal(await page.locator("#participantRouteTestletGateLabel").count(), 0);
+  await page.locator("#participantRouteNextUnitButton").click();
   await reopenedReviewController.frame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .waitFor({ timeout: 15_000 });
@@ -16216,6 +16242,50 @@ try {
       .isChecked(),
     false
   );
+  const reviewTextCodeController = await openOriginalTestController(
+    "Test_Ctrl-2b",
+    "Cy-Bklt_TC-2b"
+  );
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockKeypad").count(),
+    0
+  );
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  assert.ok(reviewTextCodeController.testRunId);
+
+  const reviewSymbolCodeController = await openOriginalTestController(
+    "Test_Ctrl-2c",
+    "Cy-Bklt_TC-2c"
+  );
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet 123." })
+    .waitFor();
+  await page.locator("#participantRouteTestletUnlockKeypad").waitFor();
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockCode").count(),
+    0
+  );
+  for (const symbol of ["1", "2", "3"]) {
+    await page
+      .locator(`#participantRouteTestletUnlockKeypadValue-${symbol}`)
+      .click();
+  }
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  assert.ok(reviewSymbolCodeController.testRunId);
   const officialReviewLogs = await (
     await sendSmokeJson(
       `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/test-logs?testRunId=${encodeURIComponent(
@@ -16279,9 +16349,9 @@ try {
   assert.deepEqual(
     bufferedControllerState.currentRunState.booklet.policy.persistence,
     {
-      unitResponsesBufferMs: 20_000_000,
-      unitStateBufferMs: 20_000_000,
-      testStateBufferMs: 20_000_000
+      unitResponsesBufferMs: 5_000,
+      unitStateBufferMs: 6_000,
+      testStateBufferMs: 1_000
     }
   );
   assert.ok(
@@ -16555,10 +16625,18 @@ try {
     policy: "forward"
   });
   await runOriginalControllerCompletenessCase({
-    loginKey: "Test_Ctrl-20",
-    bookletKey: "Cy-Bklt_TC-11",
+    loginKey: "Test_Ctrl-20a",
+    bookletKey: "Cy-Bklt_TC-11a",
     secondUnitKey: "unit2",
-    policy: "always"
+    policy: "always",
+    deniedReasons: ["presentation_incomplete"]
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-20b",
+    bookletKey: "Cy-Bklt_TC-11b",
+    secondUnitKey: "unit2",
+    policy: "always",
+    deniedReasons: ["response_incomplete"]
   });
   await runOriginalControllerCompletenessCase({
     loginKey: "Test_Ctrl-24",
@@ -16573,10 +16651,18 @@ try {
     policy: "forward"
   });
   await runOriginalControllerCompletenessCase({
-    loginKey: "Test_Ctrl-26",
-    bookletKey: "Cy-Bklt_TC-17",
+    loginKey: "Test_Ctrl-26a",
+    bookletKey: "Cy-Bklt_TC-17a",
     secondUnitKey: "unit2",
-    policy: "always"
+    policy: "always",
+    deniedReasons: ["presentation_incomplete"]
+  });
+  await runOriginalControllerCompletenessCase({
+    loginKey: "Test_Ctrl-26b",
+    bookletKey: "Cy-Bklt_TC-17b",
+    secondUnitKey: "unit2",
+    policy: "always",
+    deniedReasons: ["response_incomplete"]
   });
 
   const hotReturnTimedController =

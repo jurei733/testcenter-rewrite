@@ -19827,12 +19827,6 @@ test("original Testcenter compatibility corpus executes the current 51-account B
 });
 
 test("original Testcenter compatibility corpus executes the current 18.0 Test Controller package", async () => {
-  type SystemBooklet = {
-    fixture: string;
-    bookletKey: string;
-    displayLabel: string;
-    unitKeys: string[];
-  };
   type TestControllerPackage = {
     bookletKeys: string[];
     units: Array<[fixture: string, unitKey: string]>;
@@ -19860,7 +19854,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
       fixture: string;
       encoding: "base64";
       participantCount: number;
-      assignmentPackageIndex: number;
+      groups: TestControllerPackage["roster"]["groups"];
     };
   };
   type ExecutionModeState = {
@@ -19880,27 +19874,33 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as {
-    systemBooklets: SystemBooklet[];
-    testControllerPackages: TestControllerPackage[];
     currentOriginalTestControllerPackage: CurrentTestControllerPackage;
   };
   const expectation = corpus.currentOriginalTestControllerPackage;
-  const assignments =
-    corpus.testControllerPackages[expectation.roster.assignmentPackageIndex];
   assert.ok(expectation);
-  assert.ok(assignments);
-  const booklets = expectation.booklets.map(([fixture, bookletKey], index) => {
-    const metadata = corpus.systemBooklets.find(
-      candidate => candidate.bookletKey === bookletKey
-    );
-    assert.ok(metadata, `Missing official Controller metadata ${bookletKey}`);
+  const booklets = expectation.booklets.map(([fixture, bookletKey]) => {
+    const content = Buffer.from(
+      readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
+      "base64"
+    ).toString("utf8");
+    const displayLabel = content.match(/<Label>([^<]+)<\/Label>/)?.[1];
+    assert.ok(displayLabel, `Missing official Controller label ${bookletKey}`);
+    const unitKeys = Array.from(content.matchAll(/<Unit\b([^>]*)\/?\s*>/g), match => {
+      const attributes = match[1] ?? "";
+      const unitKey = attributes.match(/\bid="([^"]+)"/)?.[1];
+      assert.ok(unitKey, `Missing Unit id in ${bookletKey}`);
+      return attributes.match(/\balias="([^"]+)"/)?.[1] ?? unitKey;
+    });
     return {
-      ...metadata,
       fixture,
-      packagePath: `booklets/CY_Bklt_TC-${index + 1}.xml`
+      bookletKey,
+      displayLabel,
+      unitKeys,
+      content,
+      packagePath: `booklets/${bookletKey.replace("Cy-Bklt_", "CY_Bklt_")}.xml`
     };
   });
-  assert.equal(booklets.length, 17);
+  assert.equal(booklets.length, 27);
 
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
@@ -19949,16 +19949,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
       201
     );
 
-    const bookletDocuments = booklets.map(booklet => ({
-      ...booklet,
-      content: Buffer.from(
-        readFileSync(
-          resolve(originalTestcenterCorpusRoot, booklet.fixture),
-          "utf8"
-        ).trim(),
-        "base64"
-      ).toString("utf8")
-    }));
+    const bookletDocuments = booklets;
     const unitDocuments = expectation.units.map(([fixture, unitKey], index) => ({
       fixture,
       unitKey,
@@ -20065,7 +20056,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     );
     const runtimeSnapshot =
       release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
-    assert.equal(runtimeSnapshot.bookletEntries.length, 17);
+    assert.equal(runtimeSnapshot.bookletEntries.length, 27);
     for (const expectedBooklet of booklets) {
       const importedBooklet = runtimeSnapshot.bookletEntries.find(
         candidate => candidate.bookletKey === expectedBooklet.bookletKey
@@ -20124,7 +20115,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     const rosterByLoginKey = new Map(
       rosterImport.body.items.map(item => [item.loginKey, item])
     );
-    for (const group of assignments.roster.groups) {
+    for (const group of expectation.roster.groups) {
       for (const [loginKey, executionMode, bookletKey] of group.participants) {
         const participant = rosterByLoginKey.get(loginKey);
         assert.ok(participant);
@@ -20141,6 +20132,13 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
         participantSession: {
           participantSessionId: string;
           executionMode?: string;
+        };
+        participantRosterEntry: {
+          viewSettings?: {
+            theme?: string;
+            codeInput?: { type: string; length?: number };
+            monitorBookletVisibility?: string;
+          };
         };
       }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
         method: "POST",
@@ -20179,6 +20177,10 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
             };
           };
           navigation: {
+            backwardDeniedReasons: string[];
+            forwardDeniedReasons: string[];
+            backwardAdvisoryReasons: string[];
+            forwardAdvisoryReasons: string[];
             nextTestletGate: {
               testletKey: string;
               displayLabel: string;
@@ -20200,7 +20202,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
       };
     };
 
-    const demo = await start("Test_Ctrl-1", "Cy-Bklt_TC-1");
+    const demo = await start("Test_Ctrl-1b", "Cy-Bklt_TC-1b");
     assert.equal(demo.currentRunState.executionMode.mode, "run-demo");
     assert.equal(demo.currentRunState.executionMode.monitorable, false);
     assert.equal(demo.currentRunState.executionMode.saveResponses, false);
@@ -20209,7 +20211,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     assert.equal(demo.currentRunState.executionMode.showCode, true);
     assert.equal(
       demo.currentRunState.booklet.policy.navigation.unitMenuEnabled,
-      false
+      true
     );
     assert.equal(demo.currentRunState.booklet.policy.timing.showTimeLeft, false);
     assert.deepEqual(demo.testRun.unlockedTestletKeys, []);
@@ -20221,7 +20223,7 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
       visibleCode: "Hase"
     });
 
-    const review = await start("Test_Ctrl-2", "Cy-Bklt_TC-2");
+    const review = await start("Test_Ctrl-2a", "Cy-Bklt_TC-2a");
     assert.equal(review.currentRunState.executionMode.mode, "run-review");
     assert.equal(review.currentRunState.executionMode.monitorable, false);
     assert.equal(review.currentRunState.executionMode.canReview, true);
@@ -20235,12 +20237,79 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     assert.equal(review.currentRunState.availableActions.includes("review"), true);
     assert.deepEqual(review.testRun.unlockedTestletKeys, []);
     assert.deepEqual(review.testRun.testletTimers, {});
-    assert.deepEqual(review.currentRunState.navigation.nextTestletGate, {
+    assert.equal(review.currentRunState.navigation.nextTestletGate, null);
+
+    const reviewTextCode = await start("Test_Ctrl-2b", "Cy-Bklt_TC-2b");
+    assert.deepEqual(reviewTextCode.signIn.body.participantRosterEntry.viewSettings, {
+      theme: "Primar",
+      codeInput: { type: "text-field", length: 4 }
+    });
+    assert.deepEqual(reviewTextCode.currentRunState.navigation.nextTestletGate, {
       testletKey: "Tslt1",
       displayLabel: "Aufgabenblock",
       prompt: "Bitte gib das Freigabewort ein.",
       visibleCode: "Hase"
     });
+
+    const reviewSymbolCode = await start("Test_Ctrl-2c", "Cy-Bklt_TC-2c");
+    assert.deepEqual(reviewSymbolCode.signIn.body.participantRosterEntry.viewSettings, {
+      theme: "Primar",
+      codeInput: { type: "keypad-symbols", length: 4 }
+    });
+    assert.equal(
+      reviewSymbolCode.currentRunState.navigation.nextTestletGate?.visibleCode,
+      "123"
+    );
+
+    const reviewCompleteness = await start("Test_Ctrl-2d", "Cy-Bklt_TC-2d");
+    const reviewIncompleteResponse = JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        presentationProgress: "none",
+        responseProgress: "none"
+      }
+    });
+    const reviewCompletenessProgress = await requestJsonAt(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${reviewCompleteness.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "CY-Unit.Sample-100",
+          responseUnitKey: "CY-Unit.Sample-100",
+          unitResponse: reviewIncompleteResponse,
+          status: "running",
+          transientUnitResponses: {
+            "CY-Unit.Sample-100": reviewIncompleteResponse
+          }
+        }
+      }
+    );
+    assert.equal(
+      reviewCompletenessProgress.status,
+      200,
+      JSON.stringify(reviewCompletenessProgress.body)
+    );
+    const reviewCompletenessState = await requestJsonAt<{
+      currentRunState: {
+        navigation: {
+          forwardDeniedReasons: string[];
+          forwardAdvisoryReasons: string[];
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${reviewCompleteness.participantSessionId}/current-state`
+    );
+    assert.deepEqual(
+      reviewCompletenessState.body.currentRunState.navigation.forwardDeniedReasons,
+      []
+    );
+    assert.deepEqual(
+      reviewCompletenessState.body.currentRunState.navigation.forwardAdvisoryReasons,
+      ["response_incomplete"]
+    );
 
     const hotReturn = await start("Test_Ctrl-3", "Cy-Bklt_TC-3");
     assert.equal(hotReturn.currentRunState.executionMode.mode, "run-hot-return");
@@ -21655,7 +21724,7 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 11);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 12);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(

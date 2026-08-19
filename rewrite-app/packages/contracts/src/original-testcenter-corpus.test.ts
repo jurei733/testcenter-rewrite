@@ -215,7 +215,14 @@ type OriginalTestcenterCorpus = {
     roster: PinnedOriginalFixture & {
       encoding: "base64";
       participantCount: number;
-      assignmentPackageIndex: number;
+      groups: Array<{
+        groupKey: string;
+        participants: Array<[
+          loginKey: string,
+          executionMode: string,
+          bookletKey: string
+        ]>;
+      }>;
     };
   };
   testControllerPackages: Array<{
@@ -3497,16 +3504,19 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
   const current = corpus.currentOriginalTestControllerPackage;
-  const assignments = corpus.testControllerPackages[current.roster.assignmentPackageIndex];
-  assert.ok(assignments);
   assert.equal(
     current.sourceCommit,
-    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+    "031b33138151c66ec848d9f090944e94b7908f7a"
   );
   assert.equal(current.sourceDirectory, "sampledata/system-test/test-controller");
   assert.deepEqual(
     current.booklets.map(([, bookletKey]) => bookletKey),
-    Array.from({ length: 17 }, (_, index) => `Cy-Bklt_TC-${index + 1}`)
+    [
+      "1a", "1b", "1c", "1d", "1e", "1f",
+      "2a", "2b", "2c", "2d",
+      "3", "4", "5", "6", "7", "8", "9", "10",
+      "11a", "11b", "12", "13", "14", "15", "16", "17a", "17b"
+    ].map(suffix => `Cy-Bklt_TC-${suffix}`)
   );
   for (const [fixture, bookletKey, sha256] of current.booklets) {
     const document = Buffer.from(
@@ -3534,7 +3544,7 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
   );
   assert.match(rosterBuffer.toString("utf8"), /testcenter-testtaker-xml\/18\.0/);
   const participants = parseParticipantRosterText(rosterBuffer.toString("utf8"));
-  const expectedParticipants = assignments.roster.groups.flatMap(group =>
+  const expectedParticipants = current.roster.groups.flatMap(group =>
     group.participants.map(([loginKey, executionMode, bookletKey]) => ({
       loginKey,
       executionMode,
@@ -3554,6 +3564,16 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
     assert.equal(participant.bookletKey, expectation.bookletKey);
     assert.equal(participant.password, "123");
   }
+  assert.deepEqual(
+    participants.find(participant => participant.loginKey === "Test_Ctrl-2b")
+      ?.viewSettings?.codeInput,
+    { type: "text-field", length: 4 }
+  );
+  assert.deepEqual(
+    participants.find(participant => participant.loginKey === "Test_Ctrl-2c")
+      ?.viewSettings?.codeInput,
+    { type: "keypad-symbols", length: 4 }
+  );
 });
 
 test("original Testcenter compatibility corpus pins the complete official Test Controller roster", () => {
