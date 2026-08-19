@@ -10,6 +10,50 @@ import {
   resolveParticipantCustomText
 } from "./participant-custom-texts.js";
 
+const currentOriginalParticipantCustomTextKeys = [
+  "booklet_blockLockedByAfterLeave",
+  "booklet_codeToEnterPrompt",
+  "booklet_codeToEnterTitle",
+  "booklet_errormessage",
+  "booklet_loading",
+  "booklet_lockedBlock",
+  "booklet_lockedByAfterLeave",
+  "booklet_msgNavigationDeniedText_presentationIncomplete",
+  "booklet_msgNavigationDeniedText_responsesIncomplete",
+  "booklet_msgNavigationDeniedTitle",
+  "booklet_msgSoonTimeOver",
+  "booklet_msgTimeOver",
+  "booklet_msgTimerCancelled",
+  "booklet_msgTimerStarted",
+  "booklet_pausedmessage",
+  "booklet_requestFullscreen",
+  "booklet_starterContinueTestButtonLabel",
+  "booklet_starterLockedTestButtonLabel",
+  "booklet_starterStartTestButtonLabel",
+  "booklet_starterViewTestButtonLabel",
+  "booklet_tasklisttitle",
+  "booklet_warningLeaveTextPrompt-testlet",
+  "booklet_warningLeaveTextPrompt-unit",
+  "booklet_warningLeaveTimerBlockTextPrompt",
+  "booklet_warningLeaveTimerBlockTitle",
+  "booklet_warningLeaveTitle-testlet",
+  "booklet_warningLeaveTitle-unit",
+  "login_bookletSelectPromptMany",
+  "login_bookletSelectPromptNull",
+  "login_bookletSelectPromptOne",
+  "login_codeInputErrorBody",
+  "login_codeInputErrorTitle",
+  "login_codeInputPrompt",
+  "login_codeInputTitle",
+  "login_pagesNaviPrompt",
+  "login_sidepanel_subtitle",
+  "login_sidepanel_title",
+  "login_subtitle",
+  "login_testEndButtonLabel",
+  "login_testResumeButtonLabel",
+  "login_unsupportedBrowser"
+] as const;
+
 test("participant custom-text scopes follow original global-login-booklet precedence", () => {
   assert.deepEqual(
     mergeParticipantCustomTextScopes(
@@ -31,7 +75,20 @@ test("participant custom-text scopes follow original global-login-booklet preced
 });
 
 test("participant custom-text catalog preserves the complete original key set", () => {
-  assert.equal(originalParticipantCustomTextKeys.length, 43);
+  assert.equal(currentOriginalParticipantCustomTextKeys.length, 41);
+  assert.equal(originalParticipantCustomTextKeys.length, 50);
+  assert.equal(
+    (currentOriginalParticipantCustomTextKeys as readonly string[]).includes(
+      "booklet_codeToEnterWarning"
+    ),
+    false
+  );
+  assert.equal(
+    currentOriginalParticipantCustomTextKeys.every(key =>
+      originalParticipantCustomTextKeys.includes(key)
+    ),
+    true
+  );
   assert.deepEqual(
     [...originalParticipantCustomTextKeys].sort(),
     [
@@ -39,7 +96,6 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_blockLockedByAfterLeave",
       "booklet_codeToEnterPrompt",
       "booklet_codeToEnterTitle",
-      "booklet_codeToEnterWarning",
       "booklet_console_warning",
       "booklet_errormessage",
       "booklet_loading",
@@ -57,6 +113,10 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_pausedmessage",
       "booklet_reload",
       "booklet_requestFullscreen",
+      "booklet_starterContinueTestButtonLabel",
+      "booklet_starterLockedTestButtonLabel",
+      "booklet_starterStartTestButtonLabel",
+      "booklet_starterViewTestButtonLabel",
       "booklet_tasklisttitle",
       "booklet_unitLoading",
       "booklet_unitLoadingPending",
@@ -70,9 +130,13 @@ test("participant custom-text catalog preserves the complete original key set", 
       "login_bookletSelectPromptMany",
       "login_bookletSelectPromptNull",
       "login_bookletSelectPromptOne",
+      "login_codeInputErrorBody",
+      "login_codeInputErrorTitle",
       "login_codeInputPrompt",
       "login_codeInputTitle",
       "login_pagesNaviPrompt",
+      "login_sidepanel_subtitle",
+      "login_sidepanel_title",
       "login_subtitle",
       "login_testEndButtonLabel",
       "login_testResumeButtonLabel",

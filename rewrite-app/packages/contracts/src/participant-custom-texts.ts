@@ -5,8 +5,6 @@ export const originalParticipantCustomTextDefaults = {
     "Bitte gib das Freigabewort ein, das angesagt wurde!",
   booklet_codeToEnterTitle:
     "Aufgabenblock ist gesperrt, Freigabewort benötigt",
-  booklet_codeToEnterWarning:
-    "Im Eingabefeld werden automatisch alle Buchstaben groß geschrieben.",
   booklet_console_warning:
     "Du bist offenbar ein richtiger Experte und hast die Konsole geöffnet. Klasse! *sarcastic clapping*\nGehe nun schnell zurück zum Test, du hast sonst nicht genug Zeit für die Aufgaben.",
   booklet_errormessage:
@@ -31,6 +29,10 @@ export const originalParticipantCustomTextDefaults = {
   booklet_pausedmessage: "Der Test wurde kurz angehalten.",
   booklet_reload: "Neu Laden",
   booklet_requestFullscreen: "Soll das Vollbild aktiviert werden?",
+  booklet_starterContinueTestButtonLabel: "Weiter",
+  booklet_starterLockedTestButtonLabel: "Fertig",
+  booklet_starterStartTestButtonLabel: "Starten",
+  booklet_starterViewTestButtonLabel: "Ansehen",
   booklet_tasklisttitle: "Aufgaben",
   booklet_unitLoading: "Geladen",
   booklet_unitLoadingPending: "In der Warteschleife",
@@ -50,9 +52,14 @@ export const originalParticipantCustomTextDefaults = {
     "Beendet. Es können keine weiteren Testhefte gestartet werden.",
   login_bookletSelectPromptOne:
     "Bitte klicke auf die Schaltfläche auf der linken Seite, um den Test zu starten!",
+  login_codeInputErrorBody: "Versuche es noch einmal.",
+  login_codeInputErrorTitle: "Ups, falscher Code!",
   login_codeInputPrompt: "Bitte Log-in eingeben, der auf dem Zettel steht!",
   login_codeInputTitle: "Log-in eingeben",
   login_pagesNaviPrompt: "Weitere Seiten:",
+  login_sidepanel_subtitle:
+    "Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.",
+  login_sidepanel_title: "Willkommen im IQB‑Testcenter",
   login_subtitle: "Testauswahl",
   login_testEndButtonLabel: "Test beenden",
   login_testResumeButtonLabel: "Test fortsetzen",

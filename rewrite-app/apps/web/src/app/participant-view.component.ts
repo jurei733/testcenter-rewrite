@@ -20,9 +20,9 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
       >
         <header class="participant-entry-hero">
           <div>
-            <span>Participant Entry</span>
+            <span id="participantLoginSidepanelTitle">{{ view.customText('login_sidepanel_title', 'Welcome to the IQB Testcenter') }}</span>
             <h2 id="participantCustomLoginSubtitle">{{ view.customText('login_subtitle', 'Start or Resume Test') }}</h2>
-            <p>Use a direct link or enter the assigned workspace and login key. The test opens the assigned booklet directly.</p>
+            <p id="participantLoginSidepanelSubtitle">{{ view.customText('login_sidepanel_subtitle', 'Use a direct link or enter the assigned workspace and login key. The test opens the assigned booklet directly.') }}</p>
           </div>
           <div class="participant-entry-status">
             <span>Session Status</span>
@@ -227,7 +227,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               (click)="view.runtime.bookletKey = booklet.bookletKey; view.persistState()"
             >
               <strong>{{ booklet.displayLabel }}{{ view.formatBookletVariant(booklet) }}</strong>
-              <em>{{ booklet.status }}</em>
+              <em>{{ view.bookletActionLabel(booklet) }}</em>
             </button>
           </div>
         </section>
@@ -249,7 +249,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In
           </button>
-          <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">{{ view.customText('login_testResumeButtonLabel', 'Start Or Resume') }}</button>
+          <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">{{ view.starterActionLabel }}</button>
           <button id="participantRouteRefreshCurrentStateButton" class="ghost" type="button" [disabled]="!view.canRefreshCurrentState" (click)="view.refreshCurrentState()">Refresh Current State</button>
           <button
             *ngIf="view.canDownloadParticipantReviews"
@@ -836,14 +836,14 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <div>
               <span>{{ view.customText('booklet_codeToEnterTitle', 'Protected Block') }}</span>
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
-              <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', gate.prompt || 'Enter the block code supplied by the test supervisor.') }}</p>
+              <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', 'Enter the block code supplied by the test supervisor.') }}</p>
+              <p *ngIf="gate.prompt" id="participantRouteTestletGateMessage">{{ gate.prompt }}</p>
               <p
                 *ngIf="gate.visibleCode as visibleCode"
                 id="participantRouteTestletVisibleCode"
                 class="participant-testlet-visible-code"
                 role="status"
               >Das Freigabewort lautet <strong>{{ visibleCode }}</strong>.</p>
-              <small id="participantRouteTestletGateWarning">{{ view.customText('booklet_codeToEnterWarning', 'Letters are entered in uppercase automatically.') }}</small>
             </div>
             <label *ngIf="!view.usesParticipantCodeKeypad">
               Block Code

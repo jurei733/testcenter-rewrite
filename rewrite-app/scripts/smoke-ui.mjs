@@ -6462,7 +6462,7 @@ try {
     "group:invalid-booklet-entry"
   );
   await fillAndCommitUntilValue("#participantRouteBookletKey", "booklet:missing");
-  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page.locator("#participantRouteStartOrResumeButton").click();
   await page
     .locator("#participantEntryIssueTitle")
     .filter({ hasText: "Assigned booklet unavailable" })
@@ -6805,7 +6805,7 @@ try {
     .locator("#participantRouteReviewDownloadFeedback")
     .filter({ hasText: "Keine Kommentare verfügbar." })
     .waitFor();
-  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page.locator("#participantRouteStartOrResumeButton").click();
   await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteExecutionMode")
@@ -6924,7 +6924,7 @@ try {
   assert.match(participantReviewCsv, /"Updated whole-test review comment"/);
   assert.match(participantReviewCsv, /category_content/);
   assert.match(participantReviewCsv, /category_tech/);
-  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page.locator("#participantRouteStartOrResumeButton").click();
   await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
   await page
     .locator(`.participant-review-item[data-review-id="${participantReviewId}"]`)
@@ -7080,6 +7080,12 @@ try {
           "    <CustomText key=\"login_subtitle\">Project Test Selection</CustomText>",
           "    <CustomText key=\"login_codeInputTitle\">Project Access Code</CustomText>",
           "    <CustomText key=\"login_codeInputPrompt\">Ask the project supervisor for your access code.</CustomText>",
+          "    <CustomText key=\"login_codeInputErrorTitle\">Project code not accepted</CustomText>",
+          "    <CustomText key=\"login_codeInputErrorBody\">Try the project code again.</CustomText>",
+          "    <CustomText key=\"login_sidepanel_title\">Welcome to the project test</CustomText>",
+          "    <CustomText key=\"login_sidepanel_subtitle\">Use the project access details supplied to you.</CustomText>",
+          "    <CustomText key=\"booklet_starterStartTestButtonLabel\">Start project test</CustomText>",
+          "    <CustomText key=\"booklet_starterContinueTestButtonLabel\">Continue project test</CustomText>",
           "    <CustomText key=\"login_testResumeButtonLabel\">Open Project Test</CustomText>",
           "    <CustomText key=\"login_bookletSelectPromptOne\">Choose the available project test.</CustomText>",
           "  </CustomTexts>",
@@ -7145,6 +7151,18 @@ try {
     .locator("#participantCodePrompt")
     .filter({ hasText: "Ask the project supervisor for your access code." })
     .waitFor();
+  await page
+    .locator("#participantLoginSidepanelTitle")
+    .filter({ hasText: "Welcome to the project test" })
+    .waitFor();
+  await page
+    .locator("#participantLoginSidepanelSubtitle")
+    .filter({ hasText: "Use the project access details supplied to you." })
+    .waitFor();
+  await page
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "Start project test" })
+    .waitFor();
   await expectInputValue("#participantRouteSessionId", "");
   await page.locator("#participantCodeKeypadValue-1").click();
   await page.locator("#participantCodeKeypadValue-1").click();
@@ -7153,6 +7171,14 @@ try {
     .locator("#participantEntryIssueCode")
     .filter({ hasText: "participant_code_invalid" })
     .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantEntryIssueTitle")
+    .filter({ hasText: "Project code not accepted" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueDetail")
+    .filter({ hasText: "Try the project code again." })
+    .waitFor();
   assert.equal(
     await page.locator("#participantCodeKeypad .participant-code-slots .is-filled").count(),
     0,
@@ -7216,6 +7242,16 @@ try {
     false,
     "Participant codes should not be persisted in shell localStorage."
   );
+  await page.locator("#participantRouteReturnToStarterButton").click();
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Return to test selection?" })
+    .waitFor();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "Continue project test" })
+    .waitFor({ timeout: 15_000 });
   await page.locator("#participantRouteClearSessionButton").click();
   await expectInputValue("#participantRouteSessionId", "");
   assert.equal(
@@ -8189,7 +8225,6 @@ try {
               login_pagesNaviPrompt: "Project pages:",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
-              booklet_codeToEnterWarning: "Letters are normalized automatically.",
               booketlet_continueButtonLockedUnit: "Continue to project block",
               booklet_msgSoonTimeOver: "Only %s project minute remains.",
               booklet_lockedByAfterLeave: "This project task closes after leaving.",
@@ -8315,9 +8350,10 @@ try {
     .filter({ hasText: "Enter the project block code." })
     .waitFor();
   await page
-    .locator("#participantRouteTestletGateWarning")
-    .filter({ hasText: "Letters are normalized automatically." })
+    .locator("#participantRouteTestletGateMessage")
+    .filter({ hasText: "Enter the assigned Verona block code." })
     .waitFor();
+  assert.equal(await page.locator("#participantRouteTestletGateWarning").count(), 0);
   await page
     .locator("#participantRouteTestletUnlockButton")
     .filter({ hasText: "Continue to project block" })
@@ -16310,6 +16346,10 @@ try {
     .waitFor();
   await page
     .locator("#participantRouteTestletGatePrompt")
+    .filter({ hasText: "Bitte gib das Freigabewort ein, das angesagt wurde!" })
+    .waitFor();
+  await page
+    .locator("#participantRouteTestletGateMessage")
     .filter({ hasText: "Bitte gib das Freigabewort ein." })
     .waitFor();
   assert.equal(

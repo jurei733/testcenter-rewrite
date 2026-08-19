@@ -614,7 +614,7 @@ export class ParticipantViewFacade {
         this.runtime.testRunId = "";
         this.currentRunState = null;
         this.syncParticipantHeaderVisibility();
-        this.runtime.currentRunStateView = 'Use "Start Or Resume".';
+        this.runtime.currentRunStateView = "Use the starter test action.";
       }
     }
 
@@ -747,7 +747,7 @@ export class ParticipantViewFacade {
         runId: this.runtime.testRunId.trim() || "no run yet",
         nextStepLabel: hasParticipantSession ? "Start test" : "Sign in",
         nextStepDetail: hasParticipantSession
-          ? 'Use "Start Or Resume" to open the assigned booklet.'
+          ? "Use the starter test action to open the assigned booklet."
           : "Enter the assigned workspace and login key first.",
         actions: [],
         canSaveProgress: false,
@@ -1136,6 +1136,40 @@ export class ParticipantViewFacade {
       "login_bookletSelectPromptMany",
       "Select one of the available tests to start or resume it."
     );
+  }
+
+  get starterActionLabel(): string {
+    const selectedBooklet = this.assignedBooklets.find(
+      booklet => booklet.bookletKey === this.runtime.bookletKey.trim()
+    );
+    if (selectedBooklet) {
+      return this.bookletActionLabel(selectedBooklet);
+    }
+    return this.customText(
+      "booklet_starterStartTestButtonLabel",
+      this.customText("login_testResumeButtonLabel", "Starten")
+    );
+  }
+
+  bookletActionLabel(booklet: ParticipantRuntimeBooklet): string {
+    switch (booklet.status) {
+      case "in_progress":
+        return this.customText(
+          "booklet_starterContinueTestButtonLabel",
+          this.customText("login_testResumeButtonLabel", "Weiter")
+        );
+      case "completed":
+      case "locked":
+        return this.customText(
+          "booklet_starterLockedTestButtonLabel",
+          this.customText("login_testEndButtonLabel", "Fertig")
+        );
+      default:
+        return this.customText(
+          "booklet_starterStartTestButtonLabel",
+          this.customText("login_testResumeButtonLabel", "Starten")
+        );
+    }
   }
 
   get showUnitTitle(): boolean {
@@ -2548,7 +2582,7 @@ export class ParticipantViewFacade {
 
   clearSession(): void {
     this.clearStoredParticipantSession(
-      'Session cleared locally. Use "Sign In" or "Start Or Resume" for the next participant.'
+      "Session cleared locally. Sign in again for the next participant."
     );
   }
 
@@ -2848,7 +2882,7 @@ export class ParticipantViewFacade {
     this.runtime.currentRunStateView = prettyPrintJson(
       {
         status: "participant_signed_in",
-        message: 'Session is ready. Use "Start Or Resume" to open the test run.',
+        message: "Session is ready. Use the starter test action to open the test run.",
         participantSession: payload.participantSession
       },
       this.runtime.currentRunStateView
@@ -2894,7 +2928,7 @@ export class ParticipantViewFacade {
   }
 
   private clearStoredParticipantSession(
-    message = 'Stored participant session is gone. Use "Start Or Resume".'
+    message = "Stored participant session is gone. Use the starter test action."
   ): void {
     this.participantEvents.stop();
     const previousTestRunId = this.runtime.testRunId.trim();
@@ -4777,6 +4811,17 @@ export class ParticipantViewFacade {
           detail: "The saved participant session could not be found anymore.",
           action:
             "Use Leave Session, then sign in again with the assigned workspace and login key.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "participant_code_invalid":
+        return {
+          title: this.customText("login_codeInputErrorTitle", "Ups, falscher Code!"),
+          detail: this.customText("login_codeInputErrorBody", "Versuche es noch einmal."),
+          action: this.customText(
+            "login_codeInputPrompt",
+            "Bitte Log-in eingeben, der auf dem Zettel steht!"
+          ),
           errorCode: error.error,
           statusCode
         };
