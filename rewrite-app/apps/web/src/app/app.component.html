@@ -21,25 +21,6 @@
     <span>{{ warningText }}</span>
   </section>
   <section
-    id="browserCompatibilityWarning"
-    class="browser-compatibility-banner"
-    *ngIf="browserCompatibility.warning as warning"
-    role="status"
-    aria-live="polite"
-    [attr.data-browser-family]="warning.browser"
-    [attr.data-browser-version]="warning.version"
-  >
-    <strong>Browser compatibility</strong>
-    <span id="browserCompatibilityWarningMessage">{{ warning.message }}</span>
-    <button
-      id="browserCompatibilityWarningDismissButton"
-      class="ghost"
-      type="button"
-      aria-label="Dismiss browser compatibility warning"
-      (click)="browserCompatibility.dismiss()"
-    >Close</button>
-  </section>
-  <section
     id="appOfflineShellNotice"
     class="offline-shell-banner"
     *ngIf="isOffline()"

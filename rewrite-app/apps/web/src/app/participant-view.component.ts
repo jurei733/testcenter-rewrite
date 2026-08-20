@@ -4,6 +4,7 @@ import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { ApplicationSettingsService } from "./application-settings.service";
+import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
@@ -45,6 +46,18 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           *ngIf="applicationSettings.settings().introHtml.trim()"
           [innerHTML]="applicationSettings.settings().introHtml"
         ></section>
+        <section
+          id="browserCompatibilityWarning"
+          class="browser-compatibility-banner"
+          *ngIf="view.isParticipantLogin && browserCompatibility.warning as warning"
+          role="status"
+          aria-live="polite"
+          [attr.data-browser-family]="warning.browser"
+          [attr.data-browser-version]="warning.version"
+        >
+          <span class="browser-compatibility-icon" aria-hidden="true">!</span>
+          <span id="browserCompatibilityWarningMessage">{{ warning.message }}</span>
+        </section>
         <div class="participant-entry-context">
           <span id="participantEntryDisplayName">{{ view.player.displayNameLabel }}</span>
           <span>{{ view.player.loginLabel }}</span>
@@ -1034,6 +1047,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  readonly browserCompatibility = inject(BrowserCompatibilityService);
   readonly showStarterScrollButton = signal(false);
   private starterBottomElement: HTMLElement | null = null;
   private readonly starterScrollObserver =

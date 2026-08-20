@@ -307,6 +307,10 @@ export class ParticipantViewFacade {
     );
   }
 
+  get isParticipantLogin(): boolean {
+    return !this.runtime.participantSessionId.trim();
+  }
+
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
   participantViewSettings: ParticipantViewSettings = {};
   private participantRosterCustomTexts: Record<string, string> = {};

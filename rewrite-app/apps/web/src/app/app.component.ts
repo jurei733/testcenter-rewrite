@@ -8,7 +8,6 @@ import { adminPasswordPolicy } from "@testcenter-rewrite-app/contracts";
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
-import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { BugReportDialogComponent } from "./bug-report-dialog.component";
 import { BugReportService } from "./bug-report.service";
 import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
@@ -48,7 +47,6 @@ const routeViews: AppView[] = [
 export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
-  readonly browserCompatibility = inject(BrowserCompatibilityService);
   readonly bugReports = inject(BugReportService);
   readonly confirmation = inject(ConfirmationDialogService);
   readonly participantShell = inject(ParticipantShellStateService);

@@ -64,8 +64,6 @@ export const originalParticipantCustomTextDefaults = {
   login_testEndButtonLabel: "Test beenden",
   login_testResumeButtonLabel: "Test fortsetzen",
   login_unsupportedBrowser:
-    "Ihr Browser <strong>%s %s</strong> wird von dieser Anwendung leider nicht offiziell unterstützt. Dies kann möglicherweise zu Fehlfunktionen führen! <br> Bitte verwenden Sie eine aktuelle Version von Mozilla Firefox, Google Chrome, Microsoft Edge oder Apple Safari.",
-  login_unsupportedBrowserBanner:
     "Ihr Browser %s %s ist veraltet und könnte zu Fehlern führen. Bitte verwenden Sie eine aktuelle Version."
 } as const;
 

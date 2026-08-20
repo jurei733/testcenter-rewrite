@@ -76,7 +76,7 @@ test("participant custom-text scopes follow original global-login-booklet preced
 
 test("participant custom-text catalog preserves the complete original key set", () => {
   assert.equal(currentOriginalParticipantCustomTextKeys.length, 41);
-  assert.equal(originalParticipantCustomTextKeys.length, 50);
+  assert.equal(originalParticipantCustomTextKeys.length, 49);
   assert.equal(
     (currentOriginalParticipantCustomTextKeys as readonly string[]).includes(
       "booklet_codeToEnterWarning"
@@ -140,8 +140,7 @@ test("participant custom-text catalog preserves the complete original key set", 
       "login_subtitle",
       "login_testEndButtonLabel",
       "login_testResumeButtonLabel",
-      "login_unsupportedBrowser",
-      "login_unsupportedBrowserBanner"
+      "login_unsupportedBrowser"
     ].sort()
   );
   assert.equal(
@@ -159,6 +158,10 @@ test("participant custom-text catalog preserves the complete original key set", 
   assert.equal(
     originalParticipantCustomTextDefaults["booklet_warningLeaveTextPrompt-unit"],
     "Du verlässt eine Aufgabe zu der du später nicht zurückkehren kannst."
+  );
+  assert.equal(
+    originalParticipantCustomTextDefaults.login_unsupportedBrowser,
+    "Ihr Browser %s %s ist veraltet und könnte zu Fehlern führen. Bitte verwenden Sie eine aktuelle Version."
   );
 });
 

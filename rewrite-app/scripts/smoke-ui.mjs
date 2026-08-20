@@ -370,6 +370,15 @@ try {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36"
   });
   const outdatedBrowserPage = await outdatedBrowserContext.newPage();
+  await outdatedBrowserPage.goto(`${baseUrl}/app/home`, {
+    waitUntil: "networkidle"
+  });
+  await outdatedBrowserPage.locator("#applicationStartView").waitFor();
+  assert.equal(
+    await outdatedBrowserPage.locator("#browserCompatibilityWarning").count(),
+    0,
+    "The outdated-browser warning must not leak into the global application shell."
+  );
   await outdatedBrowserPage.goto(`${baseUrl}/participant`, {
     waitUntil: "networkidle"
   });
@@ -385,20 +394,35 @@ try {
     await browserCompatibilityWarning.getAttribute("data-browser-version"),
     "90.0.4430.93"
   );
-  assert.match(
+  assert.equal(
     (
       await outdatedBrowserPage
         .locator("#browserCompatibilityWarningMessage")
         .innerText()
     ).trim(),
-    /Ihr Browser Chrome 90\.0\.4430\.93 ist veraltet/
+    "Ihr Browser Chrome 90.0.4430.93 ist veraltet und könnte zu Fehlern führen. Bitte verwenden Sie eine aktuelle Version."
   );
-  await outdatedBrowserPage
-    .locator("#browserCompatibilityWarningDismissButton")
-    .click();
-  await browserCompatibilityWarning.waitFor({ state: "detached" });
-  await outdatedBrowserPage.reload({ waitUntil: "networkidle" });
-  await outdatedBrowserPage.locator("#browserCompatibilityWarning").waitFor();
+  assert.equal(
+    await outdatedBrowserPage
+      .locator("#browserCompatibilityWarningDismissButton")
+      .count(),
+    0,
+    "The current login-page warning is informational and has no global-banner close control."
+  );
+  await outdatedBrowserPage.goto(`${baseUrl}/app/ops`, {
+    waitUntil: "networkidle"
+  });
+  await outdatedBrowserPage.locator("#operatorAccessCard").waitFor();
+  assert.equal(
+    await outdatedBrowserPage.locator("#browserCompatibilityWarning").count(),
+    0,
+    "The outdated-browser warning must be absent from operator sign-in."
+  );
+  await outdatedBrowserPage.goto(`${baseUrl}/participant`, {
+    waitUntil: "networkidle"
+  });
+  await browserCompatibilityWarning.waitFor();
+  stopAfter("browser-compatibility-warning");
   if (!Number.isFinite(busyStartTimeoutMs) || busyStartTimeoutMs < 0) {
     throw new Error("UI_SMOKE_BUSY_START_TIMEOUT_MS must be a non-negative integer.");
   }
@@ -1383,6 +1407,10 @@ try {
     "UI Global Resume"
   );
   await fillAndCommit(
+    "#applicationCustomText-login_unsupportedBrowser",
+    "UI browser %s %s needs an update."
+  );
+  await fillAndCommit(
     "#applicationCustomText-gm_menu_filter",
     "UI Global Hidden Sessions"
   );
@@ -1519,7 +1547,8 @@ try {
   assert.deepEqual(configuredSettingsPayload.applicationSettings.customTexts, {
     gm_menu_filter: "UI Global Hidden Sessions",
     login_subtitle: "UI Global Selection",
-    login_testResumeButtonLabel: "UI Global Resume"
+    login_testResumeButtonLabel: "UI Global Resume",
+    login_unsupportedBrowser: "UI browser %s %s needs an update."
   });
   assert.deepEqual(
     configuredSettingsPayload.applicationSettings.assetAssignments,
@@ -1541,6 +1570,11 @@ try {
     configuredSettingsPayload.applicationSettings.globalWarningExpiresAt,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/
   );
+  await outdatedBrowserPage.reload({ waitUntil: "networkidle" });
+  await outdatedBrowserPage
+    .locator("#browserCompatibilityWarningMessage")
+    .filter({ hasText: "UI browser Chrome 90.0.4430.93 needs an update." })
+    .waitFor();
 
   const customTextTenantKey = "ui-custom-text-tenant";
   const customTextWorkspaceKey = "ui-custom-text-workspace";
@@ -8236,7 +8270,7 @@ try {
               booklet_msgTimerStarted: "Project timer started: ",
               booklet_msgTimeOver: "Project time is over.",
               booklet_msgTimerCancelled: "Project timer was cancelled.",
-              login_unsupportedBrowserBanner:
+              login_unsupportedBrowser:
                 "Project browser %s %s needs an update.",
               login_pagesNaviPrompt: "Project pages:",
               booklet_codeToEnterTitle: "Project block access",
@@ -8285,6 +8319,15 @@ try {
       }
     }
   );
+  await outdatedBrowserPage.reload({ waitUntil: "networkidle" });
+  assert.equal(
+    (
+      await outdatedBrowserPage
+        .locator("#browserCompatibilityWarningMessage")
+        .innerText()
+    ).trim(),
+    "Ihr Browser Chrome 90.0.4430.93 ist veraltet und könnte zu Fehlern führen. Bitte verwenden Sie eine aktuelle Version."
+  );
   await outdatedBrowserPage.locator("#participantTenantKey").fill(tenantKey);
   await outdatedBrowserPage
     .locator("#participantWorkspaceKey")
@@ -8292,9 +8335,8 @@ try {
   await outdatedBrowserPage.locator("#participantLoginKey").fill(veronaLoginKey);
   await outdatedBrowserPage.locator("#participantRouteSignInButton").click();
   await outdatedBrowserPage
-    .locator("#browserCompatibilityWarningMessage")
-    .filter({ hasText: "Project browser Chrome 90.0.4430.93 needs an update." })
-    .waitFor();
+    .locator("#browserCompatibilityWarning")
+    .waitFor({ state: "detached" });
   await outdatedBrowserContext.close();
   const isVeronaResourceResponse = response => response
     .url()
