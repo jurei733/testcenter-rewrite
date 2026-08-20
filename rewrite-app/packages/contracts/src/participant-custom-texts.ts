@@ -1,5 +1,4 @@
 export const originalParticipantCustomTextDefaults = {
-  booketlet_continueButtonLockedUnit: "Weiter",
   booklet_blockLockedByAfterLeave: "Block kann nicht noch einmal betreten werden",
   booklet_codeToEnterPrompt:
     "Bitte gib das Freigabewort ein, das angesagt wurde!",

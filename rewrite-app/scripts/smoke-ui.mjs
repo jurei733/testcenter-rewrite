@@ -8270,7 +8270,6 @@ try {
               login_pagesNaviPrompt: "Project pages:",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
-              booketlet_continueButtonLockedUnit: "Continue to project block",
               booklet_msgSoonTimeOver: "Only %s project minute remains.",
               booklet_lockedByAfterLeave: "This project task closes after leaving.",
               booklet_msgNavigationDeniedTitle: "Project task incomplete",
@@ -8399,7 +8398,7 @@ try {
   assert.equal(await page.locator("#participantRouteTestletGateWarning").count(), 0);
   await page
     .locator("#participantRouteTestletUnlockButton")
-    .filter({ hasText: "Continue to project block" })
+    .filter({ hasText: "Weiter" })
     .waitFor();
   await page
     .locator(".participant-testlet-gate")

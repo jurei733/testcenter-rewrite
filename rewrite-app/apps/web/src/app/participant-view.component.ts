@@ -905,7 +905,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [disabled]="!view.testletUnlockCode.trim()"
               (click)="view.unlockNextTestlet()"
             >
-              {{ view.customText('booketlet_continueButtonLockedUnit', 'Open Block') }}
+              Weiter
             </button>
           </section>
           <section

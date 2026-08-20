@@ -76,7 +76,7 @@ test("participant custom-text scopes follow original global-login-booklet preced
 
 test("participant custom-text catalog preserves the complete original key set", () => {
   assert.equal(currentOriginalParticipantCustomTextKeys.length, 41);
-  assert.equal(originalParticipantCustomTextKeys.length, 43);
+  assert.equal(originalParticipantCustomTextKeys.length, 42);
   assert.equal(
     (currentOriginalParticipantCustomTextKeys as readonly string[]).includes(
       "booklet_codeToEnterWarning"
@@ -103,6 +103,12 @@ test("participant custom-text catalog preserves the complete original key set", 
     true
   );
   assert.equal(
+    (originalParticipantCustomTextKeys as readonly string[]).includes(
+      "booketlet_continueButtonLockedUnit"
+    ),
+    false
+  );
+  assert.equal(
     currentOriginalParticipantCustomTextKeys.every(key =>
       originalParticipantCustomTextKeys.includes(key)
     ),
@@ -111,7 +117,6 @@ test("participant custom-text catalog preserves the complete original key set", 
   assert.deepEqual(
     [...originalParticipantCustomTextKeys].sort(),
     [
-      "booketlet_continueButtonLockedUnit",
       "booklet_blockLockedByAfterLeave",
       "booklet_codeToEnterPrompt",
       "booklet_codeToEnterTitle",
@@ -155,10 +160,6 @@ test("participant custom-text catalog preserves the complete original key set", 
       "login_testResumeButtonLabel",
       "login_unsupportedBrowser"
     ].sort()
-  );
-  assert.equal(
-    originalParticipantCustomTextDefaults.booketlet_continueButtonLockedUnit,
-    "Weiter"
   );
   assert.equal(
     originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTextPrompt,
