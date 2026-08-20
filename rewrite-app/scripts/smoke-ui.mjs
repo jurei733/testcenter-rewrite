@@ -8261,7 +8261,6 @@ try {
             customTexts: {
               booklet_loading: "Please wait for the project player.",
               booklet_errormessage: "The project player could not be loaded.",
-              booklet_reload: "Restart project player",
               booklet_msgTimerStarted: "Project timer started: ",
               booklet_msgTimeOver: "Project time is over.",
               booklet_msgTimerCancelled: "Project timer was cancelled.",
@@ -9206,7 +9205,7 @@ try {
   assert.equal(
     (await page.locator("#participantRouteControllerReloadButton").textContent())
       ?.trim(),
-    "Restart project player"
+    "Neu laden"
   );
   for (const selector of [
     "app-verona-player-host",

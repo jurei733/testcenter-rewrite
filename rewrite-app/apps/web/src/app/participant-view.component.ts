@@ -487,7 +487,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 class="primary"
                 type="button"
                 (click)="view.reloadAfterControllerError()"
-              >{{ view.customText('booklet_reload', 'Neu Laden') }}</button>
+              >Neu laden</button>
             </section>
           </ng-container>
           <ng-template #participantRunnableState>
