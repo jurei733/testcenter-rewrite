@@ -477,7 +477,17 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label *ngIf="view.requiresPlatformRoleConfirmation">
             Confirm Current Platform Admin Password
-            <input id="adminPlatformRoleConfirmationPassword" name="adminPlatformRoleConfirmationPassword" type="password" autocomplete="current-password" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.platformRoleConfirmationPassword" />
+            <input
+              id="adminPlatformRoleConfirmationPassword"
+              name="adminPlatformRoleConfirmationPassword"
+              type="password"
+              autocomplete="current-password"
+              [attr.maxlength]="view.adminPasswordMaximumLength"
+              [attr.aria-invalid]="view.platformRoleConfirmationError ? 'true' : null"
+              [attr.aria-describedby]="view.platformRoleConfirmationError ? 'adminPlatformRoleConfirmationError' : null"
+              [(ngModel)]="view.platformRoleConfirmationPassword"
+              (ngModelChange)="view.platformRoleConfirmationChanged()"
+            />
           </label>
           <label>
             Access Starts (ISO timestamp)
@@ -492,6 +502,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="adminCreateValidForMinutes" name="adminCreateValidForMinutes" type="number" min="1" max="5256000" step="1" [(ngModel)]="view.ops.adminCreateValidForMinutes" (change)="view.persistState()" />
           </label>
         </div>
+        <p
+          id="adminPlatformRoleConfirmationError"
+          *ngIf="view.platformRoleConfirmationError"
+          role="alert"
+        >{{ view.platformRoleConfirmationError }}</p>
         <p *ngIf="view.isCreatingOperationalAccount">
           Operational accounts receive only the selected workspace/group scope. For
           imported original logins, assign a new password here because source

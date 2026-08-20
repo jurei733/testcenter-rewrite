@@ -3871,6 +3871,17 @@ try {
     (await rejectedPlatformRoleResponse.json()).error,
     "admin_password_confirmation_invalid"
   );
+  await page
+    .locator("#adminPlatformRoleConfirmationError")
+    .filter({
+      hasText: "The current administrator password is incorrect. Try again."
+    })
+    .waitFor();
+  assert.equal(
+    await page.locator(".status-banner.is-error").count(),
+    0,
+    "A recoverable platform-role confirmation mistake should stay inline instead of opening the global error surface."
+  );
   await expectInputValue(
     "#adminPlatformRoleConfirmationPassword",
     wrongPlatformRoleConfirmation
@@ -3886,6 +3897,11 @@ try {
   );
 
   await fillAndCommit("#adminPlatformRoleConfirmationPassword", adminPassword);
+  assert.equal(
+    await page.locator("#adminPlatformRoleConfirmationError").count(),
+    0,
+    "Editing the confirmation password should clear the inline retry error."
+  );
   const assignedPlatformRoleResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "POST" &&

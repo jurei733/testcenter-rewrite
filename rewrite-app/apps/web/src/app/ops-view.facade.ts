@@ -48,6 +48,7 @@ import {
   readStringValue
 } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import {
   RewriteAppOpsService,
   type AdminUserDeletionBatchResult,
@@ -133,6 +134,8 @@ const localDemoAccess = {
 
 const generatedPasswordAlphabet =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const platformRoleConfirmationErrorMessage =
+  "The current administrator password is incorrect. Try again.";
 
 const generateAdminPassword = (): string => {
   const randomBytes = new Uint8Array(20);
@@ -147,6 +150,7 @@ const generateAdminPassword = (): string => {
 export class OpsViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly opsService = inject(RewriteAppOpsService);
+  private readonly requestState = inject(RewriteAppShellRequestService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
@@ -238,6 +242,7 @@ export class OpsViewFacade {
   adminUserPasswordBatchResult: AdminUserPasswordBatchResult | null = null;
   adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
   platformRoleConfirmationPassword = "";
+  platformRoleConfirmationError = "";
   adminResetPasswordConfirmation = "";
   adminDisplayNameTargetUserId = "";
   adminDisplayNameUpdateDraft = "";
@@ -1207,7 +1212,7 @@ export class OpsViewFacade {
       return;
     }
     this.clearAdminBatches();
-    this.platformRoleConfirmationPassword = "";
+    this.clearPlatformRoleConfirmation();
     this.adminResetPasswordConfirmation = "";
     this.adminDisplayNameTargetUserId = "";
     this.adminDisplayNameUpdateDraft = "";
@@ -1362,9 +1367,12 @@ export class OpsViewFacade {
       ? this.platformRoleConfirmationPassword
       : undefined;
     this.viewState.onActionAsync(async () => {
-      await this.opsService.createAdminUser(confirmationPassword);
       if (requiresStepUp) {
-        this.platformRoleConfirmationPassword = "";
+        await this.runPlatformRoleMutation(() =>
+          this.opsService.createAdminUser(confirmationPassword)
+        );
+      } else {
+        await this.opsService.createAdminUser();
       }
     });
   }
@@ -1378,9 +1386,12 @@ export class OpsViewFacade {
       ? this.platformRoleConfirmationPassword
       : undefined;
     this.viewState.onActionAsync(async () => {
-      await this.opsService.assignAdminRole(confirmationPassword);
       if (requiresStepUp) {
-        this.platformRoleConfirmationPassword = "";
+        await this.runPlatformRoleMutation(() =>
+          this.opsService.assignAdminRole(confirmationPassword)
+        );
+      } else {
+        await this.opsService.assignAdminRole();
       }
     });
   }
@@ -1411,9 +1422,12 @@ export class OpsViewFacade {
       ? this.platformRoleConfirmationPassword
       : undefined;
     this.viewState.onActionAsync(async () => {
-      await this.opsService.revokeAdminRole(confirmationPassword);
       if (requiresStepUp) {
-        this.platformRoleConfirmationPassword = "";
+        await this.runPlatformRoleMutation(() =>
+          this.opsService.revokeAdminRole(confirmationPassword)
+        );
+      } else {
+        await this.opsService.revokeAdminRole();
       }
     });
   }
@@ -1565,12 +1579,24 @@ export class OpsViewFacade {
       this.adminUserPasswordBatchResult = null;
       this.adminUserDeletionBatchResult = null;
       const requiresStepUp = role === "platform_admin";
+      if (requiresStepUp) {
+        this.platformRoleConfirmationError = "";
+      }
       const result = await this.opsService.assignAdminRoles(
         selectedAdminUserIds,
         requiresStepUp ? this.platformRoleConfirmationPassword : undefined
       );
-      if (requiresStepUp && result.succeededAdminUserIds.length > 0) {
-        this.platformRoleConfirmationPassword = "";
+      if (requiresStepUp) {
+        if (
+          result.failures.some(
+            failure => failure.error === "admin_password_confirmation_invalid"
+          )
+        ) {
+          this.platformRoleConfirmationError =
+            platformRoleConfirmationErrorMessage;
+        } else if (result.succeededAdminUserIds.length > 0) {
+          this.clearPlatformRoleConfirmation();
+        }
       }
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = result;
@@ -1891,6 +1917,7 @@ export class OpsViewFacade {
       return;
     }
 
+    this.platformRoleConfirmationError = "";
     this.ops.adminRoleTargetUserId = adminUserId;
     this.ops.adminRevokeTargetUserId = adminUserId;
     this.ops.adminRevokeRoleAssignmentId = roleAssignmentId;
@@ -1998,6 +2025,7 @@ export class OpsViewFacade {
   }
 
   adminCreateRoleChanged(): void {
+    this.platformRoleConfirmationError = "";
     if (this.isCreatingMonitorAccount) {
       this.setMonitorProfileEditorTarget("create");
     } else if (this.isAssigningMonitorRole) {
@@ -2007,12 +2035,43 @@ export class OpsViewFacade {
   }
 
   adminRoleRoleChanged(): void {
+    this.platformRoleConfirmationError = "";
     if (this.isAssigningMonitorRole) {
       this.setMonitorProfileEditorTarget("role");
     } else if (this.isCreatingMonitorAccount) {
       this.setMonitorProfileEditorTarget("create");
     }
     this.persistState();
+  }
+
+  platformRoleConfirmationChanged(): void {
+    this.platformRoleConfirmationError = "";
+  }
+
+  private async runPlatformRoleMutation(
+    mutation: () => Promise<void>
+  ): Promise<void> {
+    this.platformRoleConfirmationError = "";
+    try {
+      await mutation();
+      this.clearPlatformRoleConfirmation();
+    } catch (error) {
+      if (
+        this.requestState.isApiError(error) &&
+        error.error === "admin_password_confirmation_invalid"
+      ) {
+        this.requestState.clearErrorMessage();
+        this.platformRoleConfirmationError =
+          platformRoleConfirmationErrorMessage;
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private clearPlatformRoleConfirmation(): void {
+    this.platformRoleConfirmationPassword = "";
+    this.platformRoleConfirmationError = "";
   }
 
   startNewMonitorProfile(): void {
