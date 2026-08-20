@@ -1249,26 +1249,20 @@ export class ParticipantViewFacade {
 
   get veronaLoadingTitle(): string {
     return this.readCurrentRunState()?.activeTestletTimer
-      ? this.customText("booklet_loadingBlock", "Timed block is loading")
-      : this.customText("booklet_loadingUnit", "Unit is loading");
+      ? "Timed block is loading"
+      : "Unit is loading";
   }
 
   get veronaLoadingStatus(): string {
-    return this.customText(
-      "booklet_unitLoadingUnknownProgress",
-      "Loading progress is not available"
-    );
+    return "Loading progress is not available";
   }
 
   get veronaLoadingPendingStatus(): string {
-    return this.customText(
-      "booklet_unitLoadingPending",
-      "Waiting in the loading queue"
-    );
+    return "Waiting in the loading queue";
   }
 
   get veronaLoadingCompleteStatus(): string {
-    return this.customText("booklet_unitLoading", "Loaded");
+    return "Loaded";
   }
 
   get veronaErrorText(): string {

@@ -76,7 +76,7 @@ test("participant custom-text scopes follow original global-login-booklet preced
 
 test("participant custom-text catalog preserves the complete original key set", () => {
   assert.equal(currentOriginalParticipantCustomTextKeys.length, 41);
-  assert.equal(originalParticipantCustomTextKeys.length, 48);
+  assert.equal(originalParticipantCustomTextKeys.length, 43);
   assert.equal(
     (currentOriginalParticipantCustomTextKeys as readonly string[]).includes(
       "booklet_codeToEnterWarning"
@@ -88,6 +88,19 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_console_warning"
     ),
     false
+  );
+  assert.equal(
+    [
+      "booklet_loadingBlock",
+      "booklet_loadingUnit",
+      "booklet_unitLoadingUnknownProgress",
+      "booklet_unitLoadingPending",
+      "booklet_unitLoading"
+    ].every(
+      key =>
+        !(originalParticipantCustomTextKeys as readonly string[]).includes(key)
+    ),
+    true
   );
   assert.equal(
     currentOriginalParticipantCustomTextKeys.every(key =>
@@ -104,8 +117,6 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_codeToEnterTitle",
       "booklet_errormessage",
       "booklet_loading",
-      "booklet_loadingBlock",
-      "booklet_loadingUnit",
       "booklet_lockedBlock",
       "booklet_lockedByAfterLeave",
       "booklet_msgNavigationDeniedText_presentationIncomplete",
@@ -123,9 +134,6 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_starterStartTestButtonLabel",
       "booklet_starterViewTestButtonLabel",
       "booklet_tasklisttitle",
-      "booklet_unitLoading",
-      "booklet_unitLoadingPending",
-      "booklet_unitLoadingUnknownProgress",
       "booklet_warningLeaveTextPrompt-testlet",
       "booklet_warningLeaveTextPrompt-unit",
       "booklet_warningLeaveTimerBlockTextPrompt",

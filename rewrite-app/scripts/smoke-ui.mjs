@@ -8260,10 +8260,6 @@ try {
             displayName: "Verona Smoke Participant",
             customTexts: {
               booklet_loading: "Please wait for the project player.",
-              booklet_loadingBlock: "Project block is loading",
-              booklet_unitLoadingPending: "Project player is queued.",
-              booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
-              booklet_unitLoading: "Project player loaded",
               booklet_errormessage: "The project player could not be loaded.",
               booklet_reload: "Restart project player",
               booklet_msgTimerStarted: "Project timer started: ",
@@ -8498,22 +8494,23 @@ try {
     {
       phase: "pending",
       label: "Please wait for the project player.",
-      title: "Project block is loading",
-      message: "Project player is queued."
+      title: "Timed block is loading",
+      message: "Waiting in the loading queue"
     },
     {
       phase: "unknown",
       label: "Please wait for the project player.",
-      title: "Project block is loading",
-      message: "Project loading progress is pending."
+      title: "Timed block is loading",
+      message: "Loading progress is not available"
     },
     {
       phase: "complete",
       label: "Please wait for the project player.",
-      title: "Project block is loading",
-      message: "100% Project player loaded"
+      title: "Timed block is loading",
+      message: "100% Loaded"
     }
   ]);
+  stopAfter("participant-verona-loading");
   await page
     .locator("#participantRouteTestletTimerLabel")
     .filter({ hasText: "Protected Verona Block" })

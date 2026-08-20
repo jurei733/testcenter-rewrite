@@ -8,8 +8,6 @@ export const originalParticipantCustomTextDefaults = {
   booklet_errormessage:
     "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
   booklet_loading: "Bitte warten",
-  booklet_loadingBlock: "Aufgabenblock wird geladen",
-  booklet_loadingUnit: "Aufgabe wird geladen",
   booklet_lockedBlock: "Aufgabenzeit ist abgelaufen",
   booklet_lockedByAfterLeave: "Aufgabe kann nicht noch einmal betreten werden",
   booklet_msgNavigationDeniedText_presentationIncomplete:
@@ -32,9 +30,6 @@ export const originalParticipantCustomTextDefaults = {
   booklet_starterStartTestButtonLabel: "Starten",
   booklet_starterViewTestButtonLabel: "Ansehen",
   booklet_tasklisttitle: "Aufgaben",
-  booklet_unitLoading: "Geladen",
-  booklet_unitLoadingPending: "In der Warteschleife",
-  booklet_unitLoadingUnknownProgress: "Wird geladen",
   "booklet_warningLeaveTextPrompt-testlet":
     "Du verlässt einen Bereich zu dem du später nicht zurückkehren kannst.",
   "booklet_warningLeaveTextPrompt-unit":
