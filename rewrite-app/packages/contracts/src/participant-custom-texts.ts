@@ -5,8 +5,6 @@ export const originalParticipantCustomTextDefaults = {
     "Bitte gib das Freigabewort ein, das angesagt wurde!",
   booklet_codeToEnterTitle:
     "Aufgabenblock ist gesperrt, Freigabewort benötigt",
-  booklet_console_warning:
-    "Du bist offenbar ein richtiger Experte und hast die Konsole geöffnet. Klasse! *sarcastic clapping*\nGehe nun schnell zurück zum Test, du hast sonst nicht genug Zeit für die Aufgaben.",
   booklet_errormessage:
     "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
   booklet_loading: "Bitte warten",

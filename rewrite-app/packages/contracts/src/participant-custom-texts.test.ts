@@ -76,10 +76,16 @@ test("participant custom-text scopes follow original global-login-booklet preced
 
 test("participant custom-text catalog preserves the complete original key set", () => {
   assert.equal(currentOriginalParticipantCustomTextKeys.length, 41);
-  assert.equal(originalParticipantCustomTextKeys.length, 49);
+  assert.equal(originalParticipantCustomTextKeys.length, 48);
   assert.equal(
     (currentOriginalParticipantCustomTextKeys as readonly string[]).includes(
       "booklet_codeToEnterWarning"
+    ),
+    false
+  );
+  assert.equal(
+    (originalParticipantCustomTextKeys as readonly string[]).includes(
+      "booklet_console_warning"
     ),
     false
   );
@@ -96,7 +102,6 @@ test("participant custom-text catalog preserves the complete original key set", 
       "booklet_blockLockedByAfterLeave",
       "booklet_codeToEnterPrompt",
       "booklet_codeToEnterTitle",
-      "booklet_console_warning",
       "booklet_errormessage",
       "booklet_loading",
       "booklet_loadingBlock",

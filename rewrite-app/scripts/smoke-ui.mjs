@@ -8260,7 +8260,6 @@ try {
             displayName: "Verona Smoke Participant",
             customTexts: {
               booklet_loading: "Please wait for the project player.",
-              booklet_console_warning: "Project console warning",
               booklet_loadingBlock: "Project block is loading",
               booklet_unitLoadingPending: "Project player is queued.",
               booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
@@ -8379,16 +8378,6 @@ try {
       lazyBookletPreloadCompleted = true;
       return response;
     });
-  const veronaConsoleWarnings = [];
-  const recordVeronaConsoleWarning = message => {
-    if (
-      message.type() === "warning" &&
-      message.text().includes("Project console warning")
-    ) {
-      veronaConsoleWarnings.push(message.text());
-    }
-  };
-  page.on("console", recordVeronaConsoleWarning);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -8627,12 +8616,6 @@ try {
     .locator("#participantVeronaPageNavigationPrompt")
     .filter({ hasText: "Project pages:" })
     .waitFor();
-  assert.deepEqual(
-    veronaConsoleWarnings,
-    ["Project console warning"],
-    "The effective console warning should be emitted once when the run starts."
-  );
-  page.off("console", recordVeronaConsoleWarning);
   page.off("pageerror", recordMalformedVeronaMessageError);
   assert.deepEqual(
     malformedVeronaMessageErrors,
