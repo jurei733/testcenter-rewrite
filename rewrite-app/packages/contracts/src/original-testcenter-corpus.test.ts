@@ -3506,7 +3506,7 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
   const current = corpus.currentOriginalTestControllerPackage;
   assert.equal(
     current.sourceCommit,
-    "031b33138151c66ec848d9f090944e94b7908f7a"
+    "65d28718eb6474cf5158206494096d32cd3393f9"
   );
   assert.equal(current.sourceDirectory, "sampledata/system-test/test-controller");
   assert.deepEqual(
@@ -3518,6 +3518,17 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
       "11a", "11b", "12", "13", "14", "15", "16", "17a", "17b"
     ].map(suffix => `Cy-Bklt_TC-${suffix}`)
   );
+  const currentUnitListBookletKeys = new Set([
+    "Cy-Bklt_TC-5",
+    "Cy-Bklt_TC-9",
+    "Cy-Bklt_TC-10",
+    "Cy-Bklt_TC-11a",
+    "Cy-Bklt_TC-11b",
+    "Cy-Bklt_TC-15",
+    "Cy-Bklt_TC-16",
+    "Cy-Bklt_TC-17a",
+    "Cy-Bklt_TC-17b"
+  ]);
   for (const [fixture, bookletKey, sha256] of current.booklets) {
     const document = Buffer.from(
       readFileSync(resolve(corpusRoot, fixture), "utf8").trim(),
@@ -3526,6 +3537,13 @@ test("original Testcenter compatibility corpus pins the current 18.0 Test Contro
     assert.equal(createHash("sha256").update(document).digest("hex"), sha256);
     assert.match(document.toString("utf8"), /testcenter-booklet-xml\/18\.0/);
     assert.match(document.toString("utf8"), new RegExp(`<Id>${bookletKey}<\\/Id>`));
+    if (currentUnitListBookletKeys.has(bookletKey)) {
+      assert.match(
+        document.toString("utf8"),
+        /<Config key="toolbar_show_unit_list">TRUE<\/Config>/
+      );
+      assert.doesNotMatch(document.toString("utf8"), /key="unit_menu"/);
+    }
   }
   assert.deepEqual(
     current.units.map(([, unitKey]) => unitKey),

@@ -19878,6 +19878,17 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
   };
   const expectation = corpus.currentOriginalTestControllerPackage;
   assert.ok(expectation);
+  const currentUnitListBookletKeys = new Set([
+    "Cy-Bklt_TC-5",
+    "Cy-Bklt_TC-9",
+    "Cy-Bklt_TC-10",
+    "Cy-Bklt_TC-11a",
+    "Cy-Bklt_TC-11b",
+    "Cy-Bklt_TC-15",
+    "Cy-Bklt_TC-16",
+    "Cy-Bklt_TC-17a",
+    "Cy-Bklt_TC-17b"
+  ]);
   const booklets = expectation.booklets.map(([fixture, bookletKey]) => {
     const content = Buffer.from(
       readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8").trim(),
@@ -19885,6 +19896,13 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
     ).toString("utf8");
     const displayLabel = content.match(/<Label>([^<]+)<\/Label>/)?.[1];
     assert.ok(displayLabel, `Missing official Controller label ${bookletKey}`);
+    if (currentUnitListBookletKeys.has(bookletKey)) {
+      assert.match(
+        content,
+        /<Config key="toolbar_show_unit_list">TRUE<\/Config>/
+      );
+      assert.doesNotMatch(content, /key="unit_menu"/);
+    }
     const unitKeys = Array.from(content.matchAll(/<Unit\b([^>]*)\/?\s*>/g), match => {
       const attributes = match[1] ?? "";
       const unitKey = attributes.match(/\bid="([^"]+)"/)?.[1];
@@ -20041,6 +20059,9 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
             bookletEntries: Array<{
               bookletKey: string;
               displayLabel: string;
+              policy?: {
+                navigation: { unitMenuEnabled: boolean };
+              };
               unitEntries: Array<{
                 unitKey: string;
                 playerKey?: string;
@@ -20063,6 +20084,13 @@ test("original Testcenter compatibility corpus executes the current 18.0 Test Co
       );
       assert.ok(importedBooklet);
       assert.equal(importedBooklet.displayLabel, expectedBooklet.displayLabel);
+      if (currentUnitListBookletKeys.has(expectedBooklet.bookletKey)) {
+        assert.equal(
+          importedBooklet.policy?.navigation.unitMenuEnabled,
+          true,
+          expectedBooklet.bookletKey
+        );
+      }
       assert.deepEqual(
         importedBooklet.unitEntries.map(unit => unit.unitKey),
         expectedBooklet.unitKeys

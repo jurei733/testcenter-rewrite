@@ -2215,7 +2215,7 @@
   ],
   "currentOriginalTestControllerPackage": {
     "sourceRepository": "https://github.com/iqb-berlin/testcenter",
-    "sourceCommit": "031b33138151c66ec848d9f090944e94b7908f7a",
+    "sourceCommit": "65d28718eb6474cf5158206494096d32cd3393f9",
     "sourceDirectory": "sampledata/system-test/test-controller",
     "booklets": [
       [
@@ -2281,7 +2281,7 @@
       [
         "booklets/system-test/current-CY_Bklt_TC-5.xml.base64",
         "Cy-Bklt_TC-5",
-        "361b91dd042c13b6e12eb907301c1bca5be5340d24a781d95c7980999e7d9d29"
+        "07c8159db975adf83804637fde4db769507e6f1a9568ef898db2701f2d16b147"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-6.xml.base64",
@@ -2301,22 +2301,22 @@
       [
         "booklets/system-test/current-CY_Bklt_TC-9.xml.base64",
         "Cy-Bklt_TC-9",
-        "1dac4dd1a206d7b608dc818ed872a95e81da37337f30aed743f52e71b29b56a5"
+        "2c257fb1a9eb1128fc95c4d1efee75c33f7363f00888c45891b321b1e3512f78"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-10.xml.base64",
         "Cy-Bklt_TC-10",
-        "712d4094ccecadd2521d2165d89e29e1bb089e118d568123acf502e0c627e908"
+        "f2b64ee2c407c22783f249bf1612455fb075d7bc00b1b66d0980da4310755565"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-11a.xml.base64",
         "Cy-Bklt_TC-11a",
-        "3cf3e731c97b5ed39d6d88d7efc5b5f5f4b109d14a4c41f77e26dc7a069f9c5a"
+        "b70c7d2c3c59ccd281b938d4d567490c804958b87504e083511ce25360ca67b9"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-11b.xml.base64",
         "Cy-Bklt_TC-11b",
-        "de4d04a4a610c1867326c15d396e9c50e74bcf1dae34939954fa338389c9de14"
+        "8a54df24016e01bdcca0f29b8e6ba48d7c22e0d2f60a441bddafadf601c841f9"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-12.xml.base64",
@@ -2336,22 +2336,22 @@
       [
         "booklets/system-test/current-CY_Bklt_TC-15.xml.base64",
         "Cy-Bklt_TC-15",
-        "b1da9cb0a1933d631aa1b152548e6fb6fbc9637d68099f99cb8efe9880bbc637"
+        "9a688ed3a3a7c74dc1f0de8bbee648a461ef7ecb9b20fb9381c9588d9b3bfc5f"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-16.xml.base64",
         "Cy-Bklt_TC-16",
-        "9d6e56c1326f392e139e392135b833fc04488994fc075a89dec3cc38a72e993b"
+        "8b1ea3e59dd51c7838422db5bea6b174cc73fad9ba21615fff948d3197ab331d"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-17a.xml.base64",
         "Cy-Bklt_TC-17a",
-        "2b59c9ed26eb04f54bf272c409a1918eca2148a8d8a5c7c7d0a3d491b7c1761b"
+        "ef3a1693120c2dc696e2d7ad55c84279fcc7c5ac7f391a013bbfb3dae4242129"
       ],
       [
         "booklets/system-test/current-CY_Bklt_TC-17b.xml.base64",
         "Cy-Bklt_TC-17b",
-        "c5d9eb7839cff554e19806f0fba8c1700a30a3cc3103ea993c785cc7b153443a"
+        "b190a5fecbe9d0d120a83f258615c2366f5aeafdfb557dc5190a4d48597ba60b"
       ]
     ],
     "units": [

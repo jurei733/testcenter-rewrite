@@ -14,7 +14,7 @@ two-booklet Aspect, BookletConfig, Group-Monitoring, root Sample,
 and Session-Management graphs are fixed to upstream commit
 `a5a6d25a72990d667300804c337cc5b500b01d2f` (2026-08-12). The current
 Test-Controller graph is fixed to upstream commit
-`031b33138151c66ec848d9f090944e94b7908f7a` (2026-08-19). The complete
+`65d28718eb6474cf5158206494096d32cd3393f9` (2026-08-20). The complete
 13-file `e2e/src/fixtures` directory from that commit is pinned separately so
 the current 18.0/17.4 schema generation is gated without replacing its
 historical counterparts.
@@ -56,9 +56,10 @@ changed/new definitions. It now also pins the current BookletConfig cases 1–4,
 all five shared Unit documents, Verona 6.0.5 Player, and the expanded 51-login
 roster. The current two-Booklet Session-Management graph and its 12-login roster
 are now pinned as 18.0 documents against those same current dependencies. A
-follow-up audit at `031b33138151c66ec848d9f090944e94b7908f7a` refreshes the
+follow-up audit at `65d28718eb6474cf5158206494096d32cd3393f9` refreshes the
 current Test-Controller package to all 27 Booklets and its exact 36-login roster;
-they execute with the current shared Units and Verona 6.0.5 Player. The current
+the nine upstream-refactored cases use only `toolbar_show_unit_list`, and they
+execute with the current shared Units and Verona 6.0.5 Player. The current
 root Sample package now also retains its three
 Booklets, two Units, two SysChecks, Verona 6.0.5 Player, and expanded roster
 byte-for-byte, including the added `test2` login and nested ViewSettings. Every
