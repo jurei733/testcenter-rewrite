@@ -6310,11 +6310,10 @@ try {
     .filter({ hasText: "1 inferred booklet(s)" })
     .waitFor();
   logStep("import-and-activate-flow");
-  await clickCardAction(
-    "Content Action Queue",
-    "Apply Suggestion",
-    "Create source package"
-  );
+  await expectButtonSelectorEnabled("#createSourcePackageButton");
+  await page.locator("#createSourcePackageButton").click();
+  await waitForBusy("create-source-package-after-click");
+  await waitForNotBusy("create-source-package-after-click");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
     payload =>
@@ -18834,11 +18833,15 @@ try {
     .filter({ hasText: "1" })
     .filter({ hasText: "Ready" })
     .waitFor();
-  const participantEntryPopupPromise = page.waitForEvent("popup");
-  await directEntryLinkCard
-    .getByRole("button", { name: "Open Participant Entry", exact: true })
-    .click({ force: true });
-  const participantEntryPopup = await participantEntryPopupPromise;
+  const openParticipantEntryButton = directEntryLinkCard.getByRole("button", {
+    name: "Open Participant Entry",
+    exact: true
+  });
+  await openParticipantEntryButton.waitFor({ state: "visible" });
+  const [participantEntryPopup] = await Promise.all([
+    page.waitForEvent("popup", { timeout: 15_000 }),
+    openParticipantEntryButton.click({ force: true })
+  ]);
   await participantEntryPopup.locator("#participantLoginKey").waitFor();
   await participantEntryPopup.waitForFunction(
     ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey, expectedGroupKey, expectedBookletKey]) => {
