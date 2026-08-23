@@ -12686,6 +12686,122 @@ test("source-package batch deletion reports deleted, used, missing, and disallow
   );
 });
 
+test("workspace dependency references block deleting a used loose source", async () => {
+  const tenantKey = "integration-tenant-source-dependency-delete";
+  const workspaceKey = "integration-workspace-source-dependency-delete";
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const createSourcePackage = async (input: {
+    fileName: string;
+    sourceDocument: string;
+  }) => {
+    const created = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`${workspaceUrl}/source-packages`, {
+      method: "POST",
+      body: { ...input, mediaType: "application/xml" }
+    });
+    assert.equal(created.status, 201);
+    return created.body.sourcePackage;
+  };
+  const unit = await createSourcePackage({
+    fileName: "Unit-dependency-delete.xml",
+    sourceDocument: `
+      <Unit>
+        <Metadata>
+          <Id>UNIT.DEPENDENCY-DELETE</Id>
+          <Label>Dependency delete unit</Label>
+        </Metadata>
+        <Definition player="">Dependency delete content</Definition>
+      </Unit>
+    `
+  });
+  const booklet = await createSourcePackage({
+    fileName: "Booklet-dependency-delete.xml",
+    sourceDocument: `
+      <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+        <Metadata>
+          <Id>BOOKLET.DEPENDENCY-DELETE</Id>
+          <Label>Dependency delete booklet</Label>
+        </Metadata>
+        <Units>
+          <Unit id="UNIT.DEPENDENCY-DELETE" label="Dependency delete unit" />
+        </Units>
+      </Booklet>
+    `
+  });
+
+  const unitReadiness = await requestJson<{
+    deletionReadiness: {
+      canDelete: boolean;
+      blockingDependencies: Array<{
+        dependencyType: string;
+        dependencyId: string;
+        status: string;
+      }>;
+    };
+  }>(
+    `${workspaceUrl}/source-packages/${unit.sourcePackageId}/deletion-readiness`
+  );
+  assert.equal(unitReadiness.status, 200);
+  assert.equal(unitReadiness.body.deletionReadiness.canDelete, false);
+  assert.deepEqual(
+    unitReadiness.body.deletionReadiness.blockingDependencies,
+    [
+      {
+        dependencyType: "workspace_source_package_reference",
+        dependencyId: booklet.sourcePackageId,
+        status: "referenced"
+      }
+    ]
+  );
+
+  const blockedUnitDelete = await requestJson<{
+    error: string;
+    details: { blockingDependencies: Array<{ dependencyType: string }> };
+  }>(`${workspaceUrl}/source-packages/${unit.sourcePackageId}`, {
+    method: "DELETE",
+    body: { confirmation: unit.fileName }
+  });
+  assert.equal(blockedUnitDelete.status, 409);
+  assert.equal(blockedUnitDelete.body.error, "source_package_delete_blocked");
+  assert.equal(
+    blockedUnitDelete.body.details.blockingDependencies[0]?.dependencyType,
+    "workspace_source_package_reference"
+  );
+
+  const deletedBooklet = await requestJson<{
+    deletion: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages/${booklet.sourcePackageId}`, {
+    method: "DELETE",
+    body: { confirmation: booklet.fileName }
+  });
+  assert.equal(deletedBooklet.status, 200);
+  assert.equal(
+    deletedBooklet.body.deletion.sourcePackageId,
+    booklet.sourcePackageId
+  );
+
+  const deletedUnit = await requestJson<{
+    deletion: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages/${unit.sourcePackageId}`, {
+    method: "DELETE",
+    body: { confirmation: unit.fileName }
+  });
+  assert.equal(deletedUnit.status, 200);
+  assert.equal(deletedUnit.body.deletion.sourcePackageId, unit.sourcePackageId);
+});
+
 test("source-package intake rejects invalid metadata before import", async () => {
   const tenantKey = "integration-tenant-source-validation";
   const workspaceKey = "integration-workspace-source-validation";
@@ -27265,6 +27381,38 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     }
   );
   assert.equal(duplicateUnitReplacement.status, 201);
+  const dependencyReferenceIds = async (
+    sourcePackageId: string
+  ): Promise<string[]> => {
+    const readiness = await requestJson<{
+      deletionReadiness: {
+        blockingDependencies: Array<{
+          dependencyType: string;
+          dependencyId: string;
+        }>;
+      };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+        `/source-packages/${sourcePackageId}/deletion-readiness`
+    );
+    assert.equal(readiness.status, 200);
+    return readiness.body.deletionReadiness.blockingDependencies
+      .filter(
+        blocker =>
+          blocker.dependencyType === "workspace_source_package_reference"
+      )
+      .map(blocker => blocker.dependencyId);
+  };
+  assert.deepEqual(
+    await dependencyReferenceIds(sourcePackages[1]!.sourcePackageId),
+    [sourcePackages[0]!.sourcePackageId]
+  );
+  assert.deepEqual(
+    await dependencyReferenceIds(
+      duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+    ),
+    []
+  );
   const ambiguousAutomaticImport = await requestJson<{
     importJob: {
       sourcePackageId: string;
@@ -27428,6 +27576,16 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
       member => member.sourcePackageId === sourcePackages[1]!.sourcePackageId
     ),
     false
+  );
+  assert.deepEqual(
+    await dependencyReferenceIds(sourcePackages[1]!.sourcePackageId),
+    []
+  );
+  assert.deepEqual(
+    await dependencyReferenceIds(
+      duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+    ),
+    [sourcePackages[0]!.sourcePackageId]
   );
 
   const explicitFileReferenceSeed = await requestJson<{

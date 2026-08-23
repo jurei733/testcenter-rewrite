@@ -6076,6 +6076,10 @@ const buildSourcePackageDeletionReadiness = (input: {
   contentReleases: ContentRelease[];
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
+  workspaceSourcePackageReferences?: Array<{
+    sourcePackageId: string;
+    referencingSourcePackageId: string;
+  }>;
 }): WorkspaceSourcePackageDeletionReadiness => {
   const importJobs = input.importJobs
     .filter(
@@ -6119,6 +6123,16 @@ const buildSourcePackageDeletionReadiness = (input: {
         dependencyType: "test_run" as const,
         dependencyId: testRun.testRunId,
         status: testRun.status
+      })),
+    ...(input.workspaceSourcePackageReferences ?? [])
+      .filter(
+        reference =>
+          reference.sourcePackageId === input.sourcePackage.sourcePackageId
+      )
+      .map(reference => ({
+        dependencyType: "workspace_source_package_reference" as const,
+        dependencyId: reference.referencingSourcePackageId,
+        status: "referenced"
       }))
   ].sort((left, right) =>
     `${left.dependencyType}:${left.dependencyId}`.localeCompare(
@@ -16529,6 +16543,162 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   return selected.size > 1
     ? { status: "resolved", sourcePackages: [...selected.values()] }
     : { status: "not_applicable" };
+};
+
+const collectWorkspaceSourcePackageReferences = (input: {
+  sourcePackages: SourcePackage[];
+  activityEvents: WorkspaceActivityEvent[];
+}): Array<{
+  sourcePackageId: string;
+  referencingSourcePackageId: string;
+}> => {
+  const sourcePackageById = new Map(
+    input.sourcePackages.map(sourcePackage => [
+      sourcePackage.sourcePackageId,
+      sourcePackage
+    ])
+  );
+  const generatedSourcePackageIds = new Set(
+    input.activityEvents.flatMap(activityEvent =>
+      activityEvent.eventType === "source_package_assembled"
+        ? [activityEvent.subjectId]
+        : []
+    )
+  );
+  const replacementBySourcePackageId = new Map<string, string>();
+  for (const activityEvent of input.activityEvents) {
+    if (activityEvent.eventType !== "source_package_replaced") {
+      continue;
+    }
+    const replacementSourcePackageId =
+      typeof activityEvent.details.replacementSourcePackageId === "string"
+        ? activityEvent.details.replacementSourcePackageId
+        : null;
+    const replacementSourcePackage = replacementSourcePackageId
+      ? sourcePackageById.get(replacementSourcePackageId)
+      : null;
+    if (
+      replacementSourcePackage &&
+      replacementSourcePackage.status !== "rejected"
+    ) {
+      replacementBySourcePackageId.set(
+        activityEvent.subjectId,
+        replacementSourcePackage.sourcePackageId
+      );
+    }
+  }
+  const looseSourcePackages = input.sourcePackages.filter(
+    sourcePackage =>
+      sourcePackage.status !== "rejected" &&
+      !generatedSourcePackageIds.has(sourcePackage.sourcePackageId)
+  );
+  const activeRootSourcePackages = looseSourcePackages.filter(
+    sourcePackage =>
+      !replacementBySourcePackageId.has(sourcePackage.sourcePackageId)
+  );
+  const references = new Map<
+    string,
+    { sourcePackageId: string; referencingSourcePackageId: string }
+  >();
+  const addReference = (
+    sourcePackageId: string,
+    referencingSourcePackageId: string
+  ): void => {
+    if (
+      sourcePackageId === referencingSourcePackageId ||
+      !sourcePackageById.has(sourcePackageId) ||
+      !sourcePackageById.has(referencingSourcePackageId)
+    ) {
+      return;
+    }
+    references.set(`${sourcePackageId}\u0000${referencingSourcePackageId}`, {
+      sourcePackageId,
+      referencingSourcePackageId
+    });
+  };
+
+  for (const rootSourcePackage of activeRootSourcePackages) {
+    let resolution: WorkspaceDependencySourceResolution;
+    try {
+      if (
+        collectLooseSourcePackageDependencyReferences(rootSourcePackage)
+          .length === 0
+      ) {
+        continue;
+      }
+      resolution = resolveWorkspaceDependencySourcePackages({
+        rootSourcePackage,
+        workspaceSourcePackages: looseSourcePackages
+      });
+    } catch {
+      continue;
+    }
+    if (resolution.status !== "resolved") {
+      continue;
+    }
+    for (const dependencySourcePackage of resolution.sourcePackages) {
+      addReference(
+        dependencySourcePackage.sourcePackageId,
+        rootSourcePackage.sourcePackageId
+      );
+    }
+  }
+
+  const latestDependencyAssemblyByRootSourcePackageId = new Map<
+    string,
+    WorkspaceActivityEvent
+  >();
+  for (const activityEvent of [...input.activityEvents].sort(
+    (left, right) =>
+      left.occurredAt.localeCompare(right.occurredAt) ||
+      left.activityEventId.localeCompare(right.activityEventId)
+  )) {
+    if (
+      activityEvent.eventType !== "source_package_assembled" ||
+      activityEvent.details.assemblyMode !== "workspace_dependencies" ||
+      typeof activityEvent.details.rootSourcePackageId !== "string" ||
+      !Array.isArray(activityEvent.details.sourcePackages)
+    ) {
+      continue;
+    }
+    latestDependencyAssemblyByRootSourcePackageId.set(
+      activityEvent.details.rootSourcePackageId,
+      activityEvent
+    );
+  }
+  for (const [
+    recordedRootSourcePackageId,
+    activityEvent
+  ] of latestDependencyAssemblyByRootSourcePackageId) {
+    if (replacementBySourcePackageId.has(recordedRootSourcePackageId)) {
+      continue;
+    }
+    if (!sourcePackageById.has(recordedRootSourcePackageId)) {
+      continue;
+    }
+    const members = activityEvent.details.sourcePackages;
+    if (!Array.isArray(members)) {
+      continue;
+    }
+    for (const member of members) {
+      if (
+        !member ||
+        typeof member !== "object" ||
+        !("sourcePackageId" in member) ||
+        typeof member.sourcePackageId !== "string" ||
+        member.sourcePackageId === recordedRootSourcePackageId
+      ) {
+        continue;
+      }
+      addReference(member.sourcePackageId, recordedRootSourcePackageId);
+    }
+  }
+
+  return [...references.values()].sort((left, right) =>
+    `${left.sourcePackageId}:${left.referencingSourcePackageId}`.localeCompare(
+      `${right.sourcePackageId}:${right.referencingSourcePackageId}`
+    )
+  );
 };
 
 const resolveZipResourcePathCandidates = (
@@ -28511,8 +28681,18 @@ export const createFirstSliceServices = (
           );
         }
 
-        const [importJobs, contentReleases, participantSessions, testRuns] =
-          await Promise.all([
+        const [
+          sourcePackages,
+          importJobs,
+          contentReleases,
+          participantSessions,
+          testRuns,
+          activityEvents
+        ] = await Promise.all([
+            repository.listSourcePackagesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
             repository.listImportJobsByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
@@ -28528,6 +28708,10 @@ export const createFirstSliceServices = (
             repository.listTestRunsByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
+            ),
+            repository.listWorkspaceActivityEventsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
             )
           ]);
 
@@ -28536,7 +28720,12 @@ export const createFirstSliceServices = (
           importJobs,
           contentReleases,
           participantSessions,
-          testRuns
+          testRuns,
+          workspaceSourcePackageReferences:
+            collectWorkspaceSourcePackageReferences({
+              sourcePackages,
+              activityEvents
+            })
         });
       },
       async listSourcePackages(input) {
@@ -28549,8 +28738,13 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const [importJobs, contentReleases, participantSessions, testRuns] =
-          await Promise.all([
+        const [
+          importJobs,
+          contentReleases,
+          participantSessions,
+          testRuns,
+          activityEvents
+        ] = await Promise.all([
           repository.listImportJobsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
@@ -28566,8 +28760,17 @@ export const createFirstSliceServices = (
           repository.listTestRunsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
           )
         ]);
+        const workspaceSourcePackageReferences =
+          collectWorkspaceSourcePackageReferences({
+            sourcePackages,
+            activityEvents
+          });
 
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
@@ -28592,7 +28795,8 @@ export const createFirstSliceServices = (
               importJobs: sourcePackageImportJobs,
               contentReleases,
               participantSessions,
-              testRuns
+              testRuns,
+              workspaceSourcePackageReferences
             });
 
             return {
@@ -30485,8 +30689,18 @@ export const createFirstSliceServices = (
           );
         }
 
-        const [importJobs, contentReleases, participantSessions, testRuns] =
-          await Promise.all([
+        const [
+          sourcePackages,
+          importJobs,
+          contentReleases,
+          participantSessions,
+          testRuns,
+          activityEvents
+        ] = await Promise.all([
+            repository.listSourcePackagesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
             repository.listImportJobsByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
@@ -30502,6 +30716,10 @@ export const createFirstSliceServices = (
             repository.listTestRunsByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
+            ),
+            repository.listWorkspaceActivityEventsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
             )
           ]);
         const readiness = buildSourcePackageDeletionReadiness({
@@ -30509,7 +30727,12 @@ export const createFirstSliceServices = (
           importJobs,
           contentReleases,
           participantSessions,
-          testRuns
+          testRuns,
+          workspaceSourcePackageReferences:
+            collectWorkspaceSourcePackageReferences({
+              sourcePackages,
+              activityEvents
+            })
         });
         if (!readiness.canDelete) {
           throw new FirstSliceError(

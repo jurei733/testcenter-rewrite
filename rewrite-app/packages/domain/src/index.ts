@@ -1981,7 +1981,8 @@ export type WorkspaceSourcePackageDeletionBlocker = {
     | "active_import_job"
     | "active_content_release"
     | "participant_session"
-    | "test_run";
+    | "test_run"
+    | "workspace_source_package_reference";
   dependencyId: string;
   status: string;
 };
