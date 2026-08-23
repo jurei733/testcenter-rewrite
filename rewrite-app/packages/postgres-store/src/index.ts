@@ -551,9 +551,9 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
         ) as Record<string, string>,
         sharedParameters: (() => {
           try {
-            const parsed = JSON.parse(
-              String(row.shared_parameters_json ?? "[]")
-            );
+            const value = row.shared_parameters_json;
+            const parsed =
+              typeof value === "string" ? JSON.parse(value) : (value ?? []);
             return Array.isArray(parsed)
               ? (parsed as NonNullable<TestRun["sharedParameters"]>)
               : [];
