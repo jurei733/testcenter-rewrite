@@ -14632,6 +14632,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
     },
     {
+      fileName: "booklet-metadata-config-schema-id.xml",
+      sourceDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="BOOKLET.SAMPLE-1"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
       fileName: "booklet-unsupported-direct-child.xml",
       sourceDocument: validBookletXml.replace(
         "  <Units>",
@@ -14696,6 +14704,16 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
     },
     {
+      fileName: "unit-14-3-metadata-variable-schema-id.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace(
+          '<Variable id="var1"',
+          '<Variable id="UNIT.SAMPLE-2"'
+        ),
+      diagnosticCode: "testcenter_xml_unit_schema_id_duplicate"
+    },
+    {
       fileName: "unit-duplicate-metadata-label.xml",
       sourceDocument: validUnitXml.replace(
         "</Label>",
@@ -14749,6 +14767,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "<Id>SYSCHECK SAMPLE</Id>"
       ),
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
+    },
+    {
+      fileName: "syscheck-metadata-custom-text-schema-id.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        '    <Q id="1"',
+        '    <CustomText key="SYSCHECK.SAMPLE">Collision</CustomText>\n    <Q id="1"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_schema_id_duplicate"
     },
     {
       fileName: "booklet-invalid-state-id.xml",
@@ -15538,6 +15564,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
         .replace(
           'id="var6" type="string"',
           'id="1 variable id allowed in schema 14.10" type="string" page="page_1"'
+        )
+    },
+    {
+      fileName: "unit-valid-14-10-metadata-variable-id.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.10.0/definitions/")
+        .replace(
+          '<Variable id="var6"',
+          '<Variable id="UNIT.SAMPLE-2"'
         )
     },
     {
@@ -16449,6 +16484,35 @@ test("original Testcenter compatibility corpus imports representative booklets",
         'key="logPolicy"'
       ),
       diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
+      fileName: "booklet-metadata-schema-id-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="BOOKLET.SAMPLE-1"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_schema_id_duplicate"
+    },
+    {
+      fileName: "unit-metadata-schema-id-dependency.zip",
+      entryFileName: "export/items/Unit_error.xml",
+      entryDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace(
+          '<Variable id="var1"',
+          '<Variable id="UNIT.SAMPLE-2"'
+        ),
+      diagnosticCode: "testcenter_xml_unit_schema_id_duplicate"
+    },
+    {
+      fileName: "syscheck-metadata-schema-id-dependency.zip",
+      entryFileName: "export/system-checks/SysCheck_error.xml",
+      entryDocument: validSystemCheckXml.replace(
+        '    <Q id="1"',
+        '    <CustomText key="SYSCHECK.SAMPLE">Collision</CustomText>\n    <Q id="1"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_schema_id_duplicate"
     },
     {
       fileName: "invalid-status-aggregate-dependency.zip",

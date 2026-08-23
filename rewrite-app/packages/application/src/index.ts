@@ -10649,6 +10649,9 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  const metadataId = metadata
+    ? xmlElementText(xmlChildrenNamed(metadata, "Id")[0])
+    : "";
   if (!metadata) {
     diagnostics.push(
       createImportDiagnostic(
@@ -10658,7 +10661,6 @@ const validateTestcenterXmlSourceDocument = (
     );
   }
   if (metadata && canonicalRootName !== "Testtakers") {
-    const metadataId = xmlElementText(xmlChildrenNamed(metadata, "Id")[0]);
     if (metadataId && !isTestcenterXmlId(metadataId)) {
       diagnostics.push(
         createImportDiagnostic(
@@ -10893,16 +10895,22 @@ const validateTestcenterXmlSourceDocument = (
     diagnostics.push(
       ...validateUniqueTestcenterXmlValues(
         [
+          ...(metadataId
+            ? [{ value: metadataId, label: "Booklet schema ID" }]
+            : []),
           ...customTextContainers.flatMap(container =>
             xmlChildrenNamed(container, "CustomText")
-          ),
+          ).map(element => ({
+            value: element.getAttribute("key")?.trim() ?? "",
+            label: "Booklet schema ID"
+          })),
           ...bookletConfigContainers.flatMap(container =>
             xmlChildrenNamed(container, "Config")
-          )
-        ].map(element => ({
-          value: element.getAttribute("key")?.trim() ?? "",
-          label: "Booklet schema ID"
-        })),
+          ).map(element => ({
+            value: element.getAttribute("key")?.trim() ?? "",
+            label: "Booklet schema ID"
+          }))
+        ],
         "testcenter_xml_booklet_schema_id_duplicate",
         sourceFileName
       )
@@ -11990,6 +11998,20 @@ const validateTestcenterXmlSourceDocument = (
         sourceFileName
       )
     );
+    if (
+      !supportsExtendedVariableIds &&
+      metadataId &&
+      variables.some(
+        variable => variable.getAttribute("id")?.trim() === metadataId
+      )
+    ) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_unit_schema_id_duplicate",
+          `Original Testcenter unit '${sourceFileName}' contains Variable/@id '${metadataId}', which duplicates Metadata/Id in the document-wide XML ID space.`
+        )
+      );
+    }
   }
 
   if (canonicalRootName === "SysCheck") {
@@ -12316,6 +12338,20 @@ const validateTestcenterXmlSourceDocument = (
           sourceFileName
         )
       );
+      if (
+        metadataId &&
+        customTexts.some(
+          customText =>
+            customText.getAttribute("key")?.trim() === metadataId
+        )
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_schema_id_duplicate",
+            `Original Testcenter system check '${sourceFileName}' contains CustomText/@key '${metadataId}', which duplicates Metadata/Id in the document-wide XML ID space.`
+          )
+        );
+      }
     }
   }
 
