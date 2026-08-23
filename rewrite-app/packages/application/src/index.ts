@@ -10087,6 +10087,17 @@ const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] =>
 const xmlElementText = (element: XmlElement | undefined): string =>
   String(element?.textContent ?? "").trim();
 
+const xmlElementDirectText = (element: XmlElement): string => {
+  const textParts: string[] = [];
+  for (let index = 0; index < element.childNodes.length; index += 1) {
+    const child = element.childNodes.item(index);
+    if (child?.nodeType === 3 || child?.nodeType === 4) {
+      textParts.push(String(child.nodeValue ?? ""));
+    }
+  }
+  return textParts.join("").trim();
+};
+
 const parseTestcenterXmlBoolean = (value: string | null): boolean | null => {
   switch (value?.trim()) {
     case "true":
@@ -12228,6 +12239,19 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     };
+    const validateElementOnlyContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      if (xmlElementDirectText(element)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testtakers_element_content_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains character data in element-only ${context}.`
+          )
+        );
+      }
+    };
     const validateAssetAssignments = (
       parent: XmlElement,
       context: string
@@ -12242,6 +12266,10 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const container of containers) {
+        validateElementOnlyContent(
+          container,
+          `AssetAssignments for ${context}`
+        );
         if (!supportsAssetAssignments) {
           diagnostics.push(
             createImportDiagnostic(
@@ -12295,6 +12323,7 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     };
+    validateElementOnlyContent(root, "Testtakers");
     const directChildren = xmlChildElements(root);
     const directChildRanks = new Map([
       ["Metadata", 0],
@@ -12350,6 +12379,7 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
     for (const metadataContainer of metadataContainers) {
+      validateElementOnlyContent(metadataContainer, "Metadata");
       validateAttributes(metadataContainer, [], "Metadata");
       const metadataChildren = xmlChildElements(metadataContainer);
       for (const child of metadataChildren) {
@@ -12376,6 +12406,7 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const customTextContainer of customTextContainers) {
+      validateElementOnlyContent(customTextContainer, "CustomTexts");
       validateAttributes(customTextContainer, [], "CustomTexts");
       const children = xmlChildElements(customTextContainer);
       if (children.length === 0) {
@@ -12402,6 +12433,7 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const profileContainer of profileContainers) {
+      validateElementOnlyContent(profileContainer, "Profiles");
       validateAttributes(profileContainer, [], "Profiles");
       const children = xmlChildElements(profileContainer);
       for (const child of children) {
@@ -12453,6 +12485,10 @@ const validateTestcenterXmlSourceDocument = (
       xmlChildrenNamed(container, "GroupMonitor")
     );
     for (const groupMonitorContainer of groupMonitorContainers) {
+      validateElementOnlyContent(
+        groupMonitorContainer,
+        "Profiles/GroupMonitor"
+      );
       validateAttributes(groupMonitorContainer, [], "Profiles/GroupMonitor");
       for (const child of xmlChildElements(groupMonitorContainer)) {
         const childName = xmlElementLocalName(child);
@@ -12497,6 +12533,10 @@ const validateTestcenterXmlSourceDocument = (
     ]);
     for (const profile of monitorProfiles) {
       const profileId = profile.getAttribute("id")?.trim() ?? "";
+      validateElementOnlyContent(
+        profile,
+        `monitor Profile '${profileId || "unknown"}'`
+      );
       validateAttributes(
         profile,
         [
@@ -12656,10 +12696,12 @@ const validateTestcenterXmlSourceDocument = (
     }
     const logins = groups.flatMap(group => xmlChildrenNamed(group, "Login"));
     for (const group of groups) {
+      const groupId = group.getAttribute("id")?.trim() || "unknown";
+      validateElementOnlyContent(group, `Group '${groupId}'`);
       validateAttributes(
         group,
         ["id", "label", "validFrom", "validTo", "validFor"],
-        `Group '${group.getAttribute("id")?.trim() || "unknown"}'`
+        `Group '${groupId}'`
       );
       const groupChildren = xmlChildElements(group);
       let loginSeen = false;
@@ -12760,6 +12802,7 @@ const validateTestcenterXmlSourceDocument = (
     }
     for (const login of logins) {
       const loginName = login.getAttribute("name")?.trim() || "unknown";
+      validateElementOnlyContent(login, `Login '${loginName}'`);
       validateAttributes(
         login,
         ["name", "pw", "mode", "monitorcode"],
@@ -12918,6 +12961,10 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const viewSetting of viewSettings) {
+        validateElementOnlyContent(
+          viewSetting,
+          `ViewSettings for login '${loginName}'`
+        );
         if (!supportsLoginViewSettings) {
           diagnostics.push(
             createImportDiagnostic(
@@ -12982,6 +13029,10 @@ const validateTestcenterXmlSourceDocument = (
           );
         }
         for (const codeInput of codeInputs) {
+          validateElementOnlyContent(
+            codeInput,
+            `ViewSettings/codeInput for login '${loginName}'`
+          );
           validateAttributes(
             codeInput,
             [],

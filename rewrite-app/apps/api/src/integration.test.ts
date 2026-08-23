@@ -16526,6 +16526,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_monitor_profile_child_invalid"
     },
     {
+      label: "character data in element-only monitor profile",
+      rosterText: validRosterXml.replace(
+        '<Filter label="Reduced Booklet"',
+        'unexpected<Filter label="Reduced Booklet"'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_element_content_invalid"
+    },
+    {
+      label: "character data in element-only login view settings",
+      rosterText: validRosterXml.replace(
+        '<Login mode="monitor-group" name="test-group-monitor" pw="user123"/>',
+        '<Login mode="monitor-group" name="test-group-monitor" pw="user123"><ViewSettings>unexpected</ViewSettings></Login>'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_element_content_invalid"
+    },
+    {
       label: "nested element in text-only booklet assignment",
       rosterText: validRosterXml.replace(
         ">BOOKLET.SAMPLE-1</Booklet>",
