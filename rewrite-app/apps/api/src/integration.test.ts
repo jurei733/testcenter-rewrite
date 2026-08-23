@@ -12302,6 +12302,237 @@ test("source-package replacement preserves versions and deletion honors dependen
   );
 });
 
+test("source-package replacement and retry preserve workspace identity uniqueness", async () => {
+  const tenantKey = "integration-tenant-source-mutation-identities";
+  const workspaceKey = "integration-workspace-source-mutation-identities";
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const sourceDocument = (bookletKey: string): string =>
+    [
+      "<Booklet>",
+      `  <Metadata><Id>${bookletKey}</Id><Label>${bookletKey}</Label></Metadata>`,
+      '  <Units><Unit id="UNIT.IDENTITY-GUARD" label="Identity guard" /></Units>',
+      "</Booklet>"
+    ].join("\n");
+  const createSourcePackage = async (fileName: string, bookletKey: string) => {
+    const created = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`${workspaceUrl}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName,
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument(bookletKey)
+      }
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    return created.body.sourcePackage;
+  };
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const collisionOwner = await createSourcePackage(
+    "identity-owner.xml",
+    "booklet:identity-owner"
+  );
+  const replacementTarget = await createSourcePackage(
+    "replacement-target.xml",
+    "booklet:replacement-target"
+  );
+  const legitimateReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `${workspaceUrl}/source-packages/${replacementTarget.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: replacementTarget.fileName,
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:replacement-target")
+      }
+    }
+  );
+  assert.equal(
+    legitimateReplacement.status,
+    201,
+    JSON.stringify(legitimateReplacement.body)
+  );
+
+  const replacementFileNameCollision = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${legitimateReplacement.body.replacementSourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "IDENTITY-OWNER.XML",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:replacement-unique")
+      }
+    }
+  );
+  assert.equal(replacementFileNameCollision.status, 409);
+  assert.equal(
+    replacementFileNameCollision.body.error,
+    "source_package_file_name_duplicate"
+  );
+
+  const replacementIdentityCollision = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${legitimateReplacement.body.replacementSourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-identity-collision.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("BOOKLET:IDENTITY-OWNER")
+      }
+    }
+  );
+  assert.equal(
+    replacementIdentityCollision.status,
+    409,
+    JSON.stringify(replacementIdentityCollision.body)
+  );
+  assert.equal(
+    replacementIdentityCollision.body.error,
+    "source_package_booklet_id_duplicate"
+  );
+
+  const chainedReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `${workspaceUrl}/source-packages/${legitimateReplacement.body.replacementSourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: replacementTarget.fileName,
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:replacement-target")
+      }
+    }
+  );
+  assert.equal(
+    chainedReplacement.status,
+    201,
+    JSON.stringify(chainedReplacement.body)
+  );
+
+  const playerDocument =
+    `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2(
+      { id: "workspace-identity-guard-player" }
+    )}</script><main>Workspace identity guard player</main>`;
+  const playerOwner = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "workspace-identity-guard-player-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: playerDocument
+    }
+  });
+  assert.equal(playerOwner.status, 201, JSON.stringify(playerOwner.body));
+  const playerReplacementTarget = await createSourcePackage(
+    "player-replacement-target.xml",
+    "booklet:player-replacement-target"
+  );
+  const replacementPlayerIdentityCollision = await requestJson<{
+    error: string;
+  }>(
+    `${workspaceUrl}/source-packages/${playerReplacementTarget.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "workspace-identity-guard-player-copy.html",
+        mediaType: "text/html",
+        sourceDocument: playerDocument
+      }
+    }
+  );
+  assert.equal(replacementPlayerIdentityCollision.status, 409);
+  assert.equal(
+    replacementPlayerIdentityCollision.body.error,
+    "source_package_resource_id_duplicate"
+  );
+
+  const retryTarget = await createSourcePackage(
+    "retry-target.xml",
+    "booklet:retry-target"
+  );
+  const retryFileNameCollision = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${retryTarget.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "IDENTITY-OWNER.XML",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:retry-unique")
+      }
+    }
+  );
+  assert.equal(retryFileNameCollision.status, 409);
+  assert.equal(
+    retryFileNameCollision.body.error,
+    "source_package_file_name_duplicate"
+  );
+
+  const retryIdentityCollision = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${retryTarget.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "retry-identity-collision.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("BOOKLET:IDENTITY-OWNER")
+      }
+    }
+  );
+  assert.equal(
+    retryIdentityCollision.status,
+    409,
+    JSON.stringify(retryIdentityCollision.body)
+  );
+  assert.equal(
+    retryIdentityCollision.body.error,
+    "source_package_booklet_id_duplicate"
+  );
+
+  const packagesAfterRejectedMutations = await requestJson<{
+    items: Array<{
+      sourcePackage: {
+        sourcePackageId: string;
+        fileName: string;
+        status: string;
+      };
+    }>;
+  }>(`${workspaceUrl}/source-packages`);
+  const persistedRetryTarget = packagesAfterRejectedMutations.body.items.find(
+    item => item.sourcePackage.sourcePackageId === retryTarget.sourcePackageId
+  )?.sourcePackage;
+  assert.equal(persistedRetryTarget?.fileName, retryTarget.fileName);
+  assert.equal(persistedRetryTarget?.status, "uploaded");
+  assert.equal(
+    packagesAfterRejectedMutations.body.items.some(item =>
+      [
+        "replacement-identity-collision.xml",
+        "workspace-identity-guard-player-copy.html",
+        "retry-identity-collision.xml"
+      ].includes(item.sourcePackage.fileName)
+    ),
+    false
+  );
+  assert.ok(
+    packagesAfterRejectedMutations.body.items.some(
+      item => item.sourcePackage.sourcePackageId === collisionOwner.sourcePackageId
+    )
+  );
+});
+
 test("source-package batch deletion reports deleted, used, missing, and disallowed files", async () => {
   const tenantKey = "integration-tenant-source-batch-delete";
   const workspaceKey = "integration-workspace-source-batch-delete";
@@ -27017,21 +27248,10 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId).sort()
   );
 
-  const duplicateUnitSeed = await requestJson<{
-    sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
-    method: "POST",
-    body: {
-      fileName: "duplicate-unit-seed.txt",
-      mediaType: "text/plain",
-      sourceDocument: "replacement seed"
-    }
-  });
-  assert.equal(duplicateUnitSeed.status, 201);
   const duplicateUnitReplacement = await requestJson<{
     replacementSourcePackage: { sourcePackageId: string };
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateUnitSeed.body.sourcePackage.sourcePackageId}/replacements`,
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${sourcePackages[1]!.sourcePackageId}/replacements`,
     {
       method: "POST",
       body: {

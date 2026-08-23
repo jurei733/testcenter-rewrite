@@ -2,7 +2,7 @@
 
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
-and was last compared on 2026-08-23 with the latest published release
+and was last compared on 2026-08-24 with the latest published release
 `18.2.0` at `4196f03bddb680ed6d774d01143890342d8bbe5a` (2026-08-04) and the
 then-current upstream `origin/master` at
 `6455e265421777124f379090257365b70b21641f` (2026-08-21), 68 commits after
@@ -64,7 +64,7 @@ does not treat test-only upstream churn as missing application behavior. This
 is a dated planning estimate, not evidence that every production package or
 deployment has passed acceptance.
 
-A fresh upstream fetch on 2026-08-23 confirmed that the latest Original remains
+A fresh upstream fetch on 2026-08-24 confirmed that the latest Original remains
 `origin/master` at `6455e265421777124f379090257365b70b21641f`, still 68 commits
 after 18.2.0. No additional product delta therefore changes the weighted
 estimate. The audit did, however, turn one previously broad "rare file-graph"
@@ -96,7 +96,7 @@ tests:
 ## Current remaining-work queue
 
 The capability matrix below is authoritative for completion status. This queue
-contains only work that is still open after the 2026-08-23 upstream audit;
+contains only work that is still open after the 2026-08-24 upstream audit;
 participant execution modes, attachments/QR capture, and instance branding are
 no longer listed because their matrix rows are `done`.
 
@@ -106,7 +106,7 @@ no longer listed because their matrix rows are `done`.
 | 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases; close interactive state parity for the currently feasibility-only IB runtime snapshot while retaining byte/range delivery, restoration, and visible failure behavior. |
 | 4 | P0 | Interruption and recovery at production scale | Extend the proven multi-Unit foreground, reload, offline outbox, Service-Worker handoff, and idempotent replay paths to longer production packages and additional interruption timings. |
-| 5 | P1 | Workspace batch edge cases | Add more mixed-success upload, replacement, and deletion graphs, including failures that appear only after earlier successful mutations in the same operator batch. |
+| 5 | P1 | Workspace batch edge cases | Add more mixed-success replacement and deletion graphs, especially dependency changes and failures that appear only after earlier successful mutations in the same operator operation. Sequential upload mutation and collision behavior is now closed. |
 | 6 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
 | 7 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
 
@@ -1241,6 +1241,17 @@ and immutable generated dependency packages do not double-count their retained
 root files. API gates cover cross-workspace XML/JSON/ZIP conflicts,
 case-insensitive matching, accepted replacement lineage, active-version
 attribution, and tenant isolation.
+
+Latest workspace mutation-identity closure: direct upload, failed-import retry,
+and immutable replacement now apply the same case-insensitive file-name,
+standalone Booklet/Unit/SysCheck/Testtakers identity, and Verona resource-ID
+guards before changing persisted source state. A replacement or retry excludes
+only its own prior lineage, so another version of the selected file remains
+valid while an unrelated third workspace file cannot be duplicated. Rejected
+packages and sources superseded by an accepted replacement do not reserve an
+active identity. API gates prove successful replacement lineage plus rejected
+file-name and Booklet-ID collisions without partially mutating the retry target
+across memory, file, and SQLite.
 
 Latest current-schema intake closure: Unit declarations using either the legacy
 `testcenter-unit-xml` or current `unit-xml` W3ID path select the same pinned

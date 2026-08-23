@@ -23852,6 +23852,146 @@ export const createFirstSliceServices = (
     }
   };
 
+  const assertWorkspaceSourcePackageIdentitiesAvailable = async (input: {
+    workspace: Workspace;
+    sourcePackage: SourcePackage;
+    excludedSourcePackageIds?: string[];
+  }): Promise<void> => {
+    const [sourcePackages, activityEvents] = await Promise.all([
+      repository.listSourcePackagesByWorkspace(
+        input.workspace.tenantId,
+        input.workspace.workspaceId
+      ),
+      repository.listWorkspaceActivityEventsByWorkspace(
+        input.workspace.tenantId,
+        input.workspace.workspaceId
+      )
+    ]);
+    const sourcePackageById = new Map(
+      sourcePackages.map(sourcePackage => [
+        sourcePackage.sourcePackageId,
+        sourcePackage
+      ])
+    );
+    const excludedSourcePackageIds = new Set(
+      input.excludedSourcePackageIds ?? []
+    );
+    const replacementEdges = activityEvents.flatMap(activityEvent => {
+      if (activityEvent.eventType !== "source_package_replaced") {
+        return [];
+      }
+      const replacementSourcePackageId =
+        typeof activityEvent.details.replacementSourcePackageId === "string"
+          ? activityEvent.details.replacementSourcePackageId
+          : null;
+      return replacementSourcePackageId
+        ? [
+            {
+              replacedSourcePackageId: activityEvent.subjectId,
+              replacementSourcePackageId
+            }
+          ]
+        : [];
+    });
+    let foundExcludedAncestor = true;
+    while (foundExcludedAncestor) {
+      foundExcludedAncestor = false;
+      for (const replacementEdge of replacementEdges) {
+        if (
+          excludedSourcePackageIds.has(
+            replacementEdge.replacementSourcePackageId
+          ) &&
+          !excludedSourcePackageIds.has(
+            replacementEdge.replacedSourcePackageId
+          )
+        ) {
+          excludedSourcePackageIds.add(
+            replacementEdge.replacedSourcePackageId
+          );
+          foundExcludedAncestor = true;
+        }
+      }
+    }
+    const supersededSourcePackageIds = new Set(
+      replacementEdges.flatMap(replacementEdge =>
+        sourcePackageById.get(replacementEdge.replacementSourcePackageId)
+          ?.status === "accepted"
+          ? [replacementEdge.replacedSourcePackageId]
+          : []
+      )
+    );
+    const existingFileNameCandidates = sourcePackages.filter(
+      sourcePackage =>
+        !excludedSourcePackageIds.has(sourcePackage.sourcePackageId)
+    );
+    const existingIdentityCandidates = existingFileNameCandidates.filter(
+      sourcePackage =>
+        sourcePackage.status !== "rejected" &&
+        !supersededSourcePackageIds.has(sourcePackage.sourcePackageId)
+    );
+
+    const duplicateFileName = existingFileNameCandidates.find(
+      existingSourcePackage =>
+        existingSourcePackage.fileName.trim().toLowerCase() ===
+        input.sourcePackage.fileName.toLowerCase()
+    );
+    if (duplicateFileName) {
+      throw new FirstSliceError(
+        409,
+        "source_package_file_name_duplicate",
+        `Source package file name '${input.sourcePackage.fileName}' already exists. Create a replacement for source package '${duplicateFileName.sourcePackageId}' to preserve its version history.`
+      );
+    }
+
+    const testcenterFileIdentity = readStandaloneTestcenterFileIdentity(
+      input.sourcePackage
+    );
+    const duplicateIdentity = testcenterFileIdentity
+      ? existingIdentityCandidates.find(existingSourcePackage => {
+          const existingIdentity =
+            readStandaloneTestcenterFileIdentity(existingSourcePackage);
+          return (
+            existingIdentity?.fileType === testcenterFileIdentity.fileType &&
+            existingIdentity.id.toUpperCase() ===
+              testcenterFileIdentity.id.toUpperCase()
+          );
+        })
+      : null;
+    if (testcenterFileIdentity && duplicateIdentity) {
+      const normalizedFileType = testcenterFileIdentity.fileType.toLowerCase();
+      const identityConflict =
+        testcenterFileIdentity.source === "roster"
+          ? "A Testtakers roster with the same case-insensitive group and login assignments already exists"
+          : `${testcenterFileIdentity.fileType} id '${testcenterFileIdentity.id}' already exists`;
+      throw new FirstSliceError(
+        409,
+        `source_package_${normalizedFileType}_id_duplicate`,
+        `${identityConflict} in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
+      );
+    }
+
+    const veronaPlayerResourceId = readStandaloneVeronaPlayerResourceId(
+      input.sourcePackage
+    );
+    const duplicateVeronaPlayer = veronaPlayerResourceId
+      ? existingIdentityCandidates.find(existingSourcePackage => {
+          const existingResourceId =
+            readStandaloneVeronaPlayerResourceId(existingSourcePackage);
+          return (
+            existingResourceId?.toUpperCase() ===
+            veronaPlayerResourceId.toUpperCase()
+          );
+        })
+      : null;
+    if (veronaPlayerResourceId && duplicateVeronaPlayer) {
+      throw new FirstSliceError(
+        409,
+        "source_package_resource_id_duplicate",
+        `Verona player resource id '${veronaPlayerResourceId}' already exists in source package '${duplicateVeronaPlayer.fileName}'. Create a replacement for source package '${duplicateVeronaPlayer.sourcePackageId}' to preserve its version history.`
+      );
+    }
+  };
+
   const requireAttachmentAccess = async (input: {
     sessionToken: string;
     tenantKey: string;
@@ -30019,72 +30159,14 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
-        const existingSourcePackages =
-          await repository.listSourcePackagesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          );
-        const duplicateFileName = existingSourcePackages.find(
-          existingSourcePackage =>
-            existingSourcePackage.fileName.trim().toLowerCase() ===
-            sourcePackage.fileName.toLowerCase()
-        );
-        if (duplicateFileName) {
-          throw new FirstSliceError(
-            409,
-            "source_package_file_name_duplicate",
-            `Source package file name '${sourcePackage.fileName}' already exists. Create a replacement for source package '${duplicateFileName.sourcePackageId}' to preserve its version history.`
-          );
-        }
-        const testcenterFileIdentity =
-          readStandaloneTestcenterFileIdentity(sourcePackage);
-        const duplicateIdentity = testcenterFileIdentity
-          ? existingSourcePackages.find(existingSourcePackage => {
-              const existingIdentity =
-                readStandaloneTestcenterFileIdentity(existingSourcePackage);
-              return (
-                existingIdentity?.fileType === testcenterFileIdentity.fileType &&
-                existingIdentity.id.toUpperCase() ===
-                  testcenterFileIdentity.id.toUpperCase()
-              );
-            })
-          : null;
-        if (testcenterFileIdentity && duplicateIdentity) {
-          const normalizedFileType =
-            testcenterFileIdentity.fileType.toLowerCase();
-          const identityConflict =
-            testcenterFileIdentity.source === "roster"
-              ? "A Testtakers roster with the same case-insensitive group and login assignments already exists"
-              : `${testcenterFileIdentity.fileType} id '${testcenterFileIdentity.id}' already exists`;
-          throw new FirstSliceError(
-            409,
-            `source_package_${normalizedFileType}_id_duplicate`,
-            `${identityConflict} in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
-          );
-        }
+        await assertWorkspaceSourcePackageIdentitiesAvailable({
+          workspace,
+          sourcePackage
+        });
         await assertTenantTesttakersIdentitiesAvailable({
           workspace,
           sourcePackage
         });
-        const veronaPlayerResourceId =
-          readStandaloneVeronaPlayerResourceId(sourcePackage);
-        const duplicateVeronaPlayer = veronaPlayerResourceId
-          ? existingSourcePackages.find(existingSourcePackage => {
-              const existingResourceId =
-                readStandaloneVeronaPlayerResourceId(existingSourcePackage);
-              return (
-                existingResourceId?.toUpperCase() ===
-                veronaPlayerResourceId.toUpperCase()
-              );
-            })
-          : null;
-        if (veronaPlayerResourceId && duplicateVeronaPlayer) {
-          throw new FirstSliceError(
-            409,
-            "source_package_resource_id_duplicate",
-            `Verona player resource id '${veronaPlayerResourceId}' already exists in source package '${duplicateVeronaPlayer.fileName}'. Create a replacement for source package '${duplicateVeronaPlayer.sourcePackageId}' to preserve its version history.`
-          );
-        }
         await repository.saveSourcePackage(sourcePackage);
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
@@ -30256,6 +30338,11 @@ export const createFirstSliceServices = (
           status: "uploaded"
         };
 
+        await assertWorkspaceSourcePackageIdentitiesAvailable({
+          workspace,
+          sourcePackage: updatedSourcePackage,
+          excludedSourcePackageIds: [sourcePackage.sourcePackageId]
+        });
         await assertTenantTesttakersIdentitiesAvailable({
           workspace,
           sourcePackage: updatedSourcePackage,
@@ -30327,6 +30414,11 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
+        await assertWorkspaceSourcePackageIdentitiesAvailable({
+          workspace,
+          sourcePackage: replacementSourcePackage,
+          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId]
+        });
         await assertTenantTesttakersIdentitiesAvailable({
           workspace,
           sourcePackage: replacementSourcePackage,

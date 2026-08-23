@@ -5737,18 +5737,8 @@ try {
   )?.sourcePackage?.sourcePackageId;
   assert.ok(looseBookletSourcePackageId);
   assert.ok(looseUnitSourcePackageId);
-  const duplicateLooseUnitSeed = await sendSmokeJson(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
-    {
-      body: {
-        fileName: `ui-duplicate-unit-seed-${Date.now()}.txt`,
-        mediaType: "text/plain",
-        sourceDocument: "replacement seed"
-      }
-    }
-  ).then(response => response.json());
   const duplicateLooseUnitReplacement = await sendSmokeJson(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateLooseUnitSeed.sourcePackage.sourcePackageId}/replacements`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${looseUnitSourcePackageId}/replacements`,
     {
       body: {
         fileName: "Unit2-copy.xml",
@@ -16670,6 +16660,9 @@ try {
       );
       await completeOriginalControllerUnit(frame);
       await waitForOriginalControllerCompletenessAllowed(controller, "forward");
+      await page
+        .locator("#participantRouteNavigationNotice")
+        .waitFor({ state: "detached", timeout: 15_000 });
       await expectButtonSelectorEnabled("#participantRouteNextUnitButton");
     }
 
@@ -16695,6 +16688,9 @@ try {
       );
       await completeOriginalControllerUnit(frame);
       await waitForOriginalControllerCompletenessAllowed(controller, "backward");
+      await page
+        .locator("#participantRouteNavigationNotice")
+        .waitFor({ state: "detached", timeout: 15_000 });
     }
     await expectButtonSelectorEnabled("#participantRoutePreviousUnitButton");
     await page.locator("#participantRoutePreviousUnitButton").click();
@@ -22212,6 +22208,7 @@ try {
   await fillAndCommit("#sourceDocument", repairedImportSourceDocument);
   await clickAction("Create Source Package");
   await clickAction("Create Import Job");
+  await clickAction("Release Readiness");
   await clickAction("Activate Release");
   await page.waitForTimeout(250);
   await pollJsonWithPredicate(
