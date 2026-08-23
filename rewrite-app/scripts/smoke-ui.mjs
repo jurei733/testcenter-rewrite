@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { dirname, resolve } from "node:path";
@@ -13,6 +14,11 @@ const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
+const configuredProofOfWorkScopes = new Set(
+  String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES ?? "")
+    .split(/[\s,]+/u)
+    .filter(Boolean)
+);
 const skipRuntimeCsvExports = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_SKIP_RUNTIME_CSV_EXPORTS ?? "").toLowerCase()
 );
@@ -176,6 +182,43 @@ const sendSmokeJson = async (url, { method = "POST", body } = {}) => {
   }
 
   return response;
+};
+
+const solveSmokeProofOfWork = challenge => {
+  for (let number = 0; number <= challenge.maxNumber; number += 1) {
+    if (
+      createHash("sha256")
+        .update(`${challenge.salt}${number}`, "utf8")
+        .digest("hex") === challenge.challenge
+    ) {
+      return { token: challenge.token, number };
+    }
+  }
+  throw new Error("Smoke proof-of-work challenge was not solvable.");
+};
+
+const fetchAdminSignIn = async (baseUrl, username, password) => {
+  let proofOfWork;
+  if (configuredProofOfWorkScopes.has("admin")) {
+    const challengeResponse = await fetch(
+      `${baseUrl}/api/v1/system/proof-of-work/challenges`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scope: "admin",
+          credentials: { username, password }
+        })
+      }
+    );
+    assert.equal(challengeResponse.status, 200);
+    proofOfWork = { admin: solveSmokeProofOfWork(await challengeResponse.json()) };
+  }
+  return fetch(`${baseUrl}/api/v1/admin/auth/sign-in`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username, password, proofOfWork })
+  });
 };
 
 const flattenManifestRouteNames = value => {
@@ -350,6 +393,7 @@ try {
   const configuredAdminPasswordPattern =
     process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ?? "^.*$";
   let totalApiRequestCount = 0;
+  const observedProofOfWorkScopes = new Set();
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
   };
@@ -370,6 +414,19 @@ try {
     }
 
     totalApiRequestCount += 1;
+    if (
+      request.method() === "POST" &&
+      new URL(url).pathname === "/api/v1/system/proof-of-work/challenges"
+    ) {
+      try {
+        const scope = request.postDataJSON()?.scope;
+        if (typeof scope === "string") {
+          observedProofOfWorkScopes.add(scope);
+        }
+      } catch {
+        // The API assertion will surface malformed challenge requests.
+      }
+    }
   });
   logStep("browser-compatibility-warning");
   const outdatedBrowserContext = await browser.newContext({
@@ -4158,28 +4215,16 @@ try {
   await resetAdminPasswordDialog;
   await expectInputValue("#adminResetPassword", "");
   await expectInputValue("#adminResetPasswordConfirmation", "");
-  const oldWorkspaceAdminPasswordSignIn = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: workspaceAdminUsername,
-        password: workspaceAdminPassword
-      })
-    }
+  const oldWorkspaceAdminPasswordSignIn = await fetchAdminSignIn(
+    baseUrl,
+    workspaceAdminUsername,
+    workspaceAdminPassword
   );
   assert.equal(oldWorkspaceAdminPasswordSignIn.status, 401);
-  const resetWorkspaceAdminPasswordSignIn = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: workspaceAdminUsername,
-        password: workspaceAdminResetPassword
-      })
-    }
+  const resetWorkspaceAdminPasswordSignIn = await fetchAdminSignIn(
+    baseUrl,
+    workspaceAdminUsername,
+    workspaceAdminResetPassword
   );
   assert.equal(resetWorkspaceAdminPasswordSignIn.status, 200);
   const resetWorkspaceAdminPasswordPayload =
@@ -4339,16 +4384,10 @@ try {
     .locator("#ownAdminPasswordChangeDialog")
     .waitFor({ state: "detached" });
   await expectInputValue("#adminSessionToken", "");
-  const rejectedPreChangePasswordSignIn = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: workspaceAdminUsername,
-        password: workspaceAdminFinalPassword
-      })
-    }
+  const rejectedPreChangePasswordSignIn = await fetchAdminSignIn(
+    baseUrl,
+    workspaceAdminUsername,
+    workspaceAdminFinalPassword
   );
   assert.equal(rejectedPreChangePasswordSignIn.status, 401);
   await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
@@ -4655,16 +4694,10 @@ try {
           item?.adminUser?.validForMinutes === 45
       )
   );
-  const scheduledAdminSignInResponse = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: delegatedWorkspaceAdminUsername,
-        password: delegatedWorkspaceAdminPassword
-      })
-    }
+  const scheduledAdminSignInResponse = await fetchAdminSignIn(
+    baseUrl,
+    delegatedWorkspaceAdminUsername,
+    delegatedWorkspaceAdminPassword
   );
   assert.equal(scheduledAdminSignInResponse.status, 403);
   assert.equal(
@@ -4830,16 +4863,10 @@ try {
     ),
     false
   );
-  const customTextSignInResponse = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: delegatedWorkspaceAdminUsername,
-        password: delegatedWorkspaceAdminPassword
-      })
-    }
+  const customTextSignInResponse = await fetchAdminSignIn(
+    baseUrl,
+    delegatedWorkspaceAdminUsername,
+    delegatedWorkspaceAdminPassword
   );
   assert.equal(customTextSignInResponse.status, 200);
   const customTextSignInPayload = await customTextSignInResponse.json();
@@ -4951,11 +4978,7 @@ try {
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
 
   const createBatchAdminSession = async (username, password) => {
-    const response = await fetch(`${baseUrl}/api/v1/admin/auth/sign-in`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
+    const response = await fetchAdminSignIn(baseUrl, username, password);
     assert.equal(response.status, 200);
     return response.json();
   };
@@ -5214,22 +5237,16 @@ try {
       delegatedAdminGeneratedPassword
     ]
   ]) {
-    const previousPasswordResponse = await fetch(
-      `${baseUrl}/api/v1/admin/auth/sign-in`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password: previousPassword })
-      }
+    const previousPasswordResponse = await fetchAdminSignIn(
+      baseUrl,
+      username,
+      previousPassword
     );
     assert.equal(previousPasswordResponse.status, 401);
-    const generatedPasswordResponse = await fetch(
-      `${baseUrl}/api/v1/admin/auth/sign-in`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password: generatedPassword })
-      }
+    const generatedPasswordResponse = await fetchAdminSignIn(
+      baseUrl,
+      username,
+      generatedPassword
     );
     assert.equal(generatedPasswordResponse.status, 200);
     generatedPasswordSessions.push(await generatedPasswordResponse.json());
@@ -5343,16 +5360,10 @@ try {
     );
   }
   stopAfter("admin-user-bulk-status");
-  const disabledWorkspaceAdminSignIn = await fetch(
-    `${baseUrl}/api/v1/admin/auth/sign-in`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: workspaceAdminUsername,
-        password: workspaceAdminResetPassword
-      })
-    }
+  const disabledWorkspaceAdminSignIn = await fetchAdminSignIn(
+    baseUrl,
+    workspaceAdminUsername,
+    workspaceAdminResetPassword
   );
   assert.equal(disabledWorkspaceAdminSignIn.status, 401);
 
@@ -7401,6 +7412,13 @@ try {
     "Legacy-link participant codes must not be persisted in shell localStorage."
   );
   await codedLegacyContext.close();
+  for (const scope of configuredProofOfWorkScopes) {
+    assert.equal(
+      observedProofOfWorkScopes.has(scope),
+      true,
+      `UI smoke expected a browser-solved proof-of-work challenge for '${scope}'.`
+    );
+  }
   stopAfter("participant-entry-second-code");
 
   logStep("participant-entry-url");

@@ -49,6 +49,7 @@ import {
 import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellOpsHostsService } from "./rewrite-app-shell-ops-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { ProofOfWorkService } from "./proof-of-work.service";
 
 export type AdminUserStatusBatchResult = {
   requestedCount: number;
@@ -101,6 +102,7 @@ export class RewriteAppOpsService {
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly proofOfWork = inject(ProofOfWorkService);
 
   private readonly opsState = this.uiState.ops;
 
@@ -141,14 +143,15 @@ export class RewriteAppOpsService {
     this.opsState.adminAccessWindowNotice = "";
     let payload: AdminSignInResponse;
     try {
+      const credentials = await this.proofOfWork.protectAdmin({
+        username: this.opsState.adminUsername.trim(),
+        password: this.opsState.adminPassword
+      });
       payload = await this.requestState.request<AdminSignInResponse>(
         "Admin Sign In",
         "POST",
         productionApiRoutes.admin.signIn,
-        {
-          username: this.opsState.adminUsername.trim(),
-          password: this.opsState.adminPassword
-        } satisfies AdminSignInRequest
+        credentials satisfies AdminSignInRequest
       );
     } catch (error) {
       const notice = this.readAdminAccessWindowNotice(error);

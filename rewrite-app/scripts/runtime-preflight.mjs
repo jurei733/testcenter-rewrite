@@ -1,6 +1,7 @@
 import { access, readdir, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const reportFatalPreflightError = error => {
   const message = error instanceof Error ? error.message : String(error);
@@ -89,8 +90,89 @@ const resolveAdminPasswordPolicy = () => {
   };
 };
 
+const resolveProofOfWorkConfig = () => {
+  const supportedScopes = ["admin", "participant", "second_code"];
+  const enabledScopes = [
+    ...new Set(
+      String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES ?? "")
+        .trim()
+        .split(/[\s,]+/u)
+        .filter(Boolean)
+    )
+  ];
+  for (const scope of enabledScopes) {
+    if (!supportedScopes.includes(scope)) {
+      throw new Error(
+        `FIRST_SLICE_PROOF_OF_WORK_SCOPES contains unsupported scope '${scope}'. Supported scopes are ${supportedScopes.join(
+          ", "
+        )}.`
+      );
+    }
+  }
+  const currentSecret = process.env.FIRST_SLICE_PROOF_OF_WORK_SECRET || null;
+  const previousSecret =
+    process.env.FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET || null;
+  for (const [key, secret] of [
+    ["FIRST_SLICE_PROOF_OF_WORK_SECRET", currentSecret],
+    ["FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET", previousSecret]
+  ]) {
+    if (secret && secret.length < 32) {
+      throw new Error(`${key} must contain at least 32 characters.`);
+    }
+  }
+  if (enabledScopes.length > 0 && !currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when proof-of-work scopes are enabled."
+    );
+  }
+  if (previousSecret && !currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET is configured."
+    );
+  }
+  if (currentSecret && previousSecret === currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET must differ from FIRST_SLICE_PROOF_OF_WORK_SECRET."
+    );
+  }
+  const readInteger = (key, fallback, minimum, maximum) => {
+    const source = String(process.env[key] ?? fallback).trim();
+    if (!/^\d+$/u.test(source)) {
+      throw new Error(`${key} must be a positive integer.`);
+    }
+    const value = Number.parseInt(source, 10);
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+      throw new Error(`${key} must be between ${minimum} and ${maximum}.`);
+    }
+    return value;
+  };
+  const keyId = secret =>
+    secret
+      ? createHash("sha256").update(secret, "utf8").digest("hex").slice(0, 32)
+      : null;
+  return {
+    enabledScopes: supportedScopes.filter(scope => enabledScopes.includes(scope)),
+    algorithm: "SHA-256",
+    maxNumber: readInteger(
+      "FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER",
+      1_000_000,
+      1,
+      10_000_000
+    ),
+    ttlMs: readInteger(
+      "FIRST_SLICE_PROOF_OF_WORK_TTL_MS",
+      120_000,
+      1_000,
+      600_000
+    ),
+    currentKeyId: keyId(currentSecret),
+    previousKeyConfigured: Boolean(previousSecret)
+  };
+};
+
 const store = normalizeStore(process.env.FIRST_SLICE_STORE);
 const adminPasswordPolicy = resolveAdminPasswordPolicy();
+const proofOfWork = resolveProofOfWorkConfig();
 
 const requiredBuiltFiles = [
   "apps/api/dist/apps/api/src/index.js",
@@ -109,7 +191,8 @@ const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
 const requiredFrontendRuntimeFiles = [
   "service-worker.js",
   "manifest.webmanifest",
-  "app-icon.svg"
+  "app-icon.svg",
+  "altcha-lib/dist/worker.js"
 ];
 
 const parseBooleanFlag = (value, defaultValue = false) => {
@@ -345,6 +428,7 @@ process.stdout.write(
       status: "ready",
       store,
       adminPasswordPolicy,
+      proofOfWork,
       storage: storageDoctor
         ? {
             ...storageDoctor,

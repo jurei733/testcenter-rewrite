@@ -7,6 +7,7 @@ import { basename, extname, relative, resolve } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
 import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
+import { ProofOfWorkManager } from "./proof-of-work.js";
 
 import {
   createFirstSliceServices,
@@ -43,6 +44,8 @@ import {
   type CreateImportJobRequest,
   type CreateImportJobResponse,
   type CreateParticipantReviewRequest,
+  type CreateProofOfWorkChallengeRequest,
+  type CreateProofOfWorkChallengeResponse,
   type CreateReviewRequest,
   type CreateSourcePackageRequest,
   type CreateSourcePackageResponse,
@@ -181,6 +184,8 @@ import {
   type UpdateWorkspaceResponse,
   type WorkspaceReviewListQuery,
   productionApiRoutes,
+  proofOfWorkScopes,
+  type ProofOfWorkScope,
   type PublicAdminSession,
   type PublicAdminUser,
   type AdminUserDirectoryItem,
@@ -311,6 +316,41 @@ const parseBooleanEnvironmentFlag = (
   throw new Error(
     `${envKey} must be a boolean flag like true/false, yes/no, on/off, or required/optional.`
   );
+};
+
+const parseProofOfWorkScopes = (): ProofOfWorkScope[] => {
+  const rawValue = process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES?.trim();
+  if (!rawValue) {
+    return [];
+  }
+  const supportedScopes = new Set<string>(proofOfWorkScopes);
+  const resolvedScopes = new Set<ProofOfWorkScope>();
+  for (const candidate of rawValue.split(/[\s,]+/u).filter(Boolean)) {
+    if (!supportedScopes.has(candidate)) {
+      throw new Error(
+        `FIRST_SLICE_PROOF_OF_WORK_SCOPES contains unsupported scope '${candidate}'. Supported scopes are ${proofOfWorkScopes.join(
+          ", "
+        )}.`
+      );
+    }
+    resolvedScopes.add(candidate as ProofOfWorkScope);
+  }
+  return proofOfWorkScopes.filter(scope => resolvedScopes.has(scope));
+};
+
+const validateProofOfWorkSecret = (
+  environmentKey: string,
+  value: string | undefined
+): string | null => {
+  if (value === undefined || value === "") {
+    return null;
+  }
+  if (value.length < MINIMUM_PROOF_OF_WORK_SECRET_LENGTH) {
+    throw new Error(
+      `${environmentKey} must contain at least ${MINIMUM_PROOF_OF_WORK_SECRET_LENGTH} characters.`
+    );
+  }
+  return value;
 };
 
 const resolveStoreKind = (): RuntimeStoreKind => {
@@ -553,6 +593,54 @@ const createApiRuntime = async () => {
     maximumLength: adminPasswordPolicy.maximumLength,
     pattern: adminPasswordPattern
   };
+  const proofOfWorkEnabledScopes = parseProofOfWorkScopes();
+  const proofOfWorkCurrentSecret = validateProofOfWorkSecret(
+    "FIRST_SLICE_PROOF_OF_WORK_SECRET",
+    process.env.FIRST_SLICE_PROOF_OF_WORK_SECRET
+  );
+  const proofOfWorkPreviousSecret = validateProofOfWorkSecret(
+    "FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET",
+    process.env.FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET
+  );
+  if (proofOfWorkEnabledScopes.length > 0 && !proofOfWorkCurrentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when proof-of-work scopes are enabled."
+    );
+  }
+  if (proofOfWorkPreviousSecret && !proofOfWorkCurrentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET is configured."
+    );
+  }
+  if (
+    proofOfWorkCurrentSecret &&
+    proofOfWorkPreviousSecret === proofOfWorkCurrentSecret
+  ) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET must differ from FIRST_SLICE_PROOF_OF_WORK_SECRET."
+    );
+  }
+  const proofOfWorkMaxNumber = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER",
+    DEFAULT_PROOF_OF_WORK_MAX_NUMBER
+  );
+  if (proofOfWorkMaxNumber > MAXIMUM_PROOF_OF_WORK_MAX_NUMBER) {
+    throw new Error(
+      `FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER must be between 1 and ${MAXIMUM_PROOF_OF_WORK_MAX_NUMBER}.`
+    );
+  }
+  const proofOfWorkTtlMs = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_PROOF_OF_WORK_TTL_MS",
+    DEFAULT_PROOF_OF_WORK_TTL_MS
+  );
+  if (
+    proofOfWorkTtlMs < MINIMUM_PROOF_OF_WORK_TTL_MS ||
+    proofOfWorkTtlMs > MAXIMUM_PROOF_OF_WORK_TTL_MS
+  ) {
+    throw new Error(
+      `FIRST_SLICE_PROOF_OF_WORK_TTL_MS must be between ${MINIMUM_PROOF_OF_WORK_TTL_MS} and ${MAXIMUM_PROOF_OF_WORK_TTL_MS}.`
+    );
+  }
   const participantLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
     "FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES",
     DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES
@@ -580,6 +668,13 @@ const createApiRuntime = async () => {
   }
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
+  const proofOfWork = new ProofOfWorkManager(repository, {
+    enabledScopes: proofOfWorkEnabledScopes,
+    maxNumber: proofOfWorkMaxNumber,
+    ttlMs: proofOfWorkTtlMs,
+    currentSecret: proofOfWorkCurrentSecret,
+    previousSecret: proofOfWorkPreviousSecret
+  });
   const services = createFirstSliceServices({
     repository,
     adminLoginMaxFailures,
@@ -611,6 +706,7 @@ const createApiRuntime = async () => {
         failureWindowMs: adminLoginFailureWindowMs
       },
       adminPasswordPolicy: configuredAdminPasswordPolicy,
+      proofOfWork: proofOfWork.publicConfig,
       participantLoginProtection: {
         maxFailures: participantLoginMaxFailures,
         failureWindowMs: participantLoginFailureWindowMs
@@ -640,6 +736,21 @@ const createApiRuntime = async () => {
         firstSliceAdminPasswordPatternPresent: Boolean(
           process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN
         ),
+        firstSliceProofOfWorkScopesPresent: Boolean(
+          process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES
+        ),
+        firstSliceProofOfWorkSecretPresent: Boolean(
+          process.env.FIRST_SLICE_PROOF_OF_WORK_SECRET
+        ),
+        firstSliceProofOfWorkPreviousSecretPresent: Boolean(
+          process.env.FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET
+        ),
+        firstSliceProofOfWorkMaxNumberPresent: Boolean(
+          process.env.FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER
+        ),
+        firstSliceProofOfWorkTtlMsPresent: Boolean(
+          process.env.FIRST_SLICE_PROOF_OF_WORK_TTL_MS
+        ),
         firstSliceParticipantLoginMaxFailuresPresent: Boolean(
           process.env.FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES
         ),
@@ -666,6 +777,7 @@ const createApiRuntime = async () => {
     },
     repositoryConfig,
     repository,
+    proofOfWork,
     services,
     metrics: createRuntimeMetrics(),
     recentOperationalEvents: [] as RuntimeOperationalEvent[],
@@ -758,6 +870,12 @@ const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 60_000;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS = 5_000;
 const DEFAULT_ADMIN_LOGIN_MAX_FAILURES = 5;
+const DEFAULT_PROOF_OF_WORK_MAX_NUMBER = 1_000_000;
+const DEFAULT_PROOF_OF_WORK_TTL_MS = 120_000;
+const MINIMUM_PROOF_OF_WORK_SECRET_LENGTH = 32;
+const MAXIMUM_PROOF_OF_WORK_MAX_NUMBER = 10_000_000;
+const MINIMUM_PROOF_OF_WORK_TTL_MS = 1_000;
+const MAXIMUM_PROOF_OF_WORK_TTL_MS = 600_000;
 const DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 const DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES = 5;
 const DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
@@ -2823,6 +2941,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
   }
 
+  if (
+    method === "POST" &&
+    pathname === productionApiRoutes.system.createProofOfWorkChallenge
+  ) {
+    return `POST ${productionApiRoutes.system.createProofOfWorkChallenge}`;
+  }
+
   if (method === "GET" && pathname === productionApiRoutes.system.getTime) {
     return `GET ${productionApiRoutes.system.getTime}`;
   }
@@ -4292,6 +4417,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             operatorAuthRequired: runtime.config.operatorAuthRequired,
             adminLoginProtection: runtime.config.adminLoginProtection,
             adminPasswordPolicy: runtime.config.adminPasswordPolicy,
+            proofOfWork: runtime.config.proofOfWork,
             participantLoginProtection:
               runtime.config.participantLoginProtection,
             participantAccessTimeZone:
@@ -4304,6 +4430,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             environment: runtime.config.environment
           }
         });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.system.createProofOfWorkChallenge
+      ) {
+        const body =
+          await readRequestJsonBody<CreateProofOfWorkChallengeRequest>();
+        const challenge = runtime.proofOfWork.createChallenge(body);
+        response.setHeader("cache-control", "no-store");
+        sendJson<CreateProofOfWorkChallengeResponse>(response, 200, challenge);
         return;
       }
 
@@ -4576,8 +4714,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         pathname === productionApiRoutes.admin.signIn
       ) {
         const body = await readRequestJsonBody<AdminSignInRequest>();
+        await runtime.proofOfWork.verify(
+          "admin",
+          { username: body.username, password: body.password },
+          body.proofOfWork?.admin
+        );
         const { adminUser, adminSession, roleAssignments } =
-          await services.adminAuth.signIn(body);
+          await services.adminAuth.signIn({
+            username: body.username,
+            password: body.password
+          });
         sendJson<AdminSignInResponse>(response, 200, {
           adminUser: toPublicAdminUser(adminUser),
           adminSession: toPublicAdminSession(adminSession),
@@ -7765,7 +7911,26 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         pathname === productionApiRoutes.participant.signIn
       ) {
         const body = await readRequestJsonBody<ParticipantSignInRequest>();
-        const participantSession = await services.participantRuntime.signIn(body);
+        const credentials = {
+          tenantKey: body.tenantKey,
+          workspaceKey: body.workspaceKey,
+          loginKey: body.loginKey,
+          groupKey: body.groupKey,
+          password: body.password,
+          participantCode: body.participantCode
+        };
+        await runtime.proofOfWork.verify(
+          "participant",
+          credentials,
+          body.proofOfWork?.participant
+        );
+        await runtime.proofOfWork.verify(
+          "second_code",
+          credentials,
+          body.proofOfWork?.second_code
+        );
+        const participantSession =
+          await services.participantRuntime.signIn(credentials);
         const runtimeState = await services.participantRuntime.getRuntimeState({
           participantSessionId: participantSession.participantSessionId
         });
@@ -7989,13 +8154,26 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const participantSession = await services.participantRuntime.signIn({
-          tenantKey: body.tenantKey,
+        const credentials = {
+          tenantKey: body.tenantKey ?? undefined,
           workspaceKey: body.workspaceKey ?? "",
           loginKey: body.loginKey ?? "",
           groupKey: body.groupKey,
           password: body.password,
           participantCode: body.participantCode
+        };
+        await runtime.proofOfWork.verify(
+          "participant",
+          credentials,
+          body.proofOfWork?.participant
+        );
+        await runtime.proofOfWork.verify(
+          "second_code",
+          credentials,
+          body.proofOfWork?.second_code
+        );
+        const participantSession = await services.participantRuntime.signIn({
+          ...credentials
         });
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId: participantSession.participantSessionId,

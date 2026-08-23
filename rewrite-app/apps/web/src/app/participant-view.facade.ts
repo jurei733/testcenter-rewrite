@@ -76,6 +76,7 @@ import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers"
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { ProofOfWorkService } from "./proof-of-work.service";
 import type {
   VeronaControllerError,
   VeronaLogChange,
@@ -274,6 +275,7 @@ export class ParticipantViewFacade {
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly participantEvents = inject(ParticipantEventStreamService);
   private readonly participantShell = inject(ParticipantShellStateService);
+  private readonly proofOfWork = inject(ProofOfWorkService);
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
@@ -301,6 +303,7 @@ export class ParticipantViewFacade {
     return (
       !!this.runtime.participantSessionId.trim() &&
       !this.hasControllerError &&
+      !this.proofOfWork.busy() &&
       this.readCurrentRunState()?.testRun.status !== "completed" &&
       this.participantConnectionState.status !== "idle"
     );
@@ -1898,6 +1901,10 @@ export class ParticipantViewFacade {
     );
   }
 
+  get proofOfWorkBusy(): boolean {
+    return this.proofOfWork.busy();
+  }
+
   get participantCodeInputType(): ParticipantCodeInputType {
     const inputType = this.participantViewSettings.codeInput?.type;
     return inputType && participantCodeInputTypes.includes(inputType)
@@ -1985,6 +1992,9 @@ export class ParticipantViewFacade {
 
   get canStartOrResume(): boolean {
     if (this.hasControllerError) {
+      return false;
+    }
+    if (this.proofOfWork.busy()) {
       return false;
     }
     if (!this.runtime.participantSessionId.trim()) {
@@ -2826,18 +2836,19 @@ export class ParticipantViewFacade {
     this.participantEvents.stop();
     let payload: ParticipantSignInResponse;
     try {
+      const credentials = await this.proofOfWork.protectParticipant({
+        tenantKey: this.workspace.tenantKey.trim() || undefined,
+        workspaceKey: this.workspace.workspaceKey.trim(),
+        loginKey: this.runtime.loginKey.trim(),
+        groupKey: this.runtime.groupKey.trim() || undefined,
+        password: this.runtime.participantPassword || undefined,
+        participantCode: this.runtime.participantCode.trim() || undefined
+      });
       payload = await this.requestState.request<ParticipantSignInResponse>(
         "Participant Sign In",
         "POST",
         productionApiRoutes.participant.signIn,
-        {
-          tenantKey: this.workspace.tenantKey.trim() || undefined,
-          workspaceKey: this.workspace.workspaceKey.trim(),
-          loginKey: this.runtime.loginKey.trim(),
-          groupKey: this.runtime.groupKey.trim() || undefined,
-          password: this.runtime.participantPassword || undefined,
-          participantCode: this.runtime.participantCode.trim() || undefined
-        } satisfies ParticipantSignInRequest
+        credentials satisfies ParticipantSignInRequest
       );
     } catch (error) {
       if (this.handleParticipantCodeChallenge(error)) {
@@ -3021,18 +3032,21 @@ export class ParticipantViewFacade {
   private async starterLaunchInternal(): Promise<void> {
     let payload: ParticipantLaunchResponse;
     try {
+      const credentials = await this.proofOfWork.protectParticipant({
+        tenantKey: this.workspace.tenantKey.trim() || undefined,
+        workspaceKey: this.workspace.workspaceKey.trim() || undefined,
+        loginKey: this.runtime.loginKey.trim(),
+        groupKey: this.runtime.groupKey.trim() || undefined,
+        password: this.runtime.participantPassword || undefined,
+        participantCode: this.runtime.participantCode.trim() || undefined
+      });
       payload = await this.requestState.request<ParticipantLaunchResponse>(
         "Participant Starter Launch",
         "POST",
         productionApiRoutes.participant.launch,
         {
-          tenantKey: this.workspace.tenantKey.trim() || undefined,
-          workspaceKey: this.workspace.workspaceKey.trim() || undefined,
-          loginKey: this.runtime.loginKey.trim(),
-          groupKey: this.runtime.groupKey.trim() || undefined,
+          ...credentials,
           bookletKey: this.runtime.bookletKey.trim() || undefined,
-          password: this.runtime.participantPassword || undefined,
-          participantCode: this.runtime.participantCode.trim() || undefined
         } satisfies ParticipantLaunchRequest
       );
     } catch (error) {

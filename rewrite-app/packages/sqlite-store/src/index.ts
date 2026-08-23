@@ -1480,6 +1480,19 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE test_runs
         ADD COLUMN shared_parameters_json TEXT NOT NULL DEFAULT '[]';
     `
+  },
+  {
+    version: 56,
+    name: "add_consumed_proof_of_work_challenges",
+    sql: `
+      CREATE TABLE consumed_proof_of_work_challenges (
+        challenge_id TEXT PRIMARY KEY,
+        consumed_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_consumed_proof_of_work_challenges_expiry
+        ON consumed_proof_of_work_challenges (expires_at);
+    `
   }
 ];
 
@@ -1840,6 +1853,29 @@ export const createSqliteFirstSliceRepository = (
         throw new Error("Admin login failure could not be persisted.");
       }
       return result;
+    },
+    async consumeProofOfWorkChallenge(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        database
+          .prepare(
+            `DELETE FROM consumed_proof_of_work_challenges
+             WHERE expires_at <= ?`
+          )
+          .run(input.consumedAt);
+        const insertion = database
+          .prepare(
+            `INSERT OR IGNORE INTO consumed_proof_of_work_challenges (
+              challenge_id, consumed_at, expires_at
+            ) VALUES (?, ?, ?)`
+          )
+          .run(input.challengeId, input.consumedAt, input.expiresAt);
+        database.exec("COMMIT");
+        return Number(insertion.changes) === 1;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
     },
     async saveAdminUser(adminUser) {
       database

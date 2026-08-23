@@ -45,6 +45,10 @@ type PersistedFirstSliceState = {
   attachmentFiles: Record<string, AttachmentFile>;
   adminUsers: Record<string, AdminUser>;
   adminLoginAttempts: Record<string, AdminLoginAttempt>;
+  proofOfWorkChallenges: Record<
+    string,
+    { consumedAt: string; expiresAt: string }
+  >;
   adminRoleAssignments: Record<string, AdminRoleAssignment>;
   adminAuditEvents: Record<string, AdminAuditEvent>;
   adminSessions: Record<string, AdminSession>;
@@ -89,6 +93,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   attachmentFiles: {},
   adminUsers: {},
   adminLoginAttempts: {},
+  proofOfWorkChallenges: {},
   adminRoleAssignments: {},
   adminAuditEvents: {},
   adminSessions: {},
@@ -679,6 +684,27 @@ export const createFileFirstSliceRepository = (
         throw new Error("Admin login failure could not be persisted.");
       }
       return result;
+    },
+    async consumeProofOfWorkChallenge(input) {
+      let consumed = false;
+      await mutate(state => {
+        for (const [challengeId, challenge] of Object.entries(
+          state.proofOfWorkChallenges
+        )) {
+          if (challenge.expiresAt <= input.consumedAt) {
+            delete state.proofOfWorkChallenges[challengeId];
+          }
+        }
+        if (state.proofOfWorkChallenges[input.challengeId]) {
+          return;
+        }
+        state.proofOfWorkChallenges[input.challengeId] = {
+          consumedAt: input.consumedAt,
+          expiresAt: input.expiresAt
+        };
+        consumed = true;
+      });
+      return consumed;
     },
     async saveAdminUser(adminUser) {
       await mutate(state => {

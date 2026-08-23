@@ -31,6 +31,10 @@ type InMemoryFirstSliceState = {
   adminUsers: Map<string, AdminUser>;
   adminUsersByUsername: Map<string, AdminUser>;
   adminLoginAttempts: Map<string, AdminLoginAttempt>;
+  proofOfWorkChallenges: Map<
+    string,
+    { consumedAt: string; expiresAt: string }
+  >;
   adminRoleAssignments: Map<string, AdminRoleAssignment>;
   adminAuditEvents: Map<string, AdminAuditEvent>;
   adminSessionsByToken: Map<string, AdminSession>;
@@ -61,6 +65,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   adminUsers: new Map(),
   adminUsersByUsername: new Map(),
   adminLoginAttempts: new Map(),
+  proofOfWorkChallenges: new Map(),
   adminRoleAssignments: new Map(),
   adminAuditEvents: new Map(),
   adminSessionsByToken: new Map(),
@@ -165,6 +170,21 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       };
       state.adminLoginAttempts.set(input.username, next);
       return next;
+    },
+    async consumeProofOfWorkChallenge(input) {
+      for (const [challengeId, challenge] of state.proofOfWorkChallenges) {
+        if (challenge.expiresAt <= input.consumedAt) {
+          state.proofOfWorkChallenges.delete(challengeId);
+        }
+      }
+      if (state.proofOfWorkChallenges.has(input.challengeId)) {
+        return false;
+      }
+      state.proofOfWorkChallenges.set(input.challengeId, {
+        consumedAt: input.consumedAt,
+        expiresAt: input.expiresAt
+      });
+      return true;
     },
     async saveAdminUser(adminUser) {
       state.adminUsers.set(adminUser.adminUserId, adminUser);

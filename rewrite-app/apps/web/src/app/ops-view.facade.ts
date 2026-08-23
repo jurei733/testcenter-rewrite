@@ -51,6 +51,7 @@ import {
 } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
+import { ProofOfWorkService } from "./proof-of-work.service";
 import {
   RewriteAppOpsService,
   type AdminUserDeletionBatchResult,
@@ -157,6 +158,7 @@ export class OpsViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly proofOfWork = inject(ProofOfWorkService);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly applicationAssets = inject(ApplicationAssetAdminService);
 
@@ -466,13 +468,19 @@ export class OpsViewFacade {
 
   get canUseAdminCredentials(): boolean {
     return (
+      !this.proofOfWork.busy() &&
       this.ops.adminUsername.trim() !== "" &&
       this.ops.adminPassword !== ""
     );
   }
 
+  get proofOfWorkBusy(): boolean {
+    return this.proofOfWork.busy();
+  }
+
   get canBootstrapAdminCredentials(): boolean {
     return (
+      !this.proofOfWork.busy() &&
       this.ops.adminUsername.trim() !== "" &&
       this.isAdminPasswordValid(this.ops.adminPassword)
     );

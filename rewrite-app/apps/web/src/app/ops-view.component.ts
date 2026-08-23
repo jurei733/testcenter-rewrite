@@ -63,7 +63,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               Password
               <input id="adminPassword" name="adminPassword" type="password" autocomplete="current-password" [(ngModel)]="view.ops.adminPassword" />
             </label>
-            <button id="adminSignInButton" class="primary" type="submit" [disabled]="!view.canUseAdminCredentials">Sign In</button>
+            <button id="adminSignInButton" class="primary" type="submit" [disabled]="!view.canUseAdminCredentials">{{ view.proofOfWorkBusy ? "Computing Security Challenge…" : "Sign In" }}</button>
           </form>
 
           <details id="firstDeploymentSetup" class="operator-bootstrap-details" *ngIf="view.canBootstrapAdmin">

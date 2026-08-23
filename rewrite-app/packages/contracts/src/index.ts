@@ -321,6 +321,7 @@ export const productionApiRoutes = {
   },
   system: {
     getTime: "/api/v1/system/time",
+    createProofOfWorkChallenge: "/api/v1/system/proof-of-work/challenges",
     getBugReportConfig: "/api/v1/system/bug-report",
     submitBugReport: "/api/v1/system/bug-reports",
     getApplicationSettings: "/api/v1/system/application-settings",
@@ -543,13 +544,34 @@ export type AdminAuditEventListQuery = {
   limit?: number;
 };
 
-export type ParticipantSignInRequest = {
+export const proofOfWorkScopes = [
+  "admin",
+  "participant",
+  "second_code"
+] as const;
+
+export type ProofOfWorkScope = (typeof proofOfWorkScopes)[number];
+
+export type ProofOfWorkSolution = {
+  token: string;
+  number: number;
+};
+
+export type ProofOfWorkSolutions = Partial<
+  Record<ProofOfWorkScope, ProofOfWorkSolution>
+>;
+
+export type ParticipantSignInCredentials = {
   tenantKey?: string;
   workspaceKey?: string;
   loginKey: string;
   groupKey?: string;
   password?: string;
   participantCode?: string;
+};
+
+export type ParticipantSignInRequest = ParticipantSignInCredentials & {
+  proofOfWork?: ProofOfWorkSolutions;
 };
 
 export type PublicAdminUser = Omit<AdminUser, "passwordHash">;
@@ -764,9 +786,32 @@ export type BootstrapAdminUserRequest = {
   password: string;
 };
 
-export type AdminSignInRequest = {
+export type AdminSignInCredentials = {
   username: string;
   password: string;
+};
+
+export type AdminSignInRequest = AdminSignInCredentials & {
+  proofOfWork?: ProofOfWorkSolutions;
+};
+
+export type CreateProofOfWorkChallengeRequest =
+  | {
+      scope: "admin";
+      credentials: AdminSignInCredentials;
+    }
+  | {
+      scope: "participant" | "second_code";
+      credentials: ParticipantSignInCredentials;
+    };
+
+export type CreateProofOfWorkChallengeResponse = {
+  algorithm: "SHA-256";
+  challenge: string;
+  salt: string;
+  maxNumber: number;
+  expiresAt: string;
+  token: string;
 };
 
 export type AdminPasswordPolicy = {
@@ -888,6 +933,7 @@ export type ParticipantLaunchRequest = {
   bookletKey?: string;
   password?: string;
   participantCode?: string;
+  proofOfWork?: ProofOfWorkSolutions;
 };
 
 export type ImportParticipantRosterRequest = {
@@ -1565,6 +1611,14 @@ export type GetRuntimeConfigResponse = {
       failureWindowMs: number;
     };
     adminPasswordPolicy: AdminPasswordPolicy;
+    proofOfWork: {
+      enabledScopes: ProofOfWorkScope[];
+      algorithm: "SHA-256";
+      maxNumber: number;
+      ttlMs: number;
+      currentKeyId: string | null;
+      previousKeyConfigured: boolean;
+    };
     participantLoginProtection: {
       maxFailures: number;
       failureWindowMs: number;
@@ -1587,6 +1641,11 @@ export type GetRuntimeConfigResponse = {
       firstSliceAdminLoginFailureWindowMsPresent: boolean;
       firstSliceAdminPasswordMinLengthPresent: boolean;
       firstSliceAdminPasswordPatternPresent: boolean;
+      firstSliceProofOfWorkScopesPresent: boolean;
+      firstSliceProofOfWorkSecretPresent: boolean;
+      firstSliceProofOfWorkPreviousSecretPresent: boolean;
+      firstSliceProofOfWorkMaxNumberPresent: boolean;
+      firstSliceProofOfWorkTtlMsPresent: boolean;
       firstSliceParticipantLoginMaxFailuresPresent: boolean;
       firstSliceParticipantLoginFailureWindowMsPresent: boolean;
       firstSliceBootstrapDemo: boolean;

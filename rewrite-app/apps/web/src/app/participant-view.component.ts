@@ -260,7 +260,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
         ></div>
         <div class="actions">
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
-            Sign In
+            {{ view.proofOfWorkBusy ? "Computing Security Challenge…" : "Sign In" }}
           </button>
           <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">{{ view.starterActionLabel }}</button>
           <button id="participantRouteRefreshCurrentStateButton" class="ghost" type="button" [disabled]="!view.canRefreshCurrentState" (click)="view.refreshCurrentState()">Refresh Current State</button>

@@ -305,6 +305,27 @@ test("SQLite persists and atomically advances admin login failures", async () =>
   }
 });
 
+test("SQLite persists and atomically consumes proof-of-work challenges", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-proof-"));
+  const databasePath = join(tempDirectory, "proof.sqlite");
+  try {
+    const first = createSqliteFirstSliceRepository(databasePath);
+    const second = createSqliteFirstSliceRepository(databasePath);
+    const input = {
+      challengeId: "challenge:sqlite-store",
+      consumedAt: "2026-08-23T12:00:00.000Z",
+      expiresAt: "2099-08-23T12:02:00.000Z"
+    };
+    assert.equal(await first.consumeProofOfWorkChallenge(input), true);
+    assert.equal(await second.consumeProofOfWorkChallenge(input), false);
+
+    const restarted = createSqliteFirstSliceRepository(databasePath);
+    assert.equal(await restarted.consumeProofOfWorkChallenge(input), false);
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite preserves workspace-admin access modes", async () => {
   const repository = createSqliteFirstSliceRepository(":memory:");
   const roleAssignment: AdminRoleAssignment = {

@@ -32,10 +32,10 @@ current Test-Controller/Speedtest behavior is represented below. Test-only,
 selector-only, documentation, fixture-refactoring, and CI-artifact changes do
 not create separate product requirements. The 18.2 release audit did expose
 two operational security requirements that were not explicit before.
-Configurable Superadmin password length/pattern enforcement is now represented
-end to end; optional signed browser-computed proof-of-work for admin,
-participant-login, and second-code entry remains, as does an explicit
-production owner for HSTS and bootstrap/challenge secrets.
+Configurable Superadmin password length/pattern enforcement is represented end
+to end; optional signed browser-computed proof-of-work now protects admin,
+participant-login, and second-code entry independently. An explicit production
+owner for HSTS and bootstrap-secret injection remains.
 
 Status:
 
@@ -52,11 +52,12 @@ Priority:
 ## Audited completion snapshot
 
 Against the release and master revisions above, the rounded engineering
-estimate is **92% functional parity (uncertainty about +/- 3 percentage
+estimate is **93% functional parity (uncertainty about +/- 3 percentage
 points)**. The estimate weights P0/P1/P2 capabilities 5/3/1, treats every
 `done` row as complete, and scores each `partial` row from its concrete
 remaining behavior rather than from source-line counts. It therefore includes
-the newly recorded 18.2 security requirements and does not treat test-only
+the newly recorded 18.2 security requirements, including the now-complete
+password-policy and proof-of-work boundary, and does not treat test-only
 upstream churn as missing application behavior. This is a dated planning
 estimate, not evidence that every production package or deployment has passed
 acceptance.
@@ -65,8 +66,8 @@ New requirements found by the 18.2/current-master audit:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
-| Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | partial | P1 | the rewrite now applies one deployment-configurable administrator-password minimum and JavaScript regular-expression rule to bootstrap, create, reset, required change, voluntary change, and bulk-reset validation in API and Angular, while preserving sign-in for existing passwords after policy changes. Invalid settings fail startup/preflight, the secret-free effective policy reaches clients through runtime configuration, and contract/API/production Chromium gates cover rejection plus rendering. Passwords remain hashed and redacted, and durable admin/participant login sinks remain active. The remaining 18.2 gap is optional signed browser-computed proof-of-work independently selectable for administrator credentials, participant credentials, and second-code entry. Challenge replay/expiry, secret rotation, disabled-mode compatibility, rate-limit composition, and production Chromium coverage are required before this row is `done` |
-| Production TLS and bootstrap secret controls | 18.2 `HSTS_ENABLED`, `ADMIN_INIT_PASSWORD`, `SERVER_KEY` deployment contract | partial | P1 | the rewrite already emits and tests baseline security headers, keeps bootstrap entry explicit, and redacts request secrets and protected diagnostics. Remaining production evidence is one documented and automated deployment boundary that owns configurable HSTS, injects the initial administrator secret without source/default/log exposure, and rotates the proof-of-work signing secret without accepting signatures from an unintended key. Equivalent ingress/secret-manager controls are acceptable; identical Original environment-variable names are not required |
+| Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | done | P1 | the rewrite applies one deployment-configurable administrator-password minimum and JavaScript regular-expression rule to every password write while preserving sign-in for existing passwords after policy changes. Optional SHA-256 browser proof of work is independently selectable for administrator credentials, all participant logins, and second codes; the global admin and participant scopes also prevent an omitted required password from cheaply filling their failure sinks. Angular uses `altcha-lib` Workers like the Original. Signed short-lived tokens bind a keyed credential digest without exposing the credential, accept only the current or explicitly configured previous key ID, and are atomically consumed in memory/file/SQLite/Postgres. Startup and preflight validate scopes, secret length, distinct rotation keys, work range, and TTL; secret-free runtime configuration drives disabled-mode-compatible clients. Unit/API gates cover credential binding, expiry, replay, controlled rotation, redaction, password-omission resistance, and rate-limit composition, while production SQLite/Chromium proves all three scopes end to end |
+| Production TLS and bootstrap secret controls | 18.2 `HSTS_ENABLED`, `ADMIN_INIT_PASSWORD`, `SERVER_KEY` deployment contract | partial | P1 | the rewrite emits and tests baseline security headers, keeps bootstrap entry explicit, and redacts request secrets and protected diagnostics. The proof-of-work secret has a documented two-deployment secret-manager rotation: only current plus explicit previous key IDs are accepted, and the previous key is removed after one TTL and old-instance drain. Remaining production evidence is one documented and automated deployment boundary that owns configurable HSTS and injects the initial administrator secret without source/default/log exposure. Equivalent ingress/secret-manager controls are acceptable; identical Original environment-variable names are not required |
 
 ## Priority queue
 

@@ -1411,6 +1411,19 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE test_runs
         ADD COLUMN IF NOT EXISTS shared_parameters_json JSONB NOT NULL DEFAULT '[]'::jsonb;
     `
+  },
+  {
+    version: 50,
+    name: "add_consumed_proof_of_work_challenges",
+    sql: `
+      CREATE TABLE IF NOT EXISTS consumed_proof_of_work_challenges (
+        challenge_id TEXT PRIMARY KEY,
+        consumed_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_consumed_proof_of_work_challenges_expiry
+        ON consumed_proof_of_work_challenges (expires_at);
+    `
   }
 ];
 
@@ -1754,6 +1767,22 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         throw new Error("Admin login failure could not be persisted.");
       }
       return loginAttempt;
+    },
+    async consumeProofOfWorkChallenge(input) {
+      await pool.query(
+        `DELETE FROM consumed_proof_of_work_challenges
+         WHERE expires_at <= $1`,
+        [input.consumedAt]
+      );
+      const result = await pool.query<{ challenge_id: string }>(
+        `INSERT INTO consumed_proof_of_work_challenges (
+          challenge_id, consumed_at, expires_at
+        ) VALUES ($1, $2, $3)
+        ON CONFLICT (challenge_id) DO NOTHING
+        RETURNING challenge_id`,
+        [input.challengeId, input.consumedAt, input.expiresAt]
+      );
+      return result.rowCount === 1;
     },
     async saveAdminUser(adminUser) {
       await pool.query(

@@ -1259,6 +1259,11 @@ export type FirstSliceRepository = {
     attemptedAt: string;
     expiresAt: string;
   }): Promise<AdminLoginAttempt>;
+  consumeProofOfWorkChallenge(input: {
+    challengeId: string;
+    consumedAt: string;
+    expiresAt: string;
+  }): Promise<boolean>;
   saveAdminUser(adminUser: AdminUser): Promise<void>;
   deleteAdminUser(adminUserId: string): Promise<{
     deletedRoleAssignmentCount: number;

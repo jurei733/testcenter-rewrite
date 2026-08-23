@@ -469,6 +469,33 @@ describe("createFileFirstSliceRepository", () => {
     }
   });
 
+  it("persists and atomically consumes proof-of-work challenges", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-proof-"));
+    const filePath = join(tempDirectory, "state.json");
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      const input = {
+        challengeId: "challenge:file-store",
+        consumedAt: "2026-08-23T12:00:00.000Z",
+        expiresAt: "2099-08-23T12:02:00.000Z"
+      };
+      const attempts = await Promise.all(
+        Array.from({ length: 8 }, () =>
+          repository.consumeProofOfWorkChallenge(input)
+        )
+      );
+      assert.equal(attempts.filter(Boolean).length, 1);
+
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.equal(
+        await restarted.consumeProofOfWorkChallenge(input),
+        false
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("preserves global application settings across repository restarts", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-settings-"));
     const filePath = join(tempDirectory, "state.json");

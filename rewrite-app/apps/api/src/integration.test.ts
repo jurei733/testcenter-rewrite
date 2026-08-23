@@ -20,10 +20,14 @@ import {
   type CreateAdminUserResponse,
   type GetRuntimeConfigResponse,
   type GetSystemTimeResponse,
-  type ListSourcePackagesResponse
+  type ListSourcePackagesResponse,
+  type CreateProofOfWorkChallengeResponse,
+  type ProofOfWorkSolution
 } from "@testcenter-rewrite-app/contracts";
+import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
 
 import { createProductionApiServer } from "./index.js";
+import { ProofOfWorkManager } from "./proof-of-work.js";
 
 let server: Awaited<ReturnType<typeof createProductionApiServer>>;
 
@@ -40,6 +44,24 @@ const readBrotliBase64Fixture = (fixturePath: string): string =>
   ).toString("utf8");
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+const solveProofOfWork = (
+  challenge: Pick<
+    CreateProofOfWorkChallengeResponse,
+    "challenge" | "salt" | "maxNumber" | "token"
+  >
+): ProofOfWorkSolution => {
+  for (let number = 0; number <= challenge.maxNumber; number += 1) {
+    if (
+      createHash("sha256")
+        .update(`${challenge.salt}${number}`, "utf8")
+        .digest("hex") === challenge.challenge
+    ) {
+      return { token: challenge.token, number };
+    }
+  }
+  throw new Error("Proof-of-work fixture challenge was not solvable.");
+};
 
 type ZipCompressionMethod = 0 | 8;
 type ZipFixtureEntry = {
@@ -689,6 +711,400 @@ before(async () => {
 
 after(async () => {
   await closeServer(server);
+});
+
+test("proof-of-work challenges bind credentials, expire, rotate, and reject replay", async () => {
+  const repository = createInMemoryFirstSliceRepository();
+  let now = 1_000;
+  const oldSecret = "proof-of-work-old-secret-1234567890";
+  const currentSecret = "proof-of-work-current-secret-1234567890";
+  const credentials = {
+    username: "security.admin",
+    password: "correct-secret"
+  };
+  const oldManager = new ProofOfWorkManager(
+    repository,
+    {
+      enabledScopes: ["admin"],
+      maxNumber: 64,
+      ttlMs: 1_000,
+      currentSecret: oldSecret,
+      previousSecret: null
+    },
+    () => now
+  );
+  const rotatedChallenge = oldManager.createChallenge({
+    scope: "admin",
+    credentials
+  });
+  const rotatedSolution = solveProofOfWork(rotatedChallenge);
+  const rotatedManager = new ProofOfWorkManager(
+    repository,
+    {
+      enabledScopes: ["admin"],
+      maxNumber: 64,
+      ttlMs: 1_000,
+      currentSecret,
+      previousSecret: oldSecret
+    },
+    () => now
+  );
+
+  await assert.rejects(
+    rotatedManager.verify(
+      "admin",
+      { ...credentials, password: "different-secret" },
+      rotatedSolution
+    ),
+    (error: unknown) =>
+      !!error &&
+      typeof error === "object" &&
+      "errorCode" in error &&
+      error.errorCode === "proof_of_work_invalid"
+  );
+  await rotatedManager.verify("admin", credentials, rotatedSolution);
+  await assert.rejects(
+    rotatedManager.verify("admin", credentials, rotatedSolution),
+    (error: unknown) =>
+      !!error &&
+      typeof error === "object" &&
+      "errorCode" in error &&
+      error.errorCode === "proof_of_work_replayed"
+  );
+
+  const expiringChallenge = rotatedManager.createChallenge({
+    scope: "admin",
+    credentials
+  });
+  now += 1_000;
+  await assert.rejects(
+    rotatedManager.verify(
+      "admin",
+      credentials,
+      solveProofOfWork(expiringChallenge)
+    ),
+    (error: unknown) =>
+      !!error &&
+      typeof error === "object" &&
+      "errorCode" in error &&
+      error.errorCode === "proof_of_work_expired"
+  );
+
+  const withoutPreviousKey = new ProofOfWorkManager(repository, {
+    enabledScopes: ["admin"],
+    maxNumber: 64,
+    ttlMs: 1_000,
+    currentSecret,
+    previousSecret: null
+  });
+  const legacyChallenge = oldManager.createChallenge({
+    scope: "admin",
+    credentials
+  });
+  await assert.rejects(
+    withoutPreviousKey.verify(
+      "admin",
+      credentials,
+      solveProofOfWork(legacyChallenge)
+    ),
+    (error: unknown) =>
+      !!error &&
+      typeof error === "object" &&
+      "errorCode" in error &&
+      error.errorCode === "proof_of_work_invalid"
+  );
+});
+
+test("admin proof of work composes with login rate limiting", async () => {
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore =
+    requestedStore === "file" ||
+    requestedStore === "sqlite" ||
+    requestedStore === "postgres"
+      ? requestedStore
+      : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES: "3",
+    FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS: "1000",
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: "admin",
+    FIRST_SLICE_PROOF_OF_WORK_SECRET:
+      "integration-proof-of-work-secret-1234567890",
+    FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: "64",
+    FIRST_SLICE_PROOF_OF_WORK_TTL_MS: "30000"
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.proof-of-work`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.proof-of-work.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+  const credentials = {
+    username: `protected.admin.${process.pid}.${Date.now()}`,
+    password: "correct-admin-secret"
+  };
+  const createChallenge = async (password: string) => {
+    const response = await requestJsonAt<CreateProofOfWorkChallengeResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.createProofOfWorkChallenge,
+      {
+        method: "POST",
+        body: {
+          scope: "admin",
+          credentials: { username: credentials.username, password }
+        }
+      }
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    return solveProofOfWork(response.body);
+  };
+
+  try {
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.getRuntimeConfig
+    );
+    assert.deepEqual(config.body.runtimeConfig.proofOfWork.enabledScopes, [
+      "admin"
+    ]);
+    assert.equal(config.body.runtimeConfig.proofOfWork.maxNumber, 64);
+    assert.equal(
+      JSON.stringify(config.body).includes(
+        "integration-proof-of-work-secret-1234567890"
+      ),
+      false
+    );
+
+    const bootstrap = await requestJsonAt(
+      isolated.baseUrl,
+      productionApiRoutes.admin.bootstrap,
+      { method: "POST", body: credentials }
+    );
+    assert.equal(bootstrap.status, 201);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const missing = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        productionApiRoutes.admin.signIn,
+        { method: "POST", body: credentials }
+      );
+      assert.equal(missing.status, 400);
+      assert.equal(missing.body.error, "proof_of_work_required");
+    }
+
+    const emptyPasswordMissingProof = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: { username: credentials.username, password: "" }
+      }
+    );
+    assert.equal(emptyPasswordMissingProof.status, 400);
+    assert.equal(
+      emptyPasswordMissingProof.body.error,
+      "proof_of_work_required"
+    );
+
+    const emptyPassword = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: {
+          username: credentials.username,
+          password: "",
+          proofOfWork: { admin: await createChallenge("") }
+        }
+      }
+    );
+    assert.equal(emptyPassword.status, 401);
+    assert.equal(emptyPassword.body.error, "admin_credentials_invalid");
+
+    const wrongPassword = "wrong-admin-secret";
+    const rejected = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: {
+          username: credentials.username,
+          password: wrongPassword,
+          proofOfWork: { admin: await createChallenge(wrongPassword) }
+        }
+      }
+    );
+    assert.equal(rejected.status, 401);
+    assert.equal(rejected.body.error, "admin_credentials_invalid");
+
+    const solution = await createChallenge(credentials.password);
+    const accepted = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: { ...credentials, proofOfWork: { admin: solution } }
+      }
+    );
+    assert.equal(accepted.status, 200);
+    assert.ok(accepted.body.sessionToken);
+
+    const replayed = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: { ...credentials, proofOfWork: { admin: solution } }
+      }
+    );
+    assert.equal(replayed.status, 409);
+    assert.equal(replayed.body.error, "proof_of_work_replayed");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("participant proof of work cannot be bypassed by omitting a roster password", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "2",
+    FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "30000",
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: "participant",
+    FIRST_SLICE_PROOF_OF_WORK_SECRET:
+      "participant-proof-of-work-secret-1234567890",
+    FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: "64",
+    FIRST_SLICE_PROOF_OF_WORK_TTL_MS: "30000"
+  });
+  const credentials = {
+    tenantKey: "demo-tenant",
+    workspaceKey: "demo-workspace",
+    loginKey: "proof-protected-participant",
+    groupKey: "group:proof-protected"
+  };
+  const createChallenge = async (password: string | undefined) => {
+    const response = await requestJsonAt<CreateProofOfWorkChallengeResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.createProofOfWorkChallenge,
+      {
+        method: "POST",
+        body: {
+          scope: "participant",
+          credentials: { ...credentials, password }
+        }
+      }
+    );
+    assert.equal(response.status, 200);
+    return solveProofOfWork(response.body);
+  };
+
+  try {
+    const roster = await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: [
+            "loginKey,groupKey,bookletKey,pw",
+            "proof-protected-participant,group:proof-protected,booklet:demo,correct-participant-secret"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(roster.status, 201);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const missingProof = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        productionApiRoutes.participant.signIn,
+        { method: "POST", body: credentials }
+      );
+      assert.equal(missingProof.status, 400);
+      assert.equal(missingProof.body.error, "proof_of_work_required");
+    }
+
+    const invalidPassword = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.participant.signIn,
+      {
+        method: "POST",
+        body: {
+          ...credentials,
+          proofOfWork: {
+            participant: await createChallenge(undefined)
+          }
+        }
+      }
+    );
+    assert.equal(invalidPassword.status, 401);
+    assert.equal(invalidPassword.body.error, "participant_password_invalid");
+
+    const password = "correct-participant-secret";
+    const accepted = await requestJsonAt<{
+      participantSession: { loginKey: string };
+    }>(isolated.baseUrl, productionApiRoutes.participant.signIn, {
+      method: "POST",
+      body: {
+        ...credentials,
+        password,
+        proofOfWork: {
+          participant: await createChallenge(password)
+        }
+      }
+    });
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.participantSession.loginKey, credentials.loginKey);
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("disabled proof-of-work mode preserves direct authentication contracts", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: "",
+    FIRST_SLICE_PROOF_OF_WORK_SECRET: ""
+  });
+  const credentials = {
+    username: `disabled.proof.${process.pid}.${Date.now()}`,
+    password: "disabled-proof-admin-secret"
+  };
+  try {
+    const bootstrap = await requestJsonAt(
+      isolated.baseUrl,
+      productionApiRoutes.admin.bootstrap,
+      { method: "POST", body: credentials }
+    );
+    assert.equal(bootstrap.status, 201);
+    const signIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      { method: "POST", body: credentials }
+    );
+    assert.equal(signIn.status, 200);
+    assert.ok(signIn.body.sessionToken);
+
+    const challenge = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.system.createProofOfWorkChallenge,
+      {
+        method: "POST",
+        body: { scope: "admin", credentials }
+      }
+    );
+    assert.equal(challenge.status, 409);
+    assert.equal(challenge.body.error, "proof_of_work_scope_disabled");
+  } finally {
+    await closeServer(isolated.server);
+  }
 });
 
 test("bug-report endpoints keep direct delivery disabled without server credentials", async () => {
@@ -6891,6 +7307,66 @@ test("runtime port and shutdown drain settings are validated and exposed", async
         FIRST_SLICE_ADMIN_PASSWORD_PATTERN: "["
       }),
     /FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_SCOPES: "admin,unknown",
+        FIRST_SLICE_PROOF_OF_WORK_SECRET:
+          "startup-proof-of-work-secret-1234567890"
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_SCOPES contains unsupported scope 'unknown'/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_SCOPES: "admin",
+        FIRST_SLICE_PROOF_OF_WORK_SECRET: ""
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_SECRET is required when proof-of-work scopes are enabled/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_SECRET: "short-secret"
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_SECRET must contain at least 32 characters/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_SECRET:
+          "same-proof-of-work-secret-1234567890",
+        FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET:
+          "same-proof-of-work-secret-1234567890"
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET must differ/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: "10000001"
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER must be between 1 and 10000000/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PROOF_OF_WORK_TTL_MS: "999"
+      }),
+    /FIRST_SLICE_PROOF_OF_WORK_TTL_MS must be between 1000 and 600000/
   );
 });
 
