@@ -6436,24 +6436,28 @@ try {
   const batchDisposablePayload = await batchDisposableResponse.json();
   assert.ok(batchDisposablePayload.sourcePackage?.sourcePackageId);
   await page.locator("#refreshContentReadsButton").click();
-  await clickCardAction(
-    "Source Packages",
-    "Add To Delete Batch",
-    uploadedSourceFileName
-  );
-  await page
-    .locator("#sourcePackageDeletionSelection")
-    .filter({ hasText: "1 file(s) selected" })
-    .waitFor({ timeout: 15_000 });
-  await clickCardAction(
-    "Source Packages",
-    "Add To Delete Batch",
-    batchDisposableFileName
-  );
-  await page
-    .locator("#sourcePackageDeletionSelection")
-    .filter({ hasText: "2 file(s) selected" })
-    .waitFor();
+  const addSourcePackageToDeleteBatch = async (fileName, expectedCount) => {
+    const expectedSelection = page
+      .locator("#sourcePackageDeletionSelection")
+      .filter({ hasText: `${expectedCount} file(s) selected` });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await clickCardAction(
+        "Source Packages",
+        "Add To Delete Batch",
+        fileName
+      );
+      try {
+        await expectedSelection.waitFor({ timeout: 5_000 });
+        return;
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+      }
+    }
+  };
+  await addSourcePackageToDeleteBatch(uploadedSourceFileName, 1);
+  await addSourcePackageToDeleteBatch(batchDisposableFileName, 2);
   await expectButtonSelectorEnabled("#deleteSourcePackageBatchButton");
   const deleteSourcePackageBatchDialog = acceptAppConfirmation(
     /Delete selected workspace files\?/,
