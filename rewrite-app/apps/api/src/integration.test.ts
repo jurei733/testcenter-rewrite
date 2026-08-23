@@ -12117,6 +12117,64 @@ test("source-package intake rejects invalid metadata before import", async () =>
   assert.equal(blankFileName.status, 400);
   assert.equal(blankFileName.body.error, "source_package_file_name_required");
 
+  const maxAsciiFileName = `${"a".repeat(116)}.txt`;
+  assert.equal(Buffer.byteLength(maxAsciiFileName, "utf8"), 120);
+  const maxAsciiFileNameUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: maxAsciiFileName,
+      mediaType: "text/plain",
+      sourceDocument: "ASCII filename boundary"
+    }
+  });
+  assert.equal(maxAsciiFileNameUpload.status, 201);
+
+  const maxMultibyteFileName = `nested/${"ä".repeat(58)}.txt`;
+  assert.equal(
+    Buffer.byteLength(maxMultibyteFileName.split("/").at(-1)!, "utf8"),
+    120
+  );
+  const maxMultibyteFileNameUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: maxMultibyteFileName,
+      mediaType: "text/plain",
+      sourceDocument: "Multibyte filename boundary"
+    }
+  });
+  assert.equal(maxMultibyteFileNameUpload.status, 201);
+
+  for (const fileName of [
+    `${"a".repeat(117)}.txt`,
+    `nested/${"ä".repeat(59)}.txt`
+  ]) {
+    const tooLongFileName = await requestJson<{
+      error: string;
+      details: { maximumBytes: number; actualBytes: number };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName,
+          mediaType: "text/plain",
+          sourceDocument: "Rejected filename boundary"
+        }
+      }
+    );
+    assert.equal(tooLongFileName.status, 400);
+    assert.equal(
+      tooLongFileName.body.error,
+      "source_package_file_name_too_long"
+    );
+    assert.equal(tooLongFileName.body.details.maximumBytes, 120);
+    assert.ok(tooLongFileName.body.details.actualBytes > 120);
+  }
+
   const blankMediaType = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
     {
@@ -12181,6 +12239,56 @@ test("source-package intake rejects invalid metadata before import", async () =>
     }
   });
   assert.equal(metadataOnlySourcePackage.status, 201);
+
+  const tooLongRetryFileName = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${validSourcePackage.body.sourcePackage.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: { fileName: `${"r".repeat(117)}.xml` }
+    }
+  );
+  assert.equal(tooLongRetryFileName.status, 400);
+  assert.equal(
+    tooLongRetryFileName.body.error,
+    "source_package_file_name_too_long"
+  );
+
+  const tooLongReplacementFileName = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${validSourcePackage.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: `${"p".repeat(117)}.xml`,
+        mediaType: "application/xml",
+        sourceDocument:
+          "<assessment><booklet key=\"booklet:replacement\"><unit key=\"unit-replacement\" /></booklet></assessment>"
+      }
+    }
+  );
+  assert.equal(tooLongReplacementFileName.status, 400);
+  assert.equal(
+    tooLongReplacementFileName.body.error,
+    "source_package_file_name_too_long"
+  );
+
+  const tooLongAssemblyFileName = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-package-assemblies`,
+    {
+      method: "POST",
+      body: {
+        fileName: "z".repeat(117),
+        sourcePackageIds: [
+          maxAsciiFileNameUpload.body.sourcePackage.sourcePackageId,
+          maxMultibyteFileNameUpload.body.sourcePackage.sourcePackageId
+        ]
+      }
+    }
+  );
+  assert.equal(tooLongAssemblyFileName.status, 400);
+  assert.equal(
+    tooLongAssemblyFileName.body.error,
+    "source_package_file_name_too_long"
+  );
   const unavailableDownload = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${metadataOnlySourcePackage.body.sourcePackage.sourcePackageId}/download`
   );

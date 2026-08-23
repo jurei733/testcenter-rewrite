@@ -2188,6 +2188,39 @@ const normalizeSourcePackageText = (
   return value.trim();
 };
 
+const ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES = 120;
+
+const normalizeSourcePackageFileName = (value: unknown): string => {
+  const fileName = normalizeSourcePackageText(
+    value,
+    "fileName",
+    "source_package_file_name_required"
+  );
+  const baseName = fileName.split(/[\\/]/).at(-1) ?? fileName;
+  const byteLength = Buffer.byteLength(baseName, "utf8");
+  if (byteLength > ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES) {
+    throw new FirstSliceError(
+      400,
+      "source_package_file_name_too_long",
+      `Source package file names must not exceed ${ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES} UTF-8 bytes.`,
+      {
+        maximumBytes: ORIGINAL_SOURCE_PACKAGE_FILE_NAME_MAX_BYTES,
+        actualBytes: byteLength
+      }
+    );
+  }
+  return fileName;
+};
+
+const normalizeOptionalSourcePackageFileName = (
+  value: unknown
+): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  return normalizeSourcePackageFileName(value);
+};
+
 const normalizeOptionalSourcePackageText = (
   value: unknown,
   fieldName: string,
@@ -29366,11 +29399,7 @@ export const createFirstSliceServices = (
           sourcePackageId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
-          fileName: normalizeSourcePackageText(
-            input.fileName,
-            "fileName",
-            "source_package_file_name_required"
-          ),
+          fileName: normalizeSourcePackageFileName(input.fileName),
           mediaType: normalizeSourcePackageText(
             input.mediaType,
             "mediaType",
@@ -29510,14 +29539,12 @@ export const createFirstSliceServices = (
             );
           }
         }
-        const fileNameInput = normalizeSourcePackageText(
-          input.fileName,
-          "fileName",
-          "source_package_file_name_required"
+        const fileNameInput = normalizeSourcePackageFileName(input.fileName);
+        const fileName = normalizeSourcePackageFileName(
+          fileNameInput.toLowerCase().endsWith(".zip")
+            ? fileNameInput
+            : `${fileNameInput}.zip`
         );
-        const fileName = fileNameInput.toLowerCase().endsWith(".zip")
-          ? fileNameInput
-          : `${fileNameInput}.zip`;
         const { archive, members } = assembleSourcePackageArchive(sourcePackages);
         const assembledSourcePackage: SourcePackage = {
           sourcePackageId: idGenerator(),
@@ -29596,11 +29623,7 @@ export const createFirstSliceServices = (
           );
         }
 
-        const fileName = normalizeOptionalSourcePackageText(
-          input.fileName,
-          "fileName",
-          "source_package_file_name_required"
-        );
+        const fileName = normalizeOptionalSourcePackageFileName(input.fileName);
         const mediaType = normalizeOptionalSourcePackageText(
           input.mediaType,
           "mediaType",
@@ -29684,11 +29707,7 @@ export const createFirstSliceServices = (
           sourcePackageId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
-          fileName: normalizeSourcePackageText(
-            input.fileName,
-            "fileName",
-            "source_package_file_name_required"
-          ),
+          fileName: normalizeSourcePackageFileName(input.fileName),
           mediaType: normalizeSourcePackageText(
             input.mediaType,
             "mediaType",
