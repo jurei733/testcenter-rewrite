@@ -382,6 +382,47 @@ The container image and compose stack default `FIRST_SLICE_OPERATOR_AUTH_REQUIRE
 The npm compose scripts also fill `APP_BUILD_SHA` from Git and `APP_BUILD_TIMESTAMP` from the current UTC time when they are not already set, so the runtime preflight can require release metadata without extra local shell setup.
 The Compose Postgres credentials default to `POSTGRES_DB=rewrite_app`, `POSTGRES_USER=rewrite`, and `POSTGRES_PASSWORD=rewrite`; override those `POSTGRES_*` values in `.env` for non-default Compose stacks. Host-run API and test commands still use `FIRST_SLICE_POSTGRES_URL`.
 
+The production Compose boundary enables `Strict-Transport-Security` with a
+one-year `includeSubDomains` policy. Use it only where HTTPS termination is
+owned by this deployment or its trusted ingress:
+
+```bash
+npm run start:compose:postgres:production
+```
+
+For the first clean deployment, inject the initial platform-administrator
+password from a secret-manager-owned file rather than an environment value,
+image default, command-line argument, or checked-in file:
+
+```bash
+FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_SOURCE_FILE=/secure/runtime/admin-password \
+FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME=release-admin \
+FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME='Release Administrator' \
+npm run start:compose:postgres:bootstrap
+```
+
+The bootstrap overlay mounts that file as a Docker secret into the one-shot
+runtime preflight and API service. The file must contain 1–4096 bytes of valid
+UTF-8 and satisfy the active administrator password policy; one conventional
+final line ending is removed. Startup creates the account and its
+`platform_admin` role only when the store has no administrator. Later starts
+are idempotent and never replace an existing credential. After verifying the
+first sign-in, stop the bootstrap overlay and restart the normal production
+boundary so the no-longer-needed secret is not mounted:
+
+```bash
+npm run stop:compose:postgres:production
+npm run start:compose:postgres:production
+```
+
+`FIRST_SLICE_HSTS_ENABLED` can explicitly disable the header when an upstream
+gateway owns it. `/diagnostics/config` exposes only the effective HSTS flag and
+whether secret-file bootstrap is configured; it never returns the password or
+secret-file path. Startup and runtime preflight reject partial bootstrap
+configuration, unreadable/non-file/invalid UTF-8 secrets, password-policy
+violations, invalid HSTS flags, and simultaneous demo plus production
+bootstrap.
+
 To start the same Postgres-backed stack with the local demo tenant, admin, active release, and participant link pre-seeded, run:
 
 ```bash
@@ -408,6 +449,15 @@ To run the same Compose smoke with demo bootstrap enabled, use:
 
 ```bash
 npm run smoke:compose:postgres:demo
+```
+
+The production-boundary smoke generates a fresh temporary secret, proves
+preflight and idempotent administrator creation, checks the HSTS header, signs
+in through the created account, and confirms that the secret is absent from
+diagnostics, the container environment, and service logs:
+
+```bash
+npm run smoke:compose:postgres:production
 ```
 
 That stack now runs in two explicit application roles:
@@ -913,7 +963,7 @@ For runtime probes:
 - `/api/v1/system/time` returns the current server timestamp and configured participant IANA timezone without caching for system-check clock validation
 - `/speed-test/random-package/:size` and `/speed-test/random-package` provide bounded, cache-disabled download and upload packages for configured system-check throughput measurements
 - `/manifest` exposes the active storage mode, schema version, routes, use-case surface, and operator/production capability list
-- JSON, HTML, text, CSV, asset, and redirect responses include baseline security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and `Permissions-Policy`)
+- JSON, HTML, text, CSV, asset, and redirect responses include baseline security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and `Permissions-Policy`); the production boundary additionally emits configurable `Strict-Transport-Security`
 - `db:doctor` reports storage reachability plus current vs. target schema version where applicable
 - `db:migrate` applies the adapter-managed schema migrations without going through the HTTP server boot path
 
@@ -930,10 +980,10 @@ For runtime probes:
   - protected browser-driven Angular UI smoke against a Postgres service database
   - file and SQLite startup/shutdown, grouped quick/review/monitor/ops browser suites, full browser, and local-demo smokes as isolated matrix jobs
   - standalone production Docker image runtime smoke with image-time artifact preflight, in-container SQLite migration, non-root API start, and `/readyz`/`/manifest`/`/app` verification
-  - Docker compose release smoke with explicit migrate, preflight, and api roles in both demo-disabled and demo-enabled modes
+  - Docker compose release smoke with explicit migrate, preflight, and api roles in standard, demo-enabled, and HSTS/secret-file-bootstrap production modes
 - [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/file/SQLite integration plus file/SQLite startup/shutdown, `ci:browser:quick` (including the offline App-Shell gate), `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for file/SQLite metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
-- [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
+- [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks; the production and one-time bootstrap overlays own HSTS plus secret-file injection without baking the initial administrator credential into the image or environment
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
 
 The original Aspect 17.4 execution gate now imports the byte-exact companion `testtaker1.xml` roster and runs its real passwordless `testuser1` account in the production browser. Contract and API coverage pin the source hash, group, Custom Text, password-free and password-protected Hot-Return accounts, Review account, and password-redacted monitor migration candidate before launching the original player package.

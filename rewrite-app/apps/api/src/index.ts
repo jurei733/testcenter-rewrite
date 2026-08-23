@@ -190,6 +190,7 @@ import {
   type PublicAdminUser,
   type AdminUserDirectoryItem,
   adminPasswordPolicy,
+  getAdminPasswordPolicyViolation,
   redactBugReportText,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
@@ -351,6 +352,73 @@ const validateProofOfWorkSecret = (
     );
   }
   return value;
+};
+
+const MAXIMUM_BOOTSTRAP_ADMIN_SECRET_FILE_BYTES = 4_096;
+
+type BootstrapAdminConfig = {
+  username: string;
+  displayName?: string;
+  password: string;
+};
+
+const readBootstrapAdminConfig = async (): Promise<BootstrapAdminConfig | null> => {
+  const username = process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME?.trim() ?? "";
+  const passwordFile =
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE?.trim() ?? "";
+  if (!username && !passwordFile) {
+    return null;
+  }
+  if (!username || !passwordFile) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME and FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must be configured together."
+    );
+  }
+
+  const passwordFileStat = await stat(passwordFile).catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${message}`
+    );
+  });
+  if (!passwordFileStat.isFile()) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must reference a regular file."
+    );
+  }
+  if (
+    passwordFileStat.size < 1 ||
+    passwordFileStat.size > MAXIMUM_BOOTSTRAP_ADMIN_SECRET_FILE_BYTES
+  ) {
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain between 1 and ${MAXIMUM_BOOTSTRAP_ADMIN_SECRET_FILE_BYTES} bytes.`
+    );
+  }
+
+  const passwordBytes = await readFile(passwordFile);
+  let password: string;
+  try {
+    password = new TextDecoder("utf-8", { fatal: true })
+      .decode(passwordBytes)
+      .replace(/\r?\n$/u, "");
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain valid UTF-8."
+    );
+  }
+  if (!password) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain a non-empty password."
+    );
+  }
+
+  const displayName =
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME?.trim() || undefined;
+  return {
+    username,
+    ...(displayName ? { displayName } : {}),
+    password
+  };
 };
 
 const resolveStoreKind = (): RuntimeStoreKind => {
@@ -553,6 +621,10 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
     false
   );
+  const hstsEnabled = parseBooleanEnvironmentFlag(
+    "FIRST_SLICE_HSTS_ENABLED",
+    false
+  );
   const adminLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
     "FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES",
     DEFAULT_ADMIN_LOGIN_MAX_FAILURES
@@ -655,6 +727,23 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_BOOTSTRAP_DEMO",
     false
   );
+  const bootstrapAdmin = await readBootstrapAdminConfig();
+  if (demoBootstrapEnabled && bootstrapAdmin) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_DEMO cannot be combined with secret-file administrator bootstrap."
+    );
+  }
+  if (bootstrapAdmin) {
+    const bootstrapPasswordViolation = getAdminPasswordPolicyViolation(
+      bootstrapAdmin.password,
+      configuredAdminPasswordPolicy
+    );
+    if (bootstrapPasswordViolation) {
+      throw new Error(
+        `Bootstrap administrator password violates the configured ${bootstrapPasswordViolation.replaceAll("_", " ")} policy.`
+      );
+    }
+  }
   const bugReportGithubRepository =
     process.env.BUG_REPORT_GITHUB_REPOSITORY?.trim() || null;
   const bugReportGithubToken = process.env.BUG_REPORT_GITHUB_TOKEN?.trim() || null;
@@ -685,6 +774,34 @@ const createApiRuntime = async () => {
     participantLoginFailureWindowMs
   });
 
+  if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
+    try {
+      await services.adminAuth.bootstrapAdminUser(bootstrapAdmin);
+    } catch (error) {
+      // A second production replica may win the clean-store bootstrap race.
+      // Treat the configured operation as complete only after re-reading the
+      // exact account and its platform role from the shared store; otherwise
+      // preserve the original startup failure, including partial writes.
+      const concurrentlyBootstrappedAdmin =
+        await repository.getAdminUserByUsername(
+          bootstrapAdmin.username.trim().toLowerCase()
+        );
+      const concurrentlyBootstrappedRoles = concurrentlyBootstrappedAdmin
+        ? await repository.listAdminRoleAssignmentsByUserId(
+            concurrentlyBootstrappedAdmin.adminUserId
+          )
+        : [];
+      if (
+        !concurrentlyBootstrappedAdmin ||
+        !concurrentlyBootstrappedRoles.some(
+          roleAssignment => roleAssignment.role === "platform_admin"
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
+
   if (demoBootstrapEnabled) {
     await bootstrapLocalDemoState({ repository, services });
   }
@@ -700,7 +817,13 @@ const createApiRuntime = async () => {
         requestTimeoutMs: httpRequestTimeoutMs,
         keepAliveTimeoutMs: httpKeepAliveTimeoutMs
       },
+      transportSecurity: {
+        hstsEnabled
+      },
       operatorAuthRequired,
+      bootstrapAdmin: {
+        configured: Boolean(bootstrapAdmin)
+      },
       adminLoginProtection: {
         maxFailures: adminLoginMaxFailures,
         failureWindowMs: adminLoginFailureWindowMs
@@ -724,6 +847,16 @@ const createApiRuntime = async () => {
           process.env.FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES
         ),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
+        firstSliceHstsEnabled: hstsEnabled,
+        firstSliceBootstrapAdminUsernamePresent: Boolean(
+          process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME
+        ),
+        firstSliceBootstrapAdminDisplayNamePresent: Boolean(
+          process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME
+        ),
+        firstSliceBootstrapAdminPasswordFilePresent: Boolean(
+          process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE
+        ),
         firstSliceAdminLoginMaxFailuresPresent: Boolean(
           process.env.FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES
         ),
@@ -4147,6 +4280,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     );
 
     response.setHeader("x-request-id", requestId);
+    if (runtime.config.transportSecurity.hstsEnabled) {
+      response.setHeader(
+        "strict-transport-security",
+        "max-age=31536000; includeSubDomains"
+      );
+    }
     metrics.activeRequests += 1;
     metrics.totalRequests += 1;
     incrementCounter(metrics.requestCountsByMethod, method);
@@ -4414,7 +4553,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             maxSourcePackageJsonBodyBytes:
               runtime.config.maxSourcePackageJsonBodyBytes,
             httpTimeouts: runtime.config.httpTimeouts,
+            transportSecurity: runtime.config.transportSecurity,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
+            bootstrapAdmin: runtime.config.bootstrapAdmin,
             adminLoginProtection: runtime.config.adminLoginProtection,
             adminPasswordPolicy: runtime.config.adminPasswordPolicy,
             proofOfWork: runtime.config.proofOfWork,

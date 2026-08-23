@@ -218,7 +218,7 @@ jobs:
           npm run smoke:docker:runtime
 
   docker-compose-release-smoke:
-    name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
+    name: Compose Postgres smoke (${{ matrix.mode }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -227,7 +227,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        bootstrap-demo: ["false", "true"]
+        include:
+          - mode: standard
+            bootstrap-demo: "false"
+            production-boundary: "false"
+          - mode: demo
+            bootstrap-demo: "true"
+            production-boundary: "false"
+          - mode: production-secret
+            bootstrap-demo: "false"
+            production-boundary: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -241,4 +250,5 @@ jobs:
           APP_BUILD_SHA="${GITHUB_SHA::12}" \
           APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           FIRST_SLICE_BOOTSTRAP_DEMO="${{ matrix.bootstrap-demo }}" \
+          SMOKE_COMPOSE_PRODUCTION_BOUNDARY="${{ matrix.production-boundary }}" \
           npm run smoke:compose:postgres

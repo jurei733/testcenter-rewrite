@@ -1605,7 +1605,13 @@ export type GetRuntimeConfigResponse = {
       requestTimeoutMs: number;
       keepAliveTimeoutMs: number;
     };
+    transportSecurity: {
+      hstsEnabled: boolean;
+    };
     operatorAuthRequired: boolean;
+    bootstrapAdmin: {
+      configured: boolean;
+    };
     adminLoginProtection: {
       maxFailures: number;
       failureWindowMs: number;
@@ -1637,6 +1643,10 @@ export type GetRuntimeConfigResponse = {
       firstSliceMaxJsonBodyBytesPresent: boolean;
       firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
+      firstSliceHstsEnabled: boolean;
+      firstSliceBootstrapAdminUsernamePresent: boolean;
+      firstSliceBootstrapAdminDisplayNamePresent: boolean;
+      firstSliceBootstrapAdminPasswordFilePresent: boolean;
       firstSliceAdminLoginMaxFailuresPresent: boolean;
       firstSliceAdminLoginFailureWindowMsPresent: boolean;
       firstSliceAdminPasswordMinLengthPresent: boolean;

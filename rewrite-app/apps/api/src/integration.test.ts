@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
-import { readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
@@ -7224,6 +7225,144 @@ test("HTTP server timeouts are configurable and exposed", async () => {
   }
 });
 
+test("production transport and secret-file bootstrap stay configurable, idempotent, and redacted", async () => {
+  const secretDirectory = mkdtempSync(
+    join(tmpdir(), "testcenter-rewrite-bootstrap-")
+  );
+  const secretFile = join(secretDirectory, "admin-password");
+  const storeFile = join(secretDirectory, "bootstrap-store.json");
+  const bootstrapPassword = "Production-Bootstrap-Secret-42";
+  writeFileSync(secretFile, `${bootstrapPassword}\n`, {
+    encoding: "utf8",
+    mode: 0o600
+  });
+  const isolatedEnvironment = {
+    FIRST_SLICE_STORE: "file",
+    FIRST_SLICE_FILE: storeFile,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_HSTS_ENABLED: "true",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: "release.admin",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Release Administrator",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE: secretFile
+  };
+  let activeServer: Awaited<ReturnType<typeof createProductionApiServer>> | null =
+    null;
+
+  const verifyBootstrappedRuntime = async (targetBaseUrl: string) => {
+    const readiness = await fetch(`${targetBaseUrl}/readyz`);
+    assert.equal(readiness.status, 200);
+    assert.equal(
+      readiness.headers.get("strict-transport-security"),
+      "max-age=31536000; includeSubDomains"
+    );
+
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        transportSecurity: { hstsEnabled: boolean };
+        bootstrapAdmin: { configured: boolean };
+        environment: {
+          firstSliceHstsEnabled: boolean;
+          firstSliceBootstrapAdminUsernamePresent: boolean;
+          firstSliceBootstrapAdminDisplayNamePresent: boolean;
+          firstSliceBootstrapAdminPasswordFilePresent: boolean;
+        };
+      };
+    }>(targetBaseUrl, "/diagnostics/config");
+    assert.equal(config.status, 200);
+    assert.deepEqual(config.body.runtimeConfig.transportSecurity, {
+      hstsEnabled: true
+    });
+    assert.deepEqual(config.body.runtimeConfig.bootstrapAdmin, {
+      configured: true
+    });
+    assert.equal(
+      config.body.runtimeConfig.environment.firstSliceHstsEnabled,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceBootstrapAdminUsernamePresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceBootstrapAdminDisplayNamePresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceBootstrapAdminPasswordFilePresent,
+      true
+    );
+    assert.equal(JSON.stringify(config.body).includes(bootstrapPassword), false);
+    assert.equal(JSON.stringify(config.body).includes(secretFile), false);
+
+    const signIn = await requestJsonAt<{
+      adminUser: { username: string; displayName: string };
+      roleAssignments: Array<{ role: string }>;
+    }>(targetBaseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "release.admin",
+        password: bootstrapPassword
+      }
+    });
+    assert.equal(signIn.status, 200);
+    assert.equal(signIn.body.adminUser.username, "release.admin");
+    assert.equal(
+      signIn.body.adminUser.displayName,
+      "Release Administrator"
+    );
+    assert.equal(signIn.body.roleAssignments[0]?.role, "platform_admin");
+
+    const duplicateBootstrap = await requestJsonAt<{ error: string }>(
+      targetBaseUrl,
+      "/api/v1/admin/auth/bootstrap",
+      {
+        method: "POST",
+        body: {
+          username: "second.admin",
+          password: "Second-Administrator-Secret-43"
+        }
+      }
+    );
+    assert.equal(duplicateBootstrap.status, 409);
+    assert.equal(
+      duplicateBootstrap.body.error,
+      "admin_bootstrap_already_completed"
+    );
+  };
+
+  try {
+    const initial = await createIsolatedServer(isolatedEnvironment);
+    activeServer = initial.server;
+    await verifyBootstrappedRuntime(initial.baseUrl);
+    await closeServer(activeServer);
+    activeServer = null;
+
+    const restarted = await createIsolatedServer(isolatedEnvironment);
+    activeServer = restarted.server;
+    await verifyBootstrappedRuntime(restarted.baseUrl);
+
+    const hstsDisabled = await createIsolatedServer({
+      FIRST_SLICE_STORE: "memory",
+      FIRST_SLICE_HSTS_ENABLED: "false"
+    });
+    try {
+      const response = await fetch(`${hstsDisabled.baseUrl}/healthz`);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("strict-transport-security"), null);
+    } finally {
+      await closeServer(hstsDisabled.server);
+    }
+  } finally {
+    if (activeServer) {
+      await closeServer(activeServer);
+    }
+    rmSync(secretDirectory, { recursive: true, force: true });
+  }
+});
+
 test("runtime port and shutdown drain settings are validated and exposed", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -7307,6 +7446,24 @@ test("runtime port and shutdown drain settings are validated and exposed", async
         FIRST_SLICE_ADMIN_PASSWORD_PATTERN: "["
       }),
     /FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_HSTS_ENABLED: "sometimes"
+      }),
+    /FIRST_SLICE_HSTS_ENABLED must be a boolean flag/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: "incomplete.admin"
+      }),
+    /FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME and FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must be configured together/
   );
 
   await assert.rejects(

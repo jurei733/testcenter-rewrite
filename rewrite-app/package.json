@@ -50,6 +50,7 @@
     "smoke:startup:built": "node ./scripts/smoke-startup.mjs",
     "smoke:compose:postgres": "npm run build && node ./scripts/smoke-compose-postgres.mjs",
     "smoke:compose:postgres:demo": "FIRST_SLICE_BOOTSTRAP_DEMO=true npm run smoke:compose:postgres",
+    "smoke:compose:postgres:production": "SMOKE_COMPOSE_PRODUCTION_BOUNDARY=true npm run smoke:compose:postgres",
     "smoke:shutdown": "npm run build && node ./scripts/smoke-shutdown.mjs",
     "smoke:shutdown:file": "npm run build && FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/smoke-shutdown.json SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
     "smoke:shutdown:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
@@ -196,7 +197,10 @@
     "start:local": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_BOOTSTRAP_DEMO=true node ./scripts/with-build-metadata.mjs npm run start:api",
     "start:compose:postgres": "node ./scripts/compose-postgres.mjs up --build",
     "start:compose:postgres:demo": "FIRST_SLICE_BOOTSTRAP_DEMO=true node ./scripts/compose-postgres.mjs up --build",
+    "start:compose:postgres:production": "REWRITE_APP_PRODUCTION_BOUNDARY=true node ./scripts/compose-postgres.mjs up --build",
+    "start:compose:postgres:bootstrap": "REWRITE_APP_PRODUCTION_BOUNDARY=true REWRITE_APP_BOOTSTRAP_BOUNDARY=true node ./scripts/compose-postgres.mjs up --build",
     "stop:compose:postgres": "node ./scripts/compose-postgres.mjs down",
+    "stop:compose:postgres:production": "REWRITE_APP_PRODUCTION_BOUNDARY=true node ./scripts/compose-postgres.mjs down",
     "reset:local": "node ./scripts/reset-local-state.mjs"
   },
   "devDependencies": {

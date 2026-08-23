@@ -1,14 +1,73 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-const composeArgs = ["compose", "-f", "docker-compose.postgres.yml"];
+const parseBooleanFlag = (value, label = "boolean flag") => {
+  const normalizedValue = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "optional"].includes(normalizedValue)) {
+    return false;
+  }
+  throw new Error(
+    `${label} must be a boolean-like flag, got '${value}'.`
+  );
+};
+
 const buildSha = process.env.APP_BUILD_SHA ?? "local-compose-smoke";
 const buildTimestamp =
   process.env.APP_BUILD_TIMESTAMP ?? new Date().toISOString();
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED ?? "true";
 const bootstrapDemo = process.env.FIRST_SLICE_BOOTSTRAP_DEMO ?? "false";
+const productionBoundary = parseBooleanFlag(
+  process.env.SMOKE_COMPOSE_PRODUCTION_BOUNDARY ?? "false",
+  "SMOKE_COMPOSE_PRODUCTION_BOUNDARY"
+);
+if (
+  productionBoundary &&
+  parseBooleanFlag(bootstrapDemo, "FIRST_SLICE_BOOTSTRAP_DEMO")
+) {
+  throw new Error(
+    "SMOKE_COMPOSE_PRODUCTION_BOUNDARY cannot be combined with FIRST_SLICE_BOOTSTRAP_DEMO."
+  );
+}
+const bootstrapAdminUsername =
+  process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME ?? "release-admin";
+const bootstrapAdminPassword = randomBytes(24).toString("base64url");
+let generatedSecretDirectory = null;
+let bootstrapAdminPasswordSourceFile = null;
+if (productionBoundary) {
+  generatedSecretDirectory = await mkdtemp(
+    join(tmpdir(), "testcenter-rewrite-compose-secret-")
+  );
+  bootstrapAdminPasswordSourceFile = join(
+    generatedSecretDirectory,
+    "bootstrap-admin-password"
+  );
+  await writeFile(
+    bootstrapAdminPasswordSourceFile,
+    `${bootstrapAdminPassword}\n`,
+    { encoding: "utf8", mode: 0o600 }
+  );
+}
+const composeArgs = [
+  "compose",
+  "-f",
+  "docker-compose.postgres.yml",
+  ...(productionBoundary
+    ? [
+        "-f",
+        "docker-compose.production.yml",
+        "-f",
+        "docker-compose.bootstrap.yml"
+      ]
+    : [])
+];
 const composeProjectName =
   process.env.COMPOSE_PROJECT_NAME ?? `rewrite-app-smoke-${process.pid}`;
 
@@ -170,19 +229,6 @@ const requestJson = async (url, options = {}) => {
   return { response, payload };
 };
 
-const parseBooleanFlag = (value, label = "boolean flag") => {
-  const normalizedValue = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
-    return true;
-  }
-  if (["0", "false", "no", "off", "optional"].includes(normalizedValue)) {
-    return false;
-  }
-  throw new Error(
-    `${label} must be a boolean-like flag, got '${value}'.`
-  );
-};
-
 const createComposeEnvironment = () => ({
   ...process.env,
   COMPOSE_PROJECT_NAME: composeProjectName,
@@ -190,6 +236,15 @@ const createComposeEnvironment = () => ({
   APP_BUILD_TIMESTAMP: buildTimestamp,
   FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
   FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo,
+  ...(productionBoundary
+    ? {
+        FIRST_SLICE_HSTS_ENABLED: "true",
+        FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: bootstrapAdminUsername,
+        FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Release Administrator",
+        FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_SOURCE_FILE:
+          bootstrapAdminPasswordSourceFile
+      }
+    : {}),
   REWRITE_APP_PORT: String(rewriteAppPort)
 });
 
@@ -507,13 +562,158 @@ const verifyBootstrappedDemo = async baseUrl => {
   }
 };
 
+const verifyProductionBoundary = async (baseUrl, config, env) => {
+  expectEqual(
+    "runtimeConfig.transportSecurity.hstsEnabled",
+    config.runtimeConfig?.transportSecurity?.hstsEnabled,
+    true
+  );
+  expectEqual(
+    "runtimeConfig.bootstrapAdmin.configured",
+    config.runtimeConfig?.bootstrapAdmin?.configured,
+    true
+  );
+  expectEqual(
+    "runtimeConfig.environment.firstSliceBootstrapAdminPasswordFilePresent",
+    config.runtimeConfig?.environment
+      ?.firstSliceBootstrapAdminPasswordFilePresent,
+    true
+  );
+
+  const readinessResponse = await fetch(`${baseUrl}/readyz`);
+  expectEqual("production readiness status", readinessResponse.status, 200);
+  expectEqual(
+    "production Strict-Transport-Security header",
+    readinessResponse.headers.get("strict-transport-security"),
+    "max-age=31536000; includeSubDomains"
+  );
+
+  const adminSignIn = await requestJson(`${baseUrl}/api/v1/admin/auth/sign-in`, {
+    method: "POST",
+    body: {
+      username: bootstrapAdminUsername,
+      password: bootstrapAdminPassword
+    }
+  });
+  expectEqual(
+    "secret-file bootstrap admin sign-in status",
+    adminSignIn.response.status,
+    200
+  );
+  expectEqual(
+    "secret-file bootstrap admin username",
+    adminSignIn.payload?.adminUser?.username,
+    bootstrapAdminUsername
+  );
+  expectEqual(
+    "secret-file bootstrap admin role",
+    adminSignIn.payload?.roleAssignments?.[0]?.role,
+    "platform_admin"
+  );
+
+  const duplicateBootstrap = await requestJson(
+    `${baseUrl}/api/v1/admin/auth/bootstrap`,
+    {
+      method: "POST",
+      body: {
+        username: "unexpected-admin",
+        password: "Unexpected-Administrator-Secret-43"
+      }
+    }
+  );
+  expectEqual(
+    "duplicate bootstrap status",
+    duplicateBootstrap.response.status,
+    409
+  );
+  expectEqual(
+    "duplicate bootstrap error",
+    duplicateBootstrap.payload?.error,
+    "admin_bootstrap_already_completed"
+  );
+
+  await run("docker", [
+    ...composeArgs,
+    "restart",
+    "rewrite-app-api"
+  ], { env });
+  await pollJson(`${baseUrl}/readyz`);
+  const restartedAdminSignIn = await requestJson(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      body: {
+        username: bootstrapAdminUsername,
+        password: bootstrapAdminPassword
+      }
+    }
+  );
+  expectEqual(
+    "restarted secret-file bootstrap admin sign-in status",
+    restartedAdminSignIn.response.status,
+    200
+  );
+  const restartedSessionToken = restartedAdminSignIn.payload?.sessionToken;
+  if (typeof restartedSessionToken !== "string" || !restartedSessionToken) {
+    throw new Error(
+      "Expected restarted bootstrap administrator sign-in to return a session token."
+    );
+  }
+  const adminDirectory = await requestJson(
+    `${baseUrl}/api/v1/admin/users?username=${encodeURIComponent(bootstrapAdminUsername)}`,
+    {
+      headers: {
+        authorization: `Bearer ${restartedSessionToken}`
+      }
+    }
+  );
+  expectEqual(
+    "restarted bootstrap administrator directory status",
+    adminDirectory.response.status,
+    200
+  );
+  expectEqual(
+    "restarted bootstrap administrator count",
+    adminDirectory.payload?.items?.length,
+    1
+  );
+
+  const apiContainerId = await capture("docker", [
+    ...composeArgs,
+    "ps",
+    "-q",
+    "rewrite-app-api"
+  ], { env });
+  const inspectedEnvironment = await capture("docker", [
+    "inspect",
+    apiContainerId,
+    "--format",
+    "{{json .Config.Env}}"
+  ], { env });
+  const serviceLogs = await capture("docker", [
+    ...composeArgs,
+    "logs",
+    "rewrite-app-api",
+    "rewrite-app-preflight"
+  ], { env });
+  for (const [label, value] of [
+    ["runtime diagnostics", JSON.stringify(config)],
+    ["container environment", inspectedEnvironment],
+    ["service logs", serviceLogs]
+  ]) {
+    if (value.includes(bootstrapAdminPassword)) {
+      throw new Error(`Production bootstrap password leaked through ${label}.`);
+    }
+  }
+};
+
 try {
   const expectedSchemaVersion = await readExpectedPostgresSchemaVersion();
   const baseUrl = `http://127.0.0.1:${rewriteAppPort}`;
   const composeEnvironment = createComposeEnvironment();
 
   process.stdout.write(
-    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms port=${rewriteAppPort} project=${composeProjectName} bootstrapDemo=${bootstrapDemo}\n`
+    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms port=${rewriteAppPort} project=${composeProjectName} bootstrapDemo=${bootstrapDemo} productionBoundary=${productionBoundary}\n`
   );
   await run("docker", [
     ...composeArgs,
@@ -596,9 +796,12 @@ try {
   if (parseBooleanFlag(bootstrapDemo, "FIRST_SLICE_BOOTSTRAP_DEMO")) {
     await verifyBootstrappedDemo(baseUrl);
   }
+  if (productionBoundary) {
+    await verifyProductionBoundary(baseUrl, config, composeEnvironment);
+  }
 
   process.stdout.write(
-    `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired} bootstrapDemo=${bootstrapDemo}\n`
+    `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired} bootstrapDemo=${bootstrapDemo} productionBoundary=${productionBoundary}\n`
   );
 } catch (error) {
   await dumpComposeLogs(createComposeEnvironment());
@@ -607,4 +810,7 @@ try {
   await run("docker", [...composeArgs, "down", "-v"], {
     env: createComposeEnvironment()
   }).catch(() => undefined);
+  if (generatedSecretDirectory) {
+    await rm(generatedSecretDirectory, { recursive: true, force: true });
+  }
 }

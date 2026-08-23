@@ -1,6 +1,26 @@
 import { spawn } from "node:child_process";
 
-const composeArgs = ["compose", "-f", "docker-compose.postgres.yml"];
+const productionBoundary = ["1", "true", "yes", "on"].includes(
+  String(process.env.REWRITE_APP_PRODUCTION_BOUNDARY ?? "false")
+    .trim()
+    .toLowerCase()
+);
+const bootstrapBoundary = ["1", "true", "yes", "on"].includes(
+  String(process.env.REWRITE_APP_BOOTSTRAP_BOUNDARY ?? "false")
+    .trim()
+    .toLowerCase()
+);
+const composeArgs = [
+  "compose",
+  "-f",
+  "docker-compose.postgres.yml",
+  ...(productionBoundary
+    ? ["-f", "docker-compose.production.yml"]
+    : []),
+  ...(bootstrapBoundary
+    ? ["-f", "docker-compose.bootstrap.yml"]
+    : [])
+];
 
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise, reject) => {

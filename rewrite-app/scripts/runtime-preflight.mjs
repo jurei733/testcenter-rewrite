@@ -170,9 +170,74 @@ const resolveProofOfWorkConfig = () => {
   };
 };
 
-const store = normalizeStore(process.env.FIRST_SLICE_STORE);
-const adminPasswordPolicy = resolveAdminPasswordPolicy();
-const proofOfWork = resolveProofOfWorkConfig();
+const resolveBootstrapAdminConfig = async policy => {
+  const username = String(
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME ?? ""
+  ).trim();
+  const passwordFile = String(
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? ""
+  ).trim();
+  if (!username && !passwordFile) {
+    return { configured: false };
+  }
+  if (!username || !passwordFile) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME and FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must be configured together."
+    );
+  }
+
+  let passwordFileStat;
+  try {
+    passwordFileStat = await stat(passwordFile);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${error.message}`
+    );
+  }
+  if (!passwordFileStat.isFile()) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must reference a regular file."
+    );
+  }
+  if (passwordFileStat.size < 1 || passwordFileStat.size > 4_096) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain between 1 and 4096 bytes."
+    );
+  }
+
+  let password;
+  try {
+    password = new TextDecoder("utf-8", { fatal: true })
+      .decode(await readFile(passwordFile))
+      .replace(/\r?\n$/u, "");
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain valid UTF-8."
+    );
+  }
+  if (!password) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain a non-empty password."
+    );
+  }
+  if (password.length < policy.minimumLength) {
+    throw new Error(
+      `Bootstrap administrator password must contain at least ${policy.minimumLength} characters.`
+    );
+  }
+  if (password.length > policy.maximumLength) {
+    throw new Error(
+      `Bootstrap administrator password must contain no more than ${policy.maximumLength} characters.`
+    );
+  }
+  if (!new RegExp(policy.pattern).test(password)) {
+    throw new Error(
+      "Bootstrap administrator password does not match FIRST_SLICE_ADMIN_PASSWORD_PATTERN."
+    );
+  }
+
+  return { configured: true };
+};
 
 const requiredBuiltFiles = [
   "apps/api/dist/apps/api/src/index.js",
@@ -210,6 +275,23 @@ const parseBooleanFlag = (value, defaultValue = false) => {
   }
   throw new Error(`Unsupported boolean flag '${value}'.`);
 };
+
+const store = normalizeStore(process.env.FIRST_SLICE_STORE);
+const adminPasswordPolicy = resolveAdminPasswordPolicy();
+const proofOfWork = resolveProofOfWorkConfig();
+const hstsEnabled = parseBooleanFlag(
+  process.env.FIRST_SLICE_HSTS_ENABLED,
+  false
+);
+const bootstrapAdmin = await resolveBootstrapAdminConfig(adminPasswordPolicy);
+if (
+  bootstrapAdmin.configured &&
+  parseBooleanFlag(process.env.FIRST_SLICE_BOOTSTRAP_DEMO, false)
+) {
+  throw new Error(
+    "FIRST_SLICE_BOOTSTRAP_DEMO cannot be combined with secret-file administrator bootstrap."
+  );
+}
 
 const redactStorageLocation = input => {
   if (!input || !/^postgres(?:ql)?:\/\//.test(input)) {
@@ -429,6 +511,10 @@ process.stdout.write(
       store,
       adminPasswordPolicy,
       proofOfWork,
+      transportSecurity: {
+        hstsEnabled
+      },
+      bootstrapAdmin,
       storage: storageDoctor
         ? {
             ...storageDoctor,
