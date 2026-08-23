@@ -360,6 +360,7 @@ const child = spawn(process.execPath, [serverEntry], {
 });
 
 let browser;
+let page;
 
 try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
@@ -377,7 +378,7 @@ try {
     ["clipboard-read", "clipboard-write", "camera"],
     { origin: baseUrl }
   );
-  const page = await context.newPage();
+  page = await context.newPage();
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
   const participantEntryUrlPrefix = `${baseUrl}/participant?tenantKey=${encodeURIComponent(
@@ -1007,7 +1008,14 @@ try {
       .filter(
         bookletKey ? { hasText: bookletKey } : { hasText: participantSessionId }
       )
-      .waitFor({ timeout: 15_000 });
+      .waitFor({ timeout: 30_000 });
+  };
+  const assertNoUnexpectedBugReport = async context => {
+    if (await page.locator("#bugReportDialog").count()) {
+      throw new Error(
+        `Unexpected bug report during ${context}:\n${await page.locator("#bugReportText").innerText()}`
+      );
+    }
   };
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/home$/);
@@ -6827,6 +6835,7 @@ try {
     starterRuntimeState.runtimeState.booklets.map(booklet => booklet.status),
     ["in_progress"]
   );
+  await assertNoUnexpectedBugReport("participant run resume");
   await page.locator("#participantRouteStartOrResumeButton").click();
   await page.waitForFunction(
     expectedRunId =>
@@ -18102,6 +18111,7 @@ try {
     .filter({ hasText: "sys-check-login" })
     .filter({ hasText: "Ready to prepare a system_check account draft" });
   await systemCheckLoginCandidateCard.waitFor();
+  await assertNoUnexpectedBugReport("system-check account preparation");
   await systemCheckLoginCandidateCard
     .getByRole("button", { name: "Prepare System Check Account" })
     .click();
@@ -19167,6 +19177,7 @@ try {
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
   await clickAction("Refresh Runtime Reads");
+  await assertNoUnexpectedBugReport("monitor command history refresh");
   await expectMonitorCommandHistoryCard({
     commandType: "resume",
     bookletKey: participantBookletKey,
@@ -20700,6 +20711,7 @@ try {
     );
   }
   logStep("study-monitor-group-detail");
+  await assertNoUnexpectedBugReport("study-monitor navigation");
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await clickAction("Refresh Study Monitor");
@@ -23056,6 +23068,15 @@ try {
   );
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
+    const bugReport = await page
+      ?.locator("#bugReportText")
+      .innerText({ timeout: 1_000 })
+      .catch(() => "");
+    if (bugReport) {
+      process.stderr.write(
+        `Unexpected bug report at ${page.url()}:\n${bugReport}\n`
+      );
+    }
     throw error;
   }
 } finally {

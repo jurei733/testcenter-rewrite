@@ -3253,8 +3253,11 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
       this.runtime.monitorCommandHistoryView
     );
+    const commandHistoryItems = Array.isArray(payload?.items)
+      ? payload.items
+      : [];
     return (
-      payload?.items.map(item => {
+      commandHistoryItems.map(item => {
         const event = item.activityEvent;
         const details = event.details ?? {};
         const commandType = String(details.commandType ?? "command");
