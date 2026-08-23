@@ -6811,7 +6811,21 @@ try {
     participantEntryStartedRunId
   );
   await page.locator("#participantApplicationLogoButton").click();
+  const participantReturnToStarterResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/api/v1/participant/test-runs/${encodeURIComponent(
+          participantEntryStartedRunId
+        )}/return-to-starter`
+      ),
+    { timeout: 30_000 }
+  );
   await page.locator("#participantConfirmationContinueButton").click();
+  const participantReturnToStarterResponse =
+    await participantReturnToStarterResponsePromise;
+  assert.equal(participantReturnToStarterResponse.status(), 200);
+  await waitForNotBusy("participant-return-to-starter");
   await page.waitForFunction(
     () =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
@@ -6820,7 +6834,7 @@ try {
         "no run yet" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
-    { timeout: 15_000 }
+    { timeout: 30_000 }
   );
   const starterRuntimeState = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/runtime-state`,
@@ -19665,13 +19679,14 @@ try {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
   );
   const applyMonitorScopeAndWaitForOpenRuns = async step => {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await waitForNotBusy(`${step}-before-${attempt + 1}`);
       const responsePromise = page
         .waitForResponse(
           response =>
             response.request().method() === "GET" &&
             monitorOpenRunsRoute.test(response.url()),
-          { timeout: 5_000 }
+          { timeout: 30_000 }
         )
         .catch(() => null);
       await page.locator("#monitorApplyScopeButton").click();
@@ -21429,6 +21444,7 @@ try {
     .first()
     .waitFor();
   await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await waitForNotBusy("study-monitor-clear-matrix-filters");
   stopAfter("study-monitor-group-filter-matrix");
   const monitorReviewQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
