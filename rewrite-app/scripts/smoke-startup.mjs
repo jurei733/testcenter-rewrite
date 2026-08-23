@@ -327,6 +327,10 @@ try {
       "maxSourcePackageJsonBodyBytes",
       config.runtimeConfig?.maxSourcePackageJsonBodyBytes
     ],
+    [
+      "maxParticipantProgressJsonBodyBytes",
+      config.runtimeConfig?.maxParticipantProgressJsonBodyBytes
+    ],
     ["headersTimeoutMs", config.runtimeConfig?.httpTimeouts?.headersTimeoutMs],
     ["requestTimeoutMs", config.runtimeConfig?.httpTimeouts?.requestTimeoutMs],
     ["keepAliveTimeoutMs", config.runtimeConfig?.httpTimeouts?.keepAliveTimeoutMs]

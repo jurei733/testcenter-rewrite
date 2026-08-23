@@ -610,6 +610,11 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES",
     DEFAULT_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES
   );
+  const maxParticipantProgressJsonBodyBytes =
+    parsePositiveIntegerEnvironmentValue(
+      "FIRST_SLICE_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES",
+      DEFAULT_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES
+    );
   const httpHeadersTimeoutMs = parsePositiveIntegerEnvironmentValue(
     "HTTP_HEADERS_TIMEOUT_MS",
     DEFAULT_HTTP_HEADERS_TIMEOUT_MS
@@ -817,6 +822,7 @@ const createApiRuntime = async () => {
       shutdownDrainDelayMs,
       maxJsonBodyBytes,
       maxSourcePackageJsonBodyBytes,
+      maxParticipantProgressJsonBodyBytes,
       httpTimeouts: {
         headersTimeoutMs: httpHeadersTimeoutMs,
         requestTimeoutMs: httpRequestTimeoutMs,
@@ -850,6 +856,9 @@ const createApiRuntime = async () => {
         ),
         firstSliceMaxSourcePackageJsonBodyBytesPresent: Boolean(
           process.env.FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES
+        ),
+        firstSliceMaxParticipantProgressJsonBodyBytesPresent: Boolean(
+          process.env.FIRST_SLICE_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES
         ),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
         firstSliceHstsEnabled: hstsEnabled,
@@ -1004,6 +1013,7 @@ const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
 const MAX_APPLICATION_SETTINGS_JSON_BODY_BYTES = 28_100_000;
 const DEFAULT_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES = 72 * 1024 * 1024;
+const DEFAULT_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES = 64 * 1024 * 1024;
 const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 60_000;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS = 5_000;
@@ -4329,6 +4339,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       readJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
     const readSourcePackageRequestJsonBody = <T>(): Promise<T> =>
       readJsonBody<T>(request, runtime.config.maxSourcePackageJsonBodyBytes);
+    const readParticipantProgressRequestJsonBody = <T>(): Promise<T> =>
+      readJsonBody<T>(
+        request,
+        runtime.config.maxParticipantProgressJsonBodyBytes
+      );
     const readApplicationSettingsRequestJsonBody = <T>(): Promise<T> =>
       readJsonBody<T>(request, MAX_APPLICATION_SETTINGS_JSON_BODY_BYTES);
     const readOptionalRequestJsonBody = <T>(): Promise<T | null> =>
@@ -4557,6 +4572,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             maxJsonBodyBytes: runtime.config.maxJsonBodyBytes,
             maxSourcePackageJsonBodyBytes:
               runtime.config.maxSourcePackageJsonBodyBytes,
+            maxParticipantProgressJsonBodyBytes:
+              runtime.config.maxParticipantProgressJsonBodyBytes,
             httpTimeouts: runtime.config.httpTimeouts,
             transportSecurity: runtime.config.transportSecurity,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
@@ -8371,7 +8388,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readRequestJsonBody<SaveTestRunProgressRequest>();
+        const body =
+          await readParticipantProgressRequestJsonBody<SaveTestRunProgressRequest>();
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
           deliveryId: body.deliveryId,

@@ -16,6 +16,7 @@ import type { Response as IqbResponse } from "@iqbspecs/response/response.interf
 import {
   adminPasswordPolicy,
   productionApiRoutes,
+  resolveRoutePath,
   type AdminSignInResponse,
   type BootstrapAdminUserResponse,
   type CreateAdminUserResponse,
@@ -7074,7 +7075,8 @@ test("API rejects JSON request bodies above the configured limit", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
     FIRST_SLICE_MAX_JSON_BODY_BYTES: "96",
-    FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES: "512"
+    FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES: "512",
+    FIRST_SLICE_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES: "384"
   });
 
   try {
@@ -7082,6 +7084,7 @@ test("API rejects JSON request bodies above the configured limit", async () => {
       runtimeConfig: {
         maxJsonBodyBytes: number;
         maxSourcePackageJsonBodyBytes: number;
+        maxParticipantProgressJsonBodyBytes: number;
         environment: { firstSliceMaxJsonBodyBytesPresent: boolean };
       };
     }>(isolated.baseUrl, "/diagnostics/config");
@@ -7089,6 +7092,10 @@ test("API rejects JSON request bodies above the configured limit", async () => {
     assert.equal(config.status, 200);
     assert.equal(config.body.runtimeConfig.maxJsonBodyBytes, 96);
     assert.equal(config.body.runtimeConfig.maxSourcePackageJsonBodyBytes, 512);
+    assert.equal(
+      config.body.runtimeConfig.maxParticipantProgressJsonBodyBytes,
+      384
+    );
     assert.equal(
       config.body.runtimeConfig.environment.firstSliceMaxJsonBodyBytesPresent,
       true
@@ -7167,6 +7174,168 @@ test("API rejects JSON request bodies above the configured limit", async () => {
     assert.equal(
       sourcePackageAboveUploadLimit.body.details.maxJsonBodyBytes,
       512
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("participant progress accepts bounded GeoGebra-sized state without widening ordinary JSON commands", async () => {
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore =
+    requestedStore === "file" || requestedStore === "sqlite"
+      ? requestedStore
+      : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_MAX_JSON_BODY_BYTES: "1024",
+    FIRST_SLICE_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES: String(
+      3 * 1024 * 1024
+    )
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.large-participant-progress`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.large-participant-progress.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+
+  try {
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.getRuntimeConfig
+    );
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.maxJsonBodyBytes, 1024);
+    assert.equal(
+      config.body.runtimeConfig.maxParticipantProgressJsonBodyBytes,
+      3 * 1024 * 1024
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceMaxParticipantProgressJsonBodyBytesPresent,
+      true
+    );
+
+    const oversizedOrdinaryCommand = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: {
+          username: "demo-admin",
+          password: "x".repeat(2 * 1024)
+        }
+      }
+    );
+    assert.equal(oversizedOrdinaryCommand.status, 413);
+    assert.equal(
+      oversizedOrdinaryCommand.body.error,
+      "request_body_too_large"
+    );
+
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, productionApiRoutes.participant.signIn, {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    });
+    assert.equal(participantSignIn.status, 200);
+
+    const resumed = await requestJsonAt<{
+      testRun: { testRunId: string; currentUnitKey: string | null };
+    }>(
+      isolated.baseUrl,
+      resolveRoutePath(productionApiRoutes.participant.resumeSession, {
+        participantSessionId:
+          participantSignIn.body.participantSession.participantSessionId
+      }),
+      { method: "POST" }
+    );
+    assert.equal(resumed.status, 200);
+    assert.equal(resumed.body.testRun.currentUnitKey, "unit-intro");
+
+    const largeGeoGebraState = JSON.stringify({
+      unitState: {
+        dataParts: {
+          response: JSON.stringify({
+            id: "geogebra-state",
+            value: "G".repeat(2 * 1024 * 1024)
+          })
+        },
+        presentationProgress: "complete",
+        responseProgress: "complete"
+      }
+    });
+    const saved = await requestJsonAt<{
+      testRun: { unitResponses: Record<string, string> };
+    }>(
+      isolated.baseUrl,
+      resolveRoutePath(productionApiRoutes.participant.saveProgress, {
+        testRunId: resumed.body.testRun.testRunId
+      }),
+      {
+        method: "POST",
+        body: {
+          deliveryId: "integration-large-geogebra-state",
+          currentUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: largeGeoGebraState
+        }
+      }
+    );
+    assert.equal(saved.status, 200);
+    assert.equal(
+      saved.body.testRun.unitResponses["unit-intro"],
+      largeGeoGebraState
+    );
+
+    const rejected = await fetch(
+      `${isolated.baseUrl}${resolveRoutePath(
+        productionApiRoutes.participant.saveProgress,
+        { testRunId: resumed.body.testRun.testRunId }
+      )}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          currentUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: "X".repeat(3 * 1024 * 1024)
+        })
+      }
+    );
+    assert.equal(rejected.status, 413);
+    assert.deepEqual(await rejected.json(), {
+      error: "request_body_too_large",
+      message: "Request body exceeds the configured JSON payload limit.",
+      details: { maxJsonBodyBytes: 3 * 1024 * 1024 }
+    });
+
+    const restored = await requestJsonAt<{
+      currentRunState: {
+        testRun: { unitResponses: Record<string, string> };
+      };
+    }>(
+      isolated.baseUrl,
+      resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
+        participantSessionId:
+          participantSignIn.body.participantSession.participantSessionId
+      })
+    );
+    assert.equal(restored.status, 200);
+    assert.equal(
+      restored.body.currentRunState.testRun.unitResponses["unit-intro"],
+      largeGeoGebraState
     );
   } finally {
     await closeServer(isolated.server);
@@ -44224,6 +44393,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       shutdownDrainDelayMs: number;
       maxJsonBodyBytes: number;
       maxSourcePackageJsonBodyBytes: number;
+      maxParticipantProgressJsonBodyBytes: number;
       httpTimeouts: {
         headersTimeoutMs: number;
         requestTimeoutMs: number;
@@ -44234,6 +44404,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         firstSliceStore: string;
         firstSlicePostgresUrlPresent: boolean;
         firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
+        firstSliceMaxParticipantProgressJsonBodyBytesPresent: boolean;
       };
     };
   };
@@ -44243,6 +44414,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.equal(typeof config.runtimeConfig.maxJsonBodyBytes, "number");
   assert.equal(
     typeof config.runtimeConfig.maxSourcePackageJsonBodyBytes,
+    "number"
+  );
+  assert.equal(
+    typeof config.runtimeConfig.maxParticipantProgressJsonBodyBytes,
     "number"
   );
   assert.equal(typeof config.runtimeConfig.httpTimeouts.headersTimeoutMs, "number");
@@ -44263,6 +44438,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.equal(
     typeof config.runtimeConfig.environment
       .firstSliceMaxSourcePackageJsonBodyBytesPresent,
+    "boolean"
+  );
+  assert.equal(
+    typeof config.runtimeConfig.environment
+      .firstSliceMaxParticipantProgressJsonBodyBytesPresent,
     "boolean"
   );
   assertPostgresLocationRedacted(

@@ -3748,6 +3748,10 @@ export class OpsViewFacade {
             value: `${config.maxSourcePackageJsonBodyBytes} bytes`
           },
           {
+            label: "Participant Progress JSON Limit",
+            value: `${config.maxParticipantProgressJsonBodyBytes} bytes`
+          },
+          {
             label: "HTTP Timeouts",
             value: `headers ${config.httpTimeouts.headersTimeoutMs}ms, request ${config.httpTimeouts.requestTimeoutMs}ms, keep-alive ${config.httpTimeouts.keepAliveTimeoutMs}ms`
           },

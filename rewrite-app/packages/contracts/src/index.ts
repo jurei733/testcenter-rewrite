@@ -1601,6 +1601,7 @@ export type GetRuntimeConfigResponse = {
     shutdownDrainDelayMs: number;
     maxJsonBodyBytes: number;
     maxSourcePackageJsonBodyBytes: number;
+    maxParticipantProgressJsonBodyBytes: number;
     httpTimeouts: {
       headersTimeoutMs: number;
       requestTimeoutMs: number;
@@ -1643,6 +1644,7 @@ export type GetRuntimeConfigResponse = {
       firstSlicePostgresUrlPresent: boolean;
       firstSliceMaxJsonBodyBytesPresent: boolean;
       firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
+      firstSliceMaxParticipantProgressJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
       firstSliceHstsEnabled: boolean;
       firstSliceBootstrapAdminUsernamePresent: boolean;
