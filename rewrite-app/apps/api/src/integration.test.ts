@@ -7183,12 +7183,16 @@ test("API rejects JSON request bodies above the configured limit", async () => {
 test("participant progress accepts bounded GeoGebra-sized state without widening ordinary JSON commands", async () => {
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore =
-    requestedStore === "file" || requestedStore === "sqlite"
+    requestedStore === "file" ||
+    requestedStore === "sqlite" ||
+    requestedStore === "postgres"
       ? requestedStore
       : "memory";
+  const participantLoginKey = `large-progress-${process.pid}`;
   const isolatedEnvironment: Record<string, string> = {
     FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
     FIRST_SLICE_MAX_JSON_BODY_BYTES: "1024",
     FIRST_SLICE_MAX_PARTICIPANT_PROGRESS_JSON_BODY_BYTES: String(
       3 * 1024 * 1024
@@ -7240,13 +7244,39 @@ test("participant progress accepts bounded GeoGebra-sized state without widening
       "request_body_too_large"
     );
 
+    const rosterImport = await requestJsonAt<{
+      items: Array<{ loginKey: string }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: {
+            participants: [
+              {
+                login: participantLoginKey,
+                group: "group:large-progress",
+                booklet: "booklet:demo"
+              }
+            ]
+          }
+        }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.equal(
+      rosterImport.body.items.some(item => item.loginKey === participantLoginKey),
+      true
+    );
+
     const participantSignIn = await requestJsonAt<{
       participantSession: { participantSessionId: string };
     }>(isolated.baseUrl, productionApiRoutes.participant.signIn, {
       method: "POST",
       body: {
         workspaceKey: "demo-workspace",
-        loginKey: "student-demo"
+        loginKey: participantLoginKey
       }
     });
     assert.equal(participantSignIn.status, 200);
