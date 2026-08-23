@@ -77,7 +77,14 @@ workspace dependencies is now closed as well: the import diagnostic exposes
 the exact candidate source-package IDs, Angular requires an explicit choice,
 and the server validates that choice before continuing the remaining automatic
 transitive closure. This likewise strengthens existing partial rows without
-changing their weighted status or the rounded estimate.
+changing their weighted status or the rounded estimate. Selected deletion
+graphs are now closed for the same bounded workspace-file workflow: the batch
+resolves roots before their selected dependencies regardless of request order,
+supports multiple dependency levels, and retains a dependency when its selected
+root fails confirmation or another guard. This removes the known
+earlier-mutation deletion gap but leaves concurrent graph changes and broader
+replacement graphs in the partial capability, so the rounded estimate remains
+93%.
 
 New requirements found by the 18.2/current-master audit:
 
@@ -106,7 +113,7 @@ no longer listed because their matrix rows are `done`.
 | 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases; close interactive state parity for the currently feasibility-only IB runtime snapshot while retaining byte/range delivery, restoration, and visible failure behavior. |
 | 4 | P0 | Interruption and recovery at production scale | Extend the proven multi-Unit foreground, reload, offline outbox, Service-Worker handoff, and idempotent replay paths to longer production packages and additional interruption timings. |
-| 5 | P1 | Workspace batch edge cases | Add more mixed-success replacement and deletion graphs, especially dependency changes and failures that appear only after earlier successful mutations in the same operator operation. Sequential upload mutation/collision behavior and the Original's single-file dependency deletion guard are now closed. |
+| 5 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
 | 6 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
 | 7 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
 

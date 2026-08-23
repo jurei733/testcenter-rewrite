@@ -45,6 +45,7 @@ export class RewriteAppShellPersistenceService {
         this.createPersistenceStateHost(),
         JSON.parse(rawValue) as Partial<PersistedShellState>
       );
+      this.uiState.syncAdminSessionToken();
     } catch {
       // Ignore broken browser state and keep defaults.
     }

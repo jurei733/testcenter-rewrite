@@ -95,7 +95,7 @@ export class AppShellFacade {
   }
 
   get hasAdminSession(): boolean {
-    return this.ops.adminSessionToken.trim() !== "";
+    return this.uiState.adminSessionActive();
   }
 
   async changeRequiredAdminPassword(password: string): Promise<void> {

@@ -17,6 +17,7 @@ import {
 @Injectable({ providedIn: "root" })
 export class RewriteAppUiStateService {
   readonly renderVersion = signal(0);
+  readonly adminSessionActive = signal(false);
   readonly responseMeta = signal("Idle");
   readonly lastResponse = signal("No request sent yet.");
   readonly activeRequestLabel = signal<string | null>(null);
@@ -33,4 +34,13 @@ export class RewriteAppUiStateService {
   showRawDebug = false;
   autoRefreshHandle: number | null = null;
   foregroundRequestDepth = 0;
+
+  setAdminSessionToken(value: string): void {
+    this.ops.adminSessionToken = value;
+    this.adminSessionActive.set(value.trim() !== "");
+  }
+
+  syncAdminSessionToken(): void {
+    this.adminSessionActive.set(this.ops.adminSessionToken.trim() !== "");
+  }
 }

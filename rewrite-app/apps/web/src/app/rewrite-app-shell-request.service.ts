@@ -190,7 +190,7 @@ export class RewriteAppShellRequestService {
     }
 
     this.adminSessionResetStarted = true;
-    this.uiState.ops.adminSessionToken = "";
+    this.uiState.setAdminSessionToken("");
     this.uiState.ops.adminSessionView = "";
     this.uiState.ops.adminAccessWindowNotice = "";
     this.persistence.persistShellState();

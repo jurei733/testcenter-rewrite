@@ -6493,44 +6493,126 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           wasUsed: [],
           errors: []
         };
-        for (const item of normalizedItems) {
-          try {
-            report.deleted.push(
-              await services.contentIntake.deleteSourcePackage({
-                tenantKey,
-                workspaceKey,
-                sourcePackageId: item.sourcePackageId,
-                confirmation: item.confirmation
-              })
-            );
-          } catch (error) {
-            const issue = isFirstSliceError(error)
-              ? {
+        type BatchDeleteIssue =
+          | DeleteSourcePackagesResponse["report"]["didNotExist"][number]
+          | DeleteSourcePackagesResponse["report"]["notAllowed"][number]
+          | DeleteSourcePackagesResponse["report"]["wasUsed"][number]
+          | DeleteSourcePackagesResponse["report"]["errors"][number];
+        const classifyIssue = (issue: BatchDeleteIssue): void => {
+          if (issue.error === "source_package_not_found") {
+            report.didNotExist.push(issue);
+          } else if (
+            issue.error === "source_package_delete_confirmation_mismatch"
+          ) {
+            report.notAllowed.push(issue);
+          } else if (issue.error === "source_package_delete_blocked") {
+            report.wasUsed.push(issue);
+          } else {
+            report.errors.push(issue);
+          }
+        };
+        const selectedSourcePackageIds = new Set(
+          normalizedItems.map(item => item.sourcePackageId)
+        );
+        const unresolvedSourcePackageIds = new Set(selectedSourcePackageIds);
+        let pendingItems = [...normalizedItems];
+        while (pendingItems.length > 0) {
+          const deferredItems: typeof pendingItems = [];
+          const deferredIssues = new Map<string, BatchDeleteIssue>();
+          let deletedInRound = 0;
+          for (const item of pendingItems) {
+            try {
+              report.deleted.push(
+                await services.contentIntake.deleteSourcePackage({
+                  tenantKey,
+                  workspaceKey,
                   sourcePackageId: item.sourcePackageId,
-                  fileName: item.confirmation || null,
-                  error: String(error.errorCode),
-                  message: error.message,
-                  ...(error.details === undefined ? {} : { details: error.details })
-                }
-              : {
-                  sourcePackageId: item.sourcePackageId,
-                  fileName: item.confirmation || null,
-                  error: "unexpected_error",
-                  message: "Source package deletion failed unexpectedly."
-                };
-            if (issue.error === "source_package_not_found") {
-              report.didNotExist.push(issue);
-            } else if (
-              issue.error === "source_package_delete_confirmation_mismatch"
-            ) {
-              report.notAllowed.push(issue);
-            } else if (issue.error === "source_package_delete_blocked") {
-              report.wasUsed.push(issue);
-            } else {
-              report.errors.push(issue);
+                  confirmation: item.confirmation
+                })
+              );
+              unresolvedSourcePackageIds.delete(item.sourcePackageId);
+              deletedInRound += 1;
+            } catch (error) {
+              const issue: BatchDeleteIssue = isFirstSliceError(error)
+                ? {
+                    sourcePackageId: item.sourcePackageId,
+                    fileName: item.confirmation || null,
+                    error: String(error.errorCode),
+                    message: error.message,
+                    ...(error.details === undefined
+                      ? {}
+                      : { details: error.details })
+                  }
+                : {
+                    sourcePackageId: item.sourcePackageId,
+                    fileName: item.confirmation || null,
+                    error: "unexpected_error",
+                    message: "Source package deletion failed unexpectedly."
+                  };
+              const blockingDependencies =
+                issue.error === "source_package_delete_blocked" &&
+                issue.details &&
+                typeof issue.details === "object" &&
+                "blockingDependencies" in issue.details &&
+                Array.isArray(issue.details.blockingDependencies)
+                  ? issue.details.blockingDependencies
+                  : [];
+              const waitsForSelectedReferences =
+                blockingDependencies.length > 0 &&
+                blockingDependencies.every(
+                  blocker =>
+                    blocker &&
+                    typeof blocker === "object" &&
+                    "dependencyType" in blocker &&
+                    blocker.dependencyType ===
+                      "workspace_source_package_reference" &&
+                    "dependencyId" in blocker &&
+                    typeof blocker.dependencyId === "string" &&
+                    blocker.dependencyId !== item.sourcePackageId &&
+                    selectedSourcePackageIds.has(blocker.dependencyId) &&
+                    unresolvedSourcePackageIds.has(blocker.dependencyId)
+                );
+              if (waitsForSelectedReferences) {
+                deferredItems.push(item);
+                deferredIssues.set(item.sourcePackageId, issue);
+                continue;
+              }
+              unresolvedSourcePackageIds.delete(item.sourcePackageId);
+              classifyIssue(issue);
             }
           }
+          if (deferredItems.length === 0) {
+            break;
+          }
+          if (deletedInRound === 0) {
+            for (const item of deferredItems) {
+              unresolvedSourcePackageIds.delete(item.sourcePackageId);
+              const issue = deferredIssues.get(item.sourcePackageId);
+              if (issue) {
+                classifyIssue(issue);
+              }
+            }
+            break;
+          }
+          pendingItems = deferredItems;
         }
+        const selectionOrder = new Map(
+          normalizedItems.map((item, index) => [item.sourcePackageId, index])
+        );
+        const sortBySelection = <T extends { sourcePackageId: string }>(
+          items: T[]
+        ): void => {
+          items.sort(
+            (left, right) =>
+              (selectionOrder.get(left.sourcePackageId) ?? Number.MAX_SAFE_INTEGER) -
+              (selectionOrder.get(right.sourcePackageId) ?? Number.MAX_SAFE_INTEGER)
+          );
+        };
+        sortBySelection(report.deleted);
+        sortBySelection(report.didNotExist);
+        sortBySelection(report.notAllowed);
+        sortBySelection(report.wasUsed);
+        sortBySelection(report.errors);
         sendJson<DeleteSourcePackagesResponse>(response, 200, { report });
         return;
       }

@@ -6510,6 +6510,90 @@ try {
     .locator("#sourcePackageDeletionSelection")
     .filter({ hasText: "0 file(s) selected" })
     .waitFor();
+  const dependencyBatchSuffix = Date.now();
+  const dependencyBatchUnitId = `UNIT.UI-BATCH-${dependencyBatchSuffix}`;
+  const dependencyBatchUnitFileName =
+    `Unit-ui-batch-${dependencyBatchSuffix}.xml`;
+  const dependencyBatchBookletFileName =
+    `Booklet-ui-batch-${dependencyBatchSuffix}.xml`;
+  const dependencyBatchUnitResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: dependencyBatchUnitFileName,
+        mediaType: "application/xml",
+        sourceDocument: `
+          <Unit>
+            <Metadata>
+              <Id>${dependencyBatchUnitId}</Id>
+              <Label>UI dependency batch unit</Label>
+            </Metadata>
+            <Definition player="">UI dependency batch content</Definition>
+          </Unit>
+        `
+      }
+    }
+  );
+  assert.equal(dependencyBatchUnitResponse.status, 201);
+  const dependencyBatchBookletResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: dependencyBatchBookletFileName,
+        mediaType: "application/xml",
+        sourceDocument: `
+          <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+            <Metadata>
+              <Id>BOOKLET.UI-BATCH-${dependencyBatchSuffix}</Id>
+              <Label>UI dependency batch booklet</Label>
+            </Metadata>
+            <Units>
+              <Unit id="${dependencyBatchUnitId}" label="UI dependency batch unit" />
+            </Units>
+          </Booklet>
+        `
+      }
+    }
+  );
+  assert.equal(dependencyBatchBookletResponse.status, 201);
+  await page.locator("#refreshContentReadsButton").click();
+  await addSourcePackageToDeleteBatch(dependencyBatchUnitFileName, 1);
+  await addSourcePackageToDeleteBatch(dependencyBatchBookletFileName, 2);
+  await expectButtonSelectorEnabled("#deleteSourcePackageBatchButton");
+  const dependencyDeleteBatchDialog = acceptAppConfirmation(
+    /Delete selected workspace files\?/,
+    /Delete 2 selected workspace file\(s\) and their unused derivatives\? Files that are still referenced will remain and be reported separately\./
+  );
+  await page.locator("#deleteSourcePackageBatchButton").click();
+  await dependencyDeleteBatchDialog;
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace File Batch Deletion Report"
+      })
+    })
+    .filter({ hasText: "2/2 deleted" })
+    .filter({ hasText: dependencyBatchUnitFileName })
+    .filter({ hasText: dependencyBatchBookletFileName })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#sourcePackageDeletionSelection")
+    .filter({ hasText: "0 file(s) selected" })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      !payload.items.some(
+        item =>
+          item?.sourcePackage?.fileName === dependencyBatchUnitFileName ||
+          item?.sourcePackage?.fileName === dependencyBatchBookletFileName
+      )
+  );
   stopAfter("content-prompt-read-model");
 
   logStep("operational-only-login-migration-candidates");

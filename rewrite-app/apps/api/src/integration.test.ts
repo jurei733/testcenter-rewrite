@@ -12802,6 +12802,233 @@ test("workspace dependency references block deleting a used loose source", async
   assert.equal(deletedUnit.body.deletion.sourcePackageId, unit.sourcePackageId);
 });
 
+test("source-package batch deletion resolves selected dependency graphs safely", async () => {
+  const tenantKey = "integration-tenant-source-dependency-batch-delete";
+  const workspaceKey = "integration-workspace-source-dependency-batch-delete";
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const createSourcePackage = async (input: {
+    fileName: string;
+    sourceDocument: string;
+    mediaType?: string;
+  }) => {
+    const created = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`${workspaceUrl}/source-packages`, {
+      method: "POST",
+      body: {
+        ...input,
+        mediaType: input.mediaType ?? "application/xml"
+      }
+    });
+    assert.equal(created.status, 201);
+    return created.body.sourcePackage;
+  };
+  const createDependencyPair = async (suffix: string) => {
+    const unitId = `UNIT.DEPENDENCY-BATCH-${suffix}`;
+    const unit = await createSourcePackage({
+      fileName: `Unit-dependency-batch-${suffix}.xml`,
+      sourceDocument: `
+        <Unit>
+          <Metadata><Id>${unitId}</Id><Label>${suffix} unit</Label></Metadata>
+          <Definition player="">${suffix} content</Definition>
+        </Unit>
+      `
+    });
+    const booklet = await createSourcePackage({
+      fileName: `Booklet-dependency-batch-${suffix}.xml`,
+      sourceDocument: `
+        <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+          <Metadata>
+            <Id>BOOKLET.DEPENDENCY-BATCH-${suffix}</Id>
+            <Label>${suffix} booklet</Label>
+          </Metadata>
+          <Units><Unit id="${unitId}" label="${suffix} unit" /></Units>
+        </Booklet>
+      `
+    });
+    return { unit, booklet };
+  };
+  type BatchReport = {
+    requestedCount: number;
+    deleted: Array<{ sourcePackageId: string }>;
+    didNotExist: Array<{ sourcePackageId: string; error: string }>;
+    notAllowed: Array<{ sourcePackageId: string; error: string }>;
+    wasUsed: Array<{ sourcePackageId: string; error: string }>;
+    errors: Array<{ sourcePackageId: string; error: string }>;
+  };
+  const deleteBatch = (
+    items: Array<{ sourcePackageId: string; confirmation: string }>
+  ) =>
+    requestJson<{ report: BatchReport }>(
+      `${workspaceUrl}/source-package-deletions`,
+      { method: "POST", body: { items } }
+    );
+
+  const successfulPair = await createDependencyPair("SUCCESS");
+  const successfulBatch = await deleteBatch([
+    {
+      sourcePackageId: successfulPair.unit.sourcePackageId,
+      confirmation: successfulPair.unit.fileName
+    },
+    {
+      sourcePackageId: successfulPair.booklet.sourcePackageId,
+      confirmation: successfulPair.booklet.fileName
+    }
+  ]);
+  assert.equal(successfulBatch.status, 200);
+  assert.deepEqual(
+    successfulBatch.body.report.deleted.map(item => item.sourcePackageId),
+    [
+      successfulPair.unit.sourcePackageId,
+      successfulPair.booklet.sourcePackageId
+    ]
+  );
+  assert.deepEqual(successfulBatch.body.report.didNotExist, []);
+  assert.deepEqual(successfulBatch.body.report.notAllowed, []);
+  assert.deepEqual(successfulBatch.body.report.wasUsed, []);
+  assert.deepEqual(successfulBatch.body.report.errors, []);
+
+  const chainDefinition = await createSourcePackage({
+    fileName: "dependency-batch-chain-definition.html",
+    mediaType: "text/html",
+    sourceDocument: "<main>Dependency batch chain</main>"
+  });
+  const chainUnit = await createSourcePackage({
+    fileName: "Unit-dependency-batch-CHAIN.xml",
+    sourceDocument: `
+      <Unit>
+        <Metadata>
+          <Id>UNIT.DEPENDENCY-BATCH-CHAIN</Id>
+          <Label>Chain unit</Label>
+        </Metadata>
+        <DefinitionRef player="">dependency-batch-chain-definition.html</DefinitionRef>
+      </Unit>
+    `
+  });
+  const chainBooklet = await createSourcePackage({
+    fileName: "Booklet-dependency-batch-CHAIN.xml",
+    sourceDocument: `
+      <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+        <Metadata>
+          <Id>BOOKLET.DEPENDENCY-BATCH-CHAIN</Id>
+          <Label>Chain booklet</Label>
+        </Metadata>
+        <Units>
+          <Unit id="UNIT.DEPENDENCY-BATCH-CHAIN" label="Chain unit" />
+        </Units>
+      </Booklet>
+    `
+  });
+  const chainBatch = await deleteBatch([
+    {
+      sourcePackageId: chainDefinition.sourcePackageId,
+      confirmation: chainDefinition.fileName
+    },
+    {
+      sourcePackageId: chainUnit.sourcePackageId,
+      confirmation: chainUnit.fileName
+    },
+    {
+      sourcePackageId: chainBooklet.sourcePackageId,
+      confirmation: chainBooklet.fileName
+    }
+  ]);
+  assert.deepEqual(
+    chainBatch.body.report.deleted.map(item => item.sourcePackageId),
+    [
+      chainDefinition.sourcePackageId,
+      chainUnit.sourcePackageId,
+      chainBooklet.sourcePackageId
+    ]
+  );
+  assert.deepEqual(chainBatch.body.report.wasUsed, []);
+  assert.deepEqual(chainBatch.body.report.errors, []);
+
+  const guardedPair = await createDependencyPair("GUARDED");
+  const guardedBatch = await deleteBatch([
+    {
+      sourcePackageId: guardedPair.unit.sourcePackageId,
+      confirmation: guardedPair.unit.fileName
+    },
+    {
+      sourcePackageId: guardedPair.booklet.sourcePackageId,
+      confirmation: "wrong-booklet-confirmation.xml"
+    }
+  ]);
+  assert.equal(guardedBatch.status, 200);
+  assert.deepEqual(guardedBatch.body.report.deleted, []);
+  assert.deepEqual(
+    guardedBatch.body.report.notAllowed.map(item => [
+      item.sourcePackageId,
+      item.error
+    ]),
+    [
+      [
+        guardedPair.booklet.sourcePackageId,
+        "source_package_delete_confirmation_mismatch"
+      ]
+    ]
+  );
+  assert.deepEqual(
+    guardedBatch.body.report.wasUsed.map(item => [
+      item.sourcePackageId,
+      item.error
+    ]),
+    [
+      [guardedPair.unit.sourcePackageId, "source_package_delete_blocked"]
+    ]
+  );
+  assert.deepEqual(guardedBatch.body.report.didNotExist, []);
+  assert.deepEqual(guardedBatch.body.report.errors, []);
+
+  const packagesAfterGuardedBatch = await requestJson<{
+    items: Array<{ sourcePackage: { sourcePackageId: string } }>;
+  }>(`${workspaceUrl}/source-packages`);
+  assert.equal(
+    packagesAfterGuardedBatch.body.items.some(
+      item =>
+        item.sourcePackage.sourcePackageId === guardedPair.unit.sourcePackageId
+    ),
+    true
+  );
+  assert.equal(
+    packagesAfterGuardedBatch.body.items.some(
+      item =>
+        item.sourcePackage.sourcePackageId ===
+        guardedPair.booklet.sourcePackageId
+    ),
+    true
+  );
+
+  const guardedRetry = await deleteBatch([
+    {
+      sourcePackageId: guardedPair.unit.sourcePackageId,
+      confirmation: guardedPair.unit.fileName
+    },
+    {
+      sourcePackageId: guardedPair.booklet.sourcePackageId,
+      confirmation: guardedPair.booklet.fileName
+    }
+  ]);
+  assert.deepEqual(
+    guardedRetry.body.report.deleted.map(item => item.sourcePackageId),
+    [guardedPair.unit.sourcePackageId, guardedPair.booklet.sourcePackageId]
+  );
+  assert.deepEqual(guardedRetry.body.report.wasUsed, []);
+});
+
 test("source-package intake rejects invalid metadata before import", async () => {
   const tenantKey = "integration-tenant-source-validation";
   const workspaceKey = "integration-workspace-source-validation";

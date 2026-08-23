@@ -162,7 +162,7 @@ export class RewriteAppOpsService {
     }
 
     this.applyAdminAuthPayload(payload);
-    this.opsState.adminSessionToken = payload.sessionToken;
+    this.uiState.setAdminSessionToken(payload.sessionToken);
     this.opsState.adminPassword = "";
     this.feedback.rememberActivity(
       "Admin Signed In",
@@ -275,7 +275,7 @@ export class RewriteAppOpsService {
       payload,
       this.opsState.adminSessionView
     );
-    this.opsState.adminSessionToken = "";
+    this.uiState.setAdminSessionToken("");
     this.feedback.rememberActivity(
       "Admin Signed Out",
       `Session ${payload.adminSession.adminSessionId} was revoked.`

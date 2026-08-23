@@ -45,7 +45,7 @@ export class AdminPasswordChangeService {
       payload,
       this.uiState.ops.adminSessionView
     );
-    this.uiState.ops.adminSessionToken = "";
+    this.uiState.setAdminSessionToken("");
     this.feedback.rememberActivity(
       "Admin Password Changed",
       `${payload.adminUser.username} changed their password and ${payload.revokedAdminSessionIds.length} active session(s) were revoked.`
@@ -69,7 +69,7 @@ export class AdminPasswordChangeService {
       payload,
       this.uiState.ops.adminSessionView
     );
-    this.uiState.ops.adminSessionToken = "";
+    this.uiState.setAdminSessionToken("");
     this.feedback.rememberActivity(
       "Admin Signed Out",
       `Session ${payload.adminSession.adminSessionId} was revoked.`
