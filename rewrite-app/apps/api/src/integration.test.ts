@@ -29299,7 +29299,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   assert.equal(unsafeResourcePath.body.error, "participant_resource_path_invalid");
 });
 
-test("original Testcenter Unit cross-file references block incomplete packages", async () => {
+test("original Testcenter Unit cross-file references quarantine incomplete graphs", async () => {
   const tenantKey = "integration-tenant-unit-cross-references";
   const workspaceKey = "integration-workspace-unit-cross-references";
   await requestJson("/api/v1/platform/tenants", {
@@ -29411,7 +29411,10 @@ test("original Testcenter Unit cross-file references block incomplete packages",
       }
     });
     const importResult = await requestJson<{
-      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      importJob: {
+        status: string;
+        diagnostics: Array<{ severity: string; code: string }>;
+      };
       stagedContentRelease: { contentReleaseId: string } | null;
     }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
       method: "POST",
@@ -29425,11 +29428,26 @@ test("original Testcenter Unit cross-file references block incomplete packages",
       assert.ok(importResult.body.stagedContentRelease);
       continue;
     }
-    assert.equal(importResult.body.importJob.status, "failed");
+    assert.equal(importResult.body.importJob.status, "completed");
     assert.equal(importResult.body.stagedContentRelease, null);
     assert.equal(
       importResult.body.importJob.diagnostics.some(
         diagnostic => diagnostic.code === crossReferenceCase.diagnosticCode
+      ),
+      true,
+      crossReferenceCase.fileName
+    );
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === "source_document_booklet_unit_missing"
+      ),
+      true,
+      crossReferenceCase.fileName
+    );
+    assert.equal(
+      importResult.body.importJob.diagnostics.every(
+        diagnostic => diagnostic.severity === "warning"
       ),
       true,
       crossReferenceCase.fileName
@@ -29601,6 +29619,265 @@ test("original Testcenter compatibility corpus requires schema-declared Booklet 
   const acceptedLegacyShell = await importSourcePackage(shellSourcePackageId);
   assert.equal(acceptedLegacyShell.body.importJob.status, "completed");
   assert.ok(acceptedLegacyShell.body.stagedContentRelease);
+});
+
+test("original Testcenter compatibility corpus isolates invalid ZIP members and dependent graphs", async () => {
+  const tenantKey = "integration-tenant-partial-zip-import";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+
+  const validUnit = (unitId: string, label: string): string => `
+    <Unit>
+      <Metadata><Id>${unitId}</Id><Label>${label}</Label></Metadata>
+      <Definition player="">${label} content</Definition>
+    </Unit>
+  `;
+  const validBooklet = (
+    bookletId: string,
+    unitId: string,
+    label: string
+  ): string => `
+    <Booklet>
+      <Metadata><Id>${bookletId}</Id><Label>${label}</Label></Metadata>
+      <Units><Unit id="${unitId}" label="${label} unit" /></Units>
+    </Booklet>
+  `;
+  const validRoster = (
+    bookletId: string,
+    groupId: string,
+    loginName: string
+  ): string => `
+    <Testtakers>
+      <Metadata><Description>Partial ZIP fixture</Description></Metadata>
+      <Group id="${groupId}" label="Partial ZIP group">
+        <Login name="${loginName}" mode="run-review">
+          <Booklet>${bookletId}</Booklet>
+        </Login>
+      </Group>
+    </Testtakers>
+  `;
+  const importArchive = async (
+    workspaceKey: string,
+    fileName: string,
+    entries: ZipFixtureEntry[]
+  ) => {
+    await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+      method: "POST",
+      body: { workspaceKey, displayName: workspaceKey }
+    });
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName,
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${createZipBase64(entries)}`
+        }
+      }
+    );
+    assert.equal(upload.status, 201);
+    return requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{
+          severity: string;
+          code: string;
+          message: string;
+        }>;
+      };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{ unitKey: string }>;
+          }>;
+        };
+      } | null;
+      participantRosterImport?: { importedCount: number; updatedCount: number };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: upload.body.sourcePackage.sourcePackageId }
+    });
+  };
+  const acceptedPathsFor = async (workspaceKey: string): Promise<string[]> => {
+    const activities = await requestJson<{
+      items: Array<{
+        activityEvent: { details: { acceptedZipEntryPaths?: string[] } };
+      }>;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+        "/activity-events?eventType=import_job_completed&limit=1"
+    );
+    return activities.body.items[0]?.activityEvent.details
+      .acceptedZipEntryPaths ?? [];
+  };
+
+  const invalidUnitResult = await importArchive(
+    "integration-workspace-partial-zip-unit",
+    "invalid-unit-graph.zip",
+    [
+      {
+        fileName: "valid_testtakers.xml",
+        content: validRoster(
+          "BOOKLET.PARTIAL-UNIT",
+          "group-partial-unit",
+          "login-partial-unit"
+        )
+      },
+      {
+        fileName: "valid_booklet.xml",
+        content: validBooklet(
+          "BOOKLET.PARTIAL-UNIT",
+          "UNIT.PARTIAL-INVALID",
+          "Invalid Unit Graph"
+        )
+      },
+      { fileName: "P.html", content: "independent resource" },
+      { fileName: "invalid_unit.xml", content: "INVALID" }
+    ]
+  );
+  assert.equal(invalidUnitResult.status, 201);
+  assert.equal(invalidUnitResult.body.importJob.status, "completed");
+  assert.equal(invalidUnitResult.body.stagedContentRelease, null);
+  assert.equal(invalidUnitResult.body.participantRosterImport, undefined);
+  assert.deepEqual(
+    invalidUnitResult.body.importJob.diagnostics.map(diagnostic => [
+      diagnostic.severity,
+      diagnostic.code
+    ]),
+    [
+      ["warning", "source_document_xml_malformed"],
+      ["warning", "source_document_booklet_unit_missing"],
+      ["warning", "source_document_testtakers_booklet_missing"]
+    ]
+  );
+  assert.match(
+    invalidUnitResult.body.importJob.diagnostics[0]?.message ?? "",
+    /invalid_unit\.xml/
+  );
+  assert.match(
+    invalidUnitResult.body.importJob.diagnostics[1]?.message ?? "",
+    /valid_booklet\.xml.*UNIT\.PARTIAL-INVALID/
+  );
+  assert.match(
+    invalidUnitResult.body.importJob.diagnostics[2]?.message ?? "",
+    /valid_testtakers\.xml.*BOOKLET\.PARTIAL-UNIT/
+  );
+  assert.deepEqual(
+    await acceptedPathsFor("integration-workspace-partial-zip-unit"),
+    ["P.html"]
+  );
+
+  const invalidBookletResult = await importArchive(
+    "integration-workspace-partial-zip-booklet",
+    "invalid-booklet-graph.zip",
+    [
+      {
+        fileName: "valid_testtakers.xml",
+        content: validRoster(
+          "BOOKLET.PARTIAL-INVALID",
+          "group-partial-booklet",
+          "login-partial-booklet"
+        )
+      },
+      { fileName: "invalid_booklet.xml", content: "INVALID" },
+      { fileName: "P.html", content: "independent resource" },
+      {
+        fileName: "valid_unit.xml",
+        content: validUnit("UNIT.PARTIAL-VALID", "Valid independent Unit")
+      }
+    ]
+  );
+  assert.equal(invalidBookletResult.status, 201);
+  assert.equal(invalidBookletResult.body.importJob.status, "completed");
+  assert.equal(invalidBookletResult.body.stagedContentRelease, null);
+  assert.equal(invalidBookletResult.body.participantRosterImport, undefined);
+  assert.deepEqual(
+    invalidBookletResult.body.importJob.diagnostics.map(diagnostic => [
+      diagnostic.severity,
+      diagnostic.code
+    ]),
+    [
+      ["warning", "source_document_xml_malformed"],
+      ["warning", "source_document_testtakers_booklet_missing"]
+    ]
+  );
+  assert.deepEqual(
+    await acceptedPathsFor("integration-workspace-partial-zip-booklet"),
+    ["P.html", "valid_unit.xml"]
+  );
+
+  const nestedResult = await importArchive(
+    "integration-workspace-partial-zip-nested",
+    "nested-sibling-graph.zip",
+    [
+      {
+        fileName: "valid_testtakers.xml",
+        content: validRoster(
+          "BOOKLET.PARTIAL-NESTED",
+          "group-partial-nested",
+          "login-partial-nested"
+        )
+      },
+      {
+        fileName: "valid_booklet.xml",
+        content: validBooklet(
+          "BOOKLET.PARTIAL-NESTED",
+          "UNIT.PARTIAL-NESTED",
+          "Nested Valid Graph"
+        )
+      },
+      { fileName: "RESOURCE/P.html", content: "nested resource" },
+      { fileName: "whatever/somestuff/invalid_unit.xml", content: "INVALID" },
+      {
+        fileName: "whatever/somestuff/valid_unit.xml",
+        content: validUnit("UNIT.PARTIAL-NESTED", "Nested Valid Unit")
+      }
+    ]
+  );
+  assert.equal(nestedResult.status, 201);
+  assert.equal(nestedResult.body.importJob.status, "completed");
+  assert.deepEqual(
+    nestedResult.body.importJob.diagnostics.map(diagnostic => [
+      diagnostic.severity,
+      diagnostic.code
+    ]),
+    [["warning", "source_document_xml_malformed"]]
+  );
+  assert.deepEqual(
+    nestedResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
+      booklet => ({
+        bookletKey: booklet.bookletKey,
+        unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
+      })
+    ),
+    [
+      {
+        bookletKey: "BOOKLET.PARTIAL-NESTED",
+        unitKeys: ["UNIT.PARTIAL-NESTED"]
+      }
+    ]
+  );
+  assert.deepEqual(nestedResult.body.participantRosterImport, {
+    importedCount: 1,
+    updatedCount: 0,
+    sourceFileNames: ["valid_testtakers.xml"],
+    operationalLoginCandidateCount: 0
+  });
+  assert.deepEqual(
+    await acceptedPathsFor("integration-workspace-partial-zip-nested"),
+    [
+      "valid_testtakers.xml",
+      "valid_booklet.xml",
+      "RESOURCE/P.html",
+      "whatever/somestuff/valid_unit.xml"
+    ]
+  );
 });
 
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {

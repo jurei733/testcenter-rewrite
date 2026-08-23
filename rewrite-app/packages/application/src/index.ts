@@ -17790,7 +17790,8 @@ type ParticipantRosterDocument = {
 };
 
 const extractTesttakersRosterDocumentsFromZipSourcePackage = (
-  sourcePackage: SourcePackage
+  sourcePackage: SourcePackage,
+  acceptedEntryPaths?: ReadonlySet<string>
 ): ParticipantRosterDocument[] => {
   if (
     !sourcePackage.sourceDocument ||
@@ -17811,6 +17812,8 @@ const extractTesttakersRosterDocumentsFromZipSourcePackage = (
     const normalizedFileName = entry.fileName.toLowerCase();
     if (
       entry.fileName.endsWith("/") ||
+      (acceptedEntryPaths &&
+        !acceptedEntryPaths.has(zipEntryPathIdentity(entry.fileName))) ||
       (!normalizedFileName.endsWith(".xml") &&
         !normalizedFileName.endsWith(".json"))
     ) {
@@ -17903,7 +17906,7 @@ const createManifestlessZipAssemblyManifest = (
     if (
       bytes &&
       /\.xml$/i.test(entry.fileName) &&
-      /^\uFEFF?\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?(?:Booklet|SysCheck)\b/i.test(
+      /^\uFEFF?\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?(?:Booklet|Unit|Testtakers|SysCheck)\b/i.test(
         decodeSourceTextBytes(bytes)
       )
     ) {
@@ -18239,16 +18242,12 @@ type TestcenterBookletUnitReference = {
   unitId: string;
 };
 
-const collectSchemaDeclaredTestcenterBookletUnitReferences = (
+const collectTestcenterBookletUnitReferences = (
   sourceDocument: string,
   bookletFileName: string
 ): TestcenterBookletUnitReference[] => {
   const root = parseTestcenterXmlRoot(sourceDocument);
-  if (
-    !root ||
-    xmlElementLocalName(root) !== "Booklet" ||
-    !declaresTestcenterXmlSchemaProfile(root)
-  ) {
+  if (!root || xmlElementLocalName(root) !== "Booklet") {
     return [];
   }
   const metadata = xmlChildrenNamed(root, "Metadata")[0];
@@ -18264,6 +18263,16 @@ const collectSchemaDeclaredTestcenterBookletUnitReferences = (
     seenUnitIds.add(identityKey);
     return [{ bookletFileName, bookletId, unitId }];
   });
+};
+
+const collectSchemaDeclaredTestcenterBookletUnitReferences = (
+  sourceDocument: string,
+  bookletFileName: string
+): TestcenterBookletUnitReference[] => {
+  const root = parseTestcenterXmlRoot(sourceDocument);
+  return root && declaresTestcenterXmlSchemaProfile(root)
+    ? collectTestcenterBookletUnitReferences(sourceDocument, bookletFileName)
+    : [];
 };
 
 const collectTestcenterVariableIds = (root: XmlElement): Set<string> => {
@@ -19023,6 +19032,412 @@ const validateZipXmlEntries = (
   return diagnostics;
 };
 
+type ZipEntryAcceptanceResult = {
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>;
+  diagnostics: ImportJobDiagnostic[];
+  acceptedEntryPaths: string[];
+  rejectedEntryPaths: string[];
+  hasAcceptedRetainableEntry: boolean;
+  hasAcceptedTestcenterEntry: boolean;
+};
+
+const zipEntryPathIdentity = (fileName: string): string =>
+  normalizeZipEntryPath(fileName).toLowerCase();
+
+const quarantineInvalidZipEntryGraphs = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+): ZipEntryAcceptanceResult => {
+  const rejectedEntryPaths = new Set<string>();
+  const directlyRejectedXmlEntryPaths = new Set<string>();
+  const diagnostics: ImportJobDiagnostic[] = [];
+  const manifestPathIdentity = manifestExtraction.manifestFileName
+    ? zipEntryPathIdentity(manifestExtraction.manifestFileName)
+    : null;
+  const rejectEntry = (
+    entry: ZipEntry,
+    entryDiagnostics: ImportJobDiagnostic[]
+  ): void => {
+    rejectedEntryPaths.add(zipEntryPathIdentity(entry.fileName));
+    diagnostics.push(
+      ...entryDiagnostics.map(diagnostic => ({
+        ...diagnostic,
+        severity: "warning" as const
+      }))
+    );
+  };
+
+  for (const entry of manifestExtraction.entries) {
+    if (entry.fileName.endsWith("/")) {
+      continue;
+    }
+    const entryPathIdentity = zipEntryPathIdentity(entry.fileName);
+    if (entryPathIdentity === manifestPathIdentity) {
+      // The named manifest defines the graph itself. Its integrity remains a
+      // package-wide gate and is validated after member quarantine.
+      continue;
+    }
+    if (entry.fileName.toLowerCase().endsWith(".xml")) {
+      const sourceBytes = readZipEntryBuffer(
+        manifestExtraction.zipBuffer,
+        entry,
+        MAX_EXTRACTED_RESOURCE_BYTES
+      );
+      const sourceDocument = sourceBytes
+        ? readZipEntryText(manifestExtraction.zipBuffer, entry)
+        : null;
+      const entryDiagnostics = !sourceBytes || sourceDocument === null
+        ? [
+            createImportDiagnostic(
+              "source_document_zip_xml_unreadable",
+              `Source package ZIP XML entry '${entry.fileName}' failed its compression, size, encoding, or checksum integrity check.`
+            )
+          ]
+        : [
+            ...validateXmlEncodingDeclaration(
+              sourceBytes,
+              sourceDocument,
+              entry.fileName
+            ),
+            ...validateTestcenterXmlSourceDocument(
+              sourceDocument,
+              entry.fileName
+            )
+          ];
+      const entryErrors = entryDiagnostics.filter(
+        diagnostic => diagnostic.severity === "error"
+      );
+      if (entryErrors.length > 0) {
+        directlyRejectedXmlEntryPaths.add(entryPathIdentity);
+        rejectEntry(entry, entryErrors);
+      }
+      continue;
+    }
+    if (!entry.fileName.toLowerCase().endsWith(".json")) {
+      continue;
+    }
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    const rosterInspection = sourceDocument
+      ? inspectTesttakersJsonRosterDocument(sourceDocument, entry.fileName)
+      : looksLikeTesttakersJsonFileName(entry.fileName)
+        ? {
+            status: "invalid" as const,
+            reason: "the ZIP entry could not be read"
+          }
+        : { status: "not_testtakers" as const };
+    if (rosterInspection.status === "invalid") {
+      rejectEntry(entry, [
+        createImportDiagnostic(
+          "source_document_testtakers_json_invalid",
+          `Testtakers JSON ZIP entry '${entry.fileName}' was rejected: ${rosterInspection.reason}.`
+        )
+      ]);
+    }
+  }
+
+  const acceptedExtraction = (): Extract<
+    ZipManifestExtractionResult,
+    { status: "found" }
+  > => ({
+    ...manifestExtraction,
+    entries: manifestExtraction.entries.filter(
+      entry => !rejectedEntryPaths.has(zipEntryPathIdentity(entry.fileName))
+    )
+  });
+  const acceptedXmlEntries = (): Array<{
+    entry: ZipEntry;
+    sourceDocument: string;
+    root: XmlElement;
+  }> =>
+    acceptedExtraction().entries.flatMap(entry => {
+      if (
+        entry.fileName.endsWith("/") ||
+        !entry.fileName.toLowerCase().endsWith(".xml")
+      ) {
+        return [];
+      }
+      const sourceDocument = readZipEntryText(
+        manifestExtraction.zipBuffer,
+        entry
+      );
+      const root = sourceDocument
+        ? parseTestcenterXmlRoot(sourceDocument)
+        : null;
+      return sourceDocument && root ? [{ entry, sourceDocument, root }] : [];
+    });
+
+  // Unit dependencies are evaluated first. Once a Unit is quarantined, every
+  // Booklet using it and every Testtakers roster using those Booklets is
+  // removed by the following two passes.
+  const quarantinedUnitIds = new Set<string>();
+  for (const { entry, sourceDocument, root } of acceptedXmlEntries()) {
+    if (xmlElementLocalName(root) !== "Unit") {
+      continue;
+    }
+    const declaredReferences =
+      extractDeclaredTestcenterUnitCrossReferences(sourceDocument);
+    if (!declaredReferences) {
+      continue;
+    }
+    const extraction = acceptedExtraction();
+    const manifestResources = collectXmlManifestResources(
+      extraction.manifestText
+    );
+    const missingDiagnostics: ImportJobDiagnostic[] = [];
+    if (
+      declaredReferences.playerKey &&
+      !findZipUnitPlayerEntry(
+        extraction,
+        entry,
+        declaredReferences.playerKey,
+        manifestResources
+      )
+    ) {
+      missingDiagnostics.push(
+        createImportDiagnostic(
+          "source_document_unit_player_missing",
+          `Unit ZIP entry '${entry.fileName}' was rejected because player '${declaredReferences.playerKey}' is unavailable after validating the archive.`
+        )
+      );
+    }
+    for (const [reference, code, label] of [
+      [
+        declaredReferences.definitionReference,
+        "source_document_unit_definition_missing",
+        "definition"
+      ],
+      [
+        declaredReferences.variablesReference,
+        "source_document_unit_variables_missing",
+        "variables resource"
+      ]
+    ] as const) {
+      if (
+        reference &&
+        !findZipUnitReferencedEntry(
+          extraction,
+          entry,
+          reference,
+          manifestResources
+        )
+      ) {
+        missingDiagnostics.push(
+          createImportDiagnostic(
+            code,
+            `Unit ZIP entry '${entry.fileName}' was rejected because ${label} '${reference}' is unavailable after validating the archive.`
+          )
+        );
+      }
+    }
+    for (const reference of declaredReferences.playerResourceReferences) {
+      if (
+        !findZipUnitReferencedEntry(
+          extraction,
+          entry,
+          reference,
+          manifestResources
+        )
+      ) {
+        missingDiagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_player_resource_missing",
+            `Unit ZIP entry '${entry.fileName}' was rejected because player resource '${reference}' is unavailable after validating the archive.`
+          )
+        );
+      }
+    }
+    if (missingDiagnostics.length > 0) {
+      const metadata = xmlChildrenNamed(root, "Metadata")[0];
+      const unitId = xmlElementText(
+        xmlChildrenNamed(metadata ?? root, "Id")[0]
+      );
+      if (unitId) {
+        quarantinedUnitIds.add(unitId.toLowerCase());
+      }
+      rejectEntry(entry, missingDiagnostics);
+    }
+  }
+
+  const availableUnitReferenceKeys = new Set<string>();
+  for (const { entry, sourceDocument, root } of acceptedXmlEntries()) {
+    if (xmlElementLocalName(root) !== "Unit") {
+      continue;
+    }
+    const metadata = xmlChildrenNamed(root, "Metadata")[0];
+    const unitId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+    if (unitId) {
+      availableUnitReferenceKeys.add(unitId.toLowerCase());
+    }
+    for (const referenceKey of workspaceDependencyReferenceKeys(entry.fileName)) {
+      availableUnitReferenceKeys.add(referenceKey);
+    }
+  }
+  for (const { entry, sourceDocument, root } of acceptedXmlEntries()) {
+    if (xmlElementLocalName(root) !== "Booklet") {
+      continue;
+    }
+    const schemaDeclared = declaresTestcenterXmlSchemaProfile(root);
+    if (
+      !schemaDeclared &&
+      directlyRejectedXmlEntryPaths.size === 0 &&
+      quarantinedUnitIds.size === 0
+    ) {
+      // Schema-less legacy Booklets can deliberately contain route shells with
+      // no separate Unit file. Only promote their unresolved references to a
+      // quarantine dependency when another XML member was actually rejected,
+      // matching the Original's mixed-archive cascade without invalidating
+      // those established legacy shells.
+      continue;
+    }
+    const unresolvedUnitReferences = collectTestcenterBookletUnitReferences(
+      sourceDocument,
+      entry.fileName
+    ).filter(
+      reference =>
+        !workspaceDependencyReferenceKeys(reference.unitId).some(referenceKey =>
+          availableUnitReferenceKeys.has(referenceKey)
+        )
+    );
+    const missingUnitReferences =
+      schemaDeclared || directlyRejectedXmlEntryPaths.size > 0
+        ? unresolvedUnitReferences
+        : unresolvedUnitReferences.filter(reference =>
+            quarantinedUnitIds.has(reference.unitId.toLowerCase())
+          );
+    if (missingUnitReferences.length > 0) {
+      rejectEntry(
+        entry,
+        missingUnitReferences.map(reference =>
+          createImportDiagnostic(
+            "source_document_booklet_unit_missing",
+            `Booklet ZIP entry '${entry.fileName}' (${reference.bookletId || "unknown"}) was rejected because Unit ID '${reference.unitId}' is unavailable after validating the archive.`
+          )
+        )
+      );
+    }
+  }
+
+  const availableBookletIds = new Set<string>();
+  for (const { root } of acceptedXmlEntries()) {
+    if (xmlElementLocalName(root) !== "Booklet") {
+      continue;
+    }
+    const metadata = xmlChildrenNamed(root, "Metadata")[0];
+    const bookletId = xmlElementText(
+      xmlChildrenNamed(metadata ?? root, "Id")[0]
+    );
+    if (bookletId) {
+      availableBookletIds.add(bookletId.toLowerCase());
+    }
+  }
+  const rejectRosterWithMissingBooklets = (
+    entry: ZipEntry,
+    bookletIds: string[]
+  ): void => {
+    const missingBookletIds = [
+      ...new Map(
+        bookletIds
+          .filter(bookletId => !availableBookletIds.has(bookletId.toLowerCase()))
+          .map(bookletId => [bookletId.toLowerCase(), bookletId])
+      ).values()
+    ];
+    if (missingBookletIds.length > 0) {
+      rejectEntry(
+        entry,
+        missingBookletIds.map(bookletId =>
+          createImportDiagnostic(
+            "source_document_testtakers_booklet_missing",
+            `Testtakers ZIP entry '${entry.fileName}' was rejected because Booklet ID '${bookletId}' is unavailable after validating the archive.`
+          )
+        )
+      );
+    }
+  };
+  for (const { entry, root } of acceptedXmlEntries()) {
+    if (xmlElementLocalName(root) === "Testtakers") {
+      rejectRosterWithMissingBooklets(
+        entry,
+        collectTesttakersBookletReferences(root)
+      );
+    }
+  }
+  for (const entry of acceptedExtraction().entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !entry.fileName.toLowerCase().endsWith(".json")
+    ) {
+      continue;
+    }
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    const rosterDocument = sourceDocument
+      ? readTesttakersJsonRosterDocument(sourceDocument)
+      : null;
+    if (rosterDocument) {
+      rejectRosterWithMissingBooklets(entry, rosterDocument.bookletIds);
+    }
+  }
+
+  const filteredExtraction = acceptedExtraction();
+  const acceptedEntries = filteredExtraction.entries.filter(
+    entry => !entry.fileName.endsWith("/")
+  );
+  const hasAcceptedTestcenterEntry = acceptedXmlEntries().some(({ root }) =>
+    ["Booklet", "Unit", "Testtakers", "SysCheck"].includes(
+      xmlElementLocalName(root)
+    )
+  );
+  const acceptedXmlRecords = acceptedXmlEntries();
+  const hasAcceptedRetainableEntry = acceptedEntries.some(entry => {
+    if (zipEntryPathIdentity(entry.fileName) === manifestPathIdentity) {
+      return false;
+    }
+    const xmlRecord = acceptedXmlRecords.find(
+      record =>
+        zipEntryPathIdentity(record.entry.fileName) ===
+        zipEntryPathIdentity(entry.fileName)
+    );
+    if (xmlRecord) {
+      const rootName = xmlElementLocalName(xmlRecord.root);
+      if (["Unit", "Testtakers", "SysCheck"].includes(rootName)) {
+        return true;
+      }
+      return rootName === "Booklet" &&
+        collectTestcenterBookletUnitReferences(
+          xmlRecord.sourceDocument,
+          entry.fileName
+        ).length > 0;
+    }
+    if (entry.fileName.toLowerCase().endsWith(".xml")) {
+      return false;
+    }
+    if (entry.fileName.toLowerCase().endsWith(".json")) {
+      const sourceDocument = readZipEntryText(
+        manifestExtraction.zipBuffer,
+        entry
+      );
+      return !sourceDocument ||
+        inspectTesttakersJsonRosterDocument(sourceDocument, entry.fileName)
+          .status === "not_testtakers";
+    }
+    return true;
+  });
+  return {
+    manifestExtraction: filteredExtraction,
+    diagnostics,
+    acceptedEntryPaths: acceptedEntries.map(entry => entry.fileName),
+    rejectedEntryPaths: manifestExtraction.entries
+      .filter(entry => rejectedEntryPaths.has(zipEntryPathIdentity(entry.fileName)))
+      .map(entry => entry.fileName),
+    hasAcceptedRetainableEntry,
+    hasAcceptedTestcenterEntry
+  };
+};
+
 const resourceMediaTypeForPath = (resourcePath: string): string => {
   const extension = resourcePath.toLowerCase().split(".").at(-1) ?? "";
   return (
@@ -19154,6 +19569,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
 ): {
   runtimeSnapshot: ContentReleaseRuntimeSnapshot | null;
   diagnostics: ImportJobDiagnostic[];
+  acceptedZipEntryPaths?: string[];
 } => {
   if (!sourcePackage.sourceDocument) {
     return {
@@ -19252,26 +19668,70 @@ const deriveRuntimeSnapshotFromSourceDocument = (
       sourcePackage.sourceDocument
     );
     if (manifestExtraction.status === "found") {
-      const resourceExtraction = extractNestedResourcePackages(manifestExtraction);
+      const fullZipDiagnostics = validateZipXmlEntries(manifestExtraction);
+      const hasPackageWideDiagnostic = fullZipDiagnostics.some(diagnostic =>
+        [
+          "source_document_zip_entry_path_invalid",
+          "source_document_zip_entry_name_duplicate",
+          "source_document_manifest_resource_id_duplicate",
+          "testcenter_xml_group_id_cross_file_duplicate",
+          "testcenter_xml_login_name_cross_file_duplicate",
+          "testcenter_resource_id_duplicate"
+        ].includes(diagnostic.code) ||
+        /^testcenter_xml_(?:booklet|unit|syscheck|testtakers)_id_duplicate$/.test(
+          diagnostic.code
+        )
+      );
+      const entryAcceptance = quarantineInvalidZipEntryGraphs(
+        manifestExtraction
+      );
+      const canRetainAcceptedMembers =
+        !hasPackageWideDiagnostic &&
+        entryAcceptance.rejectedEntryPaths.length > 0 &&
+        entryAcceptance.hasAcceptedRetainableEntry;
+      const acceptedManifestExtraction = canRetainAcceptedMembers
+        ? entryAcceptance.manifestExtraction
+        : manifestExtraction;
+      const resourceExtraction = extractNestedResourcePackages(
+        acceptedManifestExtraction
+      );
       const diagnostics = [
-        ...validateZipXmlEntries(manifestExtraction),
+        ...(canRetainAcceptedMembers ? entryAcceptance.diagnostics : []),
+        ...(canRetainAcceptedMembers
+          ? validateZipXmlEntries(acceptedManifestExtraction)
+          : fullZipDiagnostics),
         ...resourceExtraction.diagnostics
       ];
       if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
         return { runtimeSnapshot: null, diagnostics };
       }
       const runtimeSnapshot = normalizeParsedZipXmlContentStructure(
-        manifestExtraction
+        acceptedManifestExtraction
       );
+      const retainsStandaloneTestcenterEntries =
+        entryAcceptance.rejectedEntryPaths.length === 0 &&
+        entryAcceptance.hasAcceptedRetainableEntry &&
+        entryAcceptance.hasAcceptedTestcenterEntry;
+      const acceptedRuntimeSnapshot =
+        runtimeSnapshot ??
+        (canRetainAcceptedMembers || retainsStandaloneTestcenterEntries
+          ? { bookletEntries: [] }
+          : null);
       return {
         runtimeSnapshot:
-          runtimeSnapshot && resourceExtraction.resourceEntries.length > 0
+          acceptedRuntimeSnapshot && resourceExtraction.resourceEntries.length > 0
             ? {
-                ...runtimeSnapshot,
+                ...acceptedRuntimeSnapshot,
                 resourceEntries: resourceExtraction.resourceEntries
               }
-            : runtimeSnapshot,
-        diagnostics
+            : acceptedRuntimeSnapshot,
+        diagnostics,
+        ...(canRetainAcceptedMembers || retainsStandaloneTestcenterEntries
+          ? {
+              acceptedZipEntryPaths:
+                entryAcceptance.acceptedEntryPaths
+            }
+          : {})
       };
     }
 
@@ -19312,6 +19772,7 @@ const buildRuntimeSnapshot = (
 ): {
   runtimeSnapshot: ContentReleaseRuntimeSnapshot | null;
   diagnostics: ImportJobDiagnostic[];
+  acceptedZipEntryPaths?: string[];
 } => {
   if (hasStructuredContent(sourcePackage.contentStructure)) {
     const preservesAuthoredEmptyXmlLabels =
@@ -19346,7 +19807,13 @@ const buildRuntimeSnapshot = (
     if (derivedFromSourceDocument.runtimeSnapshot) {
       return {
         runtimeSnapshot: derivedFromSourceDocument.runtimeSnapshot,
-        diagnostics: derivedFromSourceDocument.diagnostics
+        diagnostics: derivedFromSourceDocument.diagnostics,
+        ...(derivedFromSourceDocument.acceptedZipEntryPaths
+          ? {
+              acceptedZipEntryPaths:
+                derivedFromSourceDocument.acceptedZipEntryPaths
+            }
+          : {})
       };
     }
 
@@ -24297,7 +24764,11 @@ export const createFirstSliceServices = (
       finishedAt: null,
       diagnostics: []
     };
-    const importResolution = workspaceDependencyDiagnostic
+    const importResolution: {
+      runtimeSnapshot: ContentReleaseRuntimeSnapshot | null;
+      diagnostics: ImportJobDiagnostic[];
+      acceptedZipEntryPaths?: string[];
+    } = workspaceDependencyDiagnostic
       ? {
           runtimeSnapshot: null,
           diagnostics: [workspaceDependencyDiagnostic]
@@ -24343,7 +24814,16 @@ export const createFirstSliceServices = (
     }
 
     const rosterDocuments =
-      extractTesttakersRosterDocumentsFromZipSourcePackage(sourcePackage);
+      extractTesttakersRosterDocumentsFromZipSourcePackage(
+        sourcePackage,
+        importResolution.acceptedZipEntryPaths
+          ? new Set(
+              importResolution.acceptedZipEntryPaths.map(
+                zipEntryPathIdentity
+              )
+            )
+          : undefined
+      );
     let participantRosterImport: ParticipantRosterImportSummary | undefined;
     if (rosterDocuments.length > 0) {
       try {
@@ -24384,6 +24864,8 @@ export const createFirstSliceServices = (
       diagnostics: importResolution.diagnostics
     };
     if (importResolution.runtimeSnapshot.bookletEntries.length === 0) {
+      const systemCheckCount =
+        importResolution.runtimeSnapshot.systemCheckEntries?.length ?? 0;
       await repository.saveImportJob(completedImportJob);
       await repository.saveSourcePackage({
         ...sourcePackage,
@@ -24405,12 +24887,15 @@ export const createFirstSliceServices = (
         eventType: "import_job_completed",
         subjectType: "import_job",
         subjectId: completedImportJob.importJobId,
-        summary: `System-check definition import completed for '${sourcePackage.fileName}'.`,
+        summary: systemCheckCount > 0
+          ? `System-check definition import completed for '${sourcePackage.fileName}'.`
+          : `Import completed for '${sourcePackage.fileName}' without a content release.`,
         details: {
           sourcePackageId: sourcePackage.sourcePackageId,
           contentReleaseId: null,
-          systemCheckCount:
-            importResolution.runtimeSnapshot.systemCheckEntries?.length ?? 0,
+          systemCheckCount,
+          acceptedZipEntryPaths:
+            importResolution.acceptedZipEntryPaths ?? null,
           diagnostics: completedImportJob.diagnostics
         }
       });
@@ -24449,6 +24934,8 @@ export const createFirstSliceServices = (
         sourcePackageId: sourcePackage.sourcePackageId,
         contentReleaseId: stagedContentRelease.contentReleaseId,
         participantRosterImport: participantRosterImport ?? null,
+        acceptedZipEntryPaths:
+          importResolution.acceptedZipEntryPaths ?? null,
         diagnostics: completedImportJob.diagnostics
       }
     });

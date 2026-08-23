@@ -847,9 +847,9 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             aria-labelledby="participantRouteTestletGateLabel"
           >
             <div>
-              <span>{{ view.customText('booklet_codeToEnterTitle', 'Protected Block') }}</span>
+              <span>{{ view.customText('booklet_codeToEnterTitle') }}</span>
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
-              <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', 'Enter the block code supplied by the test supervisor.') }}</p>
+              <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt') }}</p>
               <p *ngIf="gate.prompt" id="participantRouteTestletGateMessage">{{ gate.prompt }}</p>
               <p
                 *ngIf="gate.visibleCode as visibleCode"

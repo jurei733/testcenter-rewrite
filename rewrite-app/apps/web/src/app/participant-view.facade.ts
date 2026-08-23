@@ -2579,7 +2579,7 @@ export class ParticipantViewFacade {
     );
   }
 
-  customText(key: ParticipantCustomTextKey, fallback: string): string {
+  customText(key: ParticipantCustomTextKey, fallback?: string): string {
     return resolveParticipantCustomText(
       this.participantCustomTexts,
       key,
