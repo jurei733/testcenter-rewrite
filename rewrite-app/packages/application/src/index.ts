@@ -10194,16 +10194,17 @@ const isTestcenterXmlDateTime = (value: string): boolean => {
 
 const parseTestcenterSchemaVersion = (
   schemaLocation: string
-): { major: number; minor: number } | null => {
+): { major: number; minor: number; patch: number } | null => {
   const match = schemaLocation.match(
-    /(?:^|\/)(\d+)\.(\d+)(?:\.\d+)?(?:\/definitions\/|(?:[?#].*)?$)/i
+    /(?:^|\/)(\d+)\.(\d+)(?:\.(\d+))?(?:\/definitions\/|(?:[?#].*)?$)/i
   );
   if (!match) {
     return null;
   }
   return {
     major: Number(match[1]),
-    minor: Number(match[2])
+    minor: Number(match[2]),
+    patch: Number(match[3] ?? 0)
   };
 };
 
@@ -10652,15 +10653,22 @@ const validateTestcenterXmlSourceDocument = (
 
   if (canonicalRootName === "Booklet") {
     const bookletSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
-    const bookletSchemaSupports = (major: number, minor: number): boolean =>
+    const bookletSchemaSupports = (
+      major: number,
+      minor: number,
+      patch = 0
+    ): boolean =>
       bookletSchemaVersion === null ||
       bookletSchemaVersion.major > major ||
       (bookletSchemaVersion.major === major &&
-        bookletSchemaVersion.minor >= minor);
+        (bookletSchemaVersion.minor > minor ||
+          (bookletSchemaVersion.minor === minor &&
+            bookletSchemaVersion.patch >= patch)));
+    const supportsBookletCustomTexts = bookletSchemaSupports(13, 3);
     const supportsAdaptiveBookletStates = bookletSchemaSupports(15, 4);
     const supportsFractionalTimeMax = bookletSchemaSupports(16, 3);
     const supportsAllowedTimeMaxLeave = bookletSchemaSupports(16, 3);
-    const supportsTimeMaxLeave = bookletSchemaSupports(15, 1);
+    const supportsTimeMaxLeave = bookletSchemaSupports(15, 1, 6);
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -10725,7 +10733,7 @@ const validateTestcenterXmlSourceDocument = (
 
     const allowedDirectChildNames = new Set([
       "Metadata",
-      "CustomTexts",
+      ...(supportsBookletCustomTexts ? ["CustomTexts"] : []),
       "BookletConfig",
       ...(supportsAdaptiveBookletStates ? ["States"] : []),
       "Units"

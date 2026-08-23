@@ -13551,10 +13551,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     ),
     "utf8"
   )
-    .replace("/14.3.0/definitions/", "/15.1.8/definitions/")
+    .replace("/14.3.0/definitions/", "/15.1.6/definitions/")
     .replace('minutes="1"', 'minutes="1" leave="forbidden"');
   const version15TimedBookletWorkspaceKey = await createValidationWorkspace(
-    "booklet-15-time-max-leave.xml"
+    "booklet-15-1-6-time-max-leave.xml"
   );
   await uploadMinimalOriginalUnitDependencies(
     tenantKey,
@@ -13568,7 +13568,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       method: "POST",
       body: {
-        fileName: "booklet-15-time-max-leave.xml",
+        fileName: "booklet-15-1-6-time-max-leave.xml",
         mediaType: "application/xml",
         sourceDocument: version15TimedBookletXml
       }
@@ -14173,6 +14173,62 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "booklets/Booklet_sameBookletID.xml"),
     "utf8"
   );
+  const version133CustomTextBookletXml = validLegacyBookletXml
+    .replace("/14.3.0/definitions/", "/13.3.0/definitions/")
+    .replace(
+      "  <BookletConfig>",
+      '  <CustomTexts><CustomText key="legacyText">Legacy text</CustomText></CustomTexts>\n\n  <BookletConfig>'
+    );
+  const version133CustomTextWorkspaceKey = await createValidationWorkspace(
+    "booklet-13-3-custom-texts.xml"
+  );
+  await uploadMinimalOriginalUnitDependencies(
+    tenantKey,
+    version133CustomTextWorkspaceKey,
+    ["UNIT.SAMPLE", "UNIT.SAMPLE-2"]
+  );
+  const version133CustomTextPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${version133CustomTextWorkspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet-13-3-custom-texts.xml",
+        mediaType: "application/xml",
+        sourceDocument: version133CustomTextBookletXml
+      }
+    }
+  );
+  assert.equal(version133CustomTextPackage.status, 201);
+  const version133CustomTextImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{ customTexts?: Record<string, string> }>;
+      };
+    } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${version133CustomTextWorkspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          version133CustomTextPackage.body.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(
+    version133CustomTextImport.body.importJob.status,
+    "completed",
+    JSON.stringify(version133CustomTextImport.body.importJob.diagnostics)
+  );
+  assert.deepEqual(version133CustomTextImport.body.importJob.diagnostics, []);
+  assert.deepEqual(
+    version133CustomTextImport.body.stagedContentRelease?.runtimeSnapshot
+      .bookletEntries[0]?.customTexts,
+    { legacyText: "Legacy text" }
+  );
   const maximumUnicodeVariableId = "🧪".repeat(50);
   const schemaValidUnorderedBookletXml = validBookletXml.replace(
     /(\s*<Metadata>[\s\S]*?<\/Metadata>)(\s*<BookletConfig>[\s\S]*?<\/BookletConfig>)/,
@@ -14708,6 +14764,23 @@ test("original Testcenter compatibility corpus imports representative booklets",
         'minutes="1"',
         'minutes="1" leave="confirm"'
       ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-13-2-custom-texts.xml",
+      sourceDocument: validLegacyBookletXml
+        .replace("/14.3.0/definitions/", "/13.2.2/definitions/")
+        .replace(
+          "  <BookletConfig>",
+          '  <CustomTexts><CustomText key="legacyText">Too early</CustomText></CustomTexts>\n\n  <BookletConfig>'
+        ),
+      diagnosticCode: "testcenter_xml_booklet_child_invalid"
+    },
+    {
+      fileName: "booklet-15-1-5-time-max-leave.xml",
+      sourceDocument: validLegacyBookletXml
+        .replace("/14.3.0/definitions/", "/15.1.5/definitions/")
+        .replace('minutes="1"', 'minutes="1" leave="confirm"'),
       diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
     },
     {
