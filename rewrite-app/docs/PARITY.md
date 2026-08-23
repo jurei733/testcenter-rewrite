@@ -64,12 +64,28 @@ does not treat test-only upstream churn as missing application behavior. This
 is a dated planning estimate, not evidence that every production package or
 deployment has passed acceptance.
 
+A fresh upstream fetch on 2026-08-23 confirmed that the latest Original remains
+`origin/master` at `6455e265421777124f379090257365b70b21641f`, still 68 commits
+after 18.2.0. No additional product delta therefore changes the weighted
+estimate. The audit did, however, turn one previously broad "rare file-graph"
+gap into the explicit mixed-ZIP acceptance requirement below. It remains part
+of the already-partial package-intake, XML-validation, and dependency-graph
+rows, so it does not add a second weighted capability or change the rounded
+93% estimate.
+
 New requirements found by the 18.2/current-master audit:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
 | Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | done | P1 | the rewrite applies one deployment-configurable administrator-password minimum and JavaScript regular-expression rule to every password write while preserving sign-in for existing passwords after policy changes. Optional SHA-256 browser proof of work is independently selectable for administrator credentials, all participant logins, and second codes; the global admin and participant scopes also prevent an omitted required password from cheaply filling their failure sinks. Angular uses `altcha-lib` Workers like the Original. Signed short-lived tokens bind a keyed credential digest without exposing the credential, accept only the current or explicitly configured previous key ID, and are atomically consumed in memory/file/SQLite/Postgres. Startup and preflight validate scopes, secret length, distinct rotation keys, work range, and TTL; secret-free runtime configuration drives disabled-mode-compatible clients. Unit/API gates cover credential binding, expiry, replay, controlled rotation, redaction, password-omission resistance, and rate-limit composition, while production SQLite/Chromium proves all three scopes end to end |
 | Production TLS and bootstrap secret controls | 18.2 `HSTS_ENABLED`, `ADMIN_INIT_PASSWORD`, `SERVER_KEY` deployment contract | done | P1 | baseline security headers remain universal, while the production deployment overlay enables a fixed one-year `Strict-Transport-Security` policy with explicit environment override for an upstream-owned boundary. A separate one-time bootstrap overlay mounts the initial administrator password as a Docker secret into runtime preflight and the API, validates UTF-8/size/password policy before serving, creates exactly one platform administrator on an empty store, and leaves existing credentials unchanged on restart. Diagnostics expose only effective/configured booleans; the production Compose smoke generates a fresh secret, proves HSTS, sign-in, duplicate-bootstrap rejection, and absence of the value from diagnostics, container environment, and service logs. The bootstrap secret is unmounted after first-deployment verification. Proof-of-work signing secrets retain their documented bounded two-deployment rotation with no source/default/log exposure. Equivalent ingress/secret-manager controls remain acceptable; identical Original environment-variable names are not required |
+
+Sharpened acceptance requirement from the current Original workspace-import
+tests:
+
+| Requirement | Original evidence | Current rewrite behavior | Priority | Acceptance condition |
+| --- | --- | --- | --- | --- |
+| Dependency-isolated mixed-ZIP import | `WorkspaceTest::test_importUncategorizedFiles_zip_rejectInvalidUnitAndDependantFiles`, `...rejectInvalidBookletAndDependantFiles`, and `...handleSubFolders` | missing inside the otherwise-partial ZIP intake: `validateZipXmlEntries` currently promotes every XML-entry error to the complete import job, returns no staged release, and therefore cannot retain an independent valid graph from the same archive | P0 | classify and validate archive entries before graph assembly; quarantine an invalid Unit plus its dependent Booklet/Testtakers, or an invalid Booklet plus its dependent Testtakers, while retaining independent resources and complete valid sibling graphs. Nested folders must behave identically. Diagnostics must name every rejected entry and dependency, roster mutations and releases must contain only accepted graphs, and the behavior must pass memory, file, and SQLite gates using fixtures equivalent to all three Original tests |
 
 ## Priority queue
 
