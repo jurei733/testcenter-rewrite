@@ -2,7 +2,11 @@
 
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
-and additionally tracks current frontend behavior at
+and was last compared on 2026-08-23 with the latest published release
+`18.2.0` at `4196f03bddb680ed6d774d01143890342d8bbe5a` (2026-08-04) and the
+then-current upstream `origin/master` at
+`6455e265421777124f379090257365b70b21641f` (2026-08-21), 68 commits after
+that release. It additionally tracks current frontend behavior at
 `90ec58845d84d899fb993553d03767c072fdd05c` (2026-08-18) plus the complete
 current 18.0 BookletConfig package at
 `a5a6d25a72990d667300804c337cc5b500b01d2f` (2026-08-12). It is the working
@@ -21,6 +25,18 @@ historical counterparts. The current Speedtest system-test graph is fixed to
 its introducing upstream commit
 `6455e265421777124f379090257365b70b21641f`.
 
+The post-release master delta changes no schema generation beyond the already
+pinned 18.0 corpus. Its product-relevant Review, code-input, execution-mode,
+navigation/leave-dialog, invalid-session, Superadmin retry, error-report, and
+current Test-Controller/Speedtest behavior is represented below. Test-only,
+selector-only, documentation, fixture-refactoring, and CI-artifact changes do
+not create separate product requirements. The 18.2 release audit did expose
+two operational security gaps that were not explicit before: configurable
+Superadmin password length/pattern enforcement and optional signed
+browser-computed proof-of-work for admin, participant-login, and second-code
+entry, plus an explicit production owner for HSTS and bootstrap/challenge
+secrets.
+
 Status:
 
 - `done`: usable end-to-end in the rewrite and covered by an automated check
@@ -32,6 +48,25 @@ Priority:
 - `P0`: blocks credible test delivery or migration from the original
 - `P1`: required for operational parity in a first production rollout
 - `P2`: important follow-up after the first controlled rollout
+
+## Audited completion snapshot
+
+Against the release and master revisions above, the rounded engineering
+estimate is **92% functional parity (uncertainty about +/- 3 percentage
+points)**. The estimate weights P0/P1/P2 capabilities 5/3/1, treats every
+`done` row as complete, and scores each `partial` row from its concrete
+remaining behavior rather than from source-line counts. It therefore includes
+the newly recorded 18.2 security requirements and does not treat test-only
+upstream churn as missing application behavior. This is a dated planning
+estimate, not evidence that every production package or deployment has passed
+acceptance.
+
+New requirements found by the 18.2/current-master audit:
+
+| Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
+| --- | --- | --- | --- | --- |
+| Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | partial | P1 | the rewrite enforces an eight-to-60-character administrator-password policy in API and Angular, hashes secrets, redacts them from logs/audits, and applies durable admin/participant login sinks. Remaining 18.2 parity is deployment-configurable minimum length plus regular-expression policy with the same server/client feedback, and optional signed browser-computed proof-of-work independently selectable for administrator credentials, participant credentials, and second-code entry. Challenge replay/expiry, secret rotation, disabled-mode compatibility, rate-limit composition, and production Chromium coverage are required before this row is `done` |
+| Production TLS and bootstrap secret controls | 18.2 `HSTS_ENABLED`, `ADMIN_INIT_PASSWORD`, `SERVER_KEY` deployment contract | partial | P1 | the rewrite already emits and tests baseline security headers, keeps bootstrap entry explicit, and redacts request secrets and protected diagnostics. Remaining production evidence is one documented and automated deployment boundary that owns configurable HSTS, injects the initial administrator secret without source/default/log exposure, and rotates the proof-of-work signing secret without accepting signatures from an unintended key. Equivalent ingress/secret-manager controls are acceptable; identical Original environment-variable names are not required |
 
 ## Priority queue
 
