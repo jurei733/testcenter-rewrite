@@ -1243,6 +1243,16 @@ Unit schema's deliberately untyped `label`, `value`, and ValuePositionLabel
 payloads. Six Original-corpus negative cases pin root and nested failures across
 all three document types without weakening those payload boundaries.
 
+Latest XML enumeration lexical closure: Original enumeration facets derived
+from `xs:string` retain exact whitespace instead of applying token-style
+normalization. Whitespace-padded Booklet timer-leave, navigation, and leave-lock
+values; Unit variable types and dependency targets; SysCheck question types;
+and Testtakers login modes, code-input types, and booklet visibility now fail
+with their existing stable diagnostics rather than being silently trimmed into
+a different valid value. Store-matrix corpus cases pin every affected document
+type while numeric and boolean XML Schema types keep their required whitespace
+collapse behavior.
+
 Latest adaptive-state element closure: matching Original commit `ca2d3e96a`
 and the pinned 17.6 schema, XSD-declared Booklets now reject the retired
 `DefaultOption` element. The fallback remains the first ordinary `Option`

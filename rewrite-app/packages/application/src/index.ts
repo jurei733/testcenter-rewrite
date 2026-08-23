@@ -11201,7 +11201,7 @@ const validateTestcenterXmlSourceDocument = (
           !(supportsAllowedTimeMaxLeave
             ? ["forbidden", "confirm", "allowed"]
             : ["forbidden", "confirm"]
-          ).includes(leave.trim())
+          ).includes(leave)
         ) {
           diagnostics.push(
             createImportDiagnostic(
@@ -11226,7 +11226,7 @@ const validateTestcenterXmlSourceDocument = (
         );
         for (const attributeName of ["presentation", "response"] as const) {
           const value = denyNavigation.getAttribute(attributeName);
-          if (value !== null && !["ON", "OFF", "ALWAYS"].includes(value.trim())) {
+          if (value !== null && !["ON", "OFF", "ALWAYS"].includes(value)) {
             diagnostics.push(
               createImportDiagnostic(
                 "testcenter_xml_navigation_restriction_invalid",
@@ -11260,7 +11260,7 @@ const validateTestcenterXmlSourceDocument = (
             )
           );
         }
-        if (scope !== null && !["unit", "testlet"].includes(scope.trim())) {
+        if (scope !== null && !["unit", "testlet"].includes(scope)) {
           diagnostics.push(
             createImportDiagnostic(
               "testcenter_xml_lock_after_leaving_scope_invalid",
@@ -11731,7 +11731,7 @@ const validateTestcenterXmlSourceDocument = (
       const target = dependency.getAttribute("for");
       if (
         target !== null &&
-        !["player", "editor", "schemer", "coder"].includes(target.trim())
+        !["player", "editor", "schemer", "coder"].includes(target)
       ) {
         diagnostics.push(
           createImportDiagnostic(
@@ -11809,7 +11809,7 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
-      const variableType = variable.getAttribute("type")?.trim() ?? "";
+      const variableType = variable.getAttribute("type") ?? "";
       if (!variableTypes.has(variableType)) {
         diagnostics.push(
           createImportDiagnostic(
@@ -12278,7 +12278,7 @@ const validateTestcenterXmlSourceDocument = (
             )
           );
         }
-        const questionType = question.getAttribute("type")?.trim() ?? "";
+        const questionType = question.getAttribute("type") ?? "";
         if (!questionTypes.has(questionType)) {
           diagnostics.push(
             createImportDiagnostic(
@@ -13099,8 +13099,8 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
-      const mode = login.getAttribute("mode")?.trim();
-      if (mode && !supportedLoginModes.has(mode)) {
+      const mode = login.getAttribute("mode");
+      if (mode !== null && !supportedLoginModes.has(mode)) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_login_mode_invalid",
@@ -13305,7 +13305,7 @@ const validateTestcenterXmlSourceDocument = (
               type,
               `ViewSettings/codeInput/type for login '${loginName}'`
             );
-            const value = xmlElementText(type);
+            const value = String(type.textContent ?? "");
             if (
               ![
                 "text-field",
@@ -13371,7 +13371,7 @@ const validateTestcenterXmlSourceDocument = (
         }
         const visibility =
           visibilityElements.length > 0
-            ? xmlElementText(visibilityElements[0])
+            ? String(visibilityElements[0]?.textContent ?? "")
             : attributeVisibility;
         if (
           visibility !== null &&

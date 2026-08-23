@@ -14754,6 +14754,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_unit_attribute_invalid"
     },
     {
+      fileName: "unit-whitespace-padded-variable-type.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        'id="var1" type=" string "'
+      ),
+      diagnosticCode: "testcenter_xml_variable_type_invalid"
+    },
+    {
+      fileName: "unit-whitespace-padded-dependency-target.xml",
+      sourceDocument: validUnitXml.replace(
+        "  <BaseVariables>",
+        '  <Dependencies><File for=" player ">resource.bin</File></Dependencies>\n\n  <BaseVariables>'
+      ),
+      diagnosticCode: "testcenter_xml_dependency_target_invalid"
+    },
+    {
       fileName: "unit-14-metadata-transcript.xml",
       sourceDocument: validUnitXml
         .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
@@ -15475,6 +15491,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       sourceDocument: validSystemCheckXml.replace(
         'type="header"',
         'type="rating"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_question_type_invalid"
+    },
+    {
+      fileName: "syscheck-whitespace-padded-question-type.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'type="header"',
+        'type=" header "'
       ),
       diagnosticCode: "testcenter_xml_syscheck_question_type_invalid"
     },
@@ -16276,10 +16300,26 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_time_max_leave_invalid"
     },
     {
+      name: "time-max-whitespace-padded-leave",
+      sourceDocument: allowedLeaveSystemBookletXml.replace(
+        /leave\s*=\s*"allowed"/,
+        'leave=" allowed "'
+      ),
+      diagnosticCode: "testcenter_xml_time_max_leave_invalid"
+    },
+    {
       name: "completion-policy",
       sourceDocument: completionSystemBookletXml.replace(
         'presentation="ON"',
         'presentation="SOMETIMES"'
+      ),
+      diagnosticCode: "testcenter_xml_navigation_restriction_invalid"
+    },
+    {
+      name: "whitespace-padded-completion-policy",
+      sourceDocument: completionSystemBookletXml.replace(
+        'presentation="ON"',
+        'presentation=" ON "'
       ),
       diagnosticCode: "testcenter_xml_navigation_restriction_invalid"
     },
@@ -16296,6 +16336,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       sourceDocument: lockSystemBookletXml.replace(
         /scope\s*=\s*"unit"/,
         'scope="session"'
+      ),
+      diagnosticCode: "testcenter_xml_lock_after_leaving_scope_invalid"
+    },
+    {
+      name: "whitespace-padded-lock-scope",
+      sourceDocument: lockSystemBookletXml.replace(
+        /scope\s*=\s*"unit"/,
+        'scope=" unit "'
       ),
       diagnosticCode: "testcenter_xml_lock_after_leaving_scope_invalid"
     },
@@ -16958,6 +17006,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_root_attribute_invalid"
     },
     {
+      label: "whitespace-padded login mode",
+      rosterText: validRosterXml.replace(
+        'mode="run-hot-return"',
+        'mode=" run-hot-return "'
+      ),
+      diagnosticCode: "testcenter_xml_login_mode_invalid"
+    },
+    {
       label: "monitor-study before schema 14.7",
       rosterText: historicalRosterXml({
         schemaVersion: "14.6.0",
@@ -17250,6 +17306,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
         '<Profile id="small" /><ViewSettings><codeInput><type>keyboard</type><length>3</length></codeInput></ViewSettings>'
       ),
       diagnosticCode: "testcenter_xml_login_code_input_type_invalid"
+    },
+    {
+      label: "whitespace-padded login code-input type",
+      rosterText: currentRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><codeInput><type> keypad-numbers </type><length>3</length></codeInput></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_code_input_type_invalid"
+    },
+    {
+      label: "whitespace-padded login booklet visibility",
+      rosterText: currentRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><monitorBookletVisibility> collapsed </monitorBookletVisibility></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_booklet_visibility_invalid"
     },
     {
       label: "invalid login code-input length",
