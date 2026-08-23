@@ -548,6 +548,44 @@ type OriginalTestcenterCorpus = {
       participantLogins: Array<[loginKey: string, executionMode: string]>;
     };
   };
+  currentOriginalSpeedPackage: {
+    family: string;
+    sourceRepository: string;
+    sourceCommit: string;
+    sourceDirectory: string;
+    player: PinnedOriginalFixture & {
+      encoding: "brotli-base64";
+      playerKey: string;
+      playerModuleId: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+      metadataVersion: string;
+      unitStateType: string;
+    };
+    units: Array<
+      PinnedOriginalFixture & {
+        encoding?: "base64";
+        unitKey: string;
+        definitionFixture: string;
+        definitionEncoding: "base64" | "brotli-base64";
+        definitionSourcePath: string;
+        definitionSha256: string;
+      }
+    >;
+    booklet: PinnedOriginalFixture & {
+      bookletKey: string;
+      unitKeys: string[];
+      originalUnitIds: string[];
+      testletIds: string[];
+      timedUnitKeys: string[];
+      timeMaxMinutes: number;
+      timeMaxLeave: "confirm";
+    };
+    roster: PinnedOriginalFixture & {
+      groupKey: string;
+      participantLogins: Array<[loginKey: string, executionMode: string]>;
+    };
+  };
   codingSchemePackages: Array<{
     family: string;
     schemeFixture: string;
@@ -2177,6 +2215,153 @@ test("original Testcenter compatibility corpus pins the current STARS system-tes
       codeInput: { type: "keypad-symbols-alt", length: 3 }
     });
   }
+});
+
+test("original Testcenter compatibility corpus pins the current Speedtest system-test graph", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const speed = corpus.currentOriginalSpeedPackage;
+  assert.equal(
+    speed.sourceCommit,
+    "6455e265421777124f379090257365b70b21641f"
+  );
+
+  const readPinnedFixture = (
+    fixture: Pick<PinnedOriginalFixture, "fixture" | "encoding">
+  ): Buffer => {
+    const document = readFileSync(resolve(corpusRoot, fixture.fixture));
+    if (fixture.encoding === "base64") {
+      return Buffer.from(document.toString("utf8").trim(), "base64");
+    }
+    if (fixture.encoding === "brotli-base64") {
+      return brotliDecompressSync(
+        Buffer.from(document.toString("utf8").trim(), "base64")
+      );
+    }
+    return document;
+  };
+  const playerDocument = readPinnedFixture(speed.player);
+  const unitDocuments = speed.units.map(unit => readPinnedFixture(unit));
+  const definitionDocuments = speed.units.map(unit =>
+    readPinnedFixture({
+      fixture: unit.definitionFixture,
+      encoding: unit.definitionEncoding
+    })
+  );
+  const bookletDocument = readPinnedFixture(speed.booklet);
+  const rosterDocument = readPinnedFixture(speed.roster);
+  for (const [document, fixture] of [
+    [playerDocument, speed.player],
+    ...unitDocuments.map((document, index) => [document, speed.units[index]] as const),
+    [bookletDocument, speed.booklet],
+    [rosterDocument, speed.roster]
+  ] as const) {
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+    assert.ok(fixture.sourcePath.startsWith(`${speed.sourceDirectory}/`));
+  }
+  for (const [definitionDocument, unit] of definitionDocuments.map(
+    (document, index) => [document, speed.units[index]] as const
+  )) {
+    assert.equal(
+      createHash("sha256").update(definitionDocument).digest("hex"),
+      unit.definitionSha256,
+      unit.definitionSourcePath
+    );
+    assert.ok(unit.definitionSourcePath.startsWith(`${speed.sourceDirectory}/`));
+  }
+
+  const playerHtml = playerDocument.toString("utf8");
+  assert.match(playerHtml, /"id"\s*:\s*"iqb-player-speedtest"/);
+  assert.match(playerHtml, /"version"\s*:\s*"9\.9\.99-cypress"/);
+  assert.match(playerHtml, /"specVersion"\s*:\s*"5\.2"/);
+  assert.match(playerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.match(playerHtml, /iqb-standard@1\.0/);
+
+  for (const [unitDocument, unit] of unitDocuments.map(
+    (document, index) => [document, speed.units[index]] as const
+  )) {
+    const unitXml = unitDocument.toString("utf8");
+    assert.match(unitXml, new RegExp(`<Id>${unit.unitKey}<\\/Id>`));
+    assert.match(
+      unitXml,
+      /<DefinitionRef player="iqb-player-speedtest@9\.9"[^>]*>CY-SpeedUnit-00[12]\.voud<\/DefinitionRef>/
+    );
+  }
+  const imageDefinition = JSON.parse(definitionDocuments[0].toString("utf8")) as {
+    type: string;
+    version: string;
+    questionType: string;
+    answerType: string;
+    questions: Array<{ text: string; src?: string; correctAnswer: number }>;
+  };
+  assert.equal(imageDefinition.type, "speedtest-unit-defintion");
+  assert.equal(imageDefinition.version, "2.1.0");
+  assert.equal(imageDefinition.questionType, "image");
+  assert.equal(imageDefinition.answerType, "number");
+  assert.deepEqual(
+    imageDefinition.questions.map(question => question.text),
+    ["Frage 1", "Frage 2", "Frage 3", "Frage 4", "Frage 5", "Frage 6", "Frage 7"]
+  );
+  assert.ok(
+    imageDefinition.questions.every(question => question.src?.startsWith("data:image/png;base64,"))
+  );
+  const instructionDefinition = JSON.parse(
+    definitionDocuments[1].toString("utf8")
+  ) as {
+    questionType: string;
+    answerType: string;
+    questions: Array<{ text: string; answers: Array<{ text: string }> }>;
+  };
+  assert.equal(instructionDefinition.questionType, "text");
+  assert.equal(instructionDefinition.answerType, "text");
+  assert.equal(instructionDefinition.questions[0]?.text, "Instruktionen");
+  assert.deepEqual(
+    instructionDefinition.questions[0]?.answers.map(answer => answer.text),
+    ["Verstanden", "Nicht verstanden"]
+  );
+
+  const bookletXml = bookletDocument.toString("utf8");
+  assert.match(bookletXml, /<Id>Cy-Bklt_Speed-1<\/Id>/);
+  assert.deepEqual(
+    Array.from(bookletXml.matchAll(/<Testlet id="([^"]+)"/g), match => match[1]),
+    speed.booklet.testletIds
+  );
+  assert.equal(
+    Array.from(bookletXml.matchAll(/<TimeMax minutes="10"/g)).length,
+    speed.booklet.testletIds.length
+  );
+  const unitReferences = Array.from(
+    bookletXml.matchAll(/<Unit id="([^"]+)" label="([^"]+)" labelshort="([^"]+)"(?: alias="([^"]+)")? \/>/g)
+  );
+  assert.equal(unitReferences.length, speed.booklet.unitKeys.length);
+  assert.deepEqual(unitReferences.map(reference => reference[1]), speed.booklet.originalUnitIds);
+  assert.deepEqual(
+    unitReferences.map(reference => reference[4] || reference[1]),
+    speed.booklet.unitKeys
+  );
+
+  const participants = parseParticipantRosterText(rosterDocument.toString("utf8"));
+  assert.deepEqual(
+    participants.map(participant => [participant.loginKey, participant.executionMode]),
+    speed.roster.participantLogins
+  );
+  assert.deepEqual(
+    participants.map(participant => ({
+      groupKey: participant.groupKey,
+      bookletKey: participant.bookletKey,
+      password: participant.password
+    })),
+    [{
+      groupKey: speed.roster.groupKey,
+      bookletKey: speed.booklet.bookletKey,
+      password: "123"
+    }]
+  );
 });
 
 test("original Testcenter compatibility corpus pins official IQB coding fixtures", () => {

@@ -22207,6 +22207,345 @@ test("original Testcenter compatibility corpus imports and starts the current ST
   );
 });
 
+test("original Testcenter compatibility corpus imports and starts the current Speedtest system-test graph", async () => {
+  type PinnedFixture = {
+    fixture: string;
+    encoding?: "base64" | "brotli-base64";
+    sha256: string;
+  };
+  type CurrentSpeedPackage = {
+    player: PinnedFixture & {
+      playerKey: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+    };
+    units: Array<
+      PinnedFixture & {
+        unitKey: string;
+        definitionFixture: string;
+        definitionEncoding: "base64" | "brotli-base64";
+        definitionSha256: string;
+      }
+    >;
+    booklet: PinnedFixture & {
+      bookletKey: string;
+      unitKeys: string[];
+      originalUnitIds: string[];
+      testletIds: string[];
+      timedUnitKeys: string[];
+      timeMaxMinutes: number;
+      timeMaxLeave: "confirm";
+    };
+    roster: PinnedFixture & {
+      groupKey: string;
+      participantLogins: Array<[loginKey: string, executionMode: string]>;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentOriginalSpeedPackage: CurrentSpeedPackage };
+  const speed = corpus.currentOriginalSpeedPackage;
+  const readPinnedFixture = (fixture: PinnedFixture): Buffer => {
+    if (fixture.encoding === "brotli-base64") {
+      return Buffer.from(
+        readBrotliBase64Fixture(
+          resolve(originalTestcenterCorpusRoot, fixture.fixture)
+        ),
+        "utf8"
+      );
+    }
+    const document = readFileSync(
+      resolve(originalTestcenterCorpusRoot, fixture.fixture)
+    );
+    return fixture.encoding === "base64"
+      ? Buffer.from(document.toString("utf8").trim(), "base64")
+      : document;
+  };
+  const playerDocument = readPinnedFixture(speed.player);
+  const unitDocuments = speed.units.map(unit => readPinnedFixture(unit));
+  const definitionDocuments = speed.units.map(unit =>
+    readPinnedFixture({
+      fixture: unit.definitionFixture,
+      encoding: unit.definitionEncoding,
+      sha256: unit.definitionSha256
+    })
+  );
+  const bookletDocument = readPinnedFixture(speed.booklet);
+  const rosterDocument = readPinnedFixture(speed.roster);
+  for (const [document, fixture] of [
+    [playerDocument, speed.player],
+    ...unitDocuments.map((document, index) => [document, speed.units[index]] as const),
+    [bookletDocument, speed.booklet],
+    [rosterDocument, speed.roster]
+  ] as const) {
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      fixture.sha256
+    );
+  }
+  for (const [definitionDocument, unit] of definitionDocuments.map(
+    (document, index) => [document, speed.units[index]] as const
+  )) {
+    assert.equal(
+      createHash("sha256").update(definitionDocument).digest("hex"),
+      unit.definitionSha256
+    );
+  }
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${speed.booklet.bookletKey}" href="booklets/CY_Bklt_Speed.xml" />
+            <resource identifier="${speed.units[0]?.unitKey}" href="units/CY-SpeedUnit-001.xml" />
+            <resource identifier="${speed.units[0]?.unitKey}.voud" href="units/CY-SpeedUnit-001.voud" />
+            <resource identifier="${speed.units[1]?.unitKey}" href="units/CY-SpeedUnit-002.xml" />
+            <resource identifier="${speed.units[1]?.unitKey}.voud" href="units/CY-SpeedUnit-002.voud" />
+            <resource identifier="${speed.player.playerKey}" href="players/iqb-player-speedtest-9.9.99-cypress.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/CY_Bklt_Speed.xml",
+      content: bookletDocument.toString("utf8")
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-001.xml",
+      content: unitDocuments[0]?.toString("utf8") ?? ""
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-001.voud",
+      content: definitionDocuments[0]?.toString("utf8") ?? ""
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-002.xml",
+      content: unitDocuments[1]?.toString("utf8") ?? ""
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-002.voud",
+      content: definitionDocuments[1]?.toString("utf8") ?? ""
+    },
+    {
+      fileName: "export/players/iqb-player-speedtest-9.9.99-cypress.html",
+      content: playerDocument
+    }
+  ]);
+  const tenantKey = "integration-tenant-current-original-speed";
+  const workspaceKey = "integration-workspace-current-original-speed";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "current-original-speed.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`${workspaceUrl}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.equal(
+    importResult.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  const contentReleaseId =
+    importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            testletEntries?: Array<Record<string, unknown>>;
+            unitEntries: Array<{
+              unitKey: string;
+              originalUnitId?: string;
+              testletPath?: string[];
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{
+            playerKey: string;
+            moduleVersion?: string;
+            apiVersion?: string;
+            html: string;
+          }>;
+        };
+      };
+    };
+  }>(`${workspaceUrl}/content-releases/${contentReleaseId}`);
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = snapshot.bookletEntries.find(
+    entry => entry.bookletKey === speed.booklet.bookletKey
+  );
+  assert.ok(booklet);
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.unitKey),
+    speed.booklet.unitKeys
+  );
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.originalUnitId ?? unit.unitKey),
+    speed.booklet.originalUnitIds
+  );
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.testletPath ?? []),
+    [
+      [],
+      [speed.booklet.testletIds[0]],
+      [],
+      [speed.booklet.testletIds[1]],
+      [],
+      [speed.booklet.testletIds[2]],
+      []
+    ]
+  );
+  assert.deepEqual(
+    booklet.testletEntries,
+    speed.booklet.testletIds.map(testletKey => ({
+      testletKey,
+      displayLabel: "First Block",
+      parentTestletKey: null,
+      restrictions: {
+        timeMax: {
+          minutes: speed.booklet.timeMaxMinutes,
+          leave: speed.booklet.timeMaxLeave
+        }
+      }
+    }))
+  );
+  assert.ok(
+    booklet.unitEntries.every(unit => unit.playerKey === speed.player.playerKey)
+  );
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.unitDefinition),
+    [
+      definitionDocuments[1]?.toString("utf8"),
+      definitionDocuments[0]?.toString("utf8"),
+      definitionDocuments[1]?.toString("utf8"),
+      definitionDocuments[0]?.toString("utf8"),
+      definitionDocuments[1]?.toString("utf8"),
+      definitionDocuments[0]?.toString("utf8"),
+      definitionDocuments[1]?.toString("utf8")
+    ].map(definition => definition?.trim())
+  );
+  const player = snapshot.playerEntries?.find(
+    entry => entry.playerKey === speed.player.playerKey
+  );
+  assert.equal(player?.playerKey, speed.player.playerKey);
+  assert.match(player?.html ?? "", /"version"\s*:\s*"9\.9\.99-cypress"/);
+
+  const activation = await requestJson(
+    `${workspaceUrl}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+  const rosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      groupKey: string;
+      bookletKey: string | null;
+      executionMode?: string;
+      passwordRequired: boolean;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+  }>(`${workspaceUrl}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: rosterDocument.toString("utf8") }
+  });
+  assert.equal(rosterImport.status, 201, JSON.stringify(rosterImport.body));
+  assert.deepEqual(
+    rosterImport.body.items.map(item => [item.loginKey, item.executionMode]),
+    speed.roster.participantLogins
+  );
+  assert.ok(
+    rosterImport.body.items.every(
+      item =>
+        item.groupKey === speed.roster.groupKey &&
+        item.bookletKey === speed.booklet.bookletKey &&
+        item.passwordRequired &&
+        item.validationWarnings.length === 0
+    )
+  );
+
+  const signIn = await requestJson<{
+    participantSession: {
+      participantSessionId: string;
+      executionMode?: string;
+    };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "speed-1",
+      password: "123"
+    }
+  });
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.participantSession.executionMode, "run-hot-restart");
+  const participantSessionId =
+    signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { currentUnitKey: string | null; executionMode?: string };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: speed.booklet.bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.equal(resume.body.testRun.currentUnitKey, speed.booklet.unitKeys[0]);
+  assert.equal(resume.body.testRun.executionMode, "run-hot-restart");
+  const currentState = await requestJson<{
+    currentRunState: {
+      currentUnit?: {
+        unitKey: string;
+        player?: { playerKey: string; moduleVersion?: string } | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.unitKey,
+    speed.booklet.unitKeys[0]
+  );
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.player?.playerKey,
+    speed.player.playerKey
+  );
+});
+
 test("original Testcenter compatibility corpus imports the historical DAN DefinitionRef graph", async () => {
   type LegacyTestbedPackage = {
     playerFixture: string;

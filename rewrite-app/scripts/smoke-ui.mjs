@@ -13244,6 +13244,341 @@ try {
     .getByText("Frage 1", { exact: true })
     .waitFor({ timeout: 30_000 });
 
+  logStep("participant-current-original-speedtest-system-package");
+  const currentOriginalSpeedPackage =
+    officialProtocolCorpus.currentOriginalSpeedPackage;
+  assert.ok(
+    currentOriginalSpeedPackage,
+    "The current Original Testcenter Speedtest package should be pinned."
+  );
+  const currentOriginalSpeedTenantKey =
+    `${tenantKey}-current-original-speedtest`;
+  const currentOriginalSpeedWorkspaceKey =
+    `${workspaceKey}-current-original-speedtest`;
+  const [
+    currentOriginalSpeedPlayerDocument,
+    currentOriginalSpeedFirstUnitDocument,
+    currentOriginalSpeedFirstDefinitionDocument,
+    currentOriginalSpeedSecondUnitDocument,
+    currentOriginalSpeedSecondDefinitionDocument,
+    currentOriginalSpeedBookletDocument,
+    currentOriginalSpeedRosterDocument
+  ] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.player.fixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.units[0].fixture
+      ),
+      "utf8"
+    ),
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.units[0].definitionFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.units[1].fixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.units[1].definitionFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8")),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.booklet.fixture
+      ),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        currentOriginalSpeedPackage.roster.fixture
+      ),
+      "utf8"
+    )
+  ]);
+  const currentOriginalSpeedZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${currentOriginalSpeedPackage.booklet.bookletKey}" href="booklets/CY_Bklt_Speed.xml" />
+            <resource identifier="${currentOriginalSpeedPackage.units[0].unitKey}" href="units/CY-SpeedUnit-001.xml" />
+            <resource identifier="${currentOriginalSpeedPackage.units[0].unitKey}.voud" href="units/CY-SpeedUnit-001.voud" />
+            <resource identifier="${currentOriginalSpeedPackage.units[1].unitKey}" href="units/CY-SpeedUnit-002.xml" />
+            <resource identifier="${currentOriginalSpeedPackage.units[1].unitKey}.voud" href="units/CY-SpeedUnit-002.voud" />
+            <resource identifier="${currentOriginalSpeedPackage.player.playerKey}" href="players/iqb-player-speedtest-9.9.99-cypress.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/CY_Bklt_Speed.xml",
+      content: currentOriginalSpeedBookletDocument
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-001.xml",
+      content: currentOriginalSpeedFirstUnitDocument
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-001.voud",
+      content: currentOriginalSpeedFirstDefinitionDocument
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-002.xml",
+      content: currentOriginalSpeedSecondUnitDocument
+    },
+    {
+      fileName: "export/units/CY-SpeedUnit-002.voud",
+      content: currentOriginalSpeedSecondDefinitionDocument
+    },
+    {
+      fileName: "export/players/iqb-player-speedtest-9.9.99-cypress.html",
+      content: currentOriginalSpeedPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: currentOriginalSpeedTenantKey,
+      displayName: "Current Original Speedtest"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${currentOriginalSpeedTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: currentOriginalSpeedWorkspaceKey,
+        displayName: "Current Original Speedtest"
+      }
+    }
+  );
+  const currentOriginalSpeedWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${currentOriginalSpeedTenantKey}` +
+    `/workspaces/${currentOriginalSpeedWorkspaceKey}`;
+  const currentOriginalSpeedSourceResponse = await sendSmokeJson(
+    `${currentOriginalSpeedWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "current-original-speedtest-system-package.zip",
+        mediaType: "application/zip",
+        sourceDocument:
+          `data:application/zip;base64,${currentOriginalSpeedZip.toString("base64")}`
+      }
+    }
+  );
+  const currentOriginalSpeedSourcePayload =
+    await currentOriginalSpeedSourceResponse.json();
+  assert.equal(currentOriginalSpeedSourceResponse.status, 201);
+  const currentOriginalSpeedImportResponse = await sendSmokeJson(
+    `${currentOriginalSpeedWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          currentOriginalSpeedSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const currentOriginalSpeedImportPayload =
+    await currentOriginalSpeedImportResponse.json();
+  assert.equal(
+    currentOriginalSpeedImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(currentOriginalSpeedImportPayload.importJob.diagnostics)
+  );
+  const currentOriginalSpeedReleaseId =
+    currentOriginalSpeedImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    currentOriginalSpeedReleaseId,
+    "Current Original Speedtest import should stage a release."
+  );
+  await sendSmokeJson(
+    `${currentOriginalSpeedWorkspaceApiUrl}/content-releases/${currentOriginalSpeedReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(
+    `${currentOriginalSpeedWorkspaceApiUrl}/participant-roster`,
+    { body: { rosterText: currentOriginalSpeedRosterDocument } }
+  );
+  const currentOriginalSpeedSignInResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/auth/sign-in`,
+    {
+      body: {
+        tenantKey: currentOriginalSpeedTenantKey,
+        workspaceKey: currentOriginalSpeedWorkspaceKey,
+        loginKey: "speed-1",
+        password: "123"
+      }
+    }
+  );
+  const currentOriginalSpeedSignInPayload =
+    await currentOriginalSpeedSignInResponse.json();
+  assert.equal(currentOriginalSpeedSignInResponse.status, 200);
+  assert.equal(
+    currentOriginalSpeedSignInPayload.participantSession.executionMode,
+    "run-hot-restart"
+  );
+  const currentOriginalSpeedParticipantSessionId =
+    currentOriginalSpeedSignInPayload.participantSession.participantSessionId;
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/resume`,
+    { body: { bookletKey: currentOriginalSpeedPackage.booklet.bookletKey } }
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentOriginalSpeedParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({
+      hasText: `API ${currentOriginalSpeedPackage.player.playerApiVersion}`
+    })
+    .waitFor({ timeout: 30_000 });
+  let currentOriginalSpeedFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await currentOriginalSpeedFrame
+    .locator('[data-cy="question-text"]')
+    .filter({ hasText: "Instruktionen" })
+    .waitFor({ timeout: 30_000 });
+  await currentOriginalSpeedFrame
+    .locator('[data-cy="answer-button-0"]')
+    .dispatchEvent("click");
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[1] })
+    .waitFor({ timeout: 30_000 });
+  const currentOriginalSpeedTimedState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.activeTestletTimer?.testletKey ===
+        currentOriginalSpeedPackage.booklet.testletIds[0] &&
+      payload?.currentRunState?.activeTestletTimer?.status === "running" &&
+      payload?.currentRunState?.activeTestletTimer?.durationSeconds === 600,
+    30_000
+  );
+  assert.equal(
+    currentOriginalSpeedTimedState.currentRunState.activeTestletTimer
+      .durationSeconds,
+    currentOriginalSpeedPackage.booklet.timeMaxMinutes * 60
+  );
+  currentOriginalSpeedFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  for (let questionIndex = 0; questionIndex < 7; questionIndex += 1) {
+    await currentOriginalSpeedFrame
+      .locator('[data-cy="image-question-text"]')
+      .filter({ hasText: `Frage ${questionIndex + 1}` })
+      .waitFor({ timeout: 30_000 });
+    await currentOriginalSpeedFrame
+      .locator(`[data-cy="math-input-button-${questionIndex % 10}"]`)
+      .dispatchEvent("click");
+    await currentOriginalSpeedFrame
+      .locator('[data-cy="unit-next-button"]')
+      .dispatchEvent("click");
+  }
+  await page
+    .locator("#participantConfirmationTitle")
+    .filter({ hasText: "Leave timed block?" })
+    .waitFor({ timeout: 30_000 });
+  await page.locator("#participantConfirmationContinueButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[2] })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
+    payload => {
+      if (
+        payload?.currentRunState?.testRun?.currentUnitKey !==
+          currentOriginalSpeedPackage.booklet.unitKeys[2] ||
+        payload?.currentRunState?.testRun?.testletTimers?.[
+          currentOriginalSpeedPackage.booklet.testletIds[0]
+        ]?.status !== "cancelled"
+      ) return false;
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          currentOriginalSpeedPackage.booklet.unitKeys[1]
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const unitState = JSON.parse(response).unitState;
+        if (
+          unitState?.unitStateDataType !==
+          currentOriginalSpeedPackage.player.unitStateType
+        ) return false;
+        const responseValues = Array.from({ length: 7 }, (_, questionIndex) =>
+          JSON.parse(unitState?.dataParts?.[`question_${questionIndex}`] ?? "null")
+        );
+        const sums = JSON.parse(unitState?.dataParts?.sums ?? "null");
+        return (
+          responseValues.every((values, questionIndex) =>
+            values?.some(
+              value =>
+                value?.id === "value" &&
+                value?.status === "CODING_COMPLETE" &&
+                value?.value === questionIndex % 10
+            )
+          ) &&
+          sums?.some(
+            value => value?.id === "total_correct" && Number.isInteger(value?.value)
+          ) &&
+          sums?.some(
+            value => value?.id === "total_wrong" && Number.isInteger(value?.value)
+          )
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  currentOriginalSpeedFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await currentOriginalSpeedFrame
+    .locator('[data-cy="question-text"]')
+    .filter({ hasText: "Instruktionen" })
+    .waitFor({ timeout: 30_000 });
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      currentOriginalSpeedParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({
+      hasText: `API ${currentOriginalSpeedPackage.player.playerApiVersion}`
+    })
+    .waitFor({ timeout: 30_000 });
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[2] })
+    .waitFor({ timeout: 30_000 });
+  await page
+    .frameLocator("#participantVeronaPlayerFrame")
+    .locator('[data-cy="question-text"]')
+    .filter({ hasText: "Instruktionen" })
+    .waitFor({ timeout: 30_000 });
+
   logStep("participant-verona-shared-parameters");
   const sharedParameterTenantKey = `${tenantKey}-verona-shared-parameters`;
   const sharedParameterWorkspaceKey =

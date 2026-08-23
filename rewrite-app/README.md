@@ -716,6 +716,13 @@ The added read side now makes the first slice inspectable:
 - completed test-runs now leave the monitor queue and persist their completion timestamp
 - participant controller and Verona Player events now persist as first-class test-wide or unit-wide logs across memory, file, SQLite, and Postgres stores; Verona window-focus notifications and host focus/visibility changes are debounced into original-compatible test-wide `FOCUS=HAS|HAS_NOT` entries. Scoped operators can filter the JSON read model and export the original semicolon/BOM log-report columns, while the prior workspace activity timeline remains available through its own audit CSV route. Group-result deletion removes associated logs and reports the count
 
+The compatibility corpus also pins the complete current Original Speedtest
+system-test graph at `6455e265421777124f379090257365b70b21641f`, including its
+byte-exact Player, two Unit/definition pairs, seven-entry nested Booklet, and
+real roster. Its full three-testlet structure imports and starts across memory,
+file, and SQLite, while the production browser gate exercises one complete
+timed block and durable continuation into the next instruction.
+
 ## Frontend Shell
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
@@ -828,6 +835,16 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
+
+The named `smoke:ui:verona-player-families` slice additionally runs the
+byte-exact current Original Speedtest system-test package introduced at
+`6455e265421777124f379090257365b70b21641f`. The complete package contains the
+Player, two Units and definitions, a seven-entry Booklet with three nested
+10-minute Testlets, and its real password-protected roster. Import and launch
+are gated across memory, file, and SQLite; production Chromium completes the
+first seven-question block, confirms leaving it, verifies persisted question
+and summary state, enters the next instruction alias, and restores that exact
+position after reload.
 
 The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent historical ABI 3.3.0 and current ABI 5.0.0 scripted-survey packages, current Aspect 2.12.6 assessment, historical DAN 3.0.0 and current DAN 3.1.0 visual-assessment packages, historical STARS 0.6.19 and current official STARS 0.7.2 choice-interaction, historical Speedtest 1.2.0 timed-choice and current Speedtest 3.3.0 multi-question choice, and Lottie 1.2.2 shared-parameter Players, the complete current Original STARS 0.6.40 system-test graph, the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph, and the official `verona-modules-ib` 0.2 ItemBuilder migration feasibility snapshot with DIPF runtime 9.9.0. It gates type-faithful API-2 through API-6 response restoration, including ABI 5.0.0's and DAN 3.1.0's metadata-spec-5/runtime-API-4 splits, Aspect's three JSON-string `iqb-standard@1.0` state parts, DAN's retained `IQBVisualUnitPlayerV2.1.0` state, and ABI's JSON-string `allData` response array, nested-resource delivery, automatic Player navigation, and test-wide shared-parameter restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice. The IB snapshot is intentionally characterized separately: its unmodified nested runtime HTML/CSS/JS/config loads and reloads through participant-isolated embeddable resources, but the legacy runtime rejects the sandboxed Player's opaque `null`-origin controller messages. Because upstream labels the repository a feasibility study rather than a release, interactive response/state parity is not claimed.
 

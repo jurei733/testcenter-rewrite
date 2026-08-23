@@ -17,7 +17,9 @@ Test-Controller graph is fixed to upstream commit
 `65d28718eb6474cf5158206494096d32cd3393f9` (2026-08-20). The complete
 13-file `e2e/src/fixtures` directory from that commit is pinned separately so
 the current 18.0/17.4 schema generation is gated without replacing its
-historical counterparts.
+historical counterparts. The current Speedtest system-test graph is fixed to
+its introducing upstream commit
+`6455e265421777124f379090257365b70b21641f`.
 
 Status:
 
@@ -689,7 +691,15 @@ official definition-type/version mismatch while the Player negotiates Verona
 API 5.2. Its production gate merges JSON-string `question_0`, `question_1`,
 `sums`, and `activeQuestionIndex` state without Player-specific rewriting,
 resumes on the next question after reload, and follows the Player's automatic
-navigation into the next Unit. The official Lottie release is byte-pinned while its
+navigation into the next Unit. The separate current Original Speedtest
+system-test package at `6455e265421777124f379090257365b70b21641f` pins its
+Player, two Units and definitions, seven-entry nested Booklet, and real
+password-protected roster byte-for-byte. Import and participant-start gates
+execute the complete three-testlet graph across memory, file, and SQLite. A
+production Chromium/SQLite gate additionally completes the first seven-question
+10-minute block, confirms leaving it, verifies all question and summary state,
+enters the following instruction alias, and restores that exact position after
+reload. The official Lottie release is byte-pinned while its
 minimal executable definition is derived from pinned Player sources. Its
 production gate fetches the required nested avatar resource, publishes an
 avatar choice, follows automatic navigation, extends the test-wide shared

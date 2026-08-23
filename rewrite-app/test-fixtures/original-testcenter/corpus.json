@@ -3508,6 +3508,66 @@
       ]
     }
   },
+  "currentOriginalSpeedPackage": {
+    "family": "Original Testcenter Speedtest system test",
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "6455e265421777124f379090257365b70b21641f",
+    "sourceDirectory": "sampledata/system-test/load-player/speed",
+    "player": {
+      "fixture": "players/iqb-player-speedtest-9.9.99-cypress.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/system-test/load-player/speed/iqb-player-speedtest-9.9.99-cypress.html",
+      "sha256": "a480ee2b4d785bc59ca04a02e3f23c49ac3e2ca9a9e3bbbe1007ca942676a8b7",
+      "playerKey": "iqb-player-speedtest@9.9",
+      "playerModuleId": "iqb-player-speedtest",
+      "playerModuleVersion": "9.9.99-cypress",
+      "playerApiVersion": "5.2",
+      "metadataVersion": "2.0",
+      "unitStateType": "iqb-standard@1.0"
+    },
+    "units": [
+      {
+        "fixture": "units/CY-SpeedUnit-001.xml",
+        "sourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-001.xml",
+        "sha256": "2dfcae9a2361abffeb7b1fc272e7fceaae0c41ac4ad6befc5e9a1990ed8d5997",
+        "unitKey": "speed-u1",
+        "definitionFixture": "definitions/speed-current-CY-SpeedUnit-001.voud.br.base64",
+        "definitionEncoding": "brotli-base64",
+        "definitionSourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-001.voud",
+        "definitionSha256": "875c470938b946ca1dbc425123625500be34e2fd7a33aa19a0162eaa5199835f"
+      },
+      {
+        "fixture": "units/CY-SpeedUnit-002.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-002.xml",
+        "sha256": "577ca2ac9ea71b6795dd19070bb066316cebfa4c3cabd177821072a10dc60cb2",
+        "unitKey": "speed-u2",
+        "definitionFixture": "definitions/speed-current-CY-SpeedUnit-002.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-002.voud",
+        "definitionSha256": "435d54d3cfa18a2e951928fd041ce3f59efc41aca875f82841d6bd41c7edae86"
+      }
+    ],
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Speed.xml",
+      "sourcePath": "sampledata/system-test/load-player/speed/CY_Bklt_Speed.xml",
+      "sha256": "2af8b83065a3dc5d476b558a4e847a37f59d6760dcbda74e51e8ef74c140b090",
+      "bookletKey": "Cy-Bklt_Speed-1",
+      "unitKeys": ["speed-u2", "speed-u1", "s1", "s2", "s3", "s4", "s5"],
+      "originalUnitIds": ["speed-u2", "speed-u1", "speed-u2", "speed-u1", "speed-u2", "speed-u1", "speed-u2"],
+      "testletIds": ["speed-block-1", "speed-block-2", "speed-block-3"],
+      "timedUnitKeys": ["speed-u1", "s2", "s4"],
+      "timeMaxMinutes": 10,
+      "timeMaxLeave": "confirm"
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Speed.xml",
+      "sourcePath": "sampledata/system-test/load-player/speed/CY_Logins_Speed.xml",
+      "sha256": "1481ad0ab0b1a216ece271ac74366dc501532c0d501185e355aee19ddb1b11fc",
+      "groupKey": "group-1",
+      "participantLogins": [["speed-1", "run-hot-restart"]]
+    }
+  },
   "currentOriginalAspectPackage": {
     "sourceRepository": "https://github.com/iqb-berlin/testcenter",
     "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
