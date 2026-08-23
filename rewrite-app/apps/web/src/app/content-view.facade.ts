@@ -43,6 +43,18 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
+type WorkspaceDependencyAmbiguityCandidate = {
+  sourcePackageId: string;
+  fileName: string;
+};
+
+type WorkspaceDependencyAmbiguity = {
+  rootSourcePackageId: string;
+  dependencyReference: string;
+  selectedDependencySourcePackageIds: string[];
+  candidates: WorkspaceDependencyAmbiguityCandidate[];
+};
+
 @Injectable({ providedIn: "root" })
 export class ContentViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -1526,22 +1538,56 @@ export class ContentViewFacade {
     const payload = parseJsonDocument<GetImportJobResponse>(this.content.importJobDetailView);
     const detail = payload?.importJobDetail;
     return (
-      detail?.importJob.diagnostics.map((diagnostic, index) => ({
-        headline: diagnostic.code,
-        subline: diagnostic.severity,
-        badges: [detail.importJob.status, `diagnostic ${index + 1}`],
-        rows: [
-          {
-            label: "Message",
-            value: diagnostic.message
-          },
-          {
-            label: "Import Job",
-            value: detail.importJob.importJobId
-          }
-        ],
-        selected: false
-      })) ?? []
+      detail?.importJob.diagnostics.map((diagnostic, index) => {
+        const ambiguity =
+          this.readWorkspaceDependencyAmbiguity(diagnostic);
+        return {
+          headline: diagnostic.code,
+          subline: diagnostic.severity,
+          badges: [
+            detail.importJob.status,
+            `diagnostic ${index + 1}`,
+            ...(ambiguity ? ["operator choice required"] : [])
+          ],
+          rows: [
+            {
+              label: "Message",
+              value: diagnostic.message
+            },
+            {
+              label: "Import Job",
+              value: detail.importJob.importJobId
+            },
+            ...(ambiguity
+              ? [
+                  {
+                    label: "Dependency Reference",
+                    value: ambiguity.dependencyReference
+                  },
+                  {
+                    label: "Candidate Count",
+                    value: String(ambiguity.candidates.length)
+                  }
+                ]
+              : [])
+          ],
+          selected: false,
+          ...(ambiguity
+            ? {
+                actions: ambiguity.candidates.map(candidate => ({
+                  label: `Use ${candidate.fileName}`,
+                  payload: {
+                    rootSourcePackageId: ambiguity.rootSourcePackageId,
+                    dependencySourcePackageIds: JSON.stringify([
+                      ...ambiguity.selectedDependencySourcePackageIds,
+                      candidate.sourcePackageId
+                    ])
+                  }
+                }))
+              }
+            : {})
+        };
+      }) ?? []
     );
   }
 
@@ -2524,6 +2570,50 @@ export class ContentViewFacade {
     this.viewState.onActionAsync(() => this.contentService.createImportJob());
   }
 
+  resolveImportDiagnostic(item: RecordCollectionItem): void {
+    const rootSourcePackageId =
+      item.actionPayload?.rootSourcePackageId?.trim();
+    const serializedDependencySourcePackageIds =
+      item.actionPayload?.dependencySourcePackageIds;
+    if (!rootSourcePackageId || !serializedDependencySourcePackageIds) {
+      return;
+    }
+    let dependencySourcePackageIds: string[];
+    try {
+      const parsed = JSON.parse(serializedDependencySourcePackageIds);
+      if (
+        !Array.isArray(parsed) ||
+        parsed.length === 0 ||
+        parsed.length > 100 ||
+        parsed.some(
+          sourcePackageId =>
+            typeof sourcePackageId !== "string" || !sourcePackageId.trim()
+        )
+      ) {
+        return;
+      }
+      dependencySourcePackageIds = parsed.map(sourcePackageId =>
+        sourcePackageId.trim()
+      );
+      if (
+        new Set(dependencySourcePackageIds).size !==
+        dependencySourcePackageIds.length
+      ) {
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    this.content.sourcePackageId = rootSourcePackageId;
+    this.content.importJobId = "";
+    this.content.contentReleaseId = "";
+    this.persistState();
+    this.viewState.onActionAsync(() =>
+      this.contentService.createImportJob(dependencySourcePackageIds)
+    );
+  }
+
   async confirmActivateContentRelease(): Promise<void> {
     const releaseId = this.content.contentReleaseId.trim();
     if (!this.canActivateContentRelease) {
@@ -2754,6 +2844,69 @@ export class ContentViewFacade {
       importJobDetail?.importJob.status === "failed" &&
       importJobDetail.sourcePackage?.sourcePackageId === selectedSourcePackageId
     );
+  }
+
+  private readWorkspaceDependencyAmbiguity(diagnostic: {
+    code: string;
+    details?: Record<string, unknown>;
+  }): WorkspaceDependencyAmbiguity | null {
+    if (
+      diagnostic.code !==
+        "source_document_workspace_dependency_ambiguous" ||
+      !diagnostic.details
+    ) {
+      return null;
+    }
+    const rootSourcePackageId =
+      typeof diagnostic.details["rootSourcePackageId"] === "string"
+        ? diagnostic.details["rootSourcePackageId"].trim()
+        : "";
+    const dependencyReference =
+      typeof diagnostic.details["dependencyReference"] === "string"
+        ? diagnostic.details["dependencyReference"].trim()
+        : "";
+    const selectedDependencySourcePackageIds = Array.isArray(
+      diagnostic.details["selectedDependencySourcePackageIds"]
+    )
+      ? diagnostic.details["selectedDependencySourcePackageIds"].filter(
+          (sourcePackageId): sourcePackageId is string =>
+            typeof sourcePackageId === "string" && Boolean(sourcePackageId.trim())
+        )
+      : [];
+    const candidates = Array.isArray(
+      diagnostic.details["candidateSourcePackages"]
+    )
+      ? diagnostic.details["candidateSourcePackages"].flatMap(candidate => {
+          if (
+            !candidate ||
+            typeof candidate !== "object" ||
+            typeof (candidate as Record<string, unknown>)["sourcePackageId"] !==
+              "string" ||
+            typeof (candidate as Record<string, unknown>)["fileName"] !==
+              "string"
+          ) {
+            return [];
+          }
+          const sourcePackageId = (
+            candidate as Record<string, string>
+          )["sourcePackageId"]!.trim();
+          const fileName = (candidate as Record<string, string>)[
+            "fileName"
+          ]!.trim();
+          return sourcePackageId && fileName
+            ? [{ sourcePackageId, fileName }]
+            : [];
+        })
+      : [];
+    if (!rootSourcePackageId || !dependencyReference || candidates.length < 2) {
+      return null;
+    }
+    return {
+      rootSourcePackageId,
+      dependencyReference,
+      selectedDependencySourcePackageIds,
+      candidates
+    };
   }
 
   private inferSourceDocumentKind(mediaType: string, sourceDocument: string): string {

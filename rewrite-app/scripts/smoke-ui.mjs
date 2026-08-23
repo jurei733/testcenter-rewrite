@@ -983,6 +983,32 @@ try {
     testRunId,
     transition
   }) => {
+    const [previousStatus, nextStatus] = transition.split(" -> ");
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+        `/activity-events?eventType=monitor_run_command_issued` +
+        `&subjectType=test_run&subjectId=${encodeURIComponent(testRunId)}` +
+        "&limit=25",
+      payload =>
+        Array.isArray(payload?.items) &&
+        payload.items.some(item => {
+          const event = item?.activityEvent;
+          const details = event?.details;
+          return (
+            event?.actorId === actorId &&
+            event?.subjectId === testRunId &&
+            details?.commandType === commandType &&
+            details?.previousStatus === previousStatus &&
+            details?.nextStatus === nextStatus &&
+            details?.participantSessionId === participantSessionId &&
+            details?.loginKey === loginKey &&
+            details?.groupKey === groupKey &&
+            (!bookletKey || details?.bookletKey === bookletKey) &&
+            (!displayName || details?.displayName === displayName)
+          );
+        })
+    );
+    await clickAction("Refresh Runtime Reads");
     await page
       .locator("app-record-collection")
       .filter({
@@ -5687,6 +5713,138 @@ try {
     .filter({ hasText: "uses player" })
     .filter({ hasText: "uses coding scheme" })
     .waitFor({ timeout: 20_000 });
+  logStep("resolve-ambiguous-workspace-dependency");
+  const looseOriginalSourcePackages = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?limit=100`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item => item?.sourcePackage?.fileName === "Booklet2.xml"
+      ) &&
+      payload.items.some(item => item?.sourcePackage?.fileName === "Unit2.xml")
+  );
+  const looseBookletSourcePackageId =
+    looseOriginalSourcePackages.items.find(
+      item => item?.sourcePackage?.fileName === "Booklet2.xml"
+    )?.sourcePackage?.sourcePackageId;
+  const looseUnitSourcePackageId = looseOriginalSourcePackages.items.find(
+    item => item?.sourcePackage?.fileName === "Unit2.xml"
+  )?.sourcePackage?.sourcePackageId;
+  assert.ok(looseBookletSourcePackageId);
+  assert.ok(looseUnitSourcePackageId);
+  const duplicateLooseUnitSeed = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: `ui-duplicate-unit-seed-${Date.now()}.txt`,
+        mediaType: "text/plain",
+        sourceDocument: "replacement seed"
+      }
+    }
+  ).then(response => response.json());
+  const duplicateLooseUnitReplacement = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateLooseUnitSeed.sourcePackage.sourcePackageId}/replacements`,
+    {
+      body: {
+        fileName: "Unit2-copy.xml",
+        mediaType: "application/xml",
+        sourceDocument: await readFile(
+          resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+          "utf8"
+        )
+      }
+    }
+  ).then(response => response.json());
+  const duplicateLooseUnitSourcePackageId =
+    duplicateLooseUnitReplacement.replacementSourcePackage.sourcePackageId;
+  assert.ok(duplicateLooseUnitSourcePackageId);
+  await sourcePackageCollection
+    .locator("article.record-card")
+    .filter({ has: page.getByRole("heading", { name: "Booklet2.xml" }) })
+    .getByRole("button", { name: "Select + Load" })
+    .click();
+  await expectInputValue("#sourcePackageId", looseBookletSourcePackageId);
+  await page.locator("#createImportJobButton").click();
+  await waitForBusy("ambiguous-workspace-dependency-import");
+  await waitForNotBusy("ambiguous-workspace-dependency-import");
+  const importDiagnosticsCollection = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Import Diagnostics" }) });
+  const ambiguousDependencyDiagnostic = importDiagnosticsCollection
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "source_document_workspace_dependency_ambiguous"
+      })
+    })
+    .filter({ hasText: "operator choice required" })
+    .filter({ hasText: "UNIT.SAMPLE-2" })
+    .filter({ hasText: "Candidate Count" })
+    .filter({ hasText: "2" });
+  await ambiguousDependencyDiagnostic.waitFor({ timeout: 20_000 });
+  await ambiguousDependencyDiagnostic
+    .getByRole("button", { name: "Use Unit2.xml" })
+    .waitFor();
+  const guidedDependencyImportRequestPromise = page.waitForRequest(
+    request =>
+      request.method() === "POST" &&
+      request.url().endsWith(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`
+      )
+  );
+  await ambiguousDependencyDiagnostic
+    .getByRole("button", { name: "Use Unit2-copy.xml" })
+    .click();
+  const guidedDependencyImportRequest =
+    await guidedDependencyImportRequestPromise;
+  assert.deepEqual(guidedDependencyImportRequest.postDataJSON(), {
+    sourcePackageId: looseBookletSourcePackageId,
+    dependencySourcePackageIds: [duplicateLooseUnitSourcePackageId]
+  });
+  await waitForBusy("guided-workspace-dependency-import");
+  await waitForNotBusy("guided-workspace-dependency-import");
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Selected Import Job Detail" })
+    })
+    .locator("article.record-card")
+    .filter({ hasText: "completed" })
+    .filter({ hasText: "staged" })
+    .waitFor({ timeout: 20_000 });
+  await importDiagnosticsCollection
+    .locator(".record-collection-empty")
+    .filter({ hasText: "No diagnostics are loaded" })
+    .waitFor({ timeout: 20_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=source_package_assembled&limit=20`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => {
+        const details = item?.activityEvent?.details;
+        const selectedIds = details?.dependencySourcePackageIds;
+        const members = details?.sourcePackages;
+        return (
+          details?.assemblyMode === "workspace_dependencies" &&
+          Array.isArray(selectedIds) &&
+          selectedIds.length === 1 &&
+          selectedIds[0] === duplicateLooseUnitSourcePackageId &&
+          Array.isArray(members) &&
+          members.some(
+            member =>
+              member?.sourcePackageId === duplicateLooseUnitSourcePackageId
+          ) &&
+          !members.some(
+            member => member?.sourcePackageId === looseUnitSourcePackageId
+          )
+        );
+      })
+  );
+  stopAfter("resolve-ambiguous-workspace-dependency");
   await fillAndCommit("#sourcePackageAssemblyFileName", looseAssemblyFileName);
   await expectButtonSelectorEnabled("#assembleSourcePackagesButton");
   await page.locator("#assembleSourcePackagesButton").click();
@@ -20976,7 +21134,7 @@ try {
     .filter({ hasText: `${studyMonitorRunDetail.missingExpectedUnitCount} missing` })
     .filter({ hasText: "1 review(s)" })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Clear Matrix Filters");
   await expectInputValue("#studyMonitorMatrixLoginFilter", "");
   await expectInputValue("#studyMonitorMatrixUnitFilter", "");
   await expectInputValue("#studyMonitorMatrixLimit", "25");
@@ -21284,7 +21442,7 @@ try {
   assert.match(filteredParticipantMatrixCsv, /unit-paused/);
   assert.match(filteredParticipantMatrixCsv, /running/);
   assert.equal(filteredParticipantMatrixCsv.trim().split("\n").length, 2);
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Clear Matrix Filters");
   await participantUnitMatrixCard
     .locator(".record-collection-summary")
     .filter({ hasText: `${visibleParticipantMatrixRecords} visible records` })
@@ -21333,7 +21491,7 @@ try {
     .filter({ hasText: "running" })
     .first()
     .waitFor();
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Clear Matrix Filters");
   stopAfter("study-monitor-status-filter-matrix");
   const monitorBookletProgressCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
@@ -21366,7 +21524,7 @@ try {
     .filter({ hasText: "booklet:starter" })
     .first()
     .waitFor();
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Clear Matrix Filters");
   stopAfter("study-monitor-booklet-filter-matrix");
   const monitorUnitProgressCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
@@ -21399,7 +21557,7 @@ try {
     .filter({ hasText: "unit-paused" })
     .first()
     .waitFor();
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Clear Matrix Filters");
   stopAfter("study-monitor-unit-filter-matrix");
   const monitorAttentionQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
@@ -21443,8 +21601,20 @@ try {
     .filter({ hasText: "group:entry-smoke" })
     .first()
     .waitFor();
-  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
-  await waitForNotBusy("study-monitor-clear-matrix-filters");
+  await fillAndCommit("#studyMonitorMatrixLoginFilter", participantLoginKey);
+  await fillAndCommit("#studyMonitorMatrixGroupFilter", "");
+  await selectAndCommit("#studyMonitorMatrixAnswerFilter", "answered");
+  await clickAction("Apply Matrix Filters");
+  await expectInputValue("#studyMonitorMatrixLoginFilter", participantLoginKey);
+  await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixAnswerFilter", "answered");
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" })
+    .filter({ hasText: "1 review(s)" })
+    .waitFor();
   stopAfter("study-monitor-group-filter-matrix");
   const monitorReviewQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {

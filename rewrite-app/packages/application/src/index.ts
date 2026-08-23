@@ -220,6 +220,7 @@ export type ContentIntakePort = {
     tenantKey: string;
     workspaceKey: string;
     sourcePackageId: string;
+    dependencySourcePackageIds?: string[];
   }): Promise<ImportJob>;
   retrySourcePackageImport(input: {
     tenantKey: string;
@@ -1228,6 +1229,7 @@ export type FirstSliceServices = FirstSlicePorts & {
     tenantKey: string;
     workspaceKey: string;
     sourcePackageId: string;
+    dependencySourcePackageIds?: string[];
   }): Promise<CreateImportJobResult>;
 };
 
@@ -8272,11 +8274,13 @@ const toDisplayLabel = (prefix: string, key: string | null): string | null => {
 const createImportDiagnostic = (
   code: string,
   message: string,
-  severity: ImportJobDiagnostic["severity"] = "error"
+  severity: ImportJobDiagnostic["severity"] = "error",
+  details?: Record<string, unknown>
 ): ImportJobDiagnostic => ({
   severity,
   code,
-  message
+  message,
+  ...(details ? { details } : {})
 });
 
 const isXmlEncodingCompatibleWithDetectedBytes = (
@@ -16254,6 +16258,7 @@ type WorkspaceDependencySourceResolution =
 const resolveWorkspaceDependencySourcePackages = (input: {
   rootSourcePackage: SourcePackage;
   workspaceSourcePackages: SourcePackage[];
+  dependencySourcePackageIds?: string[];
 }): WorkspaceDependencySourceResolution => {
   const rootReferences = collectLooseSourcePackageDependencyReferences(
     input.rootSourcePackage
@@ -16312,6 +16317,35 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       normalizedFileBaseName: string;
     }>;
 
+  const requestedDependencySourcePackageIds =
+    input.dependencySourcePackageIds ?? [];
+  const requestedDependencySourcePackageIdSet = new Set(
+    requestedDependencySourcePackageIds
+  );
+  const availableCandidateSourcePackageIds = new Set(
+    candidates.map(candidate => candidate.sourcePackage.sourcePackageId)
+  );
+  const unavailableSelections = requestedDependencySourcePackageIds.filter(
+    sourcePackageId => !availableCandidateSourcePackageIds.has(sourcePackageId)
+  );
+  if (unavailableSelections.length > 0) {
+    return {
+      status: "blocked",
+      diagnostic: createImportDiagnostic(
+        "source_document_workspace_dependency_selection_invalid",
+        `Selected workspace dependencies are unavailable for '${input.rootSourcePackage.fileName}': ${unavailableSelections.join(", ")}. Refresh the workspace files and choose an advertised candidate.`,
+        "error",
+        {
+          rootSourcePackageId: input.rootSourcePackage.sourcePackageId,
+          selectedDependencySourcePackageIds:
+            requestedDependencySourcePackageIds,
+          unavailableDependencySourcePackageIds: unavailableSelections
+        }
+      )
+    };
+  }
+  const consumedDependencySourcePackageIds = new Set<string>();
+
   const selected = new Map<string, SourcePackage>([
     [input.rootSourcePackage.sourcePackageId, input.rootSourcePackage]
   ]);
@@ -16352,7 +16386,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
       const exactIdentifierMatches = candidates.filter(
         candidate => candidate.identifierKeys.has(exactReferenceKey)
       );
-      const matches =
+      let matches =
         exactFileMatches.length > 0
           ? exactFileMatches
           : baseFileMatches.length > 0
@@ -16363,20 +16397,47 @@ const resolveWorkspaceDependencySourcePackages = (input: {
                   referenceKeys.some(key => candidate.identifierKeys.has(key))
                 );
       if (matches.length > 1) {
-        const matchingFiles = matches
-          .map(
-            candidate =>
-              `'${candidate.sourcePackage.fileName}' (${candidate.sourcePackage.sourcePackageId})`
+        const explicitlySelectedMatches = matches.filter(candidate =>
+          requestedDependencySourcePackageIdSet.has(
+            candidate.sourcePackage.sourcePackageId
           )
-          .sort((left, right) => left.localeCompare(right))
-          .join(", ");
-        return {
-          status: "blocked",
-          diagnostic: createImportDiagnostic(
-            "source_document_workspace_dependency_ambiguous",
-            `Workspace dependency '${reference}' referenced by '${currentSourcePackage.fileName}' matches multiple uploaded files: ${matchingFiles}. Use explicit loose-file assembly to select the intended immutable dependency set.`
-          )
-        };
+        );
+        if (explicitlySelectedMatches.length === 1) {
+          matches = explicitlySelectedMatches;
+          consumedDependencySourcePackageIds.add(
+            matches[0]!.sourcePackage.sourcePackageId
+          );
+        } else {
+          const matchingFiles = matches
+            .map(
+              candidate =>
+                `'${candidate.sourcePackage.fileName}' (${candidate.sourcePackage.sourcePackageId})`
+            )
+            .sort((left, right) => left.localeCompare(right))
+            .join(", ");
+          return {
+            status: "blocked",
+            diagnostic: createImportDiagnostic(
+              "source_document_workspace_dependency_ambiguous",
+              `Workspace dependency '${reference}' referenced by '${currentSourcePackage.fileName}' matches multiple uploaded files: ${matchingFiles}. Select exactly one advertised candidate to continue automatic immutable dependency assembly.`,
+              "error",
+              {
+                rootSourcePackageId: input.rootSourcePackage.sourcePackageId,
+                rootFileName: input.rootSourcePackage.fileName,
+                referencingSourcePackageId:
+                  currentSourcePackage.sourcePackageId,
+                referencingFileName: currentSourcePackage.fileName,
+                dependencyReference: reference,
+                selectedDependencySourcePackageIds:
+                  requestedDependencySourcePackageIds,
+                candidateSourcePackages: matches.map(candidate => ({
+                  sourcePackageId: candidate.sourcePackage.sourcePackageId,
+                  fileName: candidate.sourcePackage.fileName
+                }))
+              }
+            )
+          };
+        }
       }
       if (matches.length === 0) {
         missingReferences.add(reference);
@@ -16398,12 +16459,35 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         continue;
       }
       const dependency = matches[0]!.sourcePackage;
+      if (requestedDependencySourcePackageIdSet.has(dependency.sourcePackageId)) {
+        consumedDependencySourcePackageIds.add(dependency.sourcePackageId);
+      }
       if (selected.has(dependency.sourcePackageId)) {
         continue;
       }
       selected.set(dependency.sourcePackageId, dependency);
       pending.push(dependency);
     }
+  }
+
+  const unusedSelections = requestedDependencySourcePackageIds.filter(
+    sourcePackageId => !consumedDependencySourcePackageIds.has(sourcePackageId)
+  );
+  if (unusedSelections.length > 0) {
+    return {
+      status: "blocked",
+      diagnostic: createImportDiagnostic(
+        "source_document_workspace_dependency_selection_unused",
+        `Selected workspace dependencies do not resolve any reference from '${input.rootSourcePackage.fileName}': ${unusedSelections.join(", ")}. Choose only candidates advertised by the failed import.`,
+        "error",
+        {
+          rootSourcePackageId: input.rootSourcePackage.sourcePackageId,
+          selectedDependencySourcePackageIds:
+            requestedDependencySourcePackageIds,
+          unusedDependencySourcePackageIds: unusedSelections
+        }
+      )
+    };
   }
 
   if (missingReferences.size > 0) {
@@ -24659,9 +24743,45 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     sourcePackageId: string;
+    dependencySourcePackageIds?: string[];
   }, options: {
     resolveWorkspaceDependencies?: boolean;
   } = {}): Promise<CreateImportJobResult> => {
+    if (
+      input.dependencySourcePackageIds !== undefined &&
+      (!Array.isArray(input.dependencySourcePackageIds) ||
+        input.dependencySourcePackageIds.length > 100 ||
+        input.dependencySourcePackageIds.some(
+          sourcePackageId =>
+            typeof sourcePackageId !== "string" || !sourcePackageId.trim()
+        ))
+    ) {
+      throw new FirstSliceError(
+        400,
+        "source_document_workspace_dependency_selection_invalid",
+        "dependencySourcePackageIds must contain at most 100 non-empty source package ids."
+      );
+    }
+    const dependencySourcePackageIds = (
+      input.dependencySourcePackageIds ?? []
+    ).map(sourcePackageId => sourcePackageId.trim());
+    if (
+      new Set(dependencySourcePackageIds).size !==
+      dependencySourcePackageIds.length
+    ) {
+      throw new FirstSliceError(
+        400,
+        "source_document_workspace_dependency_selection_duplicate",
+        "dependencySourcePackageIds must not contain duplicates."
+      );
+    }
+    if (dependencySourcePackageIds.includes(input.sourcePackageId.trim())) {
+      throw new FirstSliceError(
+        400,
+        "source_document_workspace_dependency_selection_root",
+        "dependencySourcePackageIds must not contain the root sourcePackageId."
+      );
+    }
     const workspace = await requireWorkspace(
       repository,
       input.tenantKey,
@@ -24696,7 +24816,8 @@ export const createFirstSliceServices = (
       const workspaceDependencyResolution =
         resolveWorkspaceDependencySourcePackages({
           rootSourcePackage: sourcePackage,
-          workspaceSourcePackages
+          workspaceSourcePackages,
+          dependencySourcePackageIds
         });
       if (workspaceDependencyResolution.status === "blocked") {
         workspaceDependencyDiagnostic = workspaceDependencyResolution.diagnostic;
@@ -24735,6 +24856,7 @@ export const createFirstSliceServices = (
             sizeBytes: archive.length,
             assemblyMode: "workspace_dependencies",
             rootSourcePackageId: sourcePackage.sourcePackageId,
+            dependencySourcePackageIds,
             sourcePackages: members.map(member => ({
               sourcePackageId: member.sourcePackageId,
               fileName: member.fileName,

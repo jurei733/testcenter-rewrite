@@ -812,6 +812,7 @@ export type ImportJobDiagnostic = {
   severity: "error" | "warning";
   code: string;
   message: string;
+  details?: Record<string, unknown>;
 };
 
 export type ContentRelease = {

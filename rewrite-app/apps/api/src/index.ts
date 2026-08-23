@@ -7585,7 +7585,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const result = await services.createImportJobWithRelease({
           tenantKey,
           workspaceKey,
-          sourcePackageId: body.sourcePackageId
+          sourcePackageId: body.sourcePackageId,
+          dependencySourcePackageIds: body.dependencySourcePackageIds
         });
         sendJson<CreateImportJobResponse>(response, 201, result);
         return;

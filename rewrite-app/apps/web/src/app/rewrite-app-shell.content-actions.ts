@@ -74,7 +74,10 @@ export async function createSourcePackageAction(
   await host.loadSourcePackageDetail();
 }
 
-export async function createImportJobAction(host: ContentActionsHost): Promise<void> {
+export async function createImportJobAction(
+  host: ContentActionsHost,
+  dependencySourcePackageIds: string[] = []
+): Promise<void> {
   const requestedSourcePackageId = host.getSourcePackageId();
   const payload = await host.request<CreateImportJobResponse>(
     "Create Import Job",
@@ -84,7 +87,10 @@ export async function createImportJobAction(host: ContentActionsHost): Promise<v
       workspaceKey: host.getWorkspaceKey()
     }),
     {
-      sourcePackageId: host.getSourcePackageId()
+      sourcePackageId: host.getSourcePackageId(),
+      ...(dependencySourcePackageIds.length > 0
+        ? { dependencySourcePackageIds }
+        : {})
     } satisfies CreateImportJobRequest
   );
 

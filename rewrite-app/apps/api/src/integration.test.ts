@@ -26838,7 +26838,19 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     importJob: {
       sourcePackageId: string;
       status: string;
-      diagnostics: Array<{ code: string; message: string }>;
+      diagnostics: Array<{
+        code: string;
+        message: string;
+        details?: {
+          rootSourcePackageId?: string;
+          dependencyReference?: string;
+          selectedDependencySourcePackageIds?: string[];
+          candidateSourcePackages?: Array<{
+            sourcePackageId: string;
+            fileName: string;
+          }>;
+        };
+      }>;
     };
     stagedContentRelease: null;
   }>(
@@ -26865,6 +26877,127 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     ambiguousAutomaticImport.body.importJob.diagnostics[0]?.message ?? "";
   assert.match(ambiguousDependencyMessage, /'Unit2\.xml' \([^)]+\)/);
   assert.match(ambiguousDependencyMessage, /'Unit2-copy\.xml' \([^)]+\)/);
+  const ambiguousDependencyDetails =
+    ambiguousAutomaticImport.body.importJob.diagnostics[0]?.details;
+  assert.equal(
+    ambiguousDependencyDetails?.rootSourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  assert.equal(
+    ambiguousDependencyDetails?.dependencyReference,
+    "UNIT.SAMPLE-2"
+  );
+  assert.deepEqual(
+    ambiguousDependencyDetails?.selectedDependencySourcePackageIds,
+    []
+  );
+  assert.deepEqual(
+    ambiguousDependencyDetails?.candidateSourcePackages
+      ?.map(candidate => ({
+        sourcePackageId: candidate.sourcePackageId,
+        fileName: candidate.fileName
+      }))
+      .sort((left, right) => left.fileName.localeCompare(right.fileName)),
+    [
+      {
+        sourcePackageId:
+          duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId,
+        fileName: "Unit2-copy.xml"
+      },
+      {
+        sourcePackageId: sourcePackages[1]!.sourcePackageId,
+        fileName: "Unit2.xml"
+      }
+    ]
+  );
+
+  const duplicateGuidedSelection = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId: sourcePackages[0]!.sourcePackageId,
+        dependencySourcePackageIds: [
+          duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId,
+          duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+        ]
+      }
+    }
+  );
+  assert.equal(duplicateGuidedSelection.status, 400);
+  assert.equal(
+    duplicateGuidedSelection.body.error,
+    "source_document_workspace_dependency_selection_duplicate"
+  );
+
+  const guidedAutomaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId: sourcePackages[0]!.sourcePackageId,
+        dependencySourcePackageIds: [
+          duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+        ]
+      }
+    }
+  );
+  assert.equal(guidedAutomaticImport.status, 201);
+  assert.equal(guidedAutomaticImport.body.importJob.status, "completed");
+  assert.deepEqual(guidedAutomaticImport.body.importJob.diagnostics, []);
+  assert.notEqual(
+    guidedAutomaticImport.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  assert.ok(guidedAutomaticImport.body.stagedContentRelease?.contentReleaseId);
+
+  const guidedAssemblyActivity = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        details: {
+          assemblyMode?: string;
+          dependencySourcePackageIds?: string[];
+          sourcePackages?: Array<{
+            sourcePackageId: string;
+            fileName: string;
+          }>;
+        };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/activity-events?eventType=source_package_assembled&subjectId=${guidedAutomaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.deepEqual(
+    guidedAssemblyActivity.body.items[0]?.activityEvent.details
+      .dependencySourcePackageIds,
+    [duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId]
+  );
+  const guidedAssemblyMembers =
+    guidedAssemblyActivity.body.items[0]?.activityEvent.details.sourcePackages ??
+    [];
+  assert.equal(guidedAssemblyMembers.length, 4);
+  assert.equal(
+    guidedAssemblyMembers.some(
+      member =>
+        member.sourcePackageId ===
+        duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+    ),
+    true
+  );
+  assert.equal(
+    guidedAssemblyMembers.some(
+      member => member.sourcePackageId === sourcePackages[1]!.sourcePackageId
+    ),
+    false
+  );
 
   const explicitFileReferenceSeed = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -27214,9 +27347,15 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
   const memberGraph = memberDetail.body.sourcePackageDetail.dependencyGraph;
   const automaticDependencySnapshotNodeId =
     `source-package:${automaticImport.body.importJob.sourcePackageId}`;
+  const guidedDependencySnapshotNodeId =
+    `source-package:${guidedAutomaticImport.body.importJob.sourcePackageId}`;
   assert.deepEqual(
     [...memberGraph.directDependentNodeIds].sort(),
-    [assembledGraph.rootNodeId, automaticDependencySnapshotNodeId].sort()
+    [
+      assembledGraph.rootNodeId,
+      automaticDependencySnapshotNodeId,
+      guidedDependencySnapshotNodeId
+    ].sort()
   );
   assert.ok(
     memberGraph.nodes.some(node => node.nodeId === assembledGraph.rootNodeId)
@@ -27224,6 +27363,11 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
   assert.ok(
     memberGraph.nodes.some(
       node => node.nodeId === automaticDependencySnapshotNodeId
+    )
+  );
+  assert.ok(
+    memberGraph.nodes.some(
+      node => node.nodeId === guidedDependencySnapshotNodeId
     )
   );
 });

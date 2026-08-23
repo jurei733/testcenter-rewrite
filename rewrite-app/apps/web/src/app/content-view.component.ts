@@ -409,6 +409,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Import Diagnostics"
         subtitle="Structured diagnostics for the selected import attempt."
         [items]="view.importJobDiagnosticItems"
+        (itemAction)="view.resolveImportDiagnostic($event)"
         emptyState="No diagnostics are loaded for the selected import."
       ></app-record-collection>
 
