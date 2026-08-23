@@ -12298,6 +12298,13 @@ const validateTestcenterXmlSourceDocument = (
       rosterSchemaVersion.major > major ||
       (rosterSchemaVersion.major === major &&
         rosterSchemaVersion.minor >= minor);
+    const supportsStudyMonitorMode = rosterSchemaSupports(14, 9);
+    const supportsUnrestrictedLoginAndCustomTextIds = rosterSchemaSupports(
+      15,
+      1
+    );
+    const supportsSimulationMode = rosterSchemaSupports(15, 1);
+    const supportsSystemCheckLoginMode = rosterSchemaSupports(15, 2);
     const supportsMonitorProfiles = rosterSchemaSupports(15, 3);
     const supportsBookletStatePresets = rosterSchemaSupports(15, 4);
     const supportsExtendedMonitorProfiles = rosterSchemaSupports(15, 4);
@@ -12313,11 +12320,17 @@ const validateTestcenterXmlSourceDocument = (
       "run-trial",
       "run-review",
       "run-demo",
-      "run-simulation",
-      "monitor-group",
-      "monitor-study",
-      "sys-check-login"
+      "monitor-group"
     ]);
+    if (supportsStudyMonitorMode) {
+      supportedLoginModes.add("monitor-study");
+    }
+    if (supportsSimulationMode) {
+      supportedLoginModes.add("run-simulation");
+    }
+    if (supportsSystemCheckLoginMode) {
+      supportedLoginModes.add("sys-check-login");
+    }
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -12571,11 +12584,22 @@ const validateTestcenterXmlSourceDocument = (
       xmlChildrenNamed(container, "CustomText")
     );
     for (const customText of customTexts) {
-      if (!customText.getAttribute("key")?.trim()) {
+      const customTextKey = customText.getAttribute("key")?.trim() ?? "";
+      if (!customTextKey) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_custom_text_key_missing",
             `Original Testcenter roster '${sourceFileName}' contains CustomText without a key.`
+          )
+        );
+      } else if (
+        !supportsUnrestrictedLoginAndCustomTextIds &&
+        !isTestcenterXmlId(customTextKey)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_custom_text_key_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains CustomText key '${customTextKey}', which is not a valid XML ID for schema ${rosterSchemaLabel}.`
           )
         );
       }
@@ -12805,6 +12829,24 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
     const logins = groups.flatMap(group => xmlChildrenNamed(group, "Login"));
+    if (!supportsUnrestrictedLoginAndCustomTextIds) {
+      diagnostics.push(
+        ...validateUniqueTestcenterXmlValues(
+          [
+            ...customTexts.map(customText => ({
+              value: customText.getAttribute("key")?.trim() ?? "",
+              label: "schema ID"
+            })),
+            ...logins.map(login => ({
+              value: login.getAttribute("name")?.trim() ?? "",
+              label: "schema ID"
+            }))
+          ],
+          "testcenter_xml_testtakers_schema_id_duplicate",
+          sourceFileName
+        )
+      );
+    }
     for (const group of groups) {
       const groupId = group.getAttribute("id")?.trim() || "unknown";
       validateElementOnlyContent(group, `Group '${groupId}'`);
@@ -12968,11 +13010,22 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       validateAssetAssignments(login, `login '${loginName}'`);
-      if (!login.getAttribute("name")?.trim()) {
+      const authoredLoginName = login.getAttribute("name")?.trim() ?? "";
+      if (!authoredLoginName) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_login_name_missing",
             `Original Testcenter roster '${sourceFileName}' contains a Login without a name.`
+          )
+        );
+      } else if (
+        !supportsUnrestrictedLoginAndCustomTextIds &&
+        !isTestcenterXmlId(authoredLoginName)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_login_name_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains Login name '${authoredLoginName}', which is not a valid XML ID for schema ${rosterSchemaLabel}.`
           )
         );
       }
@@ -12981,7 +13034,7 @@ const validateTestcenterXmlSourceDocument = (
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_login_mode_invalid",
-            `Original Testcenter roster '${sourceFileName}' contains unsupported login mode '${mode}'.`
+            `Original Testcenter roster '${sourceFileName}' contains login mode '${mode}', which is not supported by schema ${rosterSchemaLabel}.`
           )
         );
       }

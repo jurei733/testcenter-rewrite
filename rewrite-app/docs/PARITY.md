@@ -1198,6 +1198,16 @@ non-integers and values outside the safely representable runtime range still
 fail with a stable diagnostic. Contract and Original-corpus API coverage gate
 all three normalization branches.
 
+Latest historical Testtakers schema closure: the validator now follows the
+official version boundaries for login roles and identifier types. `monitor-study`
+starts at 14.9, `run-simulation` and unrestricted string-valued Login names and
+CustomText keys start at 15.1, and `sys-check-login` starts at 15.2; older
+declared schemas reject those modes and still require the two former `xs:ID`
+values to be lexically valid and document-wide unique, while 15.1 permits the
+same string in the two separate key spaces. Positive boundary imports and
+negative immediately preceding versions run through the Original-corpus API
+gate across memory, file, and SQLite.
+
 Latest Testtakers element-content closure: the compatibility validator now
 distinguishes the schema's simple-content leaves from element-only complex
 containers. Non-whitespace character data in Testtakers, Metadata, CustomTexts,

@@ -16469,6 +16469,89 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
     "utf8"
   );
+  const historicalRosterXml = ({
+    schemaVersion,
+    groupId,
+    loginName,
+    mode,
+    customTextKey,
+    bookletId
+  }: {
+    schemaVersion: string;
+    groupId: string;
+    loginName: string;
+    mode: string;
+    customTextKey?: string;
+    bookletId?: string;
+  }): string =>
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      `<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/${schemaVersion}/definitions/vo_Testtakers.xsd">`,
+      "  <Metadata />",
+      ...(customTextKey
+        ? [
+            "  <CustomTexts>",
+            `    <CustomText key="${customTextKey}">historical</CustomText>`,
+            "  </CustomTexts>"
+          ]
+        : []),
+      `  <Group id="${groupId}" label="Historical boundary">`,
+      `    <Login mode="${mode}" name="${loginName}">`,
+      ...(bookletId ? [`      <Booklet>${bookletId}</Booklet>`] : []),
+      "    </Login>",
+      "  </Group>",
+      "</Testtakers>"
+    ].join("\n");
+  for (const historicalRosterCase of [
+    {
+      label: "monitor-study at schema 14.9",
+      schemaVersion: "14.9.0",
+      groupId: "schema-14-9",
+      loginName: "study-monitor-14-9",
+      mode: "monitor-study"
+    },
+    {
+      label: "run-simulation at schema 15.1",
+      schemaVersion: "15.1.0",
+      groupId: "schema-15-1-simulation",
+      loginName: "simulation-15-1",
+      mode: "run-simulation",
+      bookletId: "BOOKLET.SAMPLE-1"
+    },
+    {
+      label: "unrestricted login and custom-text ids at schema 15.1",
+      schemaVersion: "15.1.0",
+      groupId: "schema-15-1-string-ids",
+      loginName: "1login",
+      mode: "monitor-group",
+      customTextKey: "1login"
+    },
+    {
+      label: "sys-check-login at schema 15.2",
+      schemaVersion: "15.2.0",
+      groupId: "schema-15-2",
+      loginName: "system-check-15-2",
+      mode: "sys-check-login"
+    }
+  ] as const) {
+    const historicalRoster = await requestJson<{
+      items: Array<{ loginKey: string }>;
+      operationalLoginCandidates: Array<{ loginKey: string }>;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+      method: "POST",
+      body: {
+        rosterText: historicalRosterXml(historicalRosterCase)
+      }
+    });
+    assert.equal(historicalRoster.status, 201, historicalRosterCase.label);
+    assert.ok(
+      [
+        ...historicalRoster.body.items,
+        ...historicalRoster.body.operationalLoginCandidates
+      ].some(item => item.loginKey === historicalRosterCase.loginName),
+      historicalRosterCase.label
+    );
+  }
   const numericBooleanRoster = await requestJson<{
     operationalLoginCandidates: Array<{
       loginKey: string;
@@ -16714,6 +16797,69 @@ test("original Testcenter compatibility corpus imports representative booklets",
         '<Testtakers ignored="true" '
       ),
       diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      label: "monitor-study before schema 14.9",
+      rosterText: historicalRosterXml({
+        schemaVersion: "14.8.0",
+        groupId: "schema-14-8-study",
+        loginName: "study-monitor-14-8",
+        mode: "monitor-study"
+      }),
+      diagnosticCode: "testcenter_xml_login_mode_invalid"
+    },
+    {
+      label: "run-simulation before schema 15.1",
+      rosterText: historicalRosterXml({
+        schemaVersion: "15.0.0",
+        groupId: "schema-15-0-simulation",
+        loginName: "simulation-15-0",
+        mode: "run-simulation",
+        bookletId: "BOOKLET.SAMPLE-1"
+      }),
+      diagnosticCode: "testcenter_xml_login_mode_invalid"
+    },
+    {
+      label: "sys-check-login before schema 15.2",
+      rosterText: historicalRosterXml({
+        schemaVersion: "15.1.0",
+        groupId: "schema-15-1-system-check",
+        loginName: "system-check-15-1",
+        mode: "sys-check-login"
+      }),
+      diagnosticCode: "testcenter_xml_login_mode_invalid"
+    },
+    {
+      label: "non-XML-ID login name before schema 15.1",
+      rosterText: historicalRosterXml({
+        schemaVersion: "15.0.0",
+        groupId: "schema-15-0-login-id",
+        loginName: "1login",
+        mode: "monitor-group"
+      }),
+      diagnosticCode: "testcenter_xml_login_name_invalid"
+    },
+    {
+      label: "non-XML-ID custom-text key before schema 15.1",
+      rosterText: historicalRosterXml({
+        schemaVersion: "15.0.0",
+        groupId: "schema-15-0-custom-text-id",
+        loginName: "monitor-15-0",
+        mode: "monitor-group",
+        customTextKey: "1custom"
+      }),
+      diagnosticCode: "testcenter_xml_custom_text_key_invalid"
+    },
+    {
+      label: "document-wide XML-ID collision before schema 15.1",
+      rosterText: historicalRosterXml({
+        schemaVersion: "15.0.0",
+        groupId: "schema-15-0-id-collision",
+        loginName: "shared-id",
+        mode: "monitor-group",
+        customTextKey: "shared-id"
+      }),
+      diagnosticCode: "testcenter_xml_testtakers_schema_id_duplicate"
     },
     {
       label: "monitor profiles before schema 15.3",
