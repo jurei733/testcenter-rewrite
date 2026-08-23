@@ -42,6 +42,7 @@
       <span class="eyebrow">Account security</span>
       <h2 id="requiredAdminPasswordChangeTitle">Choose your own password</h2>
       <p>An administrator set the current password. Change it before opening workspace administration.</p>
+      <p id="requiredAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
       <label>
         New password
         <input
@@ -51,6 +52,7 @@
           autocomplete="new-password"
           [attr.minlength]="adminPasswordMinimumLength"
           [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
           required
           [value]="requiredAdminPassword"
           (input)="updateRequiredAdminPassword($event)"
@@ -65,6 +67,7 @@
           autocomplete="new-password"
           [attr.minlength]="adminPasswordMinimumLength"
           [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
           required
           [value]="requiredAdminPasswordConfirmation"
           (input)="updateRequiredAdminPasswordConfirmation($event)"
@@ -105,6 +108,7 @@
       <span class="eyebrow">Account security</span>
       <h2 id="ownAdminPasswordChangeTitle">Change your password</h2>
       <p>Enter the current password and choose a new one. All active sessions will be signed out after the change.</p>
+      <p id="ownAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
       <label>
         Current password
         <input
@@ -127,6 +131,7 @@
           autocomplete="new-password"
           [attr.minlength]="adminPasswordMinimumLength"
           [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
           required
           [value]="ownAdminPassword"
           (input)="updateOwnAdminPassword($event)"
@@ -141,6 +146,7 @@
           autocomplete="new-password"
           [attr.minlength]="adminPasswordMinimumLength"
           [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
           required
           [value]="ownAdminPasswordConfirmation"
           (input)="updateOwnAdminPasswordConfirmation($event)"

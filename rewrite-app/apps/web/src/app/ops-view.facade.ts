@@ -12,10 +12,12 @@ import type {
   ListWorkspacesResponse,
   RevokeAdminSessionsResponse,
   GetRuntimeConfigResponse,
-  GetRuntimeDiagnosticsResponse
+  GetRuntimeDiagnosticsResponse,
+  AdminPasswordPolicy
 } from "@testcenter-rewrite-app/contracts";
 import {
   adminPasswordPolicy,
+  getAdminPasswordPolicyViolation,
   originalMonitorCustomTextDefaults,
   originalMonitorCustomTextKeys,
   originalParticipantCustomTextDefaults,
@@ -469,6 +471,13 @@ export class OpsViewFacade {
     );
   }
 
+  get canBootstrapAdminCredentials(): boolean {
+    return (
+      this.ops.adminUsername.trim() !== "" &&
+      this.isAdminPasswordValid(this.ops.adminPassword)
+    );
+  }
+
   get canUseAdminSession(): boolean {
     return this.ops.adminSessionToken.trim() !== "";
   }
@@ -787,11 +796,19 @@ export class OpsViewFacade {
   }
 
   get adminPasswordMinimumLength(): number {
-    return adminPasswordPolicy.minimumLength;
+    return this.effectiveAdminPasswordPolicy.minimumLength;
   }
 
   get adminPasswordMaximumLength(): number {
-    return adminPasswordPolicy.maximumLength;
+    return this.effectiveAdminPasswordPolicy.maximumLength;
+  }
+
+  get adminPasswordPattern(): string {
+    return this.effectiveAdminPasswordPolicy.pattern;
+  }
+
+  get adminPasswordPolicyDescription(): string {
+    return `${this.adminPasswordMinimumLength}–${this.adminPasswordMaximumLength} characters; pattern ${this.adminPasswordPattern}`;
   }
 
   get canUpdateAdminUserStatus(): boolean {
@@ -850,8 +867,17 @@ export class OpsViewFacade {
 
   private isAdminPasswordValid(password: string): boolean {
     return (
-      password.length >= adminPasswordPolicy.minimumLength &&
-      password.length <= adminPasswordPolicy.maximumLength
+      getAdminPasswordPolicyViolation(
+        password,
+        this.effectiveAdminPasswordPolicy
+      ) === null
+    );
+  }
+
+  private get effectiveAdminPasswordPolicy(): AdminPasswordPolicy {
+    return (
+      parseJsonDocument<GetRuntimeConfigResponse>(this.ops.runtimeConfigView)
+        ?.runtimeConfig.adminPasswordPolicy ?? adminPasswordPolicy
     );
   }
 
@@ -1165,7 +1191,7 @@ export class OpsViewFacade {
   }
 
   bootstrapAdmin(): void {
-    if (!this.canUseAdminCredentials) {
+    if (!this.canBootstrapAdminCredentials) {
       return;
     }
     this.viewState.onActionAsync(() => this.opsService.bootstrapAdmin());

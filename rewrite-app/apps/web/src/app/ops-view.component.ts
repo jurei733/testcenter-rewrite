@@ -69,13 +69,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <details id="firstDeploymentSetup" class="operator-bootstrap-details" *ngIf="view.canBootstrapAdmin">
             <summary>First deployment setup</summary>
             <p>Create the first platform administrator only when this instance has not been initialized yet.</p>
+            <p id="adminBootstrapPasswordPolicy">New administrator passwords require {{ view.adminPasswordPolicyDescription }}.</p>
             <label>
               Display Name
               <input id="adminDisplayName" name="adminDisplayName" [(ngModel)]="view.ops.adminDisplayName" (change)="view.persistState()" />
             </label>
             <div class="actions">
               <button id="adminBootstrapOrSignInButton" class="secondary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-              <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Create Without Signing In</button>
+              <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canBootstrapAdminCredentials" (click)="view.bootstrapAdmin()">Create Without Signing In</button>
             </div>
           </details>
         </ng-container>
@@ -430,6 +431,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <article class="card">
         <h2>Admin User Management</h2>
         <p>Create operator accounts, grant scoped roles, and activate or disable users from the protected admin surface.</p>
+        <p id="adminManagementPasswordPolicy">New passwords require {{ view.adminPasswordPolicyDescription }}.</p>
         <div class="form-grid">
           <label>
             New Username
@@ -441,7 +443,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             New Password
-            <input id="adminCreatePassword" name="adminCreatePassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.ops.adminCreatePassword" />
+            <input id="adminCreatePassword" name="adminCreatePassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [attr.pattern]="view.adminPasswordPattern" [attr.title]="view.adminPasswordPolicyDescription" [(ngModel)]="view.ops.adminCreatePassword" />
           </label>
           <label>
             Initial Role
@@ -594,11 +596,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             New Admin Password
-            <input id="adminResetPassword" name="adminResetPassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.ops.adminResetPassword" />
+            <input id="adminResetPassword" name="adminResetPassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [attr.pattern]="view.adminPasswordPattern" [attr.title]="view.adminPasswordPolicyDescription" [(ngModel)]="view.ops.adminResetPassword" />
           </label>
           <label>
             Confirm New Admin Password
-            <input id="adminResetPasswordConfirmation" name="adminResetPasswordConfirmation" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.adminResetPasswordConfirmation" />
+            <input id="adminResetPasswordConfirmation" name="adminResetPasswordConfirmation" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [attr.pattern]="view.adminPasswordPattern" [attr.title]="view.adminPasswordPolicyDescription" [(ngModel)]="view.adminResetPasswordConfirmation" />
           </label>
         </div>
         <p id="adminResetPasswordMismatch" *ngIf="view.hasAdminResetPasswordMismatch" role="alert">

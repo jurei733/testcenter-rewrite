@@ -29,9 +29,11 @@ import {
   parseVeronaUnitResponse,
   projectVeronaPageState,
   readBookletConfigValues,
-  readVeronaLegacyHtmlMetadata
+  readVeronaLegacyHtmlMetadata,
+  getAdminPasswordPolicyViolation
 } from "@testcenter-rewrite-app/contracts";
 import type {
+  AdminPasswordPolicy,
   AdminAccessWindowErrorDetails,
   AdminUserAccessStatus,
   SourceDocumentSource
@@ -1406,6 +1408,7 @@ export type FirstSliceDependencies = {
   adminSessionTtlMs?: number;
   adminLoginMaxFailures?: number;
   adminLoginFailureWindowMs?: number;
+  adminPasswordPolicy?: AdminPasswordPolicy;
   participantAccessTimeZone?: string;
   participantLoginMaxFailures?: number;
   participantLoginFailureWindowMs?: number;
@@ -1650,16 +1653,31 @@ const normalizeAdminUsername = (value: unknown): string => {
   return value.trim().toLowerCase();
 };
 
-const requireAdminPassword = (value: unknown): string => {
-  if (
-    typeof value !== "string" ||
-    value.length < adminPasswordPolicy.minimumLength ||
-    value.length > adminPasswordPolicy.maximumLength
-  ) {
+const requireAdminPassword = (
+  value: unknown,
+  policy: AdminPasswordPolicy
+): string => {
+  const violation =
+    typeof value === "string"
+      ? getAdminPasswordPolicyViolation(value, policy)
+      : "minimum_length";
+  if (typeof value !== "string" || violation !== null) {
+    const message =
+      violation === "pattern"
+        ? `Admin password must match the configured pattern '${policy.pattern}'.`
+        : violation === "maximum_length"
+          ? `Admin password must contain no more than ${policy.maximumLength} characters.`
+          : `Admin password must contain at least ${policy.minimumLength} characters.`;
     throw new FirstSliceError(
       400,
       "admin_password_policy_violation",
-      `Admin password must contain ${adminPasswordPolicy.minimumLength} through ${adminPasswordPolicy.maximumLength} characters.`
+      message,
+      {
+        violation,
+        minimumLength: policy.minimumLength,
+        maximumLength: policy.maximumLength,
+        pattern: policy.pattern
+      }
     );
   }
 
@@ -23013,6 +23031,8 @@ export const createFirstSliceServices = (
   const adminLoginFailureWindowMs =
     dependencies.adminLoginFailureWindowMs ??
     DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS;
+  const configuredAdminPasswordPolicy =
+    dependencies.adminPasswordPolicy ?? adminPasswordPolicy;
   const participantAccessTimeZone =
     dependencies.participantAccessTimeZone ??
     DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE;
@@ -23030,6 +23050,32 @@ export const createFirstSliceServices = (
     adminLoginFailureWindowMs <= 0
   ) {
     throw new Error("adminLoginFailureWindowMs must be a positive integer.");
+  }
+  if (
+    !Number.isInteger(configuredAdminPasswordPolicy.minimumLength) ||
+    configuredAdminPasswordPolicy.minimumLength < 1 ||
+    configuredAdminPasswordPolicy.minimumLength >
+      configuredAdminPasswordPolicy.maximumLength ||
+    configuredAdminPasswordPolicy.maximumLength !==
+      adminPasswordPolicy.maximumLength
+  ) {
+    throw new Error(
+      `adminPasswordPolicy minimumLength must be an integer from 1 through ${adminPasswordPolicy.maximumLength}.`
+    );
+  }
+  if (
+    typeof configuredAdminPasswordPolicy.pattern !== "string" ||
+    configuredAdminPasswordPolicy.pattern === "" ||
+    configuredAdminPasswordPolicy.pattern.length > 1_024
+  ) {
+    throw new Error(
+      "adminPasswordPolicy pattern must contain between 1 and 1024 characters."
+    );
+  }
+  try {
+    new RegExp(configuredAdminPasswordPolicy.pattern);
+  } catch {
+    throw new Error("adminPasswordPolicy pattern must be a valid regular expression.");
   }
   if (
     !Number.isInteger(participantLoginMaxFailures) ||
@@ -25550,7 +25596,10 @@ export const createFirstSliceServices = (
         }
 
         const username = normalizeAdminUsername(input.username);
-        const password = requireAdminPassword(input.password);
+        const password = requireAdminPassword(
+          input.password,
+          configuredAdminPasswordPolicy
+        );
         const displayName = input.displayName?.trim() || username;
         const timestamp = now();
         const adminUser: AdminUser = {
@@ -25997,7 +26046,10 @@ export const createFirstSliceServices = (
             );
           }
         }
-        const password = requireAdminPassword(input.password);
+        const password = requireAdminPassword(
+          input.password,
+          configuredAdminPasswordPolicy
+        );
         const updatedAdminUser: AdminUser = {
           ...currentSession.adminUser,
           passwordHash: hashAdminPassword(password),
@@ -26140,7 +26192,10 @@ export const createFirstSliceServices = (
           );
         }
 
-        const password = requireAdminPassword(input.password);
+        const password = requireAdminPassword(
+          input.password,
+          configuredAdminPasswordPolicy
+        );
         const timestamp = now();
         const accessWindow = normalizeAdminAccessWindow(input);
         const adminUser: AdminUser = {
@@ -26470,7 +26525,10 @@ export const createFirstSliceServices = (
             targetRoleAssignments
           );
         }
-        const password = requireAdminPassword(input.password);
+        const password = requireAdminPassword(
+          input.password,
+          configuredAdminPasswordPolicy
+        );
         const updatedAdminUser: AdminUser = {
           ...adminUser,
           passwordHash: hashAdminPassword(password),

@@ -184,6 +184,7 @@ import {
   type PublicAdminSession,
   type PublicAdminUser,
   type AdminUserDirectoryItem,
+  adminPasswordPolicy,
   redactBugReportText,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
@@ -520,6 +521,38 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS",
     DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS
   );
+  const adminPasswordMinimumLength = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH",
+    adminPasswordPolicy.minimumLength
+  );
+  if (adminPasswordMinimumLength > adminPasswordPolicy.maximumLength) {
+    throw new Error(
+      `FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be between 1 and ${adminPasswordPolicy.maximumLength}.`
+    );
+  }
+  const adminPasswordPattern =
+    process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ??
+    adminPasswordPolicy.pattern;
+  if (
+    adminPasswordPattern.length < 1 ||
+    adminPasswordPattern.length > 1_024
+  ) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must contain between 1 and 1024 characters."
+    );
+  }
+  try {
+    new RegExp(adminPasswordPattern);
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression."
+    );
+  }
+  const configuredAdminPasswordPolicy = {
+    minimumLength: adminPasswordMinimumLength,
+    maximumLength: adminPasswordPolicy.maximumLength,
+    pattern: adminPasswordPattern
+  };
   const participantLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
     "FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES",
     DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES
@@ -551,6 +584,7 @@ const createApiRuntime = async () => {
     repository,
     adminLoginMaxFailures,
     adminLoginFailureWindowMs,
+    adminPasswordPolicy: configuredAdminPasswordPolicy,
     participantAccessTimeZone,
     participantLoginMaxFailures,
     participantLoginFailureWindowMs
@@ -576,6 +610,7 @@ const createApiRuntime = async () => {
         maxFailures: adminLoginMaxFailures,
         failureWindowMs: adminLoginFailureWindowMs
       },
+      adminPasswordPolicy: configuredAdminPasswordPolicy,
       participantLoginProtection: {
         maxFailures: participantLoginMaxFailures,
         failureWindowMs: participantLoginFailureWindowMs
@@ -598,6 +633,12 @@ const createApiRuntime = async () => {
         ),
         firstSliceAdminLoginFailureWindowMsPresent: Boolean(
           process.env.FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS
+        ),
+        firstSliceAdminPasswordMinLengthPresent: Boolean(
+          process.env.FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH
+        ),
+        firstSliceAdminPasswordPatternPresent: Boolean(
+          process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN
         ),
         firstSliceParticipantLoginMaxFailuresPresent: Boolean(
           process.env.FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES
@@ -4250,6 +4291,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             httpTimeouts: runtime.config.httpTimeouts,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
             adminLoginProtection: runtime.config.adminLoginProtection,
+            adminPasswordPolicy: runtime.config.adminPasswordPolicy,
             participantLoginProtection:
               runtime.config.participantLoginProtection,
             participantAccessTimeZone:

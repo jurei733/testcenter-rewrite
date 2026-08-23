@@ -15,6 +15,9 @@ import type { Response as IqbResponse } from "@iqbspecs/response/response.interf
 import {
   adminPasswordPolicy,
   productionApiRoutes,
+  type AdminSignInResponse,
+  type BootstrapAdminUserResponse,
+  type CreateAdminUserResponse,
   type GetRuntimeConfigResponse,
   type GetSystemTimeResponse,
   type ListSourcePackagesResponse
@@ -842,6 +845,142 @@ test("system time exposes the configured participant timezone without caching", 
     assert.equal(
       config.body.runtimeConfig.participantAccessTimeZone,
       "Pacific/Auckland"
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("configured admin password policy is exposed and enforced on every password write", async () => {
+  const configuredPattern = "^(?=.*[A-Z])(?=.*\\d).+$";
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH: "12",
+    FIRST_SLICE_ADMIN_PASSWORD_PATTERN: configuredPattern
+  });
+  try {
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.system.getRuntimeConfig
+    );
+    assert.equal(config.status, 200);
+    assert.deepEqual(config.body.runtimeConfig.adminPasswordPolicy, {
+      minimumLength: 12,
+      maximumLength: 60,
+      pattern: configuredPattern
+    });
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceAdminPasswordMinLengthPresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceAdminPasswordPatternPresent,
+      true
+    );
+
+    for (const [password, violation] of [
+      ["Aa1short", "minimum_length"],
+      ["lowercase-password-123", "pattern"]
+    ] as const) {
+      const rejected = await requestJsonAt<{
+        error: string;
+        details: { violation: string; pattern: string };
+      }>(isolated.baseUrl, productionApiRoutes.admin.bootstrap, {
+        method: "POST",
+        body: { username: "policy.admin", password }
+      });
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.body.error, "admin_password_policy_violation");
+      assert.equal(rejected.body.details.violation, violation);
+      assert.equal(rejected.body.details.pattern, configuredPattern);
+    }
+
+    const bootstrapPassword = "PolicyAdmin123!";
+    const bootstrap = await requestJsonAt<BootstrapAdminUserResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.bootstrap,
+      {
+        method: "POST",
+        body: { username: "policy.admin", password: bootstrapPassword }
+      }
+    );
+    assert.equal(bootstrap.status, 201);
+
+    const signIn = await requestJsonAt<AdminSignInResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.signIn,
+      {
+        method: "POST",
+        body: { username: "policy.admin", password: bootstrapPassword }
+      }
+    );
+    assert.equal(signIn.status, 200);
+    const authorization = `Bearer ${signIn.body.sessionToken}`;
+
+    const rejectedCreate = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.createUser,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          username: "policy.target",
+          password: "lowercase-password-123",
+          roleAssignments: []
+        }
+      }
+    );
+    assert.equal(rejectedCreate.status, 400);
+    assert.equal(rejectedCreate.body.error, "admin_password_policy_violation");
+
+    const created = await requestJsonAt<CreateAdminUserResponse>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.createUser,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          username: "policy.target",
+          password: "PolicyTarget123!",
+          roleAssignments: []
+        }
+      }
+    );
+    assert.equal(created.status, 201);
+
+    const rejectedReset = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.resetPassword.replace(
+        ":adminUserId",
+        encodeURIComponent(created.body.adminUser.adminUserId)
+      ),
+      {
+        method: "POST",
+        headers: { authorization },
+        body: { password: "lowercase-password-456" }
+      }
+    );
+    assert.equal(rejectedReset.status, 400);
+    assert.equal(rejectedReset.body.error, "admin_password_policy_violation");
+
+    const rejectedOwnChange = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      productionApiRoutes.admin.changeOwnPassword,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          currentPassword: bootstrapPassword,
+          password: "lowercase-password-789"
+        }
+      }
+    );
+    assert.equal(rejectedOwnChange.status, 400);
+    assert.equal(
+      rejectedOwnChange.body.error,
+      "admin_password_policy_violation"
     );
   } finally {
     await closeServer(isolated.server);
@@ -6734,6 +6873,24 @@ test("runtime port and shutdown drain settings are validated and exposed", async
         FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "1.5"
       }),
     /FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS must be a non-negative integer/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH: "61"
+      }),
+    /FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be between 1 and 60/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_ADMIN_PASSWORD_PATTERN: "["
+      }),
+    /FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression/
   );
 });
 

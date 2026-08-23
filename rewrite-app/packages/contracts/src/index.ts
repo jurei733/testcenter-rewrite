@@ -769,10 +769,39 @@ export type AdminSignInRequest = {
   password: string;
 };
 
-export const adminPasswordPolicy = {
+export type AdminPasswordPolicy = {
+  minimumLength: number;
+  maximumLength: number;
+  pattern: string;
+};
+
+export type AdminPasswordPolicyViolation =
+  | "minimum_length"
+  | "maximum_length"
+  | "pattern";
+
+export const adminPasswordPolicy: Readonly<AdminPasswordPolicy> = {
   minimumLength: 8,
-  maximumLength: 60
+  maximumLength: 60,
+  pattern: "^.*$"
 } as const;
+
+export const getAdminPasswordPolicyViolation = (
+  password: string,
+  policy: AdminPasswordPolicy = adminPasswordPolicy
+): AdminPasswordPolicyViolation | null => {
+  if (password.length < policy.minimumLength) {
+    return "minimum_length";
+  }
+  if (password.length > policy.maximumLength) {
+    return "maximum_length";
+  }
+  try {
+    return new RegExp(policy.pattern).test(password) ? null : "pattern";
+  } catch {
+    return "pattern";
+  }
+};
 
 export type ChangeAdminPasswordRequest = {
   currentPassword?: string;
@@ -1535,6 +1564,7 @@ export type GetRuntimeConfigResponse = {
       maxFailures: number;
       failureWindowMs: number;
     };
+    adminPasswordPolicy: AdminPasswordPolicy;
     participantLoginProtection: {
       maxFailures: number;
       failureWindowMs: number;
@@ -1555,6 +1585,8 @@ export type GetRuntimeConfigResponse = {
       firstSliceOperatorAuthRequired: boolean;
       firstSliceAdminLoginMaxFailuresPresent: boolean;
       firstSliceAdminLoginFailureWindowMsPresent: boolean;
+      firstSliceAdminPasswordMinLengthPresent: boolean;
+      firstSliceAdminPasswordPatternPresent: boolean;
       firstSliceParticipantLoginMaxFailuresPresent: boolean;
       firstSliceParticipantLoginFailureWindowMsPresent: boolean;
       firstSliceBootstrapDemo: boolean;

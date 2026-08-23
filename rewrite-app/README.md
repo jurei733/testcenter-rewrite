@@ -318,6 +318,8 @@ Original Testcenter roster timestamps such as `1/6/2023 10:00` are interpreted i
 
 Admin sign-in reproduces the original login sink with a durable global username counter: after five failed attempts, even correct credentials are rejected for 30 minutes. Configure the positive integer settings with `FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES` and `FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS`. Every adapter advances the counter atomically; blocked attempts are audited and return `429 admin_login_rate_limited` with `Retry-After`.
 
+New administrator passwords use one deployment-wide policy in the API and Angular. `FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH` configures the minimum length from 1 through the fixed 60-character maximum (default `8`), while `FIRST_SLICE_ADMIN_PASSWORD_PATTERN` accepts a JavaScript regular expression (default `^.*$`). The policy applies to bootstrap, account creation, reset, mandatory change, voluntary change, and bulk-reset validation; existing credentials remain usable for sign-in and current-password confirmation after a stricter policy is deployed. Invalid settings stop startup and runtime preflight, and the effective secret-free policy is exposed through `/diagnostics/config` so clients can render the same feedback and native input constraints.
+
 Password-protected participant accounts use the original login-sink threshold by default: after five failed password attempts, the same tenant/workspace/login is blocked for 30 minutes, including attempts with the correct password. The persisted counter is shared by participant sign-in and starter launch across all storage adapters; unknown and passwordless logins do not increase it. Tune the positive integer settings with `FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES` and `FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS`. Blocked requests return `429 participant_login_rate_limited` and a `Retry-After` header.
 
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
@@ -801,6 +803,7 @@ npm run smoke:ui:participant-detail-review
 npm run smoke:ui:monitor-bulk
 npm run smoke:ui:delete-group-results
 npm run smoke:ui:admin-session-bulk
+npm run smoke:ui:admin-password-policy
 npm run smoke:ui:admin-password-reset-confirmation
 npm run smoke:ui:admin-password-change
 npm run smoke:ui:admin-password-bulk
@@ -814,7 +817,7 @@ FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app
 
 The content smoke also exercises a mixed workspace-file batch deletion: a safe file is removed while an active file remains selected and is reported as still used.
 
-The `smoke:ui:participant-review` variant verifies the participant starter's compact-height scroll helper plus its review download before and after comment creation, including the original empty-`204` feedback, stable `testcenter-reviews.csv` filename, Original-compatible CSV shape, and participant-owned content. The `smoke:ui:application-settings` variant verifies the independently configurable and routed `Impressum`, `Datenschutz`, and `Barrierefreiheit` pages, sanitizer enforcement, public settings projection, and full reset against the built application on SQLite.
+The `smoke:ui:participant-review` variant verifies the participant starter's compact-height scroll helper plus its review download before and after comment creation, including the original empty-`204` feedback, stable `testcenter-reviews.csv` filename, Original-compatible CSV shape, and participant-owned content. The `smoke:ui:admin-password-policy` variant boots the protected SQLite application with a non-default minimum and regular-expression rule, creates the first platform administrator under that rule, and verifies the effective public runtime projection plus Angular policy copy and native new-password constraints. The `smoke:ui:application-settings` variant verifies the independently configurable and routed `Impressum`, `Datenschutz`, and `Barrierefreiheit` pages, sanitizer enforcement, public settings projection, and full reset against the built application on SQLite.
 
 The `smoke:ui:participant-short-link` variant opens the Original-compatible `/#/<Login>` form in a fresh browser context, verifies replacement with the canonical Participant URL, and proves that the uniquely resolved roster entry reaches its signed-in Starter without tenant or workspace parameters or interference from stale browser scope.
 
@@ -900,7 +903,7 @@ For runtime probes:
 - `/metrics` returns JSON runtime metrics including normalized request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
-- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, participant login-protection thresholds, and whether operator auth is required
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, administrator password policy, participant login-protection thresholds, and whether operator auth is required
 - `/api/v1/system/time` returns the current server timestamp and configured participant IANA timezone without caching for system-check clock validation
 - `/speed-test/random-package/:size` and `/speed-test/random-package` provide bounded, cache-disabled download and upload packages for configured system-check throughput measurements
 - `/manifest` exposes the active storage mode, schema version, routes, use-case surface, and operator/production capability list

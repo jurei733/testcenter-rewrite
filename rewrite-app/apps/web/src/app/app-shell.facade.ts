@@ -1,6 +1,12 @@
 import { Injectable, inject } from "@angular/core";
 
-import type { GetRuntimeConfigResponse } from "@testcenter-rewrite-app/contracts";
+import {
+  adminPasswordPolicy,
+  getAdminPasswordPolicyViolation,
+  type AdminPasswordPolicy,
+  type AdminPasswordPolicyViolation,
+  type GetRuntimeConfigResponse
+} from "@testcenter-rewrite-app/contracts";
 
 import type { AppView } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
@@ -147,6 +153,32 @@ export class AppShellFacade {
       this.ops.runtimeConfigView
     )?.runtimeConfig;
     return runtimeConfig?.environment.firstSliceBootstrapDemo === true;
+  }
+
+  get effectiveAdminPasswordPolicy(): AdminPasswordPolicy {
+    const configuredPolicy = parseJsonDocument<GetRuntimeConfigResponse>(
+      this.ops.runtimeConfigView
+    )?.runtimeConfig.adminPasswordPolicy;
+    return configuredPolicy ?? adminPasswordPolicy;
+  }
+
+  get adminPasswordMinimumLength(): number {
+    return this.effectiveAdminPasswordPolicy.minimumLength;
+  }
+
+  get adminPasswordMaximumLength(): number {
+    return this.effectiveAdminPasswordPolicy.maximumLength;
+  }
+
+  get adminPasswordPattern(): string {
+    return this.effectiveAdminPasswordPolicy.pattern;
+  }
+
+  getAdminPasswordViolation(password: string): AdminPasswordPolicyViolation | null {
+    return getAdminPasswordPolicyViolation(
+      password,
+      this.effectiveAdminPasswordPolicy
+    );
   }
 
   get localDemoParticipantLink(): string {

@@ -31,11 +31,11 @@ navigation/leave-dialog, invalid-session, Superadmin retry, error-report, and
 current Test-Controller/Speedtest behavior is represented below. Test-only,
 selector-only, documentation, fixture-refactoring, and CI-artifact changes do
 not create separate product requirements. The 18.2 release audit did expose
-two operational security gaps that were not explicit before: configurable
-Superadmin password length/pattern enforcement and optional signed
-browser-computed proof-of-work for admin, participant-login, and second-code
-entry, plus an explicit production owner for HSTS and bootstrap/challenge
-secrets.
+two operational security requirements that were not explicit before.
+Configurable Superadmin password length/pattern enforcement is now represented
+end to end; optional signed browser-computed proof-of-work for admin,
+participant-login, and second-code entry remains, as does an explicit
+production owner for HSTS and bootstrap/challenge secrets.
 
 Status:
 
@@ -65,7 +65,7 @@ New requirements found by the 18.2/current-master audit:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
-| Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | partial | P1 | the rewrite enforces an eight-to-60-character administrator-password policy in API and Angular, hashes secrets, redacts them from logs/audits, and applies durable admin/participant login sinks. Remaining 18.2 parity is deployment-configurable minimum length plus regular-expression policy with the same server/client feedback, and optional signed browser-computed proof-of-work independently selectable for administrator credentials, participant credentials, and second-code entry. Challenge replay/expiry, secret rotation, disabled-mode compatibility, rate-limit composition, and production Chromium coverage are required before this row is `done` |
+| Configurable password and proof-of-work policy | 18.2 `Password`, `SessionController`, `/session/challenge`, `/session/person/challenge` | partial | P1 | the rewrite now applies one deployment-configurable administrator-password minimum and JavaScript regular-expression rule to bootstrap, create, reset, required change, voluntary change, and bulk-reset validation in API and Angular, while preserving sign-in for existing passwords after policy changes. Invalid settings fail startup/preflight, the secret-free effective policy reaches clients through runtime configuration, and contract/API/production Chromium gates cover rejection plus rendering. Passwords remain hashed and redacted, and durable admin/participant login sinks remain active. The remaining 18.2 gap is optional signed browser-computed proof-of-work independently selectable for administrator credentials, participant credentials, and second-code entry. Challenge replay/expiry, secret rotation, disabled-mode compatibility, rate-limit composition, and production Chromium coverage are required before this row is `done` |
 | Production TLS and bootstrap secret controls | 18.2 `HSTS_ENABLED`, `ADMIN_INIT_PASSWORD`, `SERVER_KEY` deployment contract | partial | P1 | the rewrite already emits and tests baseline security headers, keeps bootstrap entry explicit, and redacts request secrets and protected diagnostics. Remaining production evidence is one documented and automated deployment boundary that owns configurable HSTS, injects the initial administrator secret without source/default/log exposure, and rotates the proof-of-work signing secret without accepting signatures from an unintended key. Equivalent ingress/secret-manager controls are acceptable; identical Original environment-variable names are not required |
 
 ## Priority queue

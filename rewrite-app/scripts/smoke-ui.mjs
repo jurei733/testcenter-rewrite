@@ -341,7 +341,14 @@ try {
     tenantKey
   )}&workspaceKey=${encodeURIComponent(workspaceKey)}`;
   const adminUsername = `ui-admin-${Date.now()}`;
-  const adminPassword = "ui-smoke-admin-secret";
+  const adminPassword =
+    process.env.UI_SMOKE_ADMIN_PASSWORD ?? "ui-smoke-admin-secret";
+  const configuredAdminPasswordMinimumLength = Number.parseInt(
+    process.env.FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH ?? "8",
+    10
+  );
+  const configuredAdminPasswordPattern =
+    process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ?? "^.*$";
   let totalApiRequestCount = 0;
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
@@ -1229,6 +1236,35 @@ try {
     ),
     true
   );
+  logStep("admin-password-policy");
+  const runtimeConfigResponse = await fetch(`${baseUrl}/diagnostics/config`);
+  assert.equal(runtimeConfigResponse.status, 200);
+  const runtimeConfigPayload = await runtimeConfigResponse.json();
+  assert.deepEqual(runtimeConfigPayload.runtimeConfig.adminPasswordPolicy, {
+    minimumLength: configuredAdminPasswordMinimumLength,
+    maximumLength: 60,
+    pattern: configuredAdminPasswordPattern
+  });
+  await page.locator("#adminManagementPasswordPolicy").waitFor();
+  const renderedAdminPasswordPolicy =
+    (await page.locator("#adminManagementPasswordPolicy").textContent()) ?? "";
+  assert.match(
+    renderedAdminPasswordPolicy,
+    new RegExp(`${configuredAdminPasswordMinimumLength}–60 characters`)
+  );
+  assert.equal(
+    await page.locator("#adminCreatePassword").getAttribute("minlength"),
+    String(configuredAdminPasswordMinimumLength)
+  );
+  assert.equal(
+    await page.locator("#adminCreatePassword").getAttribute("maxlength"),
+    "60"
+  );
+  assert.equal(
+    await page.locator("#adminCreatePassword").getAttribute("pattern"),
+    configuredAdminPasswordPattern
+  );
+  stopAfter("admin-password-policy");
   logStep("admin-access-window-copy");
   const scheduledAdminUsername = `ui-scheduled-admin-${Date.now()}`;
   const scheduledAdminPassword = "ui-scheduled-admin-secret";

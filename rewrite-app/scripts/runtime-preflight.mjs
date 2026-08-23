@@ -48,7 +48,49 @@ const assertPostgresUrl = value => {
   }
 };
 
+const resolveAdminPasswordPolicy = () => {
+  const minimumLengthSource =
+    process.env.FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH ?? "8";
+  if (!/^\d+$/.test(minimumLengthSource.trim())) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be a positive integer."
+    );
+  }
+  const minimumLength = Number.parseInt(minimumLengthSource, 10);
+  if (!Number.isSafeInteger(minimumLength) || minimumLength < 1) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be a positive integer."
+    );
+  }
+  if (minimumLength > 60) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be between 1 and 60."
+    );
+  }
+
+  const pattern = process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ?? "^.*$";
+  if (pattern.length < 1 || pattern.length > 1024) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must contain between 1 and 1024 characters."
+    );
+  }
+  try {
+    new RegExp(pattern);
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression."
+    );
+  }
+
+  return {
+    minimumLength,
+    maximumLength: 60,
+    pattern
+  };
+};
+
 const store = normalizeStore(process.env.FIRST_SLICE_STORE);
+const adminPasswordPolicy = resolveAdminPasswordPolicy();
 
 const requiredBuiltFiles = [
   "apps/api/dist/apps/api/src/index.js",
@@ -302,6 +344,7 @@ process.stdout.write(
     {
       status: "ready",
       store,
+      adminPasswordPolicy,
       storage: storageDoctor
         ? {
             ...storageDoctor,

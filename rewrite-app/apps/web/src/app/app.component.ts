@@ -3,8 +3,6 @@ import { ChangeDetectorRef, Component, inject, signal } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
-import { adminPasswordPolicy } from "@testcenter-rewrite-app/contracts";
-
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
@@ -59,8 +57,6 @@ export class AppComponent implements OnInit, OnDestroy {
   ownAdminPassword = "";
   ownAdminPasswordConfirmation = "";
   ownAdminPasswordError = "";
-  readonly adminPasswordMinimumLength = adminPasswordPolicy.minimumLength;
-  readonly adminPasswordMaximumLength = adminPasswordPolicy.maximumLength;
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly onlineListener = (): void => {
@@ -77,6 +73,18 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isAttachmentCaptureView ||
       this.isPublicInfoView
     );
+  }
+
+  get adminPasswordMinimumLength(): number {
+    return this.app.adminPasswordMinimumLength;
+  }
+
+  get adminPasswordMaximumLength(): number {
+    return this.app.adminPasswordMaximumLength;
+  }
+
+  get adminPasswordPattern(): string {
+    return this.app.adminPasswordPattern;
   }
 
   get isHomeView(): boolean {
@@ -209,8 +217,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get canSubmitRequiredAdminPassword(): boolean {
     return (
-      this.requiredAdminPassword.length >= adminPasswordPolicy.minimumLength &&
-      this.requiredAdminPassword.length <= adminPasswordPolicy.maximumLength &&
+      this.app.getAdminPasswordViolation(this.requiredAdminPassword) === null &&
       this.requiredAdminPassword === this.requiredAdminPasswordConfirmation &&
       this.app.activeRequestLabel() === null
     );
@@ -219,11 +226,8 @@ export class AppComponent implements OnInit, OnDestroy {
   async submitRequiredAdminPassword(): Promise<void> {
     if (!this.canSubmitRequiredAdminPassword) {
       this.requiredAdminPasswordError =
-        this.requiredAdminPassword.length < adminPasswordPolicy.minimumLength
-          ? `The new password must contain at least ${adminPasswordPolicy.minimumLength} characters.`
-          : this.requiredAdminPassword.length > adminPasswordPolicy.maximumLength
-            ? `The new password must contain no more than ${adminPasswordPolicy.maximumLength} characters.`
-            : "The password confirmation does not match.";
+        this.describeAdminPasswordViolation(this.requiredAdminPassword) ??
+        "The password confirmation does not match.";
       return;
     }
     this.requiredAdminPasswordError = "";
@@ -277,9 +281,8 @@ export class AppComponent implements OnInit, OnDestroy {
   get canSubmitOwnAdminPassword(): boolean {
     return (
       this.currentAdminPassword.length > 0 &&
-      this.currentAdminPassword.length <= adminPasswordPolicy.maximumLength &&
-      this.ownAdminPassword.length >= adminPasswordPolicy.minimumLength &&
-      this.ownAdminPassword.length <= adminPasswordPolicy.maximumLength &&
+      this.currentAdminPassword.length <= this.adminPasswordMaximumLength &&
+      this.app.getAdminPasswordViolation(this.ownAdminPassword) === null &&
       this.ownAdminPassword === this.ownAdminPasswordConfirmation &&
       this.app.activeRequestLabel() === null
     );
@@ -318,13 +321,10 @@ export class AppComponent implements OnInit, OnDestroy {
       this.ownAdminPasswordError =
         this.currentAdminPassword.length === 0
           ? "Enter the current password."
-          : this.currentAdminPassword.length > adminPasswordPolicy.maximumLength
+          : this.currentAdminPassword.length > this.adminPasswordMaximumLength
             ? "The current password is invalid."
-            : this.ownAdminPassword.length < adminPasswordPolicy.minimumLength
-              ? `The new password must contain at least ${adminPasswordPolicy.minimumLength} characters.`
-              : this.ownAdminPassword.length > adminPasswordPolicy.maximumLength
-                ? `The new password must contain no more than ${adminPasswordPolicy.maximumLength} characters.`
-                : "The password confirmation does not match.";
+            : this.describeAdminPasswordViolation(this.ownAdminPassword) ??
+              "The password confirmation does not match.";
       return;
     }
     this.ownAdminPasswordError = "";
@@ -348,6 +348,20 @@ export class AppComponent implements OnInit, OnDestroy {
     this.ownAdminPassword = "";
     this.ownAdminPasswordConfirmation = "";
     this.ownAdminPasswordError = "";
+  }
+
+  private describeAdminPasswordViolation(password: string): string | null {
+    const violation = this.app.getAdminPasswordViolation(password);
+    if (violation === "minimum_length") {
+      return `The new password must contain at least ${this.adminPasswordMinimumLength} characters.`;
+    }
+    if (violation === "maximum_length") {
+      return `The new password must contain no more than ${this.adminPasswordMaximumLength} characters.`;
+    }
+    if (violation === "pattern") {
+      return `The new password must match the configured pattern ${this.adminPasswordPattern}.`;
+    }
+    return null;
   }
 
   trackOperatorAccountAccess(
