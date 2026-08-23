@@ -74,13 +74,23 @@ const readExpectedSqliteSchemaVersion = async () => {
   return Math.max(...migrationVersions);
 };
 
+const fetchWithTimeout = async (url, timeoutMs = 5_000) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const pollJson = async url => {
   const deadline = Date.now() + 45_000;
   let lastError = null;
 
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url);
       if (!response.ok) {
         throw new Error(`Unexpected status ${response.status} for ${url}`);
       }
