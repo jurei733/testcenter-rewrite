@@ -13451,133 +13451,176 @@ try {
       hasText: `API ${currentOriginalSpeedPackage.player.playerApiVersion}`
     })
     .waitFor({ timeout: 30_000 });
-  let currentOriginalSpeedFrame = page.frameLocator(
-    "#participantVeronaPlayerFrame"
-  );
-  await currentOriginalSpeedFrame
-    .locator('[data-cy="question-text"]')
-    .filter({ hasText: "Instruktionen" })
-    .waitFor({ timeout: 30_000 });
-  await currentOriginalSpeedFrame
-    .locator('[data-cy="answer-button-0"]')
-    .dispatchEvent("click");
-  await page
-    .locator("#participantRouteUnitKey")
-    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[1] })
-    .waitFor({ timeout: 30_000 });
-  const currentOriginalSpeedTimedState = await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
-    payload =>
-      payload?.currentRunState?.activeTestletTimer?.testletKey ===
-        currentOriginalSpeedPackage.booklet.testletIds[0] &&
-      payload?.currentRunState?.activeTestletTimer?.status === "running" &&
-      payload?.currentRunState?.activeTestletTimer?.durationSeconds === 600,
-    30_000
-  );
-  assert.equal(
-    currentOriginalSpeedTimedState.currentRunState.activeTestletTimer
-      .durationSeconds,
-    currentOriginalSpeedPackage.booklet.timeMaxMinutes * 60
-  );
-  currentOriginalSpeedFrame = page.frameLocator(
-    "#participantVeronaPlayerFrame"
-  );
-  for (let questionIndex = 0; questionIndex < 7; questionIndex += 1) {
+  const currentOriginalSpeedQuestionCount = 7;
+  const currentOriginalSpeedStateMatches = (
+    payload,
+    timedUnitKey,
+    nextInstructionUnitKey,
+    testletId
+  ) => {
+    if (
+      payload?.currentRunState?.testRun?.currentUnitKey !==
+        nextInstructionUnitKey ||
+      payload?.currentRunState?.testRun?.testletTimers?.[testletId]?.status !==
+        "cancelled"
+    ) return false;
+    const response =
+      payload?.currentRunState?.testRun?.unitResponses?.[timedUnitKey];
+    if (typeof response !== "string") return false;
+    try {
+      const unitState = JSON.parse(response).unitState;
+      if (
+        unitState?.unitStateDataType !==
+        currentOriginalSpeedPackage.player.unitStateType
+      ) return false;
+      const responseValues = Array.from(
+        { length: currentOriginalSpeedQuestionCount },
+        (_, questionIndex) =>
+          JSON.parse(
+            unitState?.dataParts?.[`question_${questionIndex}`] ?? "null"
+          )
+      );
+      const sums = JSON.parse(unitState?.dataParts?.sums ?? "null");
+      return (
+        responseValues.every((values, questionIndex) =>
+          values?.some(
+            value =>
+              value?.id === "value" &&
+              value?.status === "CODING_COMPLETE" &&
+              value?.value === questionIndex % 10
+          )
+        ) &&
+        sums?.some(
+          value =>
+            value?.id === "total_correct" && Number.isInteger(value?.value)
+        ) &&
+        sums?.some(
+          value =>
+            value?.id === "total_wrong" && Number.isInteger(value?.value)
+        )
+      );
+    } catch {
+      return false;
+    }
+  };
+  for (
+    let speedBlockIndex = 0;
+    speedBlockIndex < currentOriginalSpeedPackage.booklet.testletIds.length;
+    speedBlockIndex += 1
+  ) {
+    const instructionUnitKey =
+      currentOriginalSpeedPackage.booklet.unitKeys[speedBlockIndex * 2];
+    const timedUnitKey =
+      currentOriginalSpeedPackage.booklet.unitKeys[speedBlockIndex * 2 + 1];
+    const nextInstructionUnitKey =
+      currentOriginalSpeedPackage.booklet.unitKeys[speedBlockIndex * 2 + 2];
+    const testletId =
+      currentOriginalSpeedPackage.booklet.testletIds[speedBlockIndex];
+    assert.ok(instructionUnitKey);
+    assert.ok(timedUnitKey);
+    assert.ok(nextInstructionUnitKey);
+    assert.ok(testletId);
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: instructionUnitKey })
+      .waitFor({ timeout: 30_000 });
+    let currentOriginalSpeedFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
     await currentOriginalSpeedFrame
-      .locator('[data-cy="image-question-text"]')
-      .filter({ hasText: `Frage ${questionIndex + 1}` })
+      .locator('[data-cy="question-text"]')
+      .filter({ hasText: "Instruktionen" })
       .waitFor({ timeout: 30_000 });
     await currentOriginalSpeedFrame
-      .locator(`[data-cy="math-input-button-${questionIndex % 10}"]`)
+      .locator(
+        `[data-cy="answer-button-${speedBlockIndex === 0 ? 0 : 1}"]`
+      )
       .dispatchEvent("click");
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: timedUnitKey })
+      .waitFor({ timeout: 30_000 });
+    const currentOriginalSpeedTimedState = await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
+      payload =>
+        payload?.currentRunState?.activeTestletTimer?.testletKey === testletId &&
+        payload?.currentRunState?.activeTestletTimer?.status === "running" &&
+        payload?.currentRunState?.activeTestletTimer?.durationSeconds === 600,
+      30_000
+    );
+    assert.equal(
+      currentOriginalSpeedTimedState.currentRunState.activeTestletTimer
+        .durationSeconds,
+      currentOriginalSpeedPackage.booklet.timeMaxMinutes * 60
+    );
+    currentOriginalSpeedFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
+    for (
+      let questionIndex = 0;
+      questionIndex < currentOriginalSpeedQuestionCount;
+      questionIndex += 1
+    ) {
+      await currentOriginalSpeedFrame
+        .locator('[data-cy="image-question-text"]')
+        .filter({ hasText: `Frage ${questionIndex + 1}` })
+        .waitFor({ timeout: 30_000 });
+      await currentOriginalSpeedFrame
+        .locator(`[data-cy="math-input-button-${questionIndex % 10}"]`)
+        .dispatchEvent("click");
+      await currentOriginalSpeedFrame
+        .locator('[data-cy="unit-next-button"]')
+        .dispatchEvent("click");
+    }
+    await page
+      .locator("#participantConfirmationTitle")
+      .filter({ hasText: "Leave timed block?" })
+      .waitFor({ timeout: 30_000 });
+    await page.locator("#participantConfirmationContinueButton").click();
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: nextInstructionUnitKey })
+      .waitFor({ timeout: 30_000 });
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
+      payload =>
+        currentOriginalSpeedStateMatches(
+          payload,
+          timedUnitKey,
+          nextInstructionUnitKey,
+          testletId
+        ),
+      30_000
+    );
+    currentOriginalSpeedFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
     await currentOriginalSpeedFrame
-      .locator('[data-cy="unit-next-button"]')
-      .dispatchEvent("click");
+      .locator('[data-cy="question-text"]')
+      .filter({ hasText: "Instruktionen" })
+      .waitFor({ timeout: 30_000 });
+    await page.goto(
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+        currentOriginalSpeedParticipantSessionId
+      )}`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({
+        hasText: `API ${currentOriginalSpeedPackage.player.playerApiVersion}`
+      })
+      .waitFor({ timeout: 30_000 });
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: nextInstructionUnitKey })
+      .waitFor({ timeout: 30_000 });
+    await page
+      .frameLocator("#participantVeronaPlayerFrame")
+      .locator('[data-cy="question-text"]')
+      .filter({ hasText: "Instruktionen" })
+      .waitFor({ timeout: 30_000 });
   }
-  await page
-    .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave timed block?" })
-    .waitFor({ timeout: 30_000 });
-  await page.locator("#participantConfirmationContinueButton").click();
-  await page
-    .locator("#participantRouteUnitKey")
-    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[2] })
-    .waitFor({ timeout: 30_000 });
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/current-state`,
-    payload => {
-      if (
-        payload?.currentRunState?.testRun?.currentUnitKey !==
-          currentOriginalSpeedPackage.booklet.unitKeys[2] ||
-        payload?.currentRunState?.testRun?.testletTimers?.[
-          currentOriginalSpeedPackage.booklet.testletIds[0]
-        ]?.status !== "cancelled"
-      ) return false;
-      const response =
-        payload?.currentRunState?.testRun?.unitResponses?.[
-          currentOriginalSpeedPackage.booklet.unitKeys[1]
-        ];
-      if (typeof response !== "string") return false;
-      try {
-        const unitState = JSON.parse(response).unitState;
-        if (
-          unitState?.unitStateDataType !==
-          currentOriginalSpeedPackage.player.unitStateType
-        ) return false;
-        const responseValues = Array.from({ length: 7 }, (_, questionIndex) =>
-          JSON.parse(unitState?.dataParts?.[`question_${questionIndex}`] ?? "null")
-        );
-        const sums = JSON.parse(unitState?.dataParts?.sums ?? "null");
-        return (
-          responseValues.every((values, questionIndex) =>
-            values?.some(
-              value =>
-                value?.id === "value" &&
-                value?.status === "CODING_COMPLETE" &&
-                value?.value === questionIndex % 10
-            )
-          ) &&
-          sums?.some(
-            value => value?.id === "total_correct" && Number.isInteger(value?.value)
-          ) &&
-          sums?.some(
-            value => value?.id === "total_wrong" && Number.isInteger(value?.value)
-          )
-        );
-      } catch {
-        return false;
-      }
-    },
-    30_000
-  );
-  currentOriginalSpeedFrame = page.frameLocator(
-    "#participantVeronaPlayerFrame"
-  );
-  await currentOriginalSpeedFrame
-    .locator('[data-cy="question-text"]')
-    .filter({ hasText: "Instruktionen" })
-    .waitFor({ timeout: 30_000 });
-  await page.goto(
-    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
-      currentOriginalSpeedParticipantSessionId
-    )}`,
-    { waitUntil: "domcontentloaded" }
-  );
-  await page
-    .locator("#participantVeronaPlayerVersion")
-    .filter({
-      hasText: `API ${currentOriginalSpeedPackage.player.playerApiVersion}`
-    })
-    .waitFor({ timeout: 30_000 });
-  await page
-    .locator("#participantRouteUnitKey")
-    .filter({ hasText: currentOriginalSpeedPackage.booklet.unitKeys[2] })
-    .waitFor({ timeout: 30_000 });
-  await page
-    .frameLocator("#participantVeronaPlayerFrame")
-    .locator('[data-cy="question-text"]')
-    .filter({ hasText: "Instruktionen" })
-    .waitFor({ timeout: 30_000 });
 
   logStep("participant-verona-shared-parameters");
   const sharedParameterTenantKey = `${tenantKey}-verona-shared-parameters`;

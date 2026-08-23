@@ -720,8 +720,8 @@ The compatibility corpus also pins the complete current Original Speedtest
 system-test graph at `6455e265421777124f379090257365b70b21641f`, including its
 byte-exact Player, two Unit/definition pairs, seven-entry nested Booklet, and
 real roster. Its full three-testlet structure imports and starts across memory,
-file, and SQLite, while the production browser gate exercises one complete
-timed block and durable continuation into the next instruction.
+file, and SQLite, while the production browser gate exercises all three timed
+blocks and durable continuation through the final instruction alias.
 
 ## Frontend Shell
 
@@ -842,9 +842,9 @@ byte-exact current Original Speedtest system-test package introduced at
 Player, two Units and definitions, a seven-entry Booklet with three nested
 10-minute Testlets, and its real password-protected roster. Import and launch
 are gated across memory, file, and SQLite; production Chromium completes the
-first seven-question block, confirms leaving it, verifies persisted question
-and summary state, enters the next instruction alias, and restores that exact
-position after reload.
+full 21-question sequence, confirms all three timed-block exits, verifies each
+alias-scoped question and summary state, reaches the final instruction alias,
+and restores every intermediate instruction position after reload.
 
 The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent historical ABI 3.3.0 and current ABI 5.0.0 scripted-survey packages, current Aspect 2.12.6 assessment, historical DAN 3.0.0 and current DAN 3.1.0 visual-assessment packages, historical STARS 0.6.19 and current official STARS 0.7.2 choice-interaction, historical Speedtest 1.2.0 timed-choice and current Speedtest 3.3.0 multi-question choice, and Lottie 1.2.2 shared-parameter Players, the complete current Original STARS 0.6.40 system-test graph, the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph, and the official `verona-modules-ib` 0.2 ItemBuilder migration feasibility snapshot with DIPF runtime 9.9.0. It gates type-faithful API-2 through API-6 response restoration, including ABI 5.0.0's and DAN 3.1.0's metadata-spec-5/runtime-API-4 splits, Aspect's three JSON-string `iqb-standard@1.0` state parts, DAN's retained `IQBVisualUnitPlayerV2.1.0` state, and ABI's JSON-string `allData` response array, nested-resource delivery, automatic Player navigation, and test-wide shared-parameter restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice. The IB snapshot is intentionally characterized separately: its unmodified nested runtime HTML/CSS/JS/config loads and reloads through participant-isolated embeddable resources, but the legacy runtime rejects the sandboxed Player's opaque `null`-origin controller messages. Because upstream labels the repository a feasibility study rather than a release, interactive response/state parity is not claimed.
 

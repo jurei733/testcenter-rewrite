@@ -696,10 +696,11 @@ system-test package at `6455e265421777124f379090257365b70b21641f` pins its
 Player, two Units and definitions, seven-entry nested Booklet, and real
 password-protected roster byte-for-byte. Import and participant-start gates
 execute the complete three-testlet graph across memory, file, and SQLite. A
-production Chromium/SQLite gate additionally completes the first seven-question
-10-minute block, confirms leaving it, verifies all question and summary state,
-enters the following instruction alias, and restores that exact position after
-reload. The official Lottie release is byte-pinned while its
+production Chromium/SQLite gate additionally completes all three 10-minute
+blocks and all 21 questions, confirms every timed exit, verifies the three
+alias-scoped question and summary states, reaches the final instruction alias,
+and restores every intermediate instruction position after reload. The
+official Lottie release is byte-pinned while its
 minimal executable definition is derived from pinned Player sources. Its
 production gate fetches the required nested avatar resource, publishes an
 avatar choice, follows automatic navigation, extends the test-wide shared
