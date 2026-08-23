@@ -15218,9 +15218,19 @@ test("original Testcenter compatibility corpus imports representative booklets",
       forbiddenDiagnosticCode: "testcenter_xml_unit_last_change_invalid"
     },
     {
+      fileName: "unit-14-8-transcript.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.8.0/definitions/")
+        .replace(
+          "    <Description>This is an Unit</Description>",
+          "    <Description>This is an Unit</Description>\n    <Transcript>Transcript</Transcript>"
+        ),
+      diagnosticCode: "testcenter_xml_unit_metadata_child_version_invalid"
+    },
+    {
       fileName: "unit-14-variable-id-too-long.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("/17.6.0/definitions/", "/14.9.0/definitions/")
         .replace('id="var1" type="string"', 'id="variable_identifier_x" type="string"'),
       diagnosticCode: "testcenter_xml_variable_id_invalid"
     },
@@ -15235,23 +15245,55 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "unit-14-variable-id-not-xml-id.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("/17.6.0/definitions/", "/14.9.0/definitions/")
         .replace('id="var1" type="string"', 'id="1var" type="string"'),
       diagnosticCode: "testcenter_xml_variable_id_invalid"
     },
     {
-      fileName: "unit-15-new-variable-type.xml",
+      fileName: "unit-15-4-new-variable-type.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/15.1.8/definitions/")
+        .replace("/17.6.0/definitions/", "/15.4.0/definitions/")
         .replace('id="var1" type="string"', 'id="var1" type="json"'),
       diagnosticCode: "testcenter_xml_variable_type_invalid"
     },
     {
+      fileName: "unit-15-1-value-position-labels.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.1.8/definitions/")
+        .replace(
+          '<Variable id="var6" type="string" />',
+          '<Variable id="var6" type="string"><ValuePositionLabels><ValuePositionLabel>Position</ValuePositionLabel></ValuePositionLabels></Variable>'
+        ),
+      diagnosticCode: "testcenter_xml_variable_child_version_invalid"
+    },
+    {
+      fileName: "unit-15-2-variable-alias.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.2.0/definitions/")
+        .replace(
+          'id="var6" type="string"',
+          'id="var6" type="string" alias="six"'
+        ),
+      diagnosticCode: "testcenter_xml_variable_attribute_version_invalid"
+    },
+    {
       fileName: "unit-14-variables-ref.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("/17.6.0/definitions/", "/14.9.0/definitions/")
         .replace("  <BaseVariables>", "  <VariablesRef>variables.xml</VariablesRef>\n\n  <BaseVariables>"),
       diagnosticCode: "testcenter_xml_unit_child_version_invalid"
+    },
+    {
+      fileName: "unit-14-10-variables-ref.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.10.0/definitions/")
+        .replace(
+          "  <BaseVariables>",
+          "  <VariablesRef>variables.xml</VariablesRef>\n\n  <BaseVariables>"
+        )
+        .replace("<Unit ", '<Unit ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_unit_child_version_invalid"
     },
     {
       fileName: "unit-empty-variables-ref.xml",
@@ -15264,7 +15306,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "unit-14-page.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("/17.6.0/definitions/", "/14.9.0/definitions/")
         .replace('id="var1" type="string"', 'id="var1" type="string" page="p1"'),
       diagnosticCode: "testcenter_xml_variable_attribute_version_invalid"
     },
@@ -15404,6 +15446,104 @@ test("original Testcenter compatibility corpus imports representative booklets",
       );
     }
     assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  for (const historicalUnitCase of [
+    {
+      fileName: "unit-valid-14-9-transcript-reference.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.9.0/definitions/")
+        .replace(
+          "    <Description>This is an Unit</Description>",
+          "    <Description>This is an Unit</Description>\n    <Transcript>Transcript</Transcript>\n    <Reference />"
+        )
+    },
+    {
+      fileName: "unit-valid-14-10-variable-id-page.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.10.0/definitions/")
+        .replace(
+          'id="var6" type="string"',
+          'id="1 variable id allowed in schema 14.10" type="string" page="page_1"'
+        )
+    },
+    {
+      fileName: "unit-valid-15-2-value-position-labels.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.2.0/definitions/")
+        .replace(
+          '<Variable id="var6" type="string" />',
+          '<Variable id="var6" type="string"><ValuePositionLabels><ValuePositionLabel>Position</ValuePositionLabel></ValuePositionLabels></Variable>'
+        )
+    },
+    {
+      fileName: "unit-valid-15-3-variable-alias.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.3.0/definitions/")
+        .replace(
+          'id="var6" type="string"',
+          'id="var6" type="string" alias="six"'
+        )
+    },
+    {
+      fileName: "unit-valid-15-5-json-no-value.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.5.0/definitions/")
+        .replace('id="var6" type="string"', 'id="var6" type="json"')
+        .replace(
+          "  </DerivedVariables>",
+          '    <Variable id="no_value" type="no-value" />\n  </DerivedVariables>'
+        )
+    }
+  ] as const) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      historicalUnitCase.fileName
+    );
+    await uploadOriginalAdaptiveUnitDependencies(
+      tenantKey,
+      validationWorkspaceKey,
+      historicalUnitCase.sourceDocument
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: historicalUnitCase.fileName.replace("unit-", "booklet-"),
+          mediaType: "application/xml",
+          sourceDocument: validAdaptiveBookletXml
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201, historicalUnitCase.fileName);
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: {
+          sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${historicalUnitCase.fileName}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(
+      importResult.body.importJob.diagnostics,
+      [],
+      historicalUnitCase.fileName
+    );
+    assert.ok(
+      importResult.body.stagedContentRelease?.contentReleaseId,
+      historicalUnitCase.fileName
+    );
   }
 
   for (const historicalAdaptiveCase of [

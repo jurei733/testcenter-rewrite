@@ -1235,6 +1235,16 @@ retain integer minutes plus `forbidden`/`confirm`. XSD-validated 15.4 and 16.3
 positive imports pin compiled states and the fractional allowed-leave timer,
 while 15.3 and 16.2 negative cases pin both transition edges.
 
+Latest historical Unit-schema closure: the compatibility profile now follows
+the Original's independent 14.x/15.x transitions instead of treating 15.0 and
+16.0 as coarse feature boundaries. `Metadata/Transcript` and `Reference` start
+at 14.9; arbitrary 1–50 character variable IDs, `Variable/@page`, and
+`VariablesRef` start at 14.10; `ValuePositionLabels` starts at 15.2;
+`Variable/@alias` starts at 15.3; and `json`/`no-value` variable types start at
+15.5. Five XSD-declared positive package imports exercise the supported edges,
+while the immediately preceding 14.8, 14.9, 15.1, 15.2, and 15.4 cases retain
+stable version diagnostics.
+
 The pinned import corpus now also reconstructs the original backend's
 cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of
 a login name or group ID across distinct Testtakers entries with separate stable

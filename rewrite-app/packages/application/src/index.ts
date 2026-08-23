@@ -11410,10 +11410,17 @@ const validateTestcenterXmlSourceDocument = (
 
   if (canonicalRootName === "Unit") {
     const schemaVersion = parseTestcenterSchemaVersion(schemaLocation);
-    const usesPre15UnitSchema =
-      schemaVersion !== null && schemaVersion.major < 15;
-    const usesPre16UnitSchema =
-      schemaVersion !== null && schemaVersion.major < 16;
+    const unitSchemaSupports = (major: number, minor: number): boolean =>
+      schemaVersion === null ||
+      schemaVersion.major > major ||
+      (schemaVersion.major === major && schemaVersion.minor >= minor);
+    const supportsTranscriptAndReference = unitSchemaSupports(14, 9);
+    const supportsExtendedVariableIds = unitSchemaSupports(14, 10);
+    const supportsVariablesRef = unitSchemaSupports(14, 10);
+    const supportsVariablePage = unitSchemaSupports(14, 10);
+    const supportsValuePositionLabels = unitSchemaSupports(15, 2);
+    const supportsVariableAlias = unitSchemaSupports(15, 3);
+    const supportsJsonVariableTypes = unitSchemaSupports(15, 5);
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -11483,7 +11490,7 @@ const validateTestcenterXmlSourceDocument = (
         ["Id", 0],
         ["Label", 1],
         ["Description", 2],
-        ...(!usesPre15UnitSchema
+        ...(supportsTranscriptAndReference
           ? ([
               ["Transcript", 3],
               ["Reference", 4]
@@ -11582,7 +11589,7 @@ const validateTestcenterXmlSourceDocument = (
       "BaseVariables",
       "DerivedVariables"
     ]);
-    if (!usesPre15UnitSchema) {
+    if (supportsVariablesRef) {
       allowedUnitChildren.add("VariablesRef");
     }
     for (const child of xmlChildElements(root)) {
@@ -11730,11 +11737,11 @@ const validateTestcenterXmlSourceDocument = (
       "boolean",
       "attachment"
     ]);
-    if (!usesPre16UnitSchema) {
+    if (supportsJsonVariableTypes) {
       variableTypes.add("json");
       variableTypes.add("no-value");
     }
-    const maximumVariableIdLength = usesPre15UnitSchema ? 20 : 50;
+    const maximumVariableIdLength = supportsExtendedVariableIds ? 50 : 20;
     for (const variable of variables) {
       const variableId = variable.getAttribute("id") ?? "";
       validateElementOnlyContent(
@@ -11749,15 +11756,15 @@ const validateTestcenterXmlSourceDocument = (
           "format",
           "multiple",
           "nullable",
-          ...(!usesPre15UnitSchema ? ["page"] : []),
-          ...(!usesPre16UnitSchema ? ["alias"] : [])
+          ...(supportsVariablePage ? ["page"] : []),
+          ...(supportsVariableAlias ? ["alias"] : [])
         ],
         `Variable '${variableId || "unknown"}'`
       );
       if (
         !variableId.trim() ||
         [...variableId].length > maximumVariableIdLength ||
-        (usesPre15UnitSchema && !isTestcenterXmlId(variableId))
+        (!supportsExtendedVariableIds && !isTestcenterXmlId(variableId))
       ) {
         diagnostics.push(
           createImportDiagnostic(
@@ -11799,7 +11806,7 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       const page = variable.getAttribute("page");
-      if (page !== null && usesPre15UnitSchema) {
+      if (page !== null && !supportsVariablePage) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_variable_attribute_version_invalid",
@@ -11814,7 +11821,7 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
-      if (variable.getAttribute("alias") !== null && usesPre16UnitSchema) {
+      if (variable.getAttribute("alias") !== null && !supportsVariableAlias) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_variable_attribute_version_invalid",
@@ -11837,7 +11844,7 @@ const validateTestcenterXmlSourceDocument = (
       }
       const variableChildren = xmlChildElements(variable);
       const allowedVariableChildren = new Set(["Values"]);
-      if (!usesPre15UnitSchema) {
+      if (supportsValuePositionLabels) {
         allowedVariableChildren.add("ValuePositionLabels");
       }
       let previousVariableChildRank = -1;
