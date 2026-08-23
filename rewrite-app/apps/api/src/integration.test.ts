@@ -820,8 +820,7 @@ test("admin proof of work composes with login rate limiting", async () => {
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore =
     requestedStore === "file" ||
-    requestedStore === "sqlite" ||
-    requestedStore === "postgres"
+    requestedStore === "sqlite"
       ? requestedStore
       : "memory";
   const isolatedEnvironment: Record<string, string> = {

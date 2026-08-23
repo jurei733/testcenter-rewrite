@@ -205,10 +205,19 @@ const resolveBootstrapAdminConfig = async policy => {
     );
   }
 
+  let passwordBytes;
+  try {
+    passwordBytes = await readFile(passwordFile);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${error.message}`
+    );
+  }
+
   let password;
   try {
     password = new TextDecoder("utf-8", { fatal: true })
-      .decode(await readFile(passwordFile))
+      .decode(passwordBytes)
       .replace(/\r?\n$/u, "");
   } catch {
     throw new Error(

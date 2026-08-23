@@ -52,7 +52,10 @@ if (productionBoundary) {
   await writeFile(
     bootstrapAdminPasswordSourceFile,
     `${bootstrapAdminPassword}\n`,
-    { encoding: "utf8", mode: 0o600 }
+    // Docker Compose implements local file-backed secrets as bind mounts. The
+    // generated directory remains owner-only, while the mounted file must be
+    // readable by the non-root `node` user inside the container.
+    { encoding: "utf8", mode: 0o644 }
   );
 }
 const composeArgs = [

@@ -395,7 +395,12 @@ const readBootstrapAdminConfig = async (): Promise<BootstrapAdminConfig | null> 
     );
   }
 
-  const passwordBytes = await readFile(passwordFile);
+  const passwordBytes = await readFile(passwordFile).catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${message}`
+    );
+  });
   let password: string;
   try {
     password = new TextDecoder("utf-8", { fatal: true })
