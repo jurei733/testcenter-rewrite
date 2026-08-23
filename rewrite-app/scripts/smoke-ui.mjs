@@ -1321,6 +1321,9 @@ try {
   assert.equal(adminCurrentSessionResponse.status, 200);
   const adminCurrentSessionPayload = await adminCurrentSessionResponse.json();
   assert.equal(adminCurrentSessionPayload.adminUser.username, adminUsername);
+  const expectedMonitorActorId = operatorAuthRequired
+    ? adminCurrentSessionPayload.adminUser.adminUserId
+    : "operator-ui";
   assert.equal(
     adminCurrentSessionPayload.roleAssignments.some(
       assignment => assignment.role === "platform_admin"
@@ -19351,7 +19354,7 @@ try {
   await clickAction("Refresh Runtime Reads");
   await assertNoUnexpectedBugReport("monitor command history refresh");
   await expectMonitorCommandHistoryCard({
-    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
+    actorId: expectedMonitorActorId,
     commandType: "resume",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19404,7 +19407,7 @@ try {
   );
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
-    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
+    actorId: expectedMonitorActorId,
     commandType: "pause",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19430,7 +19433,7 @@ try {
   await fillAndCommit("#monitorCommandHistoryLimit", "2");
   await clickAction("Apply Command Filters");
   await expectMonitorCommandHistoryCard({
-    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
+    actorId: expectedMonitorActorId,
     commandType: "pause",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19440,7 +19443,7 @@ try {
     transition: "running -> paused"
   });
   await expectMonitorCommandHistoryCard({
-    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
+    actorId: expectedMonitorActorId,
     commandType: "resume",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
