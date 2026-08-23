@@ -14775,6 +14775,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_structure_invalid"
     },
     {
+      fileName: "booklet-obsolete-default-option.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="beginner" label="leicht "/>',
+        '<DefaultOption id="beginner" label="leicht "/>'
+      ),
+      diagnosticCode: "testcenter_xml_state_structure_invalid"
+    },
+    {
       fileName: "booklet-unknown-state-attribute.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<State id="level"',

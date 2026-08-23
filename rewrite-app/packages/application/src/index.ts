@@ -10932,11 +10932,14 @@ const validateTestcenterXmlSourceDocument = (
       }
 
       const stateChildren = xmlChildElements(state);
-      const options = stateChildren.filter(option =>
-        ["Option", "DefaultOption"].includes(xmlElementLocalName(option))
+      // Current Original schemas use the first condition-free Option as the
+      // fallback and reject the retired DefaultOption element. The permissive
+      // schema-free parser below still understands that historical spelling.
+      const options = stateChildren.filter(
+        option => xmlElementLocalName(option) === "Option"
       );
       const unsupportedOptionChild = stateChildren.find(
-        option => !["Option", "DefaultOption"].includes(xmlElementLocalName(option))
+        option => xmlElementLocalName(option) !== "Option"
       );
       if (unsupportedOptionChild) {
         diagnostics.push(
@@ -10990,10 +10993,7 @@ const validateTestcenterXmlSourceDocument = (
         }
         optionKeys.add(optionKey);
         const optionChildren = xmlChildElements(option);
-        if (
-          optionChildren.some(child => xmlElementLocalName(child) !== "If") ||
-          (optionElementName === "DefaultOption" && optionChildren.length > 0)
-        ) {
+        if (optionChildren.some(child => xmlElementLocalName(child) !== "If")) {
           diagnostics.push(
             createImportDiagnostic(
               "testcenter_xml_state_condition_structure_invalid",

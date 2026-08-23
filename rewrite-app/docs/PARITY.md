@@ -1218,6 +1218,14 @@ Unit schema's deliberately untyped `label`, `value`, and ValuePositionLabel
 payloads. Six Original-corpus negative cases pin root and nested failures across
 all three document types without weakening those payload boundaries.
 
+Latest adaptive-state element closure: matching Original commit `ca2d3e96a`
+and the pinned 17.6 schema, XSD-declared Booklets now reject the retired
+`DefaultOption` element. The fallback remains the first ordinary `Option`
+without an `If`, which is already required and compiled by the runtime.
+Declaration-free legacy XML keeps the existing permissive parser path, so this
+tightening applies only where the source explicitly opts into Original schema
+validation. An Original-corpus negative case pins the removed element.
+
 The pinned import corpus now also reconstructs the original backend's
 cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of
 a login name or group ID across distinct Testtakers entries with separate stable
