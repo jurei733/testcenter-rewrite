@@ -1211,6 +1211,13 @@ same string in the two separate key spaces. Positive boundary imports and
 negative immediately preceding versions run through the Original-corpus API
 gate across memory, file, and SQLite.
 
+Latest Testtakers ViewSettings schema closure: schema 17.6 retains the legacy
+`ViewSettings/@monitorBookletVisibility` form, while 18.0 removes that attribute
+and accepts only the nested `theme`, `codeInput`, and
+`monitorBookletVisibility` elements. The compatibility validator now rejects
+the retired attribute under 18.0 instead of silently normalizing it, while a
+current nested view-settings import preserves its theme and keypad definition.
+
 Latest Testtakers element-content closure: the compatibility validator now
 distinguishes the schema's simple-content leaves from element-only complex
 containers. Non-whitespace character data in Testtakers, Metadata, CustomTexts,

@@ -13208,7 +13208,9 @@ const validateTestcenterXmlSourceDocument = (
         }
         validateAttributes(
           viewSetting,
-          ["monitorBookletVisibility"],
+          supportsNestedLoginViewSettings
+            ? []
+            : ["monitorBookletVisibility"],
           `ViewSettings for login '${loginName}'`
         );
         const viewSettingChildren = xmlChildElements(viewSetting);

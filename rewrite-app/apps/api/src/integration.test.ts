@@ -16606,6 +16606,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
     "utf8"
   );
+  const currentRosterXml = validRosterXml.replace(
+    "https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Testtakers.xsd",
+    "https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0/definitions/vo_Testtakers.xsd"
+  );
   const historicalRosterXml = ({
     schemaVersion,
     groupId,
@@ -16723,6 +16727,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
     '    <Login mode="run-hot-return" name="asset-participant">',
     '      <Booklet>BOOKLET.SAMPLE-1</Booklet>',
     '      <AssetAssignments><Asset slot="starterCompanion">start.webp</Asset></AssetAssignments>',
+    "      <ViewSettings>",
+    "        <theme>Primar</theme>",
+    "        <codeInput><type>keypad-numbers</type><length>4</length></codeInput>",
+    "        <monitorBookletVisibility>hidden</monitorBookletVisibility>",
+    "      </ViewSettings>",
     "    </Login>",
     "  </Group>",
     "</Testtakers>"
@@ -16835,6 +16844,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     items: Array<{
       loginKey: string;
       assetAssignments?: Record<string, string>;
+      viewSettings?: {
+        theme?: string;
+        codeInput?: { type: string; length?: number };
+      };
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`);
   assert.deepEqual(
@@ -16844,6 +16857,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       logo: "school.png",
       starterCompanion: "start.webp"
+    }
+  );
+  assert.deepEqual(
+    persistedAssetAssignments.body.items.find(
+      item => item.loginKey === "asset-participant"
+    )?.viewSettings,
+    {
+      theme: "Primar",
+      codeInput: { type: "keypad-numbers", length: 4 }
     }
   );
   const assignedRosterAssetDeletion = await requestJson<{
@@ -17047,6 +17069,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_asset_assignments_version_invalid"
     },
     {
+      label: "legacy ViewSettings attribute at schema 18.0",
+      rosterText: currentRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings monitorBookletVisibility="collapsed" />'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_attribute_invalid"
+    },
+    {
       label: "duplicate Testtakers metadata container",
       rosterText: validRosterXml.replace(
         "</Metadata>",
@@ -17207,7 +17237,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     },
     {
       label: "unsupported login view-settings child",
-      rosterText: validRosterXml.replace(
+      rosterText: currentRosterXml.replace(
         '<Profile id="small" />',
         '<Profile id="small" /><ViewSettings><Unexpected /></ViewSettings>'
       ),
@@ -17215,7 +17245,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     },
     {
       label: "invalid login code-input type",
-      rosterText: validRosterXml.replace(
+      rosterText: currentRosterXml.replace(
         '<Profile id="small" />',
         '<Profile id="small" /><ViewSettings><codeInput><type>keyboard</type><length>3</length></codeInput></ViewSettings>'
       ),
@@ -17223,7 +17253,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     },
     {
       label: "invalid login code-input length",
-      rosterText: validRosterXml.replace(
+      rosterText: currentRosterXml.replace(
         '<Profile id="small" />',
         '<Profile id="small" /><ViewSettings><codeInput><type>keypad-numbers</type><length>2</length></codeInput></ViewSettings>'
       ),
@@ -21408,7 +21438,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       expectation.roster.encoding
     ).toString("utf8").replace(
       '      <Profile id="small" />\n    </Login>',
-      '      <Profile id="small" />\n      <ViewSettings monitorBookletVisibility="collapsed" />\n    </Login>'
+      '      <Profile id="small" />\n      <ViewSettings><monitorBookletVisibility>collapsed</monitorBookletVisibility></ViewSettings>\n    </Login>'
     );
     const rosterImport = await requestJsonAt<{
       items: Array<{
