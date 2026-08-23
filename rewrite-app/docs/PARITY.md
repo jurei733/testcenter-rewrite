@@ -1208,6 +1208,16 @@ Booklet/Profile reference, Filter, Asset, theme, visibility, type, and length
 leaves. Original-corpus API cases pin both the monitor-profile and ViewSettings
 boundaries.
 
+Latest remaining XML element-content closure: the same XSD boundary now covers
+Booklet, Unit, and SysCheck documents. Character data is rejected in Booklet
+root, metadata/config/state/condition/testlet/restriction containers and
+attribute-only Booklet Unit entries; in Unit root, Metadata, Dependencies, variable
+containers, Variables, Values, and structured Value entries; and in SysCheck
+root, Metadata, and Config. Simple-content leaves remain text-capable, as do the
+Unit schema's deliberately untyped `label`, `value`, and ValuePositionLabel
+payloads. Six Original-corpus negative cases pin root and nested failures across
+all three document types without weakening those payload boundaries.
+
 The pinned import corpus now also reconstructs the original backend's
 cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of
 a login name or group ID across distinct Testtakers entries with separate stable

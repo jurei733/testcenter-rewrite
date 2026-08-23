@@ -14520,6 +14520,54 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_root_attribute_invalid"
     },
     {
+      fileName: "booklet-root-character-data.xml",
+      sourceDocument: validBookletXml.replace(
+        "  <Metadata>",
+        "  unexpected<Metadata>"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_element_content_invalid"
+    },
+    {
+      fileName: "booklet-condition-character-data.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "        <If>",
+        "        <If>unexpected"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_element_content_invalid"
+    },
+    {
+      fileName: "unit-root-character-data.xml",
+      sourceDocument: validUnitXml.replace(
+        "  <Metadata>",
+        "  unexpected<Metadata>"
+      ),
+      diagnosticCode: "testcenter_xml_unit_element_content_invalid"
+    },
+    {
+      fileName: "unit-variable-character-data.xml",
+      sourceDocument: validUnitXml.replace(
+        '<Variable id="var1" type="string" />',
+        '<Variable id="var1" type="string">unexpected</Variable>'
+      ),
+      diagnosticCode: "testcenter_xml_unit_element_content_invalid"
+    },
+    {
+      fileName: "syscheck-root-character-data.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        "  <Metadata>",
+        "  unexpected<Metadata>"
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_element_content_invalid"
+    },
+    {
+      fileName: "syscheck-config-character-data.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'skipnetwork="false">',
+        'skipnetwork="false">unexpected'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_element_content_invalid"
+    },
+    {
       fileName: "booklet-invalid-metadata-id.xml",
       sourceDocument: validBookletXml.replace(
         "<Id>BOOKLET.SAMPLE-1</Id>",

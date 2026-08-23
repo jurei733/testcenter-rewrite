@@ -10314,6 +10314,20 @@ const validateTestcenterBookletCondition = (
       );
     }
   };
+  const validateElementOnlyContent = (
+    element: XmlElement,
+    elementContext: string
+  ): void => {
+    if (xmlElementDirectText(element)) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_booklet_element_content_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains character data in element-only ${elementContext} for ${context}.`
+        )
+      );
+    }
+  };
+  validateElementOnlyContent(condition, "If");
   validateAttributes(condition, [], "If");
   const children = xmlChildElements(condition);
   const sourceNames = [
@@ -10389,6 +10403,7 @@ const validateTestcenterBookletCondition = (
     if ((testcenterBookletVariableSourceNames as readonly string[]).includes(sourceName)) {
       validateVariableSource(sourceElement);
     } else if (["Sum", "Median", "Mean"].includes(sourceName)) {
+      validateElementOnlyContent(sourceElement, sourceName);
       validateAttributes(sourceElement, [], sourceName);
       const aggregateSources = xmlChildElements(sourceElement);
       const aggregateSourceNames = new Set(
@@ -10418,6 +10433,7 @@ const validateTestcenterBookletCondition = (
         )
         .forEach(validateVariableSource);
     } else if (sourceName === "Count") {
+      validateElementOnlyContent(sourceElement, sourceName);
       validateAttributes(sourceElement, [], sourceName);
       const nestedChildren = xmlChildElements(sourceElement);
       if (
@@ -10673,6 +10689,20 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     };
+    const validateElementOnlyContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      if (xmlElementDirectText(element)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_element_content_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains character data in element-only ${context}.`
+          )
+        );
+      }
+    };
+    validateElementOnlyContent(root, "Booklet");
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -10726,6 +10756,7 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
     for (const metadataContainer of metadataContainers) {
+      validateElementOnlyContent(metadataContainer, "Metadata");
       validateAttributes(metadataContainer, [], "Metadata");
       const metadataChildren = xmlChildElements(metadataContainer);
       const metadataChildRanks = new Map([
@@ -10773,6 +10804,7 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const customTextContainer of customTextContainers) {
+      validateElementOnlyContent(customTextContainer, "CustomTexts");
       validateAttributes(customTextContainer, [], "CustomTexts");
       const children = xmlChildElements(customTextContainer);
       if (
@@ -10803,6 +10835,7 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const bookletConfigContainer of bookletConfigContainers) {
+      validateElementOnlyContent(bookletConfigContainer, "BookletConfig");
       validateAttributes(bookletConfigContainer, [], "BookletConfig");
       for (const child of xmlChildElements(bookletConfigContainer)) {
         const childName = xmlElementLocalName(child);
@@ -10859,6 +10892,7 @@ const validateTestcenterXmlSourceDocument = (
       ? xmlChildrenNamed(statesContainers[0], "State")
       : [];
     for (const statesContainer of statesContainers) {
+      validateElementOnlyContent(statesContainer, "States");
       validateAttributes(statesContainer, [], "States");
       const unsupportedStateChild = xmlChildElements(statesContainer).find(
         child => xmlElementLocalName(child) !== "State"
@@ -10876,6 +10910,7 @@ const validateTestcenterXmlSourceDocument = (
     for (const state of stateEntries) {
       const rawStateKey = state.getAttribute("id") ?? "";
       const stateKey = rawStateKey.trim();
+      validateElementOnlyContent(state, `State '${stateKey || "unknown"}'`);
       validateAttributes(state, ["id", "label"], `State '${stateKey || "unknown"}'`);
       if (!stateKey) {
         diagnostics.push(
@@ -10924,6 +10959,10 @@ const validateTestcenterXmlSourceDocument = (
         const optionElementName = xmlElementLocalName(option);
         const rawOptionKey = option.getAttribute("id") ?? "";
         const optionKey = rawOptionKey.trim();
+        validateElementOnlyContent(
+          option,
+          `${optionElementName} '${optionKey || "unknown"}' in State '${stateKey || "unknown"}'`
+        );
         validateAttributes(
           option,
           ["id", "label"],
@@ -11017,6 +11056,7 @@ const validateTestcenterXmlSourceDocument = (
       context: string,
       isRoot: boolean
     ): void => {
+      validateElementOnlyContent(restriction, `Restrictions for ${context}`);
       validateAttributes(restriction, [], `Restrictions for ${context}`);
       const allowedChildNames = isRoot
         ? ["TimeMax", "DenyNavigationOnIncomplete"]
@@ -11074,6 +11114,7 @@ const validateTestcenterXmlSourceDocument = (
       for (const show of xmlChildrenNamed(restriction, "Show")) {
         validateAttributes(show, ["if", "is"], `Show for ${context}`);
         validateSimpleContent(show, `Show for ${context}`);
+        validateElementOnlyContent(show, `Show for ${context}`);
         const stateKey = show.getAttribute("if")?.trim() ?? "";
         const optionKey = show.getAttribute("is")?.trim() ?? "";
         if (!stateKey || !stateOptions.has(stateKey)) {
@@ -11095,6 +11136,7 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       for (const timeMax of xmlChildrenNamed(restriction, "TimeMax")) {
+        validateElementOnlyContent(timeMax, `TimeMax for ${context}`);
         validateAttributes(
           timeMax,
           supportsTimeMaxLeave ? ["minutes", "leave"] : ["minutes"],
@@ -11161,6 +11203,10 @@ const validateTestcenterXmlSourceDocument = (
         restriction,
         "LockAfterLeaving"
       )) {
+        validateElementOnlyContent(
+          lockAfterLeaving,
+          `LockAfterLeaving for ${context}`
+        );
         validateAttributes(
           lockAfterLeaving,
           ["confirm", "scope"],
@@ -11192,6 +11238,7 @@ const validateTestcenterXmlSourceDocument = (
       context: string,
       isRoot: boolean
     ): void => {
+      validateElementOnlyContent(container, context);
       validateAttributes(
         container,
         isRoot ? [] : ["id", "label"],
@@ -11243,6 +11290,7 @@ const validateTestcenterXmlSourceDocument = (
             ["id", "label", "labelshort", "alias"],
             `Unit '${unitKey}'`
           );
+          validateElementOnlyContent(child, `Unit '${unitKey}'`);
           if (xmlChildElements(child).length > 0) {
             diagnostics.push(
               createImportDiagnostic(
@@ -11394,6 +11442,20 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     };
+    const validateElementOnlyContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      if (xmlElementDirectText(element)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_element_content_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains character data in element-only ${context}.`
+          )
+        );
+      }
+    };
+    validateElementOnlyContent(root, "Unit");
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -11412,6 +11474,7 @@ const validateTestcenterXmlSourceDocument = (
     }
     const metadataContainers = xmlChildrenNamed(root, "Metadata");
     for (const metadataContainer of metadataContainers) {
+      validateElementOnlyContent(metadataContainer, "Metadata");
       validateAttributes(metadataContainer, ["lastChange"], "Metadata");
       const metadataChildRanks = new Map([
         ["Id", 0],
@@ -11603,6 +11666,7 @@ const validateTestcenterXmlSourceDocument = (
 
     const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
     if (dependencies) {
+      validateElementOnlyContent(dependencies, "Dependencies");
       validateAttributes(dependencies, [], "Dependencies");
     }
     for (const dependency of dependencies ? xmlChildElements(dependencies) : []) {
@@ -11637,6 +11701,10 @@ const validateTestcenterXmlSourceDocument = (
       ...xmlChildrenNamed(root, "DerivedVariables")
     ];
     for (const container of variableContainers) {
+      validateElementOnlyContent(
+        container,
+        xmlElementLocalName(container)
+      );
       validateAttributes(container, [], xmlElementLocalName(container));
       for (const child of xmlChildElements(container)) {
         if (xmlElementLocalName(child) !== "Variable") {
@@ -11666,6 +11734,10 @@ const validateTestcenterXmlSourceDocument = (
     const maximumVariableIdLength = usesPre15UnitSchema ? 20 : 50;
     for (const variable of variables) {
       const variableId = variable.getAttribute("id") ?? "";
+      validateElementOnlyContent(
+        variable,
+        `Variable '${variableId || "unknown"}'`
+      );
       validateAttributes(
         variable,
         [
@@ -11803,6 +11875,10 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const values of valuesElements) {
+        validateElementOnlyContent(
+          values,
+          `Values for '${variableId || "unknown"}'`
+        );
         validateAttributes(values, ["complete"], `Values for '${variableId || "unknown"}'`);
         const valueElements = xmlChildElements(values);
         if (
@@ -11819,6 +11895,10 @@ const validateTestcenterXmlSourceDocument = (
         for (const value of valueElements.filter(
           item => xmlElementLocalName(item) === "Value"
         )) {
+          validateElementOnlyContent(
+            value,
+            `Value for '${variableId || "unknown"}'`
+          );
           validateAttributes(value, [], `Value for '${variableId || "unknown"}'`);
           const valueChildElements = xmlChildElements(value);
           const valueChildren = valueChildElements.map(xmlElementLocalName);
@@ -11837,6 +11917,10 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       for (const positionLabels of positionLabelElements) {
+        validateElementOnlyContent(
+          positionLabels,
+          `ValuePositionLabels for '${variableId || "unknown"}'`
+        );
         validateAttributes(
           positionLabels,
           [],
@@ -11902,6 +11986,20 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     };
+    const validateElementOnlyContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      if (xmlElementDirectText(element)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_element_content_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains character data in element-only ${context}.`
+          )
+        );
+      }
+    };
+    validateElementOnlyContent(root, "SysCheck");
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -11954,6 +12052,7 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
     for (const metadataContainer of metadataContainers) {
+      validateElementOnlyContent(metadataContainer, "Metadata");
       validateAttributes(metadataContainer, [], "Metadata");
       const metadataChildren = xmlChildElements(metadataContainer);
       const metadataChildRanks = new Map([
@@ -12002,6 +12101,7 @@ const validateTestcenterXmlSourceDocument = (
     }
     const config = configs[0];
     if (config) {
+      validateElementOnlyContent(config, "Config");
       validateAttributes(config, ["unit", "savekey", "skipnetwork"], "Config");
       const skipNetwork = config.getAttribute("skipnetwork");
       if (
