@@ -12748,8 +12748,7 @@ const validateTestcenterXmlSourceDocument = (
       if (
         validFor !== null &&
         (!isTestcenterXmlInteger(validFor) ||
-          !Number.isSafeInteger(Number(validFor)) ||
-          Number(validFor) <= 0)
+          !Number.isSafeInteger(Number(validFor)))
       ) {
         diagnostics.push(
           createImportDiagnostic(

@@ -16653,8 +16653,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_group_access_window_invalid"
     },
     {
-      label: "non-positive group relative lifetime",
-      rosterText: validRosterXml.replace('validFor="45"', 'validFor="0"'),
+      label: "non-integer group relative lifetime",
+      rosterText: validRosterXml.replace('validFor="45"', 'validFor="1.5"'),
       diagnosticCode: "testcenter_xml_group_valid_for_invalid"
     }
   ];
@@ -16686,6 +16686,38 @@ test("original Testcenter compatibility corpus imports representative booklets",
         rosterFacetCase.label
       );
     }
+  }
+
+  for (const relativeLifetimeCase of [
+    { lexicalValue: "+45", expectedMinutes: 45 },
+    { lexicalValue: "0", expectedMinutes: null },
+    { lexicalValue: "-15", expectedMinutes: null }
+  ]) {
+    const roster = await requestJson<{
+      items: Array<{ loginKey: string; validForMinutes: number | null }>;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      {
+        method: "POST",
+        body: {
+          rosterText: validRosterXml.replace(
+            'validFor="45"',
+            `validFor="${relativeLifetimeCase.lexicalValue}"`
+          )
+        }
+      }
+    );
+    assert.equal(
+      roster.status,
+      201,
+      `validFor=${relativeLifetimeCase.lexicalValue}`
+    );
+    assert.equal(
+      roster.body.items.find(item => item.loginKey === "test-trial")
+        ?.validForMinutes ?? null,
+      relativeLifetimeCase.expectedMinutes,
+      `validFor=${relativeLifetimeCase.lexicalValue}`
+    );
   }
 
   const operationalOnlyRoster = await requestJson<{

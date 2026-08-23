@@ -233,7 +233,7 @@ const readRosterDelimitedValue = (
 const parseRosterValidForMinutes = (
   value: string | null | undefined
 ): number | null => {
-  if (!value || !/^\d+$/.test(value)) {
+  if (!value || !/^[+-]?\d+$/.test(value)) {
     return null;
   }
   const minutes = Number(value);

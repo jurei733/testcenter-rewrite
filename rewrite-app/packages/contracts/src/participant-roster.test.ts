@@ -720,6 +720,35 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("normalizes signed Original xs:integer validFor values", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          "<Testtakers>",
+          "  <Metadata />",
+          '  <Group id="positive" label="Positive" validFor="+45">',
+          '    <Login mode="run-hot-return" name="positive-login"><Booklet>booklet-a</Booklet></Login>',
+          "  </Group>",
+          '  <Group id="zero" label="Zero" validFor="0">',
+          '    <Login mode="run-hot-return" name="zero-login"><Booklet>booklet-a</Booklet></Login>',
+          "  </Group>",
+          '  <Group id="negative" label="Negative" validFor="-15">',
+          '    <Login mode="run-hot-return" name="negative-login"><Booklet>booklet-a</Booklet></Login>',
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      ).map(entry => ({
+        loginKey: entry.loginKey,
+        validForMinutes: entry.validForMinutes ?? null
+      })),
+      [
+        { loginKey: "positive-login", validForMinutes: 45 },
+        { loginKey: "zero-login", validForMinutes: null },
+        { loginKey: "negative-login", validForMinutes: null }
+      ]
+    );
+  });
+
   it("applies Testcenter login modes to JSON roster entries", () => {
     assert.deepEqual(
       parseParticipantRosterText({
