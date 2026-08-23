@@ -973,7 +973,7 @@ try {
     logStep(`action-${stepName}-done`);
   };
   const expectMonitorCommandHistoryCard = async ({
-    actorId = "operator-ui",
+    actorId,
     commandType,
     groupKey,
     bookletKey = "",
@@ -19351,6 +19351,7 @@ try {
   await clickAction("Refresh Runtime Reads");
   await assertNoUnexpectedBugReport("monitor command history refresh");
   await expectMonitorCommandHistoryCard({
+    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
     commandType: "resume",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19403,6 +19404,7 @@ try {
   );
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
+    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
     commandType: "pause",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19428,6 +19430,7 @@ try {
   await fillAndCommit("#monitorCommandHistoryLimit", "2");
   await clickAction("Apply Command Filters");
   await expectMonitorCommandHistoryCard({
+    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
     commandType: "pause",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
@@ -19437,6 +19440,7 @@ try {
     transition: "running -> paused"
   });
   await expectMonitorCommandHistoryCard({
+    actorId: adminCurrentSessionPayload.adminUser.adminUserId,
     commandType: "resume",
     bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
