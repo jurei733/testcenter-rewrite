@@ -10652,12 +10652,15 @@ const validateTestcenterXmlSourceDocument = (
 
   if (canonicalRootName === "Booklet") {
     const bookletSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
-    const usesAdaptiveBookletSchema =
-      bookletSchemaVersion === null || bookletSchemaVersion.major >= 17;
-    const supportsTimeMaxLeave =
+    const bookletSchemaSupports = (major: number, minor: number): boolean =>
       bookletSchemaVersion === null ||
-      bookletSchemaVersion.major > 15 ||
-      (bookletSchemaVersion.major === 15 && bookletSchemaVersion.minor >= 1);
+      bookletSchemaVersion.major > major ||
+      (bookletSchemaVersion.major === major &&
+        bookletSchemaVersion.minor >= minor);
+    const supportsAdaptiveBookletStates = bookletSchemaSupports(15, 4);
+    const supportsFractionalTimeMax = bookletSchemaSupports(16, 3);
+    const supportsAllowedTimeMaxLeave = bookletSchemaSupports(16, 3);
+    const supportsTimeMaxLeave = bookletSchemaSupports(15, 1);
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -10724,7 +10727,7 @@ const validateTestcenterXmlSourceDocument = (
       "Metadata",
       "CustomTexts",
       "BookletConfig",
-      ...(usesAdaptiveBookletSchema ? ["States"] : []),
+      ...(supportsAdaptiveBookletStates ? ["States"] : []),
       "Units"
     ]);
     for (const child of xmlChildElements(root)) {
@@ -11063,9 +11066,9 @@ const validateTestcenterXmlSourceDocument = (
         : [
             "CodeToEnter",
             "TimeMax",
-            ...(usesAdaptiveBookletSchema ? ["Show"] : []),
+            ...(supportsAdaptiveBookletStates ? ["Show"] : []),
             "DenyNavigationOnIncomplete",
-            ...(usesAdaptiveBookletSchema ? ["LockAfterLeaving"] : [])
+            ...(supportsAdaptiveBookletStates ? ["LockAfterLeaving"] : [])
           ];
       const childRanks = new Map(
         allowedChildNames.map((childName, index) => [childName, index])
@@ -11147,7 +11150,7 @@ const validateTestcenterXmlSourceDocument = (
         const leave = timeMax.getAttribute("leave");
         const validMinutes =
           minutes === null ||
-          (usesAdaptiveBookletSchema
+          (supportsFractionalTimeMax
             ? isPositiveTestcenterXmlNumber(minutes)
             : isTestcenterXmlInteger(minutes) && Number(minutes) > 0);
         if (!validMinutes) {
@@ -11161,7 +11164,7 @@ const validateTestcenterXmlSourceDocument = (
         if (
           leave !== null &&
           supportsTimeMaxLeave &&
-          !(usesAdaptiveBookletSchema
+          !(supportsAllowedTimeMaxLeave
             ? ["forbidden", "confirm", "allowed"]
             : ["forbidden", "confirm"]
           ).includes(leave.trim())

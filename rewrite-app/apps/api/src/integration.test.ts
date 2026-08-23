@@ -15047,6 +15047,34 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_booklet_child_invalid"
     },
     {
+      fileName: "booklet-15-3-adaptive-states.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "/17.6.0/definitions/",
+        "/15.3.4/definitions/"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_child_invalid"
+    },
+    {
+      fileName: "booklet-16-2-fractional-time-max.xml",
+      sourceDocument: validAdaptiveBookletXml
+        .replace("/17.6.0/definitions/", "/16.2.0/definitions/")
+        .replace(
+          '<Show if="level" is="professional" />',
+          '<TimeMax minutes="0.5" />\n          <Show if="level" is="professional" />'
+        ),
+      diagnosticCode: "testcenter_xml_time_max_invalid"
+    },
+    {
+      fileName: "booklet-16-2-allowed-time-max-leave.xml",
+      sourceDocument: validAdaptiveBookletXml
+        .replace("/17.6.0/definitions/", "/16.2.0/definitions/")
+        .replace(
+          '<Show if="level" is="professional" />',
+          '<TimeMax minutes="1" leave="allowed" />\n          <Show if="level" is="professional" />'
+        ),
+      diagnosticCode: "testcenter_xml_time_max_leave_invalid"
+    },
+    {
       fileName: "booklet-invalid-condition-structure.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
@@ -15376,6 +15404,92 @@ test("original Testcenter compatibility corpus imports representative booklets",
       );
     }
     assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  for (const historicalAdaptiveCase of [
+    {
+      fileName: "booklet-valid-15-4-adaptive-states.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "/17.6.0/definitions/",
+        "/15.4.0/definitions/"
+      ),
+      expectedTimeMax: null
+    },
+    {
+      fileName: "booklet-valid-16-3-fractional-time-max.xml",
+      sourceDocument: validAdaptiveBookletXml
+        .replace("/17.6.0/definitions/", "/16.3.0/definitions/")
+        .replace(
+          '<Show if="level" is="professional" />',
+          '<TimeMax minutes="0.5" leave="allowed" />\n          <Show if="level" is="professional" />'
+        ),
+      expectedTimeMax: { minutes: 0.5, leave: "allowed" }
+    }
+  ] as const) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      historicalAdaptiveCase.fileName
+    );
+    await uploadOriginalAdaptiveUnitDependencies(
+      tenantKey,
+      validationWorkspaceKey
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: historicalAdaptiveCase.fileName,
+          mediaType: "application/xml",
+          sourceDocument: historicalAdaptiveCase.sourceDocument
+        }
+      }
+    );
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            stateEntries?: Array<{ stateKey: string }>;
+            testletEntries?: Array<{
+              testletKey: string;
+              restrictions?: {
+                timeMax?: { minutes: number; leave: string };
+              };
+            }>;
+          }>;
+        };
+      } | null;
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+      }
+    );
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      `${historicalAdaptiveCase.fileName}: ${JSON.stringify(importResult.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(importResult.body.importJob.diagnostics, []);
+    const booklet =
+      importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0];
+    assert.deepEqual(
+      booklet?.stateEntries?.map(state => state.stateKey),
+      ["level", "bonus"],
+      historicalAdaptiveCase.fileName
+    );
+    if (historicalAdaptiveCase.expectedTimeMax) {
+      assert.deepEqual(
+        booklet?.testletEntries?.find(
+          testlet => testlet.testletKey === "stage1-professional"
+        )?.restrictions?.timeMax,
+        historicalAdaptiveCase.expectedTimeMax,
+        historicalAdaptiveCase.fileName
+      );
+    }
   }
 
   const unorderedBookletFileName = "booklet-valid-unordered-root.xml";

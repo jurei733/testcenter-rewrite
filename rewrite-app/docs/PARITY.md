@@ -1226,6 +1226,15 @@ Declaration-free legacy XML keeps the existing permissive parser path, so this
 tightening applies only where the source explicitly opts into Original schema
 validation. An Original-corpus negative case pins the removed element.
 
+Latest historical Booklet-schema closure: adaptive `States`, conditional
+`Show`, and `LockAfterLeaving` are accepted from their actual Original 15.4
+introduction instead of being incorrectly delayed until 17.x. The independent
+16.3 boundary changes `TimeMax/@minutes` from `xs:positiveInteger` to the
+positive runtime subset of `xs:double` and adds `leave="allowed"`; 15.4–16.2
+retain integer minutes plus `forbidden`/`confirm`. XSD-validated 15.4 and 16.3
+positive imports pin compiled states and the fractional allowed-leave timer,
+while 15.3 and 16.2 negative cases pin both transition edges.
+
 The pinned import corpus now also reconstructs the original backend's
 cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of
 a login name or group ID across distinct Testtakers entries with separate stable
