@@ -2925,6 +2925,7 @@ export class ParticipantViewFacade {
     message = "Stored participant session is gone. Use the starter test action."
   ): void {
     this.participantEvents.stop();
+    this.invalidateCurrentStateRefreshes();
     const previousTestRunId = this.runtime.testRunId.trim();
     if (previousTestRunId) {
       discardParticipantSaveOutboxForRun(previousTestRunId);
@@ -3630,6 +3631,7 @@ export class ParticipantViewFacade {
       );
 
     this.participantEvents.stop();
+    this.invalidateCurrentStateRefreshes();
     discardParticipantSaveOutboxForRun(payload.testRun.testRunId);
     this.pendingVeronaSave = null;
     this.optimisticVeronaResponse = null;
@@ -3990,6 +3992,9 @@ export class ParticipantViewFacade {
         this.loadBookletAssetsInBackground(payload);
       }
       await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
+      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+        return;
+      }
       if (payload.currentRunState.testRun.status === "completed") {
         this.participantEvents.stop();
       } else {
@@ -4017,6 +4022,11 @@ export class ParticipantViewFacade {
       }
       throw error;
     }
+  }
+
+  private invalidateCurrentStateRefreshes(): void {
+    const refreshSequence = ++this.currentStateRefreshSequence;
+    this.currentStateAppliedRefreshSequence = refreshSequence;
   }
 
   private loadBookletAssets(

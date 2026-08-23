@@ -7367,6 +7367,18 @@ test("participant progress accepts bounded GeoGebra-sized state without widening
       restored.body.currentRunState.testRun.unitResponses["unit-intro"],
       largeGeoGebraState
     );
+
+    const completed = await requestJsonAt<{
+      testRun: { status: string };
+    }>(
+      isolated.baseUrl,
+      resolveRoutePath(productionApiRoutes.participant.completeRun, {
+        testRunId: resumed.body.testRun.testRunId
+      }),
+      { method: "POST" }
+    );
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.testRun.status, "completed");
   } finally {
     await closeServer(isolated.server);
   }
