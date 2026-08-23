@@ -5913,8 +5913,14 @@ try {
   logStep("loose-upload-partial-report");
   const looseUploadInput = page.locator("#sourcePackageAssemblyFiles");
   assert.equal(await looseUploadInput.getAttribute("accept"), null);
+  const mutationSeed = Date.now();
+  const firstMutatingLooseUploadFileName =
+    `ui-loose-mutation-${mutationSeed}.bin`;
+  const collidingLooseUploadFileName =
+    `UI-LOOSE-MUTATION-${mutationSeed}.BIN`;
   const survivingLooseUploadFileName = `ui-loose-survivor-${Date.now()}.voud`;
   const survivingBinaryUploadFileName = `ui-loose-binary-${Date.now()}.bin`;
+  const firstMutatingLooseUpload = Buffer.from("first batch mutation", "utf8");
   const survivingBinaryUpload = Buffer.from([0x00, 0xff, 0x80, 0x41, 0x0a]);
   const looseSourcePackageUploadRoute =
     `**/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`;
@@ -5940,11 +5946,14 @@ try {
   await page.route(looseSourcePackageUploadRoute, holdFinalLooseUpload);
   await looseUploadInput.setInputFiles([
     {
-      name: "Booklet2.xml",
-      mimeType: "application/xml",
-      buffer: await readFile(
-        resolve("test-fixtures/original-testcenter/booklets/Booklet2.xml")
-      )
+      name: firstMutatingLooseUploadFileName,
+      mimeType: "",
+      buffer: firstMutatingLooseUpload
+    },
+    {
+      name: collidingLooseUploadFileName,
+      mimeType: "",
+      buffer: Buffer.from("must be rejected after the first upload", "utf8")
     },
     {
       name: survivingLooseUploadFileName,
@@ -5966,14 +5975,14 @@ try {
     "#looseSourcePackageUploadProgress"
   );
   await liveLooseUploadProgress
-    .filter({ hasText: "2 of 3 loose file(s) processed" })
+    .filter({ hasText: "3 of 4 loose file(s) processed" })
     .filter({ hasText: `Uploading ${survivingBinaryUploadFileName}` })
     .waitFor({ timeout: 20_000 });
   assert.equal(
     await liveLooseUploadProgress
       .getByRole("progressbar", { name: "Loose file upload progress" })
       .getAttribute("aria-valuenow"),
-    "2"
+    "3"
   );
   assert.equal(await looseUploadInput.isDisabled(), true);
   releaseHeldLooseUpload();
@@ -5984,18 +5993,31 @@ try {
     });
   await looseUploadReport
     .locator("article.record-card")
-    .filter({ has: page.getByRole("heading", { name: "3 loose file(s) processed" }) })
-    .filter({ hasText: "2 uploaded, 1 rejected" })
+    .filter({ has: page.getByRole("heading", { name: "4 loose file(s) processed" }) })
+    .filter({ hasText: "3 uploaded, 1 rejected" })
     .filter({ hasText: "workspace refreshed" })
     .waitFor({ timeout: 20_000 });
   await page.unroute(looseSourcePackageUploadRoute, holdFinalLooseUpload);
   assert.equal(await looseUploadInput.isEnabled(), true);
   await looseUploadReport
     .locator("article.record-card")
-    .filter({ has: page.getByRole("heading", { name: "Booklet2.xml" }) })
+    .filter({
+      has: page.getByRole("heading", { name: collidingLooseUploadFileName })
+    })
     .filter({ hasText: "source_package_file_name_duplicate" })
     .filter({ hasText: "HTTP 409" })
     .filter({ hasText: "Create a replacement" })
+    .waitFor();
+  await looseUploadReport
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: firstMutatingLooseUploadFileName
+      })
+    })
+    .filter({ hasText: "uploaded" })
+    .filter({ hasText: "application/octet-stream" })
+    .filter({ hasText: "Selected for reviewed package assembly" })
     .waitFor();
   await looseUploadReport
     .locator("article.record-card")
@@ -6017,7 +6039,7 @@ try {
     .waitFor();
   await page
     .locator("#sourcePackageAssemblySelection")
-    .filter({ hasText: "2 file(s) selected" })
+    .filter({ hasText: "3 file(s) selected" })
     .waitFor();
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(survivingLooseUploadFileName)}`,
