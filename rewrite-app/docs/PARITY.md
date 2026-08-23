@@ -1217,6 +1217,11 @@ and accepts only the nested `theme`, `codeInput`, and
 `monitorBookletVisibility` elements. The compatibility validator now rejects
 the retired attribute under 18.0 instead of silently normalizing it, while a
 current nested view-settings import preserves its theme and keypad definition.
+The nested `codeInput/length` projection also retains XML Schema's leading-plus
+integer spelling (for example `+4`) as the intended safe numeric keypad length
+instead of silently falling back to the Rewrite's five-character default;
+integers outside JavaScript's exact safe range fail import rather than being
+persisted as a corrupt or misleading length.
 
 Latest Testtakers element-content closure: the compatibility validator now
 distinguishes the schema's simple-content leaves from element-only complex

@@ -440,9 +440,13 @@ const readXmlParticipantViewSettings = (
   const lengthValue = codeInputContent
     ? normalizeRosterTextValue(readXmlChildText(codeInputContent, "length"))
     : null;
-  const length =
-    lengthValue && /^\d+$/.test(lengthValue) && Number(lengthValue) >= 3
+  const parsedLength =
+    lengthValue && /^\+?\d+$/.test(lengthValue)
       ? Number(lengthValue)
+      : Number.NaN;
+  const length =
+    Number.isSafeInteger(parsedLength) && parsedLength >= 3
+      ? parsedLength
       : undefined;
   return {
     ...(theme ? { theme } : {}),

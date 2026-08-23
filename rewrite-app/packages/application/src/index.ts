@@ -13333,7 +13333,11 @@ const validateTestcenterXmlSourceDocument = (
               `ViewSettings/codeInput/length for login '${loginName}'`
             );
             const value = xmlElementText(length);
-            if (!isTestcenterXmlInteger(value) || Number(value) < 3) {
+            if (
+              !isTestcenterXmlInteger(value) ||
+              !Number.isSafeInteger(Number(value)) ||
+              Number(value) < 3
+            ) {
               diagnostics.push(
                 createImportDiagnostic(
                   "testcenter_xml_login_code_input_length_invalid",

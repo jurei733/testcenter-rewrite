@@ -455,6 +455,28 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("normalizes leading-plus xs:integer code-input lengths", () => {
+    const [participant] = parseParticipantRosterText(
+      [
+        "<Testtakers>",
+        '  <Group id="signed-length" label="Signed Length">',
+        '    <Login mode="run-hot-return" name="signed-length-user">',
+        "      <Booklet>BOOKLET.SIGNED-LENGTH</Booklet>",
+        "      <ViewSettings>",
+        "        <codeInput><type>keypad-numbers</type><length>+4</length></codeInput>",
+        "      </ViewSettings>",
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    );
+
+    assert.deepEqual(participant?.viewSettings?.codeInput, {
+      type: "keypad-numbers",
+      length: 4
+    });
+  });
+
   it("parses Original Testcenter comma-separated booklet state presets", () => {
     const [entry] = parseParticipantRosterText(
       [

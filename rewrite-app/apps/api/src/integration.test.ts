@@ -16729,7 +16729,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     '      <AssetAssignments><Asset slot="starterCompanion">start.webp</Asset></AssetAssignments>',
     "      <ViewSettings>",
     "        <theme>Primar</theme>",
-    "        <codeInput><type>keypad-numbers</type><length>4</length></codeInput>",
+    "        <codeInput><type>keypad-numbers</type><length>+4</length></codeInput>",
     "        <monitorBookletVisibility>hidden</monitorBookletVisibility>",
     "      </ViewSettings>",
     "    </Login>",
@@ -17256,6 +17256,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       rosterText: currentRosterXml.replace(
         '<Profile id="small" />',
         '<Profile id="small" /><ViewSettings><codeInput><type>keypad-numbers</type><length>2</length></codeInput></ViewSettings>'
+      ),
+      diagnosticCode: "testcenter_xml_login_code_input_length_invalid"
+    },
+    {
+      label: "unsafe login code-input length",
+      rosterText: currentRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings><codeInput><type>keypad-numbers</type><length>9007199254740992</length></codeInput></ViewSettings>'
       ),
       diagnosticCode: "testcenter_xml_login_code_input_length_invalid"
     },
