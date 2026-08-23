@@ -10192,9 +10192,15 @@ const isTestcenterXmlDateTime = (value: string): boolean => {
   return day <= daysInMonth[month - 1]!;
 };
 
+type TestcenterSchemaVersion = {
+  major: number;
+  minor: number;
+  patch: number;
+};
+
 const parseTestcenterSchemaVersion = (
   schemaLocation: string
-): { major: number; minor: number; patch: number } | null => {
+): TestcenterSchemaVersion | null => {
   const match = schemaLocation.match(
     /(?:^|\/)(\d+)\.(\d+)(?:\.(\d+))?(?:\/definitions\/|(?:[?#].*)?$)/i
   );
@@ -10207,6 +10213,18 @@ const parseTestcenterSchemaVersion = (
     patch: Number(match[3] ?? 0)
   };
 };
+
+const testcenterSchemaVersionSupports = (
+  version: TestcenterSchemaVersion | null,
+  major: number,
+  minor: number,
+  patch = 0
+): boolean =>
+  version === null ||
+  version.major > major ||
+  (version.major === major &&
+    (version.minor > minor ||
+      (version.minor === minor && version.patch >= patch)));
 
 const latestSupportedOriginalTestcenterSchemaVersion = {
   major: 18,
@@ -10658,12 +10676,12 @@ const validateTestcenterXmlSourceDocument = (
       minor: number,
       patch = 0
     ): boolean =>
-      bookletSchemaVersion === null ||
-      bookletSchemaVersion.major > major ||
-      (bookletSchemaVersion.major === major &&
-        (bookletSchemaVersion.minor > minor ||
-          (bookletSchemaVersion.minor === minor &&
-            bookletSchemaVersion.patch >= patch)));
+      testcenterSchemaVersionSupports(
+        bookletSchemaVersion,
+        major,
+        minor,
+        patch
+      );
     const supportsBookletCustomTexts = bookletSchemaSupports(13, 3);
     const supportsAdaptiveBookletStates = bookletSchemaSupports(15, 4);
     const supportsFractionalTimeMax = bookletSchemaSupports(16, 3);
@@ -11418,15 +11436,17 @@ const validateTestcenterXmlSourceDocument = (
 
   if (canonicalRootName === "Unit") {
     const schemaVersion = parseTestcenterSchemaVersion(schemaLocation);
-    const unitSchemaSupports = (major: number, minor: number): boolean =>
-      schemaVersion === null ||
-      schemaVersion.major > major ||
-      (schemaVersion.major === major && schemaVersion.minor >= minor);
+    const unitSchemaSupports = (
+      major: number,
+      minor: number,
+      patch = 0
+    ): boolean =>
+      testcenterSchemaVersionSupports(schemaVersion, major, minor, patch);
     const supportsTranscriptAndReference = unitSchemaSupports(14, 9);
     const supportsExtendedVariableIds = unitSchemaSupports(14, 10);
     const supportsVariablesRef = unitSchemaSupports(14, 10);
     const supportsVariablePage = unitSchemaSupports(14, 10);
-    const supportsValuePositionLabels = unitSchemaSupports(15, 2);
+    const supportsValuePositionLabels = unitSchemaSupports(15, 1, 6);
     const supportsVariableAlias = unitSchemaSupports(15, 3);
     const supportsJsonVariableTypes = unitSchemaSupports(15, 5);
     const validateAttributes = (
@@ -12301,12 +12321,18 @@ const validateTestcenterXmlSourceDocument = (
 
   if (canonicalRootName === "Testtakers") {
     const rosterSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
-    const rosterSchemaSupports = (major: number, minor: number): boolean =>
-      rosterSchemaVersion === null ||
-      rosterSchemaVersion.major > major ||
-      (rosterSchemaVersion.major === major &&
-        rosterSchemaVersion.minor >= minor);
-    const supportsStudyMonitorMode = rosterSchemaSupports(14, 9);
+    const rosterSchemaSupports = (
+      major: number,
+      minor: number,
+      patch = 0
+    ): boolean =>
+      testcenterSchemaVersionSupports(
+        rosterSchemaVersion,
+        major,
+        minor,
+        patch
+      );
+    const supportsStudyMonitorMode = rosterSchemaSupports(14, 7);
     const supportsUnrestrictedLoginAndCustomTextIds = rosterSchemaSupports(
       15,
       1

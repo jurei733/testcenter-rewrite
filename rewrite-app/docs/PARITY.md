@@ -1200,7 +1200,7 @@ all three normalization branches.
 
 Latest historical Testtakers schema closure: the validator now follows the
 official version boundaries for login roles and identifier types. `monitor-study`
-starts at 14.9, `run-simulation` and unrestricted string-valued Login names and
+starts at 14.7, `run-simulation` and unrestricted string-valued Login names and
 CustomText keys start at 15.1, and `sys-check-login` starts at 15.2; older
 declared schemas reject those modes and still require the two former `xs:ID`
 values to be lexically valid and document-wide unique, while 15.1 permits the
@@ -1256,11 +1256,11 @@ Latest historical Unit-schema closure: the compatibility profile now follows
 the Original's independent 14.x/15.x transitions instead of treating 15.0 and
 16.0 as coarse feature boundaries. `Metadata/Transcript` and `Reference` start
 at 14.9; arbitrary 1–50 character variable IDs, `Variable/@page`, and
-`VariablesRef` start at 14.10; `ValuePositionLabels` starts at 15.2;
+`VariablesRef` start at 14.10; `ValuePositionLabels` starts at 15.1.6;
 `Variable/@alias` starts at 15.3; and `json`/`no-value` variable types start at
 15.5. Five XSD-declared positive package imports exercise the supported edges,
-while the immediately preceding 14.8, 14.9, 15.1, 15.2, and 15.4 cases retain
-stable version diagnostics.
+while the immediately preceding 14.8, 14.9, 15.1.5, 15.2, and 15.4 cases
+retain stable version diagnostics.
 
 The pinned import corpus now also reconstructs the original backend's
 cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of

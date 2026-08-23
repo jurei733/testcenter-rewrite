@@ -15330,9 +15330,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_variable_type_invalid"
     },
     {
-      fileName: "unit-15-1-value-position-labels.xml",
+      fileName: "unit-15-1-5-value-position-labels.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/15.1.8/definitions/")
+        .replace("/17.6.0/definitions/", "/15.1.5/definitions/")
         .replace(
           '<Variable id="var6" type="string" />',
           '<Variable id="var6" type="string"><ValuePositionLabels><ValuePositionLabel>Position</ValuePositionLabel></ValuePositionLabels></Variable>'
@@ -15541,9 +15541,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
         )
     },
     {
-      fileName: "unit-valid-15-2-value-position-labels.xml",
+      fileName: "unit-valid-15-1-6-value-position-labels.xml",
       sourceDocument: validUnitXml
-        .replace("/17.6.0/definitions/", "/15.2.0/definitions/")
+        .replace("/17.6.0/definitions/", "/15.1.6/definitions/")
         .replace(
           '<Variable id="var6" type="string" />',
           '<Variable id="var6" type="string"><ValuePositionLabels><ValuePositionLabel>Position</ValuePositionLabel></ValuePositionLabels></Variable>'
@@ -16577,10 +16577,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     ].join("\n");
   for (const historicalRosterCase of [
     {
-      label: "monitor-study at schema 14.9",
-      schemaVersion: "14.9.0",
-      groupId: "schema-14-9",
-      loginName: "study-monitor-14-9",
+      label: "monitor-study at schema 14.7",
+      schemaVersion: "14.7.0",
+      groupId: "schema-14-7",
+      loginName: "study-monitor-14-7",
       mode: "monitor-study"
     },
     {
@@ -16872,11 +16872,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_root_attribute_invalid"
     },
     {
-      label: "monitor-study before schema 14.9",
+      label: "monitor-study before schema 14.7",
       rosterText: historicalRosterXml({
-        schemaVersion: "14.8.0",
-        groupId: "schema-14-8-study",
-        loginName: "study-monitor-14-8",
+        schemaVersion: "14.6.0",
+        groupId: "schema-14-6-study",
+        loginName: "study-monitor-14-6",
         mode: "monitor-study"
       }),
       diagnosticCode: "testcenter_xml_login_mode_invalid"
