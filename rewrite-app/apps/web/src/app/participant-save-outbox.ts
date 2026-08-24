@@ -98,9 +98,15 @@ export function persistParticipantSaveOutboxEntry(
         candidate.unitKey !== entry.unitKey
     ),
     entry
-  ]
-    .sort((left, right) => left.queuedAt.localeCompare(right.queuedAt))
-    .slice(-MAX_OUTBOX_ENTRIES);
+  ];
+  // Never make room by silently deleting another Unit or run. The caller can
+  // still attempt the foreground request, but an offline/capacity failure must
+  // surface as `save_failed` while every previously secured response remains
+  // recoverable.
+  if (entries.length > MAX_OUTBOX_ENTRIES) {
+    return false;
+  }
+  entries.sort((left, right) => left.queuedAt.localeCompare(right.queuedAt));
   return writeParticipantSaveOutbox({ version: OUTBOX_VERSION, entries }, storage);
 }
 

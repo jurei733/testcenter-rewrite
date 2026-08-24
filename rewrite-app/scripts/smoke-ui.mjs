@@ -13522,6 +13522,91 @@ try {
     "testcenter-rewrite:participant-save-outbox:v1",
     { timeout: 30_000 }
   );
+
+  logStep("participant-original-stars-outbox-capacity");
+  await page.evaluate(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(registration => registration.unregister()));
+  });
+  const rejectStarsCapacitySave = route => route.abort("failed");
+  await page.route(starsSaveProgressUrl, rejectStarsCapacitySave);
+  await page.evaluate(storageKey => {
+    const queuedAt = Date.now();
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        version: 1,
+        entries: Array.from({ length: 200 }, (_, index) => ({
+          version: 1,
+          deliveryId: `stars-capacity-${index}-${queuedAt}`,
+          testRunId: `stars-capacity-run-${index}`,
+          unitKey: "1",
+          response: `secured-capacity-response-${index}`,
+          status: "running",
+          logs: [],
+          queuedAt: new Date(queuedAt + index).toISOString()
+        }))
+      })
+    );
+  }, "testcenter-rewrite:participant-save-outbox:v1");
+  const starsCapacityFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const starsCapacityChoice = starsCapacityFrame.locator(
+    '[data-cy="button-0"] input'
+  );
+  await starsCapacityChoice.waitFor({ state: "attached", timeout: 30_000 });
+  await starsCapacityChoice.dispatchEvent("click");
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "save failed" })
+    .waitFor({ timeout: 30_000 });
+  const starsCapacityOutbox = await page.evaluate(storageKey => {
+    const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+    return stored?.entries ?? [];
+  }, "testcenter-rewrite:participant-save-outbox:v1");
+  assert.equal(
+    starsCapacityOutbox.length,
+    200,
+    "Outbox capacity must reject a new Unit without dropping secured entries."
+  );
+  assert.deepEqual(
+    starsCapacityOutbox.map(entry => entry.testRunId),
+    Array.from({ length: 200 }, (_, index) => `stars-capacity-run-${index}`),
+    "Every previously secured run must remain present in insertion order."
+  );
+  assert.ok(
+    !starsCapacityOutbox.some(entry => entry.testRunId === starsTestRunId),
+    "A response that could not be secured must not report a durable queue entry."
+  );
+  await page.unroute(starsSaveProgressUrl, rejectStarsCapacitySave);
+  await page.locator("#participantVeronaRetrySaveButton").click();
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "saved" })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.["2"];
+      if (typeof response !== "string") return false;
+      try {
+        const responses = JSON.parse(response).unitState?.dataParts?.responses;
+        return typeof responses === "string" &&
+          JSON.parse(responses)?.some(
+            value =>
+              value?.id === "interact" &&
+              value?.status === "CODING_COMPLETE" &&
+              String(value?.value) === "1"
+          );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.evaluate(storageKey => {
+    localStorage.removeItem(storageKey);
+  }, "testcenter-rewrite:participant-save-outbox:v1");
   stopAfter("participant-official-stars-player-family");
 
   logStep("participant-official-stars-current-release-player-family");
