@@ -15445,6 +15445,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     .replace("<Label>Sample booklet</Label>", "<Label>Price 12 €</Label>");
   const registeredDosEncodingBooklets = [
     {
+      fileSlug: "ibm775",
+      xmlEncodings: ["IBM775", "cp775", "csPC775Baltic"],
+      iconvEncoding: "cp775",
+      displayLabel: "Ārējā pārbaude Rīgā"
+    },
+    {
       fileSlug: "ibm855",
       xmlEncodings: ["IBM855", "cp855", "csIBM855"],
       iconvEncoding: "cp855",
