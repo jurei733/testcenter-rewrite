@@ -15443,6 +15443,79 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const ibm1140BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM01140"')
     .replace("<Label>Sample booklet</Label>", "<Label>Price 12 €</Label>");
+  const registeredDosEncodingBooklets = [
+    {
+      fileSlug: "ibm855",
+      xmlEncodings: ["IBM855", "cp855", "csIBM855"],
+      iconvEncoding: "cp855",
+      displayLabel: "Проверка Москвы"
+    },
+    {
+      fileSlug: "ibm857",
+      xmlEncodings: ["IBM857", "cp857", "csIBM857"],
+      iconvEncoding: "cp857",
+      displayLabel: "İstanbul sınavı"
+    },
+    {
+      fileSlug: "ibm860",
+      xmlEncodings: ["IBM860", "cp860", "csIBM860"],
+      iconvEncoding: "cp860",
+      displayLabel: "Avaliação em Lisboa"
+    },
+    {
+      fileSlug: "ibm861",
+      xmlEncodings: ["IBM861", "cp861", "cp-is", "csIBM861"],
+      iconvEncoding: "cp861",
+      displayLabel: "Próf í Reykjavík"
+    },
+    {
+      fileSlug: "ibm862",
+      xmlEncodings: ["IBM862", "cp862", "csPC862LatinHebrew"],
+      iconvEncoding: "cp862",
+      displayLabel: "מבחן בירושלים"
+    },
+    {
+      fileSlug: "ibm863",
+      xmlEncodings: ["IBM863", "cp863", "csIBM863"],
+      iconvEncoding: "cp863",
+      displayLabel: "Épreuve à Québec"
+    },
+    {
+      fileSlug: "ibm864",
+      xmlEncodings: ["IBM864", "cp864", "csIBM864"],
+      iconvEncoding: "cp864",
+      displayLabel: "ﺍﺑﺕ ١٢٣"
+    },
+    {
+      fileSlug: "ibm865",
+      xmlEncodings: ["IBM865", "cp865", "csIBM865"],
+      iconvEncoding: "cp865",
+      displayLabel: "Prøve i København"
+    },
+    {
+      fileSlug: "ibm869",
+      xmlEncodings: ["IBM869", "cp869", "cp-gr", "csIBM869"],
+      iconvEncoding: "cp869",
+      displayLabel: "Δοκιμή Αθήνας"
+    }
+  ].flatMap(encodedCase =>
+    encodedCase.xmlEncodings.map((xmlEncoding, aliasIndex) => ({
+      fileName: `${encodedCase.fileSlug}-${aliasIndex + 1}-original-booklet.xml`,
+      bytes: iconv.encode(
+        validBookletXml
+          .replace(
+            /encoding=["']utf-8["']/i,
+            `encoding="${xmlEncoding}"`
+          )
+          .replace(
+            "<Label>Sample booklet</Label>",
+            `<Label>${encodedCase.displayLabel}</Label>`
+          ),
+        encodedCase.iconvEncoding
+      ),
+      displayLabel: encodedCase.displayLabel
+    }))
+  );
   const percentEncodedLatin1Booklet = Array.from(
     Buffer.from(latin1BookletXml, "latin1"),
     byte => `%${byte.toString(16).padStart(2, "0")}`
@@ -15598,6 +15671,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       bytes: encodeIbm1140(ibm1140BookletXml),
       displayLabel: "Price 12 €"
     },
+    ...registeredDosEncodingBooklets,
     {
       fileName: "decoded-iso-8859-1-original-booklet.xml",
       sourceDocument: latin1BookletXml,
