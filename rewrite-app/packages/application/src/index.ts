@@ -15243,9 +15243,16 @@ const decodeZipFileName = (
   fileNameBytes: Buffer,
   generalPurposeBitFlag: number,
   extraFields: Buffer = Buffer.alloc(0)
-): string => {
+): string | null => {
   if ((generalPurposeBitFlag & 0x0800) !== 0) {
-    return fileNameBytes.toString("utf8");
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(fileNameBytes);
+    } catch {
+      // PKWARE's language-encoding flag requires a valid UTF-8 filename. The
+      // Original's libzip/ZipArchive boundary rejects the complete archive
+      // instead of normalizing malformed bytes to replacement characters.
+      return null;
+    }
   }
 
   const unicodePath = readZipUnicodePathExtraField(
@@ -15394,12 +15401,17 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
       zipBuffer.subarray(fileNameStart, fileNameEnd)
     );
 
+    const fileName = decodeZipFileName(
+      rawFileName,
+      generalPurposeBitFlag,
+      zipBuffer.subarray(fileNameEnd, extraEnd)
+    );
+    if (fileName === null) {
+      return null;
+    }
+
     entries.push({
-      fileName: decodeZipFileName(
-        rawFileName,
-        generalPurposeBitFlag,
-        zipBuffer.subarray(fileNameEnd, extraEnd)
-      ),
+      fileName,
       rawFileName,
       generalPurposeBitFlag,
       compressionMethod,

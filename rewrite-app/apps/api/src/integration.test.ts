@@ -39928,11 +39928,31 @@ test("source document import rejects inconsistent ZIP directory metadata", async
     "base64"
   );
   inconsistentZip64.writeUInt32LE(2, inconsistentZip64.length - 22 - 20 + 16);
+  const invalidUtf8FileNameZip = Buffer.from(
+    createZipBase64([
+      {
+        fileName: "imsmanifest.xml",
+        content:
+          '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources /></manifest>'
+      },
+      {
+        fileName: "assets/invalid.bin",
+        fileNameBytes: Buffer.concat([
+          Buffer.from("assets/", "ascii"),
+          Buffer.from([0xc3, 0x28]),
+          Buffer.from(".bin", "ascii")
+        ]),
+        content: "invalid UTF-8 filename"
+      }
+    ]),
+    "base64"
+  );
 
   for (const [fileName, zipPayload] of [
     ["multi-disk.zip", multiDiskZip],
     ["inconsistent-central-size.zip", inconsistentCentralSizeZip],
-    ["inconsistent-zip64-locator.zip", inconsistentZip64]
+    ["inconsistent-zip64-locator.zip", inconsistentZip64],
+    ["invalid-utf8-file-name.zip", invalidUtf8FileNameZip]
   ] as const) {
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
