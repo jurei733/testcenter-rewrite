@@ -22895,7 +22895,7 @@ try {
     payload =>
       payload?.items?.some(
         item =>
-          item?.activityEvent?.actorId === "operator-ui" &&
+          item?.activityEvent?.actorId === expectedMonitorActorId &&
           item.activityEvent.subjectId === pausedTestRunId &&
           item.activityEvent.details?.commandType === "complete_and_lock" &&
           item.activityEvent.details?.previousStatus === "running" &&

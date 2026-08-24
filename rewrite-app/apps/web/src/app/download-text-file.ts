@@ -23,7 +23,9 @@ export function downloadBlobFile(input: {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Keep the object URL alive until the browser has processed the synthetic
+  // navigation. Revoking it synchronously can cancel downloads under load.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function downloadDataUrlFile(input: {
