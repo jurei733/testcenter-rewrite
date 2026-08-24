@@ -345,7 +345,9 @@ try {
     { timeout: 15_000 }
   );
 
-  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}${demoParticipantPath}`, {
+    waitUntil: "domcontentloaded"
+  });
   await page.waitForFunction(
     () => {
       const status = document
@@ -369,7 +371,9 @@ try {
   ]) {
     assert.equal(await page.locator(starterField).count(), 0);
   }
-  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}${demoParticipantPath}`, {
+    waitUntil: "domcontentloaded"
+  });
   await page.waitForFunction(
     expectedSessionId => {
       const status = document
@@ -521,7 +525,7 @@ try {
         }),
       "Intro answer from smoke"
     );
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(
     expectedSessionId =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
