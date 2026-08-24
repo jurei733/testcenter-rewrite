@@ -10,7 +10,10 @@ export const PARTICIPANT_SAVE_OUTBOX_STORAGE_KEY =
   "testcenter-rewrite:participant-save-outbox:v1";
 
 const OUTBOX_VERSION = 1 as const;
-const MAX_OUTBOX_ENTRIES = 8;
+// The current Original STARS system package has 28 independently addressed
+// Units. Keep enough per-Unit drafts for several production-sized runs while
+// retaining a hard count and document-size boundary for browser storage.
+const MAX_OUTBOX_ENTRIES = 200;
 const MAX_STORED_RESPONSE_CHARS = 4_000_000;
 const MAX_STORED_DOCUMENT_CHARS = 4_500_000;
 

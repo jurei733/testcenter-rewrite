@@ -12803,6 +12803,220 @@ try {
   await restoredStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
   assert.equal(await restoredStarsChoice.isChecked(), true);
 
+  logStep("participant-original-stars-28-unit-outbox-recovery");
+  const starsStateForOutbox = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey === "2" &&
+      typeof payload.currentRunState.testRun.unitResponses?.["2"] === "string"
+  );
+  const starsTestRunId = starsStateForOutbox.currentRunState.testRun.testRunId;
+  const starsBaseResponse =
+    starsStateForOutbox.currentRunState.testRun.unitResponses["2"];
+  const starsUnitKeys = Array.from({ length: 28 }, (_, index) =>
+    String(index + 1)
+  );
+  const starsForegroundResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 1)}`
+    ])
+  );
+  const starsForegroundResponseUnits = new Map(
+    Object.entries(starsForegroundResponses).map(([unitKey, response]) => [
+      response,
+      unitKey
+    ])
+  );
+  const starsForegroundSaveOrder = [];
+  const observedStarsForegroundResponses = new Set();
+  const recordStarsForegroundSaveOrder = request => {
+    if (
+      request.method() !== "POST" ||
+      !request.url().endsWith(
+        `/participant/test-runs/${starsTestRunId}/save-progress`
+      )
+    ) {
+      return;
+    }
+    const requestBody = request.postDataJSON();
+    const responseUnitKey = starsForegroundResponseUnits.get(
+      requestBody?.unitResponse
+    );
+    if (
+      !responseUnitKey ||
+      observedStarsForegroundResponses.has(requestBody.unitResponse)
+    ) {
+      return;
+    }
+    observedStarsForegroundResponses.add(requestBody.unitResponse);
+    starsForegroundSaveOrder.push(requestBody.responseUnitKey);
+  };
+  page.on("request", recordStarsForegroundSaveOrder);
+  await page.evaluate(
+    ({ storageKey, testRunId, currentUnitKey, responses }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: Object.entries(responses).map(
+            ([unitKey, response], index) => ({
+              version: 1,
+              deliveryId: `stars-foreground-${unitKey}-${queuedAt}`,
+              testRunId,
+              unitKey,
+              response,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(
+                queuedAt + (unitKey === currentUnitKey ? 100 : index)
+              ).toISOString()
+            })
+          )
+        })
+      );
+      window.dispatchEvent(new Event("online"));
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: starsTestRunId,
+      currentUnitKey: "2",
+      responses: starsForegroundResponses
+    }
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(
+        unitKey =>
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey] ===
+          starsForegroundResponses[unitKey]
+      ),
+    30_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
+  page.off("request", recordStarsForegroundSaveOrder);
+  assert.equal(
+    starsForegroundSaveOrder[0],
+    "2",
+    "The visible STARS Unit must drain before the other 27 pending Units."
+  );
+  assert.deepEqual(
+    [...new Set(starsForegroundSaveOrder)].sort(
+      (left, right) => Number(left) - Number(right)
+    ),
+    starsUnitKeys,
+    "Foreground recovery must deliver every Unit in the 28-Unit STARS booklet."
+  );
+
+  logStep("participant-original-stars-28-unit-background-sync");
+  const starsBackgroundResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 101)}`
+    ])
+  );
+  await page.evaluate(
+    ({ storageKey, testRunId, responses }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: Object.entries(responses).map(
+            ([unitKey, response], index) => ({
+              version: 1,
+              deliveryId: `stars-background-${unitKey}-${queuedAt}`,
+              testRunId,
+              unitKey,
+              response,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt + index).toISOString()
+            })
+          )
+        })
+      );
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: starsTestRunId,
+      responses: starsBackgroundResponses
+    }
+  );
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await page.waitForFunction(
+    async ({ testRunId, expectedCount }) => {
+      const database = await new Promise((resolvePromise, reject) => {
+        const request = indexedDB.open("testcenter-participant-save-outbox-v1", 1);
+        request.addEventListener("error", () => reject(request.error));
+        request.addEventListener("success", () => resolvePromise(request.result));
+      });
+      try {
+        const records = await new Promise((resolvePromise, reject) => {
+          const transaction = database.transaction("pending-saves", "readonly");
+          const request = transaction.objectStore("pending-saves").getAll();
+          request.addEventListener("error", () => reject(request.error));
+          request.addEventListener("success", () => resolvePromise(request.result));
+        });
+        return (
+          records.filter(record => record.entry?.testRunId === testRunId)
+            .length === expectedCount
+        );
+      } finally {
+        database.close();
+      }
+    },
+    { testRunId: starsTestRunId, expectedCount: starsUnitKeys.length },
+    { timeout: 30_000 }
+  );
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(
+        unitKey =>
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey] ===
+          starsBackgroundResponses[unitKey]
+      ),
+    45_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
+  await page.waitForFunction(
+    async testRunId => {
+      const database = await new Promise((resolvePromise, reject) => {
+        const request = indexedDB.open("testcenter-participant-save-outbox-v1", 1);
+        request.addEventListener("error", () => reject(request.error));
+        request.addEventListener("success", () => resolvePromise(request.result));
+      });
+      try {
+        const records = await new Promise((resolvePromise, reject) => {
+          const transaction = database.transaction("pending-saves", "readonly");
+          const request = transaction.objectStore("pending-saves").getAll();
+          request.addEventListener("error", () => reject(request.error));
+          request.addEventListener("success", () => resolvePromise(request.result));
+        });
+        return !records.some(record => record.entry?.testRunId === testRunId);
+      } finally {
+        database.close();
+      }
+    },
+    starsTestRunId,
+    { timeout: 30_000 }
+  );
+  stopAfter("participant-official-stars-player-family");
+
   logStep("participant-official-stars-current-release-player-family");
   const currentStarsPlayerPackage =
     officialProtocolCorpus.veronaPlayerFamilyPackages.find(
