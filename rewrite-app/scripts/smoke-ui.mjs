@@ -12914,7 +12914,34 @@ try {
     "Foreground recovery must deliver every Unit in the 28-Unit STARS booklet."
   );
 
-  logStep("participant-original-stars-28-unit-hard-reload");
+  logStep("participant-original-stars-parallel-28-unit-hard-reload");
+  const parallelStarsSignInResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/auth/sign-in`,
+    {
+      body: {
+        tenantKey: starsTenantKey,
+        workspaceKey: starsWorkspaceKey,
+        loginKey: "stars-4",
+        password: "123"
+      }
+    }
+  );
+  const parallelStarsSignInPayload = await parallelStarsSignInResponse.json();
+  const parallelStarsParticipantSessionId =
+    parallelStarsSignInPayload.participantSession.participantSessionId;
+  assert.ok(parallelStarsParticipantSessionId);
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${parallelStarsParticipantSessionId}/resume`,
+    { body: { bookletKey: starsBookletKey } }
+  );
+  const parallelStarsState = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${parallelStarsParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey === "1" &&
+      typeof payload.currentRunState.testRun.testRunId === "string"
+  );
+  const parallelStarsTestRunId =
+    parallelStarsState.currentRunState.testRun.testRunId;
   const starsReloadResponses = Object.fromEntries(
     starsUnitKeys.map((unitKey, index) => [
       unitKey,
@@ -12936,8 +12963,31 @@ try {
       return false;
     }
   };
+  const parallelStarsReloadResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 151)}`
+    ])
+  );
+  const matchesParallelStarsReloadResponse = (unitKey, response) => {
+    const expected = parallelStarsReloadResponses[unitKey];
+    if (response === expected) {
+      return true;
+    }
+    if (unitKey !== "1" || typeof response !== "string") {
+      return false;
+    }
+    try {
+      return JSON.stringify(JSON.parse(response)) ===
+        JSON.stringify(JSON.parse(expected));
+    } catch {
+      return false;
+    }
+  };
   const starsSaveProgressUrl =
     `${baseUrl}/api/v1/participant/test-runs/${starsTestRunId}/save-progress`;
+  const parallelStarsSaveProgressUrl =
+    `${baseUrl}/api/v1/participant/test-runs/${parallelStarsTestRunId}/save-progress`;
   await page.evaluate(async () => {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map(registration => registration.unregister()));
@@ -12945,34 +12995,48 @@ try {
   const abortStarsSaveProgress = route => route.abort("failed");
   await page.route(starsSaveProgressUrl, abortStarsSaveProgress);
   await page.evaluate(
-    ({ storageKey, testRunId, currentUnitKey, responses }) => {
+    ({ storageKey, runs }) => {
       const queuedAt = Date.now();
       localStorage.setItem(
         storageKey,
         JSON.stringify({
           version: 1,
-          entries: Object.entries(responses).map(
-            ([unitKey, response], index) => ({
-              version: 1,
-              deliveryId: `stars-reload-${unitKey}-${queuedAt}`,
-              testRunId,
-              unitKey,
-              response,
-              status: "running",
-              logs: [],
-              queuedAt: new Date(
-                queuedAt + (unitKey === currentUnitKey ? 100 : index)
-              ).toISOString()
-            })
+          entries: runs.flatMap((run, runIndex) =>
+            Object.entries(run.responses).map(
+              ([unitKey, response], index) => ({
+                version: 1,
+                deliveryId:
+                  `stars-reload-${runIndex + 1}-${unitKey}-${queuedAt}`,
+                testRunId: run.testRunId,
+                unitKey,
+                response,
+                status: "running",
+                logs: [],
+                queuedAt: new Date(
+                  queuedAt +
+                    runIndex * 1_000 +
+                    (unitKey === run.currentUnitKey ? 100 : index)
+                ).toISOString()
+              })
+            )
           )
         })
       );
     },
     {
       storageKey: "testcenter-rewrite:participant-save-outbox:v1",
-      testRunId: starsTestRunId,
-      currentUnitKey: "2",
-      responses: starsReloadResponses
+      runs: [
+        {
+          testRunId: starsTestRunId,
+          currentUnitKey: "2",
+          responses: starsReloadResponses
+        },
+        {
+          testRunId: parallelStarsTestRunId,
+          currentUnitKey: "1",
+          responses: parallelStarsReloadResponses
+        }
+      ]
     }
   );
   const blockedStarsReloadSavePromise = page.waitForRequest(
@@ -12991,17 +13055,35 @@ try {
   }, "testcenter-rewrite:participant-save-outbox:v1");
   assert.equal(
     restoredStarsReloadOutbox.length,
-    starsUnitKeys.length,
-    "A hard reload must retain every pending Unit in the STARS outbox."
+    starsUnitKeys.length * 2,
+    "A hard reload must retain every pending Unit from both STARS runs."
   );
-  assert.deepEqual(
-    restoredStarsReloadOutbox
-      .map(entry => entry.unitKey)
-      .sort((left, right) => Number(left) - Number(right)),
-    starsUnitKeys
-  );
+  for (const [testRunId, responseMatches] of [
+    [starsTestRunId, matchesStarsReloadResponse],
+    [parallelStarsTestRunId, matchesParallelStarsReloadResponse]
+  ]) {
+    const restoredRunEntries = restoredStarsReloadOutbox.filter(
+      entry => entry.testRunId === testRunId
+    );
+    assert.deepEqual(
+      restoredRunEntries
+        .map(entry => entry.unitKey)
+        .sort((left, right) => Number(left) - Number(right)),
+      starsUnitKeys,
+      `Hard reload must retain the complete isolated run ${testRunId}.`
+    );
+    assert.ok(
+      restoredRunEntries.every(entry =>
+        responseMatches(entry.unitKey, entry.response)
+      ),
+      `Hard reload must preserve the responses for run ${testRunId}.`
+    );
+  }
   const mismatchedStarsReloadEntries = restoredStarsReloadOutbox
-    .filter(entry => !matchesStarsReloadResponse(entry.unitKey, entry.response))
+    .filter(entry =>
+      entry.testRunId === starsTestRunId &&
+      !matchesStarsReloadResponse(entry.unitKey, entry.response)
+    )
     .map(entry => ({
       unitKey: entry.unitKey,
       expectedLength: starsReloadResponses[entry.unitKey]?.length ?? null,
@@ -13059,8 +13141,16 @@ try {
     45_000
   );
   await page.waitForFunction(
-    storageKey => localStorage.getItem(storageKey) === null,
-    "testcenter-rewrite:participant-save-outbox:v1",
+    ({ storageKey, retainedTestRunId, expectedCount }) => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+      return stored?.entries?.length === expectedCount &&
+        stored.entries.every(entry => entry.testRunId === retainedTestRunId);
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      retainedTestRunId: parallelStarsTestRunId,
+      expectedCount: starsUnitKeys.length
+    },
     { timeout: 30_000 }
   );
   page.off("response", recordStarsReloadSaveOrder);
@@ -13076,6 +13166,82 @@ try {
     starsUnitKeys,
     "Hard-reload recovery must deliver every Unit in the STARS booklet."
   );
+  const parallelStarsReloadSaveOrder = [];
+  const observedParallelStarsReloadResponses = new Set();
+  const recordParallelStarsReloadSaveOrder = response => {
+    const request = response.request();
+    if (
+      response.status() !== 200 ||
+      request.method() !== "POST" ||
+      request.url() !== parallelStarsSaveProgressUrl
+    ) {
+      return;
+    }
+    const requestBody = request.postDataJSON();
+    const responseUnitKey = requestBody?.responseUnitKey;
+    if (
+      typeof responseUnitKey !== "string" ||
+      !matchesParallelStarsReloadResponse(
+        responseUnitKey,
+        requestBody?.unitResponse
+      ) ||
+      observedParallelStarsReloadResponses.has(responseUnitKey)
+    ) {
+      return;
+    }
+    observedParallelStarsReloadResponses.add(responseUnitKey);
+    parallelStarsReloadSaveOrder.push(responseUnitKey);
+  };
+  page.on("response", recordParallelStarsReloadSaveOrder);
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      parallelStarsParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${parallelStarsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(unitKey =>
+        matchesParallelStarsReloadResponse(
+          unitKey,
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
+        )
+      ),
+    45_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
+  page.off("response", recordParallelStarsReloadSaveOrder);
+  assert.equal(
+    parallelStarsReloadSaveOrder[0],
+    "1",
+    "Opening the second run must drain its visible STARS Unit first."
+  );
+  assert.deepEqual(
+    [...new Set(parallelStarsReloadSaveOrder)].sort(
+      (left, right) => Number(left) - Number(right)
+    ),
+    starsUnitKeys,
+    "Opening the second run must deliver its isolated 28-Unit queue."
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      starsParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
   await page.waitForFunction(
     async () => {
       const registration = await navigator.serviceWorker.getRegistration();
