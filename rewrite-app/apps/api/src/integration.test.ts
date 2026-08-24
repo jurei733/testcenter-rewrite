@@ -15776,6 +15776,80 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="UTF-8"'
   );
+  const invalidEncodedBookletBytes = (
+    sourceDocument: string,
+    marker: string,
+    invalidBytes: Buffer,
+    encode: (value: string) => Buffer
+  ): Buffer => {
+    const markerOffset = sourceDocument.indexOf(marker);
+    assert.notEqual(markerOffset, -1, `Missing encoding marker '${marker}'.`);
+    return Buffer.concat([
+      encode(sourceDocument.slice(0, markerOffset)),
+      invalidBytes,
+      encode(sourceDocument.slice(markerOffset + marker.length))
+    ]);
+  };
+  const invalidUtf8BookletBytes = invalidEncodedBookletBytes(
+    validBookletXml,
+    "Sample booklet",
+    Buffer.from([0xc3, 0x28]),
+    value => Buffer.from(value, "utf8")
+  );
+  const invalidDefaultUtf8BookletBytes = invalidEncodedBookletBytes(
+    validBookletXml.replace(/^<\?xml[^>]*>\s*/i, ""),
+    "Sample booklet",
+    Buffer.from([0xe2, 0x28, 0xa1]),
+    value => Buffer.from(value, "utf8")
+  );
+  const invalidUtf16BookletBytes = Buffer.concat([
+    Buffer.from([0xff, 0xfe]),
+    invalidEncodedBookletBytes(
+      utf16BookletXml,
+      "Sample booklet",
+      Buffer.from([0x00, 0xd8]),
+      value => Buffer.from(value, "utf16le")
+    )
+  ]);
+  const invalidUtf32CodePoint = Buffer.alloc(4);
+  invalidUtf32CodePoint.writeUInt32LE(0x110000);
+  const invalidUtf32BookletBytes = Buffer.concat([
+    Buffer.from([0xff, 0xfe, 0x00, 0x00]),
+    invalidEncodedBookletBytes(
+      utf32BookletXml,
+      "Sample booklet",
+      invalidUtf32CodePoint,
+      value => encodeUtf32(value, "little-endian")
+    )
+  ]);
+  const invalidShiftJisBookletBytes = invalidEncodedBookletBytes(
+    shiftJisBookletXml,
+    "東京の試験",
+    Buffer.from([0x82, 0x20]),
+    value => iconv.encode(value, "shift_jis")
+  );
+  const invalidEncodingByteCases = [
+    {
+      fileName: "invalid-utf-8-original-booklet.xml",
+      bytes: invalidUtf8BookletBytes
+    },
+    {
+      fileName: "invalid-default-utf-8-original-booklet.xml",
+      bytes: invalidDefaultUtf8BookletBytes
+    },
+    {
+      fileName: "invalid-utf-16-original-booklet.xml",
+      bytes: invalidUtf16BookletBytes
+    },
+    {
+      fileName: "invalid-utf-32-original-booklet.xml",
+      bytes: invalidUtf32BookletBytes
+    },
+    {
+      fileName: "invalid-shift-jis-original-booklet.xml",
+      bytes: invalidShiftJisBookletBytes
+    }
+  ];
   for (const encodingDiagnosticCase of [
     {
       fileName: "utf-16le-declared-utf-8-original-booklet.xml",
@@ -15820,7 +15894,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
         ibm037EncodingMismatchXml
       ).toString("base64")}`,
       diagnosticCode: "source_document_xml_encoding_mismatch"
-    }
+    },
+    ...invalidEncodingByteCases.map(({ fileName, bytes }) => ({
+      fileName,
+      sourceDocument: `data:application/xml;base64,${bytes.toString("base64")}`,
+      diagnosticCode: "source_document_xml_encoding_invalid_bytes"
+    }))
   ]) {
     const validationWorkspaceKey = await createValidationWorkspace(
       encodingDiagnosticCase.fileName
@@ -30916,6 +30995,118 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
       "valid_booklet.xml",
       "RESOURCE/P.html",
       "whatever/somestuff/valid_unit.xml"
+    ]
+  );
+
+  const invalidUtf8UnitSource = validUnit(
+    "UNIT.PARTIAL-INVALID-BYTES",
+    "Invalid byte Unit"
+  );
+  const invalidUtf8UnitMarker = "Invalid byte Unit";
+  const invalidUtf8UnitMarkerOffset = invalidUtf8UnitSource.indexOf(
+    invalidUtf8UnitMarker
+  );
+  assert.notEqual(invalidUtf8UnitMarkerOffset, -1);
+  const invalidUtf8UnitBytes = Buffer.concat([
+    Buffer.from(
+      invalidUtf8UnitSource.slice(0, invalidUtf8UnitMarkerOffset),
+      "utf8"
+    ),
+    Buffer.from([0xf0, 0x28, 0x8c, 0x28]),
+    Buffer.from(
+      invalidUtf8UnitSource.slice(
+        invalidUtf8UnitMarkerOffset + invalidUtf8UnitMarker.length
+      ),
+      "utf8"
+    )
+  ]);
+  const invalidBytesResult = await importArchive(
+    "integration-workspace-partial-zip-invalid-bytes",
+    "invalid-byte-sibling-graph.zip",
+    [
+      {
+        fileName: "invalid_bytes_testtakers.xml",
+        content: validRoster(
+          "BOOKLET.PARTIAL-INVALID-BYTES",
+          "group-partial-invalid-bytes",
+          "login-partial-invalid-bytes"
+        )
+      },
+      {
+        fileName: "invalid_bytes_booklet.xml",
+        content: validBooklet(
+          "BOOKLET.PARTIAL-INVALID-BYTES",
+          "UNIT.PARTIAL-INVALID-BYTES",
+          "Invalid Byte Graph"
+        )
+      },
+      { fileName: "invalid_bytes_unit.xml", content: invalidUtf8UnitBytes },
+      {
+        fileName: "valid_sibling_testtakers.xml",
+        content: validRoster(
+          "BOOKLET.PARTIAL-VALID-BYTES",
+          "group-partial-valid-bytes",
+          "login-partial-valid-bytes"
+        )
+      },
+      {
+        fileName: "valid_sibling_booklet.xml",
+        content: validBooklet(
+          "BOOKLET.PARTIAL-VALID-BYTES",
+          "UNIT.PARTIAL-VALID-BYTES",
+          "Valid Byte Sibling"
+        )
+      },
+      {
+        fileName: "valid_sibling_unit.xml",
+        content: validUnit(
+          "UNIT.PARTIAL-VALID-BYTES",
+          "Valid Byte Sibling Unit"
+        )
+      }
+    ]
+  );
+  assert.equal(invalidBytesResult.status, 201);
+  assert.equal(invalidBytesResult.body.importJob.status, "completed");
+  assert.deepEqual(
+    invalidBytesResult.body.importJob.diagnostics.map(diagnostic => [
+      diagnostic.severity,
+      diagnostic.code
+    ]),
+    [
+      ["warning", "source_document_xml_encoding_invalid_bytes"],
+      ["warning", "source_document_booklet_unit_missing"],
+      ["warning", "source_document_testtakers_booklet_missing"]
+    ]
+  );
+  assert.deepEqual(
+    invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
+      booklet => ({
+        bookletKey: booklet.bookletKey,
+        unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
+      })
+    ),
+    [
+      {
+        bookletKey: "BOOKLET.PARTIAL-VALID-BYTES",
+        unitKeys: ["UNIT.PARTIAL-VALID-BYTES"]
+      }
+    ]
+  );
+  assert.deepEqual(invalidBytesResult.body.participantRosterImport, {
+    importedCount: 1,
+    updatedCount: 0,
+    sourceFileNames: ["valid_sibling_testtakers.xml"],
+    operationalLoginCandidateCount: 0
+  });
+  assert.deepEqual(
+    await acceptedPathsFor(
+      "integration-workspace-partial-zip-invalid-bytes"
+    ),
+    [
+      "valid_sibling_testtakers.xml",
+      "valid_sibling_booklet.xml",
+      "valid_sibling_unit.xml"
     ]
   );
 });

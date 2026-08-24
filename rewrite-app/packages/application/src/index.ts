@@ -8392,15 +8392,104 @@ const isXmlEncodingCompatibleWithDetectedBytes = (
   }
 };
 
-const validateXmlEncodingDeclaration = (
+const isValidUtf32ByteSequence = (
+  bytes: Buffer,
+  byteOrder: "little-endian" | "big-endian"
+): boolean => {
+  if (bytes.length % 4 !== 0) {
+    return false;
+  }
+  for (let offset = 0; offset < bytes.length; offset += 4) {
+    const codePoint =
+      byteOrder === "little-endian"
+        ? bytes.readUInt32LE(offset)
+        : bytes.readUInt32BE(offset);
+    if (
+      codePoint > 0x10ffff ||
+      (codePoint >= 0xd800 && codePoint <= 0xdfff)
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const hasValidXmlByteSequence = (
   bytes: Buffer,
   decodedSourceDocument: string,
-  sourceFileName: string
+  externalEncoding?: string | null
+): boolean => {
+  const detectedEncoding = detectSourceTextByteEncoding(bytes);
+  const declaredEncoding =
+    readDeclaredXmlEncoding(decodedSourceDocument) ?? externalEncoding ?? null;
+  const normalizedDeclaredEncoding = declaredEncoding
+    ? normalizeSourceTextEncodingName(declaredEncoding)
+    : null;
+  const encodedBytes = detectedEncoding
+    ? bytes.subarray(detectedEncoding.byteOffset)
+    : bytes;
+  const effectiveEncoding = detectedEncoding?.encoding ??
+    normalizedDeclaredEncoding ??
+    "utf-8";
+
+  if (effectiveEncoding === "ibm037") {
+    return true;
+  }
+  if (
+    [
+      "utf-32",
+      "utf32",
+      "utf-32le",
+      "utf32le",
+      "ucs-4",
+      "ucs4",
+      "iso-10646-ucs-4"
+    ].includes(effectiveEncoding)
+  ) {
+    return isValidUtf32ByteSequence(encodedBytes, "little-endian");
+  }
+  if (["utf-32be", "utf32be"].includes(effectiveEncoding)) {
+    return isValidUtf32ByteSequence(encodedBytes, "big-endian");
+  }
+  if (
+    isSupportedEbcdicEncodingName(effectiveEncoding) ||
+    ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)
+  ) {
+    // Every currently allowlisted iconv fallback is a complete single-byte
+    // code page, so each possible byte has a defined character mapping.
+    return true;
+  }
+
+  try {
+    new TextDecoder(effectiveEncoding, { fatal: true }).decode(encodedBytes);
+    return true;
+  } catch {
+    // Unsupported names are diagnosed separately. A supported decoder that
+    // throws here found an incomplete or invalid byte sequence.
+    return !isSupportedSourceTextEncoding(effectiveEncoding);
+  }
+};
+
+const validateXmlEncoding = (
+  bytes: Buffer,
+  decodedSourceDocument: string,
+  sourceFileName: string,
+  mediaType?: string
 ): ImportJobDiagnostic[] => {
   const detectedEncoding = detectSourceTextByteEncoding(bytes)?.encoding;
-  const declaredEncoding = readDeclaredXmlEncoding(decodedSourceDocument);
+  const declaredEncoding =
+    readDeclaredXmlEncoding(decodedSourceDocument) ??
+    mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1] ??
+    null;
   if (!declaredEncoding) {
-    return [];
+    return hasValidXmlByteSequence(bytes, decodedSourceDocument)
+      ? []
+      : [
+          createImportDiagnostic(
+            "source_document_xml_encoding_invalid_bytes",
+            `Source package '${sourceFileName}' contains an invalid byte sequence for XML encoding '${detectedEncoding?.toUpperCase() ?? "UTF-8"}'.`
+          )
+        ];
   }
 
   if (!isSupportedSourceTextEncoding(declaredEncoding)) {
@@ -8412,19 +8501,32 @@ const validateXmlEncodingDeclaration = (
     ];
   }
 
+  const diagnostics: ImportJobDiagnostic[] = [];
+  if (
+    !hasValidXmlByteSequence(bytes, decodedSourceDocument, declaredEncoding)
+  ) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "source_document_xml_encoding_invalid_bytes",
+        `Source package '${sourceFileName}' contains an invalid byte sequence for XML encoding '${declaredEncoding}'.`
+      )
+    );
+  }
+
   if (
     !detectedEncoding ||
     isXmlEncodingCompatibleWithDetectedBytes(declaredEncoding, detectedEncoding)
   ) {
-    return [];
+    return diagnostics;
   }
 
-  return [
+  diagnostics.push(
     createImportDiagnostic(
       "source_document_xml_encoding_mismatch",
       `Source package '${sourceFileName}' declares XML encoding '${declaredEncoding}', but its byte order mark or leading XML byte signature identifies '${detectedEncoding.toUpperCase()}'.`
     )
-  ];
+  );
+  return diagnostics;
 };
 
 const hasStructuredContent = (
@@ -18939,12 +19041,18 @@ const validateZipXmlEntries = (
       );
       continue;
     }
+    const encodingDiagnostics = validateXmlEncoding(
+      sourceBytes,
+      sourceDocument,
+      entry.fileName
+    );
+    diagnostics.push(...encodingDiagnostics);
+    if (
+      encodingDiagnostics.some(diagnostic => diagnostic.severity === "error")
+    ) {
+      continue;
+    }
     diagnostics.push(
-      ...validateXmlEncodingDeclaration(
-        sourceBytes,
-        sourceDocument,
-        entry.fileName
-      ),
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
@@ -19380,6 +19488,14 @@ const quarantineInvalidZipEntryGraphs = (
       const sourceDocument = sourceBytes
         ? readZipEntryText(manifestExtraction.zipBuffer, entry)
         : null;
+      const encodingDiagnostics =
+        sourceBytes && sourceDocument !== null
+          ? validateXmlEncoding(
+              sourceBytes,
+              sourceDocument,
+              entry.fileName
+            )
+          : [];
       const entryDiagnostics = !sourceBytes || sourceDocument === null
         ? [
             createImportDiagnostic(
@@ -19388,15 +19504,15 @@ const quarantineInvalidZipEntryGraphs = (
             )
           ]
         : [
-            ...validateXmlEncodingDeclaration(
-              sourceBytes,
-              sourceDocument,
-              entry.fileName
-            ),
-            ...validateTestcenterXmlSourceDocument(
-              sourceDocument,
-              entry.fileName
+            ...encodingDiagnostics,
+            ...(encodingDiagnostics.some(
+              diagnostic => diagnostic.severity === "error"
             )
+              ? []
+              : validateTestcenterXmlSourceDocument(
+                  sourceDocument,
+                  entry.fileName
+                ))
           ];
       const entryErrors = entryDiagnostics.filter(
         diagnostic => diagnostic.severity === "error"
@@ -19936,18 +20052,25 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     normalizedFileName.endsWith(".manifest") ||
     looksLikeXmlDocument
   ) {
-    const diagnostics = [
-      ...(decodedPersistedDocument && hasEncodedSourceBytes
-        ? validateXmlEncodingDeclaration(
+    const encodingDiagnostics =
+      decodedPersistedDocument && hasEncodedSourceBytes
+        ? validateXmlEncoding(
             decodedPersistedDocument.bytes,
             decodedSourceDocument,
-            sourcePackage.fileName
+            sourcePackage.fileName,
+            decodedPersistedDocument.mediaType
           )
-        : []),
-      ...validateTestcenterXmlSourceDocument(
-        decodedSourceDocument,
-        sourcePackage.fileName
+        : [];
+    const diagnostics = [
+      ...encodingDiagnostics,
+      ...(encodingDiagnostics.some(
+        diagnostic => diagnostic.severity === "error"
       )
+        ? []
+        : validateTestcenterXmlSourceDocument(
+            decodedSourceDocument,
+            sourcePackage.fileName
+          ))
     ];
     if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
       return { runtimeSnapshot: null, diagnostics };
