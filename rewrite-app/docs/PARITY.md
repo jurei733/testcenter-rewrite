@@ -117,7 +117,7 @@ no longer listed because their matrix rows are `done`.
 | 1 | P0 | Production package and dependency corpus | Add further real production packages and cover the remaining rare XML lexical facets, encodings, archive layouts, and ambiguous/cross-file dependency graphs without weakening quarantine or duplicate protection. The IANA-registered Baltic IBM775 family is now covered through all registered XML aliases and the durable-store matrix. |
 | 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases; close interactive state parity for the currently feasibility-only IB runtime snapshot while retaining byte/range delivery, restoration, and visible failure behavior. |
-| 4 | P0 | Interruption and recovery at production scale | The complete current Original STARS path now proves 28-Unit foreground recovery plus page-close handoff, idempotent replay, and queue cleanup. Extend that production scale to pending hard reloads, multiple simultaneous runs, and additional interruption timings. |
+| 4 | P0 | Interruption and recovery at production scale | The complete current Original STARS path now proves 28-Unit foreground recovery, actual hard-reload restoration, page-close handoff, idempotent replay, and queue cleanup. Extend that production scale to multiple simultaneous runs and additional interruption timings. |
 | 5 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
 | 6 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
 | 7 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
@@ -840,8 +840,13 @@ The browser outbox now retains up to 200 validated per-Unit entries instead of
 discarding this package above its eighth alias. A dedicated production gate
 proves visible-Unit-first foreground delivery for all 28 aliases, mirrors all
 28 entries into IndexedDB on page close, replays them idempotently, and clears
-both the page and Service-Worker queues. Pending hard-reload timing windows and
-multiple simultaneously interrupted runs remain the production-scale gap.
+both the page and Service-Worker queues. With the save route unavailable, the
+same gate now also performs an actual hard reload, retains every inactive Unit
+response byte-exactly, restores the visible Player response semantically after
+its JSON reserialization, delivers that visible Unit first, drains all 28
+aliases, and reinstalls the Service Worker before the page-close path. Multiple
+simultaneously interrupted runs and additional interruption timings remain the
+production-scale gap.
 The older STARS 0.6.19 pair and current official STARS 0.7.2 package remain
 independent-family gates alongside this Testcenter-pinned graph.
 

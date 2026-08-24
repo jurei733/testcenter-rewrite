@@ -12914,6 +12914,177 @@ try {
     "Foreground recovery must deliver every Unit in the 28-Unit STARS booklet."
   );
 
+  logStep("participant-original-stars-28-unit-hard-reload");
+  const starsReloadResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 51)}`
+    ])
+  );
+  const matchesStarsReloadResponse = (unitKey, response) => {
+    const expected = starsReloadResponses[unitKey];
+    if (response === expected) {
+      return true;
+    }
+    if (unitKey !== "2" || typeof response !== "string") {
+      return false;
+    }
+    try {
+      return JSON.stringify(JSON.parse(response)) ===
+        JSON.stringify(JSON.parse(expected));
+    } catch {
+      return false;
+    }
+  };
+  const starsSaveProgressUrl =
+    `${baseUrl}/api/v1/participant/test-runs/${starsTestRunId}/save-progress`;
+  await page.evaluate(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(registration => registration.unregister()));
+  });
+  const abortStarsSaveProgress = route => route.abort("failed");
+  await page.route(starsSaveProgressUrl, abortStarsSaveProgress);
+  await page.evaluate(
+    ({ storageKey, testRunId, currentUnitKey, responses }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: Object.entries(responses).map(
+            ([unitKey, response], index) => ({
+              version: 1,
+              deliveryId: `stars-reload-${unitKey}-${queuedAt}`,
+              testRunId,
+              unitKey,
+              response,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(
+                queuedAt + (unitKey === currentUnitKey ? 100 : index)
+              ).toISOString()
+            })
+          )
+        })
+      );
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: starsTestRunId,
+      currentUnitKey: "2",
+      responses: starsReloadResponses
+    }
+  );
+  const blockedStarsReloadSavePromise = page.waitForRequest(
+    request =>
+      request.method() === "POST" && request.url() === starsSaveProgressUrl
+  );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await blockedStarsReloadSavePromise;
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredStarsReloadOutbox = await page.evaluate(storageKey => {
+    const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+    return stored?.entries ?? [];
+  }, "testcenter-rewrite:participant-save-outbox:v1");
+  assert.equal(
+    restoredStarsReloadOutbox.length,
+    starsUnitKeys.length,
+    "A hard reload must retain every pending Unit in the STARS outbox."
+  );
+  assert.deepEqual(
+    restoredStarsReloadOutbox
+      .map(entry => entry.unitKey)
+      .sort((left, right) => Number(left) - Number(right)),
+    starsUnitKeys
+  );
+  const mismatchedStarsReloadEntries = restoredStarsReloadOutbox
+    .filter(entry => !matchesStarsReloadResponse(entry.unitKey, entry.response))
+    .map(entry => ({
+      unitKey: entry.unitKey,
+      expectedLength: starsReloadResponses[entry.unitKey]?.length ?? null,
+      actualLength: entry.response.length,
+      semanticallyEqual: (() => {
+        try {
+          return JSON.stringify(JSON.parse(entry.response)) ===
+            JSON.stringify(JSON.parse(starsReloadResponses[entry.unitKey]));
+        } catch {
+          return false;
+        }
+      })()
+    }));
+  assert.deepEqual(
+    mismatchedStarsReloadEntries,
+    [],
+    "A hard reload must preserve all inactive responses exactly and the active Player state semantically."
+  );
+  const starsReloadSaveOrder = [];
+  const observedStarsReloadResponses = new Set();
+  const recordStarsReloadSaveOrder = response => {
+    const request = response.request();
+    if (
+      response.status() !== 200 ||
+      request.method() !== "POST" ||
+      request.url() !== starsSaveProgressUrl
+    ) {
+      return;
+    }
+    const requestBody = request.postDataJSON();
+    const responseUnitKey = requestBody?.responseUnitKey;
+    if (
+      typeof responseUnitKey !== "string" ||
+      !matchesStarsReloadResponse(responseUnitKey, requestBody?.unitResponse) ||
+      observedStarsReloadResponses.has(responseUnitKey)
+    ) {
+      return;
+    }
+    observedStarsReloadResponses.add(responseUnitKey);
+    starsReloadSaveOrder.push(responseUnitKey);
+  };
+  page.on("response", recordStarsReloadSaveOrder);
+  await page.unroute(starsSaveProgressUrl, abortStarsSaveProgress);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(
+        unitKey =>
+          matchesStarsReloadResponse(
+            unitKey,
+            payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
+          )
+      ),
+    45_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
+  page.off("response", recordStarsReloadSaveOrder);
+  assert.equal(
+    starsReloadSaveOrder[0],
+    "2",
+    "Hard-reload recovery must deliver the visible STARS Unit first."
+  );
+  assert.deepEqual(
+    [...new Set(starsReloadSaveOrder)].sort(
+      (left, right) => Number(left) - Number(right)
+    ),
+    starsUnitKeys,
+    "Hard-reload recovery must deliver every Unit in the STARS booklet."
+  );
+  await page.waitForFunction(
+    async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return registration?.active?.state === "activated";
+    },
+    undefined,
+    { timeout: 30_000 }
+  );
+
   logStep("participant-original-stars-28-unit-background-sync");
   const starsBackgroundResponses = Object.fromEntries(
     starsUnitKeys.map((unitKey, index) => [
