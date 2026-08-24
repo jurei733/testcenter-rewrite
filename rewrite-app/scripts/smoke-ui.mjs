@@ -10379,8 +10379,10 @@ try {
       originalAdaptiveUnitKey
     ];
   const originalAdaptiveBeginnerUnitKey = "beginner-unit";
+  const originalAdaptiveBonusUnitKey = "bonus-unit";
   const currentUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n`;
   const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
+  const thirdUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n  `;
   const multiUnitSaveOrder = [];
   const observedMultiUnitResponses = new Set();
   const recordMultiUnitSaveOrder = request => {
@@ -10391,7 +10393,8 @@ try {
         `/participant/test-runs/${originalAdaptiveTestRunId}/save-progress`
       ) &&
       (requestBody?.unitResponse === currentUnitOutboxResponse ||
-        requestBody?.unitResponse === otherUnitOutboxResponse) &&
+        requestBody?.unitResponse === otherUnitOutboxResponse ||
+        requestBody?.unitResponse === thirdUnitOutboxResponse) &&
       !observedMultiUnitResponses.has(requestBody.unitResponse)
     ) {
       observedMultiUnitResponses.add(requestBody.unitResponse);
@@ -10406,7 +10409,9 @@ try {
       currentUnitKey,
       currentResponse,
       otherUnitKey,
-      otherResponse
+      otherResponse,
+      thirdUnitKey,
+      thirdResponse
     }) => {
       const queuedAt = Date.now();
       localStorage.setItem(
@@ -10423,6 +10428,16 @@ try {
               status: "running",
               logs: [],
               queuedAt: new Date(queuedAt - 1_000).toISOString()
+            },
+            {
+              version: 1,
+              deliveryId: `multi-unit-third-${queuedAt}`,
+              testRunId,
+              unitKey: thirdUnitKey,
+              response: thirdResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt - 500).toISOString()
             },
             {
               version: 1,
@@ -10445,7 +10460,9 @@ try {
       currentUnitKey: originalAdaptiveUnitKey,
       currentResponse: currentUnitOutboxResponse,
       otherUnitKey: originalAdaptiveBeginnerUnitKey,
-      otherResponse: otherUnitOutboxResponse
+      otherResponse: otherUnitOutboxResponse,
+      thirdUnitKey: originalAdaptiveBonusUnitKey,
+      thirdResponse: thirdUnitOutboxResponse
     }
   );
   await pollJsonWithPredicate(
@@ -10456,7 +10473,10 @@ try {
       ] === currentUnitOutboxResponse &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
-      ] === otherUnitOutboxResponse
+      ] === otherUnitOutboxResponse &&
+      payload.currentRunState.testRun.unitResponses?.[
+        originalAdaptiveBonusUnitKey
+      ] === thirdUnitOutboxResponse
   );
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
@@ -10464,14 +10484,19 @@ try {
   );
   page.off("request", recordMultiUnitSaveOrder);
   assert.deepEqual(
-    multiUnitSaveOrder.slice(0, 2),
-    [originalAdaptiveUnitKey, originalAdaptiveBeginnerUnitKey],
+    multiUnitSaveOrder.slice(0, 3),
+    [
+      originalAdaptiveUnitKey,
+      originalAdaptiveBeginnerUnitKey,
+      originalAdaptiveBonusUnitKey
+    ],
     "Recovery must restore the visible Unit first, then drain every remaining Unit."
   );
 
   logStep("participant-multi-unit-background-sync");
-  const backgroundCurrentResponse = `${originalAdaptiveBaseResponse}\n  `;
-  const backgroundOtherResponse = `${originalAdaptiveBaseResponse}\n   `;
+  const backgroundCurrentResponse = `${originalAdaptiveBaseResponse}\n   `;
+  const backgroundOtherResponse = `${originalAdaptiveBaseResponse}\n    `;
+  const backgroundThirdResponse = `${originalAdaptiveBaseResponse}\n     `;
   await page.evaluate(
     ({
       storageKey,
@@ -10479,7 +10504,9 @@ try {
       currentUnitKey,
       currentResponse,
       otherUnitKey,
-      otherResponse
+      otherResponse,
+      thirdUnitKey,
+      thirdResponse
     }) => {
       const queuedAt = Date.now();
       localStorage.setItem(
@@ -10506,6 +10533,16 @@ try {
               status: "running",
               logs: [],
               queuedAt: new Date(queuedAt + 1).toISOString()
+            },
+            {
+              version: 1,
+              deliveryId: `background-third-${queuedAt}`,
+              testRunId,
+              unitKey: thirdUnitKey,
+              response: thirdResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt + 2).toISOString()
             }
           ]
         })
@@ -10517,7 +10554,9 @@ try {
       currentUnitKey: originalAdaptiveUnitKey,
       currentResponse: backgroundCurrentResponse,
       otherUnitKey: originalAdaptiveBeginnerUnitKey,
-      otherResponse: backgroundOtherResponse
+      otherResponse: backgroundOtherResponse,
+      thirdUnitKey: originalAdaptiveBonusUnitKey,
+      thirdResponse: backgroundThirdResponse
     }
   );
   await context.setOffline(true);
@@ -10536,7 +10575,7 @@ try {
           request.addEventListener("error", () => reject(request.error));
           request.addEventListener("success", () => resolvePromise(request.result));
         });
-        return records.filter(record => record.entry?.testRunId === testRunId).length === 2;
+        return records.filter(record => record.entry?.testRunId === testRunId).length === 3;
       } finally {
         database.close();
       }
@@ -10553,7 +10592,10 @@ try {
       ] === backgroundCurrentResponse &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
-      ] === backgroundOtherResponse
+      ] === backgroundOtherResponse &&
+      payload.currentRunState.testRun.unitResponses?.[
+        originalAdaptiveBonusUnitKey
+      ] === backgroundThirdResponse
   );
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
