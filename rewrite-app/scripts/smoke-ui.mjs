@@ -13352,6 +13352,176 @@ try {
     starsTestRunId,
     { timeout: 30_000 }
   );
+
+  logStep("participant-original-stars-mid-drain-hard-reload");
+  const starsMidDrainResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 251)}`
+    ])
+  );
+  const matchesStarsMidDrainResponse = (unitKey, response) => {
+    const expected = starsMidDrainResponses[unitKey];
+    if (response === expected) {
+      return true;
+    }
+    if (unitKey !== "2" || typeof response !== "string") {
+      return false;
+    }
+    try {
+      return JSON.stringify(JSON.parse(response)) ===
+        JSON.stringify(JSON.parse(expected));
+    } catch {
+      return false;
+    }
+  };
+  await page.evaluate(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(registration => registration.unregister()));
+  });
+  const permittedStarsMidDrainUnits = new Set();
+  const starsMidDrainRoute = async route => {
+    const requestBody = route.request().postDataJSON();
+    const responseUnitKey = requestBody?.responseUnitKey;
+    if (
+      typeof responseUnitKey === "string" &&
+      (permittedStarsMidDrainUnits.has(responseUnitKey) ||
+        permittedStarsMidDrainUnits.size < 7)
+    ) {
+      permittedStarsMidDrainUnits.add(responseUnitKey);
+      await route.continue();
+      return;
+    }
+    await route.abort("failed");
+  };
+  await page.route(starsSaveProgressUrl, starsMidDrainRoute);
+  await page.evaluate(
+    ({ storageKey, testRunId, currentUnitKey, responses }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: Object.entries(responses).map(
+            ([unitKey, response], index) => ({
+              version: 1,
+              deliveryId: `stars-mid-drain-${unitKey}-${queuedAt}`,
+              testRunId,
+              unitKey,
+              response,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(
+                queuedAt + (unitKey === currentUnitKey ? 100 : index)
+              ).toISOString()
+            })
+          )
+        })
+      );
+      window.dispatchEvent(new Event("online"));
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: starsTestRunId,
+      currentUnitKey: "2",
+      responses: starsMidDrainResponses
+    }
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      permittedStarsMidDrainUnits.size === 7 &&
+      [...permittedStarsMidDrainUnits].every(unitKey =>
+        matchesStarsMidDrainResponse(
+          unitKey,
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
+        )
+      ),
+    30_000
+  );
+  await page.waitForFunction(
+    ({ storageKey, expectedCount }) => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+      return stored?.entries?.length === expectedCount;
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      expectedCount: starsUnitKeys.length - 7
+    },
+    { timeout: 30_000 }
+  );
+  assert.equal(
+    [...permittedStarsMidDrainUnits][0],
+    "2",
+    "A partial STARS drain must still deliver the visible Unit first."
+  );
+  const blockedStarsMidDrainReloadPromise = page.waitForRequest(request => {
+    if (request.method() !== "POST" || request.url() !== starsSaveProgressUrl) {
+      return false;
+    }
+    const responseUnitKey = request.postDataJSON()?.responseUnitKey;
+    return typeof responseUnitKey === "string" &&
+      !permittedStarsMidDrainUnits.has(responseUnitKey);
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await blockedStarsMidDrainReloadPromise;
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  await page.waitForFunction(
+    ({ storageKey, deliveredUnitKeys, expectedCount }) => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+      return stored?.entries?.length === expectedCount &&
+        stored.entries.every(
+          entry => !deliveredUnitKeys.includes(entry.unitKey)
+        );
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      deliveredUnitKeys: [...permittedStarsMidDrainUnits],
+      expectedCount: starsUnitKeys.length - permittedStarsMidDrainUnits.size
+    },
+    { timeout: 30_000 }
+  );
+  const restoredStarsMidDrainEntries = await page.evaluate(storageKey => {
+    const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+    return stored?.entries ?? [];
+  }, "testcenter-rewrite:participant-save-outbox:v1");
+  const expectedStarsMidDrainUnitKeys = starsUnitKeys.filter(
+    unitKey => !permittedStarsMidDrainUnits.has(unitKey)
+  );
+  assert.deepEqual(
+    restoredStarsMidDrainEntries
+      .map(entry => entry.unitKey)
+      .sort((left, right) => Number(left) - Number(right)),
+    expectedStarsMidDrainUnitKeys,
+    "Hard reload during a partial drain must retain exactly the undelivered Units."
+  );
+  assert.ok(
+    restoredStarsMidDrainEntries.every(entry =>
+      matchesStarsMidDrainResponse(entry.unitKey, entry.response)
+    ),
+    "Hard reload during a partial drain must preserve every remaining response."
+  );
+  await page.unroute(starsSaveProgressUrl, starsMidDrainRoute);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(unitKey =>
+        matchesStarsMidDrainResponse(
+          unitKey,
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
+        )
+      ),
+    45_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
   stopAfter("participant-official-stars-player-family");
 
   logStep("participant-official-stars-current-release-player-family");
