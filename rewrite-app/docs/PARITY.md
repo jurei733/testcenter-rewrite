@@ -84,9 +84,9 @@ supports multiple dependency levels, and retains a dependency when its selected
 root fails confirmation or another guard. This removes the known
 earlier-mutation deletion gap but leaves concurrent graph changes and broader
 replacement graphs in the partial capability, so the rounded estimate remains
-93%. The explicit non-WHATWG XML decoder allowlist now also covers nine
-additional IANA-registered DOS/IBM families (`IBM855`, `IBM857`, `IBM860`,
-`IBM861`, `IBM862`, `IBM863`, `IBM864`, `IBM865`, and `IBM869`) with their
+93%. The explicit non-WHATWG XML decoder allowlist now also covers ten
+additional IANA-registered DOS/IBM families (`IBM775`, `IBM855`, `IBM857`,
+`IBM860`, `IBM861`, `IBM862`, `IBM863`, `IBM864`, `IBM865`, and `IBM869`) with their
 registered XML-name-compatible aliases. This further narrows the rare-encoding
 part of the existing partial package-intake row without admitting transport
 codecs or changing the rounded estimate.
