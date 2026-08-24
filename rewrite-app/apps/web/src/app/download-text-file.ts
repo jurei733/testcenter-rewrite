@@ -22,10 +22,13 @@ export function downloadBlobFile(input: {
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  // Keep the object URL alive until the browser has processed the synthetic
-  // navigation. Revoking it synchronously can cancel downloads under load.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Keep both the anchor and its object URL alive while the browser processes
+  // the synthetic navigation. Under load Chromium can defer the blob download
+  // beyond the current task, so immediate removal still cancels it.
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 60_000);
 }
 
 export function downloadDataUrlFile(input: {
