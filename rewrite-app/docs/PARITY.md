@@ -62,7 +62,7 @@ Priority:
 ## Audited completion snapshot
 
 Against the release and master revisions above, the rounded engineering
-estimate is **93% functional parity (uncertainty about +/- 3 percentage
+estimate is **94% functional parity (uncertainty about +/- 3 percentage
 points)**. The estimate weights P0/P1/P2 capabilities 5/3/1, treats every
 `done` row as complete, and scores each `partial` row from its concrete
 remaining behavior rather than from source-line counts. It therefore includes
@@ -82,8 +82,8 @@ however, turn one previously broad "rare file-graph"
 gap into the explicit mixed-ZIP acceptance requirement below. That requirement
 is now closed. Its implementation raises the evidence within the already-
 partial package-intake, XML-validation, and dependency-graph rows, but does not
-add or complete a separately weighted capability and therefore does not change
-the rounded 93% estimate. Operator-guided resolution of ambiguous loose
+add or complete a separately weighted capability and therefore did not by
+itself change the then-rounded 93% estimate. Operator-guided resolution of ambiguous loose
 workspace dependencies is now closed as well: the import diagnostic exposes
 the exact candidate source-package IDs, Angular requires an explicit choice,
 and the server validates that choice before continuing the remaining automatic
@@ -94,8 +94,8 @@ resolves roots before their selected dependencies regardless of request order,
 supports multiple dependency levels, and retains a dependency when its selected
 root fails confirmation or another guard. This removes the known
 earlier-mutation deletion gap but leaves concurrent graph changes and broader
-replacement graphs in the partial capability, so the rounded estimate remains
-93%. The explicit non-WHATWG XML decoder allowlist now also covers ten
+replacement graphs in the partial capability, so the then-current rounded
+estimate remained 93%. The explicit non-WHATWG XML decoder allowlist now also covers ten
 additional IANA-registered DOS/IBM families (`IBM775`, `IBM855`, `IBM857`,
 `IBM860`, `IBM861`, `IBM862`, `IBM863`, `IBM864`, `IBM865`, and `IBM869`) with their
 registered XML-name-compatible aliases. This further narrows the rare-encoding
@@ -118,14 +118,16 @@ remain accepted. This closes the identified archive-open differential inside
 the existing partial package-intake row and does not change the rounded
 estimate.
 
-The production STARS recovery gate now also closes the known browser-outbox
+The production STARS recovery gate closes the known browser-outbox
 capacity-loss case: once all 200 validated slots are occupied, a 201st
 independent Unit is rejected with visible failed-save and retry behavior rather
-than evicting an older secured response. A real Chromium renderer crash now
-proves that all 28 pending STARS Unit responses survive and drain without a
-`pagehide` handoff. A complete browser-process kill plus persistent-profile
-restart remains in the already-partial recovery capability, so this additional
-evidence does not change the rounded 93% estimate.
+than evicting an older secured response. The final interruption gap is now also
+closed: a complete Chromium browser-process crash after the origin store has
+settled, followed by relaunch from the same persistent profile, proves that all
+28 pending STARS Unit responses survive and drain without a `pagehide` handoff.
+Together with the hard-reload, mid-drain, page-close, Service-Worker, and
+capacity gates, this moves P0 resume/interruption from `partial` to `done` and
+raises the rounded weighted estimate from 93% to 94%.
 
 New requirements found by the 18.2/current-master audit:
 
@@ -153,10 +155,9 @@ no longer listed because their matrix rows are `done`.
 | 1 | P0 | Production package and dependency corpus | Add further real production packages and cover the remaining rare XML lexical facets, encodings, archive layouts, and ambiguous/cross-file dependency graphs without weakening quarantine or duplicate protection. The IANA-registered Baltic IBM775 family and strict malformed multibyte rejection are now covered through the durable-store matrix. |
 | 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases; close interactive state parity for the currently feasibility-only IB runtime snapshot while retaining byte/range delivery, restoration, and visible failure behavior. |
-| 4 | P0 | Interruption and recovery at production scale | The complete current Original STARS path now proves 28-Unit foreground recovery, two simultaneously interrupted 28-Unit runs across an actual hard reload, run-isolated draining, a second hard reload after seven of 28 Units have already settled, page-close handoff, idempotent replay, queue cleanup, lossless behavior at the 200-entry browser-storage boundary, and a real renderer crash that fires no `pagehide`. Extend the same gate to complete browser-process termination plus relaunch with a persistent profile. |
-| 5 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
-| 6 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
-| 7 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
+| 4 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
+| 5 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
+| 6 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
 
 ## Capability delivery evidence
 
@@ -901,10 +902,10 @@ clears its semantically equivalent visible-Unit reserialization, and proves
 that exactly the 21 unconfirmed responses survive before the final drain. A
 capacity-boundary gate fills all 200 browser-outbox slots, rejects a 201st
 independent Unit without evicting any previously secured response, exposes the
-failed save, and proves an explicit retry reaches the server. Abrupt
-renderer termination without ordinary reload/page-close behavior is now gated
-without a `pagehide` handoff. Complete browser-process termination plus relaunch
-with a persistent profile remains the production-scale gap.
+failed save, and proves an explicit retry reaches the server. The final
+interruption gate terminates the complete Chromium browser process after its
+origin store has settled, relaunches from the same persistent profile, and
+proves that all 28 responses drain without a `pagehide` handoff.
 The older STARS 0.6.19 pair and current official STARS 0.7.2 package remain
 independent-family gates alongside this Testcenter-pinned graph.
 
@@ -1059,7 +1060,7 @@ cross-feature navigation remain browser-gated.
 | Username with optional password | same | done | P0 | saved roster password hashes and participant sign-in. Matching the upstream SM-1/SM-2 flow, a normal login with exactly one available or in-progress Booklet immediately opens that run; a multi-Booklet login and the Original legacy-short-link route retain the Starter selection instead |
 | Two-step extra code | `app-root/code-input`, `XMLFileTesttakers.class.php` | done | P1 | original `<Booklet codes="…">` mappings trigger a password-first code challenge; valid codes select their coded assignments plus uncoded assignments, distinct codes reuse only their own durable session, and configured alternatives are not returned to participants. Matching the upstream SM-5/SM-6 flow, a valid code continues directly into the only code-scoped Booklet from either the normal form or the Original `/#/<Login>` shorthand, while ambiguous multi-Booklet assignments retain the Starter; API plus production SQLite/Chromium gates cover missing, invalid, and valid codes |
 | Multiple assigned booklets in source order | `starter.component.ts`, `XMLFileTesttakers.class.php` | done | P0 | every `<Login><Booklet>` assignment persists with a stable identity, including differently preset variants of the same source booklet; starter exposes available/in-progress/completed state and one session runs them sequentially |
-| Resume after reload/interruption | hot-return E2E flows | partial | P0 | running and participant-paused sessions resume and restore unit, Verona unit state, player page state, and response; monitor-paused sessions remain paused across direct Resume, session re-entry, and durable-store restart until a monitor continues them. The official Session-Management SM-7 fixture proves that repeated hot-return sign-in reuses the same session and run with its saved response, while SM-9 proves hot-restart creates a clean session and run. The production Chromium/SQLite Controller gate additionally exercises real `Test_Ctrl-3` and `Test_Ctrl-7` Player answers: Hot Return reuses the session/run and restores the selected answer, whereas Hot Restart creates clean session/run IDs while retaining the prior answer in its original run and filtered response export. A versioned browser outbox preserves unsent responses independently per Unit across transient disconnects and hard reloads, overlays the visible Unit before the Player remounts, then prioritizes that Unit and drains every remaining Unit after online re-entry. Page closure mirrors every pending Unit for the run into the Service-Worker queue instead of only the foreground draft. A production SQLite/Chromium gate proves three-Unit foreground recovery order plus three-Unit IndexedDB handoff and delivery across the complete active path of the official adaptive sample. The full Original STARS gate additionally retains two valid 28-Unit runs and all 56 responses across one hard reload, drains only the opened run, then proves the untouched second run drains visible-Unit-first when its own session opens. It separately reloads while a 28-Unit drain is in progress and proves that seven confirmed responses stay removed while exactly the remaining 21 survive and finish. After one online visit, the installable, versioned Service Worker also serves the cached Participant App-Shell and lazy route across a browser-proven offline reload, with a truthful connectivity notice; API state and test content remain network-authoritative, and a never-visited device still requires an initial connection |
+| Resume after reload/interruption | hot-return E2E flows | done | P0 | running and participant-paused sessions resume and restore unit, Verona unit state, player page state, and response; monitor-paused sessions remain paused across direct Resume, session re-entry, and durable-store restart until a monitor continues them. The official Session-Management SM-7 fixture proves that repeated hot-return sign-in reuses the same session and run with its saved response, while SM-9 proves hot-restart creates a clean session and run. The production Chromium/SQLite Controller gate additionally exercises real `Test_Ctrl-3` and `Test_Ctrl-7` Player answers: Hot Return reuses the session/run and restores the selected answer, whereas Hot Restart creates clean session/run IDs while retaining the prior answer in its original run and filtered response export. A versioned browser outbox preserves unsent responses independently per Unit across transient disconnects and hard reloads, overlays the visible Unit before the Player remounts, then prioritizes that Unit and drains every remaining Unit after online re-entry. Page closure mirrors every pending Unit for the run into the Service-Worker queue instead of only the foreground draft. A production SQLite/Chromium gate proves three-Unit foreground recovery order plus three-Unit IndexedDB handoff and delivery across the complete active path of the official adaptive sample. The full Original STARS gate additionally retains two valid 28-Unit runs and all 56 responses across one hard reload, drains only the opened run, then proves the untouched second run drains visible-Unit-first when its own session opens. It separately reloads while a 28-Unit drain is in progress and proves that seven confirmed responses stay removed while exactly the remaining 21 survive and finish. A complete Chromium browser-process termination followed by relaunch from the same persistent profile proves all 28 queued responses drain without `pagehide`. After one online visit, the installable, versioned Service Worker also serves the cached Participant App-Shell and lazy route across a browser-proven offline reload, with a truthful connectivity notice; API state and test content remain network-authoritative, and a never-visited device still requires an initial connection |
 | Valid-from, valid-to, valid-for | time-limited-access E2E | done | P1 | original group attributes and JSON/CSV aliases persist as normalized timestamps; scheduled/expired logins return the original-equivalent 401/410 statuses, `validFor` starts at first session creation without reset after close/release changes, the earlier relative/absolute end wins, runtime calls recheck persisted expiry, all store adapters persist it, and API plus browser tests cover the policy |
 | Admin and participant login sink/rate limiting | login-sink E2E, `SessionController`, `CacheService` | done | P1 | admin sign-in now reproduces the original global username sink: five failed credentials block the next attempt for 30 minutes by default, correct credentials cannot bypass it, every blocked attempt is audited, and the counter is atomically durable across memory, file, SQLite, and Postgres. Password-protected participant accounts retain their separate tenant/workspace/login counter shared by sign-in and starter launch; unknown/passwordless participant logins do not increment it. Both paths expose configurable thresholds/windows and stable 429 details plus `Retry-After`; API gates run the admin path across memory, file, and SQLite, while restart tests cover file and SQLite persistence |
 | Supported-browser warning | `SystemController::getConfig`, `UserAgentService`, upstream `a7843f05` | done | P2 | the exact generated current 18.3.0-beta browser list from upstream `236217815` is pinned alongside browser-family parsing, semantic version comparison, acceptance of newer releases, and rejection of outdated/unknown browsers. Chrome/Edge 150–151, Firefox 140/153–154, iOS Safari 26.5–26.6, and Safari 26.5–26.6 form a tested compatibility contract. Matching the Original's higher-version rule, Firefox 140 remains the effective ESR floor while the current regular-release entries advance; Safari 26.4 is now rejected. Angular confines the accessible warning to the unauthenticated Participant login state, removes it from the global shell and signed-in Starter/Player, has no obsolete dismiss control, and resolves the current `login_unsupportedBrowser` default plus global placeholder overrides. A focused production Chromium gate proves the route boundary and exact outdated-Chrome copy |
