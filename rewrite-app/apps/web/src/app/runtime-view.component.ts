@@ -20,6 +20,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
     SummaryCardsComponent,
     RecordCollectionComponent
   ],
+  styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+  `],
   template: `
     <div class="stack">
       <article id="monitorConnectionCard" class="card">

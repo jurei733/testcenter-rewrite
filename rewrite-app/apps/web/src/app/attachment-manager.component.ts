@@ -13,10 +13,10 @@ import { downloadBlobFile } from "./download-text-file";
   standalone: true,
   imports: [CommonModule, RouterLink],
   styles: [`
-    :host { display: block; min-width: 0; }
-    .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-    .attachment-list { display: grid; gap: .65rem; }
-    .attachment-row { border: 1px solid var(--border-subtle, #d9dee8); border-radius: .75rem; padding: .8rem; background: var(--surface-raised, #fff); text-align: left; width: 100%; }
+    :host { display: block; width: 100%; max-width: 100%; min-width: 0; overflow-x: clip; }
+    .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; }
+    .attachment-list { display: grid; gap: .65rem; min-width: 0; max-width: 100%; }
+    .attachment-row { border: 1px solid var(--border-subtle, #d9dee8); border-radius: .75rem; padding: .8rem; background: var(--surface-raised, #fff); text-align: left; width: 100%; min-width: 0; max-width: 100%; }
     .attachment-row.is-selected { border-color: var(--accent, #3157d5); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3157d5) 18%, transparent); }
     .attachment-row-header, .attachment-meta, .attachment-files { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
     .attachment-row-header { justify-content: space-between; }
