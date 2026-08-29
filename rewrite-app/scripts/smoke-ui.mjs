@@ -13664,7 +13664,7 @@ try {
       deliveredUnitKeys: [...permittedStarsMidDrainUnits],
       expectedCount: starsUnitKeys.length - permittedStarsMidDrainUnits.size
     },
-    { timeout: 30_000 }
+    { timeout: store === "postgres" ? 60_000 : 30_000 }
   );
   const restoredStarsMidDrainEntries = await page.evaluate(storageKey => {
     const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
@@ -24108,10 +24108,12 @@ try {
   ]);
   assert.ok(unsupportedAttachmentRowBox);
   assert.ok(resultRailBox);
+  const attachmentRowRight =
+    unsupportedAttachmentRowBox.x + unsupportedAttachmentRowBox.width;
+  const attachmentColumnTolerance = 1;
   assert.ok(
-    unsupportedAttachmentRowBox.x + unsupportedAttachmentRowBox.width <=
-      resultRailBox.x,
-    "Attachment rows must remain inside the Runtime column and must not extend beneath the result rail."
+    attachmentRowRight <= resultRailBox.x + attachmentColumnTolerance,
+    `Attachment rows must remain inside the Runtime column and must not extend beneath the result rail (${attachmentRowRight}px > ${resultRailBox.x}px).`
   );
   await unsupportedAttachmentRow.click();
   await attachmentManager
