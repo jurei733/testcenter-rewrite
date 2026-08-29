@@ -13429,7 +13429,22 @@ try {
   );
   const crashedStarsPage = page;
   const crashSession = await context.newCDPSession(crashedStarsPage);
-  const rendererCrash = crashedStarsPage.waitForEvent("crash");
+  await crashSession.send("Inspector.enable");
+  const rendererCrash = new Promise((resolvePromise, reject) => {
+    const timeout = setTimeout(() => {
+      reject(
+        new Error(
+          "Timed out waiting for the Chromium renderer crash signal."
+        )
+      );
+    }, 15_000);
+    const resolveCrash = () => {
+      clearTimeout(timeout);
+      resolvePromise(undefined);
+    };
+    crashedStarsPage.once("crash", resolveCrash);
+    crashSession.once("Inspector.targetCrashed", resolveCrash);
+  });
   void crashSession.send("Page.crash").catch(() => undefined);
   await rendererCrash;
   await crashedStarsPage.close().catch(() => undefined);
