@@ -16923,10 +16923,9 @@ try {
     0
   );
   await page.locator("#participantRouteTestletTimerValue").waitFor();
-  assert.equal(
-    await configTwoBrowser.playerFrame.locator("#end-unit").isDisabled(),
-    true
-  );
+  await configTwoBrowser.playerFrame
+    .locator("#end-unit:disabled")
+    .waitFor({ timeout: 15_000 });
 
   const configThreeBrowser = await openOriginalBookletConfig(
     "Bklt_Config-3",
@@ -16949,10 +16948,9 @@ try {
     await page.locator("#participantRouteUnitNavigationList").count(),
     0
   );
-  assert.equal(
-    await configThreeBrowser.playerFrame.locator("#end-unit").isDisabled(),
-    true
-  );
+  await configThreeBrowser.playerFrame
+    .locator("#end-unit:disabled")
+    .waitFor({ timeout: 15_000 });
   assert.equal(
     await page.locator("#participantRouteTestletTimerValue").count(),
     0
