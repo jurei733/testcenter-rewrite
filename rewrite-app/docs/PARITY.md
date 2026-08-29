@@ -2,10 +2,10 @@
 
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
-and was last compared on 2026-08-24 with the latest published release
+and was last compared on 2026-08-29 with the latest published release
 `18.2.0` at `4196f03bddb680ed6d774d01143890342d8bbe5a` (2026-08-04) and the
-then-current upstream `origin/master` at
-`6455e265421777124f379090257365b70b21641f` (2026-08-21), 68 commits after
+current upstream `origin/master` and `18.3.0-beta` tag at
+`21796aa50a185f3d63709a56673dedc546626e78` (2026-08-25), 75 commits after
 that release. It additionally tracks current frontend behavior at
 `90ec58845d84d899fb993553d03767c072fdd05c` (2026-08-18) plus the complete
 current 18.0 BookletConfig package at
@@ -39,6 +39,14 @@ boundary now also owns configurable HSTS and one-time secret-file administrator
 bootstrap without exposing the credential through source, environment, runtime
 diagnostics, or service logs.
 
+The seven commits after the previous `6455e2654` audit point publish the
+18.3.0 beta, update dependencies/build configuration, and adapt the Original's
+API-test multipart client to `multi-part` v4. They add no product route, schema,
+or runtime behavior requirement. Regenerating `definitions/browsers.json` does
+change the participant-login compatibility contract: Firefox advances to
+140/153–154 and iOS Safari/Safari to 26.5–26.6, while Chrome/Edge remain at
+150–151. The rewrite pins and tests that updated list below.
+
 Status:
 
 - `done`: usable end-to-end in the rewrite and covered by an automated check
@@ -64,10 +72,13 @@ does not treat test-only upstream churn as missing application behavior. This
 is a dated planning estimate, not evidence that every production package or
 deployment has passed acceptance.
 
-A fresh upstream fetch on 2026-08-24 confirmed that the latest Original remains
-`origin/master` at `6455e265421777124f379090257365b70b21641f`, still 68 commits
-after 18.2.0. No additional product delta therefore changes the weighted
-estimate. The audit did, however, turn one previously broad "rare file-graph"
+A fresh upstream fetch on 2026-08-29 confirmed the latest Original at
+`21796aa50a185f3d63709a56673dedc546626e78`, tagged `18.3.0-beta` and 75
+commits after 18.2.0. The updated generated browser list is already represented
+as a completed contract; the remaining six commits are dependency, build,
+documentation, instruction, and API-test-client maintenance. No new incomplete
+product capability changes the weighted estimate. The earlier audit did,
+however, turn one previously broad "rare file-graph"
 gap into the explicit mixed-ZIP acceptance requirement below. That requirement
 is now closed. Its implementation raises the evidence within the already-
 partial package-intake, XML-validation, and dependency-graph rows, but does not
@@ -110,9 +121,11 @@ estimate.
 The production STARS recovery gate now also closes the known browser-outbox
 capacity-loss case: once all 200 validated slots are occupied, a 201st
 independent Unit is rejected with visible failed-save and retry behavior rather
-than evicting an older secured response. Abrupt process termination remains in
-the already-partial recovery capability, so this additional evidence does not
-change the rounded 93% estimate.
+than evicting an older secured response. A real Chromium renderer crash now
+proves that all 28 pending STARS Unit responses survive and drain without a
+`pagehide` handoff. A complete browser-process kill plus persistent-profile
+restart remains in the already-partial recovery capability, so this additional
+evidence does not change the rounded 93% estimate.
 
 New requirements found by the 18.2/current-master audit:
 
@@ -131,7 +144,7 @@ tests:
 ## Current remaining-work queue
 
 The capability matrix below is authoritative for completion status. This queue
-contains only work that is still open after the 2026-08-24 upstream audit;
+contains only work that is still open after the 2026-08-29 upstream audit;
 participant execution modes, attachments/QR capture, and instance branding are
 no longer listed because their matrix rows are `done`.
 
@@ -140,7 +153,7 @@ no longer listed because their matrix rows are `done`.
 | 1 | P0 | Production package and dependency corpus | Add further real production packages and cover the remaining rare XML lexical facets, encodings, archive layouts, and ambiguous/cross-file dependency graphs without weakening quarantine or duplicate protection. The IANA-registered Baltic IBM775 family and strict malformed multibyte rejection are now covered through the durable-store matrix. |
 | 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases; close interactive state parity for the currently feasibility-only IB runtime snapshot while retaining byte/range delivery, restoration, and visible failure behavior. |
-| 4 | P0 | Interruption and recovery at production scale | The complete current Original STARS path now proves 28-Unit foreground recovery, two simultaneously interrupted 28-Unit runs across an actual hard reload, run-isolated draining, a second hard reload after seven of 28 Units have already settled, page-close handoff, idempotent replay, queue cleanup, and lossless behavior at the 200-entry browser-storage boundary. Extend that production scale to abrupt browser/process termination that cannot be represented by an ordinary page reload or page-close event. |
+| 4 | P0 | Interruption and recovery at production scale | The complete current Original STARS path now proves 28-Unit foreground recovery, two simultaneously interrupted 28-Unit runs across an actual hard reload, run-isolated draining, a second hard reload after seven of 28 Units have already settled, page-close handoff, idempotent replay, queue cleanup, lossless behavior at the 200-entry browser-storage boundary, and a real renderer crash that fires no `pagehide`. Extend the same gate to complete browser-process termination plus relaunch with a persistent profile. |
 | 5 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
 | 6 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
 | 7 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
@@ -889,8 +902,9 @@ that exactly the 21 unconfirmed responses survive before the final drain. A
 capacity-boundary gate fills all 200 browser-outbox slots, rejects a 201st
 independent Unit without evicting any previously secured response, exposes the
 failed save, and proves an explicit retry reaches the server. Abrupt
-browser/process termination beyond ordinary reload/page-close behavior remains
-the production-scale gap.
+renderer termination without ordinary reload/page-close behavior is now gated
+without a `pagehide` handoff. Complete browser-process termination plus relaunch
+with a persistent profile remains the production-scale gap.
 The older STARS 0.6.19 pair and current official STARS 0.7.2 package remain
 independent-family gates alongside this Testcenter-pinned graph.
 
@@ -1048,7 +1062,7 @@ cross-feature navigation remain browser-gated.
 | Resume after reload/interruption | hot-return E2E flows | partial | P0 | running and participant-paused sessions resume and restore unit, Verona unit state, player page state, and response; monitor-paused sessions remain paused across direct Resume, session re-entry, and durable-store restart until a monitor continues them. The official Session-Management SM-7 fixture proves that repeated hot-return sign-in reuses the same session and run with its saved response, while SM-9 proves hot-restart creates a clean session and run. The production Chromium/SQLite Controller gate additionally exercises real `Test_Ctrl-3` and `Test_Ctrl-7` Player answers: Hot Return reuses the session/run and restores the selected answer, whereas Hot Restart creates clean session/run IDs while retaining the prior answer in its original run and filtered response export. A versioned browser outbox preserves unsent responses independently per Unit across transient disconnects and hard reloads, overlays the visible Unit before the Player remounts, then prioritizes that Unit and drains every remaining Unit after online re-entry. Page closure mirrors every pending Unit for the run into the Service-Worker queue instead of only the foreground draft. A production SQLite/Chromium gate proves three-Unit foreground recovery order plus three-Unit IndexedDB handoff and delivery across the complete active path of the official adaptive sample. The full Original STARS gate additionally retains two valid 28-Unit runs and all 56 responses across one hard reload, drains only the opened run, then proves the untouched second run drains visible-Unit-first when its own session opens. It separately reloads while a 28-Unit drain is in progress and proves that seven confirmed responses stay removed while exactly the remaining 21 survive and finish. After one online visit, the installable, versioned Service Worker also serves the cached Participant App-Shell and lazy route across a browser-proven offline reload, with a truthful connectivity notice; API state and test content remain network-authoritative, and a never-visited device still requires an initial connection |
 | Valid-from, valid-to, valid-for | time-limited-access E2E | done | P1 | original group attributes and JSON/CSV aliases persist as normalized timestamps; scheduled/expired logins return the original-equivalent 401/410 statuses, `validFor` starts at first session creation without reset after close/release changes, the earlier relative/absolute end wins, runtime calls recheck persisted expiry, all store adapters persist it, and API plus browser tests cover the policy |
 | Admin and participant login sink/rate limiting | login-sink E2E, `SessionController`, `CacheService` | done | P1 | admin sign-in now reproduces the original global username sink: five failed credentials block the next attempt for 30 minutes by default, correct credentials cannot bypass it, every blocked attempt is audited, and the counter is atomically durable across memory, file, SQLite, and Postgres. Password-protected participant accounts retain their separate tenant/workspace/login counter shared by sign-in and starter launch; unknown/passwordless participant logins do not increment it. Both paths expose configurable thresholds/windows and stable 429 details plus `Retry-After`; API gates run the admin path across memory, file, and SQLite, while restart tests cover file and SQLite persistence |
-| Supported-browser warning | `SystemController::getConfig`, `UserAgentService`, upstream `a7843f05` | done | P2 | the exact generated current 18.0 browser list from upstream `90ec5884` is pinned alongside browser-family parsing, semantic version comparison, acceptance of newer releases, and rejection of outdated/unknown browsers. Chrome/Edge 150–151, Firefox 140/152–153, iOS Safari 26.3–26.4, and Safari 26.3–26.4 form a tested compatibility contract. Matching current upstream, Angular confines the accessible warning to the unauthenticated Participant login state, removes it from the global shell and signed-in Starter/Player, has no obsolete dismiss control, and resolves the current `login_unsupportedBrowser` default plus global placeholder overrides. A focused production Chromium gate proves the route boundary and exact outdated-Chrome copy |
+| Supported-browser warning | `SystemController::getConfig`, `UserAgentService`, upstream `a7843f05` | done | P2 | the exact generated current 18.3.0-beta browser list from upstream `236217815` is pinned alongside browser-family parsing, semantic version comparison, acceptance of newer releases, and rejection of outdated/unknown browsers. Chrome/Edge 150–151, Firefox 140/153–154, iOS Safari 26.5–26.6, and Safari 26.5–26.6 form a tested compatibility contract. Matching the Original's higher-version rule, Firefox 140 remains the effective ESR floor while the current regular-release entries advance; Safari 26.4 is now rejected. Angular confines the accessible warning to the unauthenticated Participant login state, removes it from the global shell and signed-in Starter/Player, has no obsolete dismiss control, and resolves the current `login_unsupportedBrowser` default plus global placeholder overrides. A focused production Chromium gate proves the route boundary and exact outdated-Chrome copy |
 | Central error report | `ErrorComponent`, `BugReportService` | done | P1 | application and Angular-global errors open an accessible central report surface with error ID, timestamp, build, browser/device, parameter-free URL, stack, and a bounded previous-error buffer. Users can inspect, copy, or download `bug-report.txt`; optional direct GitHub issue delivery is server-configured, rate-limited, timeout-bounded, and exposes neither its token nor raw provider failures to the browser. Shared client/server redaction removes URL credentials/query/fragment, Bearer/JWT values, passwords, cookies, tokens, secrets, and API keys before delivery, while operational request logs retain only paths rather than potentially sensitive query strings. Contract and API integration tests gate sanitization, size bounds, secret/config isolation, query-free logging, and the safe disabled configuration; a production SQLite/Chromium gate triggers the global handler, inspects the redacted report, confirms disabled direct delivery, and downloads the exact filename |
 | Layered custom texts | `docs/pages/custom-texts.md` | partial | P2 | original file-level `CustomTexts` are parsed once, attached to every participant and operational login, persisted by every adapter, and returned on sign-in/resume. The exact current 41-key participant catalog from upstream `031b3313` is the versioned compatibility contract, including original defaults and sequential `%s` formatting. The removed `login_unsupportedBrowserBanner` is no longer accepted or rendered; current `login_unsupportedBrowser` carries its replacement default on Participant login. The current Original's four Starter action labels, two login-side texts, and two second-code error texts are applied in Angular. Matching upstream `fa2a1514`/`8bf6c9f8`, a protected block renders the global `booklet_codeToEnterPrompt` and authored `CodeToEnter` text separately and the removed `booklet_codeToEnterWarning` is neither advertised nor rendered. XML plus native JSON maps/value objects/key-text arrays support inherited defaults and participant overrides; Booklet XML/JSON now retains its own direct custom-text map. Angular applies matching text to booklet selection, second-code login, supported-browser warnings, fullscreen, code gates, task lists, Verona unit/block loading and failure guidance, the original page-navigation prompt, five-second timer start/expiry/cancellation notices, timer warnings, leave locks/prompts, navigation denials, pause, resume, and completion states. Leave/timer title and prompt keys now render together in labelled in-app dialogs instead of native browser prompts. The three current 2026-08-18 Original leave-prompt defaults omit their redundant final question because the dialog buttons already express that decision. The effective participant scope follows the original global < Testtakers/Login < active Booklet order; the Booklet layer starts only with the run, while system-check-specific text overrides global text on that surface. Production Chromium gates both separated code texts and current login/error/Starter labels on the real Participant path, plus both leave prompts on their real Verona page controls, check-specific text on SysCheck, and effective participant text on the active run. Matching upstream `a9166f32` and `623da15f`, the obsolete participant console warning and `booklet_console_warning` key are absent. The complete original 58-key `gm_*` catalog and defaults now form a second versioned contract. Imported Testtakers monitor text survives the password-redacted migration candidate, account creation, every store, and sign-in, then overrides global settings for the authenticated monitor. The focused Angular console actively applies all 58 keys to its headline, commands, core columns, summary/group context, profile view/filter presentation and pending/locked indicators, monitor-start and password-verified scheduled/expired labels, batch-selection counts, command tooltips and confirmed unlock feedback, target-timer state and confirmation, scroll/hide controls, and typed broken-booklet errors; sequential `%s`, `%date`, and `$date` substitution and original German defaults are contract-tested. Scheduled and expired operator accounts expose their concrete access boundary and login-scoped copy only after successful password verification, while unknown accounts and wrong passwords keep the generic credential response. Broken legacy runs remain visible and distinguish missing booklet IDs, missing release entries, malformed booklet snapshots, and unavailable releases without taking down healthy monitor rows; unsafe commands are withheld for those runs. The controller-error recovery action uses the current Original's fixed `Neu laden` label, and the non-catalog `booklet_reload` key is absent. Matching upstream `ccacee3a`, the obsolete misspelled locked-unit button key is absent and the code-input action uses the fixed `Weiter` label. Matching upstream `6ee8a53e`, the five ineffective granular loading keys are absent; the Verona host retains accessible queued, indeterminate, and exact 100%-loaded milestones with fixed UI copy, while only current `booklet_loading` remains customizable and the browser smoke gates the real phase order without inventing unavailable byte percentages. |
 

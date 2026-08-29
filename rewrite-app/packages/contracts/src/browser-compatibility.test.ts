@@ -27,14 +27,39 @@ test("current Original Testcenter browser support list remains byte-pinned", () 
     "chrome 150",
     "edge 151",
     "edge 150",
+    "firefox 154",
     "firefox 153",
-    "firefox 152",
     "firefox 140",
-    "ios_saf 26.4",
-    "ios_saf 26.3",
-    "safari 26.4",
-    "safari 26.3"
+    "ios_saf 26.6",
+    "ios_saf 26.5",
+    "safari 26.6",
+    "safari 26.5"
   ]);
+});
+
+test("current Original browser thresholds retain Firefox ESR and advance Safari", () => {
+  const expectations = [
+    [
+      "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0",
+      true
+    ],
+    [
+      "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0",
+      false
+    ],
+    [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+      true
+    ],
+    [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15",
+      false
+    ]
+  ] as const;
+
+  for (const [userAgent, supported] of expectations) {
+    assert.equal(assessBrowserCompatibility(userAgent).supported, supported);
+  }
 });
 
 test("original browser policy accepts listed and newer browser versions", () => {
