@@ -1,0 +1,13 @@
+Arbeite im Repo /Users/julian/code/testcenter-rewrite/rewrite-app autonom weiter.
+
+Ziel: Testcenter-Rewrite als lauffähige, produktionsnahe Anwendung mit möglichst hoher Parität zum ursprünglichen Testcenter fertigstellen.
+
+Lies zuerst docs/PARITY.md, README.md, git status und die letzten 15 Commits.
+Setze anschließend immer den nächsten sinnvollsten Implementierungsschritt um.
+
+Aktueller nächster Kandidat:
+Prüfe und implementiere den teilnehmerisolierten Review-CSV-Download auf der Participant-Starterseite entsprechend dem Original-Ablauf „Reviews downloaden“. Review-Erfassung und Admin-Export existieren bereits.
+
+Bewahre die ungetrackte Datei docs/testcenter-thread-migration-process.pptx unverändert.
+Committe sinnvolle abgeschlossene Schritte. Nicht pushen, bis ich darum bitte.
+Frage nicht nach „weiter?“.
