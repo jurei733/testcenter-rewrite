@@ -68,6 +68,32 @@ const waitForJson = async url => {
   throw lastError ?? new Error(`Timed out waiting for ${url}`);
 };
 
+const waitForInputValue = async (locator, expectedValue) => {
+  await locator.evaluate(
+    (input, expected) =>
+      new Promise((resolvePromise, reject) => {
+        const deadline = Date.now() + 15_000;
+        const check = () => {
+          if (input.value === expected) {
+            resolvePromise(undefined);
+            return;
+          }
+          if (Date.now() >= deadline) {
+            reject(
+              new Error(
+                `Expected restored demo answer '${expected}', received '${input.value}'.`
+              )
+            );
+            return;
+          }
+          setTimeout(check, 50);
+        };
+        check();
+      }),
+    expectedValue
+  );
+};
+
 const stopProcess = async child => {
   if (!child || child.exitCode != null) {
     return;
@@ -500,31 +526,10 @@ try {
   await restoredIntroPlayerFrame
     .locator("#demoPlayerAnswer")
     .waitFor({ state: "visible", timeout: 15_000 });
-  await restoredIntroPlayerFrame
-    .locator("#demoPlayerAnswer")
-    .evaluate(
-      (input, expectedValue) =>
-        new Promise((resolve, reject) => {
-          const deadline = Date.now() + 15_000;
-          const check = () => {
-            if (input.value === expectedValue) {
-              resolve(undefined);
-              return;
-            }
-            if (Date.now() >= deadline) {
-              reject(
-                new Error(
-                  `Expected restored demo answer '${expectedValue}', received '${input.value}'.`
-                )
-              );
-              return;
-            }
-            setTimeout(check, 50);
-          };
-          check();
-        }),
-      "Intro answer from smoke"
-    );
+  await waitForInputValue(
+    restoredIntroPlayerFrame.locator("#demoPlayerAnswer"),
+    "Intro answer from smoke"
+  );
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(
     expectedSessionId =>
@@ -541,8 +546,8 @@ try {
   await reloadedIntroPlayerFrame
     .locator("#demoPlayerAnswer")
     .waitFor({ timeout: 15_000 });
-  assert.equal(
-    await reloadedIntroPlayerFrame.locator("#demoPlayerAnswer").inputValue(),
+  await waitForInputValue(
+    reloadedIntroPlayerFrame.locator("#demoPlayerAnswer"),
     "Intro answer from smoke"
   );
 
