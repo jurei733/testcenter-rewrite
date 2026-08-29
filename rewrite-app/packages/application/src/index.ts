@@ -23960,6 +23960,29 @@ export const createFirstSliceServices = (
     lastTimestampMs = nextTimestampMs;
     return new Date(nextTimestampMs).toISOString();
   };
+  const testRunMutationTails = new Map<string, Promise<void>>();
+  const serializeTestRunMutation = async <Result>(
+    testRunId: string,
+    mutation: () => Promise<Result>
+  ): Promise<Result> => {
+    const previousMutation =
+      testRunMutationTails.get(testRunId) ?? Promise.resolve();
+    let releaseMutation: () => void = () => undefined;
+    const currentMutation = new Promise<void>(resolvePromise => {
+      releaseMutation = resolvePromise;
+    });
+    testRunMutationTails.set(testRunId, currentMutation);
+    await previousMutation;
+
+    try {
+      return await mutation();
+    } finally {
+      releaseMutation();
+      if (testRunMutationTails.get(testRunId) === currentMutation) {
+        testRunMutationTails.delete(testRunId);
+      }
+    }
+  };
   const adminSessionTtlMs = dependencies.adminSessionTtlMs ?? ADMIN_SESSION_TTL_MS;
   const adminLoginMaxFailures =
     dependencies.adminLoginMaxFailures ?? DEFAULT_ADMIN_LOGIN_MAX_FAILURES;
@@ -32358,10 +32381,11 @@ export const createFirstSliceServices = (
       },
       async saveProgress(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
-        const deliveryId = normalizeOptionalParticipantDeliveryId(
-          input.deliveryId
-        );
-        const storedTestRun = await repository.getTestRunById(testRunId);
+        return serializeTestRunMutation(testRunId, async () => {
+          const deliveryId = normalizeOptionalParticipantDeliveryId(
+            input.deliveryId
+          );
+          const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
           throw new FirstSliceError(
@@ -32725,7 +32749,8 @@ export const createFirstSliceServices = (
             }
           });
         }
-        return effectiveRun;
+          return effectiveRun;
+        });
       },
       async saveTestLogs(input) {
         const testRunId = normalizeTestRunId(input.testRunId);

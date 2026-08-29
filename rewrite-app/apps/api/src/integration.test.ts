@@ -8165,6 +8165,69 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       "Practice response without repeated unit key"
     );
 
+    const concurrentResponses = {
+      "unit-intro": "Concurrent intro response",
+      "unit-practice": "Concurrent practice response"
+    };
+    const concurrentSaves = await Promise.all(
+      Object.entries(concurrentResponses).map(([responseUnitKey, unitResponse]) =>
+        requestJsonAt<{ testRun: { unitResponses: Record<string, string> } }>(
+          isolated.baseUrl,
+          `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+          {
+            method: "POST",
+            body: {
+              deliveryId: `integration-concurrent-${responseUnitKey}`,
+              responseUnitKey,
+              status: "running",
+              unitResponse
+            }
+          }
+        )
+      )
+    );
+    assert.deepEqual(
+      concurrentSaves.map(response => response.status),
+      Object.keys(concurrentResponses).map(() => 200)
+    );
+    const stateAfterConcurrentSaves = await requestJsonAt<{
+      currentRunState: {
+        testRun: { unitResponses: Record<string, string> };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+    assert.equal(stateAfterConcurrentSaves.status, 200);
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.keys(concurrentResponses).map(unitKey => [
+          unitKey,
+          stateAfterConcurrentSaves.body.currentRunState.testRun.unitResponses[
+            unitKey
+          ]
+        ])
+      ),
+      concurrentResponses,
+      "Concurrent saves for different Units must not overwrite each other."
+    );
+    for (const [responseUnitKey, unitResponse] of Object.entries({
+      "unit-intro": "My first demo response",
+      "unit-practice": "Practice response without repeated unit key"
+    })) {
+      const restoredResponse = await requestJsonAt<{
+        testRun: { unitResponses: Record<string, string> };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+        {
+          method: "POST",
+          body: { responseUnitKey, status: "running", unitResponse }
+        }
+      );
+      assert.equal(restoredResponse.status, 200);
+    }
+
     const unknownUnitSave = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
