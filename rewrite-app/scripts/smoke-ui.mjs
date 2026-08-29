@@ -13429,9 +13429,19 @@ try {
   );
   const crashedStarsPage = page;
   const crashSession = await context.newCDPSession(crashedStarsPage);
+  const browserCrashSession = await browser.newBrowserCDPSession();
+  const { targetInfo: crashedStarsTarget } = await crashSession.send(
+    "Target.getTargetInfo"
+  );
   await crashSession.send("Inspector.enable");
+  await browserCrashSession.send("Target.setDiscoverTargets", {
+    discover: true
+  });
   const rendererCrash = new Promise((resolvePromise, reject) => {
     const timeout = setTimeout(() => {
+      crashedStarsPage.off("crash", resolveCrash);
+      crashSession.off("Inspector.targetCrashed", resolveCrash);
+      browserCrashSession.off("Target.targetCrashed", resolveBrowserCrash);
       reject(
         new Error(
           "Timed out waiting for the Chromium renderer crash signal."
@@ -13440,14 +13450,29 @@ try {
     }, 15_000);
     const resolveCrash = () => {
       clearTimeout(timeout);
+      crashedStarsPage.off("crash", resolveCrash);
+      crashSession.off("Inspector.targetCrashed", resolveCrash);
+      browserCrashSession.off("Target.targetCrashed", resolveBrowserCrash);
       resolvePromise(undefined);
+    };
+    const resolveBrowserCrash = event => {
+      if (event.targetId === crashedStarsTarget.targetId) {
+        resolveCrash();
+      }
     };
     crashedStarsPage.once("crash", resolveCrash);
     crashSession.once("Inspector.targetCrashed", resolveCrash);
+    browserCrashSession.on("Target.targetCrashed", resolveBrowserCrash);
   });
   void crashSession.send("Page.crash").catch(() => undefined);
   await rendererCrash;
-  await crashedStarsPage.close().catch(() => undefined);
+  await Promise.race([
+    browserCrashSession
+      .send("Target.closeTarget", { targetId: crashedStarsTarget.targetId })
+      .catch(() => undefined),
+    delay(5_000)
+  ]);
+  await browserCrashSession.detach().catch(() => undefined);
   await context.setOffline(false);
   page = await context.newPage();
   observePageRequests(page);
