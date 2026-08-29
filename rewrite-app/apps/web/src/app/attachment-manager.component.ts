@@ -13,8 +13,8 @@ import { downloadBlobFile } from "./download-text-file";
   standalone: true,
   imports: [CommonModule, RouterLink],
   styles: [`
-    :host { display: block; min-width: 0; container-type: inline-size; }
-    .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.6fr) minmax(16rem, .8fr); }
+    :host { display: block; min-width: 0; }
+    .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
     .attachment-list { display: grid; gap: .65rem; }
     .attachment-row { border: 1px solid var(--border-subtle, #d9dee8); border-radius: .75rem; padding: .8rem; background: var(--surface-raised, #fff); text-align: left; width: 100%; }
     .attachment-row.is-selected { border-color: var(--accent, #3157d5); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #3157d5) 18%, transparent); }
@@ -26,8 +26,6 @@ import { downloadBlobFile } from "./download-text-file";
     .attachment-side { min-width: 0; }
     .attachment-file-actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
     .attachment-status { min-height: 1.4rem; }
-    @container (max-width: 850px) { .attachment-layout { grid-template-columns: 1fr; } }
-    @media (max-width: 850px) { .attachment-layout { grid-template-columns: 1fr; } }
   `],
   template: `
     <article id="attachmentManagerCard" class="card">
