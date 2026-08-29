@@ -753,6 +753,59 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const clickActionWhenInputEquals = async (
+    name,
+    inputSelector,
+    expectedValue
+  ) => {
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
+    const button = page.getByRole("button", { name, exact: true });
+    const clickDeadline = Date.now() + 30_000;
+    let clicked = false;
+    while (!clicked && Date.now() < clickDeadline) {
+      await waitForNotBusy(`${name}-before-input-commit`);
+      const committed = await fillAndCommitUntilValue(
+        inputSelector,
+        expectedValue
+      )
+        .then(() => true)
+        .catch(() => false);
+      if (committed) {
+        clicked = await button
+          .evaluate(
+            (element, { selector, value }) => {
+              const input = document.querySelector(selector);
+              if (
+                !(element instanceof HTMLButtonElement) ||
+                element.disabled ||
+                !(input instanceof HTMLInputElement) ||
+                input.value !== value
+              ) {
+                return false;
+              }
+              element.click();
+              return true;
+            },
+            { selector: inputSelector, value: expectedValue }
+          )
+          .catch(() => false);
+      }
+      if (!clicked) {
+        await page.waitForTimeout(100);
+      }
+    }
+    assert.equal(
+      clicked,
+      true,
+      `Timed out clicking action '${name}' with ${inputSelector}=${expectedValue}.`
+    );
+    const startedBusy = await waitForBusy(`${name}-after-click`);
+    if (!startedBusy) {
+      await page.waitForTimeout(150);
+    }
+    await waitForNotBusy(`${name}-after-click`);
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
+  };
   const clickSelectorAction = async (name, selector) => {
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
     await waitForNotBusy(`${name}-before-click`);
@@ -23961,17 +24014,22 @@ try {
           item?.contentRelease?.status === "active"
       )
   );
-  await fillAndCommitUntilValue("#contentReleaseId", retriedContentReleaseId);
   const activatedReleaseReadinessResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "GET" &&
       response.url().endsWith(
         `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${retriedContentReleaseId}/activation-readiness`
-      )
+      ),
+    { timeout: 45_000 }
   );
-  await clickAction("Release Readiness");
-  const activatedReleaseReadinessResponse =
-    await activatedReleaseReadinessResponsePromise;
+  const [activatedReleaseReadinessResponse] = await Promise.all([
+    activatedReleaseReadinessResponsePromise,
+    clickActionWhenInputEquals(
+      "Release Readiness",
+      "#contentReleaseId",
+      retriedContentReleaseId
+    )
+  ]);
   assert.equal(activatedReleaseReadinessResponse.status(), 200);
   await page
     .locator("#activityFeed")
