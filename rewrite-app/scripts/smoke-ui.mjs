@@ -24088,6 +24088,11 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   const attachmentManager = page.locator("#attachmentManagerCard");
   await attachmentManager.waitFor();
+  assert.equal(
+    await attachmentManager.locator(".attachment-layout").count(),
+    0,
+    "Attachment layout must remain absent until requests are loaded."
+  );
   await attachmentManager.locator("#loadAttachmentsButton").click();
   await attachmentManager
     .locator("#attachmentRows")
@@ -24121,6 +24126,15 @@ try {
     .filter({ hasText: "participant-photo" })
     .filter({ hasText: "capture-image" })
     .waitFor();
+  assert.equal(
+    await attachmentManager.locator(".attachment-layout").evaluate(element =>
+      getComputedStyle(element)
+        .gridTemplateColumns.trim()
+        .split(/\s+/).length
+    ),
+    1,
+    "Attachment Manager must collapse inside the narrow Runtime column."
+  );
   await attachmentManager
     .locator("#selectedAttachmentCode")
     .filter({ hasText: /^att-/ })

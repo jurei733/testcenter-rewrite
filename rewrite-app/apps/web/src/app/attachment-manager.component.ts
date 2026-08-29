@@ -13,7 +13,7 @@ import { downloadBlobFile } from "./download-text-file";
   standalone: true,
   imports: [CommonModule, RouterLink],
   styles: [`
-    :host { container-type: inline-size; }
+    :host { display: block; min-width: 0; container-type: inline-size; }
     .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.6fr) minmax(16rem, .8fr); }
     .attachment-list { display: grid; gap: .65rem; }
     .attachment-row { border: 1px solid var(--border-subtle, #d9dee8); border-radius: .75rem; padding: .8rem; background: var(--surface-raised, #fff); text-align: left; width: 100%; }
