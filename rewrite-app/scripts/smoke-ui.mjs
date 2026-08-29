@@ -24160,18 +24160,36 @@ try {
     .filter({ hasText: "source-audio" })
     .filter({ hasText: "type: audio" });
   await unsupportedAttachmentRow.waitFor();
+  await unsupportedAttachmentRow.scrollIntoViewIfNeeded();
   const [unsupportedAttachmentRowBox, resultRailBox] = await Promise.all([
     unsupportedAttachmentRow.boundingBox(),
     page.locator(".workspace.app-layout > .stack").nth(1).boundingBox()
   ]);
   assert.ok(unsupportedAttachmentRowBox);
   assert.ok(resultRailBox);
-  const attachmentRowRight =
-    unsupportedAttachmentRowBox.x + unsupportedAttachmentRowBox.width;
-  const attachmentColumnTolerance = 1;
-  assert.ok(
-    attachmentRowRight <= resultRailBox.x + attachmentColumnTolerance,
-    `Attachment rows must remain inside the Runtime column and must not extend beneath the result rail (${attachmentRowRight}px > ${resultRailBox.x}px).`
+  const attachmentRowOwnsResultRailPoint = await page.evaluate(
+    ({ rowSelector, resultRailX, rowY, rowHeight }) => {
+      const row = document.querySelector(rowSelector);
+      if (!(row instanceof HTMLElement)) {
+        return null;
+      }
+      const target = document.elementFromPoint(
+        resultRailX + 2,
+        rowY + Math.min(rowHeight / 2, 20)
+      );
+      return target != null && row.contains(target);
+    },
+    {
+      rowSelector: `[data-attachment-id="${await unsupportedAttachmentRow.getAttribute("data-attachment-id")}"]`,
+      resultRailX: resultRailBox.x,
+      rowY: unsupportedAttachmentRowBox.y,
+      rowHeight: unsupportedAttachmentRowBox.height
+    }
+  );
+  assert.equal(
+    attachmentRowOwnsResultRailPoint,
+    false,
+    "Attachment rows must be clipped before the result rail's interactive area."
   );
   await unsupportedAttachmentRow.click();
   await attachmentManager
