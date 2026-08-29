@@ -24155,6 +24155,10 @@ try {
     .filter({ hasText: "Attachment Smoke Participant" })
     .filter({ hasText: "missing" })
     .waitFor();
+  const clickVisibleAttachmentRow = async row => {
+    await row.scrollIntoViewIfNeeded();
+    await row.click({ position: { x: 16, y: 16 } });
+  };
   const unsupportedAttachmentRow = attachmentManager
     .locator(".attachment-row")
     .filter({ hasText: "source-audio" })
@@ -24191,7 +24195,7 @@ try {
     false,
     "Attachment rows must be clipped before the result rail's interactive area."
   );
-  await unsupportedAttachmentRow.click();
+  await clickVisibleAttachmentRow(unsupportedAttachmentRow);
   await attachmentManager
     .locator("#unsupportedAttachmentType")
     .filter({ hasText: "No audio capture workflow" })
@@ -24204,10 +24208,10 @@ try {
     await attachmentManager.locator("#captureSelectedAttachmentButton").count(),
     0
   );
-  await attachmentManager
+  const captureImageAttachmentRow = attachmentManager
     .locator(".attachment-row")
-    .filter({ hasText: "participant-photo" })
-    .click();
+    .filter({ hasText: "participant-photo" });
+  await clickVisibleAttachmentRow(captureImageAttachmentRow);
   await attachmentManager
     .locator(".attachment-side")
     .filter({ hasText: "participant-photo" })
@@ -24333,10 +24337,10 @@ try {
     .locator("#attachmentRows")
     .filter({ hasText: "image" })
     .waitFor();
-  await refreshedAttachmentManager
+  const refreshedCaptureImageAttachmentRow = refreshedAttachmentManager
     .locator(".attachment-row")
-    .filter({ hasText: "participant-photo" })
-    .click();
+    .filter({ hasText: "participant-photo" });
+  await clickVisibleAttachmentRow(refreshedCaptureImageAttachmentRow);
   await refreshedAttachmentManager
     .getByRole("button", { name: "Preview" })
     .click({ force: true });
