@@ -24102,6 +24102,17 @@ try {
     .filter({ hasText: "source-audio" })
     .filter({ hasText: "type: audio" });
   await unsupportedAttachmentRow.waitFor();
+  const [unsupportedAttachmentRowBox, resultRailBox] = await Promise.all([
+    unsupportedAttachmentRow.boundingBox(),
+    page.locator(".workspace.app-layout > .stack").nth(1).boundingBox()
+  ]);
+  assert.ok(unsupportedAttachmentRowBox);
+  assert.ok(resultRailBox);
+  assert.ok(
+    unsupportedAttachmentRowBox.x + unsupportedAttachmentRowBox.width <=
+      resultRailBox.x,
+    "Attachment rows must remain inside the Runtime column and must not extend beneath the result rail."
+  );
   await unsupportedAttachmentRow.click();
   await attachmentManager
     .locator("#unsupportedAttachmentType")
