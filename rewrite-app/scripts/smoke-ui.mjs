@@ -408,27 +408,30 @@ try {
     );
     throw new UiSmokeEarlyExit(step);
   };
-  page.on("request", request => {
-    const url = request.url();
-    if (!url.includes("/api/v1/")) {
-      return;
-    }
-
-    totalApiRequestCount += 1;
-    if (
-      request.method() === "POST" &&
-      new URL(url).pathname === "/api/v1/system/proof-of-work/challenges"
-    ) {
-      try {
-        const scope = request.postDataJSON()?.scope;
-        if (typeof scope === "string") {
-          observedProofOfWorkScopes.add(scope);
-        }
-      } catch {
-        // The API assertion will surface malformed challenge requests.
+  const observePageRequests = observedPage => {
+    observedPage.on("request", request => {
+      const url = request.url();
+      if (!url.includes("/api/v1/")) {
+        return;
       }
-    }
-  });
+
+      totalApiRequestCount += 1;
+      if (
+        request.method() === "POST" &&
+        new URL(url).pathname === "/api/v1/system/proof-of-work/challenges"
+      ) {
+        try {
+          const scope = request.postDataJSON()?.scope;
+          if (typeof scope === "string") {
+            observedProofOfWorkScopes.add(scope);
+          }
+        } catch {
+          // The API assertion will surface malformed challenge requests.
+        }
+      }
+    });
+  };
+  observePageRequests(page);
   logStep("browser-compatibility-warning");
   const outdatedBrowserContext = await browser.newContext({
     userAgent:
@@ -13104,10 +13107,8 @@ try {
   );
   const starsReloadSaveOrder = [];
   const observedStarsReloadResponses = new Set();
-  const recordStarsReloadSaveOrder = response => {
-    const request = response.request();
+  const recordStarsReloadSaveOrder = request => {
     if (
-      response.status() !== 200 ||
       request.method() !== "POST" ||
       request.url() !== starsSaveProgressUrl
     ) {
@@ -13125,7 +13126,7 @@ try {
     observedStarsReloadResponses.add(responseUnitKey);
     starsReloadSaveOrder.push(responseUnitKey);
   };
-  page.on("response", recordStarsReloadSaveOrder);
+  page.on("request", recordStarsReloadSaveOrder);
   await page.unroute(starsSaveProgressUrl, abortStarsSaveProgress);
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await pollJsonWithPredicate(
@@ -13153,7 +13154,7 @@ try {
     },
     { timeout: 30_000 }
   );
-  page.off("response", recordStarsReloadSaveOrder);
+  page.off("request", recordStarsReloadSaveOrder);
   assert.equal(
     starsReloadSaveOrder[0],
     "2",
@@ -13168,10 +13169,8 @@ try {
   );
   const parallelStarsReloadSaveOrder = [];
   const observedParallelStarsReloadResponses = new Set();
-  const recordParallelStarsReloadSaveOrder = response => {
-    const request = response.request();
+  const recordParallelStarsReloadSaveOrder = request => {
     if (
-      response.status() !== 200 ||
       request.method() !== "POST" ||
       request.url() !== parallelStarsSaveProgressUrl
     ) {
@@ -13192,7 +13191,7 @@ try {
     observedParallelStarsReloadResponses.add(responseUnitKey);
     parallelStarsReloadSaveOrder.push(responseUnitKey);
   };
-  page.on("response", recordParallelStarsReloadSaveOrder);
+  page.on("request", recordParallelStarsReloadSaveOrder);
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       parallelStarsParticipantSessionId
@@ -13219,7 +13218,7 @@ try {
     "testcenter-rewrite:participant-save-outbox:v1",
     { timeout: 30_000 }
   );
-  page.off("response", recordParallelStarsReloadSaveOrder);
+  page.off("request", recordParallelStarsReloadSaveOrder);
   assert.equal(
     parallelStarsReloadSaveOrder[0],
     "1",
@@ -13352,6 +13351,129 @@ try {
     starsTestRunId,
     { timeout: 30_000 }
   );
+
+  logStep("participant-original-stars-renderer-crash-recovery");
+  const starsRendererCrashResponses = Object.fromEntries(
+    starsUnitKeys.map((unitKey, index) => [
+      unitKey,
+      `${starsBaseResponse}\n${" ".repeat(index + 301)}`
+    ])
+  );
+  const matchesStarsRendererCrashResponse = (unitKey, response) => {
+    const expected = starsRendererCrashResponses[unitKey];
+    if (response === expected) {
+      return true;
+    }
+    if (unitKey !== "2" || typeof response !== "string") {
+      return false;
+    }
+    try {
+      return JSON.stringify(JSON.parse(response)) ===
+        JSON.stringify(JSON.parse(expected));
+    } catch {
+      return false;
+    }
+  };
+  await page.evaluate(async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(registration => registration.unregister()));
+  });
+  await context.setOffline(true);
+  await page.evaluate(
+    ({ storageKey, crashMarkerKey, testRunId, currentUnitKey, responses }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: Object.entries(responses).map(
+            ([unitKey, response], index) => ({
+              version: 1,
+              deliveryId: `stars-renderer-crash-${unitKey}-${queuedAt}`,
+              testRunId,
+              unitKey,
+              response,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(
+                queuedAt + (unitKey === currentUnitKey ? 100 : index)
+              ).toISOString()
+            })
+          )
+        })
+      );
+      localStorage.setItem(crashMarkerKey, "armed-without-pagehide");
+      window.addEventListener(
+        "pagehide",
+        () => localStorage.setItem(crashMarkerKey, "pagehide-fired"),
+        { once: true }
+      );
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      crashMarkerKey: "testcenter-rewrite:renderer-crash-probe",
+      testRunId: starsTestRunId,
+      currentUnitKey: "2",
+      responses: starsRendererCrashResponses
+    }
+  );
+  await page.waitForFunction(
+    ({ storageKey, expectedCount }) => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+      return stored?.entries?.length === expectedCount;
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      expectedCount: starsUnitKeys.length
+    }
+  );
+  const crashedStarsPage = page;
+  const crashSession = await context.newCDPSession(crashedStarsPage);
+  const rendererCrash = crashedStarsPage.waitForEvent("crash");
+  void crashSession.send("Page.crash").catch(() => undefined);
+  await rendererCrash;
+  await crashedStarsPage.close().catch(() => undefined);
+  await context.setOffline(false);
+  page = await context.newPage();
+  observePageRequests(page);
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      starsParticipantSessionId
+    )}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  assert.equal(
+    await page.evaluate(
+      crashMarkerKey => localStorage.getItem(crashMarkerKey),
+      "testcenter-rewrite:renderer-crash-probe"
+    ),
+    "armed-without-pagehide",
+    "The renderer crash gate must not depend on a pagehide handoff."
+  );
+  await page.evaluate(crashMarkerKey => {
+    localStorage.removeItem(crashMarkerKey);
+  }, "testcenter-rewrite:renderer-crash-probe");
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload =>
+      starsUnitKeys.every(unitKey =>
+        matchesStarsRendererCrashResponse(
+          unitKey,
+          payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
+        )
+      ),
+    45_000
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1",
+    { timeout: 30_000 }
+  );
+  stopAfter("participant-original-stars-renderer-crash-recovery");
 
   logStep("participant-original-stars-mid-drain-hard-reload");
   const starsMidDrainResponses = Object.fromEntries(
@@ -23968,12 +24090,11 @@ try {
     .locator("#attachmentManagerStatus")
     .filter({ hasText: "capture QR page(s) downloaded" })
     .waitFor();
-  const selectedAttachmentPageDownloadPromise = page.waitForEvent("download");
-  await attachmentManager
-    .locator("#downloadSelectedAttachmentPageButton")
-    .click();
-  const selectedAttachmentPageDownload =
-    await selectedAttachmentPageDownloadPromise;
+  await expectButtonSelectorEnabled("#downloadSelectedAttachmentPageButton");
+  const [selectedAttachmentPageDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    attachmentManager.locator("#downloadSelectedAttachmentPageButton").click()
+  ]);
   assert.equal(
     selectedAttachmentPageDownload.suggestedFilename(),
     "attachment-smoke-participant-participant-photo-attachment-page.pdf"
