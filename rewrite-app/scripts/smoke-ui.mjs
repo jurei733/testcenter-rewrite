@@ -16657,14 +16657,11 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(originalSampleParticipantSessionId);
-  const requiredTextField = originalSampleFrame.locator(
-    'input[name="required-text-field"]'
+  await fillVeronaAnswerAndWaitForHost(
+    originalSampleFrame,
+    'input[name="required-text-field"]',
+    originalSampleResponse
   );
-  await requiredTextField.fill(originalSampleResponse);
-  await requiredTextField.dispatchEvent("keyup", {
-    key: "e",
-    code: "KeyE"
-  });
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalSampleParticipantSessionId}/current-state`,
     payload => {
@@ -16689,7 +16686,8 @@ try {
         return false;
       }
     },
-    30_000
+    60_000,
+    1_000
   );
   const originalSampleResourceResponse = await fetch(
     `${baseUrl}/api/v1/participant/sessions/` +
