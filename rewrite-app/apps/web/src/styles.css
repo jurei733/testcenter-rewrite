@@ -1114,6 +1114,10 @@ app-record-collection,
   min-width: 0;
 }
 
+app-record-collection {
+  display: block;
+}
+
 .record-collection-grid[data-density="medium"] {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
 }
