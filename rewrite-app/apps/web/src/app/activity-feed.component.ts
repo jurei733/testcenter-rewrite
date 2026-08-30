@@ -26,7 +26,6 @@ import type { ActivityFeedItem } from "./rewrite-app-shell.types";
       min-width: 0;
       overflow: hidden;
       contain: inline-size;
-      pointer-events: none;
     }
 
     .collection,

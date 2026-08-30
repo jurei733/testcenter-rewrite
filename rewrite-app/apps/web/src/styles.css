@@ -192,9 +192,12 @@ h1 {
 
 .workspace > .stack > router-outlet + * {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  overflow: hidden;
+  contain: inline-size;
 }
 
 .view-nav {
