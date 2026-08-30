@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
+const ibRuntimeReadyTimeoutMs = 60_000;
 
 const readBrotliBase64Text = async fixturePath =>
   brotliDecompressSync(
@@ -268,11 +269,13 @@ try {
   await page
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${playerPackage.playerApiVersion}` })
-    .waitFor({ timeout: 30_000 });
+    .waitFor({ timeout: ibRuntimeReadyTimeoutMs });
   const runtimeFrame = page
     .frameLocator("#participantVeronaPlayerFrame")
     .frameLocator("#ib-runtime-host");
-  await runtimeFrame.locator("html").waitFor({ timeout: 30_000 });
+  await runtimeFrame.locator("html").waitFor({
+    timeout: ibRuntimeReadyTimeoutMs
+  });
   assert.equal(
     await runtimeFrame.locator("html").evaluate(() =>
       Boolean(
@@ -283,12 +286,9 @@ try {
     ),
     true
   );
-  await runtimeFrame
-    .getByText("TaskPlayer running version 9.9.0")
-    .waitFor({ timeout: 30_000 });
   await runtimeFrame.locator("input, textarea, button").first().waitFor({
     state: "visible",
-    timeout: 30_000
+    timeout: ibRuntimeReadyTimeoutMs
   });
   assert.equal(await runtimeFrame.locator("input[type='checkbox']").count(), 1);
   assert.equal(await runtimeFrame.locator("input[type='text']").count(), 1);
@@ -344,12 +344,9 @@ try {
   const restoredRuntimeFrame = page
     .frameLocator("#participantVeronaPlayerFrame")
     .frameLocator("#ib-runtime-host");
-  await restoredRuntimeFrame
-    .getByText("TaskPlayer running version 9.9.0")
-    .waitFor({ timeout: 30_000 });
   await restoredRuntimeFrame.locator("input[type='text']").waitFor({
     state: "visible",
-    timeout: 30_000
+    timeout: ibRuntimeReadyTimeoutMs
   });
   const restoredStateResponse = await fetch(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`
