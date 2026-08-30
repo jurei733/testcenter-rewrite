@@ -15455,6 +15455,51 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const iso885916BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="ISO-8859-16"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preț 12 €</Label>");
+  const registeredLatinEncodingBooklets = [
+    {
+      fileSlug: "iso-8859-10",
+      xmlEncodings: [
+        "ISO-8859-10",
+        "iso-ir-157",
+        "l6",
+        "csISOLatin6",
+        "latin6"
+      ],
+      iconvEncoding: "iso-8859-10",
+      displayLabel: "Próf á Íslandi: Þór"
+    },
+    {
+      fileSlug: "iso-8859-14",
+      xmlEncodings: [
+        "ISO-8859-14",
+        "iso-ir-199",
+        "ISO_8859-14",
+        "latin8",
+        "iso-celtic",
+        "l8",
+        "csISO885914"
+      ],
+      iconvEncoding: "iso-8859-14",
+      displayLabel: "Ŵyl Gymraeg yng Nghaerdydd"
+    }
+  ].flatMap(encodedCase =>
+    encodedCase.xmlEncodings.map((xmlEncoding, aliasIndex) => ({
+      fileName: `${encodedCase.fileSlug}-${aliasIndex + 1}-original-booklet.xml`,
+      bytes: iconv.encode(
+        validBookletXml
+          .replace(
+            /encoding=["']utf-8["']/i,
+            `encoding="${xmlEncoding}"`
+          )
+          .replace(
+            "<Label>Sample booklet</Label>",
+            `<Label>${encodedCase.displayLabel}</Label>`
+          ),
+        encodedCase.iconvEncoding
+      ),
+      displayLabel: encodedCase.displayLabel
+    }))
+  );
   const cp850BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM850"')
     .replace(
@@ -15675,6 +15720,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       bytes: iconv.encode(iso885916BookletXml, "iso-8859-16"),
       displayLabel: "Preț 12 €"
     },
+    ...registeredLatinEncodingBooklets,
     {
       fileName: "cp850-original-booklet.xml",
       bytes: iconv.encode(cp850BookletXml, "cp850"),

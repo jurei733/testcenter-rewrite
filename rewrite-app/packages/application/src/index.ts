@@ -2546,6 +2546,17 @@ const IBM1141_ENCODING_NAMES = [
 // allowlisted so iconv-lite's transport codecs (for example base64, hex, and
 // UTF-7) cannot become XML declaration encodings by accident.
 const ICONV_XML_ENCODING_NAMES = new Map<string, string>([
+  ["iso-8859-10", "iso-8859-10"],
+  ["iso-ir-157", "iso-8859-10"],
+  ["l6", "iso-8859-10"],
+  ["csisolatin6", "iso-8859-10"],
+  ["latin6", "iso-8859-10"],
+  ["iso-8859-14", "iso-8859-14"],
+  ["iso-ir-199", "iso-8859-14"],
+  ["latin8", "iso-8859-14"],
+  ["iso-celtic", "iso-8859-14"],
+  ["l8", "iso-8859-14"],
+  ["csiso885914", "iso-8859-14"],
   ["iso-8859-16", "iso-8859-16"],
   ["iso8859-16", "iso-8859-16"],
   ["iso-ir-226", "iso-8859-16"],
