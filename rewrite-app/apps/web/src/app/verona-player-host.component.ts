@@ -1038,7 +1038,9 @@ export class VeronaPlayerHostComponent
     if (this.status !== "running") {
       return;
     }
-    this.pendingPlayerHasFocus = playerHasFocus;
+    if (playerHasFocus !== undefined) {
+      this.pendingPlayerHasFocus = playerHasFocus;
+    }
     this.clearFocusLogTimeout(false);
     this.focusLogTimeout = setTimeout(() => {
       this.focusLogTimeout = null;
