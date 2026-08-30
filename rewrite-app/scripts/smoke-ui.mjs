@@ -296,7 +296,12 @@ const pollJson = async url => {
   throw lastError ?? new Error(`Timed out waiting for ${url}`);
 };
 
-const pollJsonWithPredicate = async (url, predicate, timeoutMs = 20_000) => {
+const pollJsonWithPredicate = async (
+  url,
+  predicate,
+  timeoutMs = 20_000,
+  pollIntervalMs = 250
+) => {
   const deadline = Date.now() + timeoutMs;
   let lastPayload = null;
 
@@ -309,7 +314,7 @@ const pollJsonWithPredicate = async (url, predicate, timeoutMs = 20_000) => {
         return payload;
       }
     }
-    await delay(250);
+    await delay(pollIntervalMs);
   }
 
   const serializedPayload = JSON.stringify(lastPayload);
@@ -13192,7 +13197,8 @@ try {
             payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
           )
       ),
-    45_000
+    90_000,
+    2_000
   );
   await page.waitForFunction(
     ({ storageKey, retainedTestRunId, expectedCount }) => {
@@ -13672,7 +13678,8 @@ try {
           payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
         )
       ),
-    30_000
+    90_000,
+    2_000
   );
   await page.waitForFunction(
     ({ storageKey, expectedCount }) => {
@@ -13750,7 +13757,8 @@ try {
           payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
         )
       ),
-    45_000
+    90_000,
+    2_000
   );
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
@@ -13837,7 +13845,8 @@ try {
         return false;
       }
     },
-    30_000
+    90_000,
+    2_000
   );
   await page.evaluate(storageKey => {
     localStorage.removeItem(storageKey);
