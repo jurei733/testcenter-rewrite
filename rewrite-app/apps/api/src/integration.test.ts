@@ -21491,6 +21491,435 @@ test("original Testcenter compatibility corpus executes the current adaptive pac
   );
 });
 
+test("original Testcenter compatibility corpus composes current adaptive routing with runtime restrictions", async () => {
+  type CurrentAdaptivePackage = {
+    sourceCommit: string;
+    booklet: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      bookletKey: string;
+    };
+    unit: { fixture: string; unitKey: string };
+    codingScheme: { fixture: string };
+    player: { fixture: string; playerKey: string };
+    routingResponses: {
+      professional: Array<{ id: string; status: string; value: unknown }>;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { currentOriginalAdaptivePackage: CurrentAdaptivePackage };
+  const expectation = corpus.currentOriginalAdaptivePackage;
+  const originalBookletDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.booklet.fixture),
+    "utf8"
+  );
+  assert.equal(
+    createHash("sha256").update(originalBookletDocument).digest("hex"),
+    expectation.booklet.sha256,
+    expectation.booklet.sourcePath
+  );
+  assert.equal(
+    expectation.sourceCommit,
+    "a5a6d25a72990d667300804c337cc5b500b01d2f"
+  );
+
+  const professionalShow =
+    '          <Show if="level" is="professional" />';
+  const restrictedProfessional = [
+    '          <CodeToEnter code="route" />',
+    '          <TimeMax minutes="2" leave="allowed" />',
+    professionalShow,
+    '          <DenyNavigationOnIncomplete response="ON" />',
+    '          <LockAfterLeaving confirm="false" scope="testlet" />'
+  ].join("\n");
+  const restrictedBookletDocument = originalBookletDocument
+    .replace(professionalShow, restrictedProfessional)
+    .replace(
+      "  </Units>",
+      [
+        '    <Unit id="UNIT.SAMPLE-2" label="Finish Unit" labelshort="F" alias="finish-unit" />',
+        "  </Units>"
+      ].join("\n")
+    );
+  assert.notEqual(restrictedBookletDocument, originalBookletDocument);
+  assert.match(restrictedBookletDocument, /<CodeToEnter code="route" \/>/);
+  assert.match(restrictedBookletDocument, /alias="finish-unit"/);
+
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.unit.fixture),
+    "utf8"
+  );
+  const codingSchemeDocument = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.codingScheme.fixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  ).toString("utf8");
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture)
+  );
+  const packagePayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${expectation.booklet.bookletKey}" href="booklets/CY_Bklt_Adap-1.xml" />
+            <resource identifier="${expectation.unit.unitKey}" href="units/Unit2.xml" />
+            <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
+            <resource identifier="${expectation.player.playerKey}" href="players/verona-player-simple-6.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/CY_Bklt_Adap-1.xml",
+      content: restrictedBookletDocument
+    },
+    { fileName: "export/units/Unit2.xml", content: unitDocument },
+    {
+      fileName: "export/schemes/coding-scheme.vocs.json",
+      content: codingSchemeDocument
+    },
+    {
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: playerDocument
+    }
+  ]);
+
+  const tenantKey = "integration-tenant-adaptive-restrictions";
+  const workspaceKey = "integration-workspace-adaptive-restrictions";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "current-adaptive-runtime-restrictions.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${packagePayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const imported = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ severity: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(
+    imported.body.importJob.status,
+    "completed",
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.equal(
+    imported.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false
+  );
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{ unitKey: string }>;
+            testletEntries?: Array<{
+              testletKey: string;
+              restrictions?: {
+                show?: { stateKey: string; optionKey: string };
+                codeToEnter?: { code: string };
+                timeMax?: { minutes: number; leave: string };
+                denyNavigationOnIncomplete?: { response?: string };
+                lockAfterLeaving?: { confirm: boolean; scope: string };
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const runtimeBooklet =
+    release.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0];
+  assert.ok(runtimeBooklet);
+  assert.deepEqual(
+    runtimeBooklet.unitEntries.map(unit => unit.unitKey),
+    [
+      "decision-unit",
+      "professional-unit",
+      "advanced-unit",
+      "beginner-unit",
+      "bonus-unit",
+      "finish-unit"
+    ]
+  );
+  const professionalTestlet = runtimeBooklet.testletEntries?.find(
+    testlet => testlet.testletKey === "stage1-professional"
+  );
+  assert.deepEqual(professionalTestlet?.restrictions, {
+    show: { stateKey: "level", optionKey: "professional" },
+    codeToEnter: { code: "route", prompt: "Enter the block code." },
+    timeMax: { minutes: 2, leave: "allowed" },
+    denyNavigationOnIncomplete: { response: "forward" },
+    lockAfterLeaving: { confirm: false, scope: "testlet" }
+  });
+
+  const activated = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activated.status, 200);
+  const signedIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "adaptive-runtime-participant"
+    }
+  });
+  const participantSessionId =
+    signedIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      bookletStates: Record<string, string>;
+      testletTimers?: Record<string, unknown>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.booklet.bookletKey }
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.currentUnitKey, "decision-unit");
+  assert.deepEqual(resumed.body.testRun.bookletStates, {
+    level: "beginner",
+    bonus: "no"
+  });
+  assert.deepEqual(resumed.body.testRun.testletTimers ?? {}, {});
+  const testRunId = resumed.body.testRun.testRunId;
+
+  const readState = () => requestJson<{
+    currentRunState: {
+      testRun: {
+        bookletStates: Record<string, string>;
+        testletTimers?: Record<
+          string,
+          { status: string; durationSeconds: number }
+        >;
+        lockedTestletKeys?: string[];
+      };
+      bookletUnits: Array<{ unitKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  const initialState = await readState();
+  assert.deepEqual(
+    initialState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "beginner-unit", "finish-unit"]
+  );
+  assert.equal(
+    initialState.body.currentRunState.navigation.nextUnitKey,
+    "beginner-unit"
+  );
+  assert.deepEqual(
+    initialState.body.currentRunState.testRun.testletTimers ?? {},
+    {}
+  );
+
+  const unitResponse = (
+    responses: Array<{ id: string; status: string; value: unknown }>,
+    responseProgress: "none" | "complete"
+  ) =>
+    JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        unitStateDataType: "iqb-standard@1.0",
+        presentationProgress: "complete",
+        responseProgress,
+        dataParts: { responses: JSON.stringify(responses) }
+      }
+    });
+  const routed = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse: unitResponse(
+        expectation.routingResponses.professional,
+        "complete"
+      )
+    }
+  });
+  assert.equal(routed.status, 200);
+  assert.deepEqual(routed.body.testRun.bookletStates, {
+    level: "professional",
+    bonus: "no"
+  });
+  const professionalState = await readState();
+  assert.deepEqual(
+    professionalState.body.currentRunState.bookletUnits.map(
+      unit => unit.unitKey
+    ),
+    ["decision-unit", "professional-unit", "finish-unit"]
+  );
+  assert.equal(
+    professionalState.body.currentRunState.navigation.nextUnitKey,
+    "professional-unit"
+  );
+  assert.deepEqual(
+    professionalState.body.currentRunState.testRun.testletTimers ?? {},
+    {}
+  );
+
+  const blockedByCode = await requestJson<{
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "professional-unit", status: "running" }
+  });
+  assert.equal(blockedByCode.status, 409);
+  assert.deepEqual(blockedByCode.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+
+  const unlocked = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<
+        string,
+        { status: string; durationSeconds: number }
+      >;
+    };
+  }>(
+    `/api/v1/participant/test-runs/${testRunId}/testlets/stage1-professional/unlock`,
+    { method: "POST", body: { code: "ROUTE" } }
+  );
+  assert.equal(unlocked.status, 200);
+  assert.equal(unlocked.body.testRun.currentUnitKey, "professional-unit");
+  assert.deepEqual(unlocked.body.testRun.unlockedTestletKeys, [
+    "stage1-professional"
+  ]);
+  assert.deepEqual(
+    {
+      status:
+        unlocked.body.testRun.testletTimers?.["stage1-professional"]?.status,
+      durationSeconds:
+        unlocked.body.testRun.testletTimers?.["stage1-professional"]
+          ?.durationSeconds
+    },
+    { status: "running", durationSeconds: 120 }
+  );
+
+  const blockedByCompleteness = await requestJson<{
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "finish-unit", status: "running" }
+  });
+  assert.equal(blockedByCompleteness.status, 409);
+  assert.deepEqual(blockedByCompleteness.body.details?.deniedReasons, [
+    "response_incomplete"
+  ]);
+  const afterDeniedLeave = await readState();
+  assert.equal(
+    afterDeniedLeave.body.currentRunState.testRun.testletTimers?.[
+      "stage1-professional"
+    ]?.status,
+    "running"
+  );
+  assert.deepEqual(
+    afterDeniedLeave.body.currentRunState.testRun.lockedTestletKeys ?? [],
+    []
+  );
+
+  const savedProfessional = await requestJson(
+    `/api/v1/participant/test-runs/${testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        currentUnitKey: "professional-unit",
+        status: "running",
+        unitResponse: unitResponse([], "complete")
+      }
+    }
+  );
+  assert.equal(savedProfessional.status, 200);
+  const enteredFinish = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      lockedTestletKeys?: string[];
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "finish-unit", status: "running" }
+  });
+  assert.equal(enteredFinish.status, 200);
+  assert.equal(enteredFinish.body.testRun.currentUnitKey, "finish-unit");
+  assert.deepEqual(enteredFinish.body.testRun.lockedTestletKeys, [
+    "stage1-professional"
+  ]);
+  assert.equal(
+    enteredFinish.body.testRun.testletTimers?.["stage1-professional"]?.status,
+    "cancelled"
+  );
+
+  const blockedReentry = await requestJson<{
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "professional-unit", status: "running" }
+  });
+  assert.equal(blockedReentry.status, 409);
+  assert.ok(
+    blockedReentry.body.details?.deniedReasons?.includes(
+      "testlet_leave_locked"
+    )
+  );
+  assert.ok(
+    blockedReentry.body.details?.deniedReasons?.includes("testlet_time_closed")
+  );
+
+  const testLogs = await requestJson<{
+    items: Array<{ testLog: { logKey: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${testRunId}&limit=100`
+  );
+  const logKeys = new Set(
+    testLogs.body.items.map(item => item.testLog.logKey)
+  );
+  for (const logKey of [
+    "BOOKLET_STATES",
+    "TESTLETS_CLEARED_CODE",
+    "TESTLETS_TIMELEFT",
+    "TESTLETS_LOCKED_AFTER_LEAVE"
+  ]) {
+    assert.equal(logKeys.has(logKey), true, logKey);
+  }
+});
+
 test("original Testcenter compatibility corpus executes the complete official Booklet Config package", async () => {
   type BookletExpectation = {
     fixture: string;

@@ -153,11 +153,20 @@ no longer listed because their matrix rows are `done`.
 | Order | Priority | Remaining capability | Concrete acceptance gap |
 | --- | --- | --- | --- |
 | 1 | P0 | Production package and dependency corpus | Add further real production packages and cover the remaining rare XML lexical facets, encodings, archive layouts, and ambiguous/cross-file dependency graphs without weakening quarantine or duplicate protection. The IANA-registered Latin-6/Latin-8 aliases, Baltic IBM775 family, international IBM500 EBCDIC family, and strict malformed multibyte rejection are now covered through the durable-store matrix. |
-| 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. The byte-exact current frontend controller fixture now closes the nested Root/outer/inner timer, two-stage code, and dimension-specific completeness precedence across memory, file, and SQLite; broader adaptive-plus-restriction production combinations remain. |
+| 2 | P0 | Adaptive and runtime-policy corpus | Exercise broader production coding schemes and nested combinations of adaptive states, timers, completeness locks, code gates, and leave-once navigation across the durable-store and browser gates. The byte-exact current frontend controller fixture closes the nested Root/outer/inner timer, two-stage code, and dimension-specific completeness precedence. A schema-conformant extension of the hash-pinned current `CY_Bklt_Adap-1` production package now additionally proves that hidden-route restrictions stay dormant and that its real coding-driven professional route activates code, timer, response completeness, allowed timer leave, and testlet leave-once atomically across memory, file, and SQLite. Broader production packages and the combined adaptive browser gate remain. |
 | 3 | P0 | Verona Player-family and API hardening | Add further production Player families and metadata/API edge cases, and broaden compatibility evidence beyond the hash-pinned IB feasibility snapshot. The IB runtime now executes interactively and its Unit state survives participant reloads; visual answer restoration remains unavailable because the upstream feasibility Player never applies supplied Unit state on start. |
 | 4 | P1 | Workspace batch edge cases | Add concurrent dependency-change and broader replacement graphs, including stale operator selections whose relationships change between readiness and mutation. Sequential upload mutation/collision behavior, the Original's single-file dependency deletion guard, and request-order-independent deletion of selected multi-level dependency graphs with failed-root retention are now closed. |
 | 5 | P1 | Additional system-check variants | Reconcile more original system-check definitions, report sets, and embedded Player families beyond the currently pinned 18.0 configurations. |
 | 6 | P2 | Remaining presentation combinations | Gate uncommon historical package-defined participant text and presentation combinations that are outside the complete current participant/monitor catalogs already implemented. |
+
+The adaptive-plus-restriction gate starts from the hash-pinned current upstream
+booklet, retains its Unit, coding scheme, and Verona Player byte-for-byte, and
+applies only schema-valid Booklet additions in the test package. It asserts
+compiled restrictions,
+adaptive visibility before and after coding, absence of hidden-route timer/code
+effects, the activated code and timer lifecycle, completeness denial without
+side effects, allowed timer cancellation, leave-once re-entry denial, and the
+four corresponding Original-compatible test-log families.
 
 ## Capability delivery evidence
 
