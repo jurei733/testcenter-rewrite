@@ -5,7 +5,7 @@ import {
   ViewChild,
   inject
 } from "@angular/core";
-import type { AfterViewChecked, OnDestroy } from "@angular/core";
+import type { AfterViewChecked, DoCheck, OnDestroy } from "@angular/core";
 
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 
@@ -131,7 +131,7 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
   `
 })
 export class ConfirmationDialogComponent
-  implements AfterViewChecked, OnDestroy
+  implements AfterViewChecked, DoCheck, OnDestroy
 {
   readonly confirmation = inject(ConfirmationDialogService);
 
@@ -146,7 +146,17 @@ export class ConfirmationDialogComponent
   @ViewChild("confirmButton")
   private confirmButton?: ElementRef<HTMLButtonElement>;
 
+  private activeRequestId: number | null = null;
   private focusedRequestId: number | null = null;
+
+  ngDoCheck(): void {
+    const requestId = this.confirmation.dialog()?.requestId ?? null;
+    if (requestId === this.activeRequestId) {
+      return;
+    }
+    this.activeRequestId = requestId;
+    this.verificationValue = "";
+  }
 
   ngAfterViewChecked(): void {
     const requestId = this.confirmation.dialog()?.requestId ?? null;
@@ -158,7 +168,6 @@ export class ConfirmationDialogComponent
       return;
     }
     this.focusedRequestId = requestId;
-    this.verificationValue = "";
     if (this.confirmation.dialog()?.verification) {
       this.verificationInput?.nativeElement.focus();
     } else if (!this.confirmation.dialog()?.showCancel) {

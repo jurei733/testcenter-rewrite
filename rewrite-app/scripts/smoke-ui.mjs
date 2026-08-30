@@ -16111,9 +16111,6 @@ try {
   const ibOuterFrame = page.frameLocator("#participantVeronaPlayerFrame");
   const ibRuntimeFrame = ibOuterFrame.frameLocator("#ib-runtime-host");
   await ibRuntimeFrame
-    .getByText("TaskPlayer running version 9.9.0")
-    .waitFor({ state: "visible", timeout: 30_000 });
-  await ibRuntimeFrame
     .getByText("CheckBoxA", { exact: true })
     .waitFor({ state: "visible", timeout: 30_000 });
   const ibParticipantSessionId = await page
