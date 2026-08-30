@@ -24392,8 +24392,13 @@ try {
     .filter({ hasText: "Result Groups" });
   const selectedResultGroup = resultGroups
     .locator(".record-card")
-    .filter({ hasText: participantGroupKey });
-  await resultGroups.filter({ hasText: participantGroupKey }).waitFor();
+    .filter({
+      has: page.getByRole("heading", {
+        name: participantGroupKey,
+        exact: true
+      })
+    });
+  await selectedResultGroup.waitFor();
   await selectedResultGroup
     .filter({ hasText: "Booklets Started" })
     .filter({ hasText: "Units Minimum" })
