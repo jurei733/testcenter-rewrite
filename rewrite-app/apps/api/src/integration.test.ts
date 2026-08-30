@@ -131,6 +131,10 @@ const IBM273_TO_UNICODE = Buffer.from(
   "AAABAAIAAwCcAAkAhgB/AJcAjQCOAAsADAANAA4ADwAQABEAEgATAJ0AhQAIAIcAGAAZAJIAjwAcAB0AHgAfAIAAgQCCAIMAhAAKABcAGwCIAIkAigCLAIwABQAGAAcAkACRABYAkwCUAJUAlgAEAJgAmQCaAJsAFAAVAJ4AGgAgAKAA4gB7AOAA4QDjAOUA5wDxAMQALgA8ACgAKwAhACYA6QDqAOsA6ADtAO4A7wDsAH4A3AAkACoAKQA7AF4ALQAvAMIAWwDAAMEAwwDFAMcA0QD2ACwAJQBfAD4APwD4AMkAygDLAMgAzQDOAM8AzABgADoAIwCnACcAPQAiANgAYQBiAGMAZABlAGYAZwBoAGkAqwC7APAA/QD+ALEAsABqAGsAbABtAG4AbwBwAHEAcgCqALoA5gC4AMYApAC1AN8AcwB0AHUAdgB3AHgAeQB6AKEAvwDQAN0A3gCuAKIAowClALcAqQBAALYAvAC9AL4ArAB8AD4gqAC0ANcA5ABBAEIAQwBEAEUARgBHAEgASQCtAPQApgDyAPMA9QD8AEoASwBMAE0ATgBPAFAAUQBSALkA+wB9APkA+gD/ANYA9wBTAFQAVQBWAFcAWABZAFoAsgDUAFwA0gDTANUAMAAxADIAMwA0ADUANgA3ADgAOQCzANsAXQDZANoAnwA=",
   "base64"
 );
+const IBM500_TO_UNICODE = Buffer.from(
+  "AAABAAIAAwCcAAkAhgB/AJcAjQCOAAsADAANAA4ADwAQABEAEgATAJ0AhQAIAIcAGAAZAJIAjwAcAB0AHgAfAIAAgQCCAIMAhAAKABcAGwCIAIkAigCLAIwABQAGAAcAkACRABYAkwCUAJUAlgAEAJgAmQCaAJsAFAAVAJ4AGgAgAKAA4gDkAOAA4QDjAOUA5wDxAFsALgA8ACgAKwAhACYA6QDqAOsA6ADtAO4A7wDsAN8AXQAkACoAKQA7AF4ALQAvAMIAxADAAMEAwwDFAMcA0QCmACwAJQBfAD4APwD4AMkAygDLAMgAzQDOAM8AzABgADoAIwBAACcAPQAiANgAYQBiAGMAZABlAGYAZwBoAGkAqwC7APAA/QD+ALEAsABqAGsAbABtAG4AbwBwAHEAcgCqALoA5gC4AMYApAC1AH4AcwB0AHUAdgB3AHgAeQB6AKEAvwDQAN0A3gCuAKIAowClALcAqQCnALYAvAC9AL4ArAB8AK8AqAC0ANcAewBBAEIAQwBEAEUARgBHAEgASQCtAPQA9gDyAPMA9QB9AEoASwBMAE0ATgBPAFAAUQBSALkA+wD8APkA+gD/AFwA9wBTAFQAVQBWAFcAWABZAFoAsgDUANYA0gDTANUAMAAxADIAMwA0ADUANgA3ADgAOQCzANsA3ADZANoAnwA=",
+  "base64"
+);
 
 const encodeEbcdic = (
   value: string,
@@ -162,6 +166,8 @@ const encodeIbm037 = (value: string): Buffer =>
   encodeEbcdic(value, IBM037_TO_UNICODE);
 const encodeIbm273 = (value: string): Buffer =>
   encodeEbcdic(value, IBM273_TO_UNICODE);
+const encodeIbm500 = (value: string): Buffer =>
+  encodeEbcdic(value, IBM500_TO_UNICODE);
 const encodeIbm1140 = (value: string): Buffer =>
   encodeEbcdic(value, IBM037_TO_UNICODE, true);
 const encodeIbm1141 = (value: string): Buffer =>
@@ -15545,6 +15551,27 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const ibm273BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM273"')
     .replace("<Label>Sample booklet</Label>", "<Label>Größe für Köln: §</Label>");
+  const registeredIbm500EncodingBooklets = [
+    "IBM500",
+    "cp500",
+    "csIBM500",
+    "EBCDIC-CP-BE",
+    "EBCDIC-CP-CH"
+  ].map((xmlEncoding, aliasIndex) => ({
+    fileName: `ibm500-${aliasIndex + 1}-original-booklet.xml`,
+    bytes: encodeIbm500(
+      validBookletXml
+        .replace(
+          /encoding=["']utf-8["']/i,
+          `encoding="${xmlEncoding}"`
+        )
+        .replace(
+          "<Label>Sample booklet</Label>",
+          "<Label>Épreuve à Genève: ç</Label>"
+        )
+    ),
+    displayLabel: "Épreuve à Genève: ç"
+  }));
   const ibm1141BookletXml = validBookletXml
     .replace(/encoding=["']utf-8["']/i, 'encoding="IBM01141"')
     .replace("<Label>Sample booklet</Label>", "<Label>Preis 12 € in Köln</Label>");
@@ -15776,6 +15803,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       bytes: encodeIbm273(ibm273BookletXml),
       displayLabel: "Größe für Köln: §"
     },
+    ...registeredIbm500EncodingBooklets,
     {
       fileName: "ibm1141-original-booklet.xml",
       bytes: encodeIbm1141(ibm1141BookletXml),
