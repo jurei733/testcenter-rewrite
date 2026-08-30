@@ -19738,7 +19738,7 @@ try {
     name: /Copy Entry URL:/
   });
   await savedRosterCopyLinkButton.waitFor({ state: "visible" });
-  await savedRosterCopyLinkButton.click({ force: true });
+  await savedRosterCopyLinkButton.click();
   await savedRosterBenCard
     .getByRole("button", { name: /Copied Entry URL:/ })
     .waitFor({ state: "visible" });
