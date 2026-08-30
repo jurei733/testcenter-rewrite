@@ -1,4 +1,7 @@
-import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import {
+  createWorkspaceSourcePackageReferenceRevision,
+  type FirstSliceRepository
+} from "@testcenter-rewrite-app/application";
 import { selectLatestParticipantTestStateLogs } from "@testcenter-rewrite-app/domain";
 import type {
   AdminLoginAttempt,
@@ -404,6 +407,19 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
       const idsMatch = (actual: string[], expected: string[]): boolean =>
         JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+      const workspaceSourcePackageReferenceRevision =
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages: Array.from(state.sourcePackages.values()).filter(
+            candidate =>
+              candidate.tenantId === input.tenantId &&
+              candidate.workspaceId === input.workspaceId
+          ),
+          activityEvents: Array.from(state.workspaceActivityEvents.values()).filter(
+            activityEvent =>
+              activityEvent.tenantId === input.tenantId &&
+              activityEvent.workspaceId === input.workspaceId
+          )
+        });
       const isBlocked =
         importJobs.some(
           importJob => importJob.status === "queued" || importJob.status === "running"
@@ -418,7 +434,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       if (
         isBlocked ||
         !idsMatch([...importJobIds], input.expectedImportJobIds) ||
-        !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds)
+        !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds) ||
+        workspaceSourcePackageReferenceRevision !==
+          input.expectedWorkspaceSourcePackageReferenceRevision
       ) {
         return false;
       }

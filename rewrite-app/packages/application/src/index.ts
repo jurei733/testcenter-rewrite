@@ -1324,6 +1324,7 @@ export type FirstSliceRepository = {
     sourcePackageId: string;
     expectedImportJobIds: string[];
     expectedContentReleaseIds: string[];
+    expectedWorkspaceSourcePackageReferenceRevision: string;
   }): Promise<boolean>;
   getImportJobById(importJobId: string): Promise<ImportJob | null>;
   listImportJobsByWorkspace(
@@ -16461,6 +16462,66 @@ const createWorkspaceDependencySelectionRevision = (
     )
     .digest("hex")}`;
 
+export const createWorkspaceSourcePackageReferenceRevision = (input: {
+  sourcePackages: SourcePackage[];
+  activityEvents: WorkspaceActivityEvent[];
+}): string => {
+  const sourcePackages = [...input.sourcePackages]
+    .sort((left, right) =>
+      left.sourcePackageId.localeCompare(right.sourcePackageId)
+    )
+    .map(sourcePackage => ({
+      sourcePackageId: sourcePackage.sourcePackageId,
+      fileName: sourcePackage.fileName,
+      mediaType: sourcePackage.mediaType,
+      sourceDocument: sourcePackage.sourceDocument,
+      status: sourcePackage.status
+    }));
+  const activityEvents = input.activityEvents
+    .filter(
+      activityEvent =>
+        activityEvent.eventType === "source_package_assembled" ||
+        activityEvent.eventType === "source_package_replaced"
+    )
+    .sort((left, right) =>
+      left.activityEventId.localeCompare(right.activityEventId)
+    )
+    .map(activityEvent => ({
+      activityEventId: activityEvent.activityEventId,
+      eventType: activityEvent.eventType,
+      subjectId: activityEvent.subjectId,
+      occurredAt: activityEvent.occurredAt,
+      assemblyMode:
+        typeof activityEvent.details.assemblyMode === "string"
+          ? activityEvent.details.assemblyMode
+          : null,
+      rootSourcePackageId:
+        typeof activityEvent.details.rootSourcePackageId === "string"
+          ? activityEvent.details.rootSourcePackageId
+          : null,
+      replacementSourcePackageId:
+        typeof activityEvent.details.replacementSourcePackageId === "string"
+          ? activityEvent.details.replacementSourcePackageId
+          : null,
+      sourcePackageIds: Array.isArray(activityEvent.details.sourcePackages)
+        ? activityEvent.details.sourcePackages
+            .flatMap(member =>
+              member &&
+              typeof member === "object" &&
+              "sourcePackageId" in member &&
+              typeof member.sourcePackageId === "string"
+                ? [member.sourcePackageId]
+                : []
+            )
+            .sort()
+        : []
+    }));
+
+  return `sha256:${createHash("sha256")
+    .update(JSON.stringify({ sourcePackages, activityEvents }))
+    .digest("hex")}`;
+};
+
 type WorkspaceDependencySourceResolution =
   | { status: "not_applicable" }
   | { status: "resolved"; sourcePackages: SourcePackage[] }
@@ -31032,7 +31093,12 @@ export const createFirstSliceServices = (
           ),
           expectedContentReleaseIds: readiness.contentReleases.map(
             contentRelease => contentRelease.contentReleaseId
-          )
+          ),
+          expectedWorkspaceSourcePackageReferenceRevision:
+            createWorkspaceSourcePackageReferenceRevision({
+              sourcePackages,
+              activityEvents
+            })
         });
         if (!deleted) {
           throw new FirstSliceError(

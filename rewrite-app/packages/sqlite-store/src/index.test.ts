@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
+import { createWorkspaceSourcePackageReferenceRevision } from "@testcenter-rewrite-app/application";
 import type {
   AdminLoginAttempt,
   AdminRoleAssignment,
@@ -12,11 +13,67 @@ import type {
   ApplicationAsset,
   OperationalLoginMigrationCandidate,
   ParticipantRosterEntry,
+  SourcePackage,
   TestRun,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
+
+test("SQLite rejects source-package deletion after a concurrent workspace mutation", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-delete-race-"));
+  const databasePath = join(tempDirectory, "delete-race.sqlite");
+  const sourcePackage: SourcePackage = {
+    sourcePackageId: "sqlite-source-package-delete-race",
+    tenantId: "sqlite-tenant-delete-race",
+    workspaceId: "sqlite-workspace-delete-race",
+    fileName: "Unit.xml",
+    mediaType: "application/xml",
+    contentStructure: null,
+    sourceDocument: "<Unit><Metadata><Id>UNIT.RACE</Id></Metadata></Unit>",
+    status: "accepted",
+    uploadedAt: "2026-08-30T00:00:00.000Z"
+  };
+  const concurrentRoot: SourcePackage = {
+    ...sourcePackage,
+    sourcePackageId: "sqlite-source-package-concurrent-root",
+    fileName: "Booklet.xml",
+    sourceDocument: "<Booklet><Units /></Booklet>"
+  };
+  const staleRevision = createWorkspaceSourcePackageReferenceRevision({
+    sourcePackages: [sourcePackage, concurrentRoot],
+    activityEvents: []
+  });
+
+  try {
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    await repository.saveSourcePackage(sourcePackage);
+    await repository.saveSourcePackage(concurrentRoot);
+    await repository.saveSourcePackage({
+      ...concurrentRoot,
+      sourceDocument:
+        '<Booklet><Units><Unit id="UNIT.RACE" /></Units></Booklet>'
+    });
+
+    assert.equal(
+      await repository.deleteSourcePackageAggregate({
+        tenantId: sourcePackage.tenantId,
+        workspaceId: sourcePackage.workspaceId,
+        sourcePackageId: sourcePackage.sourcePackageId,
+        expectedImportJobIds: [],
+        expectedContentReleaseIds: [],
+        expectedWorkspaceSourcePackageReferenceRevision: staleRevision
+      }),
+      false
+    );
+    assert.deepEqual(
+      await repository.getSourcePackageById(sourcePackage.sourcePackageId),
+      sourcePackage
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
 
 test("SQLite preserves global application assets across repository restarts", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-app-assets-"));

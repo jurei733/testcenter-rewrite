@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { createWorkspaceSourcePackageReferenceRevision } from "@testcenter-rewrite-app/application";
 import type {
   AdminLoginAttempt,
   AdminUser,
@@ -243,7 +244,12 @@ describe("createFileFirstSliceRepository", () => {
           workspaceId: sourcePackage.workspaceId,
           sourcePackageId: sourcePackage.sourcePackageId,
           expectedImportJobIds: [contentRelease.importJobId],
-          expectedContentReleaseIds: [contentRelease.contentReleaseId]
+          expectedContentReleaseIds: [contentRelease.contentReleaseId],
+          expectedWorkspaceSourcePackageReferenceRevision:
+            createWorkspaceSourcePackageReferenceRevision({
+              sourcePackages: [sourcePackage],
+              activityEvents: []
+            })
         }),
         true
       );
@@ -258,6 +264,56 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(
         await restarted.getContentReleaseById(contentRelease.contentReleaseId),
         null
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects deletion when workspace source-package references changed", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-delete-race-"));
+    const filePath = join(tempDirectory, "state.json");
+    const sourcePackage: SourcePackage = {
+      sourcePackageId: "source-package-delete-race",
+      tenantId: "tenant-delete-race",
+      workspaceId: "workspace-delete-race",
+      fileName: "Unit.xml",
+      mediaType: "application/xml",
+      contentStructure: null,
+      sourceDocument: "<Unit><Metadata><Id>UNIT.RACE</Id></Metadata></Unit>",
+      status: "accepted",
+      uploadedAt: "2026-08-30T00:00:00.000Z"
+    };
+    const staleRevision = createWorkspaceSourcePackageReferenceRevision({
+      sourcePackages: [sourcePackage],
+      activityEvents: []
+    });
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveSourcePackage(sourcePackage);
+      await repository.saveSourcePackage({
+        ...sourcePackage,
+        sourcePackageId: "source-package-concurrent-root",
+        fileName: "Booklet.xml",
+        sourceDocument:
+          '<Booklet><Units><Unit id="UNIT.RACE" /></Units></Booklet>'
+      });
+
+      assert.equal(
+        await repository.deleteSourcePackageAggregate({
+          tenantId: sourcePackage.tenantId,
+          workspaceId: sourcePackage.workspaceId,
+          sourcePackageId: sourcePackage.sourcePackageId,
+          expectedImportJobIds: [],
+          expectedContentReleaseIds: [],
+          expectedWorkspaceSourcePackageReferenceRevision: staleRevision
+        }),
+        false
+      );
+      assert.deepEqual(
+        await repository.getSourcePackageById(sourcePackage.sourcePackageId),
+        sourcePackage
       );
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });

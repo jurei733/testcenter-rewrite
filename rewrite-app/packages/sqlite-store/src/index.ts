@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import {
+  createWorkspaceSourcePackageReferenceRevision,
+  type FirstSliceRepository
+} from "@testcenter-rewrite-app/application";
 import type {
   AdminLoginAttempt,
   AdminAuditEvent,
@@ -2426,6 +2429,34 @@ export const createSqliteFirstSliceRepository = (
         );
         const idsMatch = (actual: string[], expected: string[]): boolean =>
           JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const workspaceSourcePackages = (
+          database
+            .prepare(
+              `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+               FROM source_packages
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(input.tenantId, input.workspaceId) as Record<string, unknown>[]
+        )
+          .map(row => mapSourcePackage(row))
+          .filter(Boolean) as SourcePackage[];
+        const workspaceActivityEvents = (
+          database
+            .prepare(
+              `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                      subject_type, subject_id, occurred_at, summary, details_json
+               FROM workspace_activity_events
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(input.tenantId, input.workspaceId) as Record<string, unknown>[]
+        )
+          .map(row => mapWorkspaceActivityEvent(row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        const workspaceSourcePackageReferenceRevision =
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages: workspaceSourcePackages,
+            activityEvents: workspaceActivityEvents
+          });
         const referenceCount = contentReleaseIds.length
           ? Number(
               (
@@ -2455,7 +2486,9 @@ export const createSqliteFirstSliceRepository = (
         if (
           isBlocked ||
           !idsMatch(importJobIds, input.expectedImportJobIds) ||
-          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds)
+          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds) ||
+          workspaceSourcePackageReferenceRevision !==
+            input.expectedWorkspaceSourcePackageReferenceRevision
         ) {
           database.exec("ROLLBACK");
           return false;

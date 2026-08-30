@@ -1,6 +1,9 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
-import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import {
+  createWorkspaceSourcePackageReferenceRevision,
+  type FirstSliceRepository
+} from "@testcenter-rewrite-app/application";
 import type {
   AdminLoginAttempt,
   AdminAuditEvent,
@@ -1543,6 +1546,37 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     return result.rows.map(row => map(row as Row)).filter(Boolean) as T[];
   };
 
+  const withWorkspaceMutationLock = async <Result>(
+    tenantId: string,
+    workspaceId: string,
+    mutation: (client: PoolClient) => Promise<Result>
+  ): Promise<Result> => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const workspace = await client.query(
+        `SELECT workspace_id
+         FROM workspaces
+         WHERE tenant_id = $1 AND workspace_id = $2
+         FOR UPDATE`,
+        [tenantId, workspaceId]
+      );
+      if (workspace.rowCount !== 1) {
+        throw new Error(
+          `Workspace '${workspaceId}' is unavailable for a source-package reference mutation.`
+        );
+      }
+      const result = await mutation(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
   return {
     async getApplicationSettings() {
       return one(
@@ -2152,32 +2186,37 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveWorkspaceActivityEvent(activityEvent) {
-      await pool.query(
-        `INSERT INTO workspace_activity_events (
-          activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT(activity_event_id) DO UPDATE SET
-          tenant_id = EXCLUDED.tenant_id,
-          workspace_id = EXCLUDED.workspace_id,
-          event_type = EXCLUDED.event_type,
-          actor_id = EXCLUDED.actor_id,
-          subject_type = EXCLUDED.subject_type,
-          subject_id = EXCLUDED.subject_id,
-          occurred_at = EXCLUDED.occurred_at,
-          summary = EXCLUDED.summary,
-          details_json = EXCLUDED.details_json`,
-        [
-          activityEvent.activityEventId,
-          activityEvent.tenantId,
-          activityEvent.workspaceId,
-          activityEvent.eventType,
-          activityEvent.actorId,
-          activityEvent.subjectType,
-          activityEvent.subjectId,
-          activityEvent.occurredAt,
-          activityEvent.summary,
-          JSON.stringify(activityEvent.details)
-        ]
+      await withWorkspaceMutationLock(
+        activityEvent.tenantId,
+        activityEvent.workspaceId,
+        client =>
+          client.query(
+            `INSERT INTO workspace_activity_events (
+              activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT(activity_event_id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
+              workspace_id = EXCLUDED.workspace_id,
+              event_type = EXCLUDED.event_type,
+              actor_id = EXCLUDED.actor_id,
+              subject_type = EXCLUDED.subject_type,
+              subject_id = EXCLUDED.subject_id,
+              occurred_at = EXCLUDED.occurred_at,
+              summary = EXCLUDED.summary,
+              details_json = EXCLUDED.details_json`,
+            [
+              activityEvent.activityEventId,
+              activityEvent.tenantId,
+              activityEvent.workspaceId,
+              activityEvent.eventType,
+              activityEvent.actorId,
+              activityEvent.subjectType,
+              activityEvent.subjectId,
+              activityEvent.occurredAt,
+              activityEvent.summary,
+              JSON.stringify(activityEvent.details)
+            ]
+          )
       );
     },
     async deleteWorkspaceActivityEventsByIds(activityEventIds) {
@@ -2209,38 +2248,54 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       );
     },
     async saveSourcePackage(sourcePackage) {
-      await pool.query(
-        `INSERT INTO source_packages (
-          source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT(source_package_id) DO UPDATE SET
-          tenant_id = EXCLUDED.tenant_id,
-          workspace_id = EXCLUDED.workspace_id,
-          file_name = EXCLUDED.file_name,
-          media_type = EXCLUDED.media_type,
-          content_structure_json = EXCLUDED.content_structure_json,
-          source_document_text = EXCLUDED.source_document_text,
-          status = EXCLUDED.status,
-          uploaded_at = EXCLUDED.uploaded_at`,
-        [
-          sourcePackage.sourcePackageId,
-          sourcePackage.tenantId,
-          sourcePackage.workspaceId,
-          sourcePackage.fileName,
-          sourcePackage.mediaType,
-          sourcePackage.contentStructure
-            ? JSON.stringify(sourcePackage.contentStructure)
-            : null,
-          sourcePackage.sourceDocument,
-          sourcePackage.status,
-          sourcePackage.uploadedAt
-        ]
+      await withWorkspaceMutationLock(
+        sourcePackage.tenantId,
+        sourcePackage.workspaceId,
+        client =>
+          client.query(
+            `INSERT INTO source_packages (
+              source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT(source_package_id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
+              workspace_id = EXCLUDED.workspace_id,
+              file_name = EXCLUDED.file_name,
+              media_type = EXCLUDED.media_type,
+              content_structure_json = EXCLUDED.content_structure_json,
+              source_document_text = EXCLUDED.source_document_text,
+              status = EXCLUDED.status,
+              uploaded_at = EXCLUDED.uploaded_at`,
+            [
+              sourcePackage.sourcePackageId,
+              sourcePackage.tenantId,
+              sourcePackage.workspaceId,
+              sourcePackage.fileName,
+              sourcePackage.mediaType,
+              sourcePackage.contentStructure
+                ? JSON.stringify(sourcePackage.contentStructure)
+                : null,
+              sourcePackage.sourceDocument,
+              sourcePackage.status,
+              sourcePackage.uploadedAt
+            ]
+          )
       );
     },
     async deleteSourcePackageAggregate(input) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        const workspace = await client.query(
+          `SELECT workspace_id
+           FROM workspaces
+           WHERE tenant_id = $1 AND workspace_id = $2
+           FOR UPDATE`,
+          [input.tenantId, input.workspaceId]
+        );
+        if (workspace.rowCount !== 1) {
+          await client.query("ROLLBACK");
+          return false;
+        }
         const sourcePackage = await client.query<{ source_package_id: string }>(
           `SELECT source_package_id
            FROM source_packages
@@ -2287,6 +2342,33 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         );
         const idsMatch = (actual: string[], expected: string[]): boolean =>
           JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const workspaceSourcePackages = (
+          await client.query(
+            `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
+                    content_structure_json, source_document_text, status, uploaded_at
+             FROM source_packages
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [input.tenantId, input.workspaceId]
+          )
+        ).rows
+          .map(row => mapSourcePackage(row as Row))
+          .filter(Boolean) as SourcePackage[];
+        const workspaceActivityEvents = (
+          await client.query(
+            `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                    subject_type, subject_id, occurred_at, summary, details_json
+             FROM workspace_activity_events
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [input.tenantId, input.workspaceId]
+          )
+        ).rows
+          .map(row => mapWorkspaceActivityEvent(row as Row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        const workspaceSourcePackageReferenceRevision =
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages: workspaceSourcePackages,
+            activityEvents: workspaceActivityEvents
+          });
         const isBlocked =
           importJobs.rows.some(
             row => row.status === "queued" || row.status === "running"
@@ -2296,7 +2378,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         if (
           isBlocked ||
           !idsMatch(importJobIds, input.expectedImportJobIds) ||
-          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds)
+          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds) ||
+          workspaceSourcePackageReferenceRevision !==
+            input.expectedWorkspaceSourcePackageReferenceRevision
         ) {
           await client.query("ROLLBACK");
           return false;

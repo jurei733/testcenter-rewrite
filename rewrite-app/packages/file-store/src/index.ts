@@ -10,7 +10,10 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import {
+  createWorkspaceSourcePackageReferenceRevision,
+  type FirstSliceRepository
+} from "@testcenter-rewrite-app/application";
 import {
   defaultApplicationSettings,
   selectLatestParticipantTestStateLogs
@@ -974,6 +977,19 @@ export const createFileFirstSliceRepository = (
         );
         const idsMatch = (actual: string[], expected: string[]): boolean =>
           JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const workspaceSourcePackageReferenceRevision =
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages: Object.values(state.sourcePackages).filter(
+              candidate =>
+                candidate.tenantId === input.tenantId &&
+                candidate.workspaceId === input.workspaceId
+            ),
+            activityEvents: Object.values(state.workspaceActivityEvents).filter(
+              activityEvent =>
+                activityEvent.tenantId === input.tenantId &&
+                activityEvent.workspaceId === input.workspaceId
+            )
+          });
         const isBlocked =
           importJobs.some(
             importJob => importJob.status === "queued" || importJob.status === "running"
@@ -988,7 +1004,9 @@ export const createFileFirstSliceRepository = (
         if (
           isBlocked ||
           !idsMatch([...importJobIds], input.expectedImportJobIds) ||
-          !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds)
+          !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds) ||
+          workspaceSourcePackageReferenceRevision !==
+            input.expectedWorkspaceSourcePackageReferenceRevision
         ) {
           return false;
         }
