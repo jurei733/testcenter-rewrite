@@ -5841,7 +5841,23 @@ try {
   await ambiguousDependencyDiagnostic
     .getByRole("button", { name: "Use Unit2.xml" })
     .waitFor();
-  const guidedDependencyImportRequestPromise = page.waitForRequest(
+  const concurrentLooseUnitReplacement = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateLooseUnitSourcePackageId}/replacements`,
+    {
+      body: {
+        fileName: "Unit2-newest.xml",
+        mediaType: "application/xml",
+        sourceDocument: await readFile(
+          resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+          "utf8"
+        )
+      }
+    }
+  ).then(response => response.json());
+  assert.ok(
+    concurrentLooseUnitReplacement.replacementSourcePackage.sourcePackageId
+  );
+  const staleDependencyImportRequestPromise = page.waitForRequest(
     request =>
       request.method() === "POST" &&
       request.url().endsWith(
@@ -5851,12 +5867,62 @@ try {
   await ambiguousDependencyDiagnostic
     .getByRole("button", { name: "Use Unit2-copy.xml" })
     .click();
+  const staleDependencyImportRequest =
+    await staleDependencyImportRequestPromise;
+  assert.match(
+    staleDependencyImportRequest.postDataJSON().dependencySelectionRevision,
+    /^sha256:[a-f0-9]{64}$/
+  );
+  await waitForBusy("stale-workspace-dependency-import");
+  await waitForNotBusy("stale-workspace-dependency-import");
+  await importDiagnosticsCollection
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "source_document_workspace_dependency_selection_stale"
+      })
+    })
+    .filter({ hasText: "Refresh the failed import" })
+    .waitFor({ timeout: 20_000 });
+
+  await page.locator("#createImportJobButton").click();
+  await waitForBusy("refresh-ambiguous-workspace-dependency-import");
+  await waitForNotBusy("refresh-ambiguous-workspace-dependency-import");
+  const refreshedAmbiguousDependencyDiagnostic = importDiagnosticsCollection
+    .locator("article.record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "source_document_workspace_dependency_ambiguous"
+      })
+    })
+    .filter({ hasText: "operator choice required" })
+    .filter({ hasText: "Candidate Count" })
+    .filter({ hasText: "3" });
+  await refreshedAmbiguousDependencyDiagnostic.waitFor({ timeout: 20_000 });
+  const guidedDependencyImportRequestPromise = page.waitForRequest(
+    request =>
+      request.method() === "POST" &&
+      request.url().endsWith(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`
+      )
+  );
+  await refreshedAmbiguousDependencyDiagnostic
+    .getByRole("button", { name: "Use Unit2-copy.xml" })
+    .click();
   const guidedDependencyImportRequest =
     await guidedDependencyImportRequestPromise;
-  assert.deepEqual(guidedDependencyImportRequest.postDataJSON(), {
+  const {
+    dependencySelectionRevision: guidedDependencySelectionRevision,
+    ...guidedDependencyImportBody
+  } = guidedDependencyImportRequest.postDataJSON();
+  assert.deepEqual(guidedDependencyImportBody, {
     sourcePackageId: looseBookletSourcePackageId,
     dependencySourcePackageIds: [duplicateLooseUnitSourcePackageId]
   });
+  assert.match(
+    guidedDependencySelectionRevision,
+    /^sha256:[a-f0-9]{64}$/
+  );
   await waitForBusy("guided-workspace-dependency-import");
   await waitForNotBusy("guided-workspace-dependency-import");
   await page

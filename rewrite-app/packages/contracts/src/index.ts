@@ -377,6 +377,7 @@ export type AssembleSourcePackagesRequest = {
 export type CreateImportJobRequest = {
   sourcePackageId: string;
   dependencySourcePackageIds?: string[];
+  dependencySelectionRevision?: string;
 };
 
 export type RetrySourcePackageImportRequest = {

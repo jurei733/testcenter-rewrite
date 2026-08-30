@@ -28522,6 +28522,7 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
         details?: {
           rootSourcePackageId?: string;
           dependencyReference?: string;
+          dependencySelectionRevision?: string;
           selectedDependencySourcePackageIds?: string[];
           candidateSourcePackages?: Array<{
             sourcePackageId: string;
@@ -28569,6 +28570,10 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     ambiguousDependencyDetails?.selectedDependencySourcePackageIds,
     []
   );
+  assert.match(
+    ambiguousDependencyDetails?.dependencySelectionRevision ?? "",
+    /^sha256:[a-f0-9]{64}$/
+  );
   assert.deepEqual(
     ambiguousDependencyDetails?.candidateSourcePackages
       ?.map(candidate => ({
@@ -28608,6 +28613,95 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     "source_document_workspace_dependency_selection_duplicate"
   );
 
+  const concurrentDependencyReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Unit2-newest.xml",
+        mediaType: "application/xml",
+        sourceDocument: readFileSync(
+          resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
+          "utf8"
+        )
+      }
+    }
+  );
+  assert.equal(concurrentDependencyReplacement.status, 201);
+
+  const staleGuidedSelection = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId: sourcePackages[0]!.sourcePackageId,
+        dependencySourcePackageIds: [
+          duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
+        ],
+        dependencySelectionRevision:
+          ambiguousDependencyDetails?.dependencySelectionRevision
+      }
+    }
+  );
+  assert.equal(staleGuidedSelection.status, 201);
+  assert.equal(staleGuidedSelection.body.importJob.status, "failed");
+  assert.deepEqual(
+    staleGuidedSelection.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_workspace_dependency_selection_stale"]
+  );
+  assert.equal(staleGuidedSelection.body.stagedContentRelease, null);
+
+  const refreshedAmbiguousImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{
+        code: string;
+        details?: {
+          dependencySelectionRevision?: string;
+          candidateSourcePackages?: Array<{ sourcePackageId: string }>;
+        };
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+    }
+  );
+  assert.equal(refreshedAmbiguousImport.status, 201);
+  assert.equal(refreshedAmbiguousImport.body.importJob.status, "failed");
+  assert.equal(
+    refreshedAmbiguousImport.body.importJob.diagnostics[0]?.code,
+    "source_document_workspace_dependency_ambiguous"
+  );
+  assert.equal(
+    refreshedAmbiguousImport.body.importJob.diagnostics[0]?.details
+      ?.candidateSourcePackages?.length,
+    3
+  );
+  const refreshedDependencySelectionRevision =
+    refreshedAmbiguousImport.body.importJob.diagnostics[0]?.details
+      ?.dependencySelectionRevision;
+  assert.match(
+    refreshedDependencySelectionRevision ?? "",
+    /^sha256:[a-f0-9]{64}$/
+  );
+  assert.notEqual(
+    refreshedDependencySelectionRevision,
+    ambiguousDependencyDetails?.dependencySelectionRevision
+  );
+
   const guidedAutomaticImport = await requestJson<{
     importJob: {
       sourcePackageId: string;
@@ -28623,7 +28717,8 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
         sourcePackageId: sourcePackages[0]!.sourcePackageId,
         dependencySourcePackageIds: [
           duplicateUnitReplacement.body.replacementSourcePackage.sourcePackageId
-        ]
+        ],
+        dependencySelectionRevision: refreshedDependencySelectionRevision
       }
     }
   );

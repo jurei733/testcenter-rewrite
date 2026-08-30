@@ -226,14 +226,16 @@ export class RewriteAppContentService {
   }
 
   async createImportJob(
-    dependencySourcePackageIds: string[] = []
+    dependencySourcePackageIds: string[] = [],
+    dependencySelectionRevision?: string
   ): Promise<void> {
     if (!this.hasWorkspaceScope()) {
       return;
     }
     await createImportJobAction(
       this.createActionsHost(),
-      dependencySourcePackageIds
+      dependencySourcePackageIds,
+      dependencySelectionRevision
     );
   }
 

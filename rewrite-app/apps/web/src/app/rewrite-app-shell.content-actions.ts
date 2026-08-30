@@ -76,7 +76,8 @@ export async function createSourcePackageAction(
 
 export async function createImportJobAction(
   host: ContentActionsHost,
-  dependencySourcePackageIds: string[] = []
+  dependencySourcePackageIds: string[] = [],
+  dependencySelectionRevision?: string
 ): Promise<void> {
   const requestedSourcePackageId = host.getSourcePackageId();
   const payload = await host.request<CreateImportJobResponse>(
@@ -89,7 +90,7 @@ export async function createImportJobAction(
     {
       sourcePackageId: host.getSourcePackageId(),
       ...(dependencySourcePackageIds.length > 0
-        ? { dependencySourcePackageIds }
+        ? { dependencySourcePackageIds, dependencySelectionRevision }
         : {})
     } satisfies CreateImportJobRequest
   );

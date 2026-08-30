@@ -51,6 +51,7 @@ type WorkspaceDependencyAmbiguityCandidate = {
 type WorkspaceDependencyAmbiguity = {
   rootSourcePackageId: string;
   dependencyReference: string;
+  dependencySelectionRevision: string;
   selectedDependencySourcePackageIds: string[];
   candidates: WorkspaceDependencyAmbiguityCandidate[];
 };
@@ -1578,6 +1579,8 @@ export class ContentViewFacade {
                   label: `Use ${candidate.fileName}`,
                   payload: {
                     rootSourcePackageId: ambiguity.rootSourcePackageId,
+                    dependencySelectionRevision:
+                      ambiguity.dependencySelectionRevision,
                     dependencySourcePackageIds: JSON.stringify([
                       ...ambiguity.selectedDependencySourcePackageIds,
                       candidate.sourcePackageId
@@ -2575,7 +2578,13 @@ export class ContentViewFacade {
       item.actionPayload?.rootSourcePackageId?.trim();
     const serializedDependencySourcePackageIds =
       item.actionPayload?.dependencySourcePackageIds;
-    if (!rootSourcePackageId || !serializedDependencySourcePackageIds) {
+    const dependencySelectionRevision =
+      item.actionPayload?.dependencySelectionRevision?.trim();
+    if (
+      !rootSourcePackageId ||
+      !serializedDependencySourcePackageIds ||
+      !dependencySelectionRevision
+    ) {
       return;
     }
     let dependencySourcePackageIds: string[];
@@ -2610,7 +2619,10 @@ export class ContentViewFacade {
     this.content.contentReleaseId = "";
     this.persistState();
     this.viewState.onActionAsync(() =>
-      this.contentService.createImportJob(dependencySourcePackageIds)
+      this.contentService.createImportJob(
+        dependencySourcePackageIds,
+        dependencySelectionRevision
+      )
     );
   }
 
@@ -2865,6 +2877,10 @@ export class ContentViewFacade {
       typeof diagnostic.details["dependencyReference"] === "string"
         ? diagnostic.details["dependencyReference"].trim()
         : "";
+    const dependencySelectionRevision =
+      typeof diagnostic.details["dependencySelectionRevision"] === "string"
+        ? diagnostic.details["dependencySelectionRevision"].trim()
+        : "";
     const selectedDependencySourcePackageIds = Array.isArray(
       diagnostic.details["selectedDependencySourcePackageIds"]
     )
@@ -2898,12 +2914,18 @@ export class ContentViewFacade {
             : [];
         })
       : [];
-    if (!rootSourcePackageId || !dependencyReference || candidates.length < 2) {
+    if (
+      !rootSourcePackageId ||
+      !dependencyReference ||
+      !/^sha256:[a-f0-9]{64}$/.test(dependencySelectionRevision) ||
+      candidates.length < 2
+    ) {
       return null;
     }
     return {
       rootSourcePackageId,
       dependencyReference,
+      dependencySelectionRevision,
       selectedDependencySourcePackageIds,
       candidates
     };

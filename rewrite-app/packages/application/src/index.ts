@@ -221,6 +221,7 @@ export type ContentIntakePort = {
     workspaceKey: string;
     sourcePackageId: string;
     dependencySourcePackageIds?: string[];
+    dependencySelectionRevision?: string;
   }): Promise<ImportJob>;
   retrySourcePackageImport(input: {
     tenantKey: string;
@@ -1230,6 +1231,7 @@ export type FirstSliceServices = FirstSlicePorts & {
     workspaceKey: string;
     sourcePackageId: string;
     dependencySourcePackageIds?: string[];
+    dependencySelectionRevision?: string;
   }): Promise<CreateImportJobResult>;
 };
 
@@ -16446,6 +16448,19 @@ const workspaceDependencyReferenceKeys = (reference: string): string[] => {
     .filter((value, index, values) => value && values.indexOf(value) === index);
 };
 
+const createWorkspaceDependencySelectionRevision = (
+  rootSourcePackageId: string,
+  candidateSourcePackageIds: string[]
+): string =>
+  `sha256:${createHash("sha256")
+    .update(
+      JSON.stringify({
+        rootSourcePackageId,
+        candidateSourcePackageIds: [...candidateSourcePackageIds].sort()
+      })
+    )
+    .digest("hex")}`;
+
 type WorkspaceDependencySourceResolution =
   | { status: "not_applicable" }
   | { status: "resolved"; sourcePackages: SourcePackage[] }
@@ -16455,6 +16470,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
   rootSourcePackage: SourcePackage;
   workspaceSourcePackages: SourcePackage[];
   dependencySourcePackageIds?: string[];
+  dependencySelectionRevision?: string;
 }): WorkspaceDependencySourceResolution => {
   const rootReferences = collectLooseSourcePackageDependencyReferences(
     input.rootSourcePackage
@@ -16515,6 +16531,30 @@ const resolveWorkspaceDependencySourcePackages = (input: {
 
   const requestedDependencySourcePackageIds =
     input.dependencySourcePackageIds ?? [];
+  const dependencySelectionRevision =
+    createWorkspaceDependencySelectionRevision(
+      input.rootSourcePackage.sourcePackageId,
+      candidates.map(candidate => candidate.sourcePackage.sourcePackageId)
+    );
+  if (
+    requestedDependencySourcePackageIds.length > 0 &&
+    input.dependencySelectionRevision !== dependencySelectionRevision
+  ) {
+    return {
+      status: "blocked",
+      diagnostic: createImportDiagnostic(
+        "source_document_workspace_dependency_selection_stale",
+        `The workspace files changed after the dependency candidates for '${input.rootSourcePackage.fileName}' were loaded. Refresh the failed import and choose from the current candidates.`,
+        "error",
+        {
+          rootSourcePackageId: input.rootSourcePackage.sourcePackageId,
+          selectedDependencySourcePackageIds:
+            requestedDependencySourcePackageIds,
+          dependencySelectionRevision
+        }
+      )
+    };
+  }
   const requestedDependencySourcePackageIdSet = new Set(
     requestedDependencySourcePackageIds
   );
@@ -16626,6 +16666,7 @@ const resolveWorkspaceDependencySourcePackages = (input: {
                 dependencyReference: reference,
                 selectedDependencySourcePackageIds:
                   requestedDependencySourcePackageIds,
+                dependencySelectionRevision,
                 candidateSourcePackages: matches.map(candidate => ({
                   sourcePackageId: candidate.sourcePackage.sourcePackageId,
                   fileName: candidate.sourcePackage.fileName
@@ -25280,6 +25321,7 @@ export const createFirstSliceServices = (
     workspaceKey: string;
     sourcePackageId: string;
     dependencySourcePackageIds?: string[];
+    dependencySelectionRevision?: string;
   }, options: {
     resolveWorkspaceDependencies?: boolean;
   } = {}): Promise<CreateImportJobResult> => {
@@ -25301,6 +25343,17 @@ export const createFirstSliceServices = (
     const dependencySourcePackageIds = (
       input.dependencySourcePackageIds ?? []
     ).map(sourcePackageId => sourcePackageId.trim());
+    if (
+      input.dependencySelectionRevision !== undefined &&
+      (typeof input.dependencySelectionRevision !== "string" ||
+        !/^sha256:[a-f0-9]{64}$/.test(input.dependencySelectionRevision))
+    ) {
+      throw new FirstSliceError(
+        400,
+        "source_document_workspace_dependency_selection_revision_invalid",
+        "dependencySelectionRevision must be a sha256 revision returned by the dependency ambiguity diagnostic."
+      );
+    }
     if (
       new Set(dependencySourcePackageIds).size !==
       dependencySourcePackageIds.length
@@ -25353,7 +25406,8 @@ export const createFirstSliceServices = (
         resolveWorkspaceDependencySourcePackages({
           rootSourcePackage: sourcePackage,
           workspaceSourcePackages,
-          dependencySourcePackageIds
+          dependencySourcePackageIds,
+          dependencySelectionRevision: input.dependencySelectionRevision
         });
       if (workspaceDependencyResolution.status === "blocked") {
         workspaceDependencyDiagnostic = workspaceDependencyResolution.diagnostic;
