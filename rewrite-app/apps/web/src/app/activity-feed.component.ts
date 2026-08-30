@@ -20,7 +20,13 @@ import type { ActivityFeedItem } from "./rewrite-app-shell.types";
   styles: `
     :host {
       display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
       min-width: 0;
+      overflow: hidden;
+      contain: inline-size;
+      pointer-events: none;
     }
 
     .collection,
