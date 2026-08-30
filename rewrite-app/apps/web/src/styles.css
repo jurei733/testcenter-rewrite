@@ -1104,6 +1104,16 @@ pre {
   gap: 12px;
 }
 
+app-record-collection,
+.record-collection-grid,
+.record-card,
+.record-card-header,
+.record-card-rows {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .record-collection-grid[data-density="medium"] {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
 }
