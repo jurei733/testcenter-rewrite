@@ -1827,7 +1827,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.deepEqual(ib.metadataCompatibilityWarnings, [
     "the official repository labels this snapshot as a feasibility study rather than a production release",
     "the upstream package builder references a 0.2.0 filename while publishing the player as 0.2",
-    "the pinned legacy runtime loads inside the host sandbox but rejects the player's opaque null-origin controller messages, so interactive response and state parity are not claimed"
+    "the pinned legacy runtime requires a hash-pinned immediate-parent origin adapter inside the sandbox; interactive state capture is covered, but the feasibility Player does not restore supplied Unit state"
   ]);
   const ibPlayerHtml = brotliDecompressSync(
     Buffer.from(

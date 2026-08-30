@@ -1008,6 +1008,76 @@ const participantResourceSecurityHeaders = {
   "permissions-policy": "camera=(self), geolocation=(), microphone=()"
 };
 
+const DIPF_RUNTIME_9_9_0_HOST_SHA256 =
+  "80ab4da7e66af31bb51c8f59f32447cff6ce6a08218aa1f98266eddb0fb41f9d";
+const DIPF_RUNTIME_9_9_0_SCRIPT_SHA256 =
+  "126598c5211ed8cf88858fda0fcfee40f8cb454f83cae03919a3956e09b8f008";
+const DIPF_OPAQUE_PARENT_ORIGIN_COMPATIBILITY_SCRIPT = `<script data-testcenter-compatibility="dipf-opaque-parent-origin">
+(() => {
+  const nativeAddEventListener = window.addEventListener.bind(window);
+  window.addEventListener = (type, listener, options) => {
+    if (type !== "message" || typeof listener !== "function") {
+      return nativeAddEventListener(type, listener, options);
+    }
+    return nativeAddEventListener("message", event => {
+      if (event.origin !== "null" || event.source !== window.parent) {
+        listener.call(window, event);
+        return;
+      }
+      listener.call(window, new MessageEvent("message", {
+        data: event.data,
+        origin: window.location.origin,
+        source: event.source,
+        ports: event.ports
+      }));
+    }, options);
+  };
+})();
+</script>`;
+
+const applyParticipantResourceCompatibility = (
+  mediaType: string,
+  body: Buffer
+): Buffer => {
+  const bodySha256 = createHash("sha256").update(body).digest("hex");
+  if (
+    mediaType.toLowerCase().startsWith("text/javascript") &&
+    bodySha256 === DIPF_RUNTIME_9_9_0_SCRIPT_SHA256
+  ) {
+    const script = body.toString("utf8");
+    const responderTargetOrigin =
+      'i=void 0===t||null==t||0===t.length||"null"===t?"*":t;n.postMessage(r,i)';
+    if (script.split(responderTargetOrigin).length !== 2) {
+      return body;
+    }
+    return Buffer.from(
+      script.replace(
+        responderTargetOrigin,
+        'i=n===window.parent||void 0===t||null==t||0===t.length||"null"===t?"*":t;n.postMessage(r,i)'
+      ),
+      "utf8"
+    );
+  }
+  if (
+    !mediaType.toLowerCase().startsWith("text/html") ||
+    bodySha256 !== DIPF_RUNTIME_9_9_0_HOST_SHA256
+  ) {
+    return body;
+  }
+  const html = body.toString("utf8");
+  const runtimeScript = '<script src="9.9.0/main.220e1b93.js"></script>';
+  if (!html.includes(runtimeScript)) {
+    return body;
+  }
+  return Buffer.from(
+    html.replace(
+      runtimeScript,
+      `${DIPF_OPAQUE_PARENT_ORIGIN_COMPATIBILITY_SCRIPT}\n${runtimeScript}`
+    ),
+    "utf8"
+  );
+};
+
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
@@ -8296,7 +8366,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           participantSessionId,
           resourcePath
         });
-        const resourceBody = Buffer.from(resource.dataBase64, "base64");
+        const resourceBody = applyParticipantResourceCompatibility(
+          resource.mediaType,
+          Buffer.from(resource.dataBase64, "base64")
+        );
         const resourceHeaders = {
           "access-control-allow-origin": "*",
           "access-control-expose-headers":

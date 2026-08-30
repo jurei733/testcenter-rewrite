@@ -24449,6 +24449,10 @@ test("original Testcenter compatibility corpus imports official independent play
     metadataFormat: string;
     unitDefinitionType: string;
     unitStateType: string;
+    resourceFixture?: string;
+    resourceEncoding?: "base64";
+    resourceSha256?: string;
+    requiredResourceId?: string;
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
@@ -24467,6 +24471,15 @@ test("original Testcenter compatibility corpus imports official independent play
       ? Buffer.from(storedDefinition.trim(), "base64")
       : Buffer.from(storedDefinition, "utf8");
     const definitionDocument = definitionBuffer.toString("utf8");
+    const resourcePackage = expectation.resourceFixture
+      ? Buffer.from(
+          readFileSync(
+            resolve(originalTestcenterCorpusRoot, expectation.resourceFixture),
+            "utf8"
+          ).trim(),
+          "base64"
+        )
+      : null;
     assert.equal(
       createHash("sha256").update(playerDocument).digest("hex"),
       expectation.playerSha256,
@@ -24477,6 +24490,14 @@ test("original Testcenter compatibility corpus imports official independent play
       expectation.definitionSha256,
       expectation.definitionSourceUrl
     );
+    if (resourcePackage) {
+      assert.equal(expectation.resourceEncoding, "base64");
+      assert.equal(
+        createHash("sha256").update(resourcePackage).digest("hex"),
+        expectation.resourceSha256
+      );
+      assert.ok(expectation.requiredResourceId);
+    }
     if (expectation.metadataFormat === "legacy-html-meta") {
       assert.match(
         playerDocument,
@@ -24539,6 +24560,7 @@ test("original Testcenter compatibility corpus imports official independent play
               <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
               <resource identifier="${unitKey}" href="units/Unit.xml" />
               <resource identifier="${expectation.playerKey}" href="players/Player.html" />
+              ${resourcePackage ? `<resource identifier="${expectation.requiredResourceId}" href="resources/${expectation.requiredResourceId}" />` : ""}
             </resources>
           </manifest>
         `
@@ -24558,13 +24580,20 @@ test("original Testcenter compatibility corpus imports official independent play
           <Unit>
             <Metadata><Id>${unitKey}</Id><Label>${expectation.family}</Label></Metadata>
             <Definition player="${expectation.playerKey}"${expectation.unitDefinitionType ? ` type="${expectation.unitDefinitionType}"` : ""}><![CDATA[${definitionDocument}]]></Definition>
+            ${resourcePackage ? `<Dependencies><File for="player">${expectation.requiredResourceId}</File></Dependencies>` : ""}
           </Unit>
         `
       },
       {
         fileName: "export/players/Player.html",
         content: playerDocument
-      }
+      },
+      ...(resourcePackage
+        ? [{
+            fileName: `export/resources/${expectation.requiredResourceId}`,
+            content: resourcePackage
+          }]
+        : [])
     ]);
     const tenantKey = `integration-tenant-official-${packageSuffix}-player`;
     const workspaceKey = `integration-workspace-official-${packageSuffix}-player`;
@@ -24617,6 +24646,124 @@ test("original Testcenter compatibility corpus imports official independent play
       false,
       JSON.stringify(importResult.body.importJob.diagnostics)
     );
+    if (resourcePackage) {
+      const contentReleaseId =
+        importResult.body.stagedContentRelease?.contentReleaseId;
+      assert.ok(contentReleaseId);
+      const activation = await requestJson(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+          `/content-releases/${contentReleaseId}/activate`,
+        { method: "POST", body: {} }
+      );
+      assert.equal(activation.status, 200);
+      const roster = await requestJson(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+        {
+          method: "POST",
+          body: {
+            rosterText: [{
+              loginKey: `participant-${packageSuffix}`,
+              groupKey: `group:${packageSuffix}`,
+              bookletKey,
+              executionMode: "run-hot-return"
+            }]
+          }
+        }
+      );
+      assert.equal(roster.status, 201);
+      const signIn = await requestJson<{
+        participantSession: { participantSessionId: string };
+      }>("/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: {
+          tenantKey,
+          workspaceKey,
+          loginKey: `participant-${packageSuffix}`
+        }
+      });
+      assert.equal(signIn.status, 200);
+      const participantSessionId =
+        signIn.body.participantSession.participantSessionId;
+      const resume = await requestJson(
+        `/api/v1/participant/sessions/${participantSessionId}/resume`,
+        { method: "POST", body: { bookletKey } }
+      );
+      assert.equal(resume.status, 200);
+      const resourceBaseUrl =
+        `${baseUrl}/api/v1/participant/sessions/${participantSessionId}` +
+        "/resources/IB_SAMPLE_2025";
+      const runtimeResponse = await fetch(
+        `${resourceBaseUrl}/runtimes/ib-runtime.9.9.0.html`
+      );
+      assert.equal(runtimeResponse.status, 200);
+      assert.match(
+        runtimeResponse.headers.get("content-type") ?? "",
+        /^text\/html/
+      );
+      assert.equal(runtimeResponse.headers.get("x-frame-options"), null);
+      const adaptedRuntime = await runtimeResponse.text();
+      assert.equal(
+        adaptedRuntime.match(
+          /data-testcenter-compatibility="dipf-opaque-parent-origin"/g
+        )?.length,
+        1
+      );
+      assert.match(adaptedRuntime, /event\.source !== window\.parent/);
+      assert.match(adaptedRuntime, /origin: window\.location\.origin/);
+      const runtimeRangeResponse = await fetch(
+        `${resourceBaseUrl}/runtimes/ib-runtime.9.9.0.html`,
+        { headers: { range: "bytes=0-14" } }
+      );
+      assert.equal(runtimeRangeResponse.status, 206);
+      assert.equal(
+        await runtimeRangeResponse.text(),
+        adaptedRuntime.slice(0, 15)
+      );
+      assert.equal(
+        runtimeRangeResponse.headers.get("content-range"),
+        `bytes 0-14/${Buffer.byteLength(adaptedRuntime, "utf8")}`
+      );
+      const runtimeScriptResponse = await fetch(
+        `${resourceBaseUrl}/runtimes/9.9.0/main.220e1b93.js`
+      );
+      assert.equal(runtimeScriptResponse.status, 200);
+      assert.equal(
+        runtimeScriptResponse.headers.get("content-type"),
+        "text/javascript; charset=utf-8"
+      );
+      const adaptedRuntimeScript = await runtimeScriptResponse.text();
+      assert.match(
+        adaptedRuntimeScript,
+        /i=n===window\.parent\|\|void 0===t/
+      );
+      assert.equal(
+        adaptedRuntimeScript.match(/i=n===window\.parent/g)?.length,
+        1
+      );
+      const runtimeScriptRangeResponse = await fetch(
+        `${resourceBaseUrl}/runtimes/9.9.0/main.220e1b93.js`,
+        { headers: { range: "bytes=0-14" } }
+      );
+      assert.equal(runtimeScriptRangeResponse.status, 206);
+      assert.equal(
+        await runtimeScriptRangeResponse.text(),
+        adaptedRuntimeScript.slice(0, 15)
+      );
+      assert.equal(
+        runtimeScriptRangeResponse.headers.get("content-range"),
+        `bytes 0-14/${Buffer.byteLength(adaptedRuntimeScript, "utf8")}`
+      );
+      const unrelatedHtmlResponse = await fetch(
+        `${resourceBaseUrl}/units/Simple/external-resources/example.html`
+      );
+      assert.equal(unrelatedHtmlResponse.status, 200);
+      assert.equal(
+        createHash("sha256")
+          .update(Buffer.from(await unrelatedHtmlResponse.arrayBuffer()))
+          .digest("hex"),
+        "55c95775f14258f86772b6f2883b37093a8b5099b4a5a2e58e476fcc8d0852d4"
+      );
+    }
   }
 });
 

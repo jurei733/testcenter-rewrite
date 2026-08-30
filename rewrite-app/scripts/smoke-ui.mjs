@@ -16114,7 +16114,7 @@ try {
     .getByText("TaskPlayer running version 9.9.0")
     .waitFor({ state: "visible", timeout: 30_000 });
   await ibRuntimeFrame
-    .getByText("Waiting for controller to start task...")
+    .getByText("CheckBoxA", { exact: true })
     .waitFor({ state: "visible", timeout: 30_000 });
   const ibParticipantSessionId = await page
     .locator("#participantRouteSessionId")
@@ -16141,7 +16141,7 @@ try {
   await page
     .frameLocator("#participantVeronaPlayerFrame")
     .frameLocator("#ib-runtime-host")
-    .getByText("Waiting for controller to start task...")
+    .getByText("CheckBoxA", { exact: true })
     .waitFor({ state: "visible", timeout: 30_000 });
   stopAfter("participant-verona-player-families");
 
