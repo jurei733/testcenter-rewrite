@@ -21915,9 +21915,16 @@ try {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
   await page.unroute(monitorSpeciesRoute);
-  await applyMonitorScopeAndWaitForOpenRuns(
-    "group-monitor-species-highlighting-restore"
+  const restoredMonitorRunsResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "GET" &&
+      monitorOpenRunsRoute.test(response.url()),
+    { timeout: 45_000 }
   );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const restoredMonitorRunsResponse = await restoredMonitorRunsResponsePromise;
+  assert.equal(restoredMonitorRunsResponse.status(), 200);
+  await waitForNotBusy("group-monitor-species-highlighting-restore");
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   stopAfter("group-monitor-auto-next-block");
 
