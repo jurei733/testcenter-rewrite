@@ -1,7 +1,19 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectorRef, Component, inject, signal } from "@angular/core";
+import {
+  ChangeDetectorRef,
+  Component,
+  effect,
+  inject,
+  signal
+} from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
+import {
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet
+} from "@angular/router";
 
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
@@ -59,6 +71,21 @@ export class AppComponent implements OnInit, OnDestroy {
   ownAdminPasswordError = "";
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
+  private readonly routeVersion = signal(0);
+  private readonly routerEventsSubscription = this.router.events.subscribe(
+    event => {
+      if (event instanceof NavigationEnd) {
+        queueMicrotask(() =>
+          this.routeVersion.update(version => version + 1)
+        );
+      }
+    }
+  );
+  private readonly operatorHero = signal(this.resolveOperatorHero());
+  private readonly synchronizeOperatorHero = effect(() => {
+    const next = this.resolveOperatorHero();
+    queueMicrotask(() => this.operatorHero.set(next));
+  });
   private readonly onlineListener = (): void => {
     this.isOffline.set(false);
   };
@@ -68,8 +95,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get isParticipantView(): boolean {
     return (
-      this.app.activeView === "participant" ||
-      this.app.activeView === "system-check" ||
+      this.activeRouteView === "participant" ||
+      this.activeRouteView === "system-check" ||
       this.isAttachmentCaptureView ||
       this.isPublicInfoView
     );
@@ -88,65 +115,89 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get isHomeView(): boolean {
-    return this.app.activeView === "home";
+    return this.activeRouteView === "home";
   }
 
   get isSignedOutOpsView(): boolean {
-    return this.app.activeView === "ops" && !this.app.hasAdminSession;
+    return this.activeRouteView === "ops" && !this.app.hasAdminSession;
+  }
+
+  get activeRouteView(): AppView {
+    this.routeVersion();
+    const routeSegment = this.router.url.split("?", 1)[0]?.split("/")[1];
+    return routeViews.find(view => view === routeSegment) ?? this.app.activeView;
   }
 
   get isFocusedEntryView(): boolean {
-    return this.isHomeView || this.isSignedOutOpsView;
+    return this.operatorHero().focused;
   }
 
   get operatorHeroEyebrow(): string {
-    if (this.isHomeView) {
-      return "Assessment delivery";
-    }
-    if (this.isSignedOutOpsView) {
-      return "Operator access";
-    }
-    if (this.app.isMonitorOnlySession || this.app.isReadOnlyAdminSession) {
-      return this.app.operatorAccessLabel;
-    }
-    return "Operator workspace";
+    return this.operatorHero().eyebrow;
   }
 
   get operatorHeroTitle(): string {
-    if (this.isHomeView) {
-      return "Run, Monitor, And Manage Assessments.";
-    }
-    if (this.isSignedOutOpsView) {
-      return "Sign In To Continue.";
-    }
-    if (this.app.isMonitorOnlySession) {
-      return "Monitor The Active Test Session.";
-    }
-    if (this.app.isReadOnlyAdminSession) {
-      return "Inspect The Workspace Without Changing It.";
-    }
-    return "Operate The Assessment Workspace.";
+    return this.operatorHero().title;
   }
 
   get operatorHeroDetail(): string {
+    return this.operatorHero().detail;
+  }
+
+  private resolveOperatorHero(): {
+    focused: boolean;
+    eyebrow: string;
+    title: string;
+    detail: string;
+  } {
     if (this.isHomeView) {
-      return "Choose a participant, system-check, or protected operator entry point. The application keeps each workflow focused while sharing one production runtime.";
+      return {
+        focused: true,
+        eyebrow: "Assessment delivery",
+        title: "Run, Monitor, And Manage Assessments.",
+        detail:
+          "Choose a participant, system-check, or protected operator entry point. The application keeps each workflow focused while sharing one production runtime."
+      };
     }
     if (this.isSignedOutOpsView) {
-      return "Administrative and monitoring tools stay private until an authorized operator session has been established.";
+      return {
+        focused: true,
+        eyebrow: "Operator access",
+        title: "Sign In To Continue.",
+        detail:
+          "Administrative and monitoring tools stay private until an authorized operator session has been established."
+      };
     }
     if (this.app.isMonitorOnlySession) {
-      return "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls.";
+      return {
+        focused: false,
+        eyebrow: this.app.operatorAccessLabel,
+        title: "Monitor The Active Test Session.",
+        detail:
+          "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls."
+      };
     }
     if (this.app.isReadOnlyAdminSession) {
-      return "This workspace administrator session can inspect operational data and exports. Changes require an RW role assignment.";
+      return {
+        focused: false,
+        eyebrow: this.app.operatorAccessLabel,
+        title: "Inspect The Workspace Without Changing It.",
+        detail:
+          "This workspace administrator session can inspect operational data and exports. Changes require an RW role assignment."
+      };
     }
-    return "Manage workspace content, participant delivery, monitoring, results, and operational diagnostics from the protected Angular console.";
+    return {
+      focused: false,
+      eyebrow: "Operator workspace",
+      title: "Operate The Assessment Workspace.",
+      detail:
+        "Manage workspace content, participant delivery, monitoring, results, and operational diagnostics from the protected Angular console."
+    };
   }
 
   get isParticipantHeaderHidden(): boolean {
     return (
-      this.app.activeView === "participant" &&
+      this.activeRouteView === "participant" &&
       this.participantShell.headerHidden()
     );
   }
@@ -213,6 +264,7 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     window.removeEventListener("online", this.onlineListener);
     window.removeEventListener("offline", this.offlineListener);
+    this.routerEventsSubscription.unsubscribe();
   }
 
   get canSubmitRequiredAdminPassword(): boolean {

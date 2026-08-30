@@ -198,7 +198,7 @@
         </button>
         <div>
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
-          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : activeRouteView === "system-check" ? "System Check" : "Participant Test" }}</h1>
         </div>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
@@ -330,7 +330,7 @@
         </div>
         <div class="status-pill">
           <strong>View</strong>
-          <span id="activeViewBadge">{{ app.activeView }}</span>
+          <span id="activeViewBadge">{{ activeRouteView }}</span>
         </div>
         <div class="status-pill">
           <strong>Readiness</strong>
