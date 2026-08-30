@@ -39636,6 +39636,191 @@ test("returning to the starter applies lock_test_on_termination before exposing 
   assert.equal(resumedAfterUnlock.body.testRun.currentUnitKey, unitKey);
 });
 
+test("original Testcenter compatibility corpus preserves nested timer, code, and completeness precedence", async () => {
+  const tenantKey = "integration-tenant-nested-runtime";
+  const workspaceKey = "integration-workspace-nested-runtime";
+  const bookletKey = "BookletId";
+  const fixture = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/TestBookletNestedRuntime.xml"
+    ),
+    "utf8"
+  );
+  // Byte-exact TestBookletXML from frontend/src/app/test-controller/test/test-data.ts
+  // at the current Original revision 21796aa50a185f3d63709a56673dedc546626e78.
+  assert.equal(
+    createHash("sha256").update(fixture).digest("hex"),
+    "60f8567bd9fd82f67c280d3d32547fb44d7d8c6020dcd7a5b671943a3df6fb5d"
+  );
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "TestBookletNestedRuntime.xml",
+      mediaType: "application/xml",
+      sourceDocument: fixture
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "nested-runtime-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      testletTimers?: Record<
+        string,
+        { status: string; durationSeconds: number }
+      >;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.currentUnitKey, "u1");
+  assert.deepEqual(Object.keys(resumed.body.testRun.testletTimers ?? {}), ["[0]"]);
+  assert.equal(resumed.body.testRun.testletTimers?.["[0]"]?.status, "running");
+  assert.equal(
+    resumed.body.testRun.testletTimers?.["[0]"]?.durationSeconds,
+    600
+  );
+  const testRunId = resumed.body.testRun.testRunId;
+
+  const response = (
+    presentationProgress: "some" | "complete",
+    responseProgress: "none" | "complete"
+  ) =>
+    JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: { presentationProgress, responseProgress },
+      playerState: {}
+    });
+  const save = (currentUnitKey: string, unitResponse?: string) =>
+    requestJson<{
+      testRun?: {
+        currentUnitKey: string | null;
+        testletTimers?: Record<string, { status: string }>;
+      };
+      error?: string;
+      details?: { deniedReasons?: string[] };
+    }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey,
+        status: "running",
+        ...(unitResponse !== undefined ? { unitResponse } : {})
+      }
+    });
+
+  const blockedByRootCompleteness = await save("u2");
+  assert.equal(blockedByRootCompleteness.status, 409);
+  assert.deepEqual(blockedByRootCompleteness.body.details?.deniedReasons, [
+    "response_incomplete",
+    "testlet_code_required"
+  ]);
+  assert.equal((await save("u1", response("some", "complete"))).status, 200);
+  const blockedByOuterCode = await save("u2");
+  assert.equal(blockedByOuterCode.status, 409);
+  assert.deepEqual(blockedByOuterCode.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+
+  const outerUnlock = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/testlets/t1/unlock`, {
+    method: "POST",
+    body: { code: "D" }
+  });
+  assert.equal(outerUnlock.status, 200);
+  assert.equal(outerUnlock.body.testRun.currentUnitKey, "u2");
+  assert.deepEqual(outerUnlock.body.testRun.unlockedTestletKeys, ["t1"]);
+  assert.deepEqual(Object.keys(outerUnlock.body.testRun.testletTimers ?? {}), [
+    "[0]"
+  ]);
+
+  assert.equal((await save("u2", response("some", "complete"))).status, 200);
+  const blockedByInnerCode = await save("u3");
+  assert.equal(blockedByInnerCode.status, 409);
+  assert.deepEqual(blockedByInnerCode.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+  const innerUnlock = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/testlets/t2/unlock`, {
+    method: "POST",
+    body: { code: "d" }
+  });
+  assert.equal(innerUnlock.status, 200);
+  assert.equal(innerUnlock.body.testRun.currentUnitKey, "u3");
+  assert.deepEqual(innerUnlock.body.testRun.unlockedTestletKeys, ["t1", "t2"]);
+  assert.deepEqual(Object.keys(innerUnlock.body.testRun.testletTimers ?? {}), [
+    "[0]"
+  ]);
+
+  assert.equal((await save("u3", response("some", "none"))).status, 200);
+  const blockedByInnerPresentation = await save("u4");
+  assert.equal(blockedByInnerPresentation.status, 409);
+  assert.deepEqual(blockedByInnerPresentation.body.details?.deniedReasons, [
+    "presentation_incomplete"
+  ]);
+  assert.equal((await save("u3", response("complete", "none"))).status, 200);
+  assert.equal((await save("u4")).status, 200);
+
+  assert.equal((await save("u4", response("some", "none"))).status, 200);
+  const blockedByRestoredRootCompleteness = await save("u5");
+  assert.equal(blockedByRestoredRootCompleteness.status, 409);
+  assert.deepEqual(
+    blockedByRestoredRootCompleteness.body.details?.deniedReasons,
+    ["response_incomplete"]
+  );
+  assert.equal((await save("u4", response("some", "complete"))).status, 200);
+  const enteredFinalUnit = await save("u5");
+  assert.equal(enteredFinalUnit.status, 200);
+  assert.equal(enteredFinalUnit.body.testRun?.currentUnitKey, "u5");
+  assert.deepEqual(Object.keys(enteredFinalUnit.body.testRun?.testletTimers ?? {}), [
+    "[0]"
+  ]);
+});
+
 test("original Testlet completeness restrictions override BookletConfig by dimension", async () => {
   const tenantKey = "integration-tenant-testlet-completeness";
   const workspaceKey = "integration-workspace-testlet-completeness";
