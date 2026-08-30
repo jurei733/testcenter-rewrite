@@ -101,6 +101,9 @@ jobs:
           - check: ui-activation-blocking-runtime
             command: npm run smoke:ui:activation-blocking-runtime
             playwright: true
+          - check: ui-adaptive-runtime
+            command: npm run smoke:ui:adaptive-runtime
+            playwright: true
           - check: ui-ops
             command: npm run ci:browser:ops
             playwright: true

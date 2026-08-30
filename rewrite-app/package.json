@@ -103,6 +103,8 @@
     "smoke:ui:verona-player-families:built": "UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_STOP_AFTER_STEP=participant-verona-player-families FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-verona-player-families.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:ib-player": "npm run build && npm run smoke:ui:ib-player:built",
     "smoke:ui:ib-player:built": "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-ib-player.sqlite node ./scripts/smoke-ib-player.mjs",
+    "smoke:ui:adaptive-runtime": "npm run build && npm run smoke:ui:adaptive-runtime:built",
+    "smoke:ui:adaptive-runtime:built": "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-adaptive-runtime.sqlite node ./scripts/smoke-adaptive-runtime.mjs",
     "smoke:ui:stars-recovery": "npm run build && UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_STOP_AFTER_STEP=participant-official-stars-player-family FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-stars-recovery.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:stars-recovery:built": "UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_STOP_AFTER_STEP=participant-official-stars-player-family FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-stars-recovery.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:booklet-config": "npm run build && UI_SMOKE_STOP_AFTER_STEP=participant-original-booklet-config FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-booklet-config.sqlite node ./scripts/smoke-ui.mjs",
