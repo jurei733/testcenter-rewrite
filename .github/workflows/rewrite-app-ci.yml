@@ -65,11 +65,41 @@ jobs:
           - check: ui-quick
             command: npm run ci:browser:quick
             playwright: true
-          - check: ui-review
-            command: npm run ci:browser:review
+          - check: ui-review-readiness
+            command: npm run smoke:ui:review-readiness
             playwright: true
-          - check: ui-monitor
-            command: npm run ci:browser:monitor
+          - check: ui-monitor-review
+            command: npm run smoke:ui:monitor-review
+            playwright: true
+          - check: ui-monitor-detail-review
+            command: npm run smoke:ui:monitor-detail-review
+            playwright: true
+          - check: ui-run-detail-review
+            command: npm run smoke:ui:run-detail-review
+            playwright: true
+          - check: ui-unit-detail-review
+            command: npm run smoke:ui:unit-detail-review
+            playwright: true
+          - check: ui-participant-detail-review
+            command: npm run smoke:ui:participant-detail-review
+            playwright: true
+          - check: ui-participant-monitor-live
+            command: npm run smoke:ui:participant-monitor-live
+            playwright: true
+          - check: ui-monitor-bulk
+            command: npm run smoke:ui:monitor-bulk
+            playwright: true
+          - check: ui-monitor-auto-next
+            command: npm run smoke:ui:monitor-auto-next
+            playwright: true
+          - check: ui-monitor-finish-all
+            command: npm run smoke:ui:monitor-finish-all
+            playwright: true
+          - check: ui-open-run-sync
+            command: npm run smoke:ui:open-run-sync
+            playwright: true
+          - check: ui-activation-blocking-runtime
+            command: npm run smoke:ui:activation-blocking-runtime
             playwright: true
           - check: ui-ops
             command: npm run ci:browser:ops
