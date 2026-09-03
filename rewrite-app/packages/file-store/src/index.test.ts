@@ -11,6 +11,7 @@ import type {
   ContentRelease,
   OperationalLoginMigrationCandidate,
   SourcePackage,
+  WorkspaceActivityEvent,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
@@ -67,6 +68,84 @@ const createLargeEntityFixture = () => {
 };
 
 describe("createFileFirstSliceRepository", () => {
+  it("atomically keeps concurrent source-package replacements linear", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-replacement-race-"));
+    const filePath = join(tempDirectory, "state.json");
+    const sourcePackage: SourcePackage = {
+      sourcePackageId: "file-source-package-replacement-race",
+      tenantId: "file-tenant-replacement-race",
+      workspaceId: "file-workspace-replacement-race",
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      contentStructure: null,
+      sourceDocument: "<Booklet />",
+      status: "accepted",
+      uploadedAt: "2026-09-03T00:00:00.000Z"
+    };
+    const revision = createWorkspaceSourcePackageReferenceRevision({
+      sourcePackages: [sourcePackage],
+      activityEvents: []
+    });
+    const replacement = (suffix: string): SourcePackage => ({
+      ...sourcePackage,
+      sourcePackageId: `file-source-package-replacement-${suffix}`,
+      fileName: `Booklet-${suffix}.xml`,
+      status: "uploaded"
+    });
+    const activityEvent = (
+      replacementSourcePackage: SourcePackage
+    ): WorkspaceActivityEvent => ({
+      activityEventId: `file-replacement-event-${replacementSourcePackage.sourcePackageId}`,
+      tenantId: sourcePackage.tenantId,
+      workspaceId: sourcePackage.workspaceId,
+      eventType: "source_package_replaced",
+      actorId: null,
+      subjectType: "source_package",
+      subjectId: sourcePackage.sourcePackageId,
+      occurredAt: "2026-09-03T00:01:00.000Z",
+      summary: "Replacement reserved.",
+      details: {
+        replacedSourcePackageId: sourcePackage.sourcePackageId,
+        replacementSourcePackageId: replacementSourcePackage.sourcePackageId
+      }
+    });
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveSourcePackage(sourcePackage);
+      const replacements = [replacement("first"), replacement("second")];
+      const results = await Promise.all(
+        replacements.map(replacementSourcePackage =>
+          repository.reserveSourcePackageReplacement({
+            replacedSourcePackageId: sourcePackage.sourcePackageId,
+            replacementSourcePackage,
+            replacementActivityEvent: activityEvent(replacementSourcePackage),
+            expectedWorkspaceSourcePackageReferenceRevision: revision
+          })
+        )
+      );
+
+      assert.deepEqual([...results].sort(), [false, true]);
+      const persisted = await repository.listSourcePackagesByWorkspace(
+        sourcePackage.tenantId,
+        sourcePackage.workspaceId
+      );
+      assert.equal(persisted.length, 2);
+      const events = await repository.listWorkspaceActivityEventsByWorkspace(
+        sourcePackage.tenantId,
+        sourcePackage.workspaceId
+      );
+      assert.equal(events.length, 1);
+      assert.equal(
+        events[0]?.details.replacementSourcePackageId,
+        persisted.find(candidate => candidate.sourcePackageId !== sourcePackage.sourcePackageId)
+          ?.sourcePackageId
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("externalizes large immutable package data without rewriting it for core mutations", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-large-"));
     const filePath = join(tempDirectory, "state.json");

@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 
 import {
   createWorkspaceSourcePackageReferenceRevision,
+  hasActiveSourcePackageReplacement,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import {
@@ -947,6 +948,50 @@ export const createFileFirstSliceRepository = (
       await mutate(state => {
         dirtySourcePackageIds.add(sourcePackage.sourcePackageId);
         state.sourcePackages[sourcePackage.sourcePackageId] = sourcePackage;
+      });
+    },
+    async reserveSourcePackageReplacement(input) {
+      return mutate(state => {
+        const { replacementSourcePackage, replacementActivityEvent } = input;
+        const replacedSourcePackage =
+          state.sourcePackages[input.replacedSourcePackageId];
+        const sourcePackages = Object.values(state.sourcePackages).filter(
+          candidate =>
+            candidate.tenantId === replacementSourcePackage.tenantId &&
+            candidate.workspaceId === replacementSourcePackage.workspaceId
+        );
+        const activityEvents = Object.values(
+          state.workspaceActivityEvents
+        ).filter(
+          activityEvent =>
+            activityEvent.tenantId === replacementSourcePackage.tenantId &&
+            activityEvent.workspaceId === replacementSourcePackage.workspaceId
+        );
+        if (
+          !replacedSourcePackage ||
+          replacedSourcePackage.tenantId !== replacementSourcePackage.tenantId ||
+          replacedSourcePackage.workspaceId !== replacementSourcePackage.workspaceId ||
+          replacementActivityEvent.tenantId !== replacementSourcePackage.tenantId ||
+          replacementActivityEvent.workspaceId !== replacementSourcePackage.workspaceId ||
+          replacementActivityEvent.subjectId !== input.replacedSourcePackageId ||
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages,
+            activityEvents
+          }) !== input.expectedWorkspaceSourcePackageReferenceRevision ||
+          hasActiveSourcePackageReplacement({
+            sourcePackageId: input.replacedSourcePackageId,
+            sourcePackages,
+            activityEvents
+          })
+        ) {
+          return false;
+        }
+        dirtySourcePackageIds.add(replacementSourcePackage.sourcePackageId);
+        state.sourcePackages[replacementSourcePackage.sourcePackageId] =
+          replacementSourcePackage;
+        state.workspaceActivityEvents[replacementActivityEvent.activityEventId] =
+          replacementActivityEvent;
+        return true;
       });
     },
     async deleteSourcePackageAggregate(input) {

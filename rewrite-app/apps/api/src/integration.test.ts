@@ -12434,6 +12434,23 @@ test("source-package replacement and retry preserve workspace identity uniquenes
     JSON.stringify(legitimateReplacement.body)
   );
 
+  const supersededReplacement = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${replacementTarget.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-branch.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:replacement-branch")
+      }
+    }
+  );
+  assert.equal(supersededReplacement.status, 409);
+  assert.equal(
+    supersededReplacement.body.error,
+    "source_package_replacement_superseded"
+  );
+
   const replacementFileNameCollision = await requestJson<{ error: string }>(
     `${workspaceUrl}/source-packages/${legitimateReplacement.body.replacementSourcePackage.sourcePackageId}/replacements`,
     {

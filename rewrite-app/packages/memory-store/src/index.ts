@@ -1,5 +1,6 @@
 import {
   createWorkspaceSourcePackageReferenceRevision,
+  hasActiveSourcePackageReplacement,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import { selectLatestParticipantTestStateLogs } from "@testcenter-rewrite-app/domain";
@@ -379,6 +380,52 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveSourcePackage(sourcePackage) {
       state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
+    },
+    async reserveSourcePackageReplacement(input) {
+      const { replacementSourcePackage, replacementActivityEvent } = input;
+      const sourcePackages = Array.from(state.sourcePackages.values()).filter(
+        candidate =>
+          candidate.tenantId === replacementSourcePackage.tenantId &&
+          candidate.workspaceId === replacementSourcePackage.workspaceId
+      );
+      const activityEvents = Array.from(
+        state.workspaceActivityEvents.values()
+      ).filter(
+        activityEvent =>
+          activityEvent.tenantId === replacementSourcePackage.tenantId &&
+          activityEvent.workspaceId === replacementSourcePackage.workspaceId
+      );
+      const replacedSourcePackage = state.sourcePackages.get(
+        input.replacedSourcePackageId
+      );
+      if (
+        !replacedSourcePackage ||
+        replacedSourcePackage.tenantId !== replacementSourcePackage.tenantId ||
+        replacedSourcePackage.workspaceId !== replacementSourcePackage.workspaceId ||
+        replacementActivityEvent.tenantId !== replacementSourcePackage.tenantId ||
+        replacementActivityEvent.workspaceId !== replacementSourcePackage.workspaceId ||
+        replacementActivityEvent.subjectId !== input.replacedSourcePackageId ||
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        }) !== input.expectedWorkspaceSourcePackageReferenceRevision ||
+        hasActiveSourcePackageReplacement({
+          sourcePackageId: input.replacedSourcePackageId,
+          sourcePackages,
+          activityEvents
+        })
+      ) {
+        return false;
+      }
+      state.sourcePackages.set(
+        replacementSourcePackage.sourcePackageId,
+        replacementSourcePackage
+      );
+      state.workspaceActivityEvents.set(
+        replacementActivityEvent.activityEventId,
+        replacementActivityEvent
+      );
+      return true;
     },
     async deleteSourcePackageAggregate(input) {
       const sourcePackage = state.sourcePackages.get(input.sourcePackageId);

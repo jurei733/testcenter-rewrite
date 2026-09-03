@@ -1318,6 +1318,12 @@ export type FirstSliceRepository = {
     workspaceId: string
   ): Promise<SourcePackage[]>;
   saveSourcePackage(sourcePackage: SourcePackage): Promise<void>;
+  reserveSourcePackageReplacement(input: {
+    replacedSourcePackageId: string;
+    replacementSourcePackage: SourcePackage;
+    replacementActivityEvent: WorkspaceActivityEvent;
+    expectedWorkspaceSourcePackageReferenceRevision: string;
+  }): Promise<boolean>;
   deleteSourcePackageAggregate(input: {
     tenantId: string;
     workspaceId: string;
@@ -16522,6 +16528,35 @@ export const createWorkspaceSourcePackageReferenceRevision = (input: {
     .digest("hex")}`;
 };
 
+export const hasActiveSourcePackageReplacement = (input: {
+  sourcePackageId: string;
+  sourcePackages: SourcePackage[];
+  activityEvents: WorkspaceActivityEvent[];
+}): boolean => {
+  const sourcePackageById = new Map(
+    input.sourcePackages.map(sourcePackage => [
+      sourcePackage.sourcePackageId,
+      sourcePackage
+    ])
+  );
+  return input.activityEvents.some(activityEvent => {
+    if (
+      activityEvent.eventType !== "source_package_replaced" ||
+      activityEvent.subjectId !== input.sourcePackageId
+    ) {
+      return false;
+    }
+    const replacementSourcePackageId =
+      typeof activityEvent.details.replacementSourcePackageId === "string"
+        ? activityEvent.details.replacementSourcePackageId
+        : null;
+    return (
+      !replacementSourcePackageId ||
+      sourcePackageById.get(replacementSourcePackageId)?.status !== "rejected"
+    );
+  });
+};
+
 type WorkspaceDependencySourceResolution =
   | { status: "not_applicable" }
   | { status: "resolved"; sourcePackages: SourcePackage[] }
@@ -24354,17 +24389,22 @@ export const createFirstSliceServices = (
     workspace: Workspace;
     sourcePackage: SourcePackage;
     excludedSourcePackageIds?: string[];
+    sourcePackages?: SourcePackage[];
+    activityEvents?: WorkspaceActivityEvent[];
   }): Promise<void> => {
-    const [sourcePackages, activityEvents] = await Promise.all([
-      repository.listSourcePackagesByWorkspace(
-        input.workspace.tenantId,
-        input.workspace.workspaceId
-      ),
-      repository.listWorkspaceActivityEventsByWorkspace(
-        input.workspace.tenantId,
-        input.workspace.workspaceId
-      )
-    ]);
+    const [sourcePackages, activityEvents] =
+      input.sourcePackages && input.activityEvents
+        ? [input.sourcePackages, input.activityEvents]
+        : await Promise.all([
+            repository.listSourcePackagesByWorkspace(
+              input.workspace.tenantId,
+              input.workspace.workspaceId
+            ),
+            repository.listWorkspaceActivityEventsByWorkspace(
+              input.workspace.tenantId,
+              input.workspace.workspaceId
+            )
+          ]);
     const sourcePackageById = new Map(
       sourcePackages.map(sourcePackage => [
         sourcePackage.sourcePackageId,
@@ -30959,17 +30999,76 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
+        const [sourcePackages, activityEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+        if (
+          hasActiveSourcePackageReplacement({
+            sourcePackageId: replacedSourcePackage.sourcePackageId,
+            sourcePackages,
+            activityEvents
+          })
+        ) {
+          throw new FirstSliceError(
+            409,
+            "source_package_replacement_superseded",
+            `Source package '${replacedSourcePackage.fileName}' already has a replacement. Replace the latest version to preserve a linear history.`
+          );
+        }
         await assertWorkspaceSourcePackageIdentitiesAvailable({
           workspace,
           sourcePackage: replacementSourcePackage,
-          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId]
+          excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId],
+          sourcePackages,
+          activityEvents
         });
         await assertTenantTesttakersIdentitiesAvailable({
           workspace,
           sourcePackage: replacementSourcePackage,
           excludedSourcePackageIds: [replacedSourcePackage.sourcePackageId]
         });
-        await repository.saveSourcePackage(replacementSourcePackage);
+        const replacementActivityEvent: WorkspaceActivityEvent = {
+          activityEventId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_replaced",
+          actorId: null,
+          subjectType: "source_package",
+          subjectId: replacedSourcePackage.sourcePackageId,
+          occurredAt: now(),
+          summary: `Source package '${replacedSourcePackage.fileName}' replacement reserved for '${replacementSourcePackage.fileName}'.`,
+          details: {
+            replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+            replacementSourcePackageId:
+              replacementSourcePackage.sourcePackageId,
+            importJobId: null,
+            stagedContentReleaseId: null
+          }
+        };
+        const reserved = await repository.reserveSourcePackageReplacement({
+          replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+          replacementSourcePackage,
+          replacementActivityEvent,
+          expectedWorkspaceSourcePackageReferenceRevision:
+            createWorkspaceSourcePackageReferenceRevision({
+              sourcePackages,
+              activityEvents
+            })
+        });
+        if (!reserved) {
+          throw new FirstSliceError(
+            409,
+            "source_package_replacement_conflict",
+            "Source package lineage changed while the replacement was being prepared. Refresh the source packages and retry against the latest version."
+          );
+        }
         const result = await createImportJobWithRelease({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
@@ -30980,12 +31079,8 @@ export const createFirstSliceServices = (
             replacementSourcePackage.sourcePackageId
           )) ?? replacementSourcePackage;
 
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "source_package_replaced",
-          subjectType: "source_package",
-          subjectId: replacedSourcePackage.sourcePackageId,
+        await repository.saveWorkspaceActivityEvent({
+          ...replacementActivityEvent,
           summary: `Source package '${replacedSourcePackage.fileName}' replaced by '${persistedReplacement.fileName}'.`,
           details: {
             replacedSourcePackageId: replacedSourcePackage.sourcePackageId,

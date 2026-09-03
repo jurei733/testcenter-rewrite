@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import {
   createWorkspaceSourcePackageReferenceRevision,
+  hasActiveSourcePackageReplacement,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import type {
@@ -2379,6 +2380,112 @@ export const createSqliteFirstSliceRepository = (
           sourcePackage.status,
           sourcePackage.uploadedAt
         );
+    },
+    async reserveSourcePackageReplacement(input) {
+      const { replacementSourcePackage, replacementActivityEvent } = input;
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const replacedSourcePackage = database
+          .prepare(
+            `SELECT source_package_id
+             FROM source_packages
+             WHERE source_package_id = ? AND tenant_id = ? AND workspace_id = ?`
+          )
+          .get(
+            input.replacedSourcePackageId,
+            replacementSourcePackage.tenantId,
+            replacementSourcePackage.workspaceId
+          ) as Record<string, unknown> | undefined;
+        const sourcePackages = (
+          database
+            .prepare(
+              `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+               FROM source_packages
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(
+              replacementSourcePackage.tenantId,
+              replacementSourcePackage.workspaceId
+            ) as Record<string, unknown>[]
+        )
+          .map(row => mapSourcePackage(row))
+          .filter(Boolean) as SourcePackage[];
+        const activityEvents = (
+          database
+            .prepare(
+              `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                      subject_type, subject_id, occurred_at, summary, details_json
+               FROM workspace_activity_events
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(
+              replacementSourcePackage.tenantId,
+              replacementSourcePackage.workspaceId
+            ) as Record<string, unknown>[]
+        )
+          .map(row => mapWorkspaceActivityEvent(row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        if (
+          !replacedSourcePackage ||
+          replacementActivityEvent.tenantId !== replacementSourcePackage.tenantId ||
+          replacementActivityEvent.workspaceId !== replacementSourcePackage.workspaceId ||
+          replacementActivityEvent.subjectId !== input.replacedSourcePackageId ||
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages,
+            activityEvents
+          }) !== input.expectedWorkspaceSourcePackageReferenceRevision ||
+          hasActiveSourcePackageReplacement({
+            sourcePackageId: input.replacedSourcePackageId,
+            sourcePackages,
+            activityEvents
+          })
+        ) {
+          database.exec("ROLLBACK");
+          return false;
+        }
+        database
+          .prepare(
+            `INSERT INTO source_packages (
+              source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            replacementSourcePackage.sourcePackageId,
+            replacementSourcePackage.tenantId,
+            replacementSourcePackage.workspaceId,
+            replacementSourcePackage.fileName,
+            replacementSourcePackage.mediaType,
+            replacementSourcePackage.contentStructure
+              ? JSON.stringify(replacementSourcePackage.contentStructure)
+              : null,
+            replacementSourcePackage.sourceDocument,
+            replacementSourcePackage.status,
+            replacementSourcePackage.uploadedAt
+          );
+        database
+          .prepare(
+            `INSERT INTO workspace_activity_events (
+              activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            replacementActivityEvent.activityEventId,
+            replacementActivityEvent.tenantId,
+            replacementActivityEvent.workspaceId,
+            replacementActivityEvent.eventType,
+            replacementActivityEvent.actorId,
+            replacementActivityEvent.subjectType,
+            replacementActivityEvent.subjectId,
+            replacementActivityEvent.occurredAt,
+            replacementActivityEvent.summary,
+            JSON.stringify(replacementActivityEvent.details)
+          );
+        database.exec("COMMIT");
+        return true;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
     },
     async deleteSourcePackageAggregate(input) {
       database.exec("BEGIN IMMEDIATE");

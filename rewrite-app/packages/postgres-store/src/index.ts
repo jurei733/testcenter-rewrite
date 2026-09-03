@@ -2,6 +2,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 import {
   createWorkspaceSourcePackageReferenceRevision,
+  hasActiveSourcePackageReplacement,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import type {
@@ -2280,6 +2281,113 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
             ]
           )
       );
+    },
+    async reserveSourcePackageReplacement(input) {
+      const { replacementSourcePackage, replacementActivityEvent } = input;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const workspace = await client.query(
+          `SELECT workspace_id
+           FROM workspaces
+           WHERE tenant_id = $1 AND workspace_id = $2
+           FOR UPDATE`,
+          [replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId]
+        );
+        const replacedSourcePackage = await client.query(
+          `SELECT source_package_id
+           FROM source_packages
+           WHERE source_package_id = $1 AND tenant_id = $2 AND workspace_id = $3`,
+          [
+            input.replacedSourcePackageId,
+            replacementSourcePackage.tenantId,
+            replacementSourcePackage.workspaceId
+          ]
+        );
+        const sourcePackages = (
+          await client.query(
+            `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
+                    content_structure_json, source_document_text, status, uploaded_at
+             FROM source_packages
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId]
+          )
+        ).rows
+          .map(row => mapSourcePackage(row as Row))
+          .filter(Boolean) as SourcePackage[];
+        const activityEvents = (
+          await client.query(
+            `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                    subject_type, subject_id, occurred_at, summary, details_json
+             FROM workspace_activity_events
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [replacementSourcePackage.tenantId, replacementSourcePackage.workspaceId]
+          )
+        ).rows
+          .map(row => mapWorkspaceActivityEvent(row as Row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        if (
+          workspace.rowCount !== 1 ||
+          replacedSourcePackage.rowCount !== 1 ||
+          replacementActivityEvent.tenantId !== replacementSourcePackage.tenantId ||
+          replacementActivityEvent.workspaceId !== replacementSourcePackage.workspaceId ||
+          replacementActivityEvent.subjectId !== input.replacedSourcePackageId ||
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages,
+            activityEvents
+          }) !== input.expectedWorkspaceSourcePackageReferenceRevision ||
+          hasActiveSourcePackageReplacement({
+            sourcePackageId: input.replacedSourcePackageId,
+            sourcePackages,
+            activityEvents
+          })
+        ) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+        await client.query(
+          `INSERT INTO source_packages (
+            source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            replacementSourcePackage.sourcePackageId,
+            replacementSourcePackage.tenantId,
+            replacementSourcePackage.workspaceId,
+            replacementSourcePackage.fileName,
+            replacementSourcePackage.mediaType,
+            replacementSourcePackage.contentStructure
+              ? JSON.stringify(replacementSourcePackage.contentStructure)
+              : null,
+            replacementSourcePackage.sourceDocument,
+            replacementSourcePackage.status,
+            replacementSourcePackage.uploadedAt
+          ]
+        );
+        await client.query(
+          `INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            replacementActivityEvent.activityEventId,
+            replacementActivityEvent.tenantId,
+            replacementActivityEvent.workspaceId,
+            replacementActivityEvent.eventType,
+            replacementActivityEvent.actorId,
+            replacementActivityEvent.subjectType,
+            replacementActivityEvent.subjectId,
+            replacementActivityEvent.occurredAt,
+            replacementActivityEvent.summary,
+            JSON.stringify(replacementActivityEvent.details)
+          ]
+        );
+        await client.query("COMMIT");
+        return true;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
     async deleteSourcePackageAggregate(input) {
       const client = await pool.connect();

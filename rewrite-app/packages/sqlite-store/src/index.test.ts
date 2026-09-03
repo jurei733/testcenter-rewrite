@@ -15,10 +15,89 @@ import type {
   ParticipantRosterEntry,
   SourcePackage,
   TestRun,
+  WorkspaceActivityEvent,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
+
+test("SQLite atomically keeps concurrent source-package replacements linear", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-replacement-race-"));
+  const databasePath = join(tempDirectory, "replacement-race.sqlite");
+  const sourcePackage: SourcePackage = {
+    sourcePackageId: "sqlite-source-package-replacement-race",
+    tenantId: "sqlite-tenant-replacement-race",
+    workspaceId: "sqlite-workspace-replacement-race",
+    fileName: "Booklet.xml",
+    mediaType: "application/xml",
+    contentStructure: null,
+    sourceDocument: "<Booklet />",
+    status: "accepted",
+    uploadedAt: "2026-09-03T00:00:00.000Z"
+  };
+  const revision = createWorkspaceSourcePackageReferenceRevision({
+    sourcePackages: [sourcePackage],
+    activityEvents: []
+  });
+  const replacement = (suffix: string): SourcePackage => ({
+    ...sourcePackage,
+    sourcePackageId: `sqlite-source-package-replacement-${suffix}`,
+    fileName: `Booklet-${suffix}.xml`,
+    status: "uploaded"
+  });
+  const activityEvent = (
+    replacementSourcePackage: SourcePackage
+  ): WorkspaceActivityEvent => ({
+    activityEventId: `sqlite-replacement-event-${replacementSourcePackage.sourcePackageId}`,
+    tenantId: sourcePackage.tenantId,
+    workspaceId: sourcePackage.workspaceId,
+    eventType: "source_package_replaced",
+    actorId: null,
+    subjectType: "source_package",
+    subjectId: sourcePackage.sourcePackageId,
+    occurredAt: "2026-09-03T00:01:00.000Z",
+    summary: "Replacement reserved.",
+    details: {
+      replacedSourcePackageId: sourcePackage.sourcePackageId,
+      replacementSourcePackageId: replacementSourcePackage.sourcePackageId
+    }
+  });
+
+  try {
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    await repository.saveSourcePackage(sourcePackage);
+    const replacements = [replacement("first"), replacement("second")];
+    const results = await Promise.all(
+      replacements.map(replacementSourcePackage =>
+        repository.reserveSourcePackageReplacement({
+          replacedSourcePackageId: sourcePackage.sourcePackageId,
+          replacementSourcePackage,
+          replacementActivityEvent: activityEvent(replacementSourcePackage),
+          expectedWorkspaceSourcePackageReferenceRevision: revision
+        })
+      )
+    );
+
+    assert.deepEqual([...results].sort(), [false, true]);
+    const persisted = await repository.listSourcePackagesByWorkspace(
+      sourcePackage.tenantId,
+      sourcePackage.workspaceId
+    );
+    assert.equal(persisted.length, 2);
+    const events = await repository.listWorkspaceActivityEventsByWorkspace(
+      sourcePackage.tenantId,
+      sourcePackage.workspaceId
+    );
+    assert.equal(events.length, 1);
+    assert.equal(
+      events[0]?.details.replacementSourcePackageId,
+      persisted.find(candidate => candidate.sourcePackageId !== sourcePackage.sourcePackageId)
+        ?.sourcePackageId
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
 
 test("SQLite rejects source-package deletion after a concurrent workspace mutation", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-delete-race-"));
