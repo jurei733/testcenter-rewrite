@@ -16550,9 +16550,11 @@ export const hasActiveSourcePackageReplacement = (input: {
       typeof activityEvent.details.replacementSourcePackageId === "string"
         ? activityEvent.details.replacementSourcePackageId
         : null;
-    return (
-      !replacementSourcePackageId ||
-      sourcePackageById.get(replacementSourcePackageId)?.status !== "rejected"
+    const replacementSourcePackage = replacementSourcePackageId
+      ? sourcePackageById.get(replacementSourcePackageId)
+      : null;
+    return Boolean(
+      replacementSourcePackage && replacementSourcePackage.status !== "rejected"
     );
   });
 };

@@ -12371,6 +12371,126 @@ test("source-package replacement preserves versions and deletion honors dependen
   );
 });
 
+test("deleting a rejected replacement keeps its valid predecessor replaceable", async () => {
+  const tenantKey = "integration-tenant-rejected-replacement-deletion";
+  const workspaceKey = "integration-workspace-rejected-replacement-deletion";
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const validSourceDocument = (bookletKey: string): string =>
+    `<assessment><booklet key="${bookletKey}"><unit key="unit:${bookletKey}" /></booklet></assessment>`;
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const original = await requestJson<{
+    sourcePackage: { sourcePackageId: string; fileName: string };
+  }>(`${workspaceUrl}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "replacement-predecessor.xml",
+      mediaType: "application/xml",
+      sourceDocument: validSourceDocument("booklet:replacement-predecessor")
+    }
+  });
+  assert.equal(original.status, 201, JSON.stringify(original.body));
+  const originalImport = await requestJson<{
+    importJob: { status: string };
+  }>(`${workspaceUrl}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: original.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(originalImport.body.importJob.status, "completed");
+
+  const rejectedReplacement = await requestJson<{
+    replacementSourcePackage: {
+      sourcePackageId: string;
+      fileName: string;
+      status: string;
+    };
+    importJob: { status: string };
+  }>(
+    `${workspaceUrl}/source-packages/${original.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-rejected.xml",
+        mediaType: "application/xml",
+        sourceDocument: "<Booklet>"
+      }
+    }
+  );
+  assert.equal(
+    rejectedReplacement.status,
+    201,
+    JSON.stringify(rejectedReplacement.body)
+  );
+  assert.equal(rejectedReplacement.body.importJob.status, "failed");
+  assert.equal(rejectedReplacement.body.replacementSourcePackage.status, "rejected");
+
+  const deletedReplacement = await requestJson<{
+    deletion: { sourcePackageId: string; deletedImportJobCount: number };
+  }>(
+    `${workspaceUrl}/source-packages/${rejectedReplacement.body.replacementSourcePackage.sourcePackageId}`,
+    {
+      method: "DELETE",
+      body: {
+        confirmation: rejectedReplacement.body.replacementSourcePackage.fileName
+      }
+    }
+  );
+  assert.equal(
+    deletedReplacement.status,
+    200,
+    JSON.stringify(deletedReplacement.body)
+  );
+  assert.equal(
+    deletedReplacement.body.deletion.sourcePackageId,
+    rejectedReplacement.body.replacementSourcePackage.sourcePackageId
+  );
+  assert.equal(deletedReplacement.body.deletion.deletedImportJobCount, 1);
+
+  const retainedReplacementAudit = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        details: { replacementSourcePackageId?: string };
+      };
+    }>;
+  }>(
+    `${workspaceUrl}/activity-events?eventType=source_package_replaced&subjectId=${original.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(retainedReplacementAudit.status, 200);
+  assert.equal(retainedReplacementAudit.body.items.length, 1);
+  assert.equal(
+    retainedReplacementAudit.body.items[0]?.activityEvent.details
+      .replacementSourcePackageId,
+    rejectedReplacement.body.replacementSourcePackage.sourcePackageId
+  );
+
+  const acceptedReplacement = await requestJson<{
+    replacementSourcePackage: { status: string };
+    importJob: { status: string };
+  }>(
+    `${workspaceUrl}/source-packages/${original.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-accepted.xml",
+        mediaType: "application/xml",
+        sourceDocument: validSourceDocument("booklet:replacement-accepted")
+      }
+    }
+  );
+  assert.equal(acceptedReplacement.status, 201, JSON.stringify(acceptedReplacement.body));
+  assert.equal(acceptedReplacement.body.importJob.status, "completed");
+  assert.equal(acceptedReplacement.body.replacementSourcePackage.status, "accepted");
+});
+
 test("source-package replacement and retry preserve workspace identity uniqueness", async () => {
   const tenantKey = "integration-tenant-source-mutation-identities";
   const workspaceKey = "integration-workspace-source-mutation-identities";
