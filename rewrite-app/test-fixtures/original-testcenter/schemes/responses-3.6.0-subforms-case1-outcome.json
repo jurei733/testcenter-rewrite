@@ -1,0 +1,70 @@
+[
+  {
+    "id": "value",
+    "status": "CODING_COMPLETE",
+    "value": 0,
+    "subform": "0"
+  },
+  {
+    "id": "time",
+    "status": "CODING_COMPLETE",
+    "value": 4251,
+    "subform": "0",
+    "code": 0,
+    "score": 0
+  },
+  { "id": "total_correct", "status": "NO_CODING", "value": 0 },
+  { "id": "total_wrong", "status": "NO_CODING", "value": 0 },
+  {
+    "id": "a1",
+    "value": 0,
+    "status": "CODING_COMPLETE",
+    "subform": "0",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "value",
+    "status": "CODING_COMPLETE",
+    "value": 1,
+    "subform": "1"
+  },
+  {
+    "id": "time",
+    "status": "CODING_COMPLETE",
+    "value": 576,
+    "subform": "1",
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "a1",
+    "value": 0,
+    "status": "CODING_COMPLETE",
+    "subform": "1",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "value",
+    "status": "CODING_COMPLETE",
+    "value": 0,
+    "subform": "2"
+  },
+  {
+    "id": "time",
+    "status": "CODING_COMPLETE",
+    "value": 608,
+    "subform": "2",
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "a1",
+    "value": 0,
+    "status": "CODING_COMPLETE",
+    "subform": "2",
+    "code": 1,
+    "score": 1
+  }
+]

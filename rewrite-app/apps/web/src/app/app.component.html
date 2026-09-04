@@ -1,88 +1,485 @@
-<div class="page" [class.is-busy]="app.activeRequestLabel() !== null">
+<div
+  class="page"
+  [class.is-busy]="app.activeRequestLabel() !== null"
+  [class.is-participant-page]="isParticipantView"
+>
   <span hidden>{{ app.renderVersion() }}</span>
-  <section class="hero">
-    <div class="hero-panel">
-      <span class="eyebrow">Rewrite App Frontend Start</span>
-      <h1>Operate The First Slice Without Leaving The Browser.</h1>
-      <p class="lead">
-        This Angular app now runs as routed frontend surface for workspace setup,
-        content intake, participant runtime, and operator diagnostics.
-      </p>
-    </div>
-    <div class="hero-panel status-grid">
-      <div class="status-pill">
-        <strong>Storage</strong>
-        <span>{{ app.ops.storageKind }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Schema</strong>
-        <span>{{ app.ops.storageSchemaVersion }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Routes</strong>
-        <span>18+</span>
-      </div>
-      <div class="status-pill">
-        <strong>Shells</strong>
-        <span>4</span>
-      </div>
-      <div class="status-pill">
-        <strong>View</strong>
-        <span id="activeViewBadge">{{ app.activeView }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Readiness</strong>
-        <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
-      </div>
-    </div>
-  </section>
-
+  @defer (when confirmation.dialog() !== null) {
+    <app-confirmation-dialog></app-confirmation-dialog>
+  }
+  @defer (when bugReports.isOpen()) {
+    <app-bug-report-dialog></app-bug-report-dialog>
+  }
   <section
-    class="status-banner"
-    *ngIf="app.activeRequestLabel() || app.errorMessage()"
-    [class.is-error]="!!app.errorMessage()"
+    id="globalApplicationWarning"
+    class="application-warning-banner"
+    *ngIf="applicationSettings.activeWarningText() as warningText"
+    role="alert"
+    aria-live="assertive"
   >
-    <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
-    <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
-      {{ app.activeRequestLabel() }} is in progress.
-    </span>
-    <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+    <strong>Service notice</strong>
+    <span>{{ warningText }}</span>
   </section>
-
-  <nav class="view-nav" aria-label="Application Views">
-    <a
-      *ngFor="let view of app.views"
-      [routerLink]="view.link"
-      routerLinkActive="is-active"
-      class="nav-link"
-      [attr.data-view-nav]="view.id"
+  <section
+    id="appOfflineShellNotice"
+    class="offline-shell-banner"
+    *ngIf="isOffline()"
+    role="status"
+    aria-live="polite"
+  >
+    <strong>Offline mode</strong>
+    <span>The application shell is available, but signing in, loading test content, and saving require a connection.</span>
+  </section>
+  <section
+    id="requiredAdminPasswordChangeDialog"
+    class="required-password-backdrop"
+    *ngIf="app.requiresAdminPasswordChange"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="requiredAdminPasswordChangeTitle"
+  >
+    <form class="required-password-card" (submit)="$event.preventDefault(); submitRequiredAdminPassword()">
+      <span class="eyebrow">Account security</span>
+      <h2 id="requiredAdminPasswordChangeTitle">Choose your own password</h2>
+      <p>An administrator set the current password. Change it before opening workspace administration.</p>
+      <p id="requiredAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
+      <label>
+        New password
+        <input
+          id="requiredAdminPassword"
+          name="requiredAdminPassword"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
+          required
+          [value]="requiredAdminPassword"
+          (input)="updateRequiredAdminPassword($event)"
+        />
+      </label>
+      <label>
+        Confirm new password
+        <input
+          id="requiredAdminPasswordConfirmation"
+          name="requiredAdminPasswordConfirmation"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
+          required
+          [value]="requiredAdminPasswordConfirmation"
+          (input)="updateRequiredAdminPasswordConfirmation($event)"
+        />
+      </label>
+      <p
+        id="requiredAdminPasswordError"
+        class="required-password-error"
+        *ngIf="requiredAdminPasswordError"
+        role="alert"
+      >{{ requiredAdminPasswordError }}</p>
+      <div class="actions">
+        <button
+          id="requiredAdminPasswordSubmitButton"
+          class="primary"
+          type="submit"
+          [disabled]="!canSubmitRequiredAdminPassword"
+        >Change password and sign out</button>
+        <button
+          id="requiredAdminPasswordSignOutButton"
+          class="ghost"
+          type="button"
+          [disabled]="app.activeRequestLabel() !== null"
+          (click)="signOutRequiredAdmin()"
+        >Sign out</button>
+      </div>
+    </form>
+  </section>
+  <section
+    id="ownAdminPasswordChangeDialog"
+    class="required-password-backdrop"
+    *ngIf="ownAdminPasswordDialogOpen"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ownAdminPasswordChangeTitle"
+  >
+    <form class="required-password-card" (submit)="$event.preventDefault(); submitOwnAdminPassword()">
+      <span class="eyebrow">Account security</span>
+      <h2 id="ownAdminPasswordChangeTitle">Change your password</h2>
+      <p>Enter the current password and choose a new one. All active sessions will be signed out after the change.</p>
+      <p id="ownAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
+      <label>
+        Current password
+        <input
+          id="currentAdminPassword"
+          name="currentAdminPassword"
+          type="password"
+          autocomplete="current-password"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          required
+          [value]="currentAdminPassword"
+          (input)="updateCurrentAdminPassword($event)"
+        />
+      </label>
+      <label>
+        New password
+        <input
+          id="ownAdminPassword"
+          name="ownAdminPassword"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
+          required
+          [value]="ownAdminPassword"
+          (input)="updateOwnAdminPassword($event)"
+        />
+      </label>
+      <label>
+        Confirm new password
+        <input
+          id="ownAdminPasswordConfirmation"
+          name="ownAdminPasswordConfirmation"
+          type="password"
+          autocomplete="new-password"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
+          [attr.pattern]="adminPasswordPattern"
+          required
+          [value]="ownAdminPasswordConfirmation"
+          (input)="updateOwnAdminPasswordConfirmation($event)"
+        />
+      </label>
+      <p
+        id="ownAdminPasswordError"
+        class="required-password-error"
+        *ngIf="ownAdminPasswordError"
+        role="alert"
+      >{{ ownAdminPasswordError }}</p>
+      <div class="actions">
+        <button
+          id="ownAdminPasswordSubmitButton"
+          class="primary"
+          type="submit"
+          [disabled]="!canSubmitOwnAdminPassword"
+        >Change password and sign out</button>
+        <button
+          id="ownAdminPasswordCancelButton"
+          class="ghost"
+          type="button"
+          [disabled]="app.activeRequestLabel() !== null"
+          (click)="closeOwnAdminPasswordDialog()"
+        >Cancel</button>
+      </div>
+    </form>
+  </section>
+  <ng-container *ngIf="isParticipantView; else operatorShell">
+    <header
+      *ngIf="!isParticipantHeaderHidden; else standaloneParticipantLogo"
+      id="participantApplicationHeader"
+      class="participant-topbar"
     >
-      {{ view.label }}
-    </a>
-  </nav>
+      <div class="application-brand">
+        <button
+          id="participantApplicationLogoButton"
+          class="application-logo-button"
+          type="button"
+          aria-label="Return to test selection"
+          (click)="leaveParticipantSession()"
+        >
+          <img
+            id="applicationLogo"
+            class="application-logo"
+            [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
+            [alt]="applicationSettings.settings().appTitle + ' logo'"
+          />
+        </button>
+        <div>
+          <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
+          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : activeRouteView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+        </div>
+      </div>
+      <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
+    </header>
+    <ng-template #standaloneParticipantLogo>
+      <button
+        id="participantStandaloneLogo"
+        class="participant-standalone-logo"
+        type="button"
+        aria-label="Return to test selection"
+        (click)="leaveParticipantSession()"
+      >
+        <img
+          id="applicationLogo"
+          class="application-logo"
+          [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
+          [alt]="applicationSettings.settings().appTitle + ' logo'"
+        />
+      </button>
+    </ng-template>
 
-  <section class="workspace app-layout">
-    <div class="stack">
+    <section
+      class="status-banner"
+      *ngIf="app.activeRequestLabel() || app.errorMessage()"
+      [class.is-error]="!!app.errorMessage()"
+    >
+      <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
+      <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
+        {{ app.activeRequestLabel() }} is in progress.
+      </span>
+      <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+      <button
+        *ngIf="app.errorMessage()"
+        class="ghost"
+        type="button"
+        data-open-bug-report
+        (click)="openErrorReport()"
+      >Fehlerbericht</button>
+    </section>
+
+    <main class="participant-stage">
       <router-outlet></router-outlet>
-    </div>
+    </main>
+  </ng-container>
 
-    <div class="stack">
-      <article class="card result">
-        <header>
-          <span>Last Response</span>
-          <span id="responseMeta">{{ app.responseMeta() }}</span>
-        </header>
-        <pre id="lastResponse">{{ app.lastResponse() }}</pre>
-      </article>
+  <ng-template #operatorShell>
+    <section class="hero" [class.is-home-hero]="isFocusedEntryView">
+      <div class="hero-panel">
+        <div class="application-brand operator-brand">
+          <img
+            id="applicationLogo"
+            class="application-logo"
+            [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
+            [alt]="applicationSettings.settings().appTitle + ' logo'"
+          />
+          <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
+        </div>
+        <span class="eyebrow">{{ operatorHeroEyebrow }}</span>
+        <h1>{{ operatorHeroTitle }}</h1>
+        <p class="lead">{{ operatorHeroDetail }}</p>
+        <section
+          id="localDemoStartupCard"
+          class="local-demo-startup"
+          *ngIf="isHomeView && app.localDemoBootstrapEnabled && !app.isMonitorOnlySession"
+        >
+          <div>
+            <span class="eyebrow">Local Demo Startup</span>
+            <h2 id="localDemoStartupStatus">{{ app.localDemoStartupHeadline }}</h2>
+            <p>{{ app.localDemoScopeLabel }}</p>
+          </div>
+          <dl>
+            <div>
+              <dt>Admin</dt>
+              <dd id="localDemoAdminCredential">{{ app.localDemoAdminCredential }}</dd>
+            </div>
+            <div>
+              <dt>Participant</dt>
+              <dd id="localDemoParticipantCredential">{{ app.localDemoParticipantCredential }}</dd>
+            </div>
+            <div>
+              <dt>Runtime</dt>
+              <dd id="localDemoRuntimeDetail">{{ app.localDemoRuntimeDetail }}</dd>
+            </div>
+            <div>
+              <dt>Build</dt>
+              <dd id="localDemoBuildDetail">{{ app.localDemoBuildDetail }}</dd>
+            </div>
+          </dl>
+          <div class="actions hero-actions">
+            <a class="button-link primary" [href]="app.localDemoParticipantLink">Start Demo Participant</a>
+            <a
+              class="button-link ghost"
+              routerLink="/ops"
+              [queryParams]="{ demoAdmin: 'sign-in' }"
+            >
+              Sign In Demo Admin
+            </a>
+          </div>
+        </section>
+      </div>
+      <div class="hero-panel status-grid" *ngIf="!isFocusedEntryView">
+        <div class="status-pill">
+          <strong>Storage</strong>
+          <span>{{ app.ops.storageKind }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Schema</strong>
+          <span>{{ app.ops.storageSchemaVersion }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Auth</strong>
+          <span id="authModeBadge">{{ app.ops.operatorAuthMode }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Port</strong>
+          <span id="runtimePortBadge">{{ app.ops.runtimePort }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Routes</strong>
+          <span id="routeCountBadge">{{ app.ops.routeCount }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Build</strong>
+          <span id="buildRefBadge">{{ app.ops.buildRef }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Shells</strong>
+          <span>{{ app.views.length }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>View</strong>
+          <span id="activeViewBadge">{{ activeRouteView }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Readiness</strong>
+          <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
+        </div>
+        <div class="status-pill action-pill">
+          <strong>Raw Debug</strong>
+          <button
+            id="rawDebugToggle"
+            class="ghost"
+            type="button"
+            [attr.aria-pressed]="app.showRawDebug"
+            (click)="app.toggleRawDebug()"
+          >
+            {{ app.showRawDebug ? "Hide" : "Show" }}
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <article class="card view-grid">
-        <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
-        <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
-        <p class="note">
-          Tip: use the ids returned in the response pane to drive import, activation,
-          and release detail flows while the Angular frontend is still intentionally lean.
-        </p>
-      </article>
-    </div>
-  </section>
+    <section
+      class="status-banner"
+      *ngIf="app.activeRequestLabel() || app.errorMessage()"
+      [class.is-error]="!!app.errorMessage()"
+    >
+      <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
+      <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
+        {{ app.activeRequestLabel() }} is in progress.
+      </span>
+      <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+      <button
+        *ngIf="app.errorMessage()"
+        class="ghost"
+        type="button"
+        data-open-bug-report
+        (click)="openErrorReport()"
+      >Fehlerbericht</button>
+    </section>
+
+    <nav class="view-nav" aria-label="Application Views">
+      <a
+        *ngFor="let view of app.views"
+        [routerLink]="view.link"
+        routerLinkActive="is-active"
+        class="nav-link"
+        [attr.data-view-nav]="view.id"
+      >
+        {{ view.label }}
+      </a>
+      <details
+        id="operatorAccountMenu"
+        class="operator-account-menu"
+        *ngIf="app.hasAdminSession"
+      >
+        <summary
+          id="operatorAccountSummary"
+          class="nav-link"
+          aria-label="Open operator account information"
+        >Account · {{ app.operatorAccountUsername }}</summary>
+        <section class="operator-account-panel" aria-label="Operator account information">
+          <h2>User information</h2>
+          <dl>
+            <div>
+              <dt>Username</dt>
+              <dd id="operatorAccountUsername">{{ app.operatorAccountUsername }}</dd>
+            </div>
+            <div>
+              <dt>Display name</dt>
+              <dd id="operatorAccountDisplayName">{{ app.operatorAccountDisplayName }}</dd>
+            </div>
+            <div>
+              <dt>Access</dt>
+              <dd id="operatorAccountAccessLabel">{{ app.operatorAccessLabel }}</dd>
+            </div>
+            <div
+              class="operator-account-permission"
+              *ngFor="let access of app.operatorAccountAccessItems; trackBy: trackOperatorAccountAccess"
+            >
+              <dt>Permission</dt>
+              <dd class="operator-account-role">{{ access.role }}</dd>
+              <dd class="operator-account-scope">{{ access.scope }}</dd>
+            </div>
+            <div>
+              <dt>Session expires</dt>
+              <dd id="operatorAccountSessionExpiresAt">{{ app.operatorAccountSessionExpiresAt }}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd id="operatorAccountVersion">{{ app.ops.buildRef }}</dd>
+            </div>
+          </dl>
+        </section>
+      </details>
+      <button
+        id="ownAdminPasswordOpenButton"
+        class="nav-link account-security-link"
+        type="button"
+        *ngIf="app.hasAdminSession"
+        [disabled]="app.activeRequestLabel() !== null"
+        (click)="openOwnAdminPasswordDialog()"
+      >Change password</button>
+      <button
+        id="globalAdminSignOutButton"
+        class="nav-link"
+        type="button"
+        *ngIf="app.hasAdminSession"
+        [disabled]="app.activeRequestLabel() !== null"
+        (click)="signOutAdmin()"
+      >Sign out</button>
+    </nav>
+
+    <main class="home-stage" *ngIf="isFocusedEntryView; else operationalWorkspace">
+      <router-outlet></router-outlet>
+    </main>
+
+    <ng-template #operationalWorkspace>
+      <section class="workspace app-layout">
+        <div class="stack">
+          <app-live-context [sections]="app.liveContextSections"></app-live-context>
+
+          <router-outlet></router-outlet>
+        </div>
+
+        <div class="stack">
+          <article class="card result">
+            <header>
+              <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
+              <span id="responseMeta">{{ app.responseMeta() }}</span>
+            </header>
+            <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
+            <ng-template #lastResponsePreview>
+              <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
+            </ng-template>
+          </article>
+
+          <article class="card view-grid">
+            <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
+            <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
+          </article>
+        </div>
+      </section>
+    </ng-template>
+  </ng-template>
+  <footer class="application-footer">
+    <span>{{ applicationSettings.settings().appTitle }}</span>
+    <nav aria-label="Public information">
+      <a id="applicationLegalNoticeLink" routerLink="/legal-notice">Legal notice</a>
+      <a id="applicationPrivacyNoticeLink" routerLink="/privacy">Privacy</a>
+      <a id="applicationAccessibilityNoticeLink" routerLink="/accessibility">Accessibility</a>
+    </nav>
+  </footer>
 </div>

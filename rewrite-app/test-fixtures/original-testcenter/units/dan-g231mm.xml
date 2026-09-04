@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<Unit>
+  <Metadata>
+    <Id>G231mm</Id>
+    <Label>Sprachliche Mittel MM</Label>
+    <Lastchange>2020-06-23T16:25:40+02:00</Lastchange>
+    <Owner>Institut zur Qualit&#xE4;tsentwicklung im Bildungswesen IQB</Owner>
+    <Project>MMe-Temp</Project>
+  </Metadata>
+  <DefinitionRef player="IQBVisualUnitPlayerV2">G231mm.voud</DefinitionRef>
+</Unit>

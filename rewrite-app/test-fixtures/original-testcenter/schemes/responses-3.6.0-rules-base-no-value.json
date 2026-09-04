@@ -1,0 +1,68 @@
+{
+  "variableCodings": [
+    {
+      "id": "text_1737972248292_1",
+      "alias": "text_1",
+      "label": "",
+      "sourceType": "BASE_NO_VALUE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": []
+    },
+    {
+      "id": "text-field_1737972287006_1",
+      "alias": "text-field_1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": false,
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    ""
+                  ]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    }
+  ],
+  "version": "3.0"
+}

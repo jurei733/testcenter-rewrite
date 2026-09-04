@@ -19,9 +19,38 @@
             "browser": "apps/web/src/main.ts",
             "index": "apps/web/src/index.html",
             "tsConfig": "apps/web/tsconfig.app.json",
-            "assets": [],
+            "assets": [
+              {
+                "glob": "service-worker.js",
+                "input": "apps/web/src",
+                "output": "/"
+              },
+              {
+                "glob": "manifest.webmanifest",
+                "input": "apps/web/src",
+                "output": "/"
+              },
+              {
+                "glob": "app-icon.svg",
+                "input": "apps/web/src",
+                "output": "/"
+              },
+              {
+                "glob": "**/*",
+                "input": "apps/web/src/assets",
+                "output": "/assets"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/altcha-lib",
+                "output": "/altcha-lib"
+              }
+            ],
             "styles": [
               "apps/web/src/styles.css"
+            ],
+            "allowedCommonJsDependencies": [
+              "ua-parser-js"
             ],
             "baseHref": "/app/"
           },
@@ -30,8 +59,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "900kB",
-                  "maximumError": "1.5MB"
+                  "maximumWarning": "450kB",
+                  "maximumError": "470kB"
                 },
                 {
                   "type": "anyComponentStyle",

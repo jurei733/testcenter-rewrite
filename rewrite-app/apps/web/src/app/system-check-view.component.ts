@@ -1,0 +1,1558 @@
+import { CommonModule } from "@angular/common";
+import { ChangeDetectorRef, Component, inject } from "@angular/core";
+import type { OnInit } from "@angular/core";
+import { FormsModule } from "@angular/forms";
+import { ActivatedRoute, Router } from "@angular/router";
+import UAParser from "ua-parser-js";
+
+import {
+  productionApiRoutes,
+  resolveRoutePath,
+  type GetSystemCheckAccessResponse,
+  type GetSystemCheckResponse,
+  type GetSystemCheckReportStatisticsResponse,
+  type GetSystemTimeResponse,
+  type ListSystemCheckReportsResponse,
+  type ListSystemChecksResponse,
+  type DeleteSystemCheckReportsResponse,
+  type ImportSystemCheckReportResponse,
+  type SaveSystemCheckReportRequest,
+  type SaveSystemCheckReportResponse,
+  type SystemCheckAccessMode,
+  type SystemCheckAuthorizedScope,
+  type SystemCheckSpeedTestUploadResponse
+} from "@testcenter-rewrite-app/contracts";
+import type {
+  SystemCheckReport,
+  SystemCheckReportEntry,
+  SystemCheckReportStatistics,
+  SystemCheckSpeedParameters,
+  WorkspaceSystemCheck
+} from "@testcenter-rewrite-app/domain";
+
+import { downloadBlobFile } from "./download-text-file";
+import { ApplicationSettingsService } from "./application-settings.service";
+import { RewriteAppApiService } from "./rewrite-app-api.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { RewriteAppOpsService } from "./rewrite-app-ops.service";
+import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { ConfirmationDialogService } from "./confirmation-dialog.service";
+import {
+  SystemCheckSaveReportDialogComponent,
+  type SystemCheckSaveReportDialogResult
+} from "./system-check-save-report-dialog.component";
+import { VeronaPlayerHostComponent } from "./verona-player-host.component";
+
+type SystemCheckStep =
+  | "welcome"
+  | "network"
+  | "unit"
+  | "questionnaire"
+  | "report";
+
+type BrowserConnection = {
+  downlink?: number;
+  effectiveType?: string;
+  rtt?: number;
+  type?: string;
+};
+
+type SystemCheckNetworkRating = "good" | "ok" | "insufficient" | "unstable";
+
+type ThroughputResult = {
+  bytesPerSecond: number;
+  unstable: boolean;
+  repetitions: number;
+};
+
+type SystemCheckUnitResponse = {
+  dataParts: Record<string, string>;
+  responseType: string;
+};
+
+const readSystemCheckUnitResponse = (
+  value: string
+): SystemCheckUnitResponse | null => {
+  try {
+    const parsed = JSON.parse(value) as {
+      kind?: unknown;
+      unitState?: {
+        dataParts?: unknown;
+        unitStateDataType?: unknown;
+      };
+    };
+    if (
+      parsed.kind !== "verona_unit_state" ||
+      typeof parsed.unitState?.dataParts !== "object" ||
+      parsed.unitState.dataParts === null ||
+      Array.isArray(parsed.unitState.dataParts)
+    ) {
+      return null;
+    }
+    const dataParts = Object.fromEntries(
+      Object.entries(parsed.unitState.dataParts).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string"
+      )
+    );
+    return {
+      dataParts,
+      responseType:
+        typeof parsed.unitState.unitStateDataType === "string"
+          ? parsed.unitState.unitStateDataType
+          : ""
+    };
+  } catch {
+    return null;
+  }
+};
+
+@Component({
+  selector: "app-system-check-view",
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    SystemCheckSaveReportDialogComponent,
+    VeronaPlayerHostComponent
+  ],
+  template: `
+    <div class="stack system-check-shell">
+      <article class="card system-check-hero">
+        <div>
+          <span class="eyebrow">Device readiness</span>
+          <h2>Check this device before testing</h2>
+          <p>Environment, network, the configured Verona item and questionnaire are collected in one report.</p>
+        </div>
+        <strong id="systemCheckStepStatus">{{ stepNumber }} / {{ steps.length }} · {{ stepLabel }}</strong>
+      </article>
+
+      <article class="card system-check-login">
+        <ng-container *ngIf="isSystemCheckSession; else systemCheckSignIn">
+          <span class="eyebrow">Protected system check</span>
+          <h2 id="systemCheckSignedInUser">Signed in as {{ signedInUsername }}</h2>
+          <p>This workspace login authorizes report saving without a separate report key.</p>
+          <button id="systemCheckSignOutButton" class="ghost" type="button" [disabled]="busy || systemCheckAuthenticationBusy" (click)="signOutSystemCheck()">Sign Out</button>
+        </ng-container>
+        <ng-template #systemCheckSignIn>
+          <span class="eyebrow">{{ systemCheckLoginRequired ? 'Protected workspace login' : 'Optional workspace login' }}</span>
+          <h2>Use a protected system-check account</h2>
+          <p *ngIf="systemCheckLoginRequired" id="systemCheckLoginRequiredStatus">This installation uses dedicated system-check accounts. Sign in to select and run the assigned workspace checks.</p>
+          <p *ngIf="!systemCheckLoginRequired">Imported <code>sys-check-login</code> accounts can save reports under their login name without entering the report key.</p>
+          <div class="form-grid">
+            <label>Login name<input id="systemCheckUsername" autocomplete="username" [(ngModel)]="systemCheckUsername" /></label>
+            <label>Password<input id="systemCheckPassword" type="password" autocomplete="current-password" [(ngModel)]="systemCheckPassword" /></label>
+          </div>
+          <button id="systemCheckSignInButton" class="primary" type="button" [disabled]="busy || !canSignInSystemCheck" (click)="signInSystemCheck()">Sign In</button>
+        </ng-template>
+      </article>
+
+      <article class="card" *ngIf="!systemCheck && canUseSystemChecks">
+        <h2>Choose a system check</h2>
+        <div class="form-grid">
+          <label>Tenant Key<input id="systemCheckTenantKey" [(ngModel)]="tenantKey" /></label>
+          <label>Workspace Key<input id="systemCheckWorkspaceKey" [(ngModel)]="workspaceKey" /></label>
+        </div>
+        <div class="actions">
+          <button id="loadSystemChecksButton" class="primary" type="button" [disabled]="busy || !canLoad" (click)="loadSystemChecks()">Load Checks</button>
+        </div>
+        <section class="system-check-options" *ngIf="systemChecks.length > 0">
+          <button
+            *ngFor="let item of systemChecks"
+            type="button"
+            class="system-check-option"
+            [attr.data-system-check-id]="item.checkId"
+            (click)="selectSystemCheck(item.checkId)"
+          >
+            <strong>{{ item.displayLabel }}</strong>
+            <span>{{ item.checkId }}</span>
+            <small>{{ item.description || 'No description provided.' }}</small>
+          </button>
+        </section>
+      </article>
+
+      <ng-container *ngIf="systemCheck as check">
+        <nav class="system-check-steps" aria-label="System check steps">
+          <button
+            *ngFor="let item of steps; let index = index"
+            type="button"
+            [class.is-current]="item === step"
+            [class.is-complete]="index < stepIndex"
+            [disabled]="index > stepIndex"
+            (click)="setStep(item)"
+          >{{ stepName(item) }}</button>
+        </nav>
+
+        <article class="card" *ngIf="step === 'welcome'">
+          <span class="eyebrow">{{ check.checkId }}</span>
+          <h2>{{ check.displayLabel }}</h2>
+          <p id="systemCheckIntroText">{{ customText('syscheck_intro', 'This check verifies whether the current device is ready for a test session.') }}</p>
+          <p *ngIf="check.description">{{ check.description }}</p>
+          <dl class="system-check-facts">
+            <div><dt>Network</dt><dd>{{ check.skipNetwork ? 'Skipped by configuration' : 'Measured' }}</dd></div>
+            <div><dt>Questions</dt><dd>{{ interactiveQuestionCount }}</dd></div>
+            <div><dt>Player item</dt><dd>{{ check.unit ? check.unit.unitKey : 'Not configured' }}</dd></div>
+            <div><dt>Report</dt><dd>{{ check.canSave ? isSystemCheckSession ? 'Authorized by system-check login' : 'Can be saved with report key' : 'Not configured' }}</dd></div>
+          </dl>
+          <h3>Ermitteln von Systemdaten (Betriebssystem, Browser)</h3>
+          <p>Values available to the browser are captured automatically. No fingerprint is retained until the report is saved.</p>
+          <dl class="system-check-results">
+            <div
+              *ngFor="let entry of environmentEntries"
+              [id]="'systemCheckEnvironment-' + entry.id"
+              [class.has-warning]="entry.warning"
+            ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+          </dl>
+          <button class="ghost" type="button" (click)="captureEnvironment()">Capture Again</button>
+        </article>
+
+        <article class="card" *ngIf="step === 'network'">
+          <h2>Network</h2>
+          <p>Configured upload and download packages measure throughput against this test server; application latency and browser-provided connection estimates are included.</p>
+          <p id="systemCheckNetworkStatus">{{ networkStatusMessage }}</p>
+          <div class="network-rating" [class.has-warning]="networkRating === 'insufficient' || networkRating === 'unstable'">
+            <span>Overall rating</span>
+            <strong id="systemCheckNetworkRating">{{ networkRating }}</strong>
+          </div>
+          <dl class="system-check-results" *ngIf="networkEntries.length > 0">
+            <div
+              *ngFor="let entry of networkEntries"
+              [id]="'systemCheckNetwork-' + entry.id"
+              [class.has-warning]="entry.warning"
+            ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+          </dl>
+          <button id="runSystemCheckNetworkButton" class="primary" type="button" [disabled]="networkBusy" (click)="runNetworkCheck()">
+            {{ networkBusy ? 'Measuring…' : networkEntries.length ? 'Measure Again' : 'Run Network Check' }}
+          </button>
+        </article>
+
+        <article class="card" *ngIf="step === 'questionnaire'">
+          <h2>Questionnaire</h2>
+          <p id="systemCheckQuestionsIntro">{{ customText('syscheck_questionsintro', 'Please answer all fields marked as required.') }}</p>
+          <div class="system-check-questionnaire">
+            <ng-container *ngFor="let question of check.questions">
+              <h3
+                *ngIf="question.type === 'header'"
+                [id]="'systemCheckQuestionHeader-' + question.id"
+              >{{ question.options.length > 0 ? question.options.join(',') : question.prompt }}</h3>
+              <label *ngIf="question.type === 'string'">
+                {{ question.prompt }}{{ question.required ? ' *' : '' }}
+                <input [id]="'systemCheckQuestion-' + question.id" [(ngModel)]="answers[question.id]" />
+              </label>
+              <label *ngIf="question.type === 'text'">
+                {{ question.prompt }}{{ question.required ? ' *' : '' }}
+                <textarea [id]="'systemCheckQuestion-' + question.id" rows="4" [(ngModel)]="answers[question.id]"></textarea>
+              </label>
+              <label *ngIf="question.type === 'select'">
+                {{ question.prompt }}{{ question.required ? ' *' : '' }}
+                <select [id]="'systemCheckQuestion-' + question.id" [(ngModel)]="answers[question.id]">
+                  <option value="">Please choose</option>
+                  <option *ngFor="let option of question.options" [value]="option">{{ option }}</option>
+                </select>
+              </label>
+              <fieldset *ngIf="question.type === 'radio'">
+                <legend>{{ question.prompt }}{{ question.required ? ' *' : '' }}</legend>
+                <label *ngFor="let option of question.options" class="choice-row">
+                  <input type="radio" [name]="'systemCheckQuestion-' + question.id" [value]="option" [(ngModel)]="answers[question.id]" />
+                  {{ option }}
+                </label>
+              </fieldset>
+              <label *ngIf="question.type === 'check'" class="choice-row">
+                <input [id]="'systemCheckQuestion-' + question.id" type="checkbox" [(ngModel)]="answers[question.id]" />
+                {{ question.prompt }}{{ question.required ? ' *' : '' }}
+              </label>
+            </ng-container>
+          </div>
+        </article>
+
+        <article class="card" *ngIf="step === 'unit'">
+          <h2>{{ customText('syscheck_unitPrompt', 'Player and unit') }}</h2>
+          <p *ngIf="check.unit">Configured item: {{ check.unit.displayLabel }} ({{ check.unit.unitKey }})</p>
+          <app-verona-player-host
+            *ngIf="check.unit?.playerHtml && check.unit?.unitDefinition; else unresolvedUnit"
+            [playerHtml]="check.unit!.playerHtml!"
+            [playerKey]="check.unit!.playerKey || 'system-check-player'"
+            testRunId="system-check"
+            [unitKey]="check.unit!.unitKey"
+            [unitTitle]="check.unit!.displayLabel"
+            [unitDefinition]="check.unit!.unitDefinition!"
+            [unitDefinitionType]="check.unit!.unitDefinitionType || ''"
+            [canComplete]="true"
+            [savedResponse]="unitResponse"
+            [pageNavigationPrompt]="customText('login_pagesNaviPrompt', 'Weitere Seiten:')"
+            (responseChange)="onUnitResponse($event)"
+          ></app-verona-player-host>
+          <ng-template #unresolvedUnit>
+            <section class="system-check-notice has-warning">
+              <strong>Player check unavailable</strong>
+              <p>The definition references {{ check.unit?.unitKey }}, but its unit definition and Verona player are not present in accepted content.</p>
+            </section>
+          </ng-template>
+        </article>
+
+        <article class="card" *ngIf="step === 'report'">
+          <h2>Report</h2>
+          <section
+            id="systemCheckQuestionnaireWarnings"
+            class="system-check-notice has-warning"
+            *ngIf="unansweredRequiredQuestions.length > 0"
+          >
+            <strong>{{ customText('syscheck_questionsRequiredMessage', 'Bitte prüfen Sie die Eingaben (unvollständig):') }}</strong>
+            <ul>
+              <li *ngFor="let question of unansweredRequiredQuestions">{{ question.prompt }}</li>
+            </ul>
+          </section>
+          <p>The report contains {{ reportEntryCount }} measured or answered values.</p>
+          <section id="systemCheckReportEnvironment" *ngIf="environmentEntries.length > 0">
+            <h3>Computer (Betriebssystem, Browser)</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of environmentEntries"
+                [id]="'systemCheckReportEnvironment-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
+          <section id="systemCheckReportNetwork" *ngIf="networkEntries.length > 0">
+            <h3>Netzwerk/Internetverbindung</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of networkEntries"
+                [id]="'systemCheckReportNetwork-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
+          <section id="systemCheckReportQuestionnaire" *ngIf="questionnaireEntries.length > 0">
+            <h3>Fragen</h3>
+            <dl class="system-check-results">
+              <div
+                *ngFor="let entry of questionnaireEntries"
+                [id]="'systemCheckReportQuestionnaire-' + entry.id"
+                [class.has-warning]="entry.warning"
+              ><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+            </dl>
+          </section>
+          <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
+          <div class="actions">
+            <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !canSaveReport" (click)="startReportSave()">Bericht senden</button>
+            <button id="cancelSystemCheckReportButton" class="secondary" type="button" [disabled]="busy" (click)="cancelSystemCheckReport()">System-Check abbrechen</button>
+          </div>
+          <section class="system-check-operator" *ngIf="!isSystemCheckSession">
+            <h3>Operator report access</h3>
+            <p>Signed-in workspace operators can inspect report distributions, migrate original Testcenter JSON reports, export legacy-compatible files, or delete reports for selected checks.</p>
+            <input
+              #legacyReportInput
+              id="legacySystemCheckReportInput"
+              type="file"
+              accept=".json,application/json"
+              multiple
+              hidden
+              (change)="importOperatorReport($event)"
+            />
+            <input
+              #legacyReportDirectoryInput
+              id="legacySystemCheckReportDirectoryInput"
+              type="file"
+              accept=".json,application/json"
+              multiple
+              webkitdirectory
+              hidden
+              (change)="importOperatorReport($event)"
+            />
+            <div class="actions">
+              <button id="loadSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="loadOperatorReports()">Load Reports</button>
+              <button id="importSystemCheckReportButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportInput.click()">Import report files</button>
+              <button id="importSystemCheckReportDirectoryButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportDirectoryInput.click()">Import report folder</button>
+              <button id="exportSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReports()">Export CSV</button>
+              <button id="exportSystemCheckReportsJsonButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReportsJson()">Export JSON</button>
+              <button id="deleteSystemCheckReportsButton" class="danger" type="button" [disabled]="!hasAdminSession || busy || selectedOperatorCheckIds.length === 0" (click)="deleteOperatorReports()">Delete selected</button>
+            </div>
+            <p id="systemCheckReportOperatorStatus" *ngIf="operatorStatusMessage">{{ operatorStatusMessage }}</p>
+            <ul id="systemCheckReportImportFailures" *ngIf="operatorImportFailures.length > 0">
+              <li *ngFor="let failure of operatorImportFailures">{{ failure }}</li>
+            </ul>
+            <div class="system-check-statistics" *ngIf="operatorStatistics.length > 0">
+              <article *ngFor="let statistics of operatorStatistics">
+                <label class="choice-row">
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="'Select reports for ' + statistics.checkId"
+                    [checked]="isOperatorCheckSelected(statistics.checkId)"
+                    (change)="toggleOperatorCheckSelection(statistics.checkId)"
+                  />
+                  <strong>{{ statistics.checkLabel }} ({{ statistics.checkId }})</strong>
+                </label>
+                <span class="report-count">{{ statistics.reportCount }} report(s) · latest {{ statistics.latestReportAt }}</span>
+                <dl>
+                  <div><dt>Operating systems</dt><dd>{{ formatBreakdown(statistics.operatingSystems) }}</dd></div>
+                  <div><dt>Browsers</dt><dd>{{ formatBreakdown(statistics.browsers) }}</dd></div>
+                  <div><dt>Overall ratings</dt><dd>{{ formatBreakdown(statistics.overallRatings) }}</dd></div>
+                </dl>
+              </article>
+            </div>
+            <ol class="system-check-report-list" *ngIf="operatorReports.length > 0">
+              <li *ngFor="let report of operatorReports">
+                <button type="button" class="ghost" (click)="selectedOperatorReport = report">
+                  <strong>{{ report.title }}</strong><span>{{ report.createdAt }}</span>
+                </button>
+              </li>
+            </ol>
+            <section class="system-check-report-detail" *ngIf="selectedOperatorReport as report">
+              <h4>{{ report.title }}</h4>
+              <p>{{ report.checkLabel }} · {{ report.systemCheckReportId }}</p>
+              <p *ngIf="report.originalFileName">Original file: {{ report.originalFileName }} · report date {{ report.sourceDate }}</p>
+              <dl>
+                <div *ngFor="let entry of report.environment"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.network"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.questionnaire"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.unit"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngIf="hasReportResponses(report.responses)"><dt>Responses</dt><dd>{{ formatReportResponses(report.responses) }}</dd></div>
+              </dl>
+            </section>
+            <small *ngIf="!hasAdminSession">Sign in under Diagnostics first.</small>
+          </section>
+        </article>
+
+        <div class="actions system-check-navigation">
+          <button id="systemCheckBackButton" class="ghost" type="button" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
+          <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
+          <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>
+        </div>
+      </ng-container>
+
+      <app-system-check-save-report-dialog
+        *ngIf="reportSaveDialogOpen"
+        [aboutPassword]="customText('syscheck_report_aboutPassword', 'Nur berechtigten Personen ist das Speichern erlaubt. Bitte geben Sie unten das System-Check-Kennwort ein, das Sie von der Projektleitung erhalten haben!')"
+        [aboutReportId]="customText('syscheck_report_aboutReportId', 'Die ermittelten bzw. eingegebenen Informationen werden in der Datenbank so gespeichert, dass eine zusammenfassende Auswertung für eine bestimmte Studie möglich ist. Um den Bericht einem bestimmten Projekt oder einer Studie zuordnen zu können, geben Sie bitte einen kurzen Text ein, der dann als Titel für den Bericht verwendet wird!')"
+        [reportIdLabel]="customText('syscheck_report_id', 'Schul-ID')"
+        (cancel)="closeReportSaveDialog()"
+        (save)="submitAnonymousReport($event)"
+      ></app-system-check-save-report-dialog>
+
+      <section class="status-banner is-error" *ngIf="errorMessage" role="alert">
+        <strong>System Check</strong><span>{{ errorMessage }}</span>
+      </section>
+    </div>
+  `,
+  styles: [`
+    .system-check-shell { max-width: 980px; margin: 0 auto; }
+    .system-check-hero { display: flex; justify-content: space-between; gap: 20px; align-items: center; }
+    .system-check-hero h2 { font-size: clamp(26px, 5vw, 42px); }
+    .system-check-hero > strong { padding: 10px 14px; border-radius: 999px; background: var(--secondary); color: white; white-space: nowrap; }
+    .system-check-options { display: grid; gap: 12px; margin-top: 18px; }
+    .system-check-option { display: grid; gap: 5px; padding: 18px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-lg); background: white; color: var(--ink); }
+    .system-check-option span, .system-check-option small { color: var(--muted); }
+    .system-check-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+    .system-check-steps button { border: 1px solid var(--line); background: rgba(255,255,255,.72); color: var(--muted); }
+    .system-check-steps button.is-current { background: var(--ink); color: white; }
+    .system-check-steps button.is-complete { background: var(--secondary-soft); color: var(--secondary); }
+    .system-check-facts, .system-check-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+    .system-check-facts div, .system-check-results div { padding: 14px; border-radius: var(--radius-md); background: rgba(27,36,48,.05); }
+    dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+    .network-rating { display: flex; justify-content: space-between; align-items: center; padding: 18px; margin: 16px 0; border-radius: var(--radius-lg); background: var(--secondary-soft); }
+    .network-rating.has-warning, .system-check-notice.has-warning, .system-check-results .has-warning { background: var(--accent-soft); }
+    .network-rating strong { font-size: 24px; }
+    .system-check-questionnaire { display: grid; gap: 16px; }
+    fieldset { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; }
+    .choice-row { display: flex; grid-template-columns: none; align-items: center; gap: 10px; color: var(--ink); }
+    .choice-row input { width: auto; }
+    .system-check-notice, .system-check-operator { margin-top: 18px; padding: 18px; border-radius: var(--radius-lg); background: var(--secondary-soft); }
+    .system-check-operator { background: rgba(27,36,48,.05); }
+    .system-check-operator ol { display: grid; gap: 8px; padding-left: 24px; }
+    .system-check-operator li { padding: 8px; }
+    .system-check-operator li span { display: block; color: var(--muted); font-size: 12px; }
+    .system-check-statistics { display: grid; gap: 12px; margin-top: 16px; }
+    .system-check-statistics article, .system-check-report-detail { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: white; }
+    .system-check-statistics dl, .system-check-report-detail dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 0; }
+    .system-check-statistics dl div, .system-check-report-detail dl div { min-width: 0; }
+    .report-count { display: block; margin: 8px 0; color: var(--muted); font-size: 12px; }
+    .system-check-report-list button { width: 100%; text-align: left; }
+    .system-check-report-detail { margin-top: 16px; }
+    .system-check-navigation { justify-content: space-between; }
+    @media (max-width: 680px) { .system-check-hero { display: grid; } .system-check-facts, .system-check-results { grid-template-columns: 1fr; } }
+  `]
+})
+export class SystemCheckViewComponent implements OnInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
+  private readonly api = inject(RewriteAppApiService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly opsService = inject(RewriteAppOpsService);
+  private readonly uiState = inject(RewriteAppUiStateService);
+  private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly confirmation = inject(ConfirmationDialogService);
+
+  tenantKey = this.uiState.workspace.tenantKey;
+  workspaceKey = this.uiState.workspace.workspaceKey;
+  systemChecks: WorkspaceSystemCheck[] = [];
+  systemCheck: WorkspaceSystemCheck | null = null;
+  step: SystemCheckStep = "welcome";
+  answers: Record<string, string | boolean> = {};
+  environmentEntries: SystemCheckReportEntry[] = [];
+  networkEntries: SystemCheckReportEntry[] = [];
+  networkRating = "not measured";
+  networkStatusMessage = "Measurement has not started.";
+  networkBusy = false;
+  unitResponse = "";
+  reportTitle = "System Check Report";
+  reportKey = "";
+  reportSaveDialogOpen = false;
+  systemCheckUsername = "";
+  systemCheckPassword = "";
+  systemCheckAccessMode: SystemCheckAccessMode = "anonymous_key";
+  authorizedSystemCheckScopes: SystemCheckAuthorizedScope[] = [];
+  operatorReports: SystemCheckReport[] = [];
+  operatorStatistics: SystemCheckReportStatistics[] = [];
+  selectedOperatorCheckIds: string[] = [];
+  selectedOperatorReport: SystemCheckReport | null = null;
+  operatorStatusMessage = "";
+  operatorImportFailures: string[] = [];
+  busy = false;
+  systemCheckAuthenticationBusy = false;
+  errorMessage = "";
+
+  async ngOnInit(): Promise<void> {
+    this.viewState.setActiveView("system-check");
+    this.tenantKey =
+      this.route.snapshot.queryParamMap.get("tenantKey")?.trim() || this.tenantKey;
+    this.workspaceKey =
+      this.route.snapshot.queryParamMap.get("workspaceKey")?.trim() ||
+      this.workspaceKey;
+    const checkId = this.route.snapshot.queryParamMap.get("checkId")?.trim();
+    await this.loadSystemCheckAccess();
+    if (this.canLoad) {
+      await this.loadSystemChecks(checkId || undefined);
+    }
+  }
+
+  get canLoad(): boolean {
+    return Boolean(
+      this.canUseSystemChecks &&
+      this.tenantKey.trim() &&
+      this.workspaceKey.trim()
+    );
+  }
+
+  get systemCheckLoginRequired(): boolean {
+    return this.systemCheckAccessMode === "login_required";
+  }
+
+  get canUseSystemChecks(): boolean {
+    return !this.systemCheckLoginRequired || this.isSystemCheckSession;
+  }
+
+  get steps(): SystemCheckStep[] {
+    if (!this.systemCheck) {
+      return ["welcome"];
+    }
+    return [
+      "welcome",
+      ...(this.systemCheck.skipNetwork ? [] : ["network" as const]),
+      ...(this.systemCheck.unit ? ["unit" as const] : []),
+      ...(this.interactiveQuestionCount > 0 ? ["questionnaire" as const] : []),
+      ...(this.systemCheck.canSave ? ["report" as const] : [])
+    ];
+  }
+
+  get stepIndex(): number {
+    return Math.max(0, this.steps.indexOf(this.step));
+  }
+
+  get stepNumber(): number {
+    return this.stepIndex + 1;
+  }
+
+  get stepLabel(): string {
+    return this.stepName(this.step);
+  }
+
+  get interactiveQuestionCount(): number {
+    return this.systemCheck?.questions.filter(question => question.type !== "header")
+      .length ?? 0;
+  }
+
+  get canContinue(): boolean {
+    if (this.step === "network") {
+      return this.networkEntries.length > 0 && !this.networkBusy;
+    }
+    return !this.busy;
+  }
+
+  get nextButtonDisabled(): boolean {
+    if (this.busy) return true;
+    if (this.stepIndex >= this.steps.length - 1) return true;
+    return this.step === "network" &&
+      (this.networkEntries.length === 0 || this.networkBusy);
+  }
+
+  get requiredQuestionsAnswered(): boolean {
+    return this.unansweredRequiredQuestions.length === 0;
+  }
+
+  get unansweredRequiredQuestions() {
+    return (this.systemCheck?.questions ?? []).filter(question => {
+      if (!question.required || question.type === "header") return false;
+      const value = this.answers[question.id];
+      return value === undefined || value === null || value === "" || value === false;
+    });
+  }
+
+  get reportEntryCount(): number {
+    return (
+      this.environmentEntries.length +
+      this.networkEntries.length +
+      this.questionnaireEntries.length
+    );
+  }
+
+  get questionnaireEntries(): SystemCheckReportEntry[] {
+    return (this.systemCheck?.questions ?? []).flatMap(question => {
+      if (question.type === "header") {
+        return [];
+      }
+      const value = this.answers[question.id];
+      return [{
+        id: question.id,
+        type: question.type,
+        label: question.prompt,
+        value:
+          typeof value === "boolean" ? value : String(value ?? ""),
+        warning:
+          question.required &&
+          (value === undefined || value === null || value === "" || value === false)
+      }];
+    });
+  }
+
+  get hasAdminSession(): boolean {
+    return Boolean(this.uiState.ops.adminSessionToken.trim());
+  }
+
+  get isSystemCheckSession(): boolean {
+    return this.operatorAccess.isSystemCheckOnly;
+  }
+
+  get signedInUsername(): string {
+    return this.uiState.ops.adminUsername.trim();
+  }
+
+  get canSignInSystemCheck(): boolean {
+    return (
+      this.systemCheckUsername.trim() !== "" && this.systemCheckPassword !== ""
+    );
+  }
+
+  get canSaveReport(): boolean {
+    return this.requiredQuestionsAnswered;
+  }
+
+  async signInSystemCheck(): Promise<void> {
+    if (!this.canSignInSystemCheck) return;
+    this.systemCheckAuthenticationBusy = true;
+    let signedIn = false;
+    try {
+      await this.run(async () => {
+        if (this.hasAdminSession) {
+          await this.opsService.signOutAdmin();
+        }
+        this.uiState.ops.adminUsername = this.systemCheckUsername.trim();
+        this.uiState.ops.adminPassword = this.systemCheckPassword;
+        await this.opsService.signInAdmin();
+        this.systemCheckPassword = "";
+        if (!this.isSystemCheckSession) {
+          await this.opsService.signOutAdmin();
+          throw new Error(
+            "This account does not have dedicated system-check access."
+          );
+        }
+        signedIn = true;
+      });
+      if (!signedIn) return;
+      await this.loadSystemCheckAccess();
+      const firstScope = this.authorizedSystemCheckScopes[0];
+      if (!firstScope) {
+        this.errorMessage = "This system-check account has no available workspace scope.";
+        return;
+      }
+      this.tenantKey = firstScope.tenantKey;
+      this.workspaceKey = firstScope.workspaceKey;
+      await this.loadSystemChecks();
+    } finally {
+      this.systemCheckAuthenticationBusy = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  async signOutSystemCheck(): Promise<void> {
+    await this.run(async () => {
+      await this.opsService.signOutAdmin();
+      this.systemCheckPassword = "";
+      this.systemCheck = null;
+      this.systemChecks = [];
+      this.authorizedSystemCheckScopes = [];
+    });
+    await this.loadSystemCheckAccess();
+  }
+
+  async loadSystemCheckAccess(): Promise<void> {
+    await this.run(async () => {
+      const headers = this.isSystemCheckSession ? this.adminHeaders : undefined;
+      const { payload } = await this.api.send<GetSystemCheckAccessResponse>(
+        "GET",
+        productionApiRoutes.system.getSystemCheckAccess,
+        undefined,
+        headers ?? {}
+      );
+      this.systemCheckAccessMode = payload.accessMode;
+      this.authorizedSystemCheckScopes = payload.authorizedScopes;
+    });
+  }
+
+  stepName(step: SystemCheckStep): string {
+    return {
+      welcome: "Start",
+      network: "Network",
+      unit: "Player",
+      questionnaire: "Questions",
+      report: "Report"
+    }[step];
+  }
+
+  async loadSystemChecks(preferredCheckId?: string): Promise<void> {
+    if (!this.canLoad) return;
+    let selectedCheckId = "";
+    await this.run(async () => {
+      this.uiState.workspace.tenantKey = this.tenantKey.trim();
+      this.uiState.workspace.workspaceKey = this.workspaceKey.trim();
+      this.viewState.persistShellState();
+      const { payload } = await this.api.send<ListSystemChecksResponse>(
+        "GET",
+        this.workspaceRoute(productionApiRoutes.workspace.listSystemChecks)
+      );
+      this.systemChecks = payload.items;
+      const selected = preferredCheckId
+        ? payload.items.find(
+            item => item.checkId.toUpperCase() === preferredCheckId.toUpperCase()
+          )
+        : payload.items.length === 1
+          ? payload.items[0]
+          : undefined;
+      selectedCheckId = selected?.checkId ?? "";
+    });
+    if (selectedCheckId) {
+      await this.selectSystemCheck(selectedCheckId);
+    }
+  }
+
+  async selectSystemCheck(checkId: string): Promise<void> {
+    await this.run(async () => {
+      const { payload } = await this.api.send<GetSystemCheckResponse>(
+        "GET",
+        this.workspaceRoute(productionApiRoutes.workspace.getSystemCheck, {
+          checkId
+        })
+      );
+      this.systemCheck = payload.systemCheck;
+      this.reportTitle = `${payload.systemCheck.displayLabel} Report`;
+      this.answers = {};
+      this.networkEntries = [];
+      this.networkRating = payload.systemCheck.skipNetwork ? "skipped" : "not measured";
+      this.networkStatusMessage = payload.systemCheck.skipNetwork
+        ? "Network measurement is skipped by configuration."
+        : "Measurement has not started.";
+      this.unitResponse = "";
+      this.reportSaveDialogOpen = false;
+      this.operatorReports = [];
+      this.step = "welcome";
+      await this.captureEnvironment();
+    });
+  }
+
+  chooseAnother(): void {
+    this.systemCheck = null;
+    this.step = "welcome";
+    this.errorMessage = "";
+  }
+
+  setStep(step: SystemCheckStep): void {
+    if (!this.steps.includes(step)) return;
+    this.step = step;
+  }
+
+  previousStep(): void {
+    const previous = this.steps[this.stepIndex - 1];
+    if (previous) this.setStep(previous);
+  }
+
+  nextStep(): void {
+    if (!this.canContinue) return;
+    const next = this.steps[this.stepIndex + 1];
+    if (next) this.setStep(next);
+  }
+
+  async captureEnvironment(): Promise<void> {
+    const userAgent = navigator.userAgent;
+    const userAgentInfo = new UAParser(userAgent).getResult();
+    const browserTimeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
+    const clientTime = Date.now();
+    const screenWidth = screen.width;
+    const screenHeight = screen.height;
+    const entries: SystemCheckReportEntry[] = [];
+    const appendUserAgentEntry = (
+      id: string,
+      label: string,
+      value: string | undefined
+    ): void => {
+      if (value) {
+        entries.push(this.entry(id, "environment", label, value));
+      }
+    };
+    appendUserAgentEntry(
+      "CPU-Architektur",
+      "CPU-Architektur",
+      userAgentInfo.cpu.architecture
+    );
+    appendUserAgentEntry(
+      "Gerätemodell",
+      "Gerätemodell",
+      userAgentInfo.device.model
+    );
+    appendUserAgentEntry(
+      "Gerätetyp",
+      "Gerätetyp",
+      userAgentInfo.device.type
+    );
+    appendUserAgentEntry(
+      "Gerätehersteller",
+      "Gerätehersteller",
+      userAgentInfo.device.vendor
+    );
+    appendUserAgentEntry("Browser", "Browser", userAgentInfo.browser.name);
+    appendUserAgentEntry(
+      "Browser-Version",
+      "Browser-Version",
+      userAgentInfo.browser.major
+    );
+    appendUserAgentEntry(
+      "Betriebsystem",
+      "Betriebsystem",
+      userAgentInfo.os.name
+    );
+    appendUserAgentEntry(
+      "Betriebsystem-Version",
+      "Betriebsystem-Version",
+      userAgentInfo.os.version
+    );
+    entries.push(
+      this.entry(
+        "screen-resolution",
+        "environment",
+        "Bildschirm-Auflösung",
+        `${screenWidth} x ${screenHeight}`,
+        screenWidth < 800 || screenHeight < 600
+      ),
+      this.entry(
+        "cookieEnabled",
+        "environment",
+        "Browser-Cookies aktiviert",
+        navigator.cookieEnabled
+      ),
+      this.entry(
+        "language",
+        "environment",
+        "Browser-Sprache",
+        navigator.language
+      ),
+      this.entry(
+        "hardwareConcurrency",
+        "environment",
+        "CPU-Kerne",
+        navigator.hardwareConcurrency || "unknown"
+      ),
+      this.entry(
+        "screen-size",
+        "environment",
+        "Fenster-Größe",
+        `${window.innerWidth} x ${window.innerHeight}`
+      )
+    );
+    const pluginNames = Array.from(
+      navigator.plugins ?? [],
+      plugin => plugin.name
+    ).filter(Boolean);
+    if (pluginNames.length > 0) {
+      entries.push(
+        this.entry(
+          "browser-plugins",
+          "environment",
+          "Browser-Plugins",
+          pluginNames.join(", ")
+        )
+      );
+    }
+    try {
+      const { payload } = await this.api.send<GetSystemTimeResponse>(
+        "GET",
+        productionApiRoutes.system.getTime
+      );
+      const timeDifferenceSeconds = Math.round(
+        (clientTime - payload.timestamp) / 1000
+      );
+      entries.push(
+        this.entry(
+          "time-difference",
+          "environment",
+          "Zeitabweichung",
+          timeDifferenceSeconds.toString(10),
+          timeDifferenceSeconds >= 60
+        ),
+        this.entry(
+          "time-zone",
+          "environment",
+          "Zeitzone",
+          browserTimeZone,
+          browserTimeZone !== payload.timezone
+        )
+      );
+    } catch {
+      entries.push(
+        this.entry(
+          "time-difference",
+          "environment",
+          "Zeitabweichung",
+          "nicht verfügbar",
+          true
+        ),
+        this.entry(
+          "time-zone",
+          "environment",
+          "Zeitzone",
+          browserTimeZone,
+          true
+        )
+      );
+    }
+    this.environmentEntries = entries.sort((left, right) =>
+      left.label > right.label ? 1 : -1
+    );
+  }
+
+  async runNetworkCheck(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check) return;
+    this.networkBusy = true;
+    this.errorMessage = "";
+    this.networkStatusMessage = "Measuring application latency…";
+    this.changeDetectorRef.detectChanges();
+    try {
+      const measurements: number[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        const startedAt = performance.now();
+        const response = await fetch(`/healthz?systemCheck=${Date.now()}-${index}`, {
+          method: "HEAD",
+          cache: "no-store"
+        });
+        if (!response.ok) throw new Error(`Health request returned HTTP ${response.status}.`);
+        measurements.push(performance.now() - startedAt);
+      }
+      const average = measurements.reduce((sum, value) => sum + value, 0) /
+        measurements.length;
+      this.networkStatusMessage = "Measuring configured download packages…";
+      this.changeDetectorRef.detectChanges();
+      const download = await this.measureThroughput("download", check.downloadSpeed);
+      this.networkStatusMessage = "Measuring configured upload packages…";
+      this.changeDetectorRef.detectChanges();
+      const upload = await this.measureThroughput("upload", check.uploadSpeed);
+      const downloadRating = this.rateThroughput(
+        download,
+        check.downloadSpeed.min,
+        check.downloadSpeed.good
+      );
+      const uploadRating = this.rateThroughput(
+        upload,
+        check.uploadSpeed.min,
+        check.uploadSpeed.good
+      );
+      this.networkRating = this.overallNetworkRating(
+        downloadRating,
+        uploadRating
+      );
+      const navigatorWithConnection = navigator as Navigator & {
+        connection?: BrowserConnection;
+        mozConnection?: BrowserConnection;
+        webkitConnection?: BrowserConnection;
+      };
+      const connection =
+        navigatorWithConnection.connection ||
+        navigatorWithConnection.mozConnection ||
+        navigatorWithConnection.webkitConnection;
+      const networkEntries = [
+        this.entry("nw-download", "network", "Downloadgeschwindigkeit", this.humanReadableBitsPerSecond(download.bytesPerSecond)),
+        this.entry("nw-download-needed", "network", "Downloadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.downloadSpeed.min)),
+        this.entry("nw-download-evaluation", "network", "Downloadbewertung", downloadRating, downloadRating === "insufficient"),
+        this.entry("nw-upload", "network", "Uploadgeschwindigkeit", this.humanReadableBitsPerSecond(upload.bytesPerSecond)),
+        this.entry("nw-upload-needed", "network", "Uploadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.uploadSpeed.min)),
+        this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient"),
+        this.entry("latency", "network", "Anwendungs-Latenz in Ms", average.toFixed(1), average >= 400),
+        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient")
+      ];
+      if (connection) {
+        if (connection.rtt) {
+          networkEntries.push(
+            this.entry(
+              "bnni-roundtrip",
+              "network",
+              "RoundTrip in Ms",
+              connection.rtt.toString()
+            )
+          );
+        }
+        if (connection.effectiveType) {
+          networkEntries.push(
+            this.entry(
+              "bnni-effective-network-type",
+              "network",
+              "Netzwerktyp nach Leistung",
+              connection.effectiveType
+            )
+          );
+        }
+        if (connection.type) {
+          networkEntries.push(
+            this.entry(
+              "bnni-network-type",
+              "network",
+              "Netzwerktyp",
+              connection.type
+            )
+          );
+        }
+        if (connection.downlink) {
+          networkEntries.push(
+            this.entry(
+              "bnni-downlink",
+              "network",
+              "Downlink MB/s",
+              connection.downlink.toString()
+            )
+          );
+        }
+      } else {
+        networkEntries.push(
+          this.entry(
+            "bnni-fail",
+            "network",
+            "Netzwerkprofil des Browsers",
+            "nicht verfügbar",
+            true
+          )
+        );
+      }
+      this.networkEntries = networkEntries;
+      this.networkStatusMessage = `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
+    } catch (error) {
+      this.networkRating = "unstable";
+      this.networkEntries = [
+        this.entry("nw-overall", "network", "Gesamtbewertung", "unstable")
+      ];
+      this.networkStatusMessage = "Network measurement failed.";
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.networkBusy = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  customText(key: string, fallback: string): string {
+    return (
+      this.systemCheck?.customTexts[key]?.trim() ||
+      this.applicationSettings.settings().customTexts[key]?.trim() ||
+      fallback
+    );
+  }
+
+  onUnitResponse(response: string): void {
+    this.unitResponse = response;
+  }
+
+  hasReportResponses(responses: unknown): boolean {
+    if (Array.isArray(responses)) {
+      return responses.length > 0;
+    }
+    return responses !== null && responses !== undefined && responses !== "";
+  }
+
+  formatReportResponses(responses: unknown): string {
+    return JSON.stringify(responses);
+  }
+
+  startReportSave(): void {
+    if (!this.canSaveReport) {
+      return;
+    }
+    if (this.isSystemCheckSession) {
+      void this.saveReport();
+      return;
+    }
+    this.reportSaveDialogOpen = true;
+  }
+
+  async cancelSystemCheckReport(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.reportSaveDialogOpen = false;
+    await this.router.navigate(["/home"]);
+  }
+
+  closeReportSaveDialog(): void {
+    this.reportSaveDialogOpen = false;
+    globalThis.queueMicrotask(() => {
+      globalThis.document
+        ?.querySelector<HTMLButtonElement>("#saveSystemCheckReportButton")
+        ?.focus();
+    });
+  }
+
+  submitAnonymousReport(result: SystemCheckSaveReportDialogResult): void {
+    this.reportTitle = result.title;
+    this.reportKey = result.key;
+    this.closeReportSaveDialog();
+    void this.saveReport();
+  }
+
+  async saveReport(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check) return;
+    await this.run(async () => {
+      await this.api.send<SaveSystemCheckReportResponse>(
+        "POST",
+        this.workspaceRoute(productionApiRoutes.workspace.saveSystemCheckReport, {
+          checkId: check.checkId
+        }),
+        this.reportPayload(!this.isSystemCheckSession),
+        this.isSystemCheckSession ? this.adminHeaders : undefined
+      );
+      this.reportKey = "";
+      await this.confirmation.confirm({
+        title: "Bericht gespeichert",
+        message:
+          "Der Bericht wurde erfolgreich gespeichert. Sie werden nach der Bestätigung weitergeleitet.",
+        confirmLabel: "Verstanden",
+        showCancel: false,
+        tone: "primary"
+      });
+      await new Promise(resolve => globalThis.setTimeout(resolve, 500));
+      await this.router.navigate(["/home"]);
+    });
+  }
+
+  async loadOperatorReports(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check || !this.hasAdminSession) return;
+    await this.run(async () => {
+      await this.refreshOperatorReports(check);
+    });
+  }
+
+  async importOperatorReport(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    const check = this.systemCheck;
+    if (files.length === 0 || !check || !this.hasAdminSession) {
+      input.value = "";
+      return;
+    }
+    if (files.length > 200) {
+      this.errorMessage = "Select at most 200 report files per migration batch.";
+      input.value = "";
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    await this.run(async () => {
+      let importedCount = 0;
+      let alreadyImportedCount = 0;
+      let selectedReport: SystemCheckReport | null = null;
+      const failures: string[] = [];
+      for (const file of files) {
+        if (!/\.json$/i.test(file.name)) {
+          failures.push(`${file.name}: not a JSON report file.`);
+          continue;
+        }
+        try {
+          const report = JSON.parse(await file.text()) as unknown;
+          const { payload } = await this.api.send<ImportSystemCheckReportResponse>(
+            "POST",
+            this.workspaceRoute(
+              productionApiRoutes.workspace.importSystemCheckReport
+            ),
+            {
+              fileName: file.name,
+              ...(file.lastModified > 0
+                ? { modifiedAt: new Date(file.lastModified).toISOString() }
+                : {}),
+              report
+            },
+            this.adminHeaders
+          );
+          if (payload.disposition === "imported") {
+            importedCount += 1;
+          } else {
+            alreadyImportedCount += 1;
+          }
+          if (payload.report.checkId.toUpperCase() === check.checkId.toUpperCase()) {
+            selectedReport = payload.report;
+          }
+        } catch (error) {
+          const message = this.api.isApiError(error)
+            ? `${error.error}: ${error.message}`
+            : error instanceof SyntaxError
+              ? "invalid JSON."
+              : error instanceof Error
+                ? error.message
+                : String(error);
+          failures.push(`${file.name}: ${message}`);
+        }
+      }
+      await this.refreshOperatorReports(check);
+      if (selectedReport) {
+        this.selectedOperatorReport = selectedReport;
+      }
+      this.operatorImportFailures = failures.slice(0, 20);
+      this.operatorStatusMessage = `${importedCount} imported, ${alreadyImportedCount} already present, ${failures.length} failed.`;
+    });
+    input.value = "";
+  }
+
+  isOperatorCheckSelected(checkId: string): boolean {
+    return this.selectedOperatorCheckIds.includes(checkId);
+  }
+
+  toggleOperatorCheckSelection(checkId: string): void {
+    this.selectedOperatorCheckIds = this.isOperatorCheckSelected(checkId)
+      ? this.selectedOperatorCheckIds.filter(candidate => candidate !== checkId)
+      : [...this.selectedOperatorCheckIds, checkId];
+  }
+
+  formatBreakdown(items: Array<{ value: string; count: number }>): string {
+    return items.map(item => `${item.value}: ${item.count}`).join(", ");
+  }
+
+  async deleteOperatorReports(): Promise<void> {
+    if (!this.hasAdminSession || this.selectedOperatorCheckIds.length === 0) return;
+    const selectedCheckIds = [...this.selectedOperatorCheckIds];
+    const workspaceKey = this.workspaceKey.trim();
+    const confirmed = await this.confirmation.confirm({
+      title: "Delete system-check reports?",
+      message: `Delete all reports for ${selectedCheckIds.join(", ")}? This cannot be undone.`,
+      confirmLabel: "Delete reports",
+      verification: {
+        label: "Exact workspace key",
+        expectedValue: workspaceKey
+      }
+    });
+    if (!confirmed || !this.hasAdminSession || selectedCheckIds.length === 0) return;
+    await this.run(async () => {
+      const { payload } = await this.api.send<DeleteSystemCheckReportsResponse>(
+        "DELETE",
+        this.workspaceRoute(productionApiRoutes.workspace.deleteSystemCheckReports),
+        { checkIds: selectedCheckIds, confirmation: workspaceKey },
+        this.adminHeaders
+      );
+      const deletedCount = payload.deletion.deletedCount;
+      this.selectedOperatorCheckIds = [];
+      this.operatorReports = this.operatorReports.filter(
+        report => !payload.deletion.deletedReportIds.includes(report.systemCheckReportId)
+      );
+      this.operatorStatistics = this.operatorStatistics.filter(
+        item => !payload.deletion.checkIds.includes(item.checkId)
+      );
+      this.selectedOperatorReport = this.operatorReports[0] ?? null;
+      this.operatorStatusMessage = `${deletedCount} report(s) deleted.`;
+    });
+  }
+
+  async exportOperatorReports(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check || !this.hasAdminSession) return;
+    await this.run(async () => {
+      const path = `${this.workspaceRoute(
+        productionApiRoutes.workspace.exportSystemCheckReportsCsv
+      )}?checkId=${encodeURIComponent(check.checkId)}`;
+      const download = await this.api.download(path, this.adminHeaders);
+      downloadBlobFile({
+        filename: download.filename || `${this.workspaceKey}-system-check-reports.csv`,
+        blob: download.blob
+      });
+    });
+  }
+
+  async exportOperatorReportsJson(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check || !this.hasAdminSession) return;
+    await this.run(async () => {
+      const path = `${this.workspaceRoute(
+        productionApiRoutes.workspace.exportSystemCheckReportsJson
+      )}?checkId=${encodeURIComponent(check.checkId)}`;
+      const download = await this.api.download(path, this.adminHeaders);
+      downloadBlobFile({
+        filename:
+          download.filename || `${this.workspaceKey}-system-check-reports.json`,
+        blob: download.blob
+      });
+    });
+  }
+
+  private async measureThroughput(
+    direction: "download" | "upload",
+    parameters: SystemCheckSpeedParameters
+  ): Promise<ThroughputResult> {
+    const sequenceSizes = parameters.sequenceSizes.filter(
+      size => Number.isSafeInteger(size) && size >= 16 && size <= 64 * 1024 * 1024
+    );
+    if (sequenceSizes.length === 0) {
+      throw new Error(`No supported ${direction} package sizes are configured.`);
+    }
+
+    const maxRepetitions = Math.max(
+      1,
+      Math.min(parameters.maxSequenceRepetitions || 1, 15)
+    );
+    const sequenceAverages: number[] = [];
+    let unstable = false;
+
+    for (let repetition = 1; repetition <= maxRepetitions; repetition += 1) {
+      const successfulSpeeds: number[] = [];
+      let errors = 0;
+      for (const size of sequenceSizes) {
+        try {
+          successfulSpeeds.push(
+            await this.measureSpeedTestPackage(direction, size, repetition)
+          );
+        } catch {
+          errors += 1;
+        }
+      }
+      if (errors > parameters.maxErrorsPerSequence || successfulSpeeds.length === 0) {
+        unstable = true;
+        break;
+      }
+
+      const sequenceAverage = successfulSpeeds.reduce((sum, speed) => sum + speed, 0) /
+        successfulSpeeds.length;
+      const previousAverage = sequenceAverages.length > 0
+        ? sequenceAverages.reduce((sum, speed) => sum + speed, 0) /
+          sequenceAverages.length
+        : null;
+      sequenceAverages.push(sequenceAverage);
+      const stable =
+        sequenceAverages.length >= 3 &&
+        previousAverage != null &&
+        Math.abs(previousAverage - sequenceAverage) <=
+          parameters.maxDevianceBytesPerSecond;
+      if (stable) break;
+    }
+
+    const bytesPerSecond = sequenceAverages.length > 0
+      ? sequenceAverages.reduce((sum, speed) => sum + speed, 0) /
+        sequenceAverages.length
+      : 0;
+    return {
+      bytesPerSecond,
+      unstable,
+      repetitions: sequenceAverages.length
+    };
+  }
+
+  private async measureSpeedTestPackage(
+    direction: "download" | "upload",
+    size: number,
+    repetition: number
+  ): Promise<number> {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      direction === "download" ? 45_000 : 10_000
+    );
+    const startedAt = performance.now();
+    try {
+      if (direction === "download") {
+        const path = resolveRoutePath(
+          productionApiRoutes.system.downloadSpeedTestPackage,
+          { size: String(size) }
+        );
+        const response = await fetch(
+          `${path}?round=${repetition}&uid=${Date.now()}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+        if (!response.ok) {
+          throw new Error(`Download speed test returned HTTP ${response.status}.`);
+        }
+        const body = await response.arrayBuffer();
+        if (body.byteLength !== size) {
+          throw new Error(`Download speed test returned ${body.byteLength} of ${size} bytes.`);
+        }
+      } else {
+        const response = await fetch(
+          productionApiRoutes.system.uploadSpeedTestPackage,
+          {
+            method: "POST",
+            headers: { "content-type": "text/plain" },
+            body: "a".repeat(size),
+            cache: "no-store",
+            signal: controller.signal
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`Upload speed test returned HTTP ${response.status}.`);
+        }
+        const payload = await response.json() as SystemCheckSpeedTestUploadResponse;
+        if (payload.packageReceivedSize !== size) {
+          throw new Error(
+            `Upload speed test received ${payload.packageReceivedSize} of ${size} bytes.`
+          );
+        }
+      }
+      const durationMs = Math.max(performance.now() - startedAt, 0.1);
+      return size / (durationMs / 1000);
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  private rateThroughput(
+    result: ThroughputResult,
+    minimum: number,
+    good: number
+  ): SystemCheckNetworkRating {
+    if (result.unstable) return "unstable";
+    if (result.bytesPerSecond < minimum) return "insufficient";
+    if (result.bytesPerSecond < good) return "ok";
+    return "good";
+  }
+
+  private overallNetworkRating(
+    download: SystemCheckNetworkRating,
+    upload: SystemCheckNetworkRating
+  ): SystemCheckNetworkRating {
+    const ratings: SystemCheckNetworkRating[] = [download, upload];
+    if (ratings.includes("unstable")) return "unstable";
+    if (ratings.includes("insufficient")) return "insufficient";
+    if (ratings.includes("ok")) return "ok";
+    return "good";
+  }
+
+  private humanReadableBitsPerSecond(bytesPerSecond: number): string {
+    const bitsPerSecond = Math.max(0, bytesPerSecond) * 8;
+    const units = ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"];
+    let value = bitsPerSecond;
+    let unitIndex = 0;
+    while (value >= 1000 && unitIndex < units.length - 1) {
+      value /= 1000;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(2)} ${units[unitIndex]}`;
+  }
+
+  private reportPayload(includeKey: boolean): SaveSystemCheckReportRequest {
+    const parsedResponse = readSystemCheckUnitResponse(this.unitResponse);
+    const responseTimestamp = Date.now();
+    const responses = Object.entries(parsedResponse?.dataParts ?? {}).map(
+      ([id, content]) => ({
+        id,
+        content,
+        ts: responseTimestamp,
+        responseType: parsedResponse?.responseType ?? ""
+      })
+    );
+    return {
+      ...(includeKey ? { keyPhrase: this.reportKey } : {}),
+      title: this.reportTitle,
+      responses,
+      environment: this.environmentEntries,
+      network: this.networkEntries,
+      questionnaire: this.questionnaireEntries,
+      unit: []
+    };
+  }
+
+  private async refreshOperatorReports(
+    check: WorkspaceSystemCheck
+  ): Promise<void> {
+    const reportsPath = `${this.workspaceRoute(
+      productionApiRoutes.workspace.listSystemCheckReports
+    )}?checkId=${encodeURIComponent(check.checkId)}&limit=25`;
+    const statisticsPath = this.workspaceRoute(
+      productionApiRoutes.workspace.getSystemCheckReportStatistics
+    );
+    const [reports, statistics] = await Promise.all([
+      this.api.send<ListSystemCheckReportsResponse>(
+        "GET",
+        reportsPath,
+        undefined,
+        this.adminHeaders
+      ),
+      this.api.send<GetSystemCheckReportStatisticsResponse>(
+        "GET",
+        statisticsPath,
+        undefined,
+        this.adminHeaders
+      )
+    ]);
+    this.operatorReports = reports.payload.items;
+    this.operatorStatistics = statistics.payload.items;
+    this.selectedOperatorReport = this.operatorReports[0] ?? null;
+    this.selectedOperatorCheckIds = this.selectedOperatorCheckIds.filter(checkId =>
+      this.operatorStatistics.some(item => item.checkId === checkId)
+    );
+    this.operatorStatusMessage = `${this.operatorReports.length} recent report(s), ${this.operatorStatistics.length} check(s).`;
+  }
+
+  private entry(
+    id: string,
+    type: string,
+    label: string,
+    value: string | number | boolean | null,
+    warning = false
+  ): SystemCheckReportEntry {
+    return { id, type, label, value, warning };
+  }
+
+  private workspaceRoute(
+    route: string,
+    extra: Record<string, string> = {}
+  ): string {
+    return resolveRoutePath(route, {
+      tenantKey: this.tenantKey.trim(),
+      workspaceKey: this.workspaceKey.trim(),
+      ...extra
+    });
+  }
+
+  private get adminHeaders(): Record<string, string> {
+    return { Authorization: `Bearer ${this.uiState.ops.adminSessionToken.trim()}` };
+  }
+
+  private async run(action: () => Promise<void>): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.errorMessage = "";
+    try {
+      await action();
+    } catch (error) {
+      this.errorMessage = this.api.isApiError(error)
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    } finally {
+      this.busy = false;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+}

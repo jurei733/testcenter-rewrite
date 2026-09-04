@@ -1,0 +1,22 @@
+[
+  {
+    "id": "b1",
+    "value": 2,
+    "status": "DISPLAYED"
+  },
+  {
+    "id": "b2",
+    "value": null,
+    "status": "DISPLAYED"
+  },
+  {
+    "id": "b3",
+    "value": null,
+    "status": "DISPLAYED"
+  },
+  {
+    "id": "b4",
+    "value": null,
+    "status": "DISPLAYED"
+  }
+]

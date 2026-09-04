@@ -1,0 +1,550 @@
+import { access, readdir, readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+
+const reportFatalPreflightError = error => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Runtime preflight failed: ${message}`);
+  process.exit(1);
+};
+
+process.on("uncaughtException", reportFatalPreflightError);
+process.on("unhandledRejection", reportFatalPreflightError);
+
+const supportedStores = new Set(["memory", "file", "sqlite", "postgres"]);
+
+const normalizeStore = value => {
+  const normalizedValue = String(value ?? "memory")
+    .trim()
+    .toLowerCase();
+  if (!supportedStores.has(normalizedValue)) {
+    throw new Error(
+      `Unsupported FIRST_SLICE_STORE '${value}'. Expected one of: ${[
+        ...supportedStores
+      ].join(", ")}.`
+    );
+  }
+  return normalizedValue;
+};
+
+const assertPostgresUrl = value => {
+  const normalizedValue = String(value ?? "").trim();
+  if (!normalizedValue) {
+    throw new Error(
+      "FIRST_SLICE_POSTGRES_URL is required when FIRST_SLICE_STORE=postgres."
+    );
+  }
+  if (!/^postgres(?:ql)?:\/\//.test(normalizedValue)) {
+    throw new Error(
+      "FIRST_SLICE_POSTGRES_URL must be a postgres:// or postgresql:// connection string."
+    );
+  }
+  try {
+    new URL(normalizedValue);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_POSTGRES_URL is not a valid URL: ${error.message}`
+    );
+  }
+};
+
+const resolveAdminPasswordPolicy = () => {
+  const minimumLengthSource =
+    process.env.FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH ?? "8";
+  if (!/^\d+$/.test(minimumLengthSource.trim())) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be a positive integer."
+    );
+  }
+  const minimumLength = Number.parseInt(minimumLengthSource, 10);
+  if (!Number.isSafeInteger(minimumLength) || minimumLength < 1) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be a positive integer."
+    );
+  }
+  if (minimumLength > 60) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH must be between 1 and 60."
+    );
+  }
+
+  const pattern = process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ?? "^.*$";
+  if (pattern.length < 1 || pattern.length > 1024) {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must contain between 1 and 1024 characters."
+    );
+  }
+  try {
+    new RegExp(pattern);
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_ADMIN_PASSWORD_PATTERN must be a valid JavaScript regular expression."
+    );
+  }
+
+  return {
+    minimumLength,
+    maximumLength: 60,
+    pattern
+  };
+};
+
+const resolveProofOfWorkConfig = () => {
+  const supportedScopes = ["admin", "participant", "second_code"];
+  const enabledScopes = [
+    ...new Set(
+      String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES ?? "")
+        .trim()
+        .split(/[\s,]+/u)
+        .filter(Boolean)
+    )
+  ];
+  for (const scope of enabledScopes) {
+    if (!supportedScopes.includes(scope)) {
+      throw new Error(
+        `FIRST_SLICE_PROOF_OF_WORK_SCOPES contains unsupported scope '${scope}'. Supported scopes are ${supportedScopes.join(
+          ", "
+        )}.`
+      );
+    }
+  }
+  const currentSecret = process.env.FIRST_SLICE_PROOF_OF_WORK_SECRET || null;
+  const previousSecret =
+    process.env.FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET || null;
+  for (const [key, secret] of [
+    ["FIRST_SLICE_PROOF_OF_WORK_SECRET", currentSecret],
+    ["FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET", previousSecret]
+  ]) {
+    if (secret && secret.length < 32) {
+      throw new Error(`${key} must contain at least 32 characters.`);
+    }
+  }
+  if (enabledScopes.length > 0 && !currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when proof-of-work scopes are enabled."
+    );
+  }
+  if (previousSecret && !currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_SECRET is required when FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET is configured."
+    );
+  }
+  if (currentSecret && previousSecret === currentSecret) {
+    throw new Error(
+      "FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET must differ from FIRST_SLICE_PROOF_OF_WORK_SECRET."
+    );
+  }
+  const readInteger = (key, fallback, minimum, maximum) => {
+    const source = String(process.env[key] ?? fallback).trim();
+    if (!/^\d+$/u.test(source)) {
+      throw new Error(`${key} must be a positive integer.`);
+    }
+    const value = Number.parseInt(source, 10);
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+      throw new Error(`${key} must be between ${minimum} and ${maximum}.`);
+    }
+    return value;
+  };
+  const keyId = secret =>
+    secret
+      ? createHash("sha256").update(secret, "utf8").digest("hex").slice(0, 32)
+      : null;
+  return {
+    enabledScopes: supportedScopes.filter(scope => enabledScopes.includes(scope)),
+    algorithm: "SHA-256",
+    maxNumber: readInteger(
+      "FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER",
+      1_000_000,
+      1,
+      10_000_000
+    ),
+    ttlMs: readInteger(
+      "FIRST_SLICE_PROOF_OF_WORK_TTL_MS",
+      120_000,
+      1_000,
+      600_000
+    ),
+    currentKeyId: keyId(currentSecret),
+    previousKeyConfigured: Boolean(previousSecret)
+  };
+};
+
+const resolveBootstrapAdminConfig = async policy => {
+  const username = String(
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME ?? ""
+  ).trim();
+  const passwordFile = String(
+    process.env.FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE ?? ""
+  ).trim();
+  if (!username && !passwordFile) {
+    return { configured: false };
+  }
+  if (!username || !passwordFile) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME and FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must be configured together."
+    );
+  }
+
+  let passwordFileStat;
+  try {
+    passwordFileStat = await stat(passwordFile);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${error.message}`
+    );
+  }
+  if (!passwordFileStat.isFile()) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must reference a regular file."
+    );
+  }
+  if (passwordFileStat.size < 1 || passwordFileStat.size > 4_096) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain between 1 and 4096 bytes."
+    );
+  }
+
+  let passwordBytes;
+  try {
+    passwordBytes = await readFile(passwordFile);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE is not readable: ${error.message}`
+    );
+  }
+
+  let password;
+  try {
+    password = new TextDecoder("utf-8", { fatal: true })
+      .decode(passwordBytes)
+      .replace(/\r?\n$/u, "");
+  } catch {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain valid UTF-8."
+    );
+  }
+  if (!password) {
+    throw new Error(
+      "FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE must contain a non-empty password."
+    );
+  }
+  if (password.length < policy.minimumLength) {
+    throw new Error(
+      `Bootstrap administrator password must contain at least ${policy.minimumLength} characters.`
+    );
+  }
+  if (password.length > policy.maximumLength) {
+    throw new Error(
+      `Bootstrap administrator password must contain no more than ${policy.maximumLength} characters.`
+    );
+  }
+  if (!new RegExp(policy.pattern).test(password)) {
+    throw new Error(
+      "Bootstrap administrator password does not match FIRST_SLICE_ADMIN_PASSWORD_PATTERN."
+    );
+  }
+
+  return { configured: true };
+};
+
+const requiredBuiltFiles = [
+  "apps/api/dist/apps/api/src/index.js",
+  "packages/domain/dist/packages/domain/src/index.js",
+  "packages/contracts/dist/packages/contracts/src/index.js",
+  "packages/application/dist/packages/application/src/index.js",
+  "packages/memory-store/dist/packages/memory-store/src/index.js",
+  "packages/file-store/dist/packages/file-store/src/index.js",
+  "packages/sqlite-store/dist/packages/sqlite-store/src/index.js",
+  "packages/postgres-store/dist/packages/postgres-store/src/index.js",
+  "dist/apps/web/browser/index.html"
+];
+
+const frontendBuildDirectory = resolve("dist/apps/web/browser");
+const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
+const requiredFrontendRuntimeFiles = [
+  "service-worker.js",
+  "manifest.webmanifest",
+  "app-icon.svg",
+  "altcha-lib/dist/worker.js"
+];
+
+const parseBooleanFlag = (value, defaultValue = false) => {
+  const normalizedValue = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalizedValue === "") {
+    return defaultValue;
+  }
+  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "optional"].includes(normalizedValue)) {
+    return false;
+  }
+  throw new Error(`Unsupported boolean flag '${value}'.`);
+};
+
+const store = normalizeStore(process.env.FIRST_SLICE_STORE);
+const adminPasswordPolicy = resolveAdminPasswordPolicy();
+const proofOfWork = resolveProofOfWorkConfig();
+const hstsEnabled = parseBooleanFlag(
+  process.env.FIRST_SLICE_HSTS_ENABLED,
+  false
+);
+const bootstrapAdmin = await resolveBootstrapAdminConfig(adminPasswordPolicy);
+if (
+  bootstrapAdmin.configured &&
+  parseBooleanFlag(process.env.FIRST_SLICE_BOOTSTRAP_DEMO, false)
+) {
+  throw new Error(
+    "FIRST_SLICE_BOOTSTRAP_DEMO cannot be combined with secret-file administrator bootstrap."
+  );
+}
+
+const redactStorageLocation = input => {
+  if (!input || !/^postgres(?:ql)?:\/\//.test(input)) {
+    return input ?? null;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.username) {
+      url.username = "REDACTED";
+    }
+    if (url.password) {
+      url.password = "REDACTED";
+    }
+    return url.toString();
+  } catch {
+    return input.replace(/\/\/([^:@/]+)(?::[^@/]+)?@/, "//REDACTED:REDACTED@");
+  }
+};
+
+const ensureFile = async filePath => {
+  const absolutePath = resolve(filePath);
+  try {
+    const fileStat = await stat(absolutePath);
+    if (!fileStat.isFile()) {
+      throw new Error(`${filePath} exists but is not a file.`);
+    }
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`Missing built runtime artifact: ${filePath}`);
+    }
+    throw error;
+  }
+};
+
+const isFrontendAssetReference = reference => {
+  const normalizedReference = reference.trim();
+  return (
+    normalizedReference !== "" &&
+    !normalizedReference.startsWith("#") &&
+    !/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(normalizedReference) &&
+    !/^(?:data|blob|mailto|javascript):/i.test(normalizedReference)
+  );
+};
+
+const normalizeFrontendAssetReference = reference => {
+  const normalizedReference = reference.trim().split(/[?#]/, 1)[0];
+  if (normalizedReference.startsWith("/app/")) {
+    return normalizedReference.slice("/app/".length);
+  }
+  if (normalizedReference.startsWith("/")) {
+    throw new Error(
+      `Frontend index references an asset outside the /app base path: ${reference}`
+    );
+  }
+  return normalizedReference.replace(/^\.\//, "");
+};
+
+const extractFrontendAssetReferences = html => {
+  const references = [];
+  for (const match of html.matchAll(
+    /<(?:script|link)\b[^>]*\s(?:src|href)="([^"]+)"[^>]*>/gi
+  )) {
+    const reference = match[1] ?? "";
+    if (isFrontendAssetReference(reference)) {
+      references.push(normalizeFrontendAssetReference(reference));
+    }
+  }
+  return [...new Set(references)];
+};
+
+const runStorageDoctor = () =>
+  new Promise((resolvePromise, reject) => {
+    const child = spawn(
+      process.execPath,
+      ["./scripts/storage-admin.mjs", "doctor"],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          FIRST_SLICE_STORE: store
+        }
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", chunk => {
+      stderr += chunk;
+    });
+    child.once("error", reject);
+    child.once("exit", code => {
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Storage doctor failed with exit code ${code ?? "unknown"}.\n${stderr}${stdout}`
+          )
+        );
+        return;
+      }
+
+      try {
+        resolvePromise(JSON.parse(stdout));
+      } catch (error) {
+        reject(
+          new Error(
+            `Storage doctor returned invalid JSON: ${error.message}\n${stdout}`
+          )
+        );
+      }
+    });
+  });
+
+if (store === "postgres") {
+  assertPostgresUrl(process.env.FIRST_SLICE_POSTGRES_URL);
+}
+
+for (const filePath of requiredBuiltFiles) {
+  await ensureFile(filePath);
+}
+
+const appHtml = await readFile(frontendIndexPath, "utf8");
+for (const marker of [
+  "<app-root></app-root>",
+  '<base href="/app/">',
+  "<title>Testcenter Rewrite App</title>"
+]) {
+  if (!appHtml.includes(marker)) {
+    throw new Error(`Frontend index is missing required marker ${marker}.`);
+  }
+}
+
+const frontendAssetReferences = extractFrontendAssetReferences(appHtml);
+if (frontendAssetReferences.length === 0) {
+  throw new Error("Frontend index does not reference any built assets.");
+}
+for (const assetReference of frontendAssetReferences) {
+  await ensureFile(resolve(frontendBuildDirectory, assetReference));
+}
+for (const runtimeFile of requiredFrontendRuntimeFiles) {
+  await ensureFile(resolve(frontendBuildDirectory, runtimeFile));
+}
+
+const serviceWorkerSource = await readFile(
+  resolve(frontendBuildDirectory, "service-worker.js"),
+  "utf8"
+);
+for (const marker of [
+  "testcenter-rewrite-app-shell-",
+  "testcenter-participant-save-outbox-v1",
+  'self.addEventListener("install"',
+  'self.addEventListener("fetch"',
+  'self.addEventListener("sync"'
+]) {
+  if (!serviceWorkerSource.includes(marker)) {
+    throw new Error(`Frontend Service Worker is missing required marker ${marker}.`);
+  }
+}
+
+const webManifest = JSON.parse(
+  await readFile(resolve(frontendBuildDirectory, "manifest.webmanifest"), "utf8")
+);
+if (webManifest.start_url !== "/app/participant") {
+  throw new Error("Frontend web manifest must start at /app/participant.");
+}
+if (webManifest.scope !== "/app/") {
+  throw new Error("Frontend web manifest must stay scoped to /app/.");
+}
+
+const frontendFiles = await readdir(frontendBuildDirectory);
+const mainBundle = frontendFiles.find(fileName => /^main-.*\.js$/.test(fileName));
+const stylesheetBundle = frontendFiles.find(fileName =>
+  /^styles-.*\.css$/.test(fileName)
+);
+if (!mainBundle) {
+  throw new Error("Frontend build is missing a hashed main JavaScript bundle.");
+}
+if (!stylesheetBundle) {
+  throw new Error("Frontend build is missing a hashed stylesheet bundle.");
+}
+if (!frontendAssetReferences.includes(mainBundle)) {
+  throw new Error(
+    `Frontend index does not reference the hashed main bundle ${mainBundle}.`
+  );
+}
+if (!frontendAssetReferences.includes(stylesheetBundle)) {
+  throw new Error(
+    `Frontend index does not reference the hashed stylesheet bundle ${stylesheetBundle}.`
+  );
+}
+await access(resolve(frontendBuildDirectory, mainBundle));
+await access(resolve(frontendBuildDirectory, stylesheetBundle));
+
+let storageDoctor = null;
+if (!parseBooleanFlag(process.env.RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR)) {
+  storageDoctor = await runStorageDoctor();
+}
+
+if (
+  parseBooleanFlag(process.env.RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA) &&
+  (!process.env.APP_BUILD_SHA ||
+    process.env.APP_BUILD_SHA === "unknown" ||
+    !process.env.APP_BUILD_TIMESTAMP ||
+    process.env.APP_BUILD_TIMESTAMP === "unknown")
+) {
+  throw new Error(
+    "Runtime preflight requires APP_BUILD_SHA and APP_BUILD_TIMESTAMP to be set."
+  );
+}
+
+process.stdout.write(
+  JSON.stringify(
+    {
+      status: "ready",
+      store,
+      adminPasswordPolicy,
+      proofOfWork,
+      transportSecurity: {
+        hstsEnabled
+      },
+      bootstrapAdmin,
+      storage: storageDoctor
+        ? {
+            ...storageDoctor,
+            location: redactStorageLocation(storageDoctor.location)
+          }
+        : null,
+      build: {
+        commitSha: process.env.APP_BUILD_SHA ?? null,
+        builtAt: process.env.APP_BUILD_TIMESTAMP ?? null
+      },
+      artifacts: {
+        apiEntry: requiredBuiltFiles[0],
+        frontendIndex: "dist/apps/web/browser/index.html",
+        frontendMainBundle: mainBundle,
+        frontendStylesheetBundle: stylesheetBundle,
+        frontendServiceWorker: "service-worker.js",
+        frontendWebManifest: "manifest.webmanifest",
+        referencedAssetCount: frontendAssetReferences.length
+      }
+    },
+    null,
+    2
+  ) + "\n"
+);

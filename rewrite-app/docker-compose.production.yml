@@ -1,0 +1,8 @@
+services:
+  rewrite-app-api:
+    environment:
+      FIRST_SLICE_HSTS_ENABLED: ${FIRST_SLICE_HSTS_ENABLED:-true}
+
+  rewrite-app-preflight:
+    environment:
+      FIRST_SLICE_HSTS_ENABLED: ${FIRST_SLICE_HSTS_ENABLED:-true}

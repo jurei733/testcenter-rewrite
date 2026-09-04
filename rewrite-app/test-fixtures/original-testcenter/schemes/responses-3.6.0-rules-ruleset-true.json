@@ -1,0 +1,209 @@
+{
+  "variableCodings" : [
+    {
+      "id" : "02",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "CHOICE",
+      "codeModelParameters" : [],
+      "codes" : [
+        {
+          "id" : 1,
+          "label" : "Richtig",
+          "score" : 285,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : true,
+              "rules" : [
+                {
+                  "method" : "MATCH",
+                  "parameters" : [
+                    "2"
+                  ]
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        },
+        {
+          "id" : 2,
+          "label" : "Falsch",
+          "score" : 0,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : false,
+              "rules" : [
+                {
+                  "method" : "ELSE"
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        }
+      ],
+      "page" : ""
+    },
+    {
+      "id" : "_05a",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "NONE",
+      "codeModelParameters" : [],
+      "codes" : [],
+      "page" : ""
+    },
+    {
+      "id" : "_05b",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "NONE",
+      "codeModelParameters" : [],
+      "codes" : [],
+      "page" : ""
+    },
+    {
+      "id" : "_05c",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "NONE",
+      "codeModelParameters" : [],
+      "codes" : [],
+      "page" : ""
+    },
+    {
+      "id" : "_05d",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "NONE",
+      "codeModelParameters" : [],
+      "codes" : [],
+      "page" : ""
+    },
+    {
+      "id" : "05",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "CHOICE",
+      "codeModelParameters" : [],
+      "codes" : [
+        {
+          "id" : 1,
+          "label" : "Richtig",
+          "score" : 331,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : true,
+              "rules" : [
+                {
+                  "method" : "MATCH",
+                  "parameters" : [
+                    "05_3"
+                  ]
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        },
+        {
+          "id" : 2,
+          "label" : "Falsch",
+          "score" : 0,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : false,
+              "rules" : [
+                {
+                  "method" : "ELSE"
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        }
+      ],
+      "page" : ""
+    },
+    {
+      "id" : "06",
+      "label" : "",
+      "sourceType" : "BASE",
+      "deriveSources" : [],
+      "processing" : [],
+      "fragmenting" : "",
+      "manualInstruction" : "",
+      "codeModel" : "CHOICE",
+      "codeModelParameters" : [],
+      "codes" : [
+        {
+          "id" : 1,
+          "label" : "Richtig",
+          "score" : 639,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : true,
+              "rules" : [
+                {
+                  "method" : "MATCH",
+                  "parameters" : [
+                    "2"
+                  ]
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        },
+        {
+          "id" : 2,
+          "label" : "Falsch",
+          "score" : 0,
+          "ruleSetOperatorAnd" : false,
+          "ruleSets" : [
+            {
+              "ruleOperatorAnd" : false,
+              "rules" : [
+                {
+                  "method" : "ELSE"
+                }
+              ]
+            }
+          ],
+          "manualInstruction" : ""
+        }
+      ],
+      "page" : ""
+    }
+  ]
+}

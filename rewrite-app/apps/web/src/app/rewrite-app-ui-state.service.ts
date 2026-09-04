@@ -1,5 +1,6 @@
 import { Injectable, signal } from "@angular/core";
 
+import type { ApiErrorLike } from "./rewrite-app-api.service";
 import {
   DEFAULT_SOURCE_DOCUMENT,
   createInitialSummaryCards,
@@ -16,10 +17,12 @@ import {
 @Injectable({ providedIn: "root" })
 export class RewriteAppUiStateService {
   readonly renderVersion = signal(0);
+  readonly adminSessionActive = signal(false);
   readonly responseMeta = signal("Idle");
   readonly lastResponse = signal("No request sent yet.");
   readonly activeRequestLabel = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
+  readonly lastApiError = signal<ApiErrorLike | null>(null);
 
   readonly feedback = createInitialShellFeedbackState(createInitialSummaryCards);
   readonly workspace = createInitialShellWorkspaceState();
@@ -27,7 +30,17 @@ export class RewriteAppUiStateService {
   readonly ops = createInitialShellOpsState();
   readonly runtime = createInitialShellRuntimeState();
 
-  activeView: AppView = "workspace";
+  activeView: AppView = "home";
+  showRawDebug = false;
   autoRefreshHandle: number | null = null;
   foregroundRequestDepth = 0;
+
+  setAdminSessionToken(value: string): void {
+    this.ops.adminSessionToken = value;
+    this.adminSessionActive.set(value.trim() !== "");
+  }
+
+  syncAdminSessionToken(): void {
+    this.adminSessionActive.set(this.ops.adminSessionToken.trim() !== "");
+  }
 }

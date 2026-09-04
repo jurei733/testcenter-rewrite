@@ -3,6 +3,6 @@
   "compilerOptions": {
     "outDir": "dist"
   },
-  "references": [{ "path": "../domain" }],
+  "references": [{ "path": "../domain" }, { "path": "../contracts" }],
   "include": ["src/**/*.ts"]
 }

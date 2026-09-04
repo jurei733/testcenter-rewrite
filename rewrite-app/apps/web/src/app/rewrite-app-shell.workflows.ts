@@ -31,8 +31,7 @@ export interface BlockedActivationFlowHost {
 }
 
 export interface ParticipantHappyPathFlowHost {
-  participantSignIn(): Promise<void>;
-  resumeParticipantSession(): Promise<void>;
+  participantLaunch(): Promise<void>;
   refreshRuntimeReads(): Promise<void>;
   rememberActivity(title: string, detail: string): void;
   getParticipantSessionId(): string;
@@ -102,8 +101,7 @@ export async function runBlockedActivationFlow(
 export async function runParticipantHappyPathFlow(
   host: ParticipantHappyPathFlowHost
 ): Promise<void> {
-  await host.participantSignIn();
-  await host.resumeParticipantSession();
+  await host.participantLaunch();
   await host.refreshRuntimeReads();
   host.rememberActivity(
     "Guided Flow",

@@ -17,6 +17,9 @@
     "paths": {
       "@testcenter-rewrite-app/domain": ["packages/domain/src/index.ts"],
       "@testcenter-rewrite-app/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite-app/contracts/participant-roster": [
+        "packages/contracts/src/participant-roster.ts"
+      ],
       "@testcenter-rewrite-app/application": ["packages/application/src/index.ts"],
       "@testcenter-rewrite-app/memory-store": ["packages/memory-store/src/index.ts"],
       "@testcenter-rewrite-app/file-store": ["packages/file-store/src/index.ts"],

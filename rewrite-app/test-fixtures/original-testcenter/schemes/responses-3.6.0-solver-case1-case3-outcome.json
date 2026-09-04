@@ -1,0 +1,42 @@
+[
+  {
+    "id": "b1_alias",
+    "status": "CODING_INCOMPLETE",
+    "value": "5"
+  },
+  {
+    "id": "b2_alias",
+    "status": "CODING_INCOMPLETE",
+    "value": "10"
+  },
+  {
+    "id": "b3_alias",
+    "status": "CODING_INCOMPLETE",
+    "value": "0"
+  },
+  {
+    "id": "d1",
+    "value": 64,
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d2",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d3",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d4",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d5",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  }
+]

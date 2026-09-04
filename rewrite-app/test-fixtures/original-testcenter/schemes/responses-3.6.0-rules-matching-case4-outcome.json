@@ -1,0 +1,23 @@
+[
+  {
+    "id": "b1",
+    "status": "CODING_COMPLETE",
+    "value": " 2 2 2 ",
+    "code": 2,
+    "score": 2
+  },
+  {
+    "id": "b2",
+    "status": "CODING_COMPLETE",
+    "value": "###",
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "b3",
+    "status": "CODING_COMPLETE",
+    "value": "iaiaKOOOOOBiiakKOOOBB",
+    "code": 2,
+    "score": 2
+  }
+]

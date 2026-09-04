@@ -1,0 +1,205 @@
+{
+  "variableCodings": [
+    {
+      "id": "value",
+      "alias": "value",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["0"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "time",
+      "alias": "time",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["0"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "activeQuestionIndex",
+      "alias": "activeQuestionIndex",
+      "label": "",
+      "sourceType": "BASE_NO_VALUE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": []
+    },
+    {
+      "id": "total_correct",
+      "alias": "total_correct",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": []
+    },
+    {
+      "id": "total_wrong",
+      "alias": "total_wrong",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": []
+    },
+    {
+      "id": "total_wrong",
+      "alias": "total_wrong",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": []
+    },
+    {
+      "id": "d_1738676396123",
+      "alias": "a1",
+      "label": "",
+      "sourceType": "SUM_CODE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": ["time"],
+      "processing": [],
+      "codeModel": "NONE",
+      "manualInstruction": "",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["0"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ],
+      "page": "",
+      "fragmenting": ""
+    }
+  ],
+  "version": "3.0"
+}

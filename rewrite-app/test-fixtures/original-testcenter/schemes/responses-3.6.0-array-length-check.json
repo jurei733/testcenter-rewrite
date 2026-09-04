@@ -1,0 +1,178 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [{ "method": "MATCH", "parameters": ["01_4"] }]
+            }
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "alias": "b2",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "<p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\">@Martin: Richtig muss sein, dass hier 01_1 UND 02_2 liegen. </p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\">Fehlt mindestens eins -&gt; Falsch (das passiert)</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\">Liegt ein weiteres DnD-Element drin -&gt; Falsch</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\"></p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\">Aktuell wird es gar nicht richtig, außer wenn ich ODER als Verbindung wähle (dann wird es aber auch richtig, wenn weitere Elemente drin liegen).</p>",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": true,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [{ "method": "MATCH", "parameters": ["01_1"] }]
+            },
+            {
+              "valueArrayPos": "ANY_OPEN",
+              "ruleOperatorAnd": false,
+              "rules": [{ "method": "MATCH", "parameters": ["01_2"] }]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "alias": "b3",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": true,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [{ "method": "MATCH", "parameters": ["01_3"] }]
+            },
+            {
+              "valueArrayPos": "LENGTH",
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["1"]
+                }
+              ]
+            }
+
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "d1",
+      "alias": "d1",
+      "label": "",
+      "sourceType": "SUM_SCORE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": ["b1", "b2", "b3"],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["3"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    }
+  ],
+  "version": "3.0"
+}

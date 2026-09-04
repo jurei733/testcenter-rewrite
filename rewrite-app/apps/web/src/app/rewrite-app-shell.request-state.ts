@@ -1,4 +1,4 @@
-import type { ApplicationRef, WritableSignal } from "@angular/core";
+import type { WritableSignal } from "@angular/core";
 
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
@@ -7,10 +7,10 @@ export interface ShellRequestStateHost {
   foregroundRequestDepth: number;
   readonly activeRequestLabel: WritableSignal<string | null>;
   readonly errorMessage: WritableSignal<string | null>;
+  readonly lastApiError: WritableSignal<ApiErrorLike | null>;
   readonly responseMeta: WritableSignal<string>;
   readonly lastResponse: WritableSignal<string>;
   readonly renderVersion: WritableSignal<number>;
-  readonly applicationRef: ApplicationRef;
 }
 
 export function beginForegroundShellRequest(
@@ -20,6 +20,7 @@ export function beginForegroundShellRequest(
   host.foregroundRequestDepth += 1;
   host.activeRequestLabel.set(label);
   host.errorMessage.set(null);
+  host.lastApiError.set(null);
 }
 
 export function applyForegroundShellResponse(
@@ -38,6 +39,7 @@ export function applyForegroundShellError(
   apiError: ApiErrorLike
 ): void {
   host.errorMessage.set(apiError.message);
+  host.lastApiError.set(apiError);
   host.responseMeta.set(`${label} · error`);
   host.lastResponse.set(prettyPrintJson(apiError, host.lastResponse()));
 }
@@ -49,6 +51,9 @@ export function finishForegroundShellRequest(
   if (host.foregroundRequestDepth === 0) {
     host.activeRequestLabel.set(null);
   }
+  flushShellRender(host);
+}
+
+export function flushShellRender(host: ShellRequestStateHost): void {
   host.renderVersion.update(version => version + 1);
-  host.applicationRef.tick();
 }
