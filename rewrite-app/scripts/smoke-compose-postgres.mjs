@@ -83,7 +83,7 @@ const parsePositiveInteger = (value, label) => {
 };
 
 const composeUpTimeoutMs = parsePositiveInteger(
-  process.env.SMOKE_COMPOSE_UP_TIMEOUT_MS ?? "360000",
+  process.env.SMOKE_COMPOSE_UP_TIMEOUT_MS ?? "900000",
   "SMOKE_COMPOSE_UP_TIMEOUT_MS"
 );
 const rewriteAppPort = parsePositiveInteger(
