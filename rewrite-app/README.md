@@ -952,7 +952,7 @@ That verifies:
 
 When `FIRST_SLICE_BOOTSTRAP_DEMO=true` is set, the same compose smoke also verifies the seeded demo state by signing in as `demo-admin`, reading the protected demo workspace overview, exporting the demo participant roster CSV, signing in `student-demo`, and resuming the demo booklet against Postgres.
 
-Set `SMOKE_COMPOSE_UP_TIMEOUT_MS` to tune how long the compose smoke waits for `docker compose up --build` before failing with diagnostics. The default is `180000` ms.
+Set `SMOKE_COMPOSE_UP_TIMEOUT_MS` to tune how long the compose smoke waits for `docker compose up --build` before failing with diagnostics. The default is `360000` ms so a cold container build remains viable when dependency downloads are slow.
 
 For runtime probes:
 
