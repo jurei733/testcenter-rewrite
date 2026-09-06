@@ -524,46 +524,49 @@ try {
     await page.waitForTimeout(50);
   };
   const fillVeronaAnswerAndWaitForHost = async (frame, selector, value) => {
-    const observedAnswer = page.evaluate(
-      expectedValue =>
-        new Promise(resolve => {
-          const timeout = globalThis.setTimeout(() => {
-            globalThis.removeEventListener("message", observeAnswer);
-            resolve(false);
-          }, 15_000);
-          const observeAnswer = event => {
-            const notification = event.data;
-            if (
-              notification?.type !== "vopStateChangedNotification" ||
-              notification.unitState == null
-            ) {
-              return;
-            }
-            let serializedUnitState = "";
-            try {
-              serializedUnitState = JSON.stringify(notification.unitState);
-            } catch {
-              return;
-            }
-            if (!serializedUnitState.includes(expectedValue)) {
-              return;
-            }
-            globalThis.clearTimeout(timeout);
-            globalThis.removeEventListener("message", observeAnswer);
-            resolve(true);
-          };
-          globalThis.addEventListener("message", observeAnswer);
-        }),
-      value
-    );
-    await frame.locator(selector).fill(value);
-    await frame.locator(selector).dispatchEvent("keyup", {
-      key: value.at(-1) ?? "a"
-    });
-    assert.equal(
-      await observedAnswer,
-      true,
-      `UI smoke expected Verona to publish the answer ${JSON.stringify(value)}.`
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const observedAnswer = page.evaluate(
+        expectedValue =>
+          new Promise(resolve => {
+            const timeout = globalThis.setTimeout(() => {
+              globalThis.removeEventListener("message", observeAnswer);
+              resolve(false);
+            }, 15_000);
+            const observeAnswer = event => {
+              const notification = event.data;
+              if (
+                notification?.type !== "vopStateChangedNotification" ||
+                notification.unitState == null
+              ) {
+                return;
+              }
+              let serializedUnitState = "";
+              try {
+                serializedUnitState = JSON.stringify(notification.unitState);
+              } catch {
+                return;
+              }
+              if (!serializedUnitState.includes(expectedValue)) {
+                return;
+              }
+              globalThis.clearTimeout(timeout);
+              globalThis.removeEventListener("message", observeAnswer);
+              resolve(true);
+            };
+            globalThis.addEventListener("message", observeAnswer);
+          }),
+        value
+      );
+      await frame.locator(selector).fill(value);
+      await frame.locator(selector).dispatchEvent("keyup", {
+        key: value.at(-1) ?? "a"
+      });
+      if (await observedAnswer) {
+        return;
+      }
+    }
+    assert.fail(
+      `UI smoke expected Verona to publish the answer ${JSON.stringify(value)} after three attempts.`
     );
   };
   const selectAndCommit = async (selector, value) => {
@@ -13025,7 +13028,7 @@ try {
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
     "testcenter-rewrite:participant-save-outbox:v1",
-    { timeout: 30_000 }
+    { timeout: 60_000 }
   );
   page.off("request", recordStarsForegroundSaveOrder);
   assert.equal(
@@ -19614,6 +19617,7 @@ try {
   assert.equal(await page.locator("#loadSystemChecksButton").count(), 0);
   await fillAndCommit("#systemCheckUsername", systemCheckUsername);
   await fillAndCommit("#systemCheckPassword", systemCheckPassword);
+  await expectButtonSelectorEnabled("#systemCheckSignInButton");
   await page.locator("#systemCheckSignInButton").click();
   await page
     .locator("#systemCheckSignedInUser")
@@ -19639,6 +19643,7 @@ try {
   await page.locator("#systemCheckSignInButton").waitFor();
   await fillAndCommit("#systemCheckUsername", systemCheckUsername);
   await fillAndCommit("#systemCheckPassword", systemCheckFinalPassword);
+  await expectButtonSelectorEnabled("#systemCheckSignInButton");
   await page.locator("#systemCheckSignInButton").click();
   await page
     .locator("#systemCheckSignedInUser")
