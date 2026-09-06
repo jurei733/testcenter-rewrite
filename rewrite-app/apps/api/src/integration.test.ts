@@ -12491,6 +12491,98 @@ test("deleting a rejected replacement keeps its valid predecessor replaceable", 
   assert.equal(acceptedReplacement.body.replacementSourcePackage.status, "accepted");
 });
 
+test("deleting the tip of a replacement chain reopens only its direct predecessor", async () => {
+  const tenantKey = "integration-tenant-replacement-chain-rollback";
+  const workspaceKey = "integration-workspace-replacement-chain-rollback";
+  const workspaceUrl = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const sourceDocument = (bookletKey: string): string =>
+    `<assessment><booklet key="${bookletKey}"><unit key="unit:${bookletKey}" /></booklet></assessment>`;
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const original = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`${workspaceUrl}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "replacement-chain-a.xml",
+      mediaType: "application/xml",
+      sourceDocument: sourceDocument("booklet:replacement-chain-a")
+    }
+  });
+  assert.equal(original.status, 201, JSON.stringify(original.body));
+
+  const replace = async (
+    sourcePackageId: string,
+    generation: string
+  ): Promise<{ sourcePackageId: string; fileName: string }> => {
+    const replacement = await requestJson<{
+      replacementSourcePackage: {
+        sourcePackageId: string;
+        fileName: string;
+        status: string;
+      };
+      importJob: { status: string };
+    }>(`${workspaceUrl}/source-packages/${sourcePackageId}/replacements`, {
+      method: "POST",
+      body: {
+        fileName: `replacement-chain-${generation}.xml`,
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument(`booklet:replacement-chain-${generation}`)
+      }
+    });
+    assert.equal(replacement.status, 201, JSON.stringify(replacement.body));
+    assert.equal(replacement.body.importJob.status, "completed");
+    assert.equal(replacement.body.replacementSourcePackage.status, "accepted");
+    return replacement.body.replacementSourcePackage;
+  };
+
+  const generationB = await replace(original.body.sourcePackage.sourcePackageId, "b");
+  const generationC = await replace(generationB.sourcePackageId, "c");
+
+  const deletedTip = await requestJson<{
+    deletion: {
+      sourcePackageId: string;
+      deletedImportJobCount: number;
+      deletedContentReleaseCount: number;
+    };
+  }>(`${workspaceUrl}/source-packages/${generationC.sourcePackageId}`, {
+    method: "DELETE",
+    body: { confirmation: generationC.fileName }
+  });
+  assert.equal(deletedTip.status, 200, JSON.stringify(deletedTip.body));
+  assert.equal(deletedTip.body.deletion.sourcePackageId, generationC.sourcePackageId);
+  assert.equal(deletedTip.body.deletion.deletedImportJobCount, 1);
+  assert.equal(deletedTip.body.deletion.deletedContentReleaseCount, 1);
+
+  const generationD = await replace(generationB.sourcePackageId, "d");
+  assert.notEqual(generationD.sourcePackageId, generationC.sourcePackageId);
+
+  const stillSupersededOriginal = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-packages/${original.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "replacement-chain-invalid-branch.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument("booklet:replacement-chain-invalid-branch")
+      }
+    }
+  );
+  assert.equal(stillSupersededOriginal.status, 409);
+  assert.equal(
+    stillSupersededOriginal.body.error,
+    "source_package_replacement_superseded"
+  );
+});
+
 test("source-package replacement and retry preserve workspace identity uniqueness", async () => {
   const tenantKey = "integration-tenant-source-mutation-identities";
   const workspaceKey = "integration-workspace-source-mutation-identities";
