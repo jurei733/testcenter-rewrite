@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   ViewChild,
-  computed,
   inject,
   signal
 } from "@angular/core";
@@ -855,7 +854,7 @@ interface ParticipantVisibleCodeNotice {
             <small *ngIf="leaveLock.confirm">You will be asked to confirm before leaving.</small>
           </section>
           <section
-            *ngIf="visibleCodeNotice() as notice"
+            *ngIf="retainedVisibleCodeNoticeForCurrentRun() as notice"
             id="participantRouteTestletVisibleCode"
             class="participant-testlet-visible-code-notice"
             role="status"
@@ -880,6 +879,22 @@ interface ParticipantVisibleCodeNotice {
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
               <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt') }}</p>
               <p *ngIf="gate.prompt" id="participantRouteTestletGateMessage">{{ gate.prompt }}</p>
+              <section
+                *ngIf="visibleGateCode(gate) as visibleCode"
+                id="participantRouteTestletVisibleCode"
+                class="participant-testlet-visible-code-notice"
+                role="status"
+                aria-live="polite"
+              >
+                <p>Das Freigabewort lautet <strong>{{ visibleCode }}</strong>.</p>
+                <button
+                  id="participantRouteTestletVisibleCodeCloseButton"
+                  class="ghost"
+                  type="button"
+                  aria-label="Freigabewort-Hinweis schließen"
+                  (click)="dismissVisibleCodeNotice(visibleCodeNoticeKey(gate, visibleCode))"
+                >Schließen</button>
+              </section>
             </div>
             <label *ngIf="!view.usesParticipantCodeKeypad">
               Block Code
@@ -890,7 +905,7 @@ interface ParticipantVisibleCodeNotice {
                 autocomplete="off"
                 [(ngModel)]="view.testletUnlockCode"
                 (ngModelChange)="view.testletUnlockCode = $event.toUpperCase()"
-                (keyup.enter)="view.unlockNextTestlet()"
+                (keyup.enter)="unlockNextTestlet()"
               />
             </label>
             <section
@@ -1075,23 +1090,6 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   private readonly retainedVisibleCodeNotice =
     signal<ParticipantVisibleCodeNotice | null>(null);
   private readonly dismissedVisibleCodeNoticeKey = signal<string | null>(null);
-  readonly visibleCodeNotice = computed<ParticipantVisibleCodeNotice | null>(() => {
-    const testRunId = this.view.runtime.testRunId.trim();
-    const gate = this.view.player.nextTestletGate;
-    const currentNotice =
-      testRunId && gate?.visibleCode
-        ? {
-            code: gate.visibleCode,
-            key: `${testRunId}:${gate.testletKey}:${gate.visibleCode}`,
-            testRunId
-          }
-        : null;
-    const notice = currentNotice ?? this.retainedVisibleCodeNotice();
-    return notice?.testRunId === testRunId &&
-      notice.key !== this.dismissedVisibleCodeNoticeKey()
-      ? notice
-      : null;
-  });
   private starterBottomElement: HTMLElement | null = null;
   private readonly starterScrollObserver =
     typeof IntersectionObserver === "undefined"
@@ -1124,11 +1122,44 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   }
 
   unlockNextTestlet(): void {
-    const notice = this.visibleCodeNotice();
-    if (notice) {
-      this.retainedVisibleCodeNotice.set(notice);
+    const testRunId = this.view.runtime.testRunId.trim();
+    const gate = this.view.player.nextTestletGate;
+    const visibleCode = gate?.visibleCode ?? null;
+    if (testRunId && gate && visibleCode) {
+      const key = this.visibleCodeNoticeKey(gate, visibleCode);
+      if (key !== this.dismissedVisibleCodeNoticeKey()) {
+        this.retainedVisibleCodeNotice.set({ code: visibleCode, key, testRunId });
+      }
     }
     this.view.unlockNextTestlet();
+  }
+
+  visibleGateCode(gate: {
+    testletKey: string;
+    visibleCode: string | null;
+  }): string | null {
+    const visibleCode = gate.visibleCode;
+    return visibleCode &&
+      this.visibleCodeNoticeKey(gate, visibleCode) !==
+        this.dismissedVisibleCodeNoticeKey()
+      ? visibleCode
+      : null;
+  }
+
+  visibleCodeNoticeKey(
+    gate: { testletKey: string },
+    visibleCode: string
+  ): string {
+    return `${this.view.runtime.testRunId.trim()}:${gate.testletKey}:${visibleCode}`;
+  }
+
+  retainedVisibleCodeNoticeForCurrentRun(): ParticipantVisibleCodeNotice | null {
+    const notice = this.retainedVisibleCodeNotice();
+    return !this.view.player.nextTestletGate &&
+      notice?.testRunId === this.view.runtime.testRunId.trim() &&
+      notice.key !== this.dismissedVisibleCodeNoticeKey()
+      ? notice
+      : null;
   }
 
   dismissVisibleCodeNotice(key: string): void {
