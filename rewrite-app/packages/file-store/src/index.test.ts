@@ -68,6 +68,83 @@ const createLargeEntityFixture = () => {
 };
 
 describe("createFileFirstSliceRepository", () => {
+  it("atomically reserves only one workspace dependency snapshot per revision", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-snapshot-race-"));
+    const filePath = join(tempDirectory, "state.json");
+    const rootSourcePackage: SourcePackage = {
+      sourcePackageId: "file-snapshot-root",
+      tenantId: "file-snapshot-tenant",
+      workspaceId: "file-snapshot-workspace",
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      contentStructure: null,
+      sourceDocument: "<Booklet />",
+      status: "accepted",
+      uploadedAt: "2026-09-07T00:00:00.000Z"
+    };
+    const revision = createWorkspaceSourcePackageReferenceRevision({
+      sourcePackages: [rootSourcePackage],
+      activityEvents: []
+    });
+    const dependencySnapshot = (suffix: string): SourcePackage => ({
+      ...rootSourcePackage,
+      sourcePackageId: `file-dependency-snapshot-${suffix}`,
+      fileName: `Booklet-${suffix}.workspace-dependencies.zip`,
+      mediaType: "application/zip",
+      status: "uploaded"
+    });
+    const assemblyActivityEvent = (
+      snapshot: SourcePackage
+    ): WorkspaceActivityEvent => ({
+      activityEventId: `file-snapshot-event-${snapshot.sourcePackageId}`,
+      tenantId: snapshot.tenantId,
+      workspaceId: snapshot.workspaceId,
+      eventType: "source_package_assembled",
+      actorId: null,
+      subjectType: "source_package",
+      subjectId: snapshot.sourcePackageId,
+      occurredAt: "2026-09-07T00:01:00.000Z",
+      summary: "Workspace dependency snapshot reserved.",
+      details: { assemblyMode: "workspace_dependencies" }
+    });
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveSourcePackage(rootSourcePackage);
+      const snapshots = [dependencySnapshot("first"), dependencySnapshot("second")];
+      const results = await Promise.all(
+        snapshots.map(snapshot =>
+          repository.reserveSourcePackageAssembly({
+            assembledSourcePackage: snapshot,
+            assemblyActivityEvent: assemblyActivityEvent(snapshot),
+            expectedWorkspaceSourcePackageReferenceRevision: revision
+          })
+        )
+      );
+
+      assert.deepEqual([...results].sort(), [false, true]);
+      const persisted = await repository.listSourcePackagesByWorkspace(
+        rootSourcePackage.tenantId,
+        rootSourcePackage.workspaceId
+      );
+      assert.equal(persisted.length, 2);
+      const events = await repository.listWorkspaceActivityEventsByWorkspace(
+        rootSourcePackage.tenantId,
+        rootSourcePackage.workspaceId
+      );
+      assert.equal(events.length, 1);
+      assert.equal(
+        events[0]?.subjectId,
+        persisted.find(
+          candidate =>
+            candidate.sourcePackageId !== rootSourcePackage.sourcePackageId
+        )?.sourcePackageId
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("atomically keeps concurrent source-package replacements linear", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-replacement-race-"));
     const filePath = join(tempDirectory, "state.json");

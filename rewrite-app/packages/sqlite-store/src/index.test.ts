@@ -21,6 +21,83 @@ import type {
 
 import { createSqliteFirstSliceRepository } from "./index.js";
 
+test("SQLite atomically reserves only one workspace dependency snapshot per revision", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-snapshot-race-"));
+  const databasePath = join(tempDirectory, "snapshot-race.sqlite");
+  const rootSourcePackage: SourcePackage = {
+    sourcePackageId: "sqlite-snapshot-root",
+    tenantId: "sqlite-snapshot-tenant",
+    workspaceId: "sqlite-snapshot-workspace",
+    fileName: "Booklet.xml",
+    mediaType: "application/xml",
+    contentStructure: null,
+    sourceDocument: "<Booklet />",
+    status: "accepted",
+    uploadedAt: "2026-09-07T00:00:00.000Z"
+  };
+  const revision = createWorkspaceSourcePackageReferenceRevision({
+    sourcePackages: [rootSourcePackage],
+    activityEvents: []
+  });
+  const dependencySnapshot = (suffix: string): SourcePackage => ({
+    ...rootSourcePackage,
+    sourcePackageId: `sqlite-dependency-snapshot-${suffix}`,
+    fileName: `Booklet-${suffix}.workspace-dependencies.zip`,
+    mediaType: "application/zip",
+    status: "uploaded"
+  });
+  const assemblyActivityEvent = (
+    snapshot: SourcePackage
+  ): WorkspaceActivityEvent => ({
+    activityEventId: `sqlite-snapshot-event-${snapshot.sourcePackageId}`,
+    tenantId: snapshot.tenantId,
+    workspaceId: snapshot.workspaceId,
+    eventType: "source_package_assembled",
+    actorId: null,
+    subjectType: "source_package",
+    subjectId: snapshot.sourcePackageId,
+    occurredAt: "2026-09-07T00:01:00.000Z",
+    summary: "Workspace dependency snapshot reserved.",
+    details: { assemblyMode: "workspace_dependencies" }
+  });
+
+  try {
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    await repository.saveSourcePackage(rootSourcePackage);
+    const snapshots = [dependencySnapshot("first"), dependencySnapshot("second")];
+    const results = await Promise.all(
+      snapshots.map(snapshot =>
+        repository.reserveSourcePackageAssembly({
+          assembledSourcePackage: snapshot,
+          assemblyActivityEvent: assemblyActivityEvent(snapshot),
+          expectedWorkspaceSourcePackageReferenceRevision: revision
+        })
+      )
+    );
+
+    assert.deepEqual([...results].sort(), [false, true]);
+    const persisted = await repository.listSourcePackagesByWorkspace(
+      rootSourcePackage.tenantId,
+      rootSourcePackage.workspaceId
+    );
+    assert.equal(persisted.length, 2);
+    const events = await repository.listWorkspaceActivityEventsByWorkspace(
+      rootSourcePackage.tenantId,
+      rootSourcePackage.workspaceId
+    );
+    assert.equal(events.length, 1);
+    assert.equal(
+      events[0]?.subjectId,
+      persisted.find(
+        candidate =>
+          candidate.sourcePackageId !== rootSourcePackage.sourcePackageId
+      )?.sourcePackageId
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite atomically keeps concurrent source-package replacements linear", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-replacement-race-"));
   const databasePath = join(tempDirectory, "replacement-race.sqlite");

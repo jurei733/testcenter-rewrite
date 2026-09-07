@@ -1318,6 +1318,11 @@ export type FirstSliceRepository = {
     workspaceId: string
   ): Promise<SourcePackage[]>;
   saveSourcePackage(sourcePackage: SourcePackage): Promise<void>;
+  reserveSourcePackageAssembly(input: {
+    assembledSourcePackage: SourcePackage;
+    assemblyActivityEvent: WorkspaceActivityEvent;
+    expectedWorkspaceSourcePackageReferenceRevision: string;
+  }): Promise<boolean>;
   reserveSourcePackageReplacement(input: {
     replacedSourcePackageId: string;
     replacementSourcePackage: SourcePackage;
@@ -25500,11 +25505,17 @@ export const createFirstSliceServices = (
         readStandaloneTestcenterFileIdentity(sourcePackage)?.fileType ===
           "Testtakers")
     ) {
-      const workspaceSourcePackages =
-        await repository.listSourcePackagesByWorkspace(
-          workspace.tenantId,
-          workspace.workspaceId
-        );
+      const [workspaceSourcePackages, workspaceActivityEvents] =
+        await Promise.all([
+          repository.listSourcePackagesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
       const workspaceDependencyResolution =
         resolveWorkspaceDependencySourcePackages({
           rootSourcePackage: sourcePackage,
@@ -25536,13 +25547,15 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
-        await repository.saveSourcePackage(dependencySnapshot);
-        await recordWorkspaceActivity({
+        const assemblyActivityEvent: WorkspaceActivityEvent = {
+          activityEventId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           eventType: "source_package_assembled",
+          actorId: null,
           subjectType: "source_package",
           subjectId: dependencySnapshot.sourcePackageId,
+          occurredAt: now(),
           summary: `Workspace dependencies for '${sourcePackage.fileName}' resolved into immutable package '${dependencySnapshot.fileName}'.`,
           details: {
             fileName: dependencySnapshot.fileName,
@@ -25556,7 +25569,24 @@ export const createFirstSliceServices = (
               sizeBytes: member.bytes.length
             }))
           }
-        });
+        };
+        const reserved =
+          await repository.reserveSourcePackageAssembly({
+            assembledSourcePackage: dependencySnapshot,
+            assemblyActivityEvent,
+            expectedWorkspaceSourcePackageReferenceRevision:
+              createWorkspaceSourcePackageReferenceRevision({
+                sourcePackages: workspaceSourcePackages,
+                activityEvents: workspaceActivityEvents
+              })
+          });
+        if (!reserved) {
+          throw new FirstSliceError(
+            409,
+            "source_document_workspace_dependency_snapshot_conflict",
+            "Workspace dependencies changed while the immutable package was being prepared. Refresh the source packages and retry the import."
+          );
+        }
         return createImportJobWithRelease(
           {
             tenantKey: input.tenantKey,
@@ -30800,23 +30830,34 @@ export const createFirstSliceServices = (
             "sourcePackageIds must not contain duplicates."
           );
         }
-        const sourcePackages = await Promise.all(
-          sourcePackageIds.map(sourcePackageId =>
-            requireSourcePackage(repository, sourcePackageId)
-          )
+        const [workspaceSourcePackages, workspaceActivityEvents] =
+          await Promise.all([
+            repository.listSourcePackagesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceActivityEventsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const sourcePackageById = new Map(
+          workspaceSourcePackages.map(sourcePackage => [
+            sourcePackage.sourcePackageId,
+            sourcePackage
+          ])
         );
-        for (const sourcePackage of sourcePackages) {
-          if (
-            sourcePackage.tenantId !== workspace.tenantId ||
-            sourcePackage.workspaceId !== workspace.workspaceId
-          ) {
+        const sourcePackages = sourcePackageIds.map(sourcePackageId => {
+          const sourcePackage = sourcePackageById.get(sourcePackageId);
+          if (!sourcePackage) {
             throw new FirstSliceError(
               404,
               "source_package_not_found",
-              `Source package '${sourcePackage.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+              `Source package '${sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
             );
           }
-        }
+          return sourcePackage;
+        });
         const fileNameInput = normalizeSourcePackageFileName(input.fileName);
         const fileName = normalizeSourcePackageFileName(
           fileNameInput.toLowerCase().endsWith(".zip")
@@ -30835,13 +30876,15 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
-        await repository.saveSourcePackage(assembledSourcePackage);
-        await recordWorkspaceActivity({
+        const assemblyActivityEvent: WorkspaceActivityEvent = {
+          activityEventId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           eventType: "source_package_assembled",
+          actorId: null,
           subjectType: "source_package",
           subjectId: assembledSourcePackage.sourcePackageId,
+          occurredAt: now(),
           summary: `Source package '${assembledSourcePackage.fileName}' assembled from ${members.length} uploaded files.`,
           details: {
             fileName: assembledSourcePackage.fileName,
@@ -30852,7 +30895,24 @@ export const createFirstSliceServices = (
               sizeBytes: member.bytes.length
             }))
           }
-        });
+        };
+        const reserved =
+          await repository.reserveSourcePackageAssembly({
+            assembledSourcePackage,
+            assemblyActivityEvent,
+            expectedWorkspaceSourcePackageReferenceRevision:
+              createWorkspaceSourcePackageReferenceRevision({
+                sourcePackages: workspaceSourcePackages,
+                activityEvents: workspaceActivityEvents
+              })
+          });
+        if (!reserved) {
+          throw new FirstSliceError(
+            409,
+            "source_package_assembly_conflict",
+            "Workspace files changed while the package was being assembled. Refresh the source packages and retry the assembly."
+          );
+        }
         const importResult = await createImportJobWithRelease({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,

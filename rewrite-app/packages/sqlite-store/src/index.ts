@@ -2381,6 +2381,98 @@ export const createSqliteFirstSliceRepository = (
           sourcePackage.uploadedAt
         );
     },
+    async reserveSourcePackageAssembly(input) {
+      const { assembledSourcePackage, assemblyActivityEvent } = input;
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const sourcePackages = (
+          database
+            .prepare(
+              `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+               FROM source_packages
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(
+              assembledSourcePackage.tenantId,
+              assembledSourcePackage.workspaceId
+            ) as Record<string, unknown>[]
+        )
+          .map(row => mapSourcePackage(row))
+          .filter(Boolean) as SourcePackage[];
+        const activityEvents = (
+          database
+            .prepare(
+              `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                      subject_type, subject_id, occurred_at, summary, details_json
+               FROM workspace_activity_events
+               WHERE tenant_id = ? AND workspace_id = ?`
+            )
+            .all(
+              assembledSourcePackage.tenantId,
+              assembledSourcePackage.workspaceId
+            ) as Record<string, unknown>[]
+        )
+          .map(row => mapWorkspaceActivityEvent(row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        if (
+          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+          assemblyActivityEvent.workspaceId !==
+            assembledSourcePackage.workspaceId ||
+          assemblyActivityEvent.eventType !== "source_package_assembled" ||
+          assemblyActivityEvent.subjectId !==
+            assembledSourcePackage.sourcePackageId ||
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages,
+            activityEvents
+          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+        ) {
+          database.exec("ROLLBACK");
+          return false;
+        }
+        database
+          .prepare(
+            `INSERT INTO source_packages (
+              source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            assembledSourcePackage.sourcePackageId,
+            assembledSourcePackage.tenantId,
+            assembledSourcePackage.workspaceId,
+            assembledSourcePackage.fileName,
+            assembledSourcePackage.mediaType,
+            assembledSourcePackage.contentStructure
+              ? JSON.stringify(assembledSourcePackage.contentStructure)
+              : null,
+            assembledSourcePackage.sourceDocument,
+            assembledSourcePackage.status,
+            assembledSourcePackage.uploadedAt
+          );
+        database
+          .prepare(
+            `INSERT INTO workspace_activity_events (
+              activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            assemblyActivityEvent.activityEventId,
+            assemblyActivityEvent.tenantId,
+            assemblyActivityEvent.workspaceId,
+            assemblyActivityEvent.eventType,
+            assemblyActivityEvent.actorId,
+            assemblyActivityEvent.subjectType,
+            assemblyActivityEvent.subjectId,
+            assemblyActivityEvent.occurredAt,
+            assemblyActivityEvent.summary,
+            JSON.stringify(assemblyActivityEvent.details)
+          );
+        database.exec("COMMIT");
+        return true;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       database.exec("BEGIN IMMEDIATE");

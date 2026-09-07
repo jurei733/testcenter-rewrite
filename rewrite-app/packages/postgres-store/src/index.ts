@@ -2282,6 +2282,100 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           )
       );
     },
+    async reserveSourcePackageAssembly(input) {
+      const { assembledSourcePackage, assemblyActivityEvent } = input;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const workspace = await client.query(
+          `SELECT workspace_id
+           FROM workspaces
+           WHERE tenant_id = $1 AND workspace_id = $2
+           FOR UPDATE`,
+          [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+        );
+        const sourcePackages = (
+          await client.query(
+            `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type,
+                    content_structure_json, source_document_text, status, uploaded_at
+             FROM source_packages
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+          )
+        ).rows
+          .map(row => mapSourcePackage(row as Row))
+          .filter(Boolean) as SourcePackage[];
+        const activityEvents = (
+          await client.query(
+            `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id,
+                    subject_type, subject_id, occurred_at, summary, details_json
+             FROM workspace_activity_events
+             WHERE tenant_id = $1 AND workspace_id = $2`,
+            [assembledSourcePackage.tenantId, assembledSourcePackage.workspaceId]
+          )
+        ).rows
+          .map(row => mapWorkspaceActivityEvent(row as Row))
+          .filter(Boolean) as WorkspaceActivityEvent[];
+        if (
+          workspace.rowCount !== 1 ||
+          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+          assemblyActivityEvent.workspaceId !==
+            assembledSourcePackage.workspaceId ||
+          assemblyActivityEvent.eventType !== "source_package_assembled" ||
+          assemblyActivityEvent.subjectId !==
+            assembledSourcePackage.sourcePackageId ||
+          createWorkspaceSourcePackageReferenceRevision({
+            sourcePackages,
+            activityEvents
+          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+        ) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+        await client.query(
+          `INSERT INTO source_packages (
+            source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            assembledSourcePackage.sourcePackageId,
+            assembledSourcePackage.tenantId,
+            assembledSourcePackage.workspaceId,
+            assembledSourcePackage.fileName,
+            assembledSourcePackage.mediaType,
+            assembledSourcePackage.contentStructure
+              ? JSON.stringify(assembledSourcePackage.contentStructure)
+              : null,
+            assembledSourcePackage.sourceDocument,
+            assembledSourcePackage.status,
+            assembledSourcePackage.uploadedAt
+          ]
+        );
+        await client.query(
+          `INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            assemblyActivityEvent.activityEventId,
+            assemblyActivityEvent.tenantId,
+            assemblyActivityEvent.workspaceId,
+            assemblyActivityEvent.eventType,
+            assemblyActivityEvent.actorId,
+            assemblyActivityEvent.subjectType,
+            assemblyActivityEvent.subjectId,
+            assemblyActivityEvent.occurredAt,
+            assemblyActivityEvent.summary,
+            JSON.stringify(assemblyActivityEvent.details)
+          ]
+        );
+        await client.query("COMMIT");
+        return true;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       const client = await pool.connect();
