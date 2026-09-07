@@ -7164,7 +7164,7 @@ try {
   await page.locator("#participantRouteReloadButton").waitFor();
   await page.locator("#participantRouteClearSessionButton").waitFor();
   await page.locator("#participantRouteReloadButton").click();
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("load");
   await page.waitForURL(url =>
     url.searchParams.get("participantSessionId") === participantEntrySignInSessionId
   );
