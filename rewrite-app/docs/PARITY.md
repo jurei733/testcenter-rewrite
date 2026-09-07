@@ -2,10 +2,10 @@
 
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
-and was last compared on 2026-09-06 with the latest published release
+and was last compared on 2026-09-07 with the latest published release
 `18.3.0` at `cff08eaad43d0a98b876fa07591ae51af9828dcf` (2026-09-01) and the
 current upstream `origin/master` at
-`401bdab833720a2e18664643bcb5df81fda09f7a` (2026-09-03), four commits after
+`19411870c3b1f8700d62e003c036c677f74116db` (2026-09-07), eleven commits after
 that release. It additionally tracks current frontend behavior at
 `90ec58845d84d899fb993553d03767c072fdd05c` (2026-08-18) plus the complete
 current 18.0 BookletConfig package at
@@ -25,7 +25,7 @@ historical counterparts. The current Speedtest system-test graph is fixed to
 its introducing upstream commit
 `6455e265421777124f379090257365b70b21641f`.
 
-The post-release master delta changes no schema generation beyond the already
+The post-release master delta changes no XML schema generation beyond the already
 pinned 18.0 corpus. Its product-relevant Review, code-input, execution-mode,
 navigation/leave-dialog, invalid-session, Superadmin retry, error-report, and
 current Test-Controller/Speedtest behavior is represented below. Test-only,
@@ -56,6 +56,19 @@ product route or runtime policy. The rewrite already returns structured response
 collections and its unnamed Compose resources inherit Docker Compose project
 isolation; the documented smoke command explicitly exercises
 `COMPOSE_PROJECT_NAME`. No capability status or weighted estimate changes.
+
+The seven commits after the previous `401bdab83` audit point move the Booklet
+and Testtaker editor schemas into the external documentation build, replace the
+old lowercase editor-schema projections with uppercase 18.0 JSON projections,
+and strengthen the existing Review-mode code-word E2E flow by requiring its
+notification to close on request. The rewrite validates the source XML rather
+than those editor-only JSON projections, and its pinned 18.0 Booklet/Testtakers
+corpus already covers the represented XML structures. The Participant UI now
+retains the visible Review/Demo/Trial code-word notification across successful
+gate entry until the participant explicitly closes it; the current Original
+text-field Controller case gates that complete lifecycle in Chromium. The
+remaining commits only relocate or rebuild documentation. No capability status
+or weighted estimate changes.
 
 Status:
 
@@ -157,7 +170,7 @@ tests:
 ## Current remaining-work queue
 
 The capability matrix below is authoritative for completion status. This queue
-contains only work that is still open after the 2026-09-06 upstream audit;
+contains only work that is still open after the 2026-09-07 upstream audit;
 participant execution modes, attachments/QR capture, and instance branding are
 no longer listed because their matrix rows are `done`.
 

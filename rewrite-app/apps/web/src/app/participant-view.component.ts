@@ -1,5 +1,12 @@
 import { CommonModule } from "@angular/common";
-import { Component, ElementRef, ViewChild, inject, signal } from "@angular/core";
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  computed,
+  inject,
+  signal
+} from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
@@ -7,6 +14,12 @@ import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
+
+interface ParticipantVisibleCodeNotice {
+  code: string;
+  key: string;
+  testRunId: string;
+}
 
 @Component({
   selector: "app-participant-view",
@@ -842,6 +855,22 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <small *ngIf="leaveLock.confirm">You will be asked to confirm before leaving.</small>
           </section>
           <section
+            *ngIf="visibleCodeNotice() as notice"
+            id="participantRouteTestletVisibleCode"
+            class="participant-testlet-visible-code-notice"
+            role="status"
+            aria-live="polite"
+          >
+            <p>Das Freigabewort lautet <strong>{{ notice.code }}</strong>.</p>
+            <button
+              id="participantRouteTestletVisibleCodeCloseButton"
+              class="ghost"
+              type="button"
+              aria-label="Freigabewort-Hinweis schließen"
+              (click)="dismissVisibleCodeNotice(notice.key)"
+            >Schließen</button>
+          </section>
+          <section
             *ngIf="view.player.nextTestletGate as gate"
             class="participant-testlet-gate"
             aria-labelledby="participantRouteTestletGateLabel"
@@ -851,12 +880,6 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
               <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt') }}</p>
               <p *ngIf="gate.prompt" id="participantRouteTestletGateMessage">{{ gate.prompt }}</p>
-              <p
-                *ngIf="gate.visibleCode as visibleCode"
-                id="participantRouteTestletVisibleCode"
-                class="participant-testlet-visible-code"
-                role="status"
-              >Das Freigabewort lautet <strong>{{ visibleCode }}</strong>.</p>
             </div>
             <label *ngIf="!view.usesParticipantCodeKeypad">
               Block Code
@@ -903,7 +926,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               class="primary"
               type="button"
               [disabled]="!view.testletUnlockCode.trim()"
-              (click)="view.unlockNextTestlet()"
+              (click)="unlockNextTestlet()"
             >
               Weiter
             </button>
@@ -1049,6 +1072,26 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
   readonly showStarterScrollButton = signal(false);
+  private readonly retainedVisibleCodeNotice =
+    signal<ParticipantVisibleCodeNotice | null>(null);
+  private readonly dismissedVisibleCodeNoticeKey = signal<string | null>(null);
+  readonly visibleCodeNotice = computed<ParticipantVisibleCodeNotice | null>(() => {
+    const testRunId = this.view.runtime.testRunId.trim();
+    const gate = this.view.player.nextTestletGate;
+    const currentNotice =
+      testRunId && gate?.visibleCode
+        ? {
+            code: gate.visibleCode,
+            key: `${testRunId}:${gate.testletKey}:${gate.visibleCode}`,
+            testRunId
+          }
+        : null;
+    const notice = currentNotice ?? this.retainedVisibleCodeNotice();
+    return notice?.testRunId === testRunId &&
+      notice.key !== this.dismissedVisibleCodeNoticeKey()
+      ? notice
+      : null;
+  });
   private starterBottomElement: HTMLElement | null = null;
   private readonly starterScrollObserver =
     typeof IntersectionObserver === "undefined"
@@ -1078,6 +1121,21 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
 
   notifyBrowserNavigationPrevented(): void {
     this.view.notifyBrowserNavigationPrevented();
+  }
+
+  unlockNextTestlet(): void {
+    const notice = this.visibleCodeNotice();
+    if (notice) {
+      this.retainedVisibleCodeNotice.set(notice);
+    }
+    this.view.unlockNextTestlet();
+  }
+
+  dismissVisibleCodeNotice(key: string): void {
+    this.dismissedVisibleCodeNoticeKey.set(key);
+    if (this.retainedVisibleCodeNotice()?.key === key) {
+      this.retainedVisibleCodeNotice.set(null);
+    }
   }
 
   scrollToStarterBottom(): void {

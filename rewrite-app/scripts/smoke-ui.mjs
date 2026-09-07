@@ -18207,6 +18207,14 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .filter({ hasText: "Das Freigabewort lautet Hase." })
+    .waitFor();
+  await page.locator("#participantRouteTestletVisibleCodeCloseButton").click();
+  await page
+    .locator("#participantRouteTestletVisibleCode")
+    .waitFor({ state: "detached" });
   assert.ok(reviewTextCodeController.testRunId);
 
   const reviewSymbolCodeController = await openOriginalTestController(

@@ -2300,13 +2300,24 @@ app-record-collection {
   color: var(--muted);
 }
 
-.participant-testlet-gate .participant-testlet-visible-code {
+.participant-testlet-visible-code-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-left: 0.25rem solid var(--accent);
-  padding: 0.55rem 0.7rem;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: var(--radius-lg);
+  padding: 0.7rem 0.8rem;
+  background: color-mix(in srgb, var(--accent) 10%, white);
 }
 
-.participant-testlet-gate .participant-testlet-visible-code strong {
+.participant-testlet-visible-code-notice p {
+  margin: 0;
+}
+
+.participant-testlet-visible-code-notice strong {
+  color: var(--accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   letter-spacing: 0.08em;
 }
