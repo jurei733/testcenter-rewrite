@@ -3,6 +3,10 @@
 The source-backed implementation priorities and current original-product gaps are
 tracked in [`docs/PARITY.md`](./docs/PARITY.md).
 
+For a short German walkthrough with the local demo credentials, participant
+link, restart behavior, and verification commands, see
+[`docs/LOCAL-TRYOUT.md`](./docs/LOCAL-TRYOUT.md).
+
 This folder is the starting point for the real production implementation.
 
 It is intentionally separate from `rewrite-spike/`:

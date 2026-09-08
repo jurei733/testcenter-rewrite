@@ -315,7 +315,8 @@ try {
   await page.keyboard.press("Tab");
   const stateDeadline = Date.now() + 10_000;
   let savedUnitResponse = "";
-  while (!savedUnitResponse && Date.now() < stateDeadline) {
+  let capturedInteractions = false;
+  while (!capturedInteractions && Date.now() < stateDeadline) {
     await delay(250);
     const currentStateResponse = await fetch(
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`
@@ -324,8 +325,24 @@ try {
     const currentState = await currentStateResponse.json();
     savedUnitResponse =
       currentState.currentRunState.testRun.unitResponses[unitKey] ?? "";
+    // The Player reports data parts separately. An initial envelope or the
+    // checkbox save can arrive before the text interaction's score part.
+    const parts = savedUnitResponse
+      ? JSON.parse(savedUnitResponse).unitState?.dataParts
+      : null;
+    if (
+      typeof parts?.variables === "string" &&
+      typeof parts?.scores === "string"
+    ) {
+      capturedInteractions = JSON.parse(parts.scores).some(
+        score => score.id === "nbUserInteractions" && score.value >= 2
+      );
+    }
   }
-  assert.ok(savedUnitResponse, "The IB runtime response should be persisted.");
+  assert.ok(
+    capturedInteractions,
+    "The IB runtime must persist variables and scores for both interactions before reload."
+  );
   const savedUnitState = JSON.parse(savedUnitResponse).unitState;
   assert.equal(savedUnitState.unitStateDataType, "iqb-standard@1.4");
   const savedVariables = JSON.parse(savedUnitState.dataParts.variables);
