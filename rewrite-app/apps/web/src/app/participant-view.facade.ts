@@ -3537,6 +3537,15 @@ export class ParticipantViewFacade {
   ): Promise<void> {
     const saveResponses =
       this.readCurrentRunState()?.executionMode.saveResponses ?? true;
+    // Participant termination preserves the run, subject to the authored lock.
+    // Explicit API completion is a separate, final lifecycle operation.
+    if (saveResponses) {
+      await this.returnToStarterInternal(
+        confirmTestletTimeLeave,
+        confirmTestletLeaveLock
+      );
+      return;
+    }
     const settledVeronaResponse =
       await this.settleVeronaAutoSaveBeforeForegroundAction();
     const activeTimerBeforeComplete =

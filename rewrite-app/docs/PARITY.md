@@ -1232,6 +1232,16 @@ locking across the store matrix; production Angular/SQLite clicks the real logo,
 checks cancellation, returns to the in-progress Starter card, and resumes the
 same run ID.
 
+Participant end-button correction: the saving-mode `Complete Test` action now
+uses that same Starter-return transition instead of the separate, irreversible
+complete API. This matches the upstream `lock_test_on_termination` OFF case:
+the same run and responses remain available through `Weiter`; ON still applies
+the authored lock. Explicit API/operator final completion remains final. The
+browser regression checks draft persistence, unchanged run ID, and re-entry;
+the Original BookletConfig OFF/ON expectations distinguish resume from locking.
+The local MaP Aspect tryout additionally verified end, resume, and reload with
+the existing response unchanged. This does not imply full acceptance of its ZIP.
+
 ### Import and content administration
 
 Import validation now rejects unsupported attributes on all four original XML root types and non-empty namespaces on their roots and schema-owned descendants, matching the schemas' missing `targetNamespace`, while allowing namespace declarations and `noNamespaceSchemaLocation` by namespace identity rather than by the conventional `xsi` prefix. Schema references mirror the original backend's case-sensitive historical `v?o?_?Type.xsd` filename surface, so current `vo_Booklet.xsd` files and legacy forms such as `Booklet.xsd`, `v_Unit.xsd`, `o_SysCheck.xsd`, and `_Testtakers.xsd` remain importable without confusing differently cased types. The Unit schema's deliberately untyped `label`, `value`, and `ValuePositionLabel` payloads retain arbitrary embedded XML. Direct XML uploads and XML entries inside ZIP bundles share this boundary.

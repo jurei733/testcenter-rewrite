@@ -8213,6 +8213,31 @@ try {
     })
     .waitFor();
   await clickAction("Complete Test");
+  await page.locator("#participantRouteEntry").waitFor();
+  const returnedAfterEnd = await (
+    await fetch(`${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`)
+  ).json();
+  assert.equal(returnedAfterEnd.currentRunState.testRun.status, "paused");
+  assert.equal(
+    returnedAfterEnd.currentRunState.testRun.unitResponses[participantRouteFirstUnitKey],
+    participantRouteFirstUnitResponse
+  );
+  const endedRunId = returnedAfterEnd.currentRunState.testRun.testRunId;
+  await page.locator("#participantRouteStartOrResumeButton").click();
+  await page.locator("#participantRouteEntry").waitFor({ state: "detached" });
+  await expectInputValue("#participantRouteUnitResponse", participantRouteFirstUnitResponse);
+  const resumedAfterEnd = await (
+    await fetch(`${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`)
+  ).json();
+  assert.equal(resumedAfterEnd.currentRunState.testRun.testRunId, endedRunId);
+  assert.equal(resumedAfterEnd.currentRunState.testRun.status, "running");
+  // Keep the separate, explicit final-completion API re-entry coverage below.
+  const finalCompletion = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/test-runs/${endedRunId}/complete`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  assert.equal(finalCompletion.status, 200);
+  await page.reload({ waitUntil: "domcontentloaded" });
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
@@ -9852,10 +9877,7 @@ try {
     .filter({ hasText: "Complete this test with" })
     .waitFor();
   await page.locator("#participantConfirmationContinueButton").click();
-  await page
-    .locator("#participantRouteStatus")
-    .filter({ hasText: "completed" })
-    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteEntry").waitFor({ timeout: 15_000 });
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -17263,11 +17285,7 @@ try {
     .filter({ hasText: "Complete test?" })
     .waitFor();
   await page.locator("#participantConfirmationContinueButton").click();
-  await page.locator("#participantRouteCompletedState").waitFor();
-  await page
-    .locator("#participantRouteStatus")
-    .filter({ hasText: "completed" })
-    .waitFor();
+  await page.locator("#participantRouteEntry").waitFor();
   const configSeventeenRuntimeState = await (
     await sendSmokeJson(
       `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
@@ -17278,11 +17296,11 @@ try {
   ).json();
   assert.equal(
     configSeventeenRuntimeState.runtimeState?.runtimeStatus,
-    "completed"
+    "in_progress"
   );
   assert.equal(
     configSeventeenRuntimeState.runtimeState?.availableAction,
-    "none"
+    "resume"
   );
 
   const configEighteenBrowser = await openOriginalBookletConfig(
@@ -17297,7 +17315,7 @@ try {
     .filter({ hasText: "Complete test?" })
     .waitFor();
   await page.locator("#participantConfirmationContinueButton").click();
-  await page.locator("#participantRoutePausedState").waitFor();
+  await page.locator("#participantRouteEntry").waitFor();
   assert.equal(
     await page.locator("#participantRouteResumeRunButton").count(),
     0
