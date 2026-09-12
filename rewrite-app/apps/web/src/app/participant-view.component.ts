@@ -12,6 +12,8 @@ import { FormsModule } from "@angular/forms";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
+import { InterfaceModeService } from "./interface-mode.service";
+import { OriginalParticipantLoginComponent } from "./original-participant-login.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -23,11 +25,12 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent],
+  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantLoginComponent],
   template: `
     <div class="stack">
+      <app-original-participant-login *ngIf="interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired" />
       <article
-        *ngIf="!view.isParticipantPlayerFocused"
+        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired)"
         id="participantRouteEntry"
         class="card participant-entry-card"
       >
@@ -294,7 +297,7 @@ interface ParticipantVisibleCodeNotice {
       </article>
 
       <button
-        *ngIf="!view.isParticipantPlayerFocused && showStarterScrollButton()"
+        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && view.isParticipantLogin) && showStarterScrollButton()"
         id="participantStarterScrollButton"
         class="secondary participant-starter-scroll-button"
         type="button"
@@ -305,7 +308,7 @@ interface ParticipantVisibleCodeNotice {
         <strong aria-hidden="true">↓</strong>
       </button>
 
-      <article class="card" id="participantRoutePlayer">
+      <article class="card" id="participantRoutePlayer" *ngIf="!(interfaceMode.mode() === 'original' && view.isParticipantLogin)">
         <input
           *ngIf="view.isParticipantPlayerFocused"
           id="participantRouteSessionId"
@@ -1083,6 +1086,7 @@ interface ParticipantVisibleCodeNotice {
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);

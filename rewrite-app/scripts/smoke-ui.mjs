@@ -7131,6 +7131,24 @@ try {
     0,
     "Participant entry issue guidance should clear after a successful sign-in."
   );
+  const originalSignInContext = await browser.newContext();
+  try {
+    const originalSignInPage = await originalSignInContext.newPage();
+    await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
+      ui: "original", tenantKey, workspaceKey
+    })}`, { waitUntil: "networkidle" });
+    await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
+    await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
+    await originalSignInPage.waitForFunction(
+      ([sessionId, runId]) =>
+        !document.querySelector("#originalParticipantLogin") &&
+        document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() === sessionId &&
+        document.querySelector("#participantRouteRunId")?.textContent?.trim() === runId,
+      [participantEntrySignInSessionId, participantEntryStartedRunId]
+    );
+  } finally {
+    await originalSignInContext.close();
+  }
   stopAfter("participant-entry-sign-in");
   logStep("participant-entry-start-after-sign-in");
   await page.waitForFunction(

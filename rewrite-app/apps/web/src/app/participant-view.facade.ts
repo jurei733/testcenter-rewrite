@@ -2078,6 +2078,11 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() => this.signInAndStartSingleBookletInternal());
   }
 
+  async signInFromOriginalInterface(): Promise<void> {
+    if (!this.canSignIn) return;
+    await this.signInAndStartSingleBookletInternal({ quiet: true });
+  }
+
   resetParticipantCodeChallenge(): void {
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
@@ -2800,8 +2805,8 @@ export class ParticipantViewFacade {
     await this.starterLaunchInternal();
   }
 
-  private async signInAndStartSingleBookletInternal(): Promise<void> {
-    const signedIn = await this.signInInternal();
+  private async signInAndStartSingleBookletInternal(options: { quiet?: boolean } = {}): Promise<void> {
+    const signedIn = await this.signInInternal(options);
     if (!signedIn || this.assignedBooklets.length !== 1) {
       return;
     }
@@ -2847,7 +2852,7 @@ export class ParticipantViewFacade {
     }
   }
 
-  private async signInInternal(): Promise<boolean> {
+  private async signInInternal(options: { quiet?: boolean } = {}): Promise<boolean> {
     this.participantEvents.stop();
     let payload: ParticipantSignInResponse;
     try {
@@ -2863,7 +2868,8 @@ export class ParticipantViewFacade {
         "Participant Sign In",
         "POST",
         productionApiRoutes.participant.signIn,
-        credentials satisfies ParticipantSignInRequest
+        credentials satisfies ParticipantSignInRequest,
+        { quiet: options.quiet ?? false }
       );
     } catch (error) {
       if (this.handleParticipantCodeChallenge(error)) {

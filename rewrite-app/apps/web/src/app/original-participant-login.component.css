@@ -1,0 +1,26 @@
+/* Layout adapted from IQB Testcenter (MIT), aa627e196; see docs/ORIGINAL-UI-PARITY.md. */
+:host { display: block; min-width: 0; font-family: 'Nunito Sans', sans-serif; }
+.login-page { display: flex; gap: 64px; min-height: 70vh; background: white; color: #271a2b; }
+.welcome-section { display: flex; flex-direction: column; align-items: center; width: 25%; gap: 48px; box-sizing: border-box; padding: 64px 24px 20px; background: var(--secondary-soft); }
+.welcome-section img { width: 100%; }
+.welcome-section .heading { font-size: 30px; }
+.login-section { display: flex; flex-direction: column; align-items: start; width: 75%; gap: 60px; }
+form { margin-top: 64px; display: flex; flex-direction: column; width: 80%; gap: 24px; }
+h2 { margin: 0; font-size: 30px; font-weight: 400; line-height: 1.3; letter-spacing: normal; }
+label { font: inherit; color: inherit; }
+input { font: inherit; background: white; border: 1px solid var(--secondary); border-radius: 4px; min-height: 48px; box-sizing: border-box; }
+button, a { font: inherit; border-radius: 10px; padding: 10px 20px; }
+.login-submit { background: var(--secondary); color: white; width: 15%; min-width: 120px; }
+.password-headline { display: flex; align-items: center; gap: 24px; }
+.password-field { display: flex; align-items: center; gap: 8px; }
+.password-field input { min-width: 0; flex: 1; }
+.button-section { align-self: end; margin-top: auto; padding: 12px 24px; }
+.button-section a { display: inline-block; color: var(--secondary); border: 1px solid var(--secondary); background: var(--secondary-soft); }
+.login-problem { color: #a12020; }
+@media (max-width: 700px) {
+  .login-page { flex-direction: column; gap: 24px; }
+  .welcome-section, .login-section { width: 100%; }
+  .welcome-section { padding: 24px; gap: 16px; }
+  .welcome-section img { max-width: 160px; }
+  form { margin: 0 auto; width: calc(100% - 48px); }
+}

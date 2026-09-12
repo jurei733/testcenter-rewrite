@@ -34,6 +34,18 @@ The Original option is explicitly labelled a development preview. The initial
 participant header adaptation is not a completed visual-parity claim; login,
 page composition, typography, controls and all matrix comparisons remain open.
 
+The Original participant login now has the name-first passwordless probe,
+password fallback, password visibility control, back navigation and credential
+error reset. It uses the existing participant sign-in, proof-of-work and
+assigned-booklet/session logic, not a second authentication implementation.
+Local Chromium checks exercised real passwordless and password-protected
+demo-workspace accounts; mocked errors cover the view transitions without
+consuming real login attempts. The main smoke also checks that Original and
+Rewrite sign-in restore the same session/run. That new full smoke gate still
+requires a completed run. Nunito Sans files are copied from the pinned Original
+and shipped with their OFL; adapted Original layout code retains its MIT notice.
+Material controls, focus fidelity and full screenshot comparisons remain open.
+
 All rows are currently open. Close a row only with matching reference states
 and browser evidence at equal viewport, theme, text and fixture settings.
 

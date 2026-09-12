@@ -1,0 +1,43 @@
+<section class="login-page" id="originalParticipantLogin">
+  <aside class="welcome-section">
+    @if (settings.assetUrl('loginIllustration'); as illustration) {
+      <img [src]="illustration" alt="" />
+    }
+    <div>
+      <p class="heading">{{ view.customText('login_sidepanel_title', 'Willkommen im IQB-Testcenter') }}</p>
+      <p>{{ view.customText('login_sidepanel_subtitle', 'Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.') }}</p>
+    </div>
+  </aside>
+  <div class="login-section">
+    <form (ngSubmit)="submit()" [attr.aria-busy]="busy()">
+      @if (!passwordStep()) {
+        <h2>Anmeldenamen eingeben</h2>
+        <label for="originalLoginName">Anmeldename</label>
+        <input id="originalLoginName" name="name" autocomplete="username" autocapitalize="off"
+          required minlength="3" [disabled]="busy()" [(ngModel)]="view.runtime.loginKey" />
+      } @else {
+        <div class="password-headline">
+          <button type="button" aria-label="Zurück zum Anmeldenamen" [disabled]="busy()" (click)="back()">‹</button>
+          <h2>Kennwort eingeben</h2>
+        </div>
+        <label for="originalLoginPassword">Kennwort</label>
+        <div class="password-field">
+          <input id="originalLoginPassword" name="password" autocomplete="current-password"
+            [type]="showPassword() ? 'text' : 'password'" [disabled]="busy()"
+            [(ngModel)]="view.runtime.participantPassword" />
+          <button type="button" [attr.aria-pressed]="showPassword()"
+            [attr.aria-label]="showPassword() ? 'Kennwort verbergen' : 'Kennwort anzeigen'"
+            (click)="showPassword.set(!showPassword())">{{ showPassword() ? 'Verbergen' : 'Anzeigen' }}</button>
+        </div>
+      }
+      @if (problem()) { <p class="login-problem" role="alert">{{ problem() }}</p> }
+      <button class="login-submit" type="submit" [disabled]="busy() || !view.canSignIn || view.runtime.loginKey.trim().length < 3">
+        {{ busy() ? 'Bitte warten …' : passwordStep() ? 'Anmelden' : 'Weiter' }}
+      </button>
+    </form>
+    @if (browserCompatibility.warning; as warning) {
+      <p class="login-warning" role="status">{{ warning.message }}</p>
+    }
+    <div class="button-section"><a routerLink="/ops">Adminbereich</a></div>
+  </div>
+</section>
