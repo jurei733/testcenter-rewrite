@@ -3,6 +3,41 @@
   padding-top: 22px;
 }
 
+/* Header geometry from the pinned Original; participant actions remain shared. */
+.participant-topbar.original-participant-topbar {
+  position: relative;
+  min-height: 64px;
+  box-sizing: border-box;
+  padding: 8px 24px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--secondary);
+  color: white;
+}
+
+.original-participant-topbar .application-brand {
+  width: 100%;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+}
+
+.original-participant-topbar .application-logo {
+  height: 48px;
+}
+
+.original-participant-topbar .eyebrow {
+  display: none;
+}
+
+.original-participant-topbar h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
 .participant-topbar {
   display: flex;
   justify-content: space-between;

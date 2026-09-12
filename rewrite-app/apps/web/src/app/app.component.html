@@ -180,6 +180,7 @@
       *ngIf="!isParticipantHeaderHidden; else standaloneParticipantLogo"
       id="participantApplicationHeader"
       class="participant-topbar"
+      [class.original-participant-topbar]="interfaceMode.mode() === 'original'"
     >
       <div class="application-brand">
         <button
@@ -201,7 +202,7 @@
           <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isPublicInfoView ? publicInfoTitle : activeRouteView === "system-check" ? "System Check" : "Participant Test" }}</h1>
         </div>
       </div>
-      <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
+      <span id="readinessBadge" *ngIf="interfaceMode.mode() === 'rewrite'">{{ app.ops.readinessBadge }}</span>
     </header>
     <ng-template #standaloneParticipantLogo>
       <button

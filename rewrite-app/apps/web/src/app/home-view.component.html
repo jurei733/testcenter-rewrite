@@ -1,4 +1,21 @@
 <article id="applicationStartView" class="card application-start-view">
+  <fieldset id="interfaceModeSelection">
+    <legend>Oberfläche</legend>
+    <label>
+      <input type="radio" name="interfaceMode" value="rewrite"
+        [checked]="interfaceMode.mode() === 'rewrite'"
+        (change)="interfaceMode.select('rewrite')" />
+      Rewrite
+    </label>
+    <label>
+      <input type="radio" name="interfaceMode" value="original"
+        [checked]="interfaceMode.mode() === 'original'"
+        (change)="interfaceMode.select('original')" />
+      Original – Vorschau in Entwicklung
+    </label>
+    <p>Die Auswahl gilt für diesen Browser. Tests und Antworten bleiben unverändert.
+      Die Vorschau ist noch nicht vollständig mit dem Original identisch.</p>
+  </fieldset>
   <header>
     <span class="eyebrow">Choose a path</span>
     <h2>Ready for assessment delivery</h2>

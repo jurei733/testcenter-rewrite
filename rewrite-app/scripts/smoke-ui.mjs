@@ -1119,6 +1119,14 @@ try {
   );
   await waitForNotBusy("initial-load");
   assert.equal(await page.locator("#authModeBadge").count(), 0);
+  logStep("interface-mode-selection");
+  assert.equal(await page.locator("html").getAttribute("data-interface-mode"), "rewrite");
+  await page.locator('input[name="interfaceMode"][value="original"]').check();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#interfaceModeSelection").waitFor();
+  assert.equal(await page.locator("html").getAttribute("data-interface-mode"), "original");
+  await page.locator('input[name="interfaceMode"][value="rewrite"]').check();
+  assert.equal(await page.locator("html").getAttribute("data-interface-mode"), "rewrite");
   logStep("central-bug-report");
   await page.goto(
     `${baseUrl}/app/home?login=browser-secret#private-fragment`,

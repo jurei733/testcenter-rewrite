@@ -23,6 +23,7 @@ import { BugReportService } from "./bug-report.service";
 import { ConfirmationDialogComponent } from "./confirmation-dialog.component";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { LiveContextComponent } from "./live-context.component";
+import { InterfaceModeService } from "./interface-mode.service";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -55,6 +56,7 @@ const routeViews: AppView[] = [
   styleUrl: "./app.component.css"
 })
 export class AppComponent implements OnInit, OnDestroy {
+  readonly interfaceMode = inject(InterfaceModeService);
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly bugReports = inject(BugReportService);

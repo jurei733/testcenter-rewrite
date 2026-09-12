@@ -9,6 +9,7 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 
 import { AppShellFacade } from "./app-shell.facade";
+import { InterfaceModeService } from "./interface-mode.service";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 
@@ -22,6 +23,7 @@ type SystemCheckEntryState = SystemCheckAccessMode | "loading" | "unavailable";
   styleUrl: "./home-view.component.css"
 })
 export class HomeViewComponent implements OnInit {
+  readonly interfaceMode = inject(InterfaceModeService);
   readonly app = inject(AppShellFacade);
   readonly systemCheckEntryState = signal<SystemCheckEntryState>("loading");
   private readonly api = inject(RewriteAppApiService);
