@@ -1,0 +1,25 @@
+[
+  {
+    "id": "b4",
+    "status": "CODING_INCOMPLETE",
+    "value": [
+      "20",
+      "9"
+    ]
+  },
+  {
+    "id": "b1",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "b2",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "b3",
+    "value": null,
+    "status": "UNSET"
+  }
+]

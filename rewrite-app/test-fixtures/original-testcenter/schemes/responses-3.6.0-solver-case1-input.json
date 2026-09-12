@@ -1,0 +1,17 @@
+[
+  {
+    "id": "b1_alias",
+    "status": "VALUE_CHANGED",
+    "value": "111"
+  },
+  {
+    "id": "b2_alias",
+    "status": "VALUE_CHANGED",
+    "value": "10"
+  },
+  {
+    "id": "b3_alias",
+    "status": "VALUE_CHANGED",
+    "value": "555"
+  }
+]

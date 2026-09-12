@@ -1,0 +1,40 @@
+<Booklet>
+  <Metadata>
+    <Id>BookletId</Id>
+    <Label>Label</Label>
+  </Metadata>
+
+  <BookletConfig>
+    <Config key="force_presentation_complete">ON</Config>
+    <Config key="force_response_complete">OFF</Config>
+    <Config key="loading_mode">EAGER</Config>
+    <Config key="unit_responses_buffer_time">1000</Config>
+    <Config key="unit_state_buffer_time">3000</Config>
+    <Config key="test_state_buffer_time">700</Config>
+  </BookletConfig>
+
+  <Units>
+    <Restrictions>
+      <DenyNavigationOnIncomplete presentation="OFF" response="ON"/>
+      <TimeMax minutes="10" />
+    </Restrictions>
+    <Unit id="u1" label="Unit-1" labelshort="U1" />
+    <Testlet id="t1" label="Label 1">
+     <Restrictions>
+       <CodeToEnter code="d" />
+       <TimeMax minutes="5" />
+     </Restrictions>
+     <Unit id="u2" label="Unit-2" labelshort="U2" />
+     <Testlet id="t2" label="Label 2">
+       <Restrictions>
+         <CodeToEnter code="d" />
+         <TimeMax minutes="3" />
+         <DenyNavigationOnIncomplete presentation="ON" response="OFF"/>
+       </Restrictions>
+       <Unit id="u3" label="Unit-3" labelshort="U3" />
+     </Testlet>
+     <Unit id="u4" label="Unit-4" labelshort="U4" />
+    </Testlet>
+    <Unit id="u5" label="Unit-5" labelshort="U5" />
+  </Units>
+</Booklet>

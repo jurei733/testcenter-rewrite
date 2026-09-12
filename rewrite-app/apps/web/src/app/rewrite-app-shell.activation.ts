@@ -1,4 +1,7 @@
-import type { GetContentReleaseActivationReadinessResponse } from "@testcenter-rewrite-app/contracts";
+import type {
+  ContentReleaseActivationSummary,
+  GetContentReleaseActivationReadinessResponse
+} from "@testcenter-rewrite-app/contracts";
 
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
 
@@ -19,16 +22,42 @@ export interface ActivationGuardDetails {
 export function applyActivationSuccessView(
   host: ActivationGuardHost,
   contentReleaseId: string,
-  forceActivation: boolean
+  forceActivation: boolean,
+  activation?: ContentReleaseActivationSummary
 ): void {
+  const supersededOpenRunCount =
+    activation?.supersededOpenRunCount ??
+    (activation?.supersededOpenRuns.length ?? 0);
+
+  host.updateMonitorSummary(
+    supersededOpenRunCount === 0 ? "Activated" : String(supersededOpenRunCount),
+    supersededOpenRunCount === 0
+      ? `Release ${contentReleaseId} is active.`
+      : `Release ${contentReleaseId} is active; ${supersededOpenRunCount} open run(s) were superseded from ${activation?.previousActiveContentReleaseId ?? "the previous release"}.`
+  );
   host.setActivationGuardView(
     prettyPrintJson(
       {
         status: "activated",
         contentReleaseId,
-        forceActivation
+        forceActivation,
+        previousActiveContentReleaseId:
+          activation?.previousActiveContentReleaseId ?? null,
+        supersededOpenRunCount,
+        supersededOpenRuns: activation?.supersededOpenRuns ?? []
       },
       host.getActivationGuardView()
+    )
+  );
+  host.setRuntimeMonitorView(
+    prettyPrintJson(
+      {
+        status: "activated",
+        contentReleaseId,
+        supersededOpenRunCount,
+        supersededOpenRuns: activation?.supersededOpenRuns ?? []
+      },
+      host.getRuntimeMonitorView()
     )
   );
 }
@@ -83,6 +112,8 @@ export function applyActivationReadinessView(
         attemptedContentReleaseId: activationReadiness.contentRelease.contentReleaseId,
         activeContentReleaseId: activationReadiness.activeContentReleaseId,
         openRunCount: activationReadiness.blockingOpenRuns.length,
+        participantRosterWarningCount:
+          activationReadiness.participantRosterWarnings.length,
         openRuns: activationReadiness.blockingOpenRuns
       },
       host.getActivationGuardView()
@@ -99,7 +130,7 @@ export function applyActivationReadinessView(
   host.rememberActivity(
     "Release Readiness",
     activationReadiness.canActivate
-      ? `Release ${activationReadiness.contentRelease.contentReleaseId} can activate now.`
-      : `Release ${activationReadiness.contentRelease.contentReleaseId} is blocked by ${activationReadiness.blockingOpenRuns.length} open run(s).`
+      ? `Release ${activationReadiness.contentRelease.contentReleaseId} can activate now with ${activationReadiness.participantRosterWarnings.length} roster warning(s).`
+      : `Release ${activationReadiness.contentRelease.contentReleaseId} is blocked by ${activationReadiness.blockingOpenRuns.length} open run(s) and has ${activationReadiness.participantRosterWarnings.length} roster warning(s).`
   );
 }

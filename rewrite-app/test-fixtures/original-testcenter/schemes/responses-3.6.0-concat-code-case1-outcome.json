@@ -1,0 +1,57 @@
+[
+  {
+    "id": "b1alias",
+    "status": "CODING_COMPLETE",
+    "value": "111",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "b2",
+    "status": "CODING_COMPLETE",
+    "value": "444",
+    "code": 2,
+    "score": 5
+  },
+  {
+    "id": "b3",
+    "status": "CODING_COMPLETE",
+    "value": "555",
+    "code": 1,
+    "score": 7
+  },
+  {
+    "id": "b4",
+    "status": "CODING_COMPLETE",
+    "value": "333",
+    "code": 0,
+    "score": 2
+  },
+  {
+    "id": "d1",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d2",
+    "value": "1_1",
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d3",
+    "value": "1_2_1",
+    "status": "CODING_COMPLETE",
+    "code": 1,
+    "score": 7
+  },
+  {
+    "id": "d4",
+    "value": "1_1_2",
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d5",
+    "value": "0_1",
+    "status": "NO_CODING"
+  }
+]

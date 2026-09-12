@@ -1,0 +1,39 @@
+[
+  {
+    "id": "05",
+    "status": "CODING_COMPLETE",
+    "value": "05_3",
+    "code": 1,
+    "score": 331
+  },
+  {
+    "id": "02",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "_05a",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "_05b",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "_05c",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "_05d",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "06",
+    "value": null,
+    "status": "UNSET"
+  }
+]

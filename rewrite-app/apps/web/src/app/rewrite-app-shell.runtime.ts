@@ -2,6 +2,7 @@ import type {
   GetParticipantSessionResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
+  ParticipantLaunchResponse,
   ParticipantRuntimeStateResponse,
   ParticipantSignInResponse,
   ResumeParticipantSessionResponse,
@@ -24,6 +25,9 @@ export interface RuntimePresentationHost {
   getWorkspaceKey(): string;
   getParticipantSessionId(): string;
   setParticipantSessionId(nextValue: string): void;
+  clearParticipantSessionSelection(): void;
+  setGroupKey(nextValue: string): void;
+  setParticipantDisplayName(nextValue: string): void;
   syncRuntimeStateFromRun(testRun: RuntimeTestRunLike): void;
   getOpenRunsView(): string;
   setOpenRunsView(nextValue: string): void;
@@ -45,7 +49,9 @@ type RuntimeTestRunLike =
   | {
       testRunId: string;
       status?: string;
+      bookletKey?: string;
       currentUnitKey?: string | null;
+      unitResponses?: Record<string, string>;
       completedAt?: string | null;
     }
   | null
@@ -56,6 +62,8 @@ export function applyParticipantSignInResult(
   payload: ParticipantSignInResponse
 ): void {
   host.setParticipantSessionId(payload.participantSession.participantSessionId);
+  host.setGroupKey(payload.participantSession.groupKey);
+  host.setParticipantDisplayName(payload.participantRosterEntry?.displayName ?? "");
   host.updateRuntimeSummary(
     payload.participantSession.status,
     `Session ${payload.participantSession.participantSessionId} signed in for login ${payload.participantSession.loginKey}.`
@@ -84,6 +92,27 @@ export function applyResumeParticipantSessionResult(
   host.rememberActivity(
     "Session Resumed",
     `Run ${payload.testRun.testRunId} is ${payload.testRun.status}.`
+  );
+}
+
+export function applyParticipantLaunchResult(
+  host: RuntimePresentationHost,
+  payload: ParticipantLaunchResponse
+): void {
+  host.setParticipantSessionId(payload.participantSession.participantSessionId);
+  host.setGroupKey(payload.participantSession.groupKey);
+  host.setParticipantDisplayName(payload.participantRosterEntry?.displayName ?? "");
+  host.syncRuntimeStateFromRun(payload.testRun);
+  host.updateRuntimeSummary(
+    payload.testRun.status,
+    `Run ${payload.testRun.testRunId} launched at ${payload.testRun.currentUnitKey ?? "no current unit"}.`
+  );
+  host.setRuntimeMonitorView(
+    prettyPrintJson(payload, host.getRuntimeMonitorView())
+  );
+  host.rememberActivity(
+    "Participant Started",
+    `Session ${payload.participantSession.participantSessionId} started ${payload.testRun.bookletKey}.`
   );
 }
 
@@ -130,26 +159,38 @@ export function applyResumeRunResult(
 
 export function applyCompleteRunResult(
   host: RuntimePresentationHost,
-  payload: { testRun: { testRunId: string; status: string; completedAt?: string | null } }
+  payload: {
+    testRun: {
+      testRunId: string;
+      status: string;
+      locked?: boolean;
+      completedAt?: string | null;
+    };
+  }
 ): void {
   host.syncRuntimeStateFromRun(payload.testRun);
   host.updateRuntimeSummary(
     payload.testRun.status,
-    `Run ${payload.testRun.testRunId} completed at ${payload.testRun.completedAt ?? "unknown"}.`
+    payload.testRun.locked
+      ? `Run ${payload.testRun.testRunId} is locked until a monitor unlocks it.`
+      : `Run ${payload.testRun.testRunId} completed at ${payload.testRun.completedAt ?? "unknown"}.`
   );
   host.setRuntimeMonitorView(
     prettyPrintJson(payload, host.getRuntimeMonitorView())
   );
   host.rememberActivity(
-    "Run Completed",
-    `Run ${payload.testRun.testRunId} is closed.`
+    payload.testRun.locked ? "Run Locked" : "Run Completed",
+    payload.testRun.locked
+      ? `Run ${payload.testRun.testRunId} is waiting for monitor unlock.`
+      : `Run ${payload.testRun.testRunId} is closed.`
   );
 }
 
 export function applyRuntimeReadsWithoutSession(
   host: RuntimePresentationHost,
   openRuns: MonitorOpenRunsResponse,
-  quiet: boolean
+  quiet: boolean,
+  options: { monitorOnly?: boolean } = {}
 ): void {
   const openRunCount = openRuns.items.length;
   host.setOpenRunsView(prettyPrintJson(openRuns, host.getOpenRunsView()));
@@ -162,8 +203,12 @@ export function applyRuntimeReadsWithoutSession(
   host.setRuntimeStateView(
     prettyPrintJson(
     {
-      status: "participant_session_required",
-      message: "Sign in a participant or enter a session id to hydrate runtime reads."
+      status: options.monitorOnly
+        ? "monitor_scope_loaded"
+        : "participant_session_required",
+      message: options.monitorOnly
+        ? "The monitor console intentionally loads only scoped open-run data."
+        : "Sign in a participant or enter a session id to hydrate runtime reads."
     },
     host.getRuntimeStateView()
     )
@@ -171,19 +216,40 @@ export function applyRuntimeReadsWithoutSession(
   host.setCurrentRunStateView(
     prettyPrintJson(
     {
-      status: "participant_session_required",
-      message: "Current run state appears after a participant session is available."
+      status: options.monitorOnly
+        ? "select_open_run"
+        : "participant_session_required",
+      message: options.monitorOnly
+        ? "Select an open run to prepare monitor commands."
+        : "Current run state appears after a participant session is available."
     },
     host.getCurrentRunStateView()
+    )
+  );
+  host.setParticipantSessionDetailView(
+    prettyPrintJson(
+      {
+        status: options.monitorOnly
+          ? "monitor_scope_loaded"
+          : "participant_session_required",
+        message: options.monitorOnly
+          ? "Participant session detail is outside the scoped monitor view."
+          : "Select or sign in a participant session to load its workspace detail."
+      },
+      host.getParticipantSessionDetailView()
     )
   );
   host.setRuntimeLoaded(true);
   if (!quiet) {
     host.rememberActivity(
-      "Runtime Refresh",
-      openRunCount === 0
-        ? "Monitor is clear; sign in a participant to load runtime state."
-        : `Monitor sees ${openRunCount} open run(s); sign in a participant to inspect session state.`
+      options.monitorOnly ? "Monitor Scope Refreshed" : "Runtime Refresh",
+      options.monitorOnly
+        ? openRunCount === 0
+          ? "No open runs are visible in the assigned monitor scope."
+          : `${openRunCount} open run(s) are visible in the assigned monitor scope.`
+        : openRunCount === 0
+          ? "Monitor is clear; sign in a participant to load runtime state."
+          : `Monitor sees ${openRunCount} open run(s); sign in a participant to inspect session state.`
     );
   }
 }
@@ -251,6 +317,9 @@ export function applyRuntimeReadsWithSession(
   );
 
   host.setRuntimeLoaded(true);
+  host.setGroupKey(
+    sessionDetailPayload.participantSessionDetail.participantSession.groupKey
+  );
   host.syncRuntimeStateFromRun(runtimeStatePayload.runtimeState.latestTestRun);
   host.updateRuntimeSummary(
     runtimeStatePayload.runtimeState.availableAction ??

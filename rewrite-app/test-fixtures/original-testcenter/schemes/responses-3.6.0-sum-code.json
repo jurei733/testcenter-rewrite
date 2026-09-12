@@ -1,0 +1,107 @@
+{
+    "variableCodings": [{
+            "id": "b1",
+            "sourceType": "BASE",
+            "codes": [{
+                    "id": 1,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["111"]
+                                }
+                            ]
+                        }
+                    ]
+                }, {
+                    "id": 2,
+                    "score": 0,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["222"]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }, {
+            "id": "b2",
+            "sourceType": "BASE",
+            "codes": [{
+                    "id": 1,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["333"]
+                                }
+                            ]
+                        }
+                    ]
+                }, {
+                    "id": 2,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["444"]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }, {
+            "id": "b3",
+            "sourceType": "BASE",
+            "codes": [{
+                    "id": 1,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["555"]
+                                }
+                            ]
+                        }
+                    ]
+                }, {
+                    "id": 2,
+                    "ruleSets": [{
+                            "rules": [{
+                                    "method": "MATCH",
+                                    "parameters": ["666"]
+                                }
+                            ]
+                        }
+                    ],
+              "score": 1
+                }
+            ]
+    }, {
+      "id": "d1",
+      "sourceType": "SUM_CODE",
+      "deriveSources": ["b1", "b2"],
+      "codes": [{
+        "id": 1,
+        "ruleSets": [{
+          "rules": [{
+            "method": "MATCH",
+            "parameters": ["1"]
+          }
+          ]
+        }
+        ]
+      }, {
+        "id": 2,
+        "ruleSets": [{
+          "rules": [{
+            "method": "MATCH",
+            "parameters": ["2"]
+          }
+          ]
+        }
+        ]
+      }
+      ]
+    }
+    ]
+}

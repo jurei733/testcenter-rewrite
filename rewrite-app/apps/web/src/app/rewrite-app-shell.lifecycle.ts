@@ -5,6 +5,13 @@ export interface ShellLifecycleHost {
   workspaceLoaded: boolean;
   contentLoaded: boolean;
   runtimeLoaded: boolean;
+  monitorConnectionStatus:
+    | "idle"
+    | "connecting"
+    | "live"
+    | "reconnecting"
+    | "polling"
+    | "offline";
   diagnosticsLoaded: boolean;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
@@ -29,6 +36,9 @@ export async function ensureShellDataForView(
   }
   if (view === "runtime" && !host.runtimeLoaded) {
     await host.refreshRuntimeReads(true).catch(() => undefined);
+    return;
+  }
+  if (view === "participant" || view === "system-check") {
     return;
   }
   if (view === "ops" && !host.diagnosticsLoaded) {
@@ -69,7 +79,17 @@ export async function refreshShellActiveViewData(
       return;
     }
     if (host.activeView === "runtime") {
+      if (host.monitorConnectionStatus === "live") {
+        return;
+      }
       await host.refreshRuntimeReads(true);
+      return;
+    }
+    if (
+      host.activeView === "home" ||
+      host.activeView === "participant" ||
+      host.activeView === "system-check"
+    ) {
       return;
     }
     await host.refreshOperationalDiagnostics(true);

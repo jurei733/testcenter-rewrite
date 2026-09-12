@@ -4,7 +4,8 @@ import { access, constants, mkdir } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
-  checkFileFirstSliceReadiness
+  checkFileFirstSliceReadiness,
+  migrateFileFirstSliceStorage
 } from "../packages/file-store/dist/packages/file-store/src/index.js";
 import {
   inspectPostgresFirstSliceStorage,
@@ -205,14 +206,13 @@ const runMigrate = async () => {
 
   if (config.kind === "file") {
     await mkdir(resolveWorkspacePath("./.data"), { recursive: true });
-    await checkFileFirstSliceReadiness(config.location);
+    const diagnostics = await migrateFileFirstSliceStorage(config.location);
     process.stdout.write(
       JSON.stringify(
         {
           store: "file",
-          migrated: false,
-          note: "JSON file store has no schema migrations.",
-          location: redactStorageLocation(config.location)
+          location: redactStorageLocation(config.location),
+          ...diagnostics
         },
         null,
         2

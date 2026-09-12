@@ -1,0 +1,28 @@
+{
+  "backgroundColor": "#ffffff",
+  "scenes": [
+    {
+      "scene": "shared-parameter-choice",
+      "cockpitSrc": "",
+      "script": [],
+      "interaction": true,
+      "interactionType": "BUTTONS",
+      "interactionParameters": {
+        "sharedId": "avatar",
+        "options": [
+          {
+            "imageSrc": "",
+            "label": "Blue avatar",
+            "value": "blue"
+          },
+          {
+            "imageSrc": "",
+            "label": "Green avatar",
+            "value": "green"
+          }
+        ]
+      }
+    }
+  ],
+  "animations": []
+}

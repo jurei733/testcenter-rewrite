@@ -1,0 +1,4070 @@
+{
+  "sourceCommit": "284a4ffcd9452d56dddd51939707ac7f646c3da7",
+  "booklets": [
+    {
+      "fixture": "booklets/Booklet.xml",
+      "sourcePath": "sampledata/Booklet.xml",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "displayLabel": "Sample booklet",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"],
+      "topLevelTestletCount": 2,
+      "policy": {
+        "logPolicy": "debug",
+        "pagingMode": "concat-scroll-snap",
+        "headerContent": "booklet"
+      }
+    },
+    {
+      "fixture": "booklets/Booklet3.xml",
+      "sourcePath": "sampledata/Booklet3.xml",
+      "bookletKey": "BOOKLET.SAMPLE-3",
+      "displayLabel": "Similar Booklet to Sample 1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"],
+      "topLevelTestletCount": 2
+    },
+    {
+      "fixture": "booklets/Booklet2.xml",
+      "sourcePath": "sampledata/Booklet2.xml",
+      "bookletKey": "BOOKLET.SAMPLE-2",
+      "displayLabel": "Adaptive Booklet",
+      "unitKeys": [
+        "decision-unit",
+        "professional-unit",
+        "advanced-unit",
+        "beginner-unit",
+        "bonus-unit"
+      ],
+      "unitShortLabels": ["D", "Ⓒ", "Ⓑ", "Ⓐ", "Ⓧ"],
+      "stateKeys": ["level", "bonus"],
+      "showRules": [
+        ["stage1-professional", "level", "professional"],
+        ["stage1-advanced", "level", "advanced"],
+        ["stage1-beginner", "level", "beginner"],
+        ["optional-block", "bonus", "yes"]
+      ],
+      "policy": {
+        "pagingMode": "separate",
+        "unitMenuEnabled": true,
+        "unitLabel": "label",
+        "unitListEnabled": false
+      }
+    },
+    {
+      "fixture": "booklets/booklet-17.4.xml",
+      "sourcePath": "sampledata/aspect/booklet1.xml",
+      "bookletKey": "booklet1",
+      "displayLabel": "Beispieltestheft 1",
+      "unitKeys": [
+        "testcenter-sample1",
+        "testcenter-sample2",
+        "testcenter-sample3"
+      ],
+      "unitShortLabels": ["1", "2", "3"],
+      "policy": {
+        "pagingMode": "separate",
+        "headerContent": "unit",
+        "unitLabel": "hidden",
+        "unitListEnabled": true
+      }
+    },
+    {
+      "fixture": "booklets/CY_Bklt_BkltConfig_2.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_2.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-2",
+      "displayLabel": "Bklt-config-2",
+      "unitKeys": [
+        "CY-Unit.Sample-101",
+        "CY-Unit.Sample-102",
+        "CY-Unit.Sample-104"
+      ],
+      "testletTimeMax": [["Tslt1", 2, "confirm"]],
+      "policy": {
+        "pagingMode": "buttons",
+        "unitMenuEnabled": true,
+        "unitControls": "hidden",
+        "playerEnd": "never",
+        "restoreCurrentPageOnReturn": true,
+        "lockOnTermination": true,
+        "headerContent": "unit",
+        "unitTitle": false,
+        "fullscreenPrompt": true,
+        "fullscreenButton": true,
+        "showTimeLeft": true,
+        "warningMinutes": [1]
+      }
+    }
+  ],
+  "systemBooklets": [
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_1.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_1.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-1",
+      "displayLabel": "Bklt-config-1",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": {
+        "unitMenuEnabled": false,
+        "unitControls": "both",
+        "playerEnd": "always",
+        "headerContent": "none",
+        "showTimeLeft": false,
+        "warningMinutes": [0.01]
+      }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_3.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_3.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-3",
+      "displayLabel": "Bklt-config-3",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"] }],
+      "policy": {
+        "unitControls": "both",
+        "playerEnd": "last_unit",
+        "headerContent": "booklet"
+      }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_4.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-4",
+      "displayLabel": "Bklt-config-4",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"] }],
+      "policy": { "unitControls": "both", "headerContent": "block" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_5.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_5.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "86e456809329070abd2822c790c1ca49a2caa451bc82873552869f084353830d",
+      "bookletKey": "Cy-Bklt_BkltConfig-5",
+      "displayLabel": "Bklt-config-5",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_6.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_6.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "07af88a78f46d498198f674865c53309abf628786bb4a45ab895d2326820a6b3",
+      "bookletKey": "Cy-Bklt_BkltConfig-6",
+      "displayLabel": "Bklt-config-6",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "forward" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_7.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_7.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "624d847f429ad505b0b3cfe286435c3f7389ccb3c60ee0858ee58060e93b0262",
+      "bookletKey": "Cy-Bklt_BkltConfig-7",
+      "displayLabel": "Bklt-config-7",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requirePresentationComplete": "always" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_8.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_8.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "7f89aa788176a7178ea57d18ce6d2b70c7d22724af1c384c3154a2e084db69bd",
+      "bookletKey": "Cy-Bklt_BkltConfig-8",
+      "displayLabel": "Bklt-config-8",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_9.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_9.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c521b904692cf1b4a8e57567de858e2d6c27fc801d9279aa65bfdcabf602378d",
+      "bookletKey": "Cy-Bklt_BkltConfig-9",
+      "displayLabel": "Bklt-config-9",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "forward" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_10.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_10.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "2ad294179d54b3e05b6ac79e353066d1eecb3bcb7d6693bdd456ed00ca1cc913",
+      "bookletKey": "Cy-Bklt_BkltConfig-10",
+      "displayLabel": "Bklt-config-10",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "requireResponseComplete": "always" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_11.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_11.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "5f2756620d1ad498df5b295410c6dcb36b33948e230d4515bbe94575510d632a",
+      "bookletKey": "Cy-Bklt_BkltConfig-11",
+      "displayLabel": "Bklt-config-11",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "booklet" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_12.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_12.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "04f0e3a34ac076cfc9f4ad9c09820585d885d790120cdf647bf45b752e441314",
+      "bookletKey": "Cy-Bklt_BkltConfig-12",
+      "displayLabel": "Bklt-config-12",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "none" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_13.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_13.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0c15198dbb6d583890562f798597e152bb7ba61a9f0a8aea8271aa985c4c7a20",
+      "bookletKey": "Cy-Bklt_BkltConfig-13",
+      "displayLabel": "Bklt-config-13",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "block" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_14.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_14.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "69de8daf80252bcd3cb72a7f72e732684aa84117975964d46c7a4a4b816994ef",
+      "bookletKey": "Cy-Bklt_BkltConfig-14",
+      "displayLabel": "Bklt-config-14",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerContent": "unit" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_15.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_15.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "b5b40c972cac08037a7b12d50ca23e92d35cd02ff273e372e99db66bd619d17e",
+      "bookletKey": "Cy-Bklt_BkltConfig-15",
+      "displayLabel": "Bklt-config-15",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerHidden": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_16.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_16.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "8966c3d85bfc061ecef6bb7fc141a66c4deda7205b5e0692d4b1a11daaf7a633",
+      "bookletKey": "Cy-Bklt_BkltConfig-16",
+      "displayLabel": "Bklt-config-16",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "headerHidden": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_17.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_17.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "4161d663387db817f87539aaba26f0d626f512423eb58879ada46485d7bec877",
+      "bookletKey": "Cy-Bklt_BkltConfig-17",
+      "displayLabel": "Bklt-config-17",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "lockOnTermination": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_18.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_18.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "ce82be104ad8dc5296767559ab59fc97da76df45244cdb175eaca6552e4f9b4c",
+      "bookletKey": "Cy-Bklt_BkltConfig-18",
+      "displayLabel": "Bklt-config-18",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "lockOnTermination": true, "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_19.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_19.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c5814b1b6ef51d90f7e86248d27235e824615653465c90e211e819fecb1538c1",
+      "bookletKey": "Cy-Bklt_BkltConfig-19",
+      "displayLabel": "Bklt-config-19",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_20.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_20.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "da6d2d656347e04856c8fe0ed28ae5c4557a05799945f690eaad1589dac74d02",
+      "bookletKey": "Cy-Bklt_BkltConfig-20",
+      "displayLabel": "Bklt-config-20",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "dynamic" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_21.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_21.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "79600eaf4945e3d500154c9bf1231a1e3e4d413085e3cc7e4eaeabf316017151",
+      "bookletKey": "Cy-Bklt_BkltConfig-21",
+      "displayLabel": "Bklt-config-21",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "units" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_22.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_22.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c2ea9be37ce6180fb297e536a7ffd511ac8443ae474702943f538bfd491bff87",
+      "bookletKey": "Cy-Bklt_BkltConfig-22",
+      "displayLabel": "Bklt-config-22",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "backwardButton": "pages" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_23.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_23.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "07a0483b4871e6f23fef182a692e7c8963ab84d6322052d2f2728e41d6e3faa6",
+      "bookletKey": "Cy-Bklt_BkltConfig-23",
+      "displayLabel": "Bklt-config-23",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_24.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_24.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "fe23302961eb4489c60039f9976e49006ca13f3ba2f624e6dbdb0baa211b6a0b",
+      "bookletKey": "Cy-Bklt_BkltConfig-24",
+      "displayLabel": "Bklt-config-24",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "dynamic" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_25.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_25.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "83b3d3f7cab3b087ec33558fc440a467d1e34d1c749cde7e8f340b02944e1ce2",
+      "bookletKey": "Cy-Bklt_BkltConfig-25",
+      "displayLabel": "Bklt-config-25",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "units" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_26.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_26.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "de00f405cdb040500a32b1590a71bbdb62db830e57cf026c980f95859c751dcb",
+      "bookletKey": "Cy-Bklt_BkltConfig-26",
+      "displayLabel": "Bklt-config-26",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "forwardButton": "pages" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_27.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_27.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "d96a8af8f4960a8f2d40b07cb7593fbc7b48123f6759233be5c7002eba59a778",
+      "bookletKey": "Cy-Bklt_BkltConfig-27",
+      "displayLabel": "Bklt-config-27",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "restoreCurrentPageOnReturn": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_28.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_28.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "beb90d9f723b7122e90f6c10cc6698adf4f47d6277a1476e746f1611a82377df",
+      "bookletKey": "Cy-Bklt_BkltConfig-28",
+      "displayLabel": "Bklt-config-28",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "restoreCurrentPageOnReturn": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_29.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_29.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "95fd6fbfe569a3858219406007e1975b62cd77a5745619d20bb0034d1b144546",
+      "bookletKey": "Cy-Bklt_BkltConfig-29",
+      "displayLabel": "Bklt-config-29",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitLabel": "index" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_30.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_30.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "196d42c5aaedc89c9147551a4bfe280420503cacf4b86129df626859591cefa7",
+      "bookletKey": "Cy-Bklt_BkltConfig-30",
+      "displayLabel": "Bklt-config-30",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitLabel": "label" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_31.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_31.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0afb0fd74c687afdfcf8a5989a53641ca81e9483dd01bdfa7f5877f0168794d7",
+      "bookletKey": "Cy-Bklt_BkltConfig-31",
+      "displayLabel": "Bklt-config-31",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitLabel": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_32.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_32.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "3407f09464d3173f2a650e505fad9576b6a8e363dd953a0f2cdc1314335c3739",
+      "bookletKey": "Cy-Bklt_BkltConfig-32",
+      "displayLabel": "Bklt-config-32",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitControls": "both" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_33.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_33.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "a76974fb193accace7ebd8a951acaa6247e936bc47b74cd5405c2c3cda717bc0",
+      "bookletKey": "Cy-Bklt_BkltConfig-33",
+      "displayLabel": "Bklt-config-33",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitControls": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_34.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_34.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "b1ffc849ac56d836ae657fbd177976858eeb0087a09745635855ed75c390af30",
+      "bookletKey": "Cy-Bklt_BkltConfig-34",
+      "displayLabel": "Bklt-config-34",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "pageLabel": "index" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_35.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_35.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "648c113097d3f5e5a6e0996b7538bf6349f200b8ca6055cd118b3609446d1ca4",
+      "bookletKey": "Cy-Bklt_BkltConfig-35",
+      "displayLabel": "Bklt-config-35",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "pageLabel": "label" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_36.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_36.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0689359b26973dead2c70c185e484e47c4d47096a776fce69e02b5f7a429f6f9",
+      "bookletKey": "Cy-Bklt_BkltConfig-36",
+      "displayLabel": "Bklt-config-36",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "pageLabel": "list" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_37.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_37.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "50b6d6063168ba007c896b090a2cefbac69429f92d0860a48a1f90d4e1221006",
+      "bookletKey": "Cy-Bklt_BkltConfig-37",
+      "displayLabel": "Bklt-config-37",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "pageLabel": "hidden" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_38.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_38.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "a71cb10ec6810a68f807e597c4da2d11e08d5b2666467d996908d3d0518db978",
+      "bookletKey": "Cy-Bklt_BkltConfig-38",
+      "displayLabel": "Bklt-config-38",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102"],
+      "policy": { "pageControlsHidden": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_39.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_39.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "dd693fb48a22bf7ccebcd68cb3c76bcbfffae8277a1b799ba1c61bebd7642b71",
+      "bookletKey": "Cy-Bklt_BkltConfig-39",
+      "displayLabel": "Bklt-config-39",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "pageControlsHidden": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_40.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_40.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "3392a181b13919b6f6a08c4aea8d1692c3b6d199bcd6ce274956f853c7c89178",
+      "bookletKey": "Cy-Bklt_BkltConfig-40",
+      "displayLabel": "Bklt-config-40",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitTitle": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_41.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_41.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "caf148f4f3b5f37fad80a6e2dd9b20c7923d9faf40a9680ba8b80a721c94b886",
+      "bookletKey": "Cy-Bklt_BkltConfig-41",
+      "displayLabel": "Bklt-config-41",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitTitle": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_42.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_42.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "672e40d48e2603b873da49facda81fb43c28d97e43f92145167389fec01d2702",
+      "bookletKey": "Cy-Bklt_BkltConfig-42",
+      "displayLabel": "Bklt-config-43",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitMenuEnabled": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_43.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_43.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "8087d7d57016d9946c8853339452c195b260d30a304b78fe7a8adb6b0a234219",
+      "bookletKey": "Cy-Bklt_BkltConfig-43",
+      "displayLabel": "Bklt-config-43",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_44.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_44.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "e7d159dff32be442276d8ab54a6357bbaafdfbf4c5a941517007fc1b51fd6770",
+      "bookletKey": "Cy-Bklt_BkltConfig-44",
+      "displayLabel": "Bklt-config-44",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "fullscreenButton": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_45.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_45.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "d7fecb588f4f5e53261f81a03c6a437581b7c7b24073b46a64fb1154d882d847",
+      "bookletKey": "Cy-Bklt_BkltConfig-45",
+      "displayLabel": "Bklt-config-45",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "fullscreenButton": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_46.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_46.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "0a9ec451b9e55bce29becd48e730fc14854a02aaf59d26a3fbac033ffe0fade8",
+      "bookletKey": "Cy-Bklt_BkltConfig-46",
+      "displayLabel": "Bklt-config-46",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "reloadButton": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_47.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_47.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "cc21c2e4d5f91f7206f110242ce8ed233669d1d7e4972349775728e1d915de35",
+      "bookletKey": "Cy-Bklt_BkltConfig-47",
+      "displayLabel": "Bklt-config-47",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "policy": { "reloadButton": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_48.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_48.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "e1438ba41782c401251340f692cece13664f51f0c6ec58eef9bc956f050344f1",
+      "bookletKey": "Cy-Bklt_BkltConfig-48",
+      "displayLabel": "Bklt-config-48",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [1, "confirm"] }],
+      "policy": { "showTimeLeft": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_49.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_49.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c22900c68757a2134f4843776090443c934f5175ba240264de24c475e04dec0b",
+      "bookletKey": "Cy-Bklt_BkltConfig-49",
+      "displayLabel": "Bklt-config-49",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [1, "confirm"] }],
+      "policy": { "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_50.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_50.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "c8a31ec836d13ceaffc751e142ade738bf6d823b8c7924caa00ee74e43696936",
+      "bookletKey": "Cy-Bklt_BkltConfig-50",
+      "displayLabel": "Bklt-config-50",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy", "xyz"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": { "showTimeLeft": true, "silentMode": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_51.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_51.xml",
+      "sourceCommit": "8e01885f76bf5b69a7e29aa9434346602b77c093",
+      "sha256": "2314edf5dafed53ca49717819c278142b6fe72a769d1928d08328556d8649617",
+      "bookletKey": "Cy-Bklt_BkltConfig-51",
+      "displayLabel": "Bklt-config-51",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy", "xyz"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": { "showTimeLeft": true, "silentMode": true }
+    },
+
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-1.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-1.xml",
+      "bookletKey": "Cy-Bklt_TC-1",
+      "displayLabel": "Test-Controller-1",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "unitMenuEnabled": false, "showTimeLeft": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-2.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-2.xml",
+      "bookletKey": "Cy-Bklt_TC-2",
+      "displayLabel": "Test-Controller-2",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-3.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-3.xml",
+      "bookletKey": "Cy-Bklt_TC-3",
+      "displayLabel": "Test-Controller-3",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": {
+        "unitMenuEnabled": true,
+        "lockOnTermination": true,
+        "showTimeLeft": true,
+        "unitResponsesBufferMs": 20000000,
+        "unitStateBufferMs": 20000000,
+        "testStateBufferMs": 20000000
+      }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-4.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-4.xml",
+      "bookletKey": "Cy-Bklt_TC-4",
+      "displayLabel": "Test-Controller-4",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-5.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-5.xml",
+      "bookletKey": "Cy-Bklt_TC-5",
+      "displayLabel": "Test-Controller-5",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [0.2, "confirm"] }],
+      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-6.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-6.xml",
+      "bookletKey": "Cy-Bklt_TC-6",
+      "displayLabel": "Test-Controller-6",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-7.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-7.xml",
+      "bookletKey": "Cy-Bklt_TC-7",
+      "displayLabel": "Test-Controller-7",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "allowed"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-8.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-8.xml",
+      "bookletKey": "Cy-Bklt_TC-8",
+      "displayLabel": "Test-Controller-8",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "forbidden"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-9.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-9.xml",
+      "bookletKey": "Cy-Bklt_TC-9",
+      "displayLabel": "Test-Controller-9",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["off", "off"] }],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-10.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-10.xml",
+      "bookletKey": "Cy-Bklt_TC-10",
+      "displayLabel": "Test-Controller-10",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["forward", "forward"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-11.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-11.xml",
+      "bookletKey": "Cy-Bklt_TC-11",
+      "displayLabel": "Test-Controller-11",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["always", "always"] }],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-12.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-12.xml",
+      "bookletKey": "Cy-Bklt_TC-12",
+      "displayLabel": "Test-Controller-12",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "lockAfterLeaving": [true, "unit"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-13.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-13.xml",
+      "bookletKey": "Cy-Bklt_TC-13",
+      "displayLabel": "Test-Controller-13",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "lockAfterLeaving": [false, "testlet"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-14.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-14.xml",
+      "bookletKey": "Cy-Bklt_TC-14",
+      "displayLabel": "Test-Controller-14",
+      "unitKeys": ["start", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "denyNavigation": ["always", "always"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-15.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-15.xml",
+      "bookletKey": "Cy-Bklt_TC-15",
+      "displayLabel": "Test-Controller-15",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-16.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-16.xml",
+      "bookletKey": "Cy-Bklt_TC-16",
+      "displayLabel": "Test-Controller-16",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-17.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-17.xml",
+      "bookletKey": "Cy-Bklt_TC-17",
+      "displayLabel": "Test-Controller-17",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "always", "requireResponseComplete": "always", "unitMenuEnabled": true }
+    }
+  ],
+  "samplePackages": [
+    {
+      "booklet": {
+        "fixture": "booklets/Booklet.xml",
+        "sourcePath": "sampledata/Booklet.xml",
+        "sha256": "3bcc9ef45f5c789783afb70ef55b913b42c1a50f05d2b801e15ec2043c4ee300",
+        "bookletKey": "BOOKLET.SAMPLE-1",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+      },
+      "units": [
+        {
+          "fixture": "units/Unit.xml",
+          "sourcePath": "sampledata/Unit.xml",
+          "sha256": "cfd09a052969a4e9dc61c16a7cecfce078816d01015ab007b2fd406c1f454a38",
+          "unitKey": "UNIT.SAMPLE",
+          "playerKey": "verona-player-simple-6.0"
+        },
+        {
+          "fixture": "units/Unit2.xml",
+          "sourcePath": "sampledata/Unit2.xml",
+          "sha256": "de54b8bcd95eb4ae902d21664029e54a023ea02837257d88b847beb6b5a945f7",
+          "unitKey": "UNIT.SAMPLE-2",
+          "playerKey": "verona-player-simple@6.0"
+        }
+      ],
+      "definition": {
+        "fixture": "definitions/SAMPLE_UNITCONTENTS.HTM",
+        "sourcePath": "sampledata/SAMPLE_UNITCONTENTS.HTM",
+        "sha256": "532310b1f4bf1eab6eaaa1603962a39566919b5669974f7b1a7dc2de4316d202"
+      },
+      "codingScheme": {
+        "fixture": "schemes/coding-scheme.vocs.json.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/coding-scheme.vocs.json",
+        "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f"
+      },
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "sourcePath": "sampledata/verona-player-simple-6.0.html",
+        "sha256": "e260cdc4bee370f5990390fbcbca17104d8069b43a41c4f0967e13b33fa6a38a",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "resourcePackage": {
+        "fixture": "resources/sample_resource_package.itcr.zip.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+        "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e"
+      }
+    }
+  ],
+  "currentOriginalSamplePackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata",
+    "booklet": {
+      "fixture": "booklets/current-Booklet.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/Booklet.xml",
+      "sha256": "31a6b8cbcad9fd7c27165949fbf2abdc6a458ec74f21cc2646904b6f9c078780",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+    },
+    "additionalBooklets": [
+      ["booklets/current-Booklet2.xml.base64", "BOOKLET.SAMPLE-2", "c3e05941047b1d4d6bdc688bdc9fad57356ee61c9384d12d2690fa6e7679e360"],
+      ["booklets/current-Booklet3.xml.base64", "BOOKLET.SAMPLE-3", "af3f5e57a81af63aa06536ee8b158ec6921afb7a59fe6a44125e932788cb627e"]
+    ],
+    "units": [
+      {
+        "fixture": "units/current-Unit.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/Unit.xml",
+        "sha256": "32da70a29cfd8a0b77109a0090570bdc420010920c61bdcfb77c7f039a9f5782",
+        "unitKey": "UNIT.SAMPLE",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      {
+        "fixture": "units/current-Unit2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/Unit2.xml",
+        "sha256": "3ac0c809c26e3c3c7fbdf35b7f1b3ac696c2d718fed8c3cd5024c77da3209780",
+        "unitKey": "UNIT.SAMPLE-2",
+        "playerKey": "verona-player-simple@6.0"
+      }
+    ],
+    "definition": {
+      "fixture": "definitions/SAMPLE_UNITCONTENTS.HTM",
+      "sourcePath": "sampledata/SAMPLE_UNITCONTENTS.HTM",
+      "sha256": "532310b1f4bf1eab6eaaa1603962a39566919b5669974f7b1a7dc2de4316d202"
+    },
+    "codingScheme": {
+      "fixture": "schemes/coding-scheme.vocs.json.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/coding-scheme.vocs.json",
+      "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f"
+    },
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "resourcePackage": {
+      "fixture": "resources/sample_resource_package.itcr.zip.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+      "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e"
+    },
+    "roster": {
+      "fixture": "rosters/current-Testtakers.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/Testtakers.xml",
+      "sha256": "cdc2fdc790e37981258813138f2ad368a681f5101022c2490d0142e23842c23c",
+      "participantLoginKeys": ["test", "test2", "test-review", "test-trial", "test-demo", "test-simulation", "test-no-pw", "test-no-pw-trial", "test-expired", "test-future"],
+      "operationalLoginKeys": ["test-group-monitor", "test-group-monitor-2", "sys-check", "test-study-monitor", "expired-group-monitor", "expired-study-monitor"]
+    },
+    "systemChecks": [
+      ["system-checks/current-SysCheck.xml.base64", "SYSCHECK.SAMPLE", "de11e774f2d0226609658a9b54a382e3896b4fd593464c6b4d43460443c10a83"],
+      ["system-checks/current-CY_SysCheck_2.xml.base64", "syscheck-2", "f69ea71a6eb3dbf9d894f6d7b671b10b21a525ed74997cf354fc6fb47f1a3774"]
+    ]
+  },
+  "adaptiveDependencyPackages": [
+    {
+      "bookletFixture": "booklets/Booklet2.xml",
+      "unitFixture": "units/Unit2.xml",
+      "codingSchemeFixture": "schemes/coding-scheme.vocs.json",
+      "playerFixture": "players/verona-player-simple-6.0.html",
+      "sourcePaths": {
+        "booklet": "sampledata/Booklet2.xml",
+        "unit": "sampledata/Unit2.xml",
+        "codingScheme": "sampledata/coding-scheme.vocs.json",
+        "player": "sampledata/verona-player-simple-6.0.html"
+      },
+      "bookletKey": "BOOKLET.SAMPLE-2",
+      "decisionUnitKey": "decision-unit",
+      "playerKey": "verona-player-simple@6.0",
+      "rawResponses": [
+        { "id": "var1", "status": "VALUE_CHANGED", "value": "a" },
+        { "id": "var2", "status": "VALUE_CHANGED", "value": "a" }
+      ],
+      "expectedStates": {
+        "level": "professional",
+        "bonus": "no"
+      },
+      "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
+    }
+  ],
+  "currentOriginalAdaptivePackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/adaptive",
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Adap-1.xml",
+      "sourcePath": "sampledata/system-test/adaptive/CY_Bklt_Adap-1.xml",
+      "sha256": "a6dbb9c24367cb78cb857e5f2d2a023a950e85ae85a62c8d7b9b0d04d20d557a",
+      "bookletKey": "CY-Bklt_Adap-1",
+      "unitKeys": [
+        "decision-unit",
+        "professional-unit",
+        "advanced-unit",
+        "beginner-unit",
+        "bonus-unit"
+      ],
+      "defaultStates": { "level": "beginner", "bonus": "no" },
+      "professionalStates": { "level": "professional", "bonus": "no" },
+      "professionalVisibleUnitKeys": ["decision-unit", "professional-unit"],
+      "advancedStates": { "level": "advanced", "bonus": "no" },
+      "advancedVisibleUnitKeys": ["decision-unit", "advanced-unit"],
+      "bonusReviewStates": { "level": "beginner", "bonus": "yes" },
+      "bonusReviewVisibleUnitKeys": ["decision-unit", "beginner-unit", "bonus-unit"]
+    },
+    "unit": {
+      "fixture": "units/adaptive-Unit2.xml",
+      "sourcePath": "sampledata/Unit2.xml",
+      "sha256": "3ac0c809c26e3c3c7fbdf35b7f1b3ac696c2d718fed8c3cd5024c77da3209780",
+      "unitKey": "UNIT.SAMPLE-2"
+    },
+    "codingScheme": {
+      "fixture": "schemes/coding-scheme.vocs.json.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/coding-scheme.vocs.json",
+      "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f",
+      "version": "3.0"
+    },
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple@6.0",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "6.0.5",
+      "playerApiVersion": "6.0"
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Adap.xml",
+      "sourcePath": "sampledata/system-test/adaptive/CY_Logins_Adap.xml",
+      "sha256": "545b6f7d6ea01a7ae9a33568a1be4c6632e974491a3a9cf97686816bc1f06d90",
+      "groupKey": "login-adap",
+      "participants": [
+        ["Adap-1", "run-hot-restart"],
+        ["Adap-2", "run-review"]
+      ],
+      "assignments": {
+        "Adap-1": ["CY-Bklt_Adap-1"],
+        "Adap-2": [
+          "CY-Bklt_Adap-1#bonus:yes",
+          "CY-Bklt_Adap-1#bonus:no"
+        ]
+      }
+    },
+    "routingResponses": {
+      "professional": [
+        { "id": "var3", "status": "VALUE_CHANGED", "value": "3" },
+        { "id": "var4", "status": "VALUE_CHANGED", "value": "3" }
+      ],
+      "advanced": [
+        { "id": "var1", "status": "VALUE_CHANGED", "value": "a" },
+        { "id": "var2", "status": "VALUE_CHANGED", "value": "anything" },
+        { "id": "var3", "status": "VALUE_CHANGED", "value": "" },
+        { "id": "var4", "status": "VALUE_CHANGED", "value": "" }
+      ]
+    }
+  },
+  "codingSchemePackages": [
+    {
+      "family": "solver-alias-chain",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case1.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case1/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case1/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case1/01_outcome.json",
+      "schemeSha256": "95c28c77be210e3a0b741a320a3d2ae58799cb817418cd30c7ea46e3b0b1e4d5",
+      "inputSha256": "f45675987705acdef5642e38656ded4031b5b5556c60332ab26df2669bcca13a",
+      "outcomeSha256": "94a52e8d06ca106c13cb6d5cdad6d62a3b7e72306cd04355c222786417167abd",
+      "license": "MIT",
+      "expectedStates": {
+        "solver-value": "calculated",
+        "solver-error": "derive-error",
+        "solver-decimal": "calculated",
+        "alias-code": "coded",
+        "alias-score": "scored"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-solver-case1-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case1-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case1/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case1/02_outcome.json",
+          "inputSha256": "84feed40ee3bf5191da1827263cf15377f6c66ca58d8abc1537bc4389e86a502",
+          "outcomeSha256": "5ed653c0df09eadc2f551c1639400a298eedc8a21be5d637889cf5628bfa9caf",
+          "expectedStates": { "solver-case1-route": "case02" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-solver-case1-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case1-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case1/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case1/03_outcome.json",
+          "inputSha256": "a112eb39bbc17060234a277276559f34599857f0dd893cfdaa37366fa4e0862a",
+          "outcomeSha256": "b8bb877d079994cdf19cac040839b92b3ecdc5ec6cddebcfdcfccca4d582cf1c",
+          "expectedStates": { "solver-case1-route": "case03" }
+        }
+      ]
+    },
+    {
+      "family": "unique-values-processing",
+      "schemeFixture": "schemes/responses-3.6.0-unique-values.json",
+      "inputFixture": "schemes/responses-3.6.0-unique-values-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-unique-values-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/UNIQUE_VALUES/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/03_input.json",
+      "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/03_outcome.json",
+      "schemeSha256": "3c2692a7c8e3c8253977f86ad437b82c92b72eb9bca7126e6ea6934e47137710",
+      "inputSha256": "acc3977aeb4dda684dea1cca8292cd2fa248947ef07c6a88a5b876f525f62551",
+      "outcomeSha256": "4b618a0b700666913c1b7000a30456fcb597ba0c45e4b937db256d3b3a691cf4",
+      "license": "MIT",
+      "expectedStates": {
+        "dependency-error": "derive-error",
+        "plain-uniqueness": "unique",
+        "derived-code": "coded",
+        "derived-score": "scored",
+        "all-spaces": "duplicate",
+        "dispensable-spaces": "unique",
+        "numeric-processing": "duplicate",
+        "combined-processing": "unique"
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/01_outcome.json",
+          "inputSha256": "e3bce56b607addce368b2ae59bd798a22ff7ca556c72b4a4291610cf78a97887",
+          "outcomeSha256": "cdbb4d77b32752295eae8dacca944b27bf39cfebbd600427f5ed9dddabb3b626",
+          "expectedStates": { "unique-values-route": "case01" }
+        },
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/02_outcome.json",
+          "inputSha256": "b60c0ae8ac72f13db57ea73c60db7c46250a6219d17c5ee0cf9ca4e79efa7ea0",
+          "outcomeSha256": "fe96cb848b95840540ab8cc5d9d2d96e44e2678502307b17cebff64801958526",
+          "expectedStates": { "unique-values-route": "case02" }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case4-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/04_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/04_outcome.json",
+          "inputSha256": "5d703180c74c262047ec8f5b89e9e85b858789526dd3ac7a62141ba52a005d3e",
+          "outcomeSha256": "576f575b49f51d67f13c568c73be4c4851b78daddfdd37179779f880637992e8",
+          "expectedStates": { "unique-values-route": "case04" }
+        }
+      ]
+    },
+    {
+      "family": "concat-code-chain",
+      "schemeFixture": "schemes/responses-3.6.0-concat-code.json",
+      "inputFixture": "schemes/responses-3.6.0-concat-code-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-concat-code-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/CONCAT_CODE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/CONCAT_CODE/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/CONCAT_CODE/01_outcome.json",
+      "schemeSha256": "f690c81ce5015235c3eeb0a26a4e97884f13d50e53eb232388cb1095dd31cc5c",
+      "inputSha256": "bce0f579c5fee9b53dc220d6e7d3d929a4ea8a0faa6938bef882a45cd1ffa28f",
+      "outcomeSha256": "05d5e8255750ad2644381ad30a7346d48468083ccbbbd109806b9b274028fee2",
+      "license": "MIT",
+      "expectedStates": {
+        "concat-dependency": "derive-error",
+        "concat-chained": "concatenated",
+        "concat-code": "coded",
+        "concat-score": "scored",
+        "concat-sort": "sorted",
+        "concat-zero-code": "retained"
+      }
+    },
+    {
+      "family": "copy-value-unset",
+      "schemeFixture": "schemes/responses-3.6.0-copy-value.json",
+      "inputFixture": "schemes/responses-3.6.0-copy-value-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-copy-value-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/COPY_VALUE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/COPY_VALUE/03_input.json",
+      "outcomeSourcePath": "test/coding/derive/COPY_VALUE/03_outcome.json",
+      "schemeSha256": "492057f87792526748801b115e222edfb5f606769f93e07c63bc410a1c973168",
+      "inputSha256": "d9981dd3f692d8a9ffa8ed9977465c114c84c05b9103fb1d7fb7369237b0cb4a",
+      "outcomeSha256": "9cc3c3817dee8182c736d80a67d1976fe6a354019f6f16b50b18ca9aa5464d83",
+      "license": "MIT",
+      "expectedStates": {
+        "copy-dependency": "derive-error",
+        "copy-score-sum": "calculated",
+        "copy-unset": "preserved"
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-copy-value-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-copy-value-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/COPY_VALUE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/COPY_VALUE/01_outcome.json",
+          "inputSha256": "1a204a2e3fcaf0d4b82cd1228d19a5db955f204851bbbf7b1dfa1332eb3a0305",
+          "outcomeSha256": "944e6d26abc0b26aa66c3798c90ffd2e63c7a558ea62d5b6d51c656f68826c96",
+          "expectedStates": { "copy-value-route": "case01" }
+        },
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-copy-value-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-copy-value-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/COPY_VALUE/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/COPY_VALUE/02_outcome.json",
+          "inputSha256": "503104f07cd56b6f30a718b9d29bf57ac88768d313292abcb599696722e2517e",
+          "outcomeSha256": "e6554a6acaa1bb28061994d09455fd7f392ca996e248b8d854cc6d978ab51ffa",
+          "expectedStates": { "copy-value-route": "case02" }
+        }
+      ]
+    },
+    {
+      "family": "sum-code-derived-coding",
+      "schemeFixture": "schemes/responses-3.6.0-sum-code.json",
+      "inputFixture": "schemes/responses-3.6.0-sum-code-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-sum-code-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SUM_CODE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SUM_CODE/02_input.json",
+      "outcomeSourcePath": "test/coding/derive/SUM_CODE/02_outcome.json",
+      "schemeSha256": "d8ebb9a2250d5e0888450f8dac60afa0e7a4b985954e2a06d68a8ced0338ae0a",
+      "inputSha256": "74e3abe850a08d85ab01b9dfa98be286b337fa07d01e65c5eb9eb11411a3b687",
+      "outcomeSha256": "47e6f1c61653e953a2a7cbaa65db84ef0165ff46306993a175bcf45408af11a7",
+      "license": "MIT",
+      "expectedStates": {
+        "sum-code-value": "calculated",
+        "sum-code-status": "complete",
+        "sum-code-code": "coded",
+        "sum-code-score": "defaulted"
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-sum-code-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-code-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_CODE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_CODE/01_outcome.json",
+          "inputSha256": "12c3ca714fc1d94330829b05b5afcade3922635d0b30a1e19b7161c56c2505f9",
+          "outcomeSha256": "af6779a73a8ff1c5dd3cf7b95fd2d6f2c2657f16ad8214f1e119c47ae69fc976",
+          "expectedStates": { "sum-code-route": "case01" }
+        }
+      ]
+    },
+    {
+      "family": "sum-score-partial",
+      "schemeFixture": "schemes/responses-3.6.0-sum-score.json",
+      "inputFixture": "schemes/responses-3.6.0-sum-score-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-sum-score-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SUM_SCORE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SUM_SCORE/02_input.json",
+      "outcomeSourcePath": "test/coding/derive/SUM_SCORE/02_outcome.json",
+      "schemeSha256": "b57af7607dd3d06086eb0ea1513a15b352ddb920d58299804b277e3134b951b3",
+      "inputSha256": "503104f07cd56b6f30a718b9d29bf57ac88768d313292abcb599696722e2517e",
+      "outcomeSha256": "7a9049fdd1c5604176d85b409e65c8844dc36a7978ff4895d1b55095d665725b",
+      "license": "MIT",
+      "expectedStates": {
+        "sum-score-invalid": "invalid",
+        "sum-score-value": "calculated"
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-sum-score-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-score-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_SCORE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_SCORE/01_outcome.json",
+          "inputSha256": "6b2678e8b9f8a29e6f0111ac498d3e59c943d5f98ec3bc33fc5aec26940513f7",
+          "outcomeSha256": "c6629cbc517d3592b830037fcbb8867a73f89532556fcd1620f7ba9747552aec",
+          "expectedStates": { "sum-score-route": "case01" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-sum-score-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-score-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_SCORE/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_SCORE/03_outcome.json",
+          "inputSha256": "7b621123b388814c3f2d166ea3bc8341d0d12f628836fb4af3a62856c032fc7a",
+          "outcomeSha256": "ddad77ac9cb433f16b56f18edcd9a30f294c20a0a64a3bd88f7b9dd8b729dcf2",
+          "expectedStates": { "sum-score-route": "case03" }
+        }
+      ]
+    },
+    {
+      "family": "manual-derive-case1",
+      "schemeFixture": "schemes/responses-3.6.0-manual-case1.json",
+      "inputFixture": "schemes/responses-3.6.0-manual-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-manual-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/MANUAL/case1/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/MANUAL/case1/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/MANUAL/case1/01_outcome.json",
+      "schemeSha256": "f150de62afb77c919d751fc29599c0ac659a455b24a816a11d70dbeb831d8142",
+      "inputSha256": "7dd29246868a4cd4d2e502acae00afea16bd5731a0b511ab1a04bca66f1f553a",
+      "outcomeSha256": "59eaa33ed6e5f5d5f6990a10cd665ce6d3d1cdcc04dc56c08e7bb7153db8d297",
+      "license": "MIT",
+      "expectedStates": { "manual-case1-route": "case01" }
+    },
+    {
+      "family": "manual-derive-case2",
+      "schemeFixture": "schemes/responses-3.6.0-manual-case2.json",
+      "inputFixture": "schemes/responses-3.6.0-manual-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-manual-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/MANUAL/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/MANUAL/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/MANUAL/case2/01_outcome.json",
+      "schemeSha256": "f150de62afb77c919d751fc29599c0ac659a455b24a816a11d70dbeb831d8142",
+      "inputSha256": "6832b3d99cf7161bcee8d000350d335f28b29e1e6e96bf0c6d08f1e18d3539a0",
+      "outcomeSha256": "aa6bf25667b065f1341988e7d41e9dc33f4a938efb78b2f0e4166ce02ec63db2",
+      "license": "MIT",
+      "expectedStates": { "manual-case2-route": "case01" }
+    },
+    {
+      "family": "solver-case2",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case2.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case2/01_outcome.json",
+      "schemeSha256": "cb30702cc2ae67c27d97aabe971d36fdc645f45448bbb3835a20ac758ab4c98a",
+      "inputSha256": "ebb9fa978e4f30385ce4259a372df845aa433bd0749ae133a1e6f8bd82bc68a4",
+      "outcomeSha256": "4c9a10951bc9702435e424951dd9accf0890caaa8d201c58a84cfb2a79685c45",
+      "license": "MIT",
+      "expectedStates": { "solver-case2-route": "case01" }
+    },
+    {
+      "family": "solver-case3",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case3.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case3/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case3/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case3/01_outcome.json",
+      "schemeSha256": "3c4ebfe5e928a300af61c9fe82c43b8031be5b8a68b59cd641351fa639520309",
+      "inputSha256": "cd00e6f2d73fd10396b1b1d7f6d6998f50d88fd8d00c2502367dc369e904a1f1",
+      "outcomeSha256": "86edbdc9238b8506d75cccf9b8bf99e6d68978bd83906a5e76e80a1608720eef",
+      "license": "MIT",
+      "expectedStates": { "solver-case3-route": "case01" }
+    },
+    {
+      "family": "solver-same-id-alias",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/01_outcome.json",
+      "schemeSha256": "c34018a20f2f362c9167923160c541212471d6452a3312bd3e3e60b8bfc76c9a",
+      "inputSha256": "22417d6f86dd5b2c1d9ac511e7093a1eaa8eb6884910b39045cabe3e1f52a6cc",
+      "outcomeSha256": "986fc3cdfbab881e23d4e1758679eaee589ac3b468114f67c140d27b419b45e0",
+      "license": "MIT",
+      "expectedStates": { "solver-same-id-alias-route": "case01" },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/02_outcome.json",
+          "inputSha256": "af204cc9e66073f704110cd9630ae6cb06f822a4e9b82a59fbf5986d20681593",
+          "outcomeSha256": "06493ad2d4d1f1995188a389879b45fb6c60e2466df8c47bfb541ce2977a264d",
+          "expectedStates": { "solver-same-id-alias-route": "case02" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/03_outcome.json",
+          "inputSha256": "34aeb3bca094e63be4af82e969c08aede790d5e30910532bef81d071b76b4737",
+          "outcomeSha256": "a94bcc44ca63480bc47b0be22bd6a82e616fbdc451cac69c2ebf700e81fdede2",
+          "expectedStates": { "solver-same-id-alias-route": "case03" }
+        }
+      ]
+    },
+    {
+      "family": "base-aliases",
+      "schemeFixture": "schemes/responses-3.6.0-alias.json",
+      "inputFixture": "schemes/responses-3.6.0-alias-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-alias-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/alias/coding-scheme.json",
+      "inputSourcePath": "test/coding/alias/01_input.json",
+      "outcomeSourcePath": "test/coding/alias/01_outcome.json",
+      "schemeSha256": "eadb5ff991f8cf071bf488094c1da4393585bfa2ff331917a38a58f444fda22c",
+      "inputSha256": "e0c8f3d05c7d037f5775cbb8959ed9d5cfeb267534638a5edc987a989d3b0871",
+      "outcomeSha256": "4ecd993cfa505025d131ce3e026b996f7ba28960cf010599e2ec60d7c0033130",
+      "license": "MIT",
+      "expectedStates": { "root-alias-route": "case01" }
+    },
+    {
+      "family": "subform-responses",
+      "schemeFixture": "schemes/responses-3.6.0-subforms.json",
+      "inputFixture": "schemes/responses-3.6.0-subforms-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-subforms-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/subforms/coding-scheme.json",
+      "inputSourcePath": "test/coding/subforms/01_input.json",
+      "outcomeSourcePath": "test/coding/subforms/01_outcome.json",
+      "schemeSha256": "d13cef608e27af8eb3ff425d1ec214265c2353a1fb91b46835097015377c04dc",
+      "inputSha256": "da6ada51c78d47c91a33e2c93e5d48a9104b36c1565fc6b9ccbbf04d7b43a955",
+      "outcomeSha256": "465190080633e265eba4d3b652f9f9b53b65b60d6ab32dae561f231aba627f68",
+      "license": "MIT",
+      "expectedStates": { "root-subforms-route": "case01" }
+    },
+    {
+      "family": "array-length-rulesets",
+      "schemeFixture": "schemes/responses-3.6.0-array-length-check.json",
+      "inputFixture": "schemes/responses-3.6.0-array-length-check-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-array-length-check-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/array-length-check/coding-scheme.json",
+      "inputSourcePath": "test/coding/array-length-check/01_input.json",
+      "outcomeSourcePath": "test/coding/array-length-check/01_outcome.json",
+      "schemeSha256": "2af5872595543e2cb6128373a7be113a15cb8018acb1b50db0931b80ae3ceab8",
+      "inputSha256": "8ce1658a84edb915de12b77e15103908c77dd85004e9b9c1d9e3369a71f16981",
+      "outcomeSha256": "bd8734165bd0943388016189ead343f42a98a9959f1d600ed6ff4495725cafb4",
+      "license": "MIT",
+      "expectedStates": {
+        "array-first-code": "full",
+        "array-open-code": "full",
+        "array-open-score": "full",
+        "array-open-value": "pair",
+        "array-length-code": "full",
+        "array-derived-value": "three",
+        "array-derived-code": "full",
+        "array-derived-score": "full"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-array-length-check-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-array-length-check-case2-outcome.json",
+          "inputSourcePath": "test/coding/array-length-check/02_input.json",
+          "outcomeSourcePath": "test/coding/array-length-check/02_outcome.json",
+          "inputSha256": "f3f5cf6a1f1a7885c0570f24f3993632c798a816eaabc5b5578910364888f9b9",
+          "outcomeSha256": "5881062de25ca075db7ea3527eb67ad83fd7933b736a378235c42caa339ba509",
+          "expectedStates": {
+            "array-first-code": "full",
+            "array-open-code": "residual",
+            "array-open-score": "zero",
+            "array-open-value": "single",
+            "array-length-code": "residual",
+            "array-derived-value": "one",
+            "array-derived-code": "residual",
+            "array-derived-score": "zero"
+          }
+        }
+      ]
+    },
+    {
+      "family": "array-selection-modes",
+      "schemeFixture": "schemes/responses-3.6.0-arrays.json",
+      "inputFixture": "schemes/responses-3.6.0-arrays-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-arrays-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/arrays/coding-scheme.json",
+      "inputSourcePath": "test/coding/arrays/01_input.json",
+      "outcomeSourcePath": "test/coding/arrays/01_outcome.json",
+      "schemeSha256": "bbbbc288884db97bac6b0840d3ed520d63ff822eb770799475b44fb6c1e4df4d",
+      "inputSha256": "f8e8f8c29542484cb5f6d87ced84a63c7e69b5d6b0684539f42eac0d709b7e99",
+      "outcomeSha256": "e15498dd49ad4f849f8c98209e6abc35793c329f56499a3780568fa32b96a8a7",
+      "license": "MIT",
+      "expectedStates": {
+        "arrays-route": "aggregate",
+        "arrays-sort-code": "coded",
+        "arrays-index-code": "coded",
+        "arrays-sum-score": "seven",
+        "arrays-b4-value": "unset"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case2-outcome.json",
+          "inputSourcePath": "test/coding/arrays/02_input.json",
+          "outcomeSourcePath": "test/coding/arrays/02_outcome.json",
+          "inputSha256": "507f75d499d8d229835f3742f04838154d85eea2d3fa80da4edde5287e89bc93",
+          "outcomeSha256": "9037a25f2d330fafc2d8d6aa72b507a33f0fd1282b5a6daa9b18ea6f8bcb33ca",
+          "expectedStates": {
+            "arrays-route": "any-other",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "ten-nine"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case3-outcome.json",
+          "inputSourcePath": "test/coding/arrays/03_input.json",
+          "outcomeSourcePath": "test/coding/arrays/03_outcome.json",
+          "inputSha256": "5e0b0a1cfd40317403f2bb1ecd097e5cc6b246ff802afb47f72fa5bcbc03cd2a",
+          "outcomeSha256": "63d46e1ec2df04ea3c9644648a67040344e537984938cd9a629b2d6ba671970c",
+          "expectedStates": {
+            "arrays-route": "incomplete",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "twenty-nine"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case4-outcome.json",
+          "inputSourcePath": "test/coding/arrays/04_input.json",
+          "outcomeSourcePath": "test/coding/arrays/04_outcome.json",
+          "inputSha256": "4e5f1210ef276c1352fc6d96c9efddcee024f6ca6856ef1e80d38c6d5154054d",
+          "outcomeSha256": "2007f9d96ad8195b1987db049fc873a5ccd2d7f5fb17099a9c096cd0f08493d5",
+          "expectedStates": {
+            "arrays-route": "any",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "twenty"
+          }
+        }
+      ]
+    },
+    {
+      "family": "regex-fragmenting",
+      "schemeFixture": "schemes/responses-3.6.0-fragmenting.json",
+      "inputFixture": "schemes/responses-3.6.0-fragmenting-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-fragmenting-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/fragmenting/coding-scheme.json",
+      "inputSourcePath": "test/coding/fragmenting/01_input.json",
+      "outcomeSourcePath": "test/coding/fragmenting/01_outcome.json",
+      "schemeSha256": "e40658fe13f03bd59cdb610fd8c848ec8d277bacfc271347f156b604bc14f484",
+      "inputSha256": "9155b7a30aff382493013492b5a8b5d20be0a091e7715b4e8b6bbb0ed6bd930e",
+      "outcomeSha256": "5d5d76e1a1aea1f00e2991ce58fbf586539f4ceb0f8749440af65a08f2ba9198",
+      "license": "MIT",
+      "expectedStates": {
+        "fragment-route": "matched",
+        "fragment-number-code": "full",
+        "fragment-number-score": "one",
+        "fragment-unit-code": "full",
+        "fragment-unit-score": "one",
+        "fragment-case-code": "full",
+        "fragment-case-score": "seven",
+        "fragment-value": "retained"
+      }
+    },
+    {
+      "family": "rule-matching-processing",
+      "schemeFixture": "schemes/responses-3.6.0-rules-matching.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-matching-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/matching/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/matching/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/matching/01_outcome.json",
+      "schemeSha256": "f054b2818602b7fec816c273a5ca3cb65853f0c6461c5872d9621f3d14dcfe0e",
+      "inputSha256": "3e02747bcd69d79de1a797946c070c88afbd9e4f0b581ffc335ef6421f1bb094",
+      "outcomeSha256": "c327a0e46c1e33c3f3f8e1e0f4981d3f4df177c78d33690e5507385095cf8040",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-matching-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/02_outcome.json",
+          "inputSha256": "f3df4659eebc4761e2a1edfc4d960839b35c8ed77b61d41e7e5226380f70276b",
+          "outcomeSha256": "8c8af7ba3f6f24951ffbb108a7f5d1c52ee20497d151344ac48e6fdaa3552147",
+          "expectedStates": {
+            "rules-matching-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/03_outcome.json",
+          "inputSha256": "5bc0be096163ad76f96d1b8844f5f6eb1e1c8d1ef76cce2ec1c3d172371b162d",
+          "outcomeSha256": "777734c0abcafdc94d49da2e56825c1b55d68cfe529ae85fc655e0ad86b5a3c4",
+          "expectedStates": {
+            "rules-matching-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/04_outcome.json",
+          "inputSha256": "74d5bb98f06b94de7f21c3b9f99c0e5fe4c6523021decc31c415ad58bbf301e5",
+          "outcomeSha256": "d1d8bbe71142298a745f59474b7665c3666952cf18cc5f1a3cb234232eae78a3",
+          "expectedStates": {
+            "rules-matching-route": "case04"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-numeric-range",
+      "schemeFixture": "schemes/responses-3.6.0-rules-numeric-range.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/numeric-range/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/numeric-range/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/numeric-range/01_outcome.json",
+      "schemeSha256": "0f3335f7d696858dffe0bdd947ab51a94a372be58777af593bf9287d3cf48e50",
+      "inputSha256": "60b826905c704fdd6b7124f1867ded7f274f0b7ed7d1111b4141c3b94ff91ddb",
+      "outcomeSha256": "d8641de26f336619d69b896b22ef466f69c7ba281ab0b5434aea8862f31159b2",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-numeric-range-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-range/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-range/02_outcome.json",
+          "inputSha256": "051f00ee309e9d51f9be2f096f769763c360595e4d131acc2a648e05c6084a43",
+          "outcomeSha256": "0fdcae3c86ba8cf453e9a7033332804f360e4ae44c8f82f7a27f82fc568bf551",
+          "expectedStates": {
+            "rules-numeric-range-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-range/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-range/03_outcome.json",
+          "inputSha256": "e0583c8ee6ea408bf188fc18cad88058608791a391f595aa90372c5af47b4fef",
+          "outcomeSha256": "72ef4c354ffa9c46f34f6a66a2b28ce79a321ec3b68767ebfae5f5aa92315442",
+          "expectedStates": {
+            "rules-numeric-range-route": "case03"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-numeric-full-range",
+      "schemeFixture": "schemes/responses-3.6.0-rules-numeric-full-range.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/numeric-full-range/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/numeric-full-range/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/numeric-full-range/01_outcome.json",
+      "schemeSha256": "dd4726f5c8b448ec522e0eb36080a5a4d2fdd4740e09bace4c52cf885b487bdd",
+      "inputSha256": "60b826905c704fdd6b7124f1867ded7f274f0b7ed7d1111b4141c3b94ff91ddb",
+      "outcomeSha256": "1817fbd5e1146f44088fcb1250d435b8cb2204f95f1bb9d091cebb2987c1a828",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-numeric-full-range-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-full-range/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-full-range/02_outcome.json",
+          "inputSha256": "051f00ee309e9d51f9be2f096f769763c360595e4d131acc2a648e05c6084a43",
+          "outcomeSha256": "0fdcae3c86ba8cf453e9a7033332804f360e4ae44c8f82f7a27f82fc568bf551",
+          "expectedStates": {
+            "rules-numeric-full-range-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-full-range/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-full-range/03_outcome.json",
+          "inputSha256": "e0583c8ee6ea408bf188fc18cad88058608791a391f595aa90372c5af47b4fef",
+          "outcomeSha256": "72ef4c354ffa9c46f34f6a66a2b28ce79a321ec3b68767ebfae5f5aa92315442",
+          "expectedStates": {
+            "rules-numeric-full-range-route": "case03"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-boolean-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-boolean.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-boolean-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-boolean-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/boolean/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/boolean/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/boolean/01_outcome.json",
+      "schemeSha256": "c09fcb2cc32dca9687b3fa82fe7614885bc5e3df0c55fa2970f4f926439ed350",
+      "inputSha256": "1c1bed41377db8a7a848f63e221d5626aaf2da0595211920d7268188d817edfc",
+      "outcomeSha256": "0f1d590cb4071193dbc20b97da8cdbc009ff10608607ba51e0b85e67a188c47b",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-boolean-route": "case01"
+      }
+    },
+    {
+      "family": "rule-null-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-null.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-null-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-null-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/null/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/null/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/null/01_outcome.json",
+      "schemeSha256": "6d3af6152fbe0632ef6f5f32a8807b17db77afffdb3cebb8f97a591ca3c40d0b",
+      "inputSha256": "e9383b6fdce142a12b696c227d2b5fac10c146f6644df76653095e863afb13c5",
+      "outcomeSha256": "8ffc362ef51ae900b7897e37dc3d59503dd2294602f2294f3c0af847d529d15e",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-null-route": "case01"
+      }
+    },
+    {
+      "family": "rule-empty-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-empty.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-empty-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-empty-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/empty/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/empty/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/empty/01_outcome.json",
+      "schemeSha256": "bb5f702497b3bba59cfb52938f56f5466f19f2321ba62681401b87f2ec6b8656",
+      "inputSha256": "dbf549ff516379b071a2589ef9b0de28fa667b314de53fb01152c2b5a8c4cfdc",
+      "outcomeSha256": "6bfb593e0274a25b810968cf2932f508730b0e72ff16880d84a9a65108c3283d",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-empty-route": "case01"
+      }
+    },
+    {
+      "family": "rule-zero-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-zero.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-zero-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-zero-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/zero/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/zero/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/zero/01_outcome.json",
+      "schemeSha256": "3a3f63ef66c3104920a7e5af61f659f96f9b41b3b05f681044e74e79cbcd452b",
+      "inputSha256": "ab6d0d586dbef115d1ee9a978840227dd6fc2ea7d99921da1c7d72d5a9e02448",
+      "outcomeSha256": "8aceca0cdac947345ba33da0be150365f0ac58c8de3fbccdaf14d0231986a828",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-zero-route": "case01"
+      }
+    },
+    {
+      "family": "rule-empty-array",
+      "schemeFixture": "schemes/responses-3.6.0-rules-empty-array.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-empty-array-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-empty-array-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/empty-array/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/empty-array/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/empty-array/01_outcome.json",
+      "schemeSha256": "375db85649ed56e7f40ea27168576fbe3417c90690e31ccd94a28050765618af",
+      "inputSha256": "950303fb3a26ca225cc6a5511bb6082ae341a43547ca8ca00f3dd05861982cd3",
+      "outcomeSha256": "cbc000b5aecdc45bfa7899dd970ce882ba172d0b1fbc3a035ef39e92e9ed81d0",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-empty-array-route": "case01"
+      }
+    },
+    {
+      "family": "rule-injected-variables",
+      "schemeFixture": "schemes/responses-3.6.0-rules-injected-vars.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/injected-vars/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/injected-vars/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/injected-vars/01_outcome.json",
+      "schemeSha256": "c52fb5e575ff1bdf73fac86d452acbc460cb9e29ce90a229ba69875d22584bec",
+      "inputSha256": "7dbb67dc1239ddac52ce784f06bb22596f88abb3630d851c1e45dbeff71a8b00",
+      "outcomeSha256": "31faefefbe3473b2ff911b000aeccbad1ca49687cbb4239cf4c492f2b0d25167",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-injected-vars-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/02_outcome.json",
+          "inputSha256": "663abde2439cbdb5b1f7da7a1ded329b8c84a38d332ca73868a3df1d042f31df",
+          "outcomeSha256": "0b027c6336bdac12a141f1e2506e9ac4c737b790550612f6be7dd3b5fee538a8",
+          "expectedStates": {
+            "rules-injected-vars-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/03_outcome.json",
+          "inputSha256": "8c98158a3266aad85b8590a61c15f8a9305f4318c9614193fa77239a6bc1b9f8",
+          "outcomeSha256": "81c530309593132170e7d1160464538a502d0bb3fe81a8e0c13dd88d98d523c9",
+          "expectedStates": {
+            "rules-injected-vars-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/04_outcome.json",
+          "inputSha256": "d31ed032c1983bd84c08204f0bc6485c8d4c3fca1e8cb100908d2927833c71f8",
+          "outcomeSha256": "319dfe20888b9034c0bb79202a5cf8aacea53be36c9e51404b41d777ca59ad4e",
+          "expectedStates": {
+            "rules-injected-vars-route": "case04"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-intended-incomplete-statuses",
+      "schemeFixture": "schemes/responses-3.6.0-rules-intended-incomplete.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/intended-incomplete/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/intended-incomplete/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/01_outcome.json",
+      "schemeSha256": "0495ac3e36947f7b8b98c161dba5829b2d884dcc5310a59143db34118433220f",
+      "inputSha256": "ddbf24abdbfac78cf1a887f2e3337afd40d68ea63a1823768e5f695c1cafcdd6",
+      "outcomeSha256": "fa67f3a21e80a3b20b69baad7ba02caa74e02ba5646a8fdc1c73d84c227398ec",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-intended-incomplete-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/02_outcome.json",
+          "inputSha256": "d1ba22fcc9a3980781cc2f5b6c45889f319844c38fb94c772c65c5f467844f44",
+          "outcomeSha256": "e3edcac85d8aead0c7d7a5efa966898b72b7dbafea7229e7fadf2bd5ea5ffc8a",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/03_outcome.json",
+          "inputSha256": "63750e5c00a78b69f1228a153b0fb9d6d1a870a5ee1e7cfb2e5292444d3e5e71",
+          "outcomeSha256": "b473ef6dbe380916741ecbc1585b9866c7950be9c5e92010bfccedc67eb98eb1",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/04_outcome.json",
+          "inputSha256": "352678ebb588aa7f6c27b462418655b640892f2e3a4298266e813602ca070c20",
+          "outcomeSha256": "cc494f99f50d324d51c3b9170bc322c0b357abbd8244530c511ee3c4a23e7f98",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case04"
+          }
+        },
+        {
+          "caseId": "05",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case5-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case5-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/05_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/05_outcome.json",
+          "inputSha256": "7c2c31addfcc6d50155620844825e103ed4ed65c546b38c7c01d11aa02f445fa",
+          "outcomeSha256": "49bf60b1292f46f933aa76d8aec026ee4ef6100360649cc847952841f087b5d8",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case05"
+          }
+        },
+        {
+          "caseId": "06",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case6-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case6-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/06_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/06_outcome.json",
+          "inputSha256": "ba8983132fa61d5448ac19be0606c92b2d46c940c028bcdc2d1cf0a2278bfda3",
+          "outcomeSha256": "0e50ad9d92bde5e0f78a41f5d6f2cae3269631cd0df10464bea5f2855eed617d",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case06"
+          }
+        },
+        {
+          "caseId": "07",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case7-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case7-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/07_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/07_outcome.json",
+          "inputSha256": "d502d5f1e46b505067c365c1872171f554b9a7c9f442305a2a3395cecbeda1db",
+          "outcomeSha256": "59236746cde14b690cf6a68fecc14ba3a61e9412835bfe6ca86197e6aa6b2b28",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case07"
+          }
+        },
+        {
+          "caseId": "08",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case8-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case8-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/08_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/08_outcome.json",
+          "inputSha256": "22db018af6eff7bb7dd6ea95a3384f460217c78ec04dcb8e4d46b491b92ccc54",
+          "outcomeSha256": "ab448e08f3aaafa88a8af3b3561295c050a47f4dd71a457a51d21c67e10bcdfd",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case08"
+          }
+        },
+        {
+          "caseId": "09",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case9-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case9-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/09_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/09_outcome.json",
+          "inputSha256": "2f568e49514edf42b8b5ff5ec3bb7df5b1c1c17988c5db9183cef4d374deec93",
+          "outcomeSha256": "6cfbf115578513a9e42d6264ad6c19fa7aaa323213da5fdd69877f40a6b4b58c",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case09"
+          }
+        },
+        {
+          "caseId": "10",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case10-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case10-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/10_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/10_outcome.json",
+          "inputSha256": "c340c7c63425b32d6a94287cf661e853c90a1731aad9ee88baa1fde192006697",
+          "outcomeSha256": "d11c3692a769529babc7905896151b2e249d1b4d3a496a78f0c648dcc9a4ccd2",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case10"
+          }
+        },
+        {
+          "caseId": "11",
+          "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case11-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case11-outcome.json",
+          "inputSourcePath": "test/coding/rules/intended-incomplete/case2/11_input.json",
+          "outcomeSourcePath": "test/coding/rules/intended-incomplete/case2/11_outcome.json",
+          "inputSha256": "56cb87b3bb481917e4b46863f8d2135427c04cde1127be60e9d08a5706bd0244",
+          "outcomeSha256": "df0dec873ca6adeab3da97369758a4195b78a878e37ad053980d78d9763c2842",
+          "expectedStates": {
+            "rules-intended-incomplete-route": "case11"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-base-no-value",
+      "schemeFixture": "schemes/responses-3.6.0-rules-base-no-value.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-base-no-value-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-base-no-value-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/base-no-value/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/base-no-value/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/base-no-value/01_outcome.json",
+      "schemeSha256": "d00ff6fbf9f22b2b78e2ef2a87794d27dd983a485f200898c7131e0ed588c4e6",
+      "inputSha256": "5efbc50cff08c5ab30cc34919f288bff7daa54ce53ecd87fc485cfb37797b849",
+      "outcomeSha256": "ad4b81fd3029d69827e6031dd009a75295b04579bc2ad7f20e638eda8f405f9e",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-base-no-value-route": "case01"
+      }
+    },
+    {
+      "family": "rule-base-derived-recoding",
+      "schemeFixture": "schemes/responses-3.6.0-rules-base-var-derived-var-same-id.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-base-var-derived-var-same-id-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-base-var-derived-var-same-id-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/base-var-derived-var-same-id/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/base-var-derived-var-same-id/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/base-var-derived-var-same-id/01_outcome.json",
+      "schemeSha256": "495fae405e5933535cafeb59c612e2586ec8ac63ebeeda4f32aa6b0645ed0941",
+      "inputSha256": "25e40bde3bc1b4c7cc2c2854ca56d68feca4d0cfaddadc2a9855cbd20316bd41",
+      "outcomeSha256": "128666f67c7984969b03e7627c528c38c793707c8472eeda5ef2cd9a5465bce8",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-base-var-derived-var-same-id-route": "case01"
+      }
+    },
+    {
+      "family": "rule-intended-incomplete-coding",
+      "schemeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-intended-incomplete-case1-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/intended-incomplete/case1/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/intended-incomplete/case1/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/intended-incomplete/case1/01_outcome.json",
+      "schemeSha256": "250c5283b8bfafa60908676d08a9dd6443735be55c8a6cf0ba5c9744f08073d2",
+      "inputSha256": "34ad68d51e44075b919350bb0340a723a98afdaf52c838a63e8dcdabf24f7083",
+      "outcomeSha256": "ae1364be51a0912ff617e2c659c6e49ca116cf7a1db718ae3bed7ab9288363eb",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-intended-incomplete-case1-route": "case01"
+      }
+    },
+    {
+      "family": "rule-numeric-match",
+      "schemeFixture": "schemes/responses-3.6.0-rules-numeric-match.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-numeric-match-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-match-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/numeric-match/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/numeric-match/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/numeric-match/01_outcome.json",
+      "schemeSha256": "71b00cb4ecef983e6761f256c9e26d701d3b1f55180ab4e3a8a50ff03e8e4d5f",
+      "inputSha256": "bf86cde769fa0941934f4afdfeea660dc92fb0172e326611d2a937256b09282e",
+      "outcomeSha256": "5272db67325537f5c75ba417582e97e0b46efd063613f48bc081f693ba4cca55",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-numeric-match-route": "case01"
+      }
+    },
+    {
+      "family": "rule-rules-and-joined",
+      "schemeFixture": "schemes/responses-3.6.0-rules-rules-and-joined.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-rules-and-joined-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-rules-and-joined-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/rules-and-joined/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/rules-and-joined/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/rules-and-joined/01_outcome.json",
+      "schemeSha256": "6e1618c9eb1d36a85ec161d3cb25106f01db415c5a02b77136ad849155b77241",
+      "inputSha256": "c403dc7fad4c2f662c55bd704600efca7fdfafdfe1b959f3c0e81f8104668411",
+      "outcomeSha256": "b8c731b0b24807861e2a8613835ebc7b3515245b31aef43ca7014986e5256206",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-rules-and-joined-route": "case01"
+      }
+    },
+    {
+      "family": "rule-ruleset-else",
+      "schemeFixture": "schemes/responses-3.6.0-rules-ruleset-true.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-ruleset-true-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-ruleset-true-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/ruleset-true/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/ruleset-true/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/ruleset-true/01_outcome.json",
+      "schemeSha256": "333ad0d66dbeaa8a3615a13d7ebc406bbb09d841fa11cb44934450a1cc98a14d",
+      "inputSha256": "9f4c976f99e666a1fcd66e6859995492ba2a6723c587fc13fd599a5af41291d8",
+      "outcomeSha256": "63f695f4a57b2baae5788ba8910d1016007f2675dbab9c43d53991317216167a",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-ruleset-true-route": "case01"
+      }
+    },
+    {
+      "family": "rule-rulesets-and-joined",
+      "schemeFixture": "schemes/responses-3.6.0-rules-rulesets-and-joined.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-rulesets-and-joined-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-rulesets-and-joined-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/rulesets-and-joined/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/rulesets-and-joined/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/rulesets-and-joined/01_outcome.json",
+      "schemeSha256": "1e45b59a2d4bb13a2c25e8fb6e6415768359bc2961b1d1ae624f4cd7bcbb917d",
+      "inputSha256": "531736a7e14a3bbbe008a11d3211751a3d493e02ece4e33ef60395be96636c09",
+      "outcomeSha256": "99c705ddf2ef8be06b7ec5ffd3cd1a7cee10de800ffb134bb98316c8cceb2b9d",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-rulesets-and-joined-route": "case01"
+      }
+    },
+    {
+      "family": "rule-rulesets-boolean-and-joined",
+      "schemeFixture": "schemes/responses-3.6.0-rules-rulesets-boolean-and-joined.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-rulesets-boolean-and-joined-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-rulesets-boolean-and-joined-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/rulesets-boolean-and-joined/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/rulesets-boolean-and-joined/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/rulesets-boolean-and-joined/01_outcome.json",
+      "schemeSha256": "8d0460840e1ed3f1d6a4e945e9fa62acd10518866e27e5860925e56bf7568446",
+      "inputSha256": "6d7a7e235500f0da3a4ca7f61d6c03db40a4ac3b55f09acdb80d3bddf38dd0a8",
+      "outcomeSha256": "593b0de70e298423dc2b3838e118b9ed06f59ff119c442788353c7cc1740779b",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-rulesets-boolean-and-joined-route": "case01"
+      }
+    }
+  ],
+  "currentOriginalBookletConfigPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/booklet-config",
+    "bookletKeys": ["Cy-Bklt_BkltConfig-1","Cy-Bklt_BkltConfig-2","Cy-Bklt_BkltConfig-3","Cy-Bklt_BkltConfig-4","Cy-Bklt_BkltConfig-5","Cy-Bklt_BkltConfig-6","Cy-Bklt_BkltConfig-7","Cy-Bklt_BkltConfig-8","Cy-Bklt_BkltConfig-9","Cy-Bklt_BkltConfig-10","Cy-Bklt_BkltConfig-11","Cy-Bklt_BkltConfig-12","Cy-Bklt_BkltConfig-13","Cy-Bklt_BkltConfig-14","Cy-Bklt_BkltConfig-15","Cy-Bklt_BkltConfig-16","Cy-Bklt_BkltConfig-17","Cy-Bklt_BkltConfig-18","Cy-Bklt_BkltConfig-19","Cy-Bklt_BkltConfig-20","Cy-Bklt_BkltConfig-21","Cy-Bklt_BkltConfig-22","Cy-Bklt_BkltConfig-23","Cy-Bklt_BkltConfig-24","Cy-Bklt_BkltConfig-25","Cy-Bklt_BkltConfig-26","Cy-Bklt_BkltConfig-27","Cy-Bklt_BkltConfig-28","Cy-Bklt_BkltConfig-29","Cy-Bklt_BkltConfig-30","Cy-Bklt_BkltConfig-31","Cy-Bklt_BkltConfig-32","Cy-Bklt_BkltConfig-33","Cy-Bklt_BkltConfig-34","Cy-Bklt_BkltConfig-35","Cy-Bklt_BkltConfig-36","Cy-Bklt_BkltConfig-37","Cy-Bklt_BkltConfig-38","Cy-Bklt_BkltConfig-39","Cy-Bklt_BkltConfig-40","Cy-Bklt_BkltConfig-41","Cy-Bklt_BkltConfig-42","Cy-Bklt_BkltConfig-43","Cy-Bklt_BkltConfig-44","Cy-Bklt_BkltConfig-45","Cy-Bklt_BkltConfig-46","Cy-Bklt_BkltConfig-47","Cy-Bklt_BkltConfig-48","Cy-Bklt_BkltConfig-49","Cy-Bklt_BkltConfig-50","Cy-Bklt_BkltConfig-51"],
+    "currentBookletOverrides": [
+      {
+        "fixture": "booklets/system-test/current-CY_Bklt_BkltConfig_1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_1.xml",
+        "sha256": "a08c4209fbe4b8ff1e35b980b90f28202ac4f5960dec11e076e09fdb9317c9c9",
+        "bookletKey": "Cy-Bklt_BkltConfig-1"
+      },
+      {
+        "fixture": "booklets/system-test/current-CY_Bklt_BkltConfig_2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_2.xml",
+        "sha256": "f640e9d03498378f0dc2ce91bf10babd90c12db496f1aa958f57060d44d5123e",
+        "bookletKey": "Cy-Bklt_BkltConfig-2"
+      },
+      {
+        "fixture": "booklets/system-test/current-CY_Bklt_BkltConfig_3.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_3.xml",
+        "sha256": "4a109044da175de292d56ffc0a481532fdcef1f11dcdf3599e6fb52fd90fc1a6",
+        "bookletKey": "Cy-Bklt_BkltConfig-3"
+      },
+      {
+        "fixture": "booklets/system-test/current-CY_Bklt_BkltConfig_4.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_4.xml",
+        "sha256": "6e2c7425ae545963dd30506a825ef11a9924b1d0cad360e68b0b6949f8610f26",
+        "bookletKey": "Cy-Bklt_BkltConfig-4"
+      }
+    ],
+    "units": [
+      ["units/current-CY_Unit100.xml.base64", "CY-Unit.Sample-100", "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e"],
+      ["units/current-CY_Unit101.xml.base64", "CY-Unit.Sample-101", "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86"],
+      ["units/current-CY_Unit102.xml.base64", "CY-Unit.Sample-102", "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e"],
+      ["units/current-CY_Unit103.xml.base64", "CY-Unit.Sample-103", "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b"],
+      ["units/current-CY_Unit104.xml.base64", "CY-Unit.Sample-104", "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c"]
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_BkltConfig.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Logins_BkltConfig.xml",
+      "sha256": "940f23538c61cfaba0f00788068a03a4f6c0e45b85b192740e118d42c0e9c900",
+      "groupKey": "bklt-config",
+      "participantCount": 51,
+      "loginPrefix": "Bklt_Config-",
+      "password": "123",
+      "executionMode": "run-hot-restart"
+    }
+  },
+  "bookletConfigPackages": [
+    {
+      "bookletKeys": [
+        "Cy-Bklt_BkltConfig-1",
+        "Cy-Bklt_BkltConfig-2",
+        "Cy-Bklt_BkltConfig-3",
+        "Cy-Bklt_BkltConfig-4"
+      ],
+      "units": [
+        ["units/CY_Unit101.xml", "CY-Unit.Sample-101"],
+        ["units/CY_Unit102.xml", "CY-Unit.Sample-102"],
+        ["units/CY_Unit104.xml", "CY-Unit.Sample-104"]
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_BkltConfig.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Logins_BkltConfig.xml",
+        "sha256": "79f9069466c0623f7c62e644acbf6fd45a2c040ad44b585e6b8f51c24ac70bab",
+        "groupKey": "bklt-config",
+        "participants": [
+          ["Bklt_Config-1", "run-hot-restart", "Cy-Bklt_BkltConfig-1"],
+          ["Bklt_Config-2", "run-hot-restart", "Cy-Bklt_BkltConfig-2"],
+          ["Bklt_Config-3", "run-hot-restart", "Cy-Bklt_BkltConfig-3"],
+          ["Bklt_Config-4", "run-hot-restart", "Cy-Bklt_BkltConfig-4"]
+        ]
+      }
+    }
+  ],
+  "currentOriginalTestControllerPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "65d28718eb6474cf5158206494096d32cd3393f9",
+    "sourceDirectory": "sampledata/system-test/test-controller",
+    "booklets": [
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1a.xml.base64",
+        "Cy-Bklt_TC-1a",
+        "fce9ba850005052989f1f14b5a230b275e23a4defc3c014ab08f2ecaee634c01"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1b.xml.base64",
+        "Cy-Bklt_TC-1b",
+        "da010f2770656025fe6d79f3cb0bef4a7a594e5724e4cf76dd2daff7976daf64"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1c.xml.base64",
+        "Cy-Bklt_TC-1c",
+        "3b7e246562a9d8cca4fae092b6a2a5beaeb259ce11c8b44a90c063c917d3b1cc"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1d.xml.base64",
+        "Cy-Bklt_TC-1d",
+        "766e2ba084c1233c88c754cec12c1db4b9851e43c2e6e38625eff5dbf34bea28"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1e.xml.base64",
+        "Cy-Bklt_TC-1e",
+        "c0d0c6b03bf1833d99a062d409bc0ec959852144af67807ee041e37c62e497f1"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-1f.xml.base64",
+        "Cy-Bklt_TC-1f",
+        "f6a7660997d45dabf04df86f62f1fe84d2a7c8c2d80ab9e76d85f9e07acf3718"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-2a.xml.base64",
+        "Cy-Bklt_TC-2a",
+        "780e0b626ac8a8d3207137fc416e6c0c05c30d025fb5e557b79efa2e7662855f"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-2b.xml.base64",
+        "Cy-Bklt_TC-2b",
+        "09d768a93d4c7a65d293709894c80b4787e1207946fc148b6f15b5fece0285b4"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-2c.xml.base64",
+        "Cy-Bklt_TC-2c",
+        "d0d5394e28b7ee82acc3e2ece873be1b3b443fa4aeb50eae5c8f3004c4a31c68"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-2d.xml.base64",
+        "Cy-Bklt_TC-2d",
+        "1625e40aa60e729ec2433890907b69c4e0536b0eb9473bc970f3f0b94b3ea5b0"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-3.xml.base64",
+        "Cy-Bklt_TC-3",
+        "b8ee122c35c5f7babf6b4d1b61d71e5585509aefda3bf8bb52706798a68065c7"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-4.xml.base64",
+        "Cy-Bklt_TC-4",
+        "e884ccd7fb910ff0156f1903231e2c87275b8e1c59b1f986112fd87d0f1e506f"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-5.xml.base64",
+        "Cy-Bklt_TC-5",
+        "07c8159db975adf83804637fde4db769507e6f1a9568ef898db2701f2d16b147"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-6.xml.base64",
+        "Cy-Bklt_TC-6",
+        "c75b3be5969d4ad867b5e207a48c38f45c00fe85ecb044fbb1bf17d0cb2626dc"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-7.xml.base64",
+        "Cy-Bklt_TC-7",
+        "615f5ecfc739bc05a5481e6b15849e7c2d7a1e21fd98d048d6ec1228720ade08"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-8.xml.base64",
+        "Cy-Bklt_TC-8",
+        "d8e56baf298a1067159c39f54c164c18f3426bfadb702b472330e8bcca0a0651"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-9.xml.base64",
+        "Cy-Bklt_TC-9",
+        "2c257fb1a9eb1128fc95c4d1efee75c33f7363f00888c45891b321b1e3512f78"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-10.xml.base64",
+        "Cy-Bklt_TC-10",
+        "f2b64ee2c407c22783f249bf1612455fb075d7bc00b1b66d0980da4310755565"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-11a.xml.base64",
+        "Cy-Bklt_TC-11a",
+        "b70c7d2c3c59ccd281b938d4d567490c804958b87504e083511ce25360ca67b9"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-11b.xml.base64",
+        "Cy-Bklt_TC-11b",
+        "8a54df24016e01bdcca0f29b8e6ba48d7c22e0d2f60a441bddafadf601c841f9"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-12.xml.base64",
+        "Cy-Bklt_TC-12",
+        "7b6cdb7b9c05b32484d0d8cc107e013f2e879e2c24e3a2d1ba2f2b1a677d948d"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-13.xml.base64",
+        "Cy-Bklt_TC-13",
+        "68e731e8d7744454959b67f68780bddf2d86f4b624091b6f350801c3696ab6f6"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-14.xml.base64",
+        "Cy-Bklt_TC-14",
+        "20db96771605d24912f72fe2fa4fbeed501aa2e99aa0ba0849f6562d3422fc35"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-15.xml.base64",
+        "Cy-Bklt_TC-15",
+        "9a688ed3a3a7c74dc1f0de8bbee648a461ef7ecb9b20fb9381c9588d9b3bfc5f"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-16.xml.base64",
+        "Cy-Bklt_TC-16",
+        "8b1ea3e59dd51c7838422db5bea6b174cc73fad9ba21615fff948d3197ab331d"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-17a.xml.base64",
+        "Cy-Bklt_TC-17a",
+        "ef3a1693120c2dc696e2d7ad55c84279fcc7c5ac7f391a013bbfb3dae4242129"
+      ],
+      [
+        "booklets/system-test/current-CY_Bklt_TC-17b.xml.base64",
+        "Cy-Bklt_TC-17b",
+        "b190a5fecbe9d0d120a83f258615c2366f5aeafdfb557dc5190a4d48597ba60b"
+      ]
+    ],
+    "units": [
+      [
+        "units/current-CY_Unit100.xml.base64",
+        "CY-Unit.Sample-100"
+      ],
+      [
+        "units/current-CY_Unit101.xml.base64",
+        "CY-Unit.Sample-101"
+      ],
+      [
+        "units/current-CY_Unit102.xml.base64",
+        "CY-Unit.Sample-102"
+      ],
+      [
+        "units/current-CY_Unit103.xml.base64",
+        "CY-Unit.Sample-103"
+      ],
+      [
+        "units/current-CY_Unit104.xml.base64",
+        "CY-Unit.Sample-104"
+      ]
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_TestController.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Logins_TestController.xml",
+      "sha256": "0418192823b5d9017127dbad17406ac3283b497d95658293a56e8fa32d147ffa",
+      "participantCount": 36,
+      "groups": [
+        {
+          "groupKey": "demo",
+          "participants": [
+            [
+              "Test_Ctrl-1a",
+              "run-demo",
+              "Cy-Bklt_TC-1a"
+            ],
+            [
+              "Test_Ctrl-1b",
+              "run-demo",
+              "Cy-Bklt_TC-1b"
+            ],
+            [
+              "Test_Ctrl-1c",
+              "run-demo",
+              "Cy-Bklt_TC-1c"
+            ],
+            [
+              "Test_Ctrl-1d",
+              "run-demo",
+              "Cy-Bklt_TC-1d"
+            ],
+            [
+              "Test_Ctrl-1e",
+              "run-demo",
+              "Cy-Bklt_TC-1e"
+            ],
+            [
+              "Test_Ctrl-1f",
+              "run-demo",
+              "Cy-Bklt_TC-1f"
+            ]
+          ]
+        },
+        {
+          "groupKey": "review",
+          "participants": [
+            [
+              "Test_Ctrl-2a",
+              "run-review",
+              "Cy-Bklt_TC-2a"
+            ],
+            [
+              "Test_Ctrl-2b",
+              "run-review",
+              "Cy-Bklt_TC-2b"
+            ],
+            [
+              "Test_Ctrl-2c",
+              "run-review",
+              "Cy-Bklt_TC-2c"
+            ],
+            [
+              "Test_Ctrl-2d",
+              "run-review",
+              "Cy-Bklt_TC-2d"
+            ]
+          ]
+        },
+        {
+          "groupKey": "hot-return",
+          "participants": [
+            [
+              "Test_Ctrl-3",
+              "run-hot-return",
+              "Cy-Bklt_TC-3"
+            ],
+            [
+              "Test_Ctrl-4",
+              "run-hot-return",
+              "Cy-Bklt_TC-3"
+            ],
+            [
+              "Test_Ctrl-5",
+              "run-hot-return",
+              "Cy-Bklt_TC-3"
+            ],
+            [
+              "Test_Ctrl-6",
+              "run-hot-return",
+              "Cy-Bklt_TC-3"
+            ]
+          ]
+        },
+        {
+          "groupKey": "hot-restart",
+          "participants": [
+            [
+              "Test_Ctrl-7",
+              "run-hot-restart",
+              "Cy-Bklt_TC-4"
+            ],
+            [
+              "Test_Ctrl-8",
+              "run-hot-restart",
+              "Cy-Bklt_TC-4"
+            ],
+            [
+              "Test_Ctrl-9",
+              "run-hot-restart",
+              "Cy-Bklt_TC-4"
+            ]
+          ]
+        },
+        {
+          "groupKey": "time-restr",
+          "participants": [
+            [
+              "Test_Ctrl-10",
+              "run-hot-return",
+              "Cy-Bklt_TC-5"
+            ],
+            [
+              "Test_Ctrl-11",
+              "run-hot-return",
+              "Cy-Bklt_TC-5"
+            ],
+            [
+              "Test_Ctrl-12",
+              "run-hot-restart",
+              "Cy-Bklt_TC-5"
+            ],
+            [
+              "Test_Ctrl-13",
+              "run-demo",
+              "Cy-Bklt_TC-5"
+            ],
+            [
+              "Test_Ctrl-14",
+              "run-review",
+              "Cy-Bklt_TC-5"
+            ],
+            [
+              "Test_Ctrl-15",
+              "run-hot-restart",
+              "Cy-Bklt_TC-6"
+            ],
+            [
+              "Test_Ctrl-16",
+              "run-hot-restart",
+              "Cy-Bklt_TC-7"
+            ],
+            [
+              "Test_Ctrl-17",
+              "run-hot-restart",
+              "Cy-Bklt_TC-8"
+            ]
+          ]
+        },
+        {
+          "groupKey": "tslt-restr",
+          "participants": [
+            [
+              "Test_Ctrl-18",
+              "run-hot-restart",
+              "Cy-Bklt_TC-9"
+            ],
+            [
+              "Test_Ctrl-19",
+              "run-hot-restart",
+              "Cy-Bklt_TC-10"
+            ],
+            [
+              "Test_Ctrl-20a",
+              "run-hot-restart",
+              "Cy-Bklt_TC-11a"
+            ],
+            [
+              "Test_Ctrl-20b",
+              "run-hot-restart",
+              "Cy-Bklt_TC-11b"
+            ],
+            [
+              "Test_Ctrl-21",
+              "run-hot-restart",
+              "Cy-Bklt_TC-12"
+            ],
+            [
+              "Test_Ctrl-22",
+              "run-hot-restart",
+              "Cy-Bklt_TC-13"
+            ]
+          ]
+        },
+        {
+          "groupKey": "bklt-cfg-restr",
+          "participants": [
+            [
+              "Test_Ctrl-23",
+              "run-hot-restart",
+              "Cy-Bklt_TC-14"
+            ],
+            [
+              "Test_Ctrl-24",
+              "run-hot-restart",
+              "Cy-Bklt_TC-15"
+            ],
+            [
+              "Test_Ctrl-25",
+              "run-hot-restart",
+              "Cy-Bklt_TC-16"
+            ],
+            [
+              "Test_Ctrl-26a",
+              "run-hot-restart",
+              "Cy-Bklt_TC-17a"
+            ],
+            [
+              "Test_Ctrl-26b",
+              "run-hot-restart",
+              "Cy-Bklt_TC-17b"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "testControllerPackages": [
+    {
+      "bookletKeys": [
+        "Cy-Bklt_TC-1",
+        "Cy-Bklt_TC-2",
+        "Cy-Bklt_TC-3",
+        "Cy-Bklt_TC-4",
+        "Cy-Bklt_TC-5",
+        "Cy-Bklt_TC-6",
+        "Cy-Bklt_TC-7",
+        "Cy-Bklt_TC-8",
+        "Cy-Bklt_TC-9",
+        "Cy-Bklt_TC-10",
+        "Cy-Bklt_TC-11",
+        "Cy-Bklt_TC-12",
+        "Cy-Bklt_TC-13",
+        "Cy-Bklt_TC-14",
+        "Cy-Bklt_TC-15",
+        "Cy-Bklt_TC-16",
+        "Cy-Bklt_TC-17"
+      ],
+      "units": [
+        ["units/CY_Unit100.xml", "CY-Unit.Sample-100"],
+        ["units/CY_Unit101.xml", "CY-Unit.Sample-101"],
+        ["units/CY_Unit102.xml", "CY-Unit.Sample-102"],
+        ["units/CY_Unit103.xml", "CY-Unit.Sample-103"],
+        ["units/CY_Unit104.xml", "CY-Unit.Sample-104"]
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_TestController.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/test-controller/CY_Logins_TestController.xml",
+        "sha256": "cc00c9495ffd0160772cc53957cead0b67003a136020a652a5d81a8191bf4114",
+        "groups": [
+          {
+            "groupKey": "demo",
+            "participants": [["Test_Ctrl-1", "run-demo", "Cy-Bklt_TC-1"]]
+          },
+          {
+            "groupKey": "review",
+            "participants": [["Test_Ctrl-2", "run-review", "Cy-Bklt_TC-2"]]
+          },
+          {
+            "groupKey": "hot-return",
+            "participants": [
+              ["Test_Ctrl-3", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-4", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-5", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-6", "run-hot-return", "Cy-Bklt_TC-3"]
+            ]
+          },
+          {
+            "groupKey": "hot-restart",
+            "participants": [
+              ["Test_Ctrl-7", "run-hot-restart", "Cy-Bklt_TC-4"],
+              ["Test_Ctrl-8", "run-hot-restart", "Cy-Bklt_TC-4"],
+              ["Test_Ctrl-9", "run-hot-restart", "Cy-Bklt_TC-4"]
+            ]
+          },
+          {
+            "groupKey": "time-restr",
+            "participants": [
+              ["Test_Ctrl-10", "run-hot-return", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-11", "run-hot-return", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-12", "run-hot-restart", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-13", "run-demo", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-14", "run-review", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-15", "run-hot-restart", "Cy-Bklt_TC-6"],
+              ["Test_Ctrl-16", "run-hot-restart", "Cy-Bklt_TC-7"],
+              ["Test_Ctrl-17", "run-hot-restart", "Cy-Bklt_TC-8"]
+            ]
+          },
+          {
+            "groupKey": "tslt-restr",
+            "participants": [
+              ["Test_Ctrl-18", "run-hot-restart", "Cy-Bklt_TC-9"],
+              ["Test_Ctrl-19", "run-hot-restart", "Cy-Bklt_TC-10"],
+              ["Test_Ctrl-20", "run-hot-restart", "Cy-Bklt_TC-11"],
+              ["Test_Ctrl-21", "run-hot-restart", "Cy-Bklt_TC-12"],
+              ["Test_Ctrl-22", "run-hot-restart", "Cy-Bklt_TC-13"]
+            ]
+          },
+          {
+            "groupKey": "bklt-cfg-restr",
+            "participants": [
+              ["Test_Ctrl-23", "run-hot-restart", "Cy-Bklt_TC-14"],
+              ["Test_Ctrl-24", "run-hot-restart", "Cy-Bklt_TC-15"],
+              ["Test_Ctrl-25", "run-hot-restart", "Cy-Bklt_TC-16"],
+              ["Test_Ctrl-26", "run-hot-restart", "Cy-Bklt_TC-17"]
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "currentOriginalGroupMonitoringPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/groupmon",
+    "booklet": {
+      "fixture": "booklets/group-monitoring/current-CY_Bklt_GM-1.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/groupmon/CY_Bklt_GM-1.xml",
+      "sha256": "09a079ed04ac347ef90f1ab053bee7f00738983c735fda6a4b3f971b6a53ab3e",
+      "bookletKey": "Cy-Bklt_GM-1",
+      "unitKeys": [
+        "CY-Unit.Sample-100",
+        "CY-Unit.Sample-101",
+        "CY-Unit.Sample-102",
+        "CY-Unit.Sample-103",
+        "CY-Unit.Sample-104"
+      ]
+    },
+    "units": [
+      {
+        "fixture": "units/current-CY_Unit100.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+        "sha256": "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e",
+        "unitKey": "CY-Unit.Sample-100"
+      },
+      {
+        "fixture": "units/current-CY_Unit101.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+        "sha256": "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86",
+        "unitKey": "CY-Unit.Sample-101"
+      },
+      {
+        "fixture": "units/current-CY_Unit102.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+        "sha256": "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e",
+        "unitKey": "CY-Unit.Sample-102"
+      },
+      {
+        "fixture": "units/current-CY_Unit103.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+        "sha256": "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b",
+        "unitKey": "CY-Unit.Sample-103"
+      },
+      {
+        "fixture": "units/current-CY_Unit104.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+        "sha256": "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c",
+        "unitKey": "CY-Unit.Sample-104"
+      }
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_GM.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/groupmon/CY_Logins_GM.xml",
+      "sha256": "b09e694764908728eeb7a874b3c1f7a36f29c6bc5d4b531b60955af9fd54d24b",
+      "participantLoginKeys": ["testtaker-a"],
+      "operationalLoginKeys": ["GM-1"],
+      "monitorPasswordRequired": false
+    }
+  },
+  "groupMonitoringPackages": [
+    {
+      "booklet": {
+        "fixture": "booklets/group-monitoring/CY_Bklt_GM-1.xml",
+        "sourcePath": "sampledata/system-test/groupmon/CY_Bklt_GM-1.xml",
+        "sha256": "5d44bb9faf33a989c91ed8b950730f227b85b13e6c1b8e6fa6d8be294de241bd",
+        "bookletKey": "Cy-Bklt_GM-1",
+        "unitKeys": [
+          "CY-Unit.Sample-100",
+          "CY-Unit.Sample-101",
+          "CY-Unit.Sample-102",
+          "CY-Unit.Sample-103",
+          "CY-Unit.Sample-104"
+        ]
+      },
+      "units": [
+        {
+          "fixture": "units/CY_Unit100.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+          "sha256": "d7fb72c8349ac60e8773774f494203bebdaec3416876cf49bced18202081e063",
+          "unitKey": "CY-Unit.Sample-100"
+        },
+        {
+          "fixture": "units/CY_Unit101.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+          "sha256": "070268e4a13fe4527dcb76d03499d386769dc60513660b91e5df070f2cf34a97",
+          "unitKey": "CY-Unit.Sample-101"
+        },
+        {
+          "fixture": "units/CY_Unit102.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+          "sha256": "d9030c53649b357914ba203efc2e788b7197e797f3a1bb1e2dc21f16e4be2fb4",
+          "unitKey": "CY-Unit.Sample-102"
+        },
+        {
+          "fixture": "units/CY_Unit103.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+          "sha256": "abb8464d00d7fbf60c793a05ea4cf2b9f61a5dcf8123d158ba067389e5a6d1b0",
+          "unitKey": "CY-Unit.Sample-103"
+        },
+        {
+          "fixture": "units/CY_Unit104.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+          "sha256": "9cd532605bbbe8cc332e969c56bd7331e155d96d6114fa80e250a4f19be72d8f",
+          "unitKey": "CY-Unit.Sample-104"
+        }
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "sourcePath": "sampledata/verona-player-simple-6.0.html",
+        "sha256": "e260cdc4bee370f5990390fbcbca17104d8069b43a41c4f0967e13b33fa6a38a",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_GM.xml",
+        "sourcePath": "sampledata/system-test/groupmon/CY_Logins_GM.xml",
+        "sha256": "ef4c8f621f682cee2efd56c2acf78bf63033e355e3579b5bc50dd900420d6722",
+        "participantLoginKeys": ["testtaker-a"],
+        "operationalLoginKeys": ["GM-1"]
+      }
+    }
+  ],
+  "currentOriginalSessionManagementPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/system-test/session-management",
+    "booklets": [
+      {
+        "fixture": "booklets/session-management/current-CY_Bklt_SM-1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-1.xml",
+        "sha256": "512013ab97f785133d53ca69121e9f1c1b54da0dec5bc33c01a3d6a3364e5c5c",
+        "bookletKey": "Cy-Bklt_SM-1",
+        "unitKeys": [
+          "CY-Unit.Sample-100",
+          "CY-Unit.Sample-101",
+          "CY-Unit.Sample-102",
+          "CY-Unit.Sample-103",
+          "CY-Unit.Sample-104"
+        ]
+      },
+      {
+        "fixture": "booklets/session-management/current-CY_Bklt_SM-2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-2.xml",
+        "sha256": "f52e8f4e5c95a7f6646eb78c2fd93865e21415196f2c391c76c72d7e8a3f600d",
+        "bookletKey": "Cy-Bklt_SM-2",
+        "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102"]
+      }
+    ],
+    "units": [
+      {
+        "fixture": "units/current-CY_Unit100.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+        "sha256": "8cd9a2a092c1e968596b0610a38b4e9a49a5a7a42d922022eb64208a5cf4653e",
+        "unitKey": "CY-Unit.Sample-100"
+      },
+      {
+        "fixture": "units/current-CY_Unit101.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+        "sha256": "5891107c96588bcaf03cb98a4a1cfe3380640554697dc093d4caeeabcf841f86",
+        "unitKey": "CY-Unit.Sample-101"
+      },
+      {
+        "fixture": "units/current-CY_Unit102.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+        "sha256": "d430be2cda979b549eca9807628f5a8ef5e21f340153a3604c4d55374cf6621e",
+        "unitKey": "CY-Unit.Sample-102"
+      },
+      {
+        "fixture": "units/current-CY_Unit103.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+        "sha256": "bcc2a35f365a7f69d7e6e081d4f5e9a23076be1f6fd7820dcdeef8fc89ef445b",
+        "unitKey": "CY-Unit.Sample-103"
+      },
+      {
+        "fixture": "units/current-CY_Unit104.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+        "sha256": "ed54fb762137a772d130b10b3b5ac43db05f03e4a0e884389ebd4ef8b4b9f85c",
+        "unitKey": "CY-Unit.Sample-104"
+      }
+    ],
+    "player": {
+      "fixture": "players/verona-player-simple-6.0.5.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/verona-player-simple-6.0.html",
+      "sha256": "bece3e969e4267a5690620b4a9b056c5245c02697628b1306dca630423a7b2d3",
+      "playerKey": "verona-player-simple-6.0"
+    },
+    "roster": {
+      "fixture": "rosters/current-CY_Logins_SM.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/session-management/CY_Logins_SM.xml",
+      "sha256": "aba2147ac8994ed577bbda1a65f5653d2d3246c58f2b01f91dddd9170287a644",
+      "participantLoginKeys": [
+        "SM-1",
+        "SM-2",
+        "SM-3",
+        "SM-4",
+        "SM-5",
+        "SM-6",
+        "SM-10",
+        "SM-11",
+        "SM-12",
+        "SM-7",
+        "SM-8",
+        "SM-9"
+      ]
+    }
+  },
+  "sessionManagementPackages": [
+    {
+      "booklets": [
+        {
+          "fixture": "booklets/session-management/CY_Bklt_SM-1.xml",
+          "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-1.xml",
+          "sha256": "53e6cf423768c53201df2e61e4f05291fffa49997996548398225fac8e348bf6",
+          "bookletKey": "Cy-Bklt_SM-1",
+          "unitKeys": [
+            "CY-Unit.Sample-100",
+            "CY-Unit.Sample-101",
+            "CY-Unit.Sample-102",
+            "CY-Unit.Sample-103",
+            "CY-Unit.Sample-104"
+          ]
+        },
+        {
+          "fixture": "booklets/session-management/CY_Bklt_SM-2.xml",
+          "sourcePath": "sampledata/system-test/session-management/CY_Bklt_SM-2.xml",
+          "sha256": "2faadce90df1c8672f276a7c4f816802a6e5c8da42369d7a1862ec9957563c11",
+          "bookletKey": "Cy-Bklt_SM-2",
+          "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102"]
+        }
+      ],
+      "units": [
+        {
+          "fixture": "units/CY_Unit100.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+          "sha256": "d7fb72c8349ac60e8773774f494203bebdaec3416876cf49bced18202081e063",
+          "unitKey": "CY-Unit.Sample-100"
+        },
+        {
+          "fixture": "units/CY_Unit101.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+          "sha256": "070268e4a13fe4527dcb76d03499d386769dc60513660b91e5df070f2cf34a97",
+          "unitKey": "CY-Unit.Sample-101"
+        },
+        {
+          "fixture": "units/CY_Unit102.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+          "sha256": "d9030c53649b357914ba203efc2e788b7197e797f3a1bb1e2dc21f16e4be2fb4",
+          "unitKey": "CY-Unit.Sample-102"
+        },
+        {
+          "fixture": "units/CY_Unit103.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+          "sha256": "abb8464d00d7fbf60c793a05ea4cf2b9f61a5dcf8123d158ba067389e5a6d1b0",
+          "unitKey": "CY-Unit.Sample-103"
+        },
+        {
+          "fixture": "units/CY_Unit104.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+          "sha256": "9cd532605bbbe8cc332e969c56bd7331e155d96d6114fa80e250a4f19be72d8f",
+          "unitKey": "CY-Unit.Sample-104"
+        }
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "sourcePath": "sampledata/verona-player-simple-6.0.html",
+        "sha256": "e260cdc4bee370f5990390fbcbca17104d8069b43a41c4f0967e13b33fa6a38a",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_SM.xml",
+        "sourcePath": "sampledata/system-test/session-management/CY_Logins_SM.xml",
+        "sha256": "0274750dfc9e0a58ce0322be123a67353f3fff96fc91ac6d139a764eef696b71",
+        "participantLoginKeys": [
+          "SM-1",
+          "SM-2",
+          "SM-3",
+          "SM-4",
+          "SM-5",
+          "SM-6",
+          "SM-10",
+          "SM-11",
+          "SM-12",
+          "SM-7",
+          "SM-8",
+          "SM-9"
+        ]
+      }
+    }
+  ],
+  "veronaSimplePlayerPackages": [
+    {
+      "fixture": "players/verona-simple-player-1.0.1.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "1.0.1",
+      "sourceCommit": "282d552be69cd9005d3829a5053737535f5e6b21",
+      "sourcePath": "verona-simple-player-1.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/1.0.1/verona-simple-player-1.html",
+      "sha256": "08b1c6baca5e2f6e03964fc31253d4ad61028b34e09cd50310b1f449dc748526",
+      "license": "MIT",
+      "playerKey": "verona-simple-player@1.0",
+      "playerModuleId": "verona-simple-player",
+      "playerModuleVersion": "1.0.1",
+      "playerApiVersion": "2.1.0",
+      "metadataFormat": "legacy-meta-element",
+      "unitDefinitionType": "verona-simple-player-1.0.0"
+    },
+    {
+      "fixture": "players/verona-simple-player-2.1.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "2.1.0",
+      "sourceCommit": "9c4c48c77ecc0cfe7fbc8976c63ae7dc73b24710",
+      "sourcePath": "verona-simple-player-2.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/2.1.0/verona-simple-player-2.html",
+      "sha256": "95343e3c9a9855da177f805b81a3b1a43136b4c9ca6f7a1c87a43cd34fb70770",
+      "license": "MIT",
+      "playerKey": "iqb-player-simple@2.1",
+      "playerModuleId": "iqb-player-simple",
+      "playerModuleVersion": "2.1.0",
+      "playerApiVersion": "3.0.0",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "iqb-simple-html@1.0.0"
+    },
+    {
+      "fixture": "players/verona-simple-player-4.0.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "4.0.0",
+      "sourceCommit": "b17de1c6ec96e5da1343dfc9b14e0e56f3104ec2",
+      "sourcePath": "verona-player-simple-4.0.0.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/4.0.0/verona-player-simple-4.0.0.html",
+      "sha256": "3d7023bc70bbaf1996480ba24feecb0fe5394dcf58a325da6b9c3e07cac35f6b",
+      "license": "MIT",
+      "playerKey": "verona-player-simple@4.0",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "4.0.0",
+      "playerApiVersion": "4.0",
+      "metadataFormat": "experimental-jsonld",
+      "unitDefinitionType": "verona-player-simple-4.0.0"
+    },
+    {
+      "fixture": "players/verona-simple-player-5.2.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "5.2.0",
+      "sourceCommit": "35a14250e9b3fa650249489a74ca49328b30878b",
+      "sourcePath": "verona-player-simple-5.2.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/5.2.0/verona-player-simple-5.2.html",
+      "sha256": "23177baf0020355e04c52841b61e872c62aed7c536dfa93155783d3ae1bf0727",
+      "license": "MIT",
+      "playerKey": "verona-player-simple@5.2",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "5.2.0",
+      "playerApiVersion": "5.2",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "verona-player-simple-5.2"
+    }
+  ],
+  "veronaPlayerFamilyPackages": [
+    {
+      "family": "ABI scripted survey",
+      "playerFixture": "players/iqb-player-abi-3.3.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/abi-example-script-3.3.0.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-abi",
+      "sourceTag": "v3.3.0",
+      "sourceCommit": "1e872a261c6a20b7dfe1f86d8916cfe643acdfb8",
+      "playerSourcePath": "iqb-player-abi@3.3.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-abi/releases/download/v3.3.0/iqb-player-abi%403.3.0.html",
+      "playerSha256": "c035721f902f188d66ea38277e2ed09cd99d4210810e4127feb4ee30056516bb",
+      "definitionSourcePath": "example-script.voud",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-abi/releases/download/v3.3.0/example-script.voud",
+      "definitionSha256": "3acf683d0e47dc3e726c68138896cb777dbe59afb1fe179b0a0e35370da1a577",
+      "license": "MIT",
+      "playerKey": "iqb-player-abi@3.3",
+      "playerModuleId": "iqb-player-abi",
+      "playerModuleVersion": "3.3.0",
+      "playerApiVersion": "2.1.0",
+      "metadataApiVersion": "2.0",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "iqb-scripted@1.0",
+      "unitStateType": "iqb-key-value@1.0.0"
+    },
+    {
+      "family": "ABI current-release scripted survey",
+      "playerFixture": "players/verona-player-abi-5.0.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/abi-example-script-5.0.0.voud",
+      "definitionEncoding": "utf8",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-abi",
+      "sourceTag": "5.0.0",
+      "sourceCommit": "05bcb7ffc4fc99245f74f3089465220ae6285bfe",
+      "playerSourcePath": "verona-player-abi-5.0.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-abi/releases/download/5.0.0/verona-player-abi-5.0.0.html",
+      "playerSha256": "56f794fc5a34ebdd7b1d11f2d5601ca6377d4f04be73dee8f516a25f2ab144ef",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-abi",
+      "definitionSourceCommit": "05bcb7ffc4fc99245f74f3089465220ae6285bfe",
+      "definitionSourcePath": "example-units/example-script.voud",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-abi/05bcb7ffc4fc99245f74f3089465220ae6285bfe/example-units/example-script.voud",
+      "definitionSha256": "eb041d5e0857399be51b39ae1a2df4655842c877e9131ddbb9cb02c98e314f09",
+      "license": "MIT",
+      "playerKey": "iqb-player-abi@5.0",
+      "playerModuleId": "iqb-player-abi",
+      "playerModuleVersion": "5.0.0",
+      "playerApiVersion": "4",
+      "metadataApiVersion": "5.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "iqb-scripted@1.0",
+      "unitStateType": "iqb-standard@1.1"
+    },
+    {
+      "family": "Aspect current-release assessment",
+      "playerFixture": "players/iqb-player-aspect-2.12.6.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/aspect-current-testcenter-sample1.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-aspect",
+      "sourceTag": "editor/2.12.6+player/2.12.6",
+      "sourceCommit": "b281f3353ee12b3d70d48cdca4a441d569f6763b",
+      "playerSourcePath": "iqb-player-aspect-2.12.6.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-modules-aspect/releases/download/editor/2.12.6%2Bplayer/2.12.6/iqb-player-aspect-2.12.6.html",
+      "playerByteSize": 3605455,
+      "playerSha256": "147563ed3129f03aa6d204b2a8195c0da9caa2c5f6a2fc6581abdc1b76403bb8",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/testcenter",
+      "definitionSourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+      "definitionSourcePath": "sampledata/aspect/testcenter-sample1.voud",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/testcenter/a5a6d25a72990d667300804c337cc5b500b01d2f/sampledata/aspect/testcenter-sample1.voud",
+      "definitionSha256": "03b24c4ce44b86cfb489eb82cc9668815563693d1660c7971648fcc7ba7903ff",
+      "license": "MIT",
+      "playerKey": "iqb-player-aspect@2.12",
+      "playerModuleId": "iqb-player-aspect",
+      "playerModuleVersion": "2.12.6",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "aspect-unit-definition",
+      "unitStateType": "iqb-standard@1.0"
+    },
+    {
+      "family": "DAN visual assessment",
+      "playerFixture": "players/iqb-player-dan-3.0.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/dan-g231mm-3.0.0.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-dan",
+      "sourceTag": "v3.0.0",
+      "sourceCommit": "89d21726c70a014c179b95cd846ff31a25821a21",
+      "playerSourcePath": "iqb-player-dan@3.0.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-dan/releases/download/v3.0.0/iqb-player-dan%403.0.0.html",
+      "playerSha256": "14300f0130bd02494f10819fb6093073de693ad4bff388ab6931b296beed8f12",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-testbed",
+      "definitionSourceCommit": "1343550c864701daf9ca4a1b064351b37a617d89",
+      "definitionSourcePath": "example_units/G231mm.voud",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.voud",
+      "definitionSha256": "e6e1b9d7daf945332e9e1a224b1d9c2566c49ed0b368a642d3e795cca2285075",
+      "license": "MIT",
+      "playerKey": "iqb-player-dan@3.0",
+      "playerModuleId": "iqb-player-dan",
+      "playerModuleVersion": "3.0.0",
+      "playerApiVersion": "2.1.0",
+      "metadataApiVersion": "2.1",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "IQBVisualUnitPlayerV2.1.0",
+      "unitStateType": "IQBVisualUnitPlayerV2.1.0",
+      "legacyTestbedPackage": {
+        "playerFixture": "players/iqb-visual-unit-player-v2.99.2.html.br.base64",
+        "playerEncoding": "brotli-base64",
+        "playerKey": "IQBVisualUnitPlayerV2",
+        "playerModuleVersion": "2.99.2",
+        "playerApiVersion": "2.1.0",
+        "playerSourcePath": "player/IQBVisualUnitPlayerV2.99.2.html",
+        "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/player/IQBVisualUnitPlayerV2.99.2.html",
+        "playerSha256": "d6fc46a7a2b8e4ea50a3ef1df04b400396f67e55f515dee11bf107ef984e65af",
+        "unitFixture": "units/dan-g231mm.xml",
+        "unitEncoding": "utf8",
+        "unitSourcePath": "example_units/G231mm.xml",
+        "unitSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.xml",
+        "unitSha256": "fbd8e6b7244ed46dd25ea1fe7ff8497f01d3384260a879293d68aca8f5c8c9b2"
+      }
+    },
+    {
+      "family": "DAN current-release visual assessment",
+      "playerFixture": "players/iqb-player-dan-3.1.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/dan-g231mm-3.0.0.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-dan",
+      "sourceTag": "3.1.0",
+      "sourceCommit": "d2d2f4eb668f264d13b84d733cb152cc8a647445",
+      "playerSourcePath": "iqb-player-dan@3.1.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-dan/releases/download/3.1.0/iqb-player-dan%403.1.0.html",
+      "playerSha256": "8da94be85ff57b705114c7ff25d6252cb4f59e05aa933f13473b2b336a30e867",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-testbed",
+      "definitionSourceCommit": "1343550c864701daf9ca4a1b064351b37a617d89",
+      "definitionSourcePath": "example_units/G231mm.voud",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.voud",
+      "definitionSha256": "e6e1b9d7daf945332e9e1a224b1d9c2566c49ed0b368a642d3e795cca2285075",
+      "license": "MIT",
+      "playerKey": "iqb-player-dan@3.1",
+      "playerModuleId": "iqb-player-dan",
+      "playerModuleVersion": "3.1.0-beta",
+      "playerApiVersion": "4",
+      "metadataApiVersion": "5.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "IQBVisualUnitPlayerV2.1.0",
+      "unitStateType": "IQBVisualUnitPlayerV2.1.0"
+    },
+    {
+      "family": "EVA scripted survey",
+      "playerFixture": "players/verona-player-eva-1.0.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/eva-scripted-survey-1.0.0.voud",
+      "definitionEncoding": "utf8",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-eva",
+      "sourceTag": "v1.0.0",
+      "sourceCommit": "a704af05e31eff3c45c603cbe664897ba5c372e4",
+      "playerSourcePath": "verona-player-eva@1.0.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-eva/releases/download/v1.0.0/verona-player-eva%401.0.0.html",
+      "playerSha256": "609f2d1fda73e85b78b950d637e7d82239637627e159d169dc3793147efd8387",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-data-specifications",
+      "definitionSourceCommit": "4111fc8807cec9f9a7d3196adf23d13efa876ac1",
+      "definitionSourcePath": "unit-defs/manual_iqb-scripted.md",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-data-specifications/blob/4111fc8807cec9f9a7d3196adf23d13efa876ac1/unit-defs/manual_iqb-scripted.md",
+      "definitionExtraction": "minimal executable survey derived from the pinned official iqb-scripted 1.0 element examples",
+      "definitionSha256": "f77792ee12b5863f3ed833f6e15d47a81359c18694db431682bcebcc809a6196",
+      "license": "MIT",
+      "playerKey": "verona-player-eva@1.0",
+      "playerModuleId": "verona-player-eva",
+      "playerModuleVersion": "1.0.0",
+      "playerApiVersion": "2.1.0",
+      "metadataApiVersion": "2.1",
+      "metadataFormat": "legacy-html-meta",
+      "unitDefinitionType": "iqb-scripted@1.0",
+      "unitStateType": "iqb-key-value@1.0.0"
+    },
+    {
+      "family": "STARS choice interaction",
+      "playerFixture": "players/iqb-player-stars-0.6.19.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/stars-buttons-radio-0.6.19.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "sourceTag": "0.6.19",
+      "sourceCommit": "fdc2eb01016ec65bf1e5250eb44c0acfb54c690d",
+      "playerSourceRepository": "https://github.com/iqb-berlin/verona-player-testbed",
+      "playerSourceCommit": "1343550c864701daf9ca4a1b064351b37a617d89",
+      "playerSourcePath": "player/iqb-player-stars-0.6.19.html",
+      "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/player/iqb-player-stars-0.6.19.html",
+      "playerSha256": "288e78a1a11313b4af8de8cc859408e512ef967e0b5fe2f8883c99fea3c5c1b2",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "definitionSourceCommit": "fdc2eb01016ec65bf1e5250eb44c0acfb54c690d",
+      "definitionSourcePath": "projects/player/test/unitdata/buttons/radio/buttons_2Rows_2-2_big_radio_option_text.json",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-stars/fdc2eb01016ec65bf1e5250eb44c0acfb54c690d/projects/player/test/unitdata/buttons/radio/buttons_2Rows_2-2_big_radio_option_text.json",
+      "definitionSha256": "0d28877bcd1f08ff963328dd558dbc89914f35567c1b88224e24c7be29d75d43",
+      "license": "MIT",
+      "playerKey": "iqb-player-stars@0.6",
+      "playerModuleId": "iqb-player-stars",
+      "playerModuleVersion": "0.6.19",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "stars-unit-definition@0.17",
+      "unitStateType": "iqb-standard@1.1"
+    },
+    {
+      "family": "STARS current-release choice interaction",
+      "playerFixture": "players/iqb-player-stars-0.7.2.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/stars-buttons-option-text-0.7.2.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "sourceTag": "0.7.2",
+      "sourceCommit": "c156efd37536a8e2b182cc9ab470cdb8eaa222f8",
+      "playerSourcePath": "iqb-player-stars-0.7.2.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-modules-stars/releases/download/0.7.2/iqb-player-stars-0.7.2.html",
+      "playerSha256": "db892b71db21f63408ad6c51e8ee49e3e5939eed9e920640ebb5686d3d6f8f34",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "definitionSourceCommit": "c156efd37536a8e2b182cc9ab470cdb8eaa222f8",
+      "definitionSourcePath": "cypress/fixtures/interaction-buttons/buttons_option_text_test.json",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-stars/c156efd37536a8e2b182cc9ab470cdb8eaa222f8/cypress/fixtures/interaction-buttons/buttons_option_text_test.json",
+      "definitionSha256": "314f5a7ff325a19992b72b869ebbdbbfca851dd23940189359424a6ece323b30",
+      "license": "MIT",
+      "playerKey": "iqb-player-stars@0.7",
+      "playerModuleId": "iqb-player-stars",
+      "playerModuleVersion": "0.7.2",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "stars-unit-definition@5.3",
+      "unitStateType": "iqb-standard@2.0"
+    },
+    {
+      "family": "Speedtest timed choice",
+      "playerFixture": "players/verona-player-speedtest-1.2.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/speedtest-example-1.2.0.txt.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-speedtest",
+      "sourceTag": "1.2.0",
+      "sourceCommit": "fce0e23229ab1ca62630f1f6ec15a13fa878b95d",
+      "playerSourcePath": "verona-player-speedtest.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-speedtest/releases/download/1.2.0/verona-player-speedtest-1.2.0.html",
+      "playerSha256": "ae691f8f55e40e1f39dc7a73de5b5ff7aa6dae2bfadaabfb59614784491c18c9",
+      "definitionSourcePath": "test/test.spec.js",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-speedtest/blob/fce0e23229ab1ca62630f1f6ec15a13fa878b95d/test/test.spec.js#L52",
+      "definitionExtraction": "unitDefinition literal from the official load-unit test",
+      "definitionSha256": "63a35e15d8fab6178b0f801ba85e20dcd31b43940e138d94019b8bfc3ea8fff3",
+      "license": "MIT",
+      "playerKey": "verona-player-speedtest-1.2.0",
+      "playerModuleId": "verona-player-speedtest",
+      "playerModuleVersion": "1.2.0",
+      "playerApiVersion": "4",
+      "metadataApiVersion": "5.0",
+      "metadataFormat": "metadata-2.0",
+      "unitStateType": "iqb-standard@1.0"
+    },
+    {
+      "family": "Speedtest current-release timed choice",
+      "playerFixture": "players/iqb-player-speedtest-3.3.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/speedtest-text-choice-3.3.0.json",
+      "definitionEncoding": "utf8",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-speedtest",
+      "sourceTag": "3.3.0",
+      "sourceCommit": "89d15006f3daa68bb5f26355b6f298cd12b8a993",
+      "playerSourcePath": "iqb-player-speedtest-3.3.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-modules-speedtest/releases/download/3.3.0/iqb-player-speedtest-3.3.0.html",
+      "playerSha256": "c2b9df06e6e436775f2b1d70ea0a4099292d4ae1186334b0c0556d8d2a5f2580",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-speedtest",
+      "definitionSourceCommit": "89d15006f3daa68bb5f26355b6f298cd12b8a993",
+      "definitionSourcePath": "package.json + projects/editor/src/app/services/unit.service.ts + projects/editor/src/app/services/csv-parser.spec.ts",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-modules-speedtest/tree/89d15006f3daa68bb5f26355b6f298cd12b8a993",
+      "definitionExtraction": "minimal executable two-question definition derived from the pinned official UnitService defaults, package definition version, and CSV parser expectations",
+      "definitionSha256": "0e7c9194132ee3f1239c57b62eddbba1a77f59a53ebd6d5d9440a4c77db0d595",
+      "license": "MIT",
+      "playerKey": "iqb-player-speedtest@3.3",
+      "playerModuleId": "iqb-player-speedtest",
+      "playerModuleVersion": "3.3.0",
+      "playerApiVersion": "5.2",
+      "metadataApiVersion": "5.2",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "speedtest-unit-definition@1.0.0",
+      "unitStateType": "iqb-standard@1.0"
+    },
+    {
+      "family": "Lottie shared-parameter interaction",
+      "playerFixture": "players/iqb-player-lottie-1.2.2.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/lottie-shared-parameters-1.2.2.json",
+      "definitionEncoding": "utf8",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-lottie",
+      "sourceTag": "1.2.2",
+      "sourceCommit": "764be685e15f66893ab986428cf62699c26f121e",
+      "playerSourcePath": "iqb-player-lottie-1.2.2.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-lottie/releases/download/1.2.2/iqb-player-lottie-1.2.2.html",
+      "playerSha256": "6a46febd83579359d943788c9eea3634ec46b55b04507f19448ffa0ca54d43a0",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-lottie",
+      "definitionSourceCommit": "764be685e15f66893ab986428cf62699c26f121e",
+      "definitionSourcePath": "src/player/app/models/unit.model.ts + src/player/app/services/unit.service.ts + src/player/app/components/scene/scene.component.ts",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-lottie/tree/764be685e15f66893ab986428cf62699c26f121e/src/player/app",
+      "definitionExtraction": "minimal executable shared-parameter contract fixture derived from the pinned official UnitData, SceneData, and interaction implementation",
+      "definitionSha256": "8d0ccaa127affc70020c4bd8797f64e8e101a86ec790866c9936a0175c24a952",
+      "license": "MIT",
+      "playerKey": "iqb-player-lottie@1.2",
+      "playerModuleId": "iqb-player-lottie",
+      "playerModuleVersion": "1.2.2",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-3.1-with-legacy-extensions",
+      "metadataCompatibilityWarnings": [
+        "retains the legacy '$schema' instance property",
+        "uses the legacy lowercase 'player' module type",
+        "retains the legacy 'notSupportedFeatures' property",
+        "uses a singleton dependency object instead of an array"
+      ],
+      "requiredResourceId": "avatar.itcr.zip"
+    },
+    {
+      "family": "IB ItemBuilder migration study",
+      "playerFixture": "players/verona-player-ib-0.2.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/ib-simple-0.2.0.voud.json",
+      "definitionEncoding": "utf8",
+      "resourceFixture": "resources/IB_SAMPLE_2025.itcr.zip.base64",
+      "resourceEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-ib",
+      "sourceTag": "unreleased-master-snapshot",
+      "sourceCommit": "285e155db7637edfca75191c00c722afe736f510",
+      "playerSourcePath": "src/verona-player-ib-0.2.html",
+      "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-ib/285e155db7637edfca75191c00c722afe736f510/src/verona-player-ib-0.2.html",
+      "playerSha256": "298fc62dd8b0645e21862b678c3d66f77cb17eb4edd6be28a3f89d69c0e24bac",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-ib",
+      "definitionSourceCommit": "285e155db7637edfca75191c00c722afe736f510",
+      "definitionSourcePath": "script/package-builder.js + sample-data/Simple/config.json",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-modules-ib/tree/285e155db7637edfca75191c00c722afe736f510/sample-data/Simple",
+      "definitionExtraction": "exact package-builder Unit definition for the official Simple sample and deterministic package id IB_SAMPLE_2025",
+      "definitionSha256": "25af91a80887b51d69194dcc31ad336622d6489d51d6696a83ea862bdaa1ce7b",
+      "resourceSha256": "e1d27bb1f475ab01b6a7a134ba4279206951adb2a20480bb9cf9c6e10f091e13",
+      "resourceBuild": "deterministic ZIP of the package-builder output with normalized file timestamps and package id IB_SAMPLE_2025",
+      "runtimeSourceRepository": "https://github.com/DIPFtba/CBAItemBuilderSupportedRuntimes",
+      "runtimeSourceCommit": "3b6cd474a76f82087e632ad8de14f6818ad754ca",
+      "runtimeVersion": "9.9.0",
+      "license": "MIT",
+      "playerKey": "verona-player-ib@0.2",
+      "playerModuleId": "verona-player-ib",
+      "playerModuleVersion": "0.2.0",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitStateType": "iqb-standard@1.4",
+      "metadataCompatibilityWarnings": [
+        "the official repository labels this snapshot as a feasibility study rather than a production release",
+        "the upstream package builder references a 0.2.0 filename while publishing the player as 0.2",
+        "the pinned legacy runtime requires a hash-pinned immediate-parent origin adapter inside the sandbox; interactive state capture is covered, but the feasibility Player does not restore supplied Unit state"
+      ],
+      "requiredResourceId": "IB_SAMPLE_2025.itcr.zip"
+    }
+  ],
+  "currentOriginalStarsPackage": {
+    "family": "Original Testcenter STARS system test",
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "94b04751abfe024eb1d354c29718f90b4740c4c6",
+    "sourceDirectory": "sampledata/system-test/load-player/stars",
+    "player": {
+      "fixture": "players/iqb-player-stars-0.6.40.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/iqb-player-stars-0.6.40.html",
+      "sha256": "04cc96dc343bc4c2f4f248669569a9673fadd104685a8e3232ee3214a09d4cd5",
+      "playerKey": "iqb-player-stars@0.6",
+      "playerModuleId": "iqb-player-stars",
+      "playerModuleVersion": "0.6.40",
+      "playerApiVersion": "6.0",
+      "metadataVersion": "2.0",
+      "unitStateType": "iqb-standard@2.0"
+    },
+    "unit": {
+      "fixture": "units/CY-StarsUnit-001.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.xml",
+      "sha256": "9df6b68828b126a05c5656afe4e879df801572766e37cc6ceda157b7bc6e828f",
+      "unitKey": "CY-StarsUnit-001"
+    },
+    "definition": {
+      "fixture": "definitions/stars-CY-StarsUnit-001.voud.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.voud",
+      "sha256": "d2de55691182b7277a3ba80c6e96a787e95e00f45fead9cfadc5ce470f99a131",
+      "definitionType": "stars-unit-definition@0.7"
+    },
+    "metadata": {
+      "fixture": "definitions/stars-CY-StarsUnit-001.vomd.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY-StarsUnit-001.vomd",
+      "sha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
+    },
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Stars.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Bklt_Stars.xml",
+      "sha256": "af4f05ae04b190ef9f010d22f36e7a684b831afa3707b885ea60e5d9cdc5a8b3",
+      "bookletKey": "Cy-Bklt_Stars-1",
+      "unitKey": "CY-StarsUnit-001",
+      "unitCount": 28,
+      "aliases": [
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+        "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+        "21", "22", "23", "24", "25", "26", "27", "28"
+      ]
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Stars.xml",
+      "sourcePath": "sampledata/system-test/load-player/stars/CY_Logins_Stars.xml",
+      "sha256": "63401d260a84e71e0270b84faea4f53f64c7c94f7f4a3b9a96bda3faedba83f0",
+      "groupKey": "group1",
+      "participantLogins": [
+        ["stars-1", "run-review"],
+        ["stars-2", "run-demo"],
+        ["stars-3", "run-hot-return"],
+        ["stars-4", "run-hot-restart"]
+      ]
+    }
+  },
+  "currentOriginalSpeedPackage": {
+    "family": "Original Testcenter Speedtest system test",
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "6455e265421777124f379090257365b70b21641f",
+    "sourceDirectory": "sampledata/system-test/load-player/speed",
+    "player": {
+      "fixture": "players/iqb-player-speedtest-9.9.99-cypress.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/system-test/load-player/speed/iqb-player-speedtest-9.9.99-cypress.html",
+      "sha256": "a480ee2b4d785bc59ca04a02e3f23c49ac3e2ca9a9e3bbbe1007ca942676a8b7",
+      "playerKey": "iqb-player-speedtest@9.9",
+      "playerModuleId": "iqb-player-speedtest",
+      "playerModuleVersion": "9.9.99-cypress",
+      "playerApiVersion": "5.2",
+      "metadataVersion": "2.0",
+      "unitStateType": "iqb-standard@1.0"
+    },
+    "units": [
+      {
+        "fixture": "units/CY-SpeedUnit-001.xml",
+        "sourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-001.xml",
+        "sha256": "2dfcae9a2361abffeb7b1fc272e7fceaae0c41ac4ad6befc5e9a1990ed8d5997",
+        "unitKey": "speed-u1",
+        "definitionFixture": "definitions/speed-current-CY-SpeedUnit-001.voud.br.base64",
+        "definitionEncoding": "brotli-base64",
+        "definitionSourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-001.voud",
+        "definitionSha256": "875c470938b946ca1dbc425123625500be34e2fd7a33aa19a0162eaa5199835f"
+      },
+      {
+        "fixture": "units/CY-SpeedUnit-002.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-002.xml",
+        "sha256": "577ca2ac9ea71b6795dd19070bb066316cebfa4c3cabd177821072a10dc60cb2",
+        "unitKey": "speed-u2",
+        "definitionFixture": "definitions/speed-current-CY-SpeedUnit-002.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/system-test/load-player/speed/CY-SpeedUnit-002.voud",
+        "definitionSha256": "435d54d3cfa18a2e951928fd041ce3f59efc41aca875f82841d6bd41c7edae86"
+      }
+    ],
+    "booklet": {
+      "fixture": "booklets/system-test/CY_Bklt_Speed.xml",
+      "sourcePath": "sampledata/system-test/load-player/speed/CY_Bklt_Speed.xml",
+      "sha256": "2af8b83065a3dc5d476b558a4e847a37f59d6760dcbda74e51e8ef74c140b090",
+      "bookletKey": "Cy-Bklt_Speed-1",
+      "unitKeys": ["speed-u2", "speed-u1", "s1", "s2", "s3", "s4", "s5"],
+      "originalUnitIds": ["speed-u2", "speed-u1", "speed-u2", "speed-u1", "speed-u2", "speed-u1", "speed-u2"],
+      "testletIds": ["speed-block-1", "speed-block-2", "speed-block-3"],
+      "timedUnitKeys": ["speed-u1", "s2", "s4"],
+      "timeMaxMinutes": 10,
+      "timeMaxLeave": "confirm"
+    },
+    "roster": {
+      "fixture": "rosters/CY_Logins_Speed.xml",
+      "sourcePath": "sampledata/system-test/load-player/speed/CY_Logins_Speed.xml",
+      "sha256": "1481ad0ab0b1a216ece271ac74366dc501532c0d501185e355aee19ddb1b11fc",
+      "groupKey": "group-1",
+      "participantLogins": [["speed-1", "run-hot-restart"]]
+    }
+  },
+  "currentOriginalAspectPackage": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "sampledata/aspect",
+    "booklets": [
+      {
+        "fixture": "booklets/aspect-current-booklet1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/booklet1.xml",
+        "sha256": "42cec20a4e2e943402844d4e5c315abec1d2f3cfcf687c40364ac105bf0c4243",
+        "bookletKey": "booklet1",
+        "unitKeys": ["testcenter-sample1", "testcenter-sample2", "testcenter-sample3"]
+      },
+      {
+        "fixture": "booklets/aspect-current-booklet2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/booklet2.xml",
+        "sha256": "ae17d6eaa42978fdfb33b70cbc868c5f98c2a43bd1401a5423074580fb77a840",
+        "bookletKey": "booklet2",
+        "unitKeys": ["testcenter-sample1", "testcenterTEST4", "testcenter-sample3"]
+      }
+    ],
+    "units": [
+      {
+        "fixture": "units/aspect-current-testcenter-sample1.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample1.xml",
+        "sha256": "2c0116db583f9d2a52eb8e7542f3e646637298afe1c7839681479f3838c8be2c",
+        "unitKey": "testcenter-sample1",
+        "definitionFixture": "definitions/aspect-current-testcenter-sample1.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample1.voud",
+        "definitionSha256": "03b24c4ce44b86cfb489eb82cc9668815563693d1660c7971648fcc7ba7903ff",
+        "metadataReferenceFixture": "definitions/aspect-testcenter-sample1.vomd.base64"
+      },
+      {
+        "fixture": "units/aspect-current-testcenter-sample2.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample2.xml",
+        "sha256": "d0d30adb409316fbd1a7c4de9aa9cd0e467d97b1b27ab23a486e7d405f200950",
+        "unitKey": "testcenter-sample2",
+        "definitionFixture": "definitions/aspect-testcenter-sample2.voud.br.base64",
+        "definitionEncoding": "brotli-base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample2.voud",
+        "definitionSha256": "c7af813cca325099fa7659cb7b2c5dd01a8e35cc2f3c96cf937c9769d05b6fa8"
+      },
+      {
+        "fixture": "units/aspect-current-testcenter-sample3.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenter-sample3.xml",
+        "sha256": "7d95fbd7b21b0342e6b1b64e9fbb679bc3016bebe64d6de51656bfed50e96db1",
+        "unitKey": "testcenter-sample3",
+        "definitionFixture": "definitions/aspect-current-testcenter-sample3.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenter-sample3.voud",
+        "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a",
+        "metadataReferenceFixture": "definitions/aspect-testcenter-sample3.vomd.base64"
+      },
+      {
+        "fixture": "units/aspect-current-testcenterTEST4.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/aspect/testcenterTEST4.xml",
+        "sha256": "b30c8e3e5c5059baf01cfba559fdd4407d471f3ca34382c604e442f357ade31c",
+        "unitKey": "testcenterTEST4",
+        "definitionFixture": "definitions/aspect-current-testcenterTEST4.voud.base64",
+        "definitionEncoding": "base64",
+        "definitionSourcePath": "sampledata/aspect/testcenterTEST4.voud",
+        "definitionSha256": "2d09ee890615a5543be3ff98b998a69b21db505b4d14717fdce91981415cd204"
+      }
+    ],
+    "player": {
+      "fixture": "players/iqb-player-aspect-2.12.3.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourcePath": "sampledata/aspect/iqb-player-aspect-2.12.3.html",
+      "sha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5",
+      "playerKey": "iqb-player-aspect@2.12"
+    },
+    "roster": {
+      "fixture": "rosters/aspect-testtaker1-current.xml.base64",
+      "encoding": "base64",
+      "sourcePath": "sampledata/aspect/testtaker1.xml",
+      "sha256": "f6560783a32a30392ad5e0287ade5e7eac50d83a652db04acf94536ce424f967",
+      "groupKey": "TestTakerGroup_d4v9z",
+      "participantLoginKeys": ["testuser1", "testuser2", "testuser3", "testuser-review"],
+      "operationalLoginKeys": ["testuser-monitor"],
+      "assignments": {
+        "testuser1": ["booklet1", "booklet2"],
+        "testuser2": ["booklet1"],
+        "testuser3": ["booklet1"],
+        "testuser-review": ["booklet1"]
+      },
+      "accessCodes": {
+        "testuser1": ["xxx", "yyy", "11111"],
+        "testuser2": ["xxx", "yyy", "111"],
+        "testuser3": ["xxx", "yyy", "11111"]
+      }
+    }
+  },
+  "playerPackages": [
+    {
+      "bookletFixture": "booklets/booklet-17.4.xml",
+      "playerFixture": "players/iqb-player-aspect-2.12.3.html.br.base64",
+      "sourcePaths": {
+        "booklet": "sampledata/aspect/booklet1.xml",
+        "player": "sampledata/aspect/iqb-player-aspect-2.12.3.html"
+      },
+      "bookletKey": "booklet1",
+      "playerKey": "iqb-player-aspect@2.12",
+      "playerModuleVersion": "2.12.3",
+      "playerApiVersion": "6.0",
+      "playerSha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5",
+      "roster": {
+        "fixture": "rosters/aspect-testtaker1.xml",
+        "sourcePath": "sampledata/aspect/testtaker1.xml",
+        "sha256": "615fbfeb86c6a7060fadf3d72237002c16cd6fe8786f8659d5b1532efafd818c",
+        "groupKey": "TestTakerGroup_d4v9z",
+        "participantLoginKeys": ["testuser1", "testuser2", "testuser-review"],
+        "operationalLoginKeys": ["testuser-monitor"],
+        "customTexts": { "login_testEndButtonText": "Test beenden" }
+      },
+      "units": [
+        {
+          "unitKey": "testcenter-sample1",
+          "unitFixture": "units/aspect-testcenter-sample1.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample1.voud",
+          "definitionEncoding": "utf8",
+          "metadataReferenceFixture": "definitions/aspect-testcenter-sample1.vomd.base64",
+          "metadataReferenceEncoding": "base64",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample1.xml",
+            "definition": "sampledata/aspect/testcenter-sample1.voud",
+            "metadataReference": "sampledata/aspect/testcenter-sample1.vomd"
+          },
+          "unitSha256": "d4f699a4af07b36edfbe34e3fd0f7e02425df22b533d0c763877e2409416232c",
+          "definitionSha256": "2b62797529990581859363634476a4ca96d4c916b31b8655a2599511e89818f3",
+          "metadataReferenceSha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
+        },
+        {
+          "unitKey": "testcenter-sample2",
+          "unitFixture": "units/aspect-testcenter-sample2.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample2.voud.br.base64",
+          "definitionEncoding": "brotli-base64",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample2.xml",
+            "definition": "sampledata/aspect/testcenter-sample2.voud"
+          },
+          "unitSha256": "f3b6b9a6f6527d571d48432c29607c99cd5ba69fbff65efa54d8635f7f0b7300",
+          "definitionSha256": "c7af813cca325099fa7659cb7b2c5dd01a8e35cc2f3c96cf937c9769d05b6fa8"
+        },
+        {
+          "unitKey": "testcenter-sample3",
+          "unitFixture": "units/aspect-testcenter-sample3.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample3.voud",
+          "definitionEncoding": "utf8",
+          "metadataReferenceFixture": "definitions/aspect-testcenter-sample3.vomd.base64",
+          "metadataReferenceEncoding": "base64",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample3.xml",
+            "definition": "sampledata/aspect/testcenter-sample3.voud",
+            "metadataReference": "sampledata/aspect/testcenter-sample3.vomd"
+          },
+          "unitSha256": "cdea5bcc2145e9d55e4a300eae8a99e39a9d4e836991c65c77f71d7ade6eca67",
+          "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a",
+          "metadataReferenceSha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
+        }
+      ]
+    }
+  ],
+  "roster": {
+    "fixture": "rosters/Testtakers.xml",
+    "sourcePath": "sampledata/Testtakers.xml",
+    "participantLoginKeys": [
+      "test",
+      "test-review",
+      "test-trial",
+      "test-demo",
+      "test-simulation",
+      "test-no-pw",
+      "test-no-pw-trial",
+      "test-expired",
+      "test-future"
+    ],
+    "excludedOperationalLoginKeys": [
+      "test-group-monitor",
+      "test-group-monitor-2",
+      "sys-check",
+      "test-study-monitor",
+      "expired-group-monitor",
+      "expired-study-monitor"
+    ]
+  },
+  "legacyRosters": [
+    {
+      "fixture": "rosters/Testtakers_withoutSyscheck.xml",
+      "sourcePath": "e2e/src/fixtures/Testtakers_withoutSyscheck.xml",
+      "sha256": "867495606ae1a0c6d07ee74e952f98a62e77f7dee0dcad8c1e881dc917127344",
+      "schemaVersion": "15.2.0",
+      "participantLoginKeys": [
+        "test",
+        "test-review",
+        "test-trial",
+        "test-demo",
+        "test-simulation",
+        "test-no-pw",
+        "test-no-pw-trial",
+        "test-expired",
+        "test-future"
+      ],
+      "operationalLoginKeys": [
+        "test-group-monitor",
+        "test-study-monitor",
+        "expired-group-monitor",
+        "expired-study-monitor"
+      ],
+      "hasSystemCheckLogin": false
+    }
+  ],
+  "currentE2eFixtures": {
+    "sourceRepository": "https://github.com/iqb-berlin/testcenter",
+    "sourceCommit": "a5a6d25a72990d667300804c337cc5b500b01d2f",
+    "sourceDirectory": "e2e/src/fixtures",
+    "resource": {
+      "fixture": "current-e2e/AnyResource.txt.base64",
+      "sourcePath": "e2e/src/fixtures/AnyResource.txt",
+      "sha256": "6449d85c076433b48eafe83738537c26b3513d007cf42f2d64efbf345b1a0540",
+      "encoding": "base64",
+      "content": "I am some resource."
+    },
+    "validBooklets": [
+      {
+        "fixture": "current-e2e/Booklet.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet.xml",
+        "sha256": "ce363c143e6cd777f25239b60c07cd5899cf338a404eb43648006a8a8aeea69f",
+        "encoding": "base64",
+        "bookletKey": "BOOKLET.SAMPLE-100",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameUnitIDs_Alias.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs_Alias.xml",
+        "sha256": "8dc5156f8b1f7f36143411640c895a043b27881e04bf25a1a5db6d589ccddc84",
+        "encoding": "base64",
+        "bookletKey": "BOOKLET.SAMPLE-1",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "cpy"]
+      }
+    ],
+    "bookletIdentityCollision": {
+      "fixture": "current-e2e/Booklet_sameBookletID.xml.base64",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameBookletID.xml",
+      "sha256": "24b5d2142da624ba15b1970e3fec0018b12e95dfdabf888160e458c44039b947",
+      "encoding": "base64",
+      "collidesWithFixture": "current-e2e/Booklet.xml.base64",
+      "bookletKey": "BOOKLET.SAMPLE-100",
+      "diagnosticCode": "source_package_booklet_id_duplicate"
+    },
+    "roster": {
+      "fixture": "current-e2e/Testtakers_withoutSyscheck.xml.base64",
+      "sourcePath": "e2e/src/fixtures/Testtakers_withoutSyscheck.xml",
+      "sha256": "46a1c5591e39184e94c89eb05dbcec90d6b2f9e8baa1562726e592d74424fffd",
+      "encoding": "base64",
+      "schemaVersion": "18.0",
+      "participantLoginKeys": [
+        "test",
+        "test-review",
+        "test-trial",
+        "test-demo",
+        "test-simulation",
+        "test-no-pw",
+        "test-no-pw-trial",
+        "test-expired",
+        "test-future"
+      ],
+      "operationalLoginKeys": [
+        "test-group-monitor",
+        "test-study-monitor",
+        "expired-group-monitor",
+        "expired-study-monitor"
+      ],
+      "hasSystemCheckLogin": false
+    },
+    "invalidXml": [
+      {
+        "fixture": "current-e2e/Booklet_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_error.xml",
+        "sha256": "5b04ea2e8f0a6e6c5153f30714bc92eb08cd8488fe7112638063cf83e9981ad7",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameTestlets.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameTestlets.xml",
+        "sha256": "76b9a6d4f7bedb663b2a2ba229f2631cde88e4f847ccda94eac9a2231b8393d0",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_testlet_id_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Booklet_sameUnitIDs.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs.xml",
+        "sha256": "42ee2c85c327ef103cf10092d7f054825177a3f575bd920e79e6ac5c11301805",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_unit_key_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtaker_DuplicatedGroup.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedGroup.xml",
+        "sha256": "4104c401c044a4a87716d8b3f1ac4034e189da3a48519210799bd66cf3a8bca8",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_group_id_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtaker_DuplicatedLogin.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedLogin.xml",
+        "sha256": "8bf64187f569e55e7a841231d5f8273af9a84c4d36b32be895aec86f2eddb212",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_login_name_duplicate"
+      },
+      {
+        "fixture": "current-e2e/Testtakers_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Testtakers_error.xml",
+        "sha256": "a6a8453e5aa2333cd141cbb7f2ae2f3f67138c01f5d975aa57cd8027ce40748e",
+        "encoding": "base64",
+        "kind": "participant-roster",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/Unit_error.xml.base64",
+        "sourcePath": "e2e/src/fixtures/Unit_error.xml",
+        "sha256": "7d6e4c3fdb9d523ffeb0509357288e9dc9ffd68aa70beb3bb8fc80ebee1596a4",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      },
+      {
+        "fixture": "current-e2e/invalid_SysCheck.xml.base64",
+        "sourcePath": "e2e/src/fixtures/invalid_SysCheck.xml",
+        "sha256": "fc0759ee7a6bbb554be6263ca100f5ef196bbc7a2834bf5816acd3ec6701c630",
+        "encoding": "base64",
+        "kind": "source-package",
+        "diagnosticCode": "testcenter_xml_metadata_missing"
+      }
+    ]
+  },
+  "resourcePackages": [
+    {
+      "fixture": "resources/sample_resource_package.itcr.zip.base64",
+      "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+      "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e",
+      "packageKey": "sample_resource_package",
+      "resources": [
+        {
+          "path": "file.text",
+          "mediaType": "text/plain; charset=utf-8",
+          "content": "This content was fetched dynamically by the player via directDownloadUrl from resource-package \"sample_resource_package\".\n"
+        }
+      ]
+    }
+  ],
+  "validXml": [
+    {
+      "fixture": "booklets/Booklet_sameUnitIDs_Alias.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs_Alias.xml",
+      "kind": "source-package",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "cpy"]
+    }
+  ],
+  "bookletIdentityCollisions": [
+    {
+      "fixture": "booklets/Booklet_sameBookletID.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameBookletID.xml",
+      "collidesWithSourcePath": "e2e/src/fixtures/Booklet.xml",
+      "bookletKey": "BOOKLET.SAMPLE-100",
+      "sha256": "53f9ac2009f1cc04e2e59c3c4b5ff06d591cb9989f5cfea57e71c8890010adc6",
+      "diagnosticCode": "testcenter_xml_booklet_id_duplicate"
+    }
+  ],
+  "crossFileRosterCollisions": {
+    "sameWorkspaceLoginFixtures": [
+      {
+        "fixture": "invalid/testtakers-duplicate-login-name-cross-file-1.xml",
+        "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-file-1.xml",
+        "sha256": "e7fdc67fa538809b86da52efa5d62dba8694a8a9870699300039f67e06e8611a"
+      },
+      {
+        "fixture": "invalid/testtakers-duplicate-login-name-cross-file-2.xml",
+        "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-file-2.xml",
+        "sha256": "6d92351ef8e8b667ba2b45d0783012862e8d63a35b7a6cc8aefe845a07f1b2c8"
+      }
+    ],
+    "crossWorkspaceFixture": {
+      "fixture": "invalid/testtakers-duplicate-login-name-cross-workspace.xml",
+      "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-ws.xml",
+      "sha256": "f68162c812a2ca76a92956abc0be5602b879c09f2db53148ac0887507121b46a"
+    },
+    "loginName": "double_login",
+    "groupId": "another_group",
+    "loginDiagnosticCode": "testcenter_xml_login_name_cross_file_duplicate",
+    "groupDiagnosticCode": "testcenter_xml_group_id_cross_file_duplicate"
+  },
+  "invalidXml": [
+    {
+      "fixture": "invalid/Booklet_error.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_error.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_metadata_missing"
+    },
+    {
+      "fixture": "invalid/Booklet_sameUnitIDs.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_unit_key_duplicate"
+    },
+    {
+      "fixture": "invalid/Booklet_sameTestlets.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameTestlets.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_testlet_id_duplicate"
+    },
+    {
+      "fixture": "invalid/Unit_error.xml",
+      "sourcePath": "e2e/src/fixtures/Unit_error.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_metadata_missing"
+    },
+    {
+      "fixture": "invalid/Testtakers_error.xml",
+      "sourcePath": "e2e/src/fixtures/Testtakers_error.xml",
+      "kind": "participant-roster",
+      "diagnosticCode": "testcenter_xml_metadata_missing"
+    },
+    {
+      "fixture": "invalid/Testtaker_DuplicatedGroup.xml",
+      "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedGroup.xml",
+      "kind": "participant-roster",
+      "diagnosticCode": "testcenter_xml_group_id_duplicate"
+    },
+    {
+      "fixture": "invalid/Testtaker_DuplicatedLogin.xml",
+      "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedLogin.xml",
+      "kind": "participant-roster",
+      "diagnosticCode": "testcenter_xml_login_name_duplicate"
+    },
+    {
+      "fixture": "invalid/invalid_SysCheck.xml",
+      "sourcePath": "e2e/src/fixtures/invalid_SysCheck.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_metadata_missing"
+    }
+  ],
+  "systemCheckReports": [
+    {
+      "fixture": "system-checks/SysCheck-Report.json",
+      "sourcePath": "sampledata/SysCheck-Report.json",
+      "sha256": "7f98207e760f630aecb38344edf888861ee607f388d22f939bfcb96555935495",
+      "installedFileName": "SAMPLE_SYSCHECK-REPORT.JSON",
+      "date": "2020-02-17 13:01:31",
+      "checkId": "SYSCHECK.SAMPLE",
+      "checkLabel": "An example SysCheck definition",
+      "title": "SAMPLE SYS-CHECK REPORT",
+      "sectionEntryCounts": {
+        "environment": 11,
+        "network": 10,
+        "questionnaire": 5,
+        "unit": 1
+      }
+    }
+  ],
+  "systemChecks": [
+    {
+      "fixture": "system-checks/SysCheck.xml",
+      "sourcePath": "sampledata/SysCheck.xml",
+      "checkId": "SYSCHECK.SAMPLE",
+      "displayLabel": "System-Check Beispiel",
+      "unitKey": "UNIT.SAMPLE",
+      "questionCount": 6,
+      "questionTypes": ["header", "string", "select", "text", "check", "radio"],
+      "requiredQuestionIds": ["2"],
+      "skipNetwork": false,
+      "canSave": true
+    },
+    {
+      "fixture": "system-checks/CY_SysCheck_2.xml",
+      "sourcePath": "sampledata/system-test/CY_SysCheck_2.xml",
+      "sha256": "ccc8fa83ec7680bb466ebd02a58fb3062b130673b956feb7d33f3cbdfaca9d7c",
+      "checkId": "syscheck-2",
+      "displayLabel": "System-Check-2",
+      "unitKey": "UNIT.SAMPLE",
+      "questionCount": 6,
+      "questionTypes": ["header", "string", "select", "text", "check", "radio"],
+      "requiredQuestionIds": ["2"],
+      "skipNetwork": true,
+      "canSave": true
+    }
+  ]
+}

@@ -12,6 +12,19 @@ export const prettyPrintJson = (value: unknown, fallback: string): string => {
   }
 };
 
+export const parseJsonDocument = <T = Record<string, unknown>>(
+  value: string
+): T | null => {
+  if (!value.trim()) {
+    return null;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+};
+
 export const readUnknownValue = (value: unknown, path: string[]): unknown => {
   let current: unknown = value;
   for (const segment of path) {

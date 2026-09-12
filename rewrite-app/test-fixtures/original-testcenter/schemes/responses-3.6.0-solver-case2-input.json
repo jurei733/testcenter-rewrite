@@ -1,0 +1,12 @@
+[
+  {
+    "id": "text-1",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  },
+  {
+    "id": "text-2",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  }
+]

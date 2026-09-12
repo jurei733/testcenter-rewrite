@@ -1,0 +1,13 @@
+[
+  {
+    "id": "b1",
+    "status": "INTENDED_INCOMPLETE",
+    "value": "d"
+  },
+  {
+    "id": "b2",
+    "status": "PARTLY_DISPLAYED",
+    "value": "d"
+  },
+  { "id": "d1", "value": null, "status": "INVALID" }
+]

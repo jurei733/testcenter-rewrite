@@ -1,0 +1,81 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "<p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indentsize=\"20\">Musste wiederhergestellt werden. Bitte frisch erzeugen und nochmal durch 6 Augen prüfen lassen (Julia, Jakob und Philipp)</p>",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": true,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 0,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_6"] }
+              ]
+            },
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 1,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_2"] }
+              ]
+            },
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 2,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_5"] }
+              ]
+            },
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 3,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_3"] }
+              ]
+            },
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 4,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_1"] }
+              ]
+            },
+            {
+              "ruleOperatorAnd": true,
+              "valueArrayPos": 5,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_4"] }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": "<p style=\"padding-left: 0; text-indent: 0; margin-bottom: 0; margin-top: 0\">\n                                Alle anderen Antworten  (automatisch)\n                              </p>"
+        }
+      ]
+    }
+  ],
+  "version": "3.0"
+}

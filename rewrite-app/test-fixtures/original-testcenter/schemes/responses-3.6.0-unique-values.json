@@ -1,0 +1,233 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "111"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "222"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 100,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "333"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 5,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "444"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "555"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "666"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d1",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1","d2"
+      ]
+    },
+    {
+      "id": "d2",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1",
+        "b2"
+      ]
+    },
+    {
+      "id": "d3",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1", "b2", "b3"
+      ],
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "true"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "false"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d4",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "REMOVE_ALL_SPACES"
+        ]
+      }
+    },
+    {
+      "id": "d5",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "REMOVE_DISPENSABLE_SPACES"
+        ]
+      }
+    },
+    {
+      "id": "d6",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "TO_NUMBER"
+        ]
+      }
+    },
+    {
+      "id": "d7",
+      "sourceType": "UNIQUE_VALUES",
+      "deriveSources": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "TO_LOWER_CASE", "REMOVE_DISPENSABLE_SPACES"
+        ]
+      }
+    }
+  ]
+}
+

@@ -39,6 +39,8 @@ The current spike exit boundary is captured in:
 
 ## Verification
 
+Use Node.js 22 LTS for the production app workspace. The Docker image and GitHub Actions workflow both run Node 22, and the repository includes `.node-version` and `.nvmrc` for local version managers.
+
 Run inside `rewrite-spike/`:
 
 ```bash

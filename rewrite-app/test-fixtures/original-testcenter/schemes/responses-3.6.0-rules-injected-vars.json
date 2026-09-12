@@ -1,0 +1,80 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": ["REPLAY_REQUIRED"],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "MANUAL_ONLY",
+      "page": "0",
+      "codes": []
+    },
+    {
+      "id": "b2",
+      "alias": "b2",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": ["REPLAY_REQUIRED"],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "MANUAL_ONLY",
+      "page": "0",
+      "codes": []
+    },
+    {
+      "id": "b3",
+      "alias": "b3",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": ["REPLAY_REQUIRED"],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "MANUAL_ONLY",
+      "page": "0",
+      "codes": []
+    },
+    {
+      "id": "d1",
+      "alias": "d1",
+      "label": "",
+      "sourceType": "",
+      "sourceParameters": { "solverExpression": "", "processing": ["NO_CODING"] },
+      "deriveSources": ["b1", "b2", "b3"],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "MANUAL_ONLY",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "type": "FULL_CREDIT",
+          "label": "",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [{ "ruleOperatorAnd": true, "rules": [] }],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    }
+  ],
+  "version": "3.0"
+}

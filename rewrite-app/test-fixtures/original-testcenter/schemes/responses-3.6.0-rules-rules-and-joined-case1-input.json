@@ -1,0 +1,12 @@
+[
+  {
+    "id": "b1",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  },
+  {
+    "id": "b2",
+    "status": "VALUE_CHANGED",
+    "value": "3"
+  }
+]

@@ -16,6 +16,27 @@ import type { ActivityFeedItem } from "./rewrite-app-shell.types";
         </div>
       </div>
     </div>
+  `,
+  styles: `
+    :host {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      contain: inline-size;
+    }
+
+    .collection,
+    .activity-feed,
+    .activity-item {
+      min-width: 0;
+    }
+
+    .activity-item p {
+      overflow-wrap: anywhere;
+    }
   `
 })
 export class ActivityFeedComponent {

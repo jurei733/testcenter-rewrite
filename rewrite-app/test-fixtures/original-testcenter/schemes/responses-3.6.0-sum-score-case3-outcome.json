@@ -1,0 +1,27 @@
+[
+  {
+    "id": "b1",
+    "status": "CODING_INCOMPLETE",
+    "value": "112"
+  },
+  {
+    "id": "b2",
+    "status": "DISPLAYED",
+    "value": null
+  },
+  {
+    "id": "b3",
+    "status": "CODING_INCOMPLETE",
+    "value": "545"
+  },
+  {
+    "id": "d1",
+    "value": null,
+    "status": "INVALID"
+  },
+  {
+    "id": "d2",
+    "value": null,
+    "status": "DERIVE_PENDING"
+  }
+]
