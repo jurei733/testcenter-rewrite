@@ -416,6 +416,7 @@ export class ParticipantViewFacade {
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
   private currentStateRefreshSequence = 0;
+  private viewLifecycleSequence = 0;
   private currentStateAppliedRefreshSequence = 0;
   private currentTextDraftIdentity: string | null = null;
   private readonly navigationAdvisory = signal<{
@@ -506,6 +507,10 @@ export class ParticipantViewFacade {
   }
 
   destroy(): void {
+    this.viewLifecycleSequence += 1;
+    // Stopping event delivery does not cancel requests already in flight.
+    // Their responses must not restore participant scope after a route change.
+    this.invalidateCurrentStateRefreshes();
     this.participantEvents.stop();
     this.participantShell.setHeaderHidden(false);
     globalThis.window?.removeEventListener(
@@ -2812,6 +2817,7 @@ export class ParticipantViewFacade {
   private async resumeEntrySessionInternal(
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
+    const lifecycleSequence = this.viewLifecycleSequence;
     // A session-only re-entry URL is authoritative. Load an existing run
     // without changing its status so a reload cannot bypass a monitor pause.
     // Do not let a booklet from a previously persisted browser session
@@ -2819,11 +2825,20 @@ export class ParticipantViewFacade {
     this.runtime.bookletKey = normalized.bookletKey;
     try {
       await this.refreshCurrentStateInternal(true);
+      if (lifecycleSequence !== this.viewLifecycleSequence) {
+        return;
+      }
       if (!this.currentRunState) {
         await this.resumeSessionInternal({ quiet: true });
       }
+      if (lifecycleSequence !== this.viewLifecycleSequence) {
+        return;
+      }
       await this.applyEntryDraftAfterResume(normalized);
     } catch (error) {
+      if (lifecycleSequence !== this.viewLifecycleSequence) {
+        return;
+      }
       if (!this.isParticipantSessionNoLongerResumable(error)) {
         throw error;
       }
@@ -3092,6 +3107,7 @@ export class ParticipantViewFacade {
   }
 
   private async resumeSessionInternal(options: { quiet?: boolean } = {}): Promise<void> {
+    const lifecycleSequence = this.viewLifecycleSequence;
     const payload = await this.requestState.request<ResumeParticipantSessionResponse>(
       "Participant Resume Session",
       "POST",
@@ -3103,6 +3119,9 @@ export class ParticipantViewFacade {
       } satisfies ResumeParticipantSessionRequest,
       { quiet: options.quiet ?? false }
     );
+    if (lifecycleSequence !== this.viewLifecycleSequence) {
+      return;
+    }
 
     this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
     if (
@@ -3958,6 +3977,9 @@ export class ParticipantViewFacade {
           undefined,
           { quiet }
         );
+      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+        return;
+      }
       const testRunId = payload.currentRunState.testRun.testRunId;
       if (!this.bookletAssetLoadStartedAtMs.has(testRunId)) {
         this.bookletAssetLoadStartedAtMs.set(testRunId, loadStartedAtMs);
@@ -4015,6 +4037,9 @@ export class ParticipantViewFacade {
       }
       this.persistState();
     } catch (error) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+        return;
+      }
       if (
         this.requestState.isApiError(error) &&
         error.error === "participant_session_has_no_current_run"
