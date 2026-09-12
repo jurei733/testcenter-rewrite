@@ -28,7 +28,11 @@ interface ParticipantVisibleCodeNotice {
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantLoginComponent],
   template: `
     <div class="stack">
-      <app-original-participant-login *ngIf="interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired" />
+      @defer (when interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired) {
+        @if (interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired) {
+          <app-original-participant-login />
+        }
+      }
       <article
         *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired)"
         id="participantRouteEntry"

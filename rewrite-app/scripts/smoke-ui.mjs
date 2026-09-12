@@ -11,6 +11,7 @@ import { chromium } from "playwright";
 import QRCode from "qrcode";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
+const browserChannel = process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined;
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
@@ -371,6 +372,7 @@ try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
 
   browser = await chromium.launch({
+    channel: browserChannel,
     headless: true,
     args: [
       "--use-fake-device-for-media-stream",
@@ -7137,6 +7139,8 @@ try {
     await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
       ui: "original", tenantKey, workspaceKey
     })}`, { waitUntil: "networkidle" });
+    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator(".login-submit svg[matButtonIcon]").waitFor();
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
     await originalSignInPage.waitForFunction(
@@ -13553,6 +13557,7 @@ try {
     crashingStarsContext = await chromium.launchPersistentContext(
       browserCrashProfileDirectory,
       {
+        channel: browserChannel,
         headless: true,
         args: [
           "--use-fake-device-for-media-stream",
@@ -13652,6 +13657,7 @@ try {
     recoveredStarsContext = await chromium.launchPersistentContext(
       browserCrashProfileDirectory,
       {
+        channel: browserChannel,
         headless: true,
         args: [
           "--use-fake-device-for-media-stream",

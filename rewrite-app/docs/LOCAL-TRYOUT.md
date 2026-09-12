@@ -73,6 +73,16 @@ Der vorhandene automatisierte Demo-Test verwendet seine eigene Testdatenbank:
 npm run smoke:local-demo
 ```
 
+Für einen gezielten lokalen UI-Smoke kann bei fehlendem Playwright-Chromium
+der bereits installierte Chrome verwendet werden (ohne Änderung der CI):
+
+```bash
+UI_SMOKE_BROWSER_CHANNEL=chrome FIRST_SLICE_STORE=memory UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_STOP_AFTER_STEP=participant-entry-sign-in node scripts/smoke-ui.mjs
+```
+
+Dieser verkürzte Test prüft nicht die späteren Player-/Monitor-Abläufe. Der
+Chrome-Gegenlauf ersetzt auch nicht den vollständigen Chromium-Nachweis der CI.
+
 Nur wenn alle lokalen Demo-Daten ausdrücklich verworfen werden sollen:
 Server beenden, `npm run reset:local` ausführen und erneut starten. Das löscht
 die lokale Demo-Datenbank einschließlich ihrer Antworten und Änderungen.

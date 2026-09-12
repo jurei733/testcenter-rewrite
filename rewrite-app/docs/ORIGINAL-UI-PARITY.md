@@ -44,7 +44,11 @@ consuming real login attempts. The main smoke also checks that Original and
 Rewrite sign-in restore the same session/run. That new full smoke gate still
 requires a completed run. Nunito Sans files are copied from the pinned Original
 and shipped with their OFL; adapted Original layout code retains its MIT notice.
-Material controls, focus fidelity and full screenshot comparisons remain open.
+Material 20.2.14 (the Original lockfile version) now provides the login fields
+and primary/tonal buttons under a component-scoped theme. Focus follows name,
+password, back and retry transitions, with a Caps Lock hint. Local Chromium
+checks cover focus and the real passwordless path. Full screenshot comparisons,
+remaining icon/control details and the other surfaces remain open.
 
 All rows are currently open. Close a row only with matching reference states
 and browser evidence at equal viewport, theme, text and fixture settings.

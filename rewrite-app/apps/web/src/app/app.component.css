@@ -7,6 +7,7 @@
 .participant-topbar.original-participant-topbar {
   position: relative;
   min-height: 64px;
+  margin-bottom: 0;
   box-sizing: border-box;
   padding: 8px 24px;
   border: 0;

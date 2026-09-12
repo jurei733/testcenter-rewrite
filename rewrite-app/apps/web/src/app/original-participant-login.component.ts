@@ -1,5 +1,8 @@
-import { Component, inject, signal } from "@angular/core";
+import { Component, ElementRef, afterRenderEffect, inject, signal, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { MatButtonModule } from "@angular/material/button";
+import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatInputModule } from "@angular/material/input";
 import { RouterLink } from "@angular/router";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
@@ -9,9 +12,9 @@ import { BrowserCompatibilityService } from "./browser-compatibility.service";
 @Component({
   selector: "app-original-participant-login",
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule],
   templateUrl: "./original-participant-login.component.html",
-  styleUrl: "./original-participant-login.component.css"
+  styleUrls: ["./original-participant-login.component.css", "./original-login-theme.scss"]
 })
 export class OriginalParticipantLoginComponent {
   readonly view = inject(ParticipantViewFacade);
@@ -22,6 +25,22 @@ export class OriginalParticipantLoginComponent {
   readonly busy = signal(false);
   readonly problem = signal("");
   readonly showPassword = signal(false);
+  readonly capsLock = signal(false);
+  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>("nameInput");
+  private readonly passwordInput = viewChild<ElementRef<HTMLInputElement>>("passwordInput");
+
+  constructor() {
+    afterRenderEffect(() => {
+      if (this.busy()) return;
+      const input = this.passwordStep() ? this.passwordInput() : this.nameInput();
+      input?.nativeElement.focus();
+    });
+  }
+
+  passwordKeyUp(event: KeyboardEvent): void {
+    this.capsLock.set(typeof event.getModifierState === "function" && event.getModifierState("CapsLock"));
+    this.problem.set("");
+  }
 
   back(): void {
     if (this.busy()) return;
@@ -29,6 +48,7 @@ export class OriginalParticipantLoginComponent {
     this.view.runtime.participantPassword = "";
     this.problem.set("");
     this.showPassword.set(false);
+    this.capsLock.set(false);
   }
 
   async submit(): Promise<void> {
@@ -37,6 +57,7 @@ export class OriginalParticipantLoginComponent {
     if (!wasPasswordStep) this.view.runtime.participantPassword = "";
     this.busy.set(true);
     this.problem.set("");
+    this.capsLock.set(false);
     try {
       await this.view.signInFromOriginalInterface();
     } catch (error) {

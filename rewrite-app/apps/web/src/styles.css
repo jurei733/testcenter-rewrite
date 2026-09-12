@@ -110,9 +110,23 @@ app-root {
   background: white;
 }
 
+:root[data-interface-mode="original"] {
+  --secondary-soft: #ccdfe5;
+}
+:root[data-interface-mode="original"][data-application-theme="Sekundar"] {
+  --secondary-soft: #ced5e6;
+}
+:root[data-interface-mode="original"][data-application-theme="Erwachsene"] {
+  --secondary-soft: #e1d7eb;
+}
+
 :root[data-interface-mode="original"] .page.is-participant-page {
   max-width: none;
   padding: 0;
+}
+
+:root[data-interface-mode="original"] .participant-stage > router-outlet {
+  display: none;
 }
 
 .page {
