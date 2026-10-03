@@ -66,7 +66,7 @@ return to the Original card and resuming the exact same session/run. Additional
 local browser checks cover locked/completed cards, retry after a failed resume,
 desktop/mobile widths and an actual Review account's empty CSV response (204)
 with its authored start-button text. Full CI for the new commit is still a
-separate gate. The current production bundle is 466.18kB under the unchanged
+separate gate. The current production bundle is 467.04kB under the unchanged
 470kB error limit; its 450kB warning remains.
 
 All rows are currently open. Close a row only with matching reference states
@@ -79,9 +79,16 @@ controller events and server-authoritative permissions; no second iframe or
 session implementation is introduced. A headful Chromium/isolated-SQLite check
 on 2026-10-03 passed nine official Bklt_Config variants within 29–39, real forward/back
 task and page changes, the same-run return to Rewrite, narrow-width grouping,
-and no page errors. The screenshot review still shows Rewrite diagnostic cards
-around this navigation: toolbar, side panels, full-height content and dialogs
-remain open. This is a navigation slice, not a closed Player visual-parity row.
+and no page errors. The Original player now has a full-height frame without
+Rewrite diagnostic cards, an authored-title/timer Material toolbar and modal
+task/comment side panels. The panels reuse the existing state and persistence;
+opening and closing them does not replace the iframe. Headful Chromium checks
+cover keyboard trapping and return, draft retention, actual comment save/delete,
+nested confirmation focus, mobile bounds, authored menu permissions, actual
+reload of the same run and return to Rewrite. The integrated smoke has the same
+surface gate. Remaining sidebar contents, account/footer, dialogs and matching
+reference screenshots keep the Player visual-parity row open. This is not a
+completed visual-identity claim.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

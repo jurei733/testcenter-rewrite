@@ -95,6 +95,7 @@ type RetiredVeronaFrame = {
             (globalBackward)="goGlobalBackward()" (globalForward)="goGlobalForward()" />
         }
       }
+      <ng-content select="[original-player-toolbar]" />
       <header>
         <div>
           <span>Verona Player</span>
@@ -131,7 +132,10 @@ type RetiredVeronaFrame = {
         </div>
         <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatusLabel }}</p>
       </section>
-      <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
+      <div class="verona-player-content">
+        <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
+        <ng-content select="[original-player-sidebar]" />
+      </div>
       <nav
         *ngIf="!originalUi && (showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton)"
         class="verona-player-page-navigation"

@@ -1,0 +1,21 @@
+:host { display: block; flex: 0 0 auto; }
+.toolbar-header {
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 30%);
+  margin-bottom: 5px;
+  font-size: 18px;
+  padding: 0 25px;
+  min-height: 48px;
+  font-family: 'Nunito Sans', sans-serif;
+}
+.toolbar-header p { margin: 0; align-self: center; }
+.toolbar-right { margin-left: auto; display: flex; align-items: center; color: var(--secondary); }
+.toolbar-right button { font-size: inherit; }
+.toolbar-right p { margin-right: 20px; }
+svg { width: 24px; height: 24px; fill: currentColor; flex: 0 0 auto; vertical-align: middle; }
+button[matButton] svg { margin-right: 8px; }
+@media (max-width: 620px) {
+  .toolbar-header { flex-wrap: wrap; padding: 0 12px; }
+  .toolbar-right { flex-wrap: wrap; }
+}

@@ -17114,7 +17114,7 @@ try {
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
-      .waitFor({ timeout: 30_000 });
+      .waitFor({ timeout: 30_000, state: interfaceMode === "original" ? "attached" : "visible" });
     const playerFrame = page.frameLocator("#participantVeronaPlayerFrame");
     await playerFrame.locator("#end-unit").waitFor({ timeout: 15_000 });
     return { participantSessionId, playerFrame };
@@ -17743,10 +17743,64 @@ try {
   assert.equal(await page.locator("#participantVeronaGlobalForwardButton").count(), 0);
   await openOriginalNavigation(25);
   await page.locator("#participantVeronaGlobalForwardButton").click();
-  await page.locator("#participantRouteUnitKey").filter({ hasText: "cpy" }).waitFor();
+  await page.locator("#participantRouteUnitKey").filter({ hasText: "cpy" }).waitFor({ state: "attached" });
   await page.goto(`${baseUrl}/participant?participantSessionId=${originalIndexedPages.participantSessionId}&ui=rewrite`);
   await page.locator("#participantVeronaPlayerVersion").filter({ hasText: "API 6.0" }).waitFor();
   stopAfter("optional-original-player-navigation");
+
+  logStep("optional-original-player-surface");
+  await sendSmokeJson(`${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`, {
+    body: { rosterText: [
+      "loginKey,groupKey,bookletKey,displayName,pw,executionMode",
+      "original-surface-review,original-surface,Cy-Bklt_BkltConfig-34,Original Surface,123,run-review"
+    ].join("\n") }
+  });
+  const originalSurface = await openOriginalBookletConfig(
+    "original-surface-review", "Cy-Bklt_BkltConfig-34", "original"
+  );
+  await page.locator("#originalPlayerToolbar").waitFor();
+  assert.equal(await page.locator("#participantRoutePlayer > h2").isVisible(), false);
+  assert.equal(await page.locator(".participant-meta-grid").isVisible(), false);
+  const originalSurfaceFrame = await page.locator("#participantVeronaPlayerFrame").elementHandle();
+  assert.ok(originalSurfaceFrame);
+  const originalSurfaceGeometry = await page.locator("#participantVeronaPlayerFrame").boundingBox();
+  assert.ok(originalSurfaceGeometry.height > 300 && originalSurfaceGeometry.y < 220);
+  await page.locator('[data-cy="unit-menu"]').click();
+  const originalSidebar = page.locator('app-original-player-sidebar [role="dialog"]');
+  await originalSidebar.waitFor();
+  await page.locator("#participantRouteUnitRail").waitFor();
+  await page.waitForFunction(() => document.activeElement?.id === "originalPlayerSidebarCloseButton");
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await page.evaluate(() => !!document.activeElement?.closest("app-original-player-sidebar")), true);
+  await page.keyboard.press("Escape");
+  await originalSidebar.waitFor({ state: "detached" });
+  assert.equal(await page.locator('[data-cy="unit-menu"]').evaluate(element => element === document.activeElement), true);
+  assert.equal(await originalSurfaceFrame.evaluate(element => element.isConnected), true);
+  await page.locator('[data-cy="send-comments"]').click();
+  const originalSurfaceComment = "Original toolbar sidebar acceptance";
+  await page.locator("#participantRouteReviewComment").fill(originalSurfaceComment);
+  await page.locator("#originalPlayerSidebarCloseButton").click();
+  await originalSidebar.waitFor({ state: "detached" });
+  await page.locator('[data-cy="send-comments"]').click();
+  assert.equal(await page.locator("#participantRouteReviewComment").inputValue(), originalSurfaceComment);
+  await page.locator("#participantRouteReviewSaveButton").click();
+  const originalSavedReview = page.locator(".participant-review-item").filter({ hasText: originalSurfaceComment });
+  await originalSavedReview.waitFor();
+  await originalSavedReview.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.locator("#participantConfirmationContinueButton").click();
+  await originalSavedReview.waitFor({ state: "detached" });
+  await page.waitForFunction(() => !!document.activeElement?.closest("app-original-player-sidebar"));
+  await page.keyboard.press("Escape");
+  await originalSidebar.waitFor({ state: "detached" });
+  assert.equal(await originalSurfaceFrame.evaluate(element => element.isConnected), true);
+  const originalSurfaceRunId = (await page.locator("#participantRouteRunId").textContent())?.trim();
+  await page.goto(`${baseUrl}/participant?participantSessionId=${originalSurface.participantSessionId}&ui=rewrite`);
+  await page.locator("#participantVeronaPlayerVersion").filter({ hasText: "API 6.0" }).waitFor();
+  assert.equal(await page.locator("#originalPlayerToolbar").count(), 0);
+  assert.equal((await page.locator("#participantRouteRunId").textContent())?.trim(), originalSurfaceRunId);
+  await page.locator("#participantRouteReviewComment").waitFor();
+  await page.locator("#participantRouteUnitRail").waitFor();
+  stopAfter("optional-original-player-surface");
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");
@@ -17957,7 +18011,7 @@ try {
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
-      .waitFor({ timeout: 30_000 });
+      .waitFor({ timeout: 30_000, state: interfaceMode === "original" ? "attached" : "visible" });
     return {
       frame: page.frameLocator("#participantVeronaPlayerFrame"),
       participantSessionId,
@@ -18687,7 +18741,7 @@ try {
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
-    .waitFor({ timeout: 15_000 });
+    .waitFor({ timeout: 15_000, state: "attached" });
   await page.waitForFunction(
     frame => !frame.isConnected,
     aliasedStartPlayerFrame,
@@ -18718,7 +18772,7 @@ try {
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
-    .waitFor();
+    .waitFor({ state: "attached" });
   await completionControllerFrame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .check();
@@ -18735,11 +18789,11 @@ try {
     "forward"
   );
   await page
-    .locator("#participantRouteNextUnitButton")
+    .locator("#originalUnitNavigation-forward")
     .waitFor({ state: "visible", timeout: 15_000 });
   await page.waitForFunction(
     () => {
-      const button = document.querySelector("#participantRouteNextUnitButton");
+      const button = document.querySelector("#originalUnitNavigation-forward");
       return button instanceof HTMLButtonElement && !button.disabled;
     },
     undefined,
@@ -18749,11 +18803,11 @@ try {
     await completionControllerFrame.locator("#next-unit").isEnabled(),
     true
   );
-  await page.locator("#participantRouteNextUnitButton").click();
+  await page.locator("#originalUnitNavigation-forward").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
-    .waitFor({ timeout: 15_000 });
+    .waitFor({ timeout: 15_000, state: "attached" });
 
   await runOriginalControllerCompletenessCase({
     loginKey: "Test_Ctrl-18",

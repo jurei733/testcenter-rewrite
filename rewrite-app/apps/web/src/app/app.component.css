@@ -5,6 +5,7 @@
 
 /* Header geometry from the pinned Original; participant actions remain shared. */
 .participant-topbar.original-participant-topbar {
+  display: flex;
   position: relative;
   min-height: 64px;
   margin-bottom: 0;

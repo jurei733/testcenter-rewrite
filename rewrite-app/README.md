@@ -10,7 +10,8 @@ link, restart behavior, and verification commands, see
 The Start page offers a reversible, browser-local interface choice. Direct
 links can use `?ui=original` or `?ui=rewrite`; both use the same application,
 permissions and stored sessions. The optional Original 19 layout is still a
-preview: participant login, starter and grouped Player navigation are adapted,
+preview: participant login, starter, grouped Player navigation, full-height
+content, toolbar and modal task/comment side panels are adapted,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 

@@ -14,6 +14,8 @@ import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
+import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
+import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -25,9 +27,10 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent],
+  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent],
   template: `
-    <div class="stack">
+    <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
       @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
         @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
           <app-original-participant-entry />
@@ -647,7 +650,25 @@ interface ParticipantVisibleCodeNotice {
               (responseUpdate)="view.saveVeronaResponse($event)"
               (navigationRequest)="view.navigateFromVerona($event)"
               (retrySave)="view.retryVeronaSave()"
-            ></app-verona-player-host>
+            >
+              <div original-player-toolbar>
+                @defer (when interfaceMode.mode() === 'original') {
+                  @if (interfaceMode.mode() === 'original') {
+                    <app-original-player-toolbar (openPanel)="toggleOriginalPanel($event)" />
+                  }
+                }
+              </div>
+              <div original-player-sidebar>
+                @defer (when interfaceMode.mode() === 'original' && originalPanel() !== null) {
+                  @if (interfaceMode.mode() === 'original' && originalPanel(); as panel) {
+                    <app-original-player-sidebar
+                      [title]="panel === 'review' ? 'Kommentare' : view.customText('booklet_tasklisttitle', 'Bearbeitungsstand')"
+                      [content]="panel === 'review' ? participantReviewPanel : participantUnitMenu"
+                      (close)="originalPanel.set(null)" />
+                  }
+                }
+              </div>
+            </app-verona-player-host>
             <ng-template #textResponsePlayer>
               <section class="participant-unit-prompt" aria-label="Current unit prompt">
                 <span>Unit Prompt</span>
@@ -687,6 +708,8 @@ interface ParticipantVisibleCodeNotice {
               <p>{{ view.veronaLoadingPendingStatus }}</p>
             </section>
           </ng-template>
+          <ng-container *ngIf="interfaceMode.mode() !== 'original'" [ngTemplateOutlet]="participantReviewPanel" />
+          <ng-template #participantReviewPanel>
           <section
             *ngIf="view.player.canReview"
             id="participantRouteReviewPanel"
@@ -795,6 +818,7 @@ interface ParticipantVisibleCodeNotice {
               <p id="participantRouteReviewEmpty" class="hint">No comments have been added for this run.</p>
             </ng-template>
           </section>
+          </ng-template>
           <section
             class="participant-draft-state"
             [class.has-unsaved-response]="view.player.hasUnsavedResponse"
@@ -967,6 +991,8 @@ interface ParticipantVisibleCodeNotice {
             <strong id="participantRouteNavigationNoticeTitle">{{ view.player.navigationNoticeTitle }}</strong>
             <p>{{ view.player.navigationNotice }}</p>
           </section>
+          <ng-container *ngIf="interfaceMode.mode() !== 'original'" [ngTemplateOutlet]="participantUnitMenu" />
+          <ng-template #participantUnitMenu>
           <section class="unit-rail" [attr.aria-label]="view.customText('booklet_tasklisttitle', 'Booklet units')" *ngIf="view.player.showUnitMenu && view.player.unitItems.length > 0">
             <header>
               <div>
@@ -987,7 +1013,7 @@ interface ParticipantVisibleCodeNotice {
                 [attr.aria-current]="unit.isCurrent ? 'step' : null"
                 [attr.aria-label]="unit.accessibilityLabel"
                 [attr.title]="unit.accessibilityLabel"
-                (click)="view.goToUnit(unit.unitKey)"
+                (click)="view.goToUnit(unit.unitKey); originalPanel.set(null)"
               >
                 <span>{{ unit.position }}</span>
                 <strong>{{ unit.label }}</strong>
@@ -995,6 +1021,7 @@ interface ParticipantVisibleCodeNotice {
               </button>
             </div>
           </section>
+          </ng-template>
           <div class="actions">
             <span
               *ngIf="view.player.unitNavigationLabel"
@@ -1098,6 +1125,15 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  readonly originalPanel = signal<"review" | "units" | null>(null);
+
+  toggleOriginalPanel(panel: "review" | "units"): void {
+    if (panel === "review" && !this.view.player.canReview ||
+        panel === "units" && !this.view.player.showUnitMenu) {
+      return;
+    }
+    this.originalPanel.update(current => current === panel ? null : panel);
+  }
   readonly browserCompatibility = inject(BrowserCompatibilityService);
   readonly showStarterScrollButton = signal(false);
   private readonly retainedVisibleCodeNotice =

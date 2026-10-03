@@ -1,0 +1,88 @@
+/* Original controller geometry, adapted from IQB Testcenter 19 (MIT). */
+:root[data-interface-mode="original"] .page.is-participant-page:has(.is-original-player) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+:root[data-interface-mode="original"] .page:has(.is-original-player) .participant-topbar,
+:root[data-interface-mode="original"] .page:has(.is-original-player) .application-footer { flex: 0 0 auto; }
+:root[data-interface-mode="original"] .page:has(.is-original-player) .application-footer {
+  margin: 0;
+  padding: 8px 24px;
+  font-family: 'Nunito Sans', sans-serif;
+}
+:root[data-interface-mode="original"] .participant-stage:has(.is-original-player) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+:root[data-interface-mode="original"] app-participant-view:has(.is-original-player) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.is-original-player {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+.is-original-player #participantRoutePlayer,
+.is-original-player #participantRoutePlayer > .record-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: white;
+  box-shadow: none;
+  gap: 0;
+}
+.is-original-player #participantRoutePlayer > h2,
+.is-original-player .participant-runtime-toolbar,
+.is-original-player #participantRouteBookletLoadingStatus,
+.is-original-player .participant-meta-grid,
+.is-original-player .record-card > header,
+.is-original-player .record-card > dl,
+.is-original-player .participant-progress,
+.is-original-player .participant-draft-state,
+.is-original-player .participant-completion-readiness,
+.is-original-player .participant-leave-lock,
+.is-original-player .record-card > .participant-testlet-timer:not(.is-warning),
+.is-original-player .record-card > .actions,
+.is-original-player .verona-player-shell > header,
+.is-original-player .verona-player-shell > footer:not(:has(button)),
+.is-original-player .participant-connection-state:not(.is-degraded) { display: none; }
+.is-original-player app-verona-player-host,
+.is-original-player .verona-player-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+}
+.is-original-player .verona-player-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.is-original-player .verona-player-frame-host { height: 100%; min-height: 0; }
+.is-original-player .verona-player-frame { height: 100%; min-height: 0; }
+.is-original-player .participant-review-panel,
+.is-original-player .unit-rail {
+  margin: 0;
+  padding: 15px;
+  border: 0;
+  border-radius: 0;
+  background: white;
+}
+.is-original-player .unit-rail-grid { grid-template-columns: 1fr; }
+.is-original-player .unit-chip { max-width: 100%; }
+.is-original-player .form-grid { grid-template-columns: 1fr; }
+.original-player-menu { font-family: 'Nunito Sans', sans-serif; }
