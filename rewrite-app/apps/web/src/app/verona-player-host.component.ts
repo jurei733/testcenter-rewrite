@@ -7,7 +7,8 @@ import {
   HostListener,
   Input,
   Output,
-  ViewChild
+  ViewChild,
+  ViewEncapsulation
 } from "@angular/core";
 import type {
   AfterViewInit,
@@ -78,6 +79,10 @@ type RetiredVeronaFrame = {
   selector: "app-verona-player-host",
   standalone: true,
   imports: [CommonModule, OriginalPlayerNavigationComponent],
+  // Keep the established global selectors/specificity, but load Player-only
+  // styles when a host is actually created, not on home/login/operator entry.
+  encapsulation: ViewEncapsulation.None,
+  styleUrl: "./verona-player-host.component.css",
   template: `
     <section class="verona-player-shell" aria-label="Verona unit player">
       @defer (when originalUi) {

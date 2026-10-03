@@ -163,8 +163,8 @@ it. A questionnaire containing only authored headers also retains its step,
 matching the source instead of counting only input controls. New environment
 reports now use the current Original labels/IDs (`Browserversion`,
 `Betriebssystem`, `Betriebssystemversion`, `Bildschirmauflösung`, `Browsersprache`,
-`Fenstergröße`); existing reports are not rewritten. Navigation currently has
-native hover titles, not the source's Material tooltips. Network, Unit,
+`Fenstergröße`); existing reports are not rewritten. Navigation now also has
+the source's Material tooltips and accessible control names. Network, Unit,
 questionnaire/report composition, the protected-account card, remaining header
 details and equal-reference screenshot acceptance are still open.
 The final headful welcome check and fresh protected SQLite/Chromium report gate
@@ -173,6 +173,15 @@ the home action. Twenty-five frontend-state tests passed. The production initial
 bundle is 469.91kB below the unchanged 470kB error limit. Screenshots were
 inspected for actual table readability and 390px bounds; they are not Original
 reference screenshots. Publication CI is an independent gate.
+Player-only visual rules are now delivered when a Verona host is created,
+instead of on every initial shell entry. Their selector/declaration bytes and
+global specificity remain unchanged. The isolated development browser gate
+passed actual computed-style comparisons against the previous initial placement
+in both layouts at 1280px and 390px, no overflow, and actual ABI answer/save,
+authored reload, page reload and Unit changes with exact response retention and
+no page/console errors. The headful welcome gate passed the real visible
+Material tooltip. The production initial bundle is now 467.76kB, under the
+unchanged 470kB error limit; this is not rendered Original-reference acceptance.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

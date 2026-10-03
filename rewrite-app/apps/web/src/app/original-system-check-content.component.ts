@@ -2,6 +2,7 @@ import { Component, Input } from "@angular/core";
 import { NgFor, NgIf } from "@angular/common";
 import { MatFabButton } from "@angular/material/button";
 import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from "@angular/material/card";
+import { MatTooltip } from "@angular/material/tooltip";
 import type { SystemCheckViewComponent } from "./system-check-view.component";
 
 // Adapted from IQB Testcenter 19 sys-check/welcome and sys-check.component (MIT).
@@ -9,16 +10,16 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
 // measurement and response; this surface does not create another check state.
 @Component({
   selector: "app-original-system-check-content", standalone: true,
-  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle],
+  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip],
   template: `
     <ng-container *ngIf="view.systemCheck as check">
       <div class="header">
         <h2>Systemcheck: {{ check.displayLabel }}</h2>
-        <button id="syscheck-previous-step" matFab title="Zurück" aria-label="Zurück"
+        <button id="syscheck-previous-step" matFab matTooltip="Zurück" aria-label="Zurück"
           [disabled]="view.stepIndex === 0 || view.busy || view.networkBusy" (click)="view.previousStep()">
           <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z" /></svg>
         </button>
-        <button id="syscheck-next-step" matFab title="Weiter" aria-label="Weiter"
+        <button id="syscheck-next-step" matFab matTooltip="Weiter" aria-label="Weiter"
           [disabled]="view.nextButtonDisabled || view.networkBusy" (click)="view.nextStep()">
           <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m400-240-56-56 184-184-184-184 56-56 240 240-240 240Z" /></svg>
         </button>

@@ -145,6 +145,42 @@ try {
     assert.ok(participantToken);
     const state = () => json(`/api/v1/participant/sessions/${sessionId}/current-state`, undefined, participantToken);
     await ready();
+    // Moving unchanged Player-only CSS out of the initial shell must preserve
+    // its real layout, including Original's higher-specificity overrides.
+    const playerCss = await readFile(resolve(appRoot, "apps/web/src/app/verona-player-host.component.css"), "utf8");
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const comparison = await page.evaluate(css => {
+        const selectors = [".verona-player-shell", ".verona-player-shell > header", ".verona-player-shell > footer",
+          "#participantVeronaFrameHost", "#participantVeronaPlayerFrame", ".verona-player-page-navigation"];
+        const properties = ["display", "position", "width", "height", "min-height", "padding", "gap",
+          "border", "border-radius", "background-color", "color", "font-family", "overflow", "align-items", "justify-content"];
+        const snapshot = () => selectors.map(selector => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          const computed = getComputedStyle(element);
+          return Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)]));
+        });
+        const movedStyles = [...document.head.querySelectorAll("style")].filter(style => style.textContent?.includes(".verona-player-shell"));
+        const hostStyle = movedStyles.find(style => !style.textContent?.includes(".is-original-player"));
+        if (!hostStyle) throw new Error("Player-only stylesheet must be delivered with the host");
+        const actual = snapshot();
+        const parent = hostStyle.parentNode, sibling = hostStyle.nextSibling;
+        hostStyle.remove();
+        const oldPlacement = document.createElement("style");
+        oldPlacement.textContent = css;
+        const initialStyles = document.head.querySelector("link[rel='stylesheet']");
+        if (initialStyles) initialStyles.after(oldPlacement); else document.head.prepend(oldPlacement);
+        const originalPlacement = snapshot();
+        oldPlacement.remove();
+        parent.insertBefore(hostStyle, sibling);
+        return { actual, originalPlacement };
+      }, playerCss);
+      assert.deepEqual(comparison.actual, comparison.originalPlacement,
+        `${layout} Player CSS remains identical at ${width}px after lazy delivery`);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
     const initial = (await state()).currentRunState;
     const runId = initial.testRun.testRunId;
     const frame = page.frameLocator("#participantVeronaPlayerFrame");

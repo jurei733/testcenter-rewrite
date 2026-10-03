@@ -289,13 +289,25 @@ returning to selection clears the check parameter. The header logo returns home.
 Header-only questionnaires retain their step, matching Original 19's question
 array rather than its number of input controls. Newly captured environment IDs
 and labels now match the current source; stored historical reports remain intact.
-Native hover titles still differ from Original Material tooltips, and the
-remaining full-page/reference comparisons are not closed by this slice.
+Material tooltips now also match the source; the remaining full-page/reference
+comparisons are not closed by this slice.
 The final headful welcome check and fresh protected SQLite/Chromium production
 report gate exited 0; the latter also passed the header-only questionnaire case
 and the unchanged report/save/export flows. Twenty-five frontend-state tests
 passed. The 469.91kB production initial bundle remains below the unchanged 470kB
 error limit. Current publication CI remains separate.
+The subsequent Player-style delivery change retains the exact former visual
+rules and global specificity but loads them with an actual Verona host. This
+reduces the initial shell to 467.76kB while adding real Original Material
+navigation tooltips. The isolated development gate passed both layouts at
+1280px/390px, exact computed-style comparison against the old initial placement,
+no overflow, real ABI input/save, reload and Unit changes, exact saved response,
+no page/console errors and final exit 0. A headful welcome check also passed
+the visible tooltip. This is local evidence, not new publication/reference
+screenshot acceptance.
+The fresh protected SQLite/Chromium production Systemcheck gate also exited 0
+with the visible Material tooltip/accessibility assertion and both existing
+report/save/export flows. The full unit/frontend-state gate passed (140 + 25).
 
 The same CI revision exposed an additional browser-gate race in both full UI
 and Ops: attachment setup timed out waiting for the auto-refresh preference to

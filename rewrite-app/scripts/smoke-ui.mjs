@@ -2604,6 +2604,10 @@ try {
     assert.equal(await page.locator(".system-check-facts").count(), 0);
     assert.equal(await page.locator(".system-check-steps").count(), 0);
     assert.equal(await page.locator("#syscheck-previous-step").isDisabled(), true);
+    await page.locator("#syscheck-next-step").hover();
+    await page.locator(".mat-mdc-tooltip").filter({ hasText: "Weiter" }).waitFor();
+    assert.equal(await page.locator("#syscheck-next-step").getAttribute("aria-label"), "Weiter",
+      "The navigation has an accessible name; Material deliberately omits an identical duplicate description");
     await page.locator("#syscheck-next-step").click();
     await page.locator("#systemCheckQuestionsIntro").waitFor();
     assert.equal(await page.locator("#syscheck-next-step").isDisabled(), true);
