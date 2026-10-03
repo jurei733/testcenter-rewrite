@@ -123,14 +123,14 @@ const readSystemCheckUnitResponse = (
   ],
   template: `
     <div class="stack system-check-shell">
-      @defer (when interfaceMode.mode() === 'original' && !systemCheck && canUseSystemChecks) {
-        @if (interfaceMode.mode() === 'original' && !systemCheck && canUseSystemChecks) {
-          <app-original-system-check-starter [choices]="systemCheckChoices"
+      @defer (when interfaceMode.mode() === 'original' && canUseSystemChecks) {
+        @if (interfaceMode.mode() === 'original' && canUseSystemChecks) {
+          <app-original-system-check-starter [view]="this" [choices]="systemCheckChoices"
             [loading]="busy || !systemCheckChoicesLoaded" [error]="errorMessage"
             (select)="selectOriginalSystemCheck($event)" (retry)="loadSystemCheckChoices()" />
         }
       }
-      <article class="card system-check-hero" *ngIf="interfaceMode.mode() !== 'original' || systemCheck || !canUseSystemChecks">
+      <article class="card system-check-hero" *ngIf="interfaceMode.mode() !== 'original' || !canUseSystemChecks">
         <div>
           <span class="eyebrow">Device readiness</span>
           <h2>Check this device before testing</h2>
@@ -184,7 +184,7 @@ const readSystemCheckUnitResponse = (
       </article>
 
       <ng-container *ngIf="systemCheck as check">
-        <nav class="system-check-steps" aria-label="System check steps">
+        <nav class="system-check-steps" aria-label="System check steps" *ngIf="interfaceMode.mode() !== 'original'">
           <button
             *ngFor="let item of steps; let index = index"
             type="button"
@@ -195,7 +195,7 @@ const readSystemCheckUnitResponse = (
           >{{ stepName(item) }}</button>
         </nav>
 
-        <article class="card" *ngIf="step === 'welcome'">
+        <article class="card" *ngIf="step === 'welcome' && interfaceMode.mode() !== 'original'">
           <span class="eyebrow">{{ check.checkId }}</span>
           <h2>{{ check.displayLabel }}</h2>
           <p id="systemCheckIntroText">{{ customText('syscheck_intro', 'This check verifies whether the current device is ready for a test session.') }}</p>
@@ -427,8 +427,8 @@ const readSystemCheckUnitResponse = (
         </article>
 
         <div class="actions system-check-navigation">
-          <button id="systemCheckBackButton" class="ghost" type="button" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
-          <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
+          <button id="systemCheckBackButton" class="ghost" type="button" *ngIf="interfaceMode.mode() !== 'original'" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
+          <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report' && interfaceMode.mode() !== 'original'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
           <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>
         </div>
       </ng-container>
@@ -571,7 +571,7 @@ export class SystemCheckViewComponent implements OnInit {
       "welcome",
       ...(this.systemCheck.skipNetwork ? [] : ["network" as const]),
       ...(this.systemCheck.unit ? ["unit" as const] : []),
-      ...(this.interactiveQuestionCount > 0 ? ["questionnaire" as const] : []),
+      ...(this.systemCheck.questions.length > 0 ? ["questionnaire" as const] : []),
       ...(this.systemCheck.canSave ? ["report" as const] : [])
     ];
   }
@@ -744,6 +744,10 @@ export class SystemCheckViewComponent implements OnInit {
     this.uiState.workspace.workspaceKey = this.workspaceKey;
     this.viewState.persistShellState();
     await this.selectSystemCheck(choice.checkId);
+    if (this.systemCheck) await this.router.navigate([], {
+      relativeTo: this.route, queryParamsHandling: "merge",
+      queryParams: { tenantKey: choice.tenantKey, workspaceKey: choice.workspaceKey, checkId: choice.checkId }
+    });
   }
 
   async loadSystemCheckAccess(): Promise<void> {
@@ -824,6 +828,9 @@ export class SystemCheckViewComponent implements OnInit {
     this.systemCheck = null;
     this.step = "welcome";
     this.errorMessage = "";
+    if (this.interfaceMode.mode() === "original") void this.router.navigate([], {
+      relativeTo: this.route, queryParamsHandling: "merge", queryParams: { checkId: null }
+    });
   }
 
   setStep(step: SystemCheckStep): void {
@@ -882,25 +889,25 @@ export class SystemCheckViewComponent implements OnInit {
     );
     appendUserAgentEntry("Browser", "Browser", userAgentInfo.browser.name);
     appendUserAgentEntry(
-      "Browser-Version",
-      "Browser-Version",
+      "Browserversion",
+      "Browserversion",
       userAgentInfo.browser.major
     );
     appendUserAgentEntry(
-      "Betriebsystem",
-      "Betriebsystem",
+      "Betriebssystem",
+      "Betriebssystem",
       userAgentInfo.os.name
     );
     appendUserAgentEntry(
-      "Betriebsystem-Version",
-      "Betriebsystem-Version",
+      "Betriebssystemversion",
+      "Betriebssystemversion",
       userAgentInfo.os.version
     );
     entries.push(
       this.entry(
         "screen-resolution",
         "environment",
-        "Bildschirm-Auflösung",
+        "Bildschirmauflösung",
         `${screenWidth} x ${screenHeight}`,
         screenWidth < 800 || screenHeight < 600
       ),
@@ -913,19 +920,19 @@ export class SystemCheckViewComponent implements OnInit {
       this.entry(
         "language",
         "environment",
-        "Browser-Sprache",
+        "Browsersprache",
         navigator.language
       ),
       this.entry(
         "hardwareConcurrency",
         "environment",
         "CPU-Kerne",
-        navigator.hardwareConcurrency || "unknown"
+        navigator.hardwareConcurrency
       ),
       this.entry(
         "screen-size",
         "environment",
-        "Fenster-Größe",
+        "Fenstergröße",
         `${window.innerWidth} x ${window.innerHeight}`
       )
     );

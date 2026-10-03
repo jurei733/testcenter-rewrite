@@ -5,14 +5,19 @@ import { MatButton } from "@angular/material/button";
 import { MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle } from "@angular/material/card";
 import type { SystemCheckChoice } from "@testcenter-rewrite-app/domain";
 import { ApplicationSettingsService } from "./application-settings.service";
+import { OriginalSystemCheckContentComponent } from "./original-system-check-content.component";
+import type { SystemCheckViewComponent } from "./system-check-view.component";
 
 // Adapted from IQB Testcenter 19 sys-check-starter (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt. The existing authorized controller owns
 // loading and selection; this component creates no sessions or report data.
 @Component({
   selector: "app-original-system-check-starter", standalone: true,
-  imports: [NgFor, NgIf, RouterLink, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle],
+  imports: [NgFor, NgIf, RouterLink, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardSubtitle, MatCardTitle, OriginalSystemCheckContentComponent],
   template: `
+    @if (view.systemCheck) {
+      <app-original-system-check-content [view]="view" />
+    } @else {
     <div class="flex-row-wrap" id="originalSystemCheckStarter">
       <mat-card appearance="raised">
         <mat-card-header>
@@ -48,6 +53,7 @@ import { ApplicationSettingsService } from "./application-settings.service";
         </mat-card-actions>
       </mat-card>
     </div>
+    }
   `,
   styles: [`
     :host { display: block; min-width: 0; }
@@ -63,6 +69,7 @@ import { ApplicationSettingsService } from "./application-settings.service";
 })
 export class OriginalSystemCheckStarterComponent {
   readonly settings = inject(ApplicationSettingsService);
+  @Input({ required: true }) view!: SystemCheckViewComponent;
   @Input() choices: SystemCheckChoice[] = [];
   @Input() loading = false;
   @Input() error = "";

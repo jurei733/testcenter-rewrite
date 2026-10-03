@@ -150,9 +150,29 @@ their authorized scopes; invalid credentials do not fall back to public access.
 Headful checks passed empty/single/multiple selection, actual scoped selection,
 390px layout bounds, one error notice and real retry, required password change,
 re-login and sign-out. The corresponding selection cases are in the repository
-browser gate. The protected login card and subsequent check steps still use the
-Rewrite layout. Header details and equal-fixture rendered Original comparisons
+browser gate. The protected login card and the remaining check steps still use
+the Rewrite layout. Header details and equal-fixture rendered Original comparisons
 remain open; this does not close the Systemcheck matrix row.
+The selected check now has the pinned Original welcome's two 400px Material
+cards, German step labels and instructions, source environment table, and real
+Material FAB previous/next navigation using the existing controller guards.
+The header says `Systemcheck`; its logo returns home rather than sending an
+unhandled participant-only event. Selection adds an exact tenant/workspace/check
+permalink; reloading restores that check, and returning to the directory clears
+it. A questionnaire containing only authored headers also retains its step,
+matching the source instead of counting only input controls. New environment
+reports now use the current Original labels/IDs (`Browserversion`,
+`Betriebssystem`, `Betriebssystemversion`, `Bildschirmauflösung`, `Browsersprache`,
+`Fenstergröße`); existing reports are not rewritten. Navigation currently has
+native hover titles, not the source's Material tooltips. Network, Unit,
+questionnaire/report composition, the protected-account card, remaining header
+details and equal-reference screenshot acceptance are still open.
+The final headful welcome check and fresh protected SQLite/Chromium report gate
+both exited 0, including reload, cleared selection, header-only questions and
+the home action. Twenty-five frontend-state tests passed. The production initial
+bundle is 469.91kB below the unchanged 470kB error limit. Screenshots were
+inspected for actual table readability and 390px bounds; they are not Original
+reference screenshots. Publication CI is an independent gate.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

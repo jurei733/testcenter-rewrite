@@ -2560,10 +2560,22 @@ try {
     );
     const noSaveSystemCheckImport = await noSaveSystemCheckImportResponse.json();
     assert.equal(noSaveSystemCheckImport.importJob?.status, "completed");
+    const headerOnlyCheckId = "SYS-CHECK-HEADER-ONLY";
+    const headerOnlySourceResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`, {
+        body: { fileName: "HeaderOnlySysCheck.xml", mediaType: "application/xml", sourceDocument:
+          '<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-syscheck-xml/18.0"><Metadata><Id>SYS-CHECK-HEADER-ONLY</Id><Label>Header Only Check</Label></Metadata><Config skipnetwork="true"><Q id="only-header" type="header" prompt="Header-only instructions"/></Config></SysCheck>' }
+      });
+    const headerOnlySource = await headerOnlySourceResponse.json();
+    const headerOnlyImportResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/import-jobs`, {
+        body: { sourcePackageId: headerOnlySource.sourcePackage.sourcePackageId }
+      });
+    assert.equal((await headerOnlyImportResponse.json()).importJob.status, "completed");
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     const originalChoices = page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}']`);
     await originalChoices.first().waitFor();
-    assert.equal(await originalChoices.count(), 3);
+    assert.equal(await originalChoices.count(), 4);
     assert.equal(await page.locator("#systemCheckTenantKey").count(), 0);
     assert.equal(await page.locator("#systemCheckIntroText").count(), 0);
     const choiceViewport = page.viewportSize();
@@ -2586,8 +2598,31 @@ try {
     await selectedOriginalCheck;
     await page.locator("#systemCheckIntroText").waitFor();
     assert.equal(await page.locator("#originalSystemCheckStarter").count(), 0);
+    await page.waitForURL(url => url.searchParams.get("checkId") === noSaveSystemCheckId &&
+      url.searchParams.get("workspaceKey") === systemCheckWorkspaceKey && url.searchParams.get("ui") === "original");
+    assert.equal(await page.locator("#originalSystemCheckWelcome mat-card").count(), 2);
+    assert.equal(await page.locator(".system-check-facts").count(), 0);
+    assert.equal(await page.locator(".system-check-steps").count(), 0);
+    assert.equal(await page.locator("#syscheck-previous-step").isDisabled(), true);
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#systemCheckQuestionsIntro").waitFor();
+    assert.equal(await page.locator("#syscheck-next-step").isDisabled(), true);
+    await page.locator("#syscheck-previous-step").click();
+    await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator("#originalSystemCheckWelcome").waitFor();
     await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
     await originalChoices.first().waitFor();
+    await page.waitForURL(url => !url.searchParams.has("checkId"));
+    await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${headerOnlyCheckId}']`).click();
+    await page.locator("#originalSystemCheckWelcome").waitFor();
+    assert.equal(await page.locator("#originalSystemCheckWelcome ol li").count(), 2,
+      "Original retains a questionnaire step even when it contains only authored headers");
+    await page.locator("#syscheck-next-step").click();
+    await page.getByRole("heading", { name: "Header-only instructions", exact: true }).waitFor();
+    assert.equal(await page.locator("#syscheck-next-step").isDisabled(), true);
+    await page.locator("#participantApplicationLogoButton").click();
+    await page.waitForURL(url => url.pathname === "/app/home");
     await page.setViewportSize(choiceViewport);
     await page.goto(
       `${baseUrl}/app/system-check?ui=rewrite&tenantKey=${encodeURIComponent(
@@ -2603,7 +2638,7 @@ try {
     await page
       .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
       .waitFor();
-    assert.equal(await page.locator(".system-check-option").count(), 3);
+    assert.equal(await page.locator(".system-check-option").count(), 4);
     await page
       .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
       .click();
@@ -2705,9 +2740,9 @@ try {
       ["Gerätetyp", "mobile"],
       ["Gerätehersteller", "Samsung"],
       ["Browser", "Chrome"],
-      ["Browser-Version", "120"],
-      ["Betriebsystem", "Android"],
-      ["Betriebsystem-Version", "13"],
+      ["Browserversion", "120"],
+      ["Betriebssystem", "Android"],
+      ["Betriebssystemversion", "13"],
       ["browser-plugins", "Smoke PDF Viewer"]
     ]) {
       await page
@@ -3020,7 +3055,7 @@ try {
       "utf8"
     );
     for (const expectedValue of [
-      '"Browser-Version"',
+      '"Browserversion"',
       '"CPU-Architektur"',
       '"SM-S918B"',
       '"Smoke PDF Viewer"',

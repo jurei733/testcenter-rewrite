@@ -216,10 +216,14 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     if (this.isAttachmentCaptureView) return "Capture Attachment";
     if (this.isPublicInfoView) return this.publicInfoTitle;
-    return this.activeRouteView === "system-check" ? "System Check" : "Participant Test";
+    return this.activeRouteView === "system-check" ? (this.interfaceMode.mode() === "original" ? "Systemcheck" : "System Check") : "Participant Test";
   }
 
   leaveParticipantSession(): void {
+    if (this.activeRouteView === "system-check") {
+      void this.router.navigateByUrl("/home");
+      return;
+    }
     // The shared controller updates the header only after the guarded leave
     // succeeds. Cancelling must preserve an authored hidden-header layout.
     globalThis.dispatchEvent(new CustomEvent("participant-leave-session"));

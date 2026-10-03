@@ -279,9 +279,23 @@ protected SQLite/Chromium production gate passed the new public-selection
 checks and both existing report/save/export flows with final exit 0. API
 assertions and the repository browser gate retain these cases. Current
 publication CI and PostgreSQL remain separate gates.
-Protected login and the welcome/network/Unit/questionnaire/report layouts
+Protected login and the network/Unit/questionnaire/report layouts
 still require Original adaptation and rendered reference comparisons. This is
 a selection slice, not completion of the Systemcheck or visual-parity matrix.
+The subsequent welcome/navigation slice adapts the two 400px Material cards,
+German step labels, environment table, header and FAB previous/next controls.
+The exact selected scope/check now survives reload through query parameters;
+returning to selection clears the check parameter. The header logo returns home.
+Header-only questionnaires retain their step, matching Original 19's question
+array rather than its number of input controls. Newly captured environment IDs
+and labels now match the current source; stored historical reports remain intact.
+Native hover titles still differ from Original Material tooltips, and the
+remaining full-page/reference comparisons are not closed by this slice.
+The final headful welcome check and fresh protected SQLite/Chromium production
+report gate exited 0; the latter also passed the header-only questionnaire case
+and the unchanged report/save/export flows. Twenty-five frontend-state tests
+passed. The 469.91kB production initial bundle remains below the unchanged 470kB
+error limit. Current publication CI remains separate.
 
 The same CI revision exposed an additional browser-gate race in both full UI
 and Ops: attachment setup timed out waiting for the auto-refresh preference to
