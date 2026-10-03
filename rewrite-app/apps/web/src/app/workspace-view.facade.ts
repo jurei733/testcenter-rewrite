@@ -2437,6 +2437,11 @@ export class WorkspaceViewFacade {
     this.viewState.onAutoRefreshSettingsChanged();
   }
 
+  setAutoRefreshEnabled(enabled: boolean): void {
+    this.workspace.autoRefreshEnabled = enabled;
+    this.viewState.onAutoRefreshSettingsChanged();
+  }
+
   createTenant(): void {
     if (!this.canCreateTenant) {
       return;

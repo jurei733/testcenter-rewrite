@@ -58,15 +58,15 @@ through the existing authenticated resume service; locked/completed assignments
 cannot launch. The Original starter replaces the Rewrite diagnostic cards only
 when a signed-in participant has no active run. Player/terminal/error states
 continue through the existing controller. Long-list scrolling is observed with
-an IntersectionObserver. Equal-fixture comparison, the account panel and the
-operator/monitor starter remain open; this is not a closed visual-parity row.
+an IntersectionObserver. Equal-fixture comparison and the operator/monitor
+starter remain open; this is not a closed visual-parity row.
 The focused integrated memory/Chrome smoke passed on 2026-10-03 through
 `participant-entry-sign-in`, including cancellation of return, confirmed
 return to the Original card and resuming the exact same session/run. Additional
 local browser checks cover locked/completed cards, retry after a failed resume,
 desktop/mobile widths and an actual Review account's empty CSV response (204)
 with its authored start-button text. Full CI for the new commit is still a
-separate gate. The current production bundle is 467.25kB under the unchanged
+separate gate. The current production bundle is 468.47kB under the unchanged
 470kB error limit; its 450kB warning remains.
 
 All rows are currently open. Close a row only with matching reference states
@@ -86,9 +86,24 @@ opening and closing them does not replace the iframe. Headful Chromium checks
 cover keyboard trapping and return, draft retention, actual comment save/delete,
 nested confirmation focus, mobile bounds, authored menu permissions, actual
 reload of the same run and return to Rewrite. The integrated smoke has the same
-surface gate. Remaining sidebar contents, account/footer, dialogs and matching
+surface gate. Remaining sidebar contents, account sign-out, dialogs and matching
 reference screenshots keep the Player visual-parity row open. This is not a
 completed visual-identity claim.
+The Original login footer now has the source's Material-link order and German
+labels, and is absent from the Starter and active Player as in 19.0. Its version
+label describes the actual Rewrite build, not a fictitious Original release.
+The Starter account menu shows the authorized login, authored group label,
+booklet access and build identity. A headful Chromium/isolated-SQLite check
+passed both surfaces, viewport-height login composition, opaque themed CDK
+overlays, mobile menu bounds, Escape/close focus restoration and same-run
+return to Rewrite. A fresh protected SQLite/Chromium entry gate also passed
+the footer/account assertions and the same-session/run Starter resume. The
+sign-out control is explicitly disabled in
+this development preview until the backend can reproduce Original
+`deletePersonToken`: revoke access without deleting responses, issue a fresh
+credential on re-entry, and keep the old credential invalid. Local
+`clearSession` is not equivalent to that operation. This remains a functional
+requirement as well as an open account-menu interaction state.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

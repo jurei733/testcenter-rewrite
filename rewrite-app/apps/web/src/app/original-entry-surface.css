@@ -1,0 +1,31 @@
+/* Original root/starter/login flex geometry; scoped to the optional entry. */
+:root[data-interface-mode="original"] .page.is-participant-page:has(#originalParticipantLogin, #originalParticipantStarter) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+:root[data-interface-mode="original"] .participant-stage:has(#originalParticipantLogin, #originalParticipantStarter),
+:root[data-interface-mode="original"] app-participant-view:has(#originalParticipantLogin, #originalParticipantStarter),
+:root[data-interface-mode="original"] app-original-participant-entry {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+:root[data-interface-mode="original"] app-participant-view > .stack:has(#originalParticipantLogin, #originalParticipantStarter) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0;
+}
+:root[data-interface-mode="original"] app-original-participant-login,
+:root[data-interface-mode="original"] app-original-participant-starter {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+:root[data-interface-mode="original"] app-original-participant-login .login-page,
+:root[data-interface-mode="original"] app-original-participant-starter .starter {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}

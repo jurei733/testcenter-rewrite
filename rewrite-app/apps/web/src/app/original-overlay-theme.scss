@@ -1,0 +1,8 @@
+@use './original-material-theme' as theme;
+
+// CDK overlays live under body, outside the component's themed host.
+// Scope their theme explicitly; never affect a Rewrite menu or dialog.
+:root[data-interface-mode='original'] .original-participant-account-menu,
+:root[data-interface-mode='original'] .original-player-menu {
+  @include theme.apply();
+}

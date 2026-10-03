@@ -325,6 +325,7 @@ export class ParticipantViewFacade {
   }
 
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  private participantGroupLabel = "";
   participantViewSettings: ParticipantViewSettings = {};
   private participantRosterCustomTexts: Record<string, string> = {};
   private participantBookletCustomTexts: Record<string, string> = {};
@@ -738,7 +739,7 @@ export class ParticipantViewFacade {
           this.runtime.loginKey.trim() ||
           "No participant name yet",
         loginLabel: this.runtime.loginKey.trim() || "No login yet",
-        groupLabel: this.runtime.groupKey.trim() || "No group yet",
+        groupLabel: this.participantGroupLabel || this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
         sessionEntryLink: this.createParticipantSessionEntryLink(),
         bookletLabel: "No booklet loaded",
@@ -2981,6 +2982,7 @@ export class ParticipantViewFacade {
     }
     this.copiedSessionEntryLink = "";
     this.assignedBooklets = [];
+    this.participantGroupLabel = "";
     this.participantReviews = [];
     this.resetReviewEditor();
     this.reviewFeedback = "";
@@ -4346,11 +4348,12 @@ export class ParticipantViewFacade {
   private syncParticipantRosterEntry(
     participantRosterEntry: Pick<
       ParticipantRosterEntry,
-      "displayName" | "customTexts" | "viewSettings" | "assetAssignments"
+      "displayName" | "groupLabel" | "customTexts" | "viewSettings" | "assetAssignments"
     > | null
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
+    this.participantGroupLabel = participantRosterEntry?.groupLabel?.trim() ?? "";
     this.setParticipantRosterCustomTexts(participantRosterEntry?.customTexts ?? {});
     this.setParticipantViewSettings(participantRosterEntry?.viewSettings ?? {});
     this.applicationSettings.applyParticipantAssets(

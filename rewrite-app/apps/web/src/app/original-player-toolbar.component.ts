@@ -3,14 +3,16 @@ import { MatButton, MatIconButton } from "@angular/material/button";
 import { MatMenu, MatMenuItem, MatMenuTrigger } from "@angular/material/menu";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { OriginalPlayerSurfaceStylesComponent } from "./original-player-surface-styles.component";
+import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
 
 // Adapted from IQB Testcenter 19's toolbar-header. See ORIGINAL-UI-LICENSE.txt.
 @Component({
   selector: "app-original-player-toolbar",
   standalone: true,
   imports: [MatButton, MatIconButton, MatMenu, MatMenuItem, MatMenuTrigger,
-    OriginalPlayerSurfaceStylesComponent],
+    OriginalPlayerSurfaceStylesComponent, OriginalOverlayStylesComponent],
   template: `
+    <app-original-overlay-styles />
     <app-original-player-surface-styles />
     <div id="originalPlayerToolbar" class="toolbar-header" data-cy="unit-screenheader">
       @if (view.showUnitTitle) { <p data-cy="unit-title">{{ view.player.headline }}</p> }

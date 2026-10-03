@@ -7149,6 +7149,10 @@ try {
       ui: "original", tenantKey, workspaceKey
     })}`, { waitUntil: "networkidle" });
     await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator("#originalApplicationFooter").waitFor();
+    assert.deepEqual(await originalSignInPage.locator("#originalApplicationFooter nav a").allTextContents(),
+      ["Barrierefreiheit", "Datenschutz", "Impressum"]);
+    assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").count(), 0);
     await originalSignInPage.locator(".login-submit svg[matButtonIcon]").waitFor();
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
@@ -7171,6 +7175,17 @@ try {
     assert.equal(await originalSignInPage.locator("#participantRouteEntry").count(), 0);
     assert.equal(await originalSignInPage.locator("#participantRoutePlayer").count(), 0);
     await originalSignInPage.locator("#participantApplicationHeader h1").filter({ hasText: "Übersicht" }).waitFor();
+    assert.equal(await originalSignInPage.locator("#originalApplicationFooter").count(), 0);
+    await originalSignInPage.locator("#originalParticipantAccountButton").click();
+    await originalSignInPage.locator("#originalParticipantAccountLogin").waitFor();
+    assert.equal((await originalSignInPage.locator("#originalParticipantAccountLogin").textContent())?.trim(),
+      participantEntrySignInLoginKey);
+    assert.equal((await originalSignInPage.locator("#originalParticipantAccountGroup").textContent())?.trim(),
+      participantEntrySignInGroupKey);
+    assert.equal(await originalSignInPage.locator("#originalParticipantLogoutButton").isDisabled(), true);
+    await originalSignInPage.keyboard.press("Escape");
+    await originalSignInPage.locator("#originalParticipantAccountLogin").waitFor({ state: "detached" });
+    assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").evaluate(el => el === document.activeElement), true);
     const originalResumeCard = originalSignInPage.locator("#originalParticipantStarter mat-card[data-booklet-status='in_progress']");
     assert.equal(await originalResumeCard.count(), 1);
     await originalResumeCard.getByRole("button").click();
@@ -24475,9 +24490,13 @@ try {
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   // Async capture updates must render without an unrelated shell refresh.
-  if (await page.locator("#autoRefreshEnabled").isChecked()) {
-    await page.locator("#autoRefreshEnabled").uncheck();
-  }
+  // Exercise the actual checkbox instead of treating a just-created,
+  // not-yet-hydrated input's default false value as a persisted preference.
+  await page.locator("#autoRefreshEnabled").check();
+  await page.waitForFunction(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+      .autoRefreshEnabled === true);
+  await page.locator("#autoRefreshEnabled").uncheck();
   await page.waitForFunction(() =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
       .autoRefreshEnabled === false);

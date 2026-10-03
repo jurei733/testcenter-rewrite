@@ -182,6 +182,11 @@
       class="participant-topbar"
       [class.original-participant-topbar]="interfaceMode.mode() === 'original'"
     >
+      @defer (when interfaceMode.mode() === 'original' && activeRouteView === 'participant' && !!app.runtime.participantSessionId && !app.runtime.testRunId) {
+        @if (interfaceMode.mode() === 'original' && activeRouteView === 'participant' && !!app.runtime.participantSessionId && !app.runtime.testRunId) {
+          <app-original-participant-account />
+        }
+      }
       <div class="application-brand">
         <button
           id="participantApplicationLogoButton"
@@ -475,6 +480,11 @@
       </section>
     </ng-template>
   </ng-template>
+  @if (interfaceMode.mode() === 'original' && isParticipantView) {
+    @if (activeRouteView === 'participant' && !app.runtime.participantSessionId) {
+      @defer (when true) { <app-original-footer /> }
+    }
+  } @else {
   <footer class="application-footer">
     <span>{{ applicationSettings.settings().appTitle }}</span>
     <nav aria-label="Public information">
@@ -483,4 +493,5 @@
       <a id="applicationAccessibilityNoticeLink" routerLink="/accessibility">Accessibility</a>
     </nav>
   </footer>
+  }
 </div>

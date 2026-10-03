@@ -50,6 +50,11 @@ and implementation. Each needs current rewrite evidence before it is closed:
   reads/acknowledgements and Review CRUD; authenticated file paths remain
   inside their workspace, authenticated downloads use private caching, and
   internal errors do not disclose server details.
+  Participant account sign-out must also reproduce `deletePersonToken`: revoke
+  its access credential without deleting the session/answers, and re-entry
+  must not reactivate the old credential. The existing local `clearSession`
+  action does not establish this guarantee; Original-preview sign-out stays
+  disabled until this server boundary has been implemented and verified.
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
@@ -106,10 +111,20 @@ Review JSON is 200 with `[]`, category values remain JSON booleans, and only
 the authenticated participant's reviews are included. Systemcheck's generic
 route retains operator authorization for every format. The upstream
 `ReportFormat.php` test matrix and API regressions passed with memory, file and
-SQLite stores; PostgreSQL remains CI-gated. The fresh protected SQLite/Chromium
+SQLite stores. PostgreSQL integration and PostgreSQL UI CI passed at
+`b0c4a85ddd0432b31b2bc54df9f47005d3e3ffc9` on 2026-10-03. The fresh protected SQLite/Chromium
 Systemcheck gate also passed saving and exporting both checks and the corrected
 `RoundTrip in ms` / `Anwendungs-Latenz in ms` labels. Negotiation for standalone
 workspace response/log/review reports is not covered by this slice.
+
+The same CI revision exposed an additional browser-gate race in both full UI
+and Ops: attachment setup timed out waiting for the auto-refresh preference to
+be saved as false. The checkbox now assigns and persists its emitted model
+value in one explicit handler. The attachment gate exercises and verifies both
+enabled and disabled states instead of trusting a newly rendered input's
+default value. A fresh protected SQLite/Chromium attachment/camera gate passed
+with refresh disabled, including lookup, capture, upload, preview and deletion;
+the complete post-fix CI still needs its own successful result.
 
 The zoneless Attachment Capture view now explicitly notifies Angular after
 camera, QR, target lookup, photo encoding and upload callbacks. The isolated

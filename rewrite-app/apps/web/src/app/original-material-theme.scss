@@ -1,0 +1,19 @@
+@use '@angular/material' as mat;
+@use './original-base-palettes' as palettes;
+
+@mixin apply() {
+  @include mat.theme((
+    color: (primary: palettes.$primary-palette, tertiary: palettes.$tertiary-palette),
+    typography: 'Nunito Sans',
+    density: 0
+  ));
+  --mat-sys-primary: var(--secondary);
+  --mat-sys-secondary: var(--secondary-soft);
+  --mat-sys-on-primary: #fff;
+  --mat-sys-primary-container: #fff;
+  --mat-sys-on-secondary-container: var(--secondary);
+  --mat-sys-surface: #fff;
+  --mat-sys-surface-container: #fff;
+  --mat-sys-outline-variant: var(--secondary);
+  @include mat.button-overrides((filled-container-shape: 10px, tonal-container-shape: 10px, outlined-container-shape: 10px));
+}

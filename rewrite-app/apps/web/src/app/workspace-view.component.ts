@@ -46,8 +46,8 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
                 id="autoRefreshEnabled"
                 name="autoRefreshEnabled"
                 type="checkbox"
-                [(ngModel)]="view.workspace.autoRefreshEnabled"
-                (change)="view.onAutoRefreshSettingsChanged()"
+                [ngModel]="view.workspace.autoRefreshEnabled"
+                (ngModelChange)="view.setAutoRefreshEnabled($event)"
               />
               Refresh workspace, content, runtime, and diagnostics views automatically
             </span>
