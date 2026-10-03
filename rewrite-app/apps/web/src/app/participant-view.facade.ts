@@ -313,6 +313,17 @@ export class ParticipantViewFacade {
     return !this.runtime.participantSessionId.trim();
   }
 
+  get isParticipantStarter(): boolean {
+    return !this.isParticipantLogin && !this.currentRunState && !this.hasControllerError;
+  }
+
+  get noAssignedBookletsLabel(): string {
+    // The Original starter also accepts this authored key outside the
+    // versioned participant default catalog.
+    return this.participantCustomTexts.login_noBookletsAvailable?.trim() ||
+      "Für diese Anmeldung wurde kein Test gefunden.";
+  }
+
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
   participantViewSettings: ParticipantViewSettings = {};
   private participantRosterCustomTexts: Record<string, string> = {};
@@ -2081,6 +2092,15 @@ export class ParticipantViewFacade {
   async signInFromOriginalInterface(): Promise<void> {
     if (!this.canSignIn) return;
     await this.signInAndStartSingleBookletInternal({ quiet: true });
+  }
+
+  async startAssignedBooklet(bookletKey: string): Promise<void> {
+    if (!this.isParticipantStarter || !this.canStartOrResume) return;
+    const booklet = this.assignedBooklets.find(item => item.bookletKey === bookletKey);
+    if (!booklet || !["available", "in_progress"].includes(booklet.status)) return;
+    this.runtime.bookletKey = booklet.bookletKey;
+    this.persistState();
+    await this.resumeSessionInternal({ quiet: true });
   }
 
   resetParticipantCodeChallenge(): void {

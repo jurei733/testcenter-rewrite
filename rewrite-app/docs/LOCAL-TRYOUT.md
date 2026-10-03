@@ -36,6 +36,21 @@ Die Demo verwendet einen eingebetteten Verona-6-Player. Sie zeigt Anmeldung,
 Antwortspeicherung und Wiederaufnahme; die Parität zusätzlicher Originalpakete
 wird separat in [PARITY.md](./PARITY.md) bewertet.
 
+## Optionale Original-Oberfläche
+
+Auf der Startseite lässt sich unter der Oberflächenauswahl die
+„Original“-Vorschau aktivieren und wieder auf „Rewrite“ wechseln. Alternativ
+öffnen: <http://127.0.0.1:4310/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace>.
+Bei einem anderen lokalen Port die Portnummer entsprechend ersetzen.
+
+Die Original-Anmeldung fragt zuerst den Namen und bei Bedarf das Kennwort ab.
+Bei mehreren zugewiesenen Testheften erscheint die nummerierte Kartenauswahl.
+Aus einem laufenden Test führt das Logo nach Bestätigung zurück zur Auswahl;
+die passende Karte setzt denselben Testlauf fort. Gesperrte oder abgeschlossene
+Testhefte haben eine deaktivierte Aktion. Review-Anmeldungen finden darunter
+„Reviews downloaden“. Die Oberfläche ist weiterhin eine Vorschau; Player,
+Administration und vollständige visuelle Gleichheit sind noch in Arbeit.
+
 ## Frische Demo neben einer vorhandenen Installation
 
 Ältere lokale Datenbanken können noch ein Demo-Booklet ohne Player enthalten.

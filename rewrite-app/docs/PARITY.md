@@ -1,5 +1,53 @@
 # Testcenter parity checklist
 
+## Current 19.0 delta to verify
+
+On 2026-10-03, the Original fetch advanced to
+`c35cff81383949b4664e0fdffa3ba1154d144d9d` (version 19.0). The broad historical
+audit below remains useful, but its 94% estimate is **not a verified estimate
+against 19.0** and does not include the newly requested identical optional UI.
+The following additional acceptance requirements come from the 19.0 changelog
+and implementation. Each needs current rewrite evidence before it is closed:
+
+- Required current-password confirmation for self-service password changes
+  and for superadmin deletion of administrators/workspaces; resetting another
+  administrator's password retains its distinct authorization boundary.
+- Optional installation-wide refusal of passwordless logins and rejection of
+  Testtakers files containing them, with the Original `sys-check-login` exception.
+- Login codes and `CodeToEnter` are case-insensitive; successful login resets
+  failed-attempt counters. Current execution-mode/session reuse capabilities
+  must agree with the Original definitions.
+- Default XML XSD validation, supported schema versions and supported
+  `https://w3id.org/iqb/spec/<repo>/<version>` references. Unsupported versions
+  and historical GitHub schema locations are rejected when applying this
+  current contract; the operator file view explains supported versions.
+- Ownership and mode checks for participant answers, unit states, command
+  reads/acknowledgements and Review CRUD; authenticated file paths remain
+  inside their workspace, authenticated downloads use private caching, and
+  internal errors do not disclose server details.
+- Live-connection registration rejects unknown/duplicate tokens, tokens are
+  unpredictable, and silent disconnects become lost within one minute.
+  Internal broadcaster endpoints remain inaccessible to public clients.
+- Navigation to the starter/route dispatcher applies active-unit completeness,
+  timer and leave-lock checks, including manually entered routes. A player
+  reporting no Verona version produces a clear controller error.
+- Monitor action enablement and missing state icons, distinct live/polling
+  indicators, and Review timing without invented time limits.
+- All Original-compatible CSV cells, including headers, are quoted and
+  preserve embedded quotes/semicolons/newlines. Verify the changed log content
+  contract and corrected Systemcheck labels/`ms` units. Report Accept handling
+  supports media-type parameters and ordered alternatives.
+- Physical attachment deletion, explicit test-mode opt-in, backup/restore
+  installation matching and PostgreSQL startup/import atomicity. PHP-specific
+  `open_basedir`, extension and MySQL migration mechanics are implementation
+  details; verify their effective access/data guarantees for this rewrite.
+
+The optional UI has its separate complete acceptance matrix in
+[`ORIGINAL-UI-PARITY.md`](./ORIGINAL-UI-PARITY.md). Neither a green historical
+pipeline nor a completed login/starter slice proves current full parity.
+
+## Historical broad baseline
+
 This checklist uses IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20) as its broad baseline
 and was last compared on 2026-09-07 with the latest published release

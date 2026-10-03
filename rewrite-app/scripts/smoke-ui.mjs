@@ -7150,6 +7150,29 @@ try {
         document.querySelector("#participantRouteRunId")?.textContent?.trim() === runId,
       [participantEntrySignInSessionId, participantEntryStartedRunId]
     );
+    // The optional layout must preserve the same durable run when returning
+    // to its numbered Starter card and resuming from that card.
+    await originalSignInPage.locator("#participantApplicationLogoButton").click();
+    await originalSignInPage.locator("#participantConfirmationContinueButton").waitFor();
+    await originalSignInPage.locator("#participantConfirmationStayButton").click();
+    assert.equal(await originalSignInPage.locator("#originalParticipantStarter").count(), 0);
+    await originalSignInPage.locator("#participantApplicationLogoButton").click();
+    await originalSignInPage.locator("#participantConfirmationContinueButton").click();
+    await originalSignInPage.locator("#originalParticipantStarter").waitFor();
+    assert.equal(await originalSignInPage.locator("#participantRouteEntry").count(), 0);
+    assert.equal(await originalSignInPage.locator("#participantRoutePlayer").count(), 0);
+    await originalSignInPage.locator("#participantApplicationHeader h1").filter({ hasText: "Übersicht" }).waitFor();
+    const originalResumeCard = originalSignInPage.locator("#originalParticipantStarter mat-card[data-booklet-status='in_progress']");
+    assert.equal(await originalResumeCard.count(), 1);
+    await originalResumeCard.getByRole("button").click();
+    await originalSignInPage.waitForFunction(
+      ([sessionId, runId]) =>
+        !document.querySelector("#originalParticipantStarter") &&
+        document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() === sessionId &&
+        document.querySelector("#participantRouteRunId")?.textContent?.trim() === runId &&
+        document.querySelector("#participantRouteStatus")?.textContent?.trim() === "running",
+      [participantEntrySignInSessionId, participantEntryStartedRunId]
+    );
   } finally {
     await originalSignInContext.close();
   }

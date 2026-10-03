@@ -1,0 +1,23 @@
+:host { display: block; }
+.starter { min-height: calc(100svh - 160px); display: flex; flex-direction: column; align-items: center; }
+.intro { width: 684px; margin: 48px 0; display: flex; align-items: center; gap: 24px; }
+.companion-image { width: 94px; height: 94px; flex-shrink: 0; aspect-ratio: 1 / 1; object-fit: contain; }
+p { font-family: inherit; font-size: 16px; line-height: 1.5; margin: 1em 0; color: inherit; }
+.intro-heading { font-weight: 700; }
+.cards { width: 684px; display: flex; flex-direction: column; gap: 24px; }
+mat-card { padding: 16px 24px; border-radius: 4px; border: 1px solid var(--mat-sys-primary); flex-direction: row; align-items: center; gap: 24px; background: #fff; }
+.number { font-size: 57px; }
+.card-content { min-width: 0; }
+mat-card-header { padding: 0; }
+mat-card-header p { overflow-wrap: anywhere; }
+.mat-icon { width: 24px; height: 24px; fill: currentColor; vertical-align: bottom; }
+.done-image { position: absolute; right: 1px; bottom: 1px; max-width: 20%; pointer-events: none; }
+button.test-done { background-color: transparent; color: var(--mat-sys-primary); }
+.sentinel { width: 100%; height: 1px; }
+.button-box { margin-top: auto; align-self: end; display: flex; align-items: center; gap: 9px; padding: 20px; }
+.scroll-button { position: sticky; bottom: 24px; right: 24px; align-self: end; display: flex; flex-direction: column; align-items: center; }
+.starter-problem { color: #ba1a1a; }
+@media (max-width: 732px) {
+  .intro, .cards { width: calc(100% - 48px); }
+  .button-box { flex-wrap: wrap; }
+}

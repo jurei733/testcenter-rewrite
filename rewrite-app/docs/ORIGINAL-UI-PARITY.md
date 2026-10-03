@@ -8,7 +8,7 @@ acceptance axis from functional parity; the historical 94% estimate in
 PARITY.md does not measure it.
 
 Reference: `iqb-berlin/testcenter` commit
-`aa627e19636bc1826854d77a4a126b2ef0b038b5`, fetched on 2026-09-12.
+`c35cff81383949b4664e0fdffa3ba1154d144d9d` (19.0), fetched on 2026-10-03.
 Compare source files from that revision, not the older local checkout.
 
 ## Required behavior
@@ -50,6 +50,24 @@ password, back and retry transitions, with a Caps Lock hint. Local Chromium
 checks cover focus and the real passwordless path. Full screenshot comparisons,
 remaining icon/control details and the other surfaces remain open.
 
+The participant starter now adapts the Original's numbered Material cards,
+684px card/intro layout, companion assets, Starten/Fortsetzen/locked actions and
+bottom Review download action. Available and in-progress assignments open
+through the existing authenticated resume service; locked/completed assignments
+cannot launch. The Original starter replaces the Rewrite diagnostic cards only
+when a signed-in participant has no active run. Player/terminal/error states
+continue through the existing controller. Long-list scrolling is observed with
+an IntersectionObserver. Equal-fixture comparison, the account panel and the
+operator/monitor starter remain open; this is not a closed visual-parity row.
+The focused integrated memory/Chrome smoke passed on 2026-10-03 through
+`participant-entry-sign-in`, including cancellation of return, confirmed
+return to the Original card and resuming the exact same session/run. Additional
+local browser checks cover locked/completed cards, retry after a failed resume,
+desktop/mobile widths and an actual Review account's empty CSV response (204)
+with its authored start-button text. Full CI for the new commit is still a
+separate gate. The initial production bundle is 466.01kB under the unchanged
+470kB error limit; its 450kB warning remains.
+
 All rows are currently open. Close a row only with matching reference states
 and browser evidence at equal viewport, theme, text and fixture settings.
 
@@ -70,6 +88,9 @@ The new baseline includes changes since the previous audit. Before updating
 functional completion, examine sensitive-route reauthentication, login-code
 case handling, API error/409 responses, report Accept-header handling and
 loading transitions. CI-only changes do not create product requirements.
+The 2026-10-03 fetch also includes the 19.0 XML, authentication, ownership,
+CSV and live-connection changes itemized in PARITY.md. Login and starter source
+layouts did not change between the previous UI reference and this revision.
 
 ## Source reuse
 

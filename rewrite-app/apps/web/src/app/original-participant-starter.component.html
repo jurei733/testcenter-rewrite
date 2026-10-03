@@ -1,0 +1,54 @@
+<section id="originalParticipantStarter" class="starter">
+  <div class="intro">
+    @if (settings.assetUrl('starterCompanion'); as companion) {
+      <img class="companion-image" [src]="companion" alt="" />
+    } @else {
+      <div class="companion-image"></div>
+    }
+    <div>
+      <p class="intro-heading">Schön, dass du da bist!</p>
+      <p>Komm, wir legen los. Wähle einen Teil aus.</p>
+    </div>
+  </div>
+  <div class="cards" aria-label="Verfügbare Tests">
+      <mat-card *ngFor="let booklet of view.assignedBooklets; let i = index; trackBy: trackBooklet" [attr.data-booklet-key]="booklet.bookletKey" [attr.data-booklet-status]="booklet.status">
+        <div class="number" aria-hidden="true">{{ i + 1 }}</div>
+        <div class="card-content">
+          <mat-card-header><p>{{ booklet.displayLabel }}{{ view.formatBookletVariant(booklet) }}</p></mat-card-header>
+          <mat-card-actions>
+            <button matButton="filled" type="button" [class.test-done]="isLocked(booklet)"
+              [disabled]="isLocked(booklet) || !!pendingBooklet() || !view.canStartOrResume"
+              [attr.aria-busy]="pendingBooklet() === booklet.bookletKey" (click)="start(booklet)">
+              <svg class="mat-icon" matButtonIcon aria-hidden="true" viewBox="0 -960 960 960" focusable="false">
+                @if (isLocked(booklet)) {
+                  <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
+                } @else if (booklet.status === 'in_progress') {
+                  <path d="M200-312v-336l240 168-240 168Zm320-8v-320h80v320h-80Zm160 0v-320h80v320h-80Z" />
+                } @else {
+                  <path d="M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z" />
+                }
+              </svg>
+              {{ pendingBooklet() === booklet.bookletKey ? 'Bitte warten …' : actionLabel(booklet) }}
+            </button>
+          </mat-card-actions>
+        </div>
+        @if (isLocked(booklet)) {
+          @if (settings.assetUrl('starterCardDone'); as doneImage) { <img class="done-image" [src]="doneImage" alt="" /> }
+        }
+      </mat-card>
+      <p *ngIf="!view.assignedBooklets.length" role="status">{{ view.noAssignedBookletsLabel }}</p>
+    @if (problem()) { <p class="starter-problem" role="alert">{{ problem() }}</p> }
+  </div>
+  <div #bottomSentinel id="originalStarterBottomSentinel" class="sentinel"></div>
+  @if (showScrollButton()) {
+    <button type="button" class="scroll-button" aria-controls="originalStarterBottomSentinel" (click)="scrollDown()">
+      Unten geht es weiter <span aria-hidden="true">↓</span>
+    </button>
+  }
+  <div class="button-box">
+    @if (view.canDownloadParticipantReviews) {
+      <button matButton="tonal" id="originalDownloadReviews" type="button" (click)="view.downloadParticipantReviews()">Reviews downloaden</button>
+    }
+    @if (view.reviewDownloadFeedback) { <p role="status">{{ view.reviewDownloadFeedback }}</p> }
+  </div>
+</section>

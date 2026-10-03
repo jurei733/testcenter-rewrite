@@ -13,7 +13,7 @@ import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { InterfaceModeService } from "./interface-mode.service";
-import { OriginalParticipantLoginComponent } from "./original-participant-login.component";
+import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -25,16 +25,16 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantLoginComponent],
+  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent],
   template: `
     <div class="stack">
-      @defer (when interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired) {
-        @if (interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired) {
-          <app-original-participant-login />
+      @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
+        @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
+          <app-original-participant-entry />
         }
       }
       <article
-        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && view.isParticipantLogin && !view.participantCodeRequired)"
+        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired))"
         id="participantRouteEntry"
         class="card participant-entry-card"
       >
@@ -301,7 +301,7 @@ interface ParticipantVisibleCodeNotice {
       </article>
 
       <button
-        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && view.isParticipantLogin) && showStarterScrollButton()"
+        *ngIf="!view.isParticipantPlayerFocused && !(interfaceMode.mode() === 'original' && (view.isParticipantLogin || view.isParticipantStarter)) && showStarterScrollButton()"
         id="participantStarterScrollButton"
         class="secondary participant-starter-scroll-button"
         type="button"
@@ -312,7 +312,7 @@ interface ParticipantVisibleCodeNotice {
         <strong aria-hidden="true">↓</strong>
       </button>
 
-      <article class="card" id="participantRoutePlayer" *ngIf="!(interfaceMode.mode() === 'original' && view.isParticipantLogin)">
+      <article class="card" id="participantRoutePlayer" *ngIf="!(interfaceMode.mode() === 'original' && (view.isParticipantLogin || view.isParticipantStarter))">
         <input
           *ngIf="view.isParticipantPlayerFocused"
           id="participantRouteSessionId"
