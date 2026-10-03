@@ -24492,7 +24492,52 @@ try {
   // Async capture updates must render without an unrelated shell refresh.
   // Exercise the actual checkbox instead of treating a just-created,
   // not-yet-hydrated input's default false value as a persisted preference.
-  await page.locator("#autoRefreshEnabled").check();
+  await page.evaluate(() => {
+    const input = document.querySelector("#autoRefreshEnabled");
+    const label = input?.closest("label");
+    const events = [];
+    const persisted = () => JSON.parse(
+      localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}"
+    ).autoRefreshEnabled;
+    const observe = event => {
+      if (!label?.contains(event.target)) return;
+      events.push({
+        type: event.type, target: event.target.tagName,
+        targetId: event.target.id, checked: input.checked,
+        persisted: persisted(), defaultPrevented: event.defaultPrevented,
+        x: event.clientX, y: event.clientY
+      });
+    };
+    const eventTypes = ["pointerdown", "pointerup", "click", "input", "change"];
+    for (const type of eventTypes) document.addEventListener(type, observe, true);
+    window.workspaceRefreshSmokeDiagnostic = () => {
+      for (const type of eventTypes) document.removeEventListener(type, observe, true);
+      const current = document.querySelector("#autoRefreshEnabled");
+      const rect = current?.getBoundingClientRect();
+      const hit = rect && document.elementFromPoint(
+        rect.x + rect.width / 2, rect.y + rect.height / 2
+      );
+      return {
+        events, checked: current?.checked, persisted: persisted(),
+        sameInput: current === input, rect: rect?.toJSON(),
+        hit: hit && { tag: hit.tagName, id: hit.id },
+        scrollY: window.scrollY,
+        viewport: { width: innerWidth, height: innerHeight }
+      };
+    };
+  });
+  try {
+    await page.locator("#autoRefreshEnabled").check();
+  } catch (error) {
+    console.error("workspace_refresh_checkbox_diagnostic=" + JSON.stringify(
+      await page.evaluate(() => window.workspaceRefreshSmokeDiagnostic())
+    ));
+    throw error;
+  }
+  await page.evaluate(() => {
+    window.workspaceRefreshSmokeDiagnostic();
+    delete window.workspaceRefreshSmokeDiagnostic;
+  });
   await page.waitForFunction(() =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
       .autoRefreshEnabled === true);
