@@ -33,6 +33,7 @@ export class RewriteAppUiStateService {
   activeView: AppView = "home";
   showRawDebug = false;
   autoRefreshHandle: number | null = null;
+  autoRefreshInFlight = false;
   foregroundRequestDepth = 0;
 
   setAdminSessionToken(value: string): void {

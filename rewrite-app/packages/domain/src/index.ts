@@ -827,6 +827,12 @@ export type ContentRelease = {
   activatedAt: string | null;
 };
 
+/** List metadata; immutable runtime content is loaded from the detail route. */
+export type ContentReleaseSummary = Omit<ContentRelease, "runtimeSnapshot"> & {
+  bookletCount: number;
+  unitCount: number;
+};
+
 export type ContentReleaseRuntimeSnapshot = {
   bookletEntries: ContentReleaseBookletEntry[];
   playerEntries?: ContentReleasePlayerEntry[];
@@ -1710,7 +1716,7 @@ export type WorkspaceStudyMonitorSummary = {
 };
 
 export type WorkspaceContentReleaseListItem = {
-  contentRelease: ContentRelease;
+  contentRelease: ContentReleaseSummary;
   importJob: ImportJob | null;
   sourcePackage: SourcePackage | null;
   participantSessionCount: number;
@@ -1835,7 +1841,7 @@ export type WorkspaceParticipantSessionListItem = {
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
   latestTestRun: TestRun | null;
-  contentRelease: ContentRelease | null;
+  contentRelease: ContentReleaseSummary | null;
 };
 
 export type WorkspaceParticipantSessionRunSummary = {

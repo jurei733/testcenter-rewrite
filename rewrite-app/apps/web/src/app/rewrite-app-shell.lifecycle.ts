@@ -16,6 +16,8 @@ export interface ShellLifecycleHost {
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   autoRefreshHandle: number | null;
+  autoRefreshInFlight: boolean;
+  readonly foregroundRequestActive: boolean;
   refreshWorkspaceOverview(quiet?: boolean): Promise<void>;
   refreshContentReads(quiet?: boolean): Promise<void>;
   refreshRuntimeReads(quiet?: boolean): Promise<void>;
@@ -62,7 +64,15 @@ export function scheduleShellAutoRefresh(host: ShellLifecycleHost): void {
 
   const refreshSeconds = Math.max(3, Number(host.autoRefreshSeconds) || 8);
   host.autoRefreshHandle = window.setInterval(() => {
-    void refreshShellActiveViewData(host);
+    // Slow imports/media work must not accumulate another five-request batch
+    // on every timer tick or compete with an explicit operator action.
+    if (!host.autoRefreshEnabled || host.autoRefreshInFlight || host.foregroundRequestActive) {
+      return;
+    }
+    host.autoRefreshInFlight = true;
+    void refreshShellActiveViewData(host).finally(() => {
+      host.autoRefreshInFlight = false;
+    });
   }, refreshSeconds * 1000);
 }
 

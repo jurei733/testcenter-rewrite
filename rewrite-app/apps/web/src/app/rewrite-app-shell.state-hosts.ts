@@ -21,6 +21,9 @@ export function createShellLifecycleStateHost(args: {
   setActiveView(nextValue: AppView): void;
   getAutoRefreshHandle(): number | null;
   setAutoRefreshHandle(nextValue: number | null): void;
+  getAutoRefreshInFlight(): boolean;
+  setAutoRefreshInFlight(nextValue: boolean): void;
+  isForegroundRequestActive(): boolean;
   refreshWorkspaceOverview(quiet?: boolean): Promise<void>;
   refreshContentReads(quiet?: boolean): Promise<void>;
   refreshRuntimeReads(quiet?: boolean): Promise<void>;
@@ -77,6 +80,15 @@ export function createShellLifecycleStateHost(args: {
     },
     set autoRefreshHandle(nextValue) {
       args.setAutoRefreshHandle(nextValue);
+    },
+    get autoRefreshInFlight() {
+      return args.getAutoRefreshInFlight();
+    },
+    set autoRefreshInFlight(nextValue) {
+      args.setAutoRefreshInFlight(nextValue);
+    },
+    get foregroundRequestActive() {
+      return args.isForegroundRequestActive();
     },
     refreshWorkspaceOverview: args.refreshWorkspaceOverview,
     refreshContentReads: args.refreshContentReads,

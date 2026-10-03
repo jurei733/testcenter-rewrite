@@ -66,7 +66,7 @@ return to the Original card and resuming the exact same session/run. Additional
 local browser checks cover locked/completed cards, retry after a failed resume,
 desktop/mobile widths and an actual Review account's empty CSV response (204)
 with its authored start-button text. Full CI for the new commit is still a
-separate gate. The current production bundle is 467.04kB under the unchanged
+separate gate. The current production bundle is 467.25kB under the unchanged
 470kB error limit; its 450kB warning remains.
 
 All rows are currently open. Close a row only with matching reference states

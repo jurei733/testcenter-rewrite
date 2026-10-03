@@ -78,6 +78,7 @@ import type {
   BookletRuntimePolicy,
   ContentReleaseActivationReadiness,
   ContentRelease,
+  ContentReleaseSummary,
   ContentReleaseBookletEntry,
   ContentReleasePlayerEntry,
   ContentReleaseStatus,
@@ -7667,11 +7668,7 @@ const formatContentReleasesCsv = (input: {
   return [
     header.join(","),
     ...input.items.map(item => {
-      const bookletCount = item.contentRelease.runtimeSnapshot.bookletEntries.length;
-      const unitCount = item.contentRelease.runtimeSnapshot.bookletEntries.reduce(
-        (sum, booklet) => sum + booklet.unitEntries.length,
-        0
-      );
+      const { bookletCount, unitCount } = item.contentRelease;
 
       return [
         input.tenantKey,
@@ -22571,6 +22568,31 @@ const sortWorkspaceContentReleases = (
     return rightTimestamp.localeCompare(leftTimestamp);
   });
 
+const toContentReleaseSummary = (
+  contentRelease: ContentRelease
+): ContentReleaseSummary => {
+  const { runtimeSnapshot, ...metadata } = contentRelease;
+  return {
+    ...metadata,
+    bookletCount: runtimeSnapshot.bookletEntries.length,
+    unitCount: runtimeSnapshot.bookletEntries.reduce(
+      (sum, booklet) => sum + booklet.unitEntries.length,
+      0
+    )
+  };
+};
+
+// Lists expose identity/status and download readiness, not a duplicate of
+// potentially multi-megabyte documents or inline media definitions. Do not
+// mutate repository objects: detail/download and import keep the exact bytes.
+const toSourcePackageListSummary = (
+  sourcePackage: SourcePackage | null
+): SourcePackage | null => sourcePackage ? {
+  ...sourcePackage,
+  contentStructure: null,
+  sourceDocument: null
+} : null;
+
 const buildWorkspaceContentReleaseListItems = (input: {
   contentReleases: ContentRelease[];
   importJobs: ImportJob[];
@@ -22592,9 +22614,9 @@ const buildWorkspaceContentReleaseListItems = (input: {
           : null;
 
       return {
-        contentRelease,
+        contentRelease: toContentReleaseSummary(contentRelease),
         importJob,
-        sourcePackage,
+        sourcePackage: toSourcePackageListSummary(sourcePackage),
         participantSessionCount: input.participantSessions.filter(
           participantSession =>
             participantSession.contentReleaseId === contentRelease.contentReleaseId
@@ -29214,10 +29236,7 @@ export const createFirstSliceServices = (
             });
 
             return {
-              sourcePackage: {
-                ...sourcePackage,
-                sourceDocument: null
-              },
+              sourcePackage: toSourcePackageListSummary(sourcePackage)!,
               fileType: classifyWorkspaceSourcePackage(
                 sourcePackage,
                 decodedDocument
@@ -29414,11 +29433,12 @@ export const createFirstSliceServices = (
           .slice(0, limit)
           .map<WorkspaceImportJobListItem>(importJob => ({
             importJob,
-            sourcePackage:
+            sourcePackage: toSourcePackageListSummary(
               sourcePackages.find(
                 sourcePackage =>
                   sourcePackage.sourcePackageId === importJob.sourcePackageId
               ) ?? null
+            )
           }));
       },
       async exportImportJobsCsv(input) {
@@ -29565,6 +29585,12 @@ export const createFirstSliceServices = (
         const participantRosterEntriesByLoginKey = new Map(
           participantRosterEntries.map(entry => [entry.loginKey, entry])
         );
+        const contentReleaseSummariesById = new Map(
+          contentReleases.map(contentRelease => [
+            contentRelease.contentReleaseId,
+            toContentReleaseSummary(contentRelease)
+          ])
+        );
 
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
@@ -29585,12 +29611,9 @@ export const createFirstSliceServices = (
                   participantSession.loginKey
                 ) ?? null,
               latestTestRun: sessionRuns[0] ?? null,
-              contentRelease:
-                contentReleases.find(
-                  contentRelease =>
-                    contentRelease.contentReleaseId ===
-                    participantSession.contentReleaseId
-                ) ?? null
+              contentRelease: contentReleaseSummariesById.get(
+                participantSession.contentReleaseId
+              ) ?? null
             };
           })
           .filter(item => {

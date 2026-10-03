@@ -17,6 +17,13 @@ while the remaining full-page comparisons stay open in
 
 This folder is the starting point for the real production implementation.
 
+Operator lists are metadata views: import/source lists omit document bytes and
+inline content structures; release/session lists expose release identity,
+status and booklet/unit counts instead of duplicating full runtime snapshots
+for every participant. Detail routes and downloads retain the complete exact
+content. Automatic shell polling never overlaps a pending background batch and
+yields to foreground actions, so slow imports cannot accumulate refresh work.
+
 It is intentionally separate from `rewrite-spike/`:
 
 - `rewrite-spike/` proves architecture and semantics

@@ -72,6 +72,18 @@ The optional UI has its separate complete acceptance matrix in
 [`ORIGINAL-UI-PARITY.md`](./ORIGINAL-UI-PARITY.md). Neither a green historical
 pipeline nor a completed login/starter slice proves current full parity.
 
+Operational verification on 2026-10-03 found repeated full runtime snapshots
+in operator release/session lists. These now return typed release metadata and
+booklet/unit counts; source/import lists omit inline documents and structures.
+Detail routes and exact downloads retain their content. In the same isolated
+official BookletConfig workspace, the participant-list payload fell from
+31,587,092 to 316,792 bytes; counts, identities, filters and CSV remain intact.
+Memory/file/SQLite regressions exercise a 1.5MB source and four sessions, exact
+detail/download retention and metadata-only lists. Three frontend-state tests
+also gate non-overlapping polling, foreground priority, timer rescheduling,
+failure recovery and route selection. The full UI and current CI remain
+independent acceptance gates.
+
 The Original 19 CSV encoding portion is implemented on 2026-10-03 against
 upstream `0435f3bb003d4189d8fcaca66f9ee208c2434c86`: participant Review downloads,
 Original result-archive response/log/review CSV, workspace log CSV and

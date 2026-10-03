@@ -97,6 +97,11 @@ export class RewriteAppShellLifecycleService {
       setAutoRefreshHandle: nextValue => {
         this.uiState.autoRefreshHandle = nextValue;
       },
+      getAutoRefreshInFlight: () => this.uiState.autoRefreshInFlight,
+      setAutoRefreshInFlight: nextValue => {
+        this.uiState.autoRefreshInFlight = nextValue;
+      },
+      isForegroundRequestActive: () => this.uiState.activeRequestLabel() !== null,
       refreshWorkspaceOverview,
       refreshContentReads,
       refreshRuntimeReads,

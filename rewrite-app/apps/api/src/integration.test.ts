@@ -23,6 +23,11 @@ import {
   type GetRuntimeConfigResponse,
   type GetSystemTimeResponse,
   type ListSourcePackagesResponse,
+  type ListImportJobsResponse,
+  type ListContentReleasesResponse,
+  type ListParticipantSessionsResponse,
+  type GetContentReleaseResponse,
+  type GetSourcePackageResponse,
   type CreateProofOfWorkChallengeResponse,
   type ProofOfWorkSolution
 } from "@testcenter-rewrite-app/contracts";
@@ -46107,6 +46112,115 @@ test("activation guard clears after monitor completes blocking run", async () =>
   assert.equal(activation.body.activation.forced, false);
   assert.equal(activation.body.activation.previousActiveContentReleaseId, firstReleaseId);
   assert.equal(activation.body.activation.supersededOpenRunCount, 0);
+});
+
+test("workspace lists omit inline content while detail and download retain exact bytes", async () => {
+  const tenantKey = `compact-list-${process.pid}-${Date.now()}`;
+  const workspaceKey = "compact-content";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST", body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST", body: { workspaceKey, displayName: workspaceKey }
+  });
+  const scope = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const prompt = `exact-large-content-${"x".repeat(512 * 1024)}`;
+  const contentStructure = {
+    bookletEntries: [
+      { bookletKey: "compact-a", displayLabel: "First", unitEntries: [
+        { unitKey: "compact-a-1", displayLabel: "One", content: prompt },
+        { unitKey: "compact-a-2", displayLabel: "Two", content: prompt }
+      ] },
+      { bookletKey: "compact-b", displayLabel: "Second", unitEntries: [
+        { unitKey: "compact-b-1", displayLabel: "Three", content: prompt }
+      ] }
+    ]
+  };
+  const sourceDocument = JSON.stringify(contentStructure);
+  const uploaded = await requestJson<{ sourcePackage: { sourcePackageId: string } }>(`${scope}/source-packages`, {
+    method: "POST", body: {
+      fileName: "compact.json", mediaType: "application/json", sourceDocument, contentStructure
+    }
+  });
+  assert.equal(uploaded.status, 201);
+  const sourcePackageId = uploaded.body.sourcePackage.sourcePackageId;
+  const imported = await requestJson<{
+    importJob: { status: string };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`${scope}/import-jobs`, { method: "POST", body: { sourcePackageId } });
+  assert.equal(imported.status, 201);
+  assert.equal(imported.body.importJob.status, "completed");
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  await requestJson(`${scope}/content-releases/${contentReleaseId}/activate`, {
+    method: "POST", body: { activatedByActorId: "compact-list-test" }
+  });
+  for (let index = 0; index < 4; index += 1) {
+    const signedIn = await requestJson<{ participantSession: { participantSessionId: string } }>(
+      "/api/v1/participant/auth/sign-in", {
+        method: "POST", body: { tenantKey, workspaceKey, loginKey: `compact-reader-${index}` }
+      }
+    );
+    assert.equal(signedIn.status, 200);
+    const resumed = await requestJson(
+      `/api/v1/participant/sessions/${signedIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST", body: { bookletKey: "compact-a" } }
+    );
+    assert.equal(resumed.status, 200);
+  }
+  const files = await requestJson<ListSourcePackagesResponse>(`${scope}/source-packages`);
+  const imports = await requestJson<ListImportJobsResponse>(`${scope}/import-jobs`);
+  const releases = await requestJson<ListContentReleasesResponse>(`${scope}/content-releases`);
+  const sessions = await requestJson<ListParticipantSessionsResponse>(`${scope}/participant-sessions`);
+  for (const result of [files, imports, releases, sessions]) {
+    assert.equal(result.status, 200);
+    assert.ok(Buffer.byteLength(JSON.stringify(result.body)) < 40_000,
+      "List payload must not grow with inline media or duplicate it for each participant.");
+    assert.equal(JSON.stringify(result.body).includes("exact-large-content-"), false);
+  }
+  assert.equal(files.body.items[0]?.fileSizeBytes, Buffer.byteLength(sourceDocument));
+  assert.equal(files.body.items[0]?.downloadAvailable, true);
+  for (const sourcePackage of [files.body.items[0]?.sourcePackage, imports.body.items[0]?.sourcePackage,
+    releases.body.items[0]?.sourcePackage]) {
+    assert.equal(sourcePackage?.sourceDocument, null);
+    assert.equal(sourcePackage?.contentStructure, null);
+    assert.equal(sourcePackage?.sourcePackageId, sourcePackageId);
+  }
+  assert.equal(releases.body.items[0]?.contentRelease.bookletCount, 2);
+  assert.equal(releases.body.items[0]?.contentRelease.unitCount, 3);
+  assert.equal("runtimeSnapshot" in releases.body.items[0]!.contentRelease, false);
+  assert.equal(releases.body.items[0]?.participantSessionCount, 4);
+  assert.equal(releases.body.items[0]?.openTestRunCount, 4);
+  assert.equal(sessions.body.items.length, 4);
+  for (const session of sessions.body.items) {
+    assert.equal(session.latestTestRun?.bookletKey, "compact-a");
+    assert.equal(session.contentRelease?.contentReleaseId, contentReleaseId);
+    assert.equal(session.contentRelease?.bookletCount, 2);
+    assert.equal("runtimeSnapshot" in session.contentRelease!, false);
+  }
+  const releaseDetail = await requestJson<GetContentReleaseResponse>(`${scope}/content-releases/${contentReleaseId}`);
+  assert.equal(releaseDetail.status, 200);
+  assert.equal(releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.content, prompt);
+  assert.equal(releaseDetail.body.contentReleaseDetail.sourcePackage?.sourceDocument, sourceDocument);
+  const sourceDetail = await requestJson<GetSourcePackageResponse>(`${scope}/source-packages/${sourcePackageId}`);
+  assert.equal(sourceDetail.status, 200);
+  assert.equal(sourceDetail.body.sourcePackageDetail.sourcePackage.sourceDocument, sourceDocument);
+  assert.equal(sourceDetail.body.sourcePackageDetail.sourcePackage.contentStructure?.bookletEntries[0]?.unitEntries[0]?.content, prompt);
+  const downloadPath = resolveRoutePath(productionApiRoutes.workspace.downloadSourcePackage, {
+    tenantKey, workspaceKey, sourcePackageId
+  });
+  const downloaded = await fetch(`${baseUrl}${downloadPath}`);
+  assert.equal(downloaded.status, 200);
+  assert.equal(await downloaded.text(), sourceDocument);
+  const csv = await fetch(`${baseUrl}${resolveRoutePath(productionApiRoutes.workspace.exportContentReleasesCsv, {
+    tenantKey, workspaceKey
+  })}`);
+  assert.equal(csv.status, 200);
+  const csvLines = (await csv.text()).trim().split("\n");
+  const columns = csvLines[0]!.split(",");
+  const values = csvLines[1]!.split(",").map(value => value.replace(/^"|"$/g, ""));
+  assert.equal(values[columns.indexOf("bookletCount")], "2");
+  assert.equal(values[columns.indexOf("unitCount")], "3");
 });
 
 test("workspace participant-session list shows latest run and active release", async () => {
