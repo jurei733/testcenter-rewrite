@@ -853,7 +853,7 @@ try {
       document
         .querySelector("#workspaceLogExportPreview")
         ?.textContent?.includes(
-          "groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry"
+          '"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"'
         ) &&
       document
         .querySelector("#workspaceLogExportPreview")

@@ -9713,7 +9713,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(logCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       logCsv.body,
-      /^groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry\n/
+      /^"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"\n/
     );
     assert.match(
       logCsv.body,
@@ -9897,11 +9897,19 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.match(
       resultArchiveEntries.get("responses.csv") ?? "",
-      /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;responses;laststate\n/
+      /^\uFEFF"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"responses";"laststate"\n/
     );
     assert.match(
       resultArchiveEntries.get("logs.csv") ?? "",
-      /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry\n/
+      /^\uFEFF"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"\n/
+    );
+    const originalLogRows = JSON.parse(resultArchiveEntries.get("logs.json") ?? "[]") as Array<{ logentry: string }>;
+    const structuredLog = originalLogRows.find(row => row.logentry.startsWith("LOADCOMPLETE : "));
+    assert.ok(structuredLog, "The result archive must include the structured load-complete log.");
+    assert.ok(structuredLog.logentry.includes('\\"browserName\\"'));
+    assert.ok(
+      (resultArchiveEntries.get("logs.csv") ?? "").includes(`"${structuredLog.logentry.replace(/"/g, '""')}"`),
+      "Original 19 CSV must keep the exact JSON log string, including backslashes, in one quoted cell."
     );
     assert.match(
       resultArchiveEntries.get("reviews.csv") ?? "",
@@ -9912,6 +9920,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     ) as Array<Record<string, unknown>>;
     assert.equal(originalReviewRows[0]?.["category_cleanup-check"], true);
     assert.equal(originalReviewRows[0]?.entry, "Review removed by group deletion");
+    assert.match(resultArchiveEntries.get("reviews.csv") ?? "", /;"TRUE";/);
 
     const selectedResponseCsv = await requestTextAt(
       isolated.baseUrl,
@@ -43417,7 +43426,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   );
   assert.equal(reviewParticipantCsv.status, 200);
   assert.match(reviewParticipantCsv.contentType ?? "", /^text\/csv/);
-  assert.match(reviewParticipantCsv.body, /^groupname;loginname;code;/);
+  assert.match(reviewParticipantCsv.body, /^"groupname";"loginname";"code";/);
   assert.match(reviewParticipantCsv.body, /category_general/);
   assert.match(reviewParticipantCsv.body, /"mode-review"/);
   assert.match(reviewParticipantCsv.body, /"Retained across review re-entry"/);

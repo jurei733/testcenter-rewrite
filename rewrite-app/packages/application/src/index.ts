@@ -14,6 +14,7 @@ import type {
   Document as XmlDocument,
   Element as XmlElement
 } from "@xmldom/xmldom";
+import { formatOriginalReportCsv } from "./original-report-csv.js";
 import { CodingSchemeFactory } from "@iqb/responses";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
@@ -7394,8 +7395,6 @@ const formatParticipantTestLogCsv = (
     "timestamp",
     "logentry"
   ];
-  const escapeSemicolonCsvCell = (value: unknown): string =>
-    `"${String(value ?? "").replace(/"/g, '""')}"`;
   const chronologicalItems = [...items].sort((left, right) =>
     left.testLog.timestamp - right.testLog.timestamp ||
     left.testLog.recordedAt.localeCompare(right.testLog.recordedAt) ||
@@ -7403,25 +7402,25 @@ const formatParticipantTestLogCsv = (
       right.testLog.participantTestLogId
     )
   );
-  return `\uFEFF${[
-    columns.join(";"),
-    ...chronologicalItems.map(item => {
+  return formatOriginalReportCsv(
+    columns,
+    chronologicalItems.map(item => {
       const separator = item.testLog.unitKey ? " = " : " : ";
       const logEntry = item.testLog.logContent
         ? `${item.testLog.logKey}${separator}${JSON.stringify(item.testLog.logContent)}`
         : item.testLog.logKey;
-      return [
-        item.groupKey,
-        item.loginKey,
-        item.participantCode,
-        item.bookletAssignmentKey,
-        item.testLog.unitKey ?? "",
-        item.testLog.originalUnitId ?? "",
-        item.testLog.timestamp,
-        logEntry
-      ].map(escapeSemicolonCsvCell).join(";");
+      return {
+        groupname: item.groupKey,
+        loginname: item.loginKey,
+        code: item.participantCode,
+        bookletname: item.bookletAssignmentKey,
+        unitname: item.testLog.unitKey ?? "",
+        originalUnitId: item.testLog.originalUnitId ?? "",
+        timestamp: item.testLog.timestamp,
+        logentry: logEntry
+      };
     })
-  ].join("\n")}\n`;
+  );
 };
 
 const formatSourcePackagesCsv = (input: {
@@ -15733,51 +15732,27 @@ type OriginalLogReportRow = {
 
 type OriginalReviewReportRow = Record<string, string | number | boolean | null>;
 
-const escapeOriginalCsvCell = (value: unknown): string =>
-  `"${String(value ?? "").replace(/"/g, '""')}"`;
-
-const formatOriginalReportCsv = (
-  columns: string[],
-  rows: Array<Record<string, unknown>>
-): string =>
-  `\uFEFF${[
-    columns.join(";"),
-    ...rows.map(row =>
-      columns.map(column => escapeOriginalCsvCell(row[column])).join(";")
-    )
-  ].join("\n")}`;
-
 const formatOriginalLogReportCsv = (
   columns: string[],
   rows: OriginalLogReportRow[]
 ): string =>
-  `\uFEFF${[
-    columns.join(";"),
-    ...rows.map(row =>
-      columns
-        .map(column =>
-          column === "logentry"
-            ? row.logentry.replace(/\\"/g, '""')
-            : escapeOriginalCsvCell(row[column as keyof OriginalLogReportRow])
-        )
-        .join(";")
-    )
-  ].join("\n")}`;
+  formatOriginalReportCsv(columns, rows);
 
 const formatOriginalReviewReportCsv = (
   columns: string[],
   rows: Array<Record<string, unknown>>
 ): string =>
-  `\uFEFF${[
-    columns.join(";"),
-    ...rows.map(row =>
-      columns
-        .map(column =>
-          row[column] == null ? "" : escapeOriginalCsvCell(row[column])
-        )
-        .join(";")
-    )
-  ].join("\n")}`;
+  formatOriginalReportCsv(
+    columns,
+    rows.map(row => Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [
+        key,
+        key.startsWith("category_") && typeof value === "boolean"
+          ? (value ? "TRUE" : "FALSE")
+          : value
+      ])
+    ))
+  );
 
 const toOriginalReportDateTime = (value: string): string => {
   const timestamp = Date.parse(value);
@@ -26284,17 +26259,7 @@ export const createFirstSliceServices = (
       return values;
     });
     const headers = [...baseHeaders, ...dynamicHeaders];
-    const escapeSemicolonCsvCell = (value: unknown): string => {
-      const text =
-        typeof value === "boolean" ? (value ? "1" : "") : String(value ?? "");
-      return `"${text.replace(/"/g, '""')}"`;
-    };
-    return `\uFEFF${[
-      headers.map(escapeSemicolonCsvCell).join(";"),
-      ...rows.map(row =>
-        headers.map(header => escapeSemicolonCsvCell(row.get(header))).join(";")
-      )
-    ].join("\n")}`;
+    return formatOriginalReportCsv(headers, rows.map(row => Object.fromEntries(row)));
   };
 
   const exportSystemCheckReportsJson = async (input: {

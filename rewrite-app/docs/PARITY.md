@@ -36,7 +36,8 @@ and implementation. Each needs current rewrite evidence before it is closed:
 - All Original-compatible CSV cells, including headers, are quoted and
   preserve embedded quotes/semicolons/newlines. Verify the changed log content
   contract and corrected Systemcheck labels/`ms` units. Report Accept handling
-  supports media-type parameters and ordered alternatives.
+  supports media-type parameters and ordered alternatives. Review/report
+  timestamps support the current UTC offset and fractional-second shapes.
 - Physical attachment deletion, explicit test-mode opt-in, backup/restore
   installation matching and PostgreSQL startup/import atomicity. PHP-specific
   `open_basedir`, extension and MySQL migration mechanics are implementation
@@ -45,6 +46,18 @@ and implementation. Each needs current rewrite evidence before it is closed:
 The optional UI has its separate complete acceptance matrix in
 [`ORIGINAL-UI-PARITY.md`](./ORIGINAL-UI-PARITY.md). Neither a green historical
 pipeline nor a completed login/starter slice proves current full parity.
+
+The Original 19 CSV encoding portion is implemented on 2026-10-03 against
+upstream `0435f3bb003d4189d8fcaca66f9ee208c2434c86`: participant Review downloads,
+Original result-archive response/log/review CSV, workspace log CSV and
+Systemcheck CSV share one semicolon/BOM encoder. Non-null cells and headers are
+quoted, embedded quotes are doubled, actual null cells stay empty, and the
+archived log string retains its original backslashes. Review category booleans
+use the Original CSV `TRUE`/`FALSE` representation while JSON retains booleans.
+Tests cover adversarial headers/log values, archive CSV versus JSON log
+identity, participant isolation, and official SysCheck report exports. This
+closes the encoding subrequirement; timestamp shapes, current Systemcheck
+labels/units and Accept negotiation still require the current-version audit.
 
 ## Historical broad baseline
 

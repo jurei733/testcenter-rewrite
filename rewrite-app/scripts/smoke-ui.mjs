@@ -7482,7 +7482,7 @@ try {
     "utf8"
   );
   await rm(participantReviewDownloadPath, { force: true });
-  assert.match(participantReviewCsv, /^\uFEFFgroupname;loginname;code;/);
+  assert.match(participantReviewCsv, /^\uFEFF"groupname";"loginname";"code";/);
   assert.match(participantReviewCsv, /"student-entry-review"/);
   assert.match(participantReviewCsv, /"Updated whole-test review comment"/);
   assert.match(participantReviewCsv, /category_content/);
@@ -23719,7 +23719,7 @@ try {
     .locator("#workspaceLogExportPreview")
     .filter({
       hasText:
-        "groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry"
+        '"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"'
     })
     .filter({ hasText: "PLAYER_STATE_CHANGED" })
     .filter({ hasText: "Saved through Verona" })
@@ -24617,7 +24617,7 @@ try {
   assert.ok(resultArchiveManifest.counts.reviews > 0);
   assert.match(
     resultArchiveEntries.get("responses.csv"),
-    /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;responses;laststate\n/
+    /^\uFEFF"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"responses";"laststate"\n/
   );
   assert.match(resultArchiveEntries.get("reviews.csv"), /category_/);
   await rm(resultArchivePath, { force: true });
