@@ -24326,6 +24326,13 @@ try {
 
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
+  // Async capture updates must render without an unrelated shell refresh.
+  if (await page.locator("#autoRefreshEnabled").isChecked()) {
+    await page.locator("#autoRefreshEnabled").uncheck();
+  }
+  await page.waitForFunction(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+      .autoRefreshEnabled === false);
   await fillAndCommitUntilValue("#workspaceKey", attachmentWorkspaceKey);
   await page.waitForFunction(expectedWorkspaceKey =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
@@ -24459,6 +24466,14 @@ try {
   await page.waitForURL(/\/app\/attachment-capture$/);
   const attachmentCapture = page.locator("#attachmentCaptureCard");
   await attachmentCapture.waitFor();
+  logStep("attachment-capture-no-background-refresh");
+  await attachmentCapture.locator("#attachmentCaptureCode").fill("att-unknown-ui-smoke");
+  await attachmentCapture.locator("#resolveAttachmentCodeButton").click();
+  await attachmentCapture
+    .locator("#attachmentCaptureStatus.is-error")
+    .filter({ hasText: "not found" })
+    .waitFor();
+  assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
   await attachmentCapture.locator("#startAttachmentCameraButton").click();
   try {
     await attachmentCapture

@@ -73,6 +73,13 @@ identity, participant isolation, and official SysCheck report exports. This
 closes the encoding subrequirement; timestamp shapes, current Systemcheck
 labels/units and Accept negotiation still require the current-version audit.
 
+The zoneless Attachment Capture view now explicitly notifies Angular after
+camera, QR, target lookup, photo encoding and upload callbacks. The isolated
+SQLite/Chromium gate passed on 2026-10-03 with automatic shell refresh disabled,
+including an unknown-code error, camera startup, QR-image resolution, target
+confirmation, frame preview, upload, preview in the manager and deletion.
+This closes that async-rendering defect, not the optional Original visual row.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit

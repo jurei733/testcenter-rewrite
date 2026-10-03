@@ -1,6 +1,8 @@
 import { CommonModule } from "@angular/common";
 import {
+  ChangeDetectorRef,
   Component,
+  DestroyRef,
   ElementRef,
   ViewChild,
   inject
@@ -175,6 +177,8 @@ export class AttachmentCaptureComponent
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly route = inject(ActivatedRoute);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
   private scanner: QrScanner | null = null;
   private scanInProgress = false;
 
@@ -265,6 +269,8 @@ export class AttachmentCaptureComponent
       this.cameraMessage = this.describeCameraError(error);
       this.status = "Camera unavailable. Use a saved QR image or the manual code fallback.";
       this.statusIsError = true;
+    } finally {
+      this.refreshView();
     }
   }
 
@@ -286,6 +292,8 @@ export class AttachmentCaptureComponent
     } catch (error) {
       this.status = this.describeCameraError(error);
       this.statusIsError = true;
+    } finally {
+      this.refreshView();
     }
   }
 
@@ -297,6 +305,8 @@ export class AttachmentCaptureComponent
     } catch (error) {
       this.status = this.describeCameraError(error);
       this.statusIsError = true;
+    } finally {
+      this.refreshView();
     }
   }
 
@@ -322,6 +332,7 @@ export class AttachmentCaptureComponent
       this.statusIsError = true;
     } finally {
       this.busy = false;
+      this.refreshView();
     }
   }
 
@@ -333,6 +344,7 @@ export class AttachmentCaptureComponent
       await this.resolveCodeInternal();
     } finally {
       this.busy = false;
+      this.refreshView();
     }
   }
 
@@ -379,11 +391,13 @@ export class AttachmentCaptureComponent
     if (!blob) {
       this.status = "The browser could not encode the captured image.";
       this.statusIsError = true;
+      this.refreshView();
       return;
     }
     this.setCapture(blob, `attachment-capture-${Date.now()}.png`);
     this.status = "Camera frame captured. Confirm the target and upload when ready.";
     this.statusIsError = false;
+    this.refreshView();
   }
 
   selectCaptureFile(event: Event): void {
@@ -428,6 +442,7 @@ export class AttachmentCaptureComponent
       this.statusIsError = true;
     } finally {
       this.busy = false;
+      this.refreshView();
     }
   }
 
@@ -459,6 +474,15 @@ export class AttachmentCaptureComponent
       await this.resolveCode();
     } finally {
       this.scanInProgress = false;
+      this.refreshView();
+    }
+  }
+
+  private refreshView(): void {
+    // Camera/QR/HTTP callbacks finish outside Angular's template event. Notify
+    // the zoneless view instead of depending on unrelated shell polling.
+    if (!this.destroyRef.destroyed) {
+      this.changeDetectorRef.markForCheck();
     }
   }
 
