@@ -210,22 +210,25 @@ const registerParticipantSaveSync = async () => {
   }
 };
 
-const drainParticipantBackgroundSaves = async () => {
-  const records = await readParticipantBackgroundSaves();
+const drainParticipantBackgroundSaves = async ({
+  readRecords = readParticipantBackgroundSaves,
+  send = fetch,
+  removeRecord = deleteParticipantBackgroundSaveByKey,
+  removeInvalidRecord = key => runParticipantSaveTransaction("readwrite", store => store.delete(key))
+} = {}) => {
+  const records = await readRecords();
   let retryNeeded = false;
 
   for (const record of records) {
     const entry = record?.entry;
     if (!isParticipantSaveEntry(entry)) {
-      await runParticipantSaveTransaction("readwrite", store => {
-        store.delete(record.key);
-      });
+      await removeInvalidRecord(record.key);
       continue;
     }
 
     let response;
     try {
-      response = await fetch(
+      response = await send(
         new URL(
           `/api/v1/participant/test-runs/${encodeURIComponent(entry.testRunId)}/save-progress`,
           self.location.origin
@@ -248,8 +251,11 @@ const drainParticipantBackgroundSaves = async () => {
       continue;
     }
 
-    if (response.ok || (response.status >= 400 && response.status < 500)) {
-      await deleteParticipantBackgroundSaveByKey(record.key, entry.deliveryId);
+    // Authentication may be renewed after logout/re-entry, and timeout/rate
+    // limits may disappear. Keep the same response and delivery ID for retry.
+    const recoverableClientError = [401, 403, 408, 429].includes(response.status);
+    if (response.ok || (response.status >= 400 && response.status < 500 && !recoverableClientError)) {
+      await removeRecord(record.key, entry.deliveryId);
     } else {
       retryNeeded = true;
     }

@@ -77,6 +77,16 @@ and implementation. Each needs current rewrite evidence before it is closed:
   yet exposed as a UI logout operation: HTTP participant routes, resource and
   live channels, and foreground/background saves still need one consistently
   enforced credential transport before enabling the Original account action.
+  As a prerequisite, the shipped background worker now retains its exact
+  pending response and delivery ID on 401/403, request timeout, rate limiting,
+  network failure and server failure, so renewed authentication can retry it.
+  Other independently deliverable Units still drain. The existing permanent
+  rejection behavior and foreground outbox remain unchanged. Four tests run
+  the actual worker's drain function with controlled network/storage boundaries;
+  the full unit/frontend-state gate passed (138 + 7 tests). A fresh protected
+  SQLite/Chromium gate passed real Verona offline outbox, view-closure background
+  delivery, controller-error recovery and exact response restoration. This
+  does not yet prove the future credential transport or a real browser 401.
   The complete API suite passed with memory, file and SQLite stores (160 tests
   per store), together with 138 unit and three frontend-state tests. PostgreSQL
   validation of the new credential table remains its own pending CI gate;
