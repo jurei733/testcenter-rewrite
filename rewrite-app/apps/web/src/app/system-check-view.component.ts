@@ -14,6 +14,7 @@ import {
   type GetSystemTimeResponse,
   type ListSystemCheckReportsResponse,
   type ListSystemChecksResponse,
+  type ListSystemCheckChoicesResponse,
   type DeleteSystemCheckReportsResponse,
   type ImportSystemCheckReportResponse,
   type SaveSystemCheckReportRequest,
@@ -27,7 +28,8 @@ import type {
   SystemCheckReportEntry,
   SystemCheckReportStatistics,
   SystemCheckSpeedParameters,
-  WorkspaceSystemCheck
+  WorkspaceSystemCheck,
+  SystemCheckChoice
 } from "@testcenter-rewrite-app/domain";
 
 import { downloadBlobFile } from "./download-text-file";
@@ -43,6 +45,8 @@ import {
   type SystemCheckSaveReportDialogResult
 } from "./system-check-save-report-dialog.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
+import { InterfaceModeService } from "./interface-mode.service";
+import { OriginalSystemCheckStarterComponent } from "./original-system-check-starter.component";
 
 type SystemCheckStep =
   | "welcome"
@@ -114,11 +118,19 @@ const readSystemCheckUnitResponse = (
     CommonModule,
     FormsModule,
     SystemCheckSaveReportDialogComponent,
-    VeronaPlayerHostComponent
+    VeronaPlayerHostComponent,
+    OriginalSystemCheckStarterComponent
   ],
   template: `
     <div class="stack system-check-shell">
-      <article class="card system-check-hero">
+      @defer (when interfaceMode.mode() === 'original' && !systemCheck && canUseSystemChecks) {
+        @if (interfaceMode.mode() === 'original' && !systemCheck && canUseSystemChecks) {
+          <app-original-system-check-starter [choices]="systemCheckChoices"
+            [loading]="busy || !systemCheckChoicesLoaded" [error]="errorMessage"
+            (select)="selectOriginalSystemCheck($event)" (retry)="loadSystemCheckChoices()" />
+        }
+      }
+      <article class="card system-check-hero" *ngIf="interfaceMode.mode() !== 'original' || systemCheck || !canUseSystemChecks">
         <div>
           <span class="eyebrow">Device readiness</span>
           <h2>Check this device before testing</h2>
@@ -127,7 +139,7 @@ const readSystemCheckUnitResponse = (
         <strong id="systemCheckStepStatus">{{ stepNumber }} / {{ steps.length }} · {{ stepLabel }}</strong>
       </article>
 
-      <article class="card system-check-login">
+      <article class="card system-check-login" *ngIf="interfaceMode.mode() !== 'original' || isSystemCheckSession || systemCheckLoginRequired">
         <ng-container *ngIf="isSystemCheckSession; else systemCheckSignIn">
           <span class="eyebrow">Protected system check</span>
           <h2 id="systemCheckSignedInUser">Signed in as {{ signedInUsername }}</h2>
@@ -147,7 +159,7 @@ const readSystemCheckUnitResponse = (
         </ng-template>
       </article>
 
-      <article class="card" *ngIf="!systemCheck && canUseSystemChecks">
+      <article class="card" *ngIf="!systemCheck && canUseSystemChecks && interfaceMode.mode() !== 'original'">
         <h2>Choose a system check</h2>
         <div class="form-grid">
           <label>Tenant Key<input id="systemCheckTenantKey" [(ngModel)]="tenantKey" /></label>
@@ -430,7 +442,7 @@ const readSystemCheckUnitResponse = (
         (save)="submitAnonymousReport($event)"
       ></app-system-check-save-report-dialog>
 
-      <section class="status-banner is-error" *ngIf="errorMessage" role="alert">
+      <section class="status-banner is-error" *ngIf="errorMessage && (interfaceMode.mode() !== 'original' || systemCheck || !canUseSystemChecks)" role="alert">
         <strong>System Check</strong><span>{{ errorMessage }}</span>
       </section>
     </div>
@@ -475,6 +487,7 @@ const readSystemCheckUnitResponse = (
   `]
 })
 export class SystemCheckViewComponent implements OnInit {
+  readonly interfaceMode = inject(InterfaceModeService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
@@ -489,6 +502,8 @@ export class SystemCheckViewComponent implements OnInit {
   tenantKey = this.uiState.workspace.tenantKey;
   workspaceKey = this.uiState.workspace.workspaceKey;
   systemChecks: WorkspaceSystemCheck[] = [];
+  systemCheckChoices: SystemCheckChoice[] = [];
+  systemCheckChoicesLoaded = false;
   systemCheck: WorkspaceSystemCheck | null = null;
   step: SystemCheckStep = "welcome";
   answers: Record<string, string | boolean> = {};
@@ -524,7 +539,10 @@ export class SystemCheckViewComponent implements OnInit {
       this.workspaceKey;
     const checkId = this.route.snapshot.queryParamMap.get("checkId")?.trim();
     await this.loadSystemCheckAccess();
-    if (this.canLoad) {
+    if (this.interfaceMode.mode() === "original" && this.canUseSystemChecks) {
+      await this.loadSystemCheckChoices();
+      if (checkId && this.canLoad) await this.selectSystemCheck(checkId);
+    } else if (this.canLoad) {
       await this.loadSystemChecks(checkId || undefined);
     }
   }
@@ -680,7 +698,8 @@ export class SystemCheckViewComponent implements OnInit {
       }
       this.tenantKey = firstScope.tenantKey;
       this.workspaceKey = firstScope.workspaceKey;
-      await this.loadSystemChecks();
+      if (this.interfaceMode.mode() === "original") await this.loadSystemCheckChoices();
+      else await this.loadSystemChecks();
     } finally {
       this.systemCheckAuthenticationBusy = false;
       this.changeDetectorRef.detectChanges();
@@ -693,9 +712,38 @@ export class SystemCheckViewComponent implements OnInit {
       this.systemCheckPassword = "";
       this.systemCheck = null;
       this.systemChecks = [];
+      this.systemCheckChoices = [];
+      this.systemCheckChoicesLoaded = false;
       this.authorizedSystemCheckScopes = [];
     });
     await this.loadSystemCheckAccess();
+    if (this.interfaceMode.mode() === "original" && this.canUseSystemChecks) await this.loadSystemCheckChoices();
+  }
+
+  async loadSystemCheckChoices(): Promise<void> {
+    if (!this.canUseSystemChecks || this.busy) return;
+    try {
+      await this.run(async () => {
+        const { payload } = await this.api.send<ListSystemCheckChoicesResponse>(
+          "GET", productionApiRoutes.system.listSystemCheckChoices, undefined,
+          this.isSystemCheckSession ? this.adminHeaders : {}
+        );
+        this.systemCheckChoices = payload.items;
+      });
+    } finally {
+      this.systemCheckChoicesLoaded = true;
+      this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  async selectOriginalSystemCheck(choice: SystemCheckChoice): Promise<void> {
+    if (this.busy || this.systemCheck || !this.systemCheckChoices.includes(choice)) return;
+    this.tenantKey = choice.tenantKey;
+    this.workspaceKey = choice.workspaceKey;
+    this.uiState.workspace.tenantKey = this.tenantKey;
+    this.uiState.workspace.workspaceKey = this.workspaceKey;
+    this.viewState.persistShellState();
+    await this.selectSystemCheck(choice.checkId);
   }
 
   async loadSystemCheckAccess(): Promise<void> {

@@ -264,6 +264,25 @@ Systemcheck gate also passed saving and exporting both checks and the corrected
 `RoundTrip in ms` / `Anwendungs-Latenz in ms` labels. Negotiation for standalone
 workspace response/log/review reports is not covered by this slice.
 
+The optional Original Systemcheck selection now follows the pinned 19.0 starter:
+400px Material card, German empty/single/multiple instructions, explicit start,
+authored labels/descriptions and the home action, without Rewrite diagnostic
+inputs. Its directory is metadata-only and never returns report keys, Player
+HTML, Unit definitions or release snapshots. Identical IDs in different
+workspaces remain separate; dedicated logins are restricted to their authorized
+workspaces and invalid credentials cannot fall back to anonymous selection.
+Headful checks passed public selection, actual scoped check loading, 390px
+bounds, failure/retry, the required initial password change, re-login and
+sign-out. The full API suites passed with memory, file and SQLite (161 tests
+per store), together with 140 unit and 25 frontend-state tests. A fresh
+protected SQLite/Chromium production gate passed the new public-selection
+checks and both existing report/save/export flows with final exit 0. API
+assertions and the repository browser gate retain these cases. Current
+publication CI and PostgreSQL remain separate gates.
+Protected login and the welcome/network/Unit/questionnaire/report layouts
+still require Original adaptation and rendered reference comparisons. This is
+a selection slice, not completion of the Systemcheck or visual-parity matrix.
+
 The same CI revision exposed an additional browser-gate race in both full UI
 and Ops: attachment setup timed out waiting for the auto-refresh preference to
 be saved as false. The checkbox now assigns and persists its emitted model

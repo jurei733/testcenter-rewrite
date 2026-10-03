@@ -140,6 +140,19 @@ reload and Unit changes, the same run and exact saved response, no page/console
 errors and final exit 0. This adds a dedicated CI check without disabling
 Angular verification or replacing another runtime's frontend/database. It is
 functional browser evidence, not matching-reference screenshot acceptance.
+The Systemcheck selection now adapts the pinned 19.0 400px Material card,
+German instructions, explicit start even for a single check, authored labels
+and descriptions, and the home action. Rewrite tenant/workspace diagnosis inputs
+are absent from this selection. A metadata-only directory returns no report key,
+Unit definition, Player or release payload; identical check IDs in different
+workspaces remain separate choices. Dedicated system-check sessions see only
+their authorized scopes; invalid credentials do not fall back to public access.
+Headful checks passed empty/single/multiple selection, actual scoped selection,
+390px layout bounds, one error notice and real retry, required password change,
+re-login and sign-out. The corresponding selection cases are in the repository
+browser gate. The protected login card and subsequent check steps still use the
+Rewrite layout. Header details and equal-fixture rendered Original comparisons
+remain open; this does not close the Systemcheck matrix row.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

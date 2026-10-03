@@ -31,6 +31,7 @@ import type {
   SourcePackageContentStructure,
   WorkspaceFileType,
   SystemCheckReport,
+  SystemCheckChoice,
   SystemCheckReportDeletion,
   SystemCheckReportEntry,
   SystemCheckReportStatistics,
@@ -335,6 +336,7 @@ export const productionApiRoutes = {
     getRuntimeDiagnostics: "/diagnostics/runtime",
     getRuntimeConfig: "/diagnostics/config",
     getSystemCheckAccess: "/api/v1/system-check/access",
+    listSystemCheckChoices: "/api/v1/system-check/choices",
     downloadSpeedTestPackage: "/speed-test/random-package/:size",
     uploadSpeedTestPackage: "/speed-test/random-package"
   }
@@ -1394,6 +1396,10 @@ export type ActivateContentReleaseResponse = {
 
 export type ListSystemChecksResponse = {
   items: WorkspaceSystemCheck[];
+};
+
+export type ListSystemCheckChoicesResponse = {
+  items: SystemCheckChoice[];
 };
 
 export type SystemCheckAccessMode = "anonymous_key" | "login_required";

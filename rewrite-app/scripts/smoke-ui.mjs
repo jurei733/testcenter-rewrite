@@ -2560,8 +2560,37 @@ try {
     );
     const noSaveSystemCheckImport = await noSaveSystemCheckImportResponse.json();
     assert.equal(noSaveSystemCheckImport.importJob?.status, "completed");
+    await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
+    const originalChoices = page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}']`);
+    await originalChoices.first().waitFor();
+    assert.equal(await originalChoices.count(), 3);
+    assert.equal(await page.locator("#systemCheckTenantKey").count(), 0);
+    assert.equal(await page.locator("#systemCheckIntroText").count(), 0);
+    const choiceViewport = page.viewportSize();
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    const choiceFailureRoute = "**/api/v1/system-check/choices";
+    await page.route(choiceFailureRoute, route => route.fulfill({
+      status: 503, contentType: "application/json",
+      body: JSON.stringify({ error: "selection_temporarily_unavailable", message: "Konfiguration ist vorübergehend nicht verfügbar." })
+    }));
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator("#originalSystemCheckError").filter({ hasText: "vorübergehend" }).waitFor();
+    assert.equal(await page.locator(".status-banner.is-error").count(), 0, "Selection has one error notice, not a duplicate Rewrite banner");
+    await page.unroute(choiceFailureRoute);
+    await page.locator("#originalSystemCheckRetryButton").click();
+    await originalChoices.first().waitFor();
+    const selectedOriginalCheck = page.waitForResponse(response => response.ok() &&
+      new URL(response.url()).pathname === `/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/system-checks/${noSaveSystemCheckId}`);
+    await originalChoices.filter({ hasText: "System Check Without Report" }).click();
+    await selectedOriginalCheck;
+    await page.locator("#systemCheckIntroText").waitFor();
+    assert.equal(await page.locator("#originalSystemCheckStarter").count(), 0);
+    await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+    await originalChoices.first().waitFor();
+    await page.setViewportSize(choiceViewport);
     await page.goto(
-      `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+      `${baseUrl}/app/system-check?ui=rewrite&tenantKey=${encodeURIComponent(
         systemCheckTenantKey
       )}&workspaceKey=${encodeURIComponent(
         systemCheckWorkspaceKey
@@ -20115,6 +20144,20 @@ try {
   assert.equal((await protectedSystemCheckSignOutResponsePromise).status(), 200);
   await page.locator("#systemCheckSignInButton").waitFor();
   await page.locator("#systemCheckLoginRequiredStatus").waitFor();
+  await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
+  await fillAndCommit("#systemCheckUsername", systemCheckUsername);
+  await fillAndCommit("#systemCheckPassword", systemCheckFinalPassword);
+  await page.locator("#systemCheckSignInButton").click();
+  await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${protectedSystemCheckId}']`).waitFor();
+  const protectedOriginalChoices = page.locator("#originalSystemCheckStarter button[data-system-check-id]");
+  assert.equal(await protectedOriginalChoices.count(), 1);
+  assert.equal(await protectedOriginalChoices.first().getAttribute("data-tenant-key"), tenantKey);
+  assert.equal(await protectedOriginalChoices.first().getAttribute("data-workspace-key"), workspaceKey);
+  assert.equal(await page.locator("#systemCheckIntroText").count(), 0, "One protected Original check also requires explicit selection");
+  await page.locator("#systemCheckSignOutButton").click();
+  await page.locator("#systemCheckSignInButton").waitFor();
+  assert.equal(await page.locator("#originalSystemCheckStarter").count(), 0);
+  await page.goto(`${baseUrl}/app/system-check?ui=rewrite`, { waitUntil: "networkidle" });
   await page.goto(`${baseUrl}/app/ops`);
   await fillAndCommit("#adminUsername", adminUsername);
   await fillAndCommit("#adminPassword", adminPassword);

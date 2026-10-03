@@ -68,6 +68,7 @@ import {
 } from "@testcenter-rewrite-app/domain";
 import type {
   AdminLoginAttempt,
+  SystemCheckChoice,
   AdminAuditEvent,
   AdminAuditEventType,
   AdminRole,
@@ -574,6 +575,9 @@ export type WorkspaceOriginalResultArchive = {
 };
 
 export type SystemCheckPort = {
+  listSystemCheckChoices(input: {
+    scopes?: Array<{ tenantKey: string; workspaceKey: string }>;
+  }): Promise<SystemCheckChoice[]>;
   listSystemChecks(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -34495,6 +34499,36 @@ export const createFirstSliceServices = (
       }
     },
     systemCheck: {
+      async listSystemCheckChoices(input) {
+        const scopes = input.scopes ?? (await Promise.all(
+          (await repository.listTenants()).filter(tenant => tenant.status === "active").map(async tenant =>
+            (await repository.listWorkspacesByTenantId(tenant.tenantId))
+              .filter(workspace => workspace.status === "active")
+              .map(workspace => ({ tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey }))
+          )
+        )).flat();
+        const choices: SystemCheckChoice[] = [];
+        for (const scope of scopes) {
+          const workspace = await requireWorkspace(repository, scope.tenantKey, scope.workspaceKey);
+          const packages = (await repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId))
+            .filter(item => item.status === "accepted")
+            .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+          const seen = new Set<string>();
+          for (const source of packages) {
+            for (const check of source.contentStructure?.systemCheckEntries ?? []) {
+              const key = check.checkId.toUpperCase();
+              if (seen.has(key)) continue;
+              seen.add(key);
+              // Selection needs metadata only, never report keys, definitions,
+              // Player HTML or any runtime/release snapshots.
+              choices.push({ ...scope, checkId: check.checkId,
+                displayLabel: check.displayLabel, description: check.description ?? "" });
+            }
+          }
+        }
+        return choices.sort((left, right) => left.tenantKey.localeCompare(right.tenantKey) ||
+          left.workspaceKey.localeCompare(right.workspaceKey) || left.checkId.localeCompare(right.checkId));
+      },
       async listSystemChecks(input) {
         return listWorkspaceSystemChecks(input);
       },

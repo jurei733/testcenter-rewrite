@@ -49010,6 +49010,44 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.equal(anonymousSystemCheckAccess.body.accessMode, "anonymous_key");
   assert.deepEqual(anonymousSystemCheckAccess.body.authorizedScopes, []);
 
+  // An identical authored ID in another workspace is a distinct choice.
+  // Its configuration is intentionally selection-only, not a Player fixture.
+  const otherChoiceWorkspaceKey = "other-system-check-workspace";
+  const otherChoiceWorkspace = await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST", body: { workspaceKey: otherChoiceWorkspaceKey, displayName: "Other Check Workspace" }
+  });
+  assert.equal(otherChoiceWorkspace.status, 201);
+  const otherChoiceSource = await requestJson<{ sourcePackage: { sourcePackageId: string } }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${otherChoiceWorkspaceKey}/source-packages`, {
+      method: "POST", body: { fileName: "SysCheck.xml", mediaType: "application/xml",
+        sourceDocument: sourceDocument.replace(' unit="UNIT.SAMPLE"', '') }
+    });
+  assert.equal(otherChoiceSource.status, 201);
+  const otherChoiceImport = await requestJson<{ importJob: { status: string } }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${otherChoiceWorkspaceKey}/import-jobs`, {
+      method: "POST", body: { sourcePackageId: otherChoiceSource.body.sourcePackage.sourcePackageId }
+    });
+  assert.equal(otherChoiceImport.body.importJob.status, "completed");
+
+  const anonymousChoices = await requestJson<{
+    items: Array<{ tenantKey: string; workspaceKey: string; checkId: string; displayLabel: string; description: string }>;
+  }>("/api/v1/system-check/choices");
+  assert.equal(anonymousChoices.status, 200);
+  const ownAnonymousChoices = anonymousChoices.body.items.filter(item => item.tenantKey === tenantKey && item.workspaceKey === workspaceKey);
+  assert.equal(ownAnonymousChoices.length, 2);
+  assert.ok(ownAnonymousChoices.some(item => item.checkId === "SYSCHECK.SAMPLE"));
+  assert.equal(anonymousChoices.body.items.filter(item => item.tenantKey === tenantKey && item.checkId === "SYSCHECK.SAMPLE").length, 2);
+  for (const item of anonymousChoices.body.items) {
+    assert.deepEqual(Object.keys(item).sort(), ["checkId", "description", "displayLabel", "tenantKey", "workspaceKey"]);
+  }
+  const anonymousChoicesHead = await requestText("/api/v1/system-check/choices", { method: "HEAD" });
+  assert.equal(anonymousChoicesHead.status, 200);
+  assert.equal(anonymousChoicesHead.body, "");
+  const invalidAnonymousChoiceCredential = await requestJson<{ error: string }>("/api/v1/system-check/choices", {
+    headers: { authorization: "Bearer invalid-system-check-key" }
+  });
+  assert.equal(invalidAnonymousChoiceCredential.status, 401, "Invalid credentials must not silently fall back to public selection");
+
   const platformAdminBootstrap = await requestJson<{ error?: string }>(
     "/api/v1/admin/auth/bootstrap",
     {
@@ -49100,6 +49138,23 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.deepEqual(protectedSystemCheckAccess.body.authorizedScopes, [
     { tenantKey, workspaceKey }
   ]);
+  const protectedChoices = await requestJson<{ items: typeof ownAnonymousChoices }>("/api/v1/system-check/choices", {
+    headers: { authorization: `Bearer ${systemCheckSignIn.body.sessionToken}` }
+  });
+  assert.equal(protectedChoices.status, 200);
+  assert.deepEqual(protectedChoices.body.items, ownAnonymousChoices);
+  const deniedAnonymousChoices = await requestJson<{ error: string }>("/api/v1/system-check/choices");
+  assert.equal(deniedAnonymousChoices.status, 401);
+  assert.equal(deniedAnonymousChoices.body.error, "system_check_login_required");
+  const deniedAdminChoices = await requestJson<{ error: string }>("/api/v1/system-check/choices", {
+    headers: { authorization: `Bearer ${platformAdminSignIn.body.sessionToken}` }
+  });
+  assert.equal(deniedAdminChoices.status, 403);
+  assert.equal(deniedAdminChoices.body.error, "admin_role_required");
+  const deniedInvalidChoices = await requestJson<{ error: string }>("/api/v1/system-check/choices", {
+    headers: { authorization: "Bearer invalid-system-check-key" }
+  });
+  assert.equal(deniedInvalidChoices.status, 401);
   const signedOutProtectedSystemCheckAccess = await requestJson<{
     accessMode: string;
     authorizedScopes: unknown[];

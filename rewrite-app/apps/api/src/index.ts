@@ -82,6 +82,7 @@ import {
   type GetApplicationSettingsResponse,
   type GetAttachmentResponse,
   type GetSystemCheckAccessResponse,
+  type ListSystemCheckChoicesResponse,
   type GetSourcePackageResponse,
   type GetSourcePackageDeletionReadinessResponse,
   type GetStudyMonitorBookletResponse,
@@ -3260,9 +3261,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (
     method === "GET" &&
-    pathname === productionApiRoutes.system.getSystemCheckAccess
+    (pathname === productionApiRoutes.system.getSystemCheckAccess ||
+      pathname === productionApiRoutes.system.listSystemCheckChoices)
   ) {
-    return `GET ${productionApiRoutes.system.getSystemCheckAccess}`;
+    return `GET ${pathname}`;
   }
 
   if (method === "GET" && systemCheckSpeedTestDownloadPattern.test(pathname)) {
@@ -4875,7 +4877,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (
         request.method === "GET" &&
-        pathname === productionApiRoutes.system.getSystemCheckAccess
+        (pathname === productionApiRoutes.system.getSystemCheckAccess ||
+          pathname === productionApiRoutes.system.listSystemCheckChoices)
       ) {
         const allSystemCheckRoles = await listSystemCheckRoleAssignments(
           runtime.repository
@@ -4904,11 +4907,25 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             systemCheckRoles
           );
         }
-        sendJson<GetSystemCheckAccessResponse>(response, 200, {
+        const access: GetSystemCheckAccessResponse = {
           accessMode:
             allSystemCheckRoles.length > 0 ? "login_required" : "anonymous_key",
           authorizedScopes
-        });
+        };
+        if (pathname === productionApiRoutes.system.listSystemCheckChoices) {
+          if (access.accessMode === "login_required" && !sessionToken) {
+            sendError(response, 401, "system_check_login_required", "Sign in with a dedicated system-check account to select a check.");
+            return;
+          }
+          const items = await services.systemCheck.listSystemCheckChoices({
+            // A valid dedicated login stays scoped even on an anonymous-key
+            // installation. Other administrator roles were rejected above.
+            scopes: sessionToken ? authorizedScopes : undefined
+          });
+          sendJson<ListSystemCheckChoicesResponse>(response, 200, { items });
+        } else {
+          sendJson<GetSystemCheckAccessResponse>(response, 200, access);
+        }
         return;
       }
 

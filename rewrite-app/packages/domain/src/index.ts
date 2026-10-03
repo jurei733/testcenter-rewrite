@@ -840,6 +840,14 @@ export type ContentReleaseRuntimeSnapshot = {
   systemCheckEntries?: SourcePackageSystemCheckEntry[];
 };
 
+export type SystemCheckChoice = {
+  tenantKey: string;
+  workspaceKey: string;
+  checkId: string;
+  displayLabel: string;
+  description: string;
+};
+
 export type WorkspaceSystemCheck = Omit<
   SourcePackageSystemCheckEntry,
   "saveKey" | "unitEntry"
