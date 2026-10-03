@@ -9,6 +9,10 @@ import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
+import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+
+const participantHttpActor = createParticipantHttpTestActor();
+const fetch = participantHttpActor.fetch;
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const browserChannel = process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined;
@@ -155,8 +159,10 @@ class UiSmokeEarlyExit extends Error {
   }
 }
 
-const createSmokeFetchInit = () =>
-  smokeAdminSessionToken
+const createSmokeFetchInit = url =>
+  url && participantHttpActor.isParticipant(url)
+    ? { headers: participantHttpActor.headers(url) }
+    : smokeAdminSessionToken
     ? {
         headers: {
           authorization: `Bearer ${smokeAdminSessionToken}`
@@ -169,7 +175,9 @@ const sendSmokeJson = async (url, { method = "POST", body } = {}) => {
     method,
     headers: {
       "content-type": "application/json",
-      ...(smokeAdminSessionToken
+      ...(participantHttpActor.isParticipant(url)
+        ? participantHttpActor.headers(url, body)
+        : smokeAdminSessionToken
         ? { authorization: `Bearer ${smokeAdminSessionToken}` }
         : {})
     },
@@ -307,7 +315,7 @@ const pollJsonWithPredicate = async (
   let lastPayload = null;
 
   while (Date.now() < deadline) {
-    const response = await fetch(url, createSmokeFetchInit());
+    const response = await fetch(url, createSmokeFetchInit(url));
     if (response.ok) {
       const payload = await response.json();
       lastPayload = payload;
@@ -381,6 +389,7 @@ try {
   });
   const baseUrl = `http://127.0.0.1:${port}`;
   const context = await browser.newContext();
+  participantHttpActor.observeContext(context);
   await context.grantPermissions(
     ["clipboard-read", "clipboard-write", "camera"],
     { origin: baseUrl }
@@ -419,6 +428,7 @@ try {
     throw new UiSmokeEarlyExit(step);
   };
   const observePageRequests = observedPage => {
+    participantHttpActor.observePage(observedPage);
     observedPage.on("request", request => {
       const url = request.url();
       if (!url.includes("/api/v1/")) {
@@ -1483,6 +1493,7 @@ try {
   );
   const expiredAdminPayload = await expiredAdminResponse.json();
   const accessWindowContext = await browser.newContext();
+  participantHttpActor.observeContext(accessWindowContext);
   const accessWindowPage = await accessWindowContext.newPage();
   try {
     await accessWindowPage.goto(`${baseUrl}/app/ops`, {
@@ -5111,6 +5122,7 @@ try {
     return response.json();
   };
   const invalidSessionContext = await browser.newContext();
+  participantHttpActor.observeContext(invalidSessionContext);
   const invalidSessionPage = await invalidSessionContext.newPage();
   await invalidSessionPage.goto(`${baseUrl}/app/ops`, {
     waitUntil: "networkidle"
@@ -7030,6 +7042,7 @@ try {
   );
   logStep("participant-entry-legacy-short-link");
   const legacyShortLinkContext = await browser.newContext();
+  participantHttpActor.observeContext(legacyShortLinkContext);
   await legacyShortLinkContext.addInitScript(
     ({ staleTenantKey, staleWorkspaceKey }) => {
       window.localStorage.setItem(
@@ -7151,6 +7164,7 @@ try {
     "Participant entry issue guidance should clear after a successful sign-in."
   );
   const originalSignInContext = await browser.newContext();
+  participantHttpActor.observeContext(originalSignInContext);
   try {
     const originalSignInPage = await originalSignInContext.newPage();
     await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
@@ -7208,6 +7222,18 @@ try {
   } finally {
     await originalSignInContext.close();
   }
+  // A second real login rotates access for this participant. Re-authenticate
+  // the first browser through its UI; never inject the other browser's token.
+  await page.locator("#participantRouteClearSessionButton").click();
+  await page.locator("#participantRouteEntry").waitFor();
+  await page.locator("#participantRouteSignInButton").click();
+  await page.waitForFunction(
+    ([sessionId, runId]) =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() === sessionId &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() === runId &&
+      document.querySelector("#participantRouteEntry") == null,
+    [participantEntrySignInSessionId, participantEntryStartedRunId]
+  );
   stopAfter("participant-entry-sign-in");
   logStep("participant-entry-start-after-sign-in");
   await page.waitForFunction(
@@ -7857,6 +7883,7 @@ try {
 
   logStep("participant-entry-legacy-short-link-code");
   const codedLegacyContext = await browser.newContext();
+  participantHttpActor.observeContext(codedLegacyContext);
   const codedLegacyPage = await codedLegacyContext.newPage();
   await codedLegacyPage.goto(
     `${baseUrl}/#/${encodeURIComponent(codedParticipantLoginKey)}`,
@@ -8224,7 +8251,7 @@ try {
   await page.evaluate(() => {
     window.localStorage.removeItem("testcenter-rewrite-app-shell");
   });
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
     )}`,
@@ -8383,7 +8410,7 @@ try {
       })
     );
   });
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
     )}`,
@@ -8908,9 +8935,8 @@ try {
     .locator("#browserCompatibilityWarning")
     .waitFor({ state: "detached" });
   await outdatedBrowserContext.close();
-  const isVeronaResourceResponse = response => response
-    .url()
-    .endsWith("/resources/sample_resource_package/file.text");
+  const isVeronaResourceResponse = response =>
+    /\/resources\/\.access\/r1\.[A-Za-z0-9_-]{43}\/sample_resource_package\/file\.text$/u.test(new URL(response.url()).pathname);
   const veronaResourceResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
@@ -9287,11 +9313,11 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(veronaParticipantSessionId);
-  assert.equal(
+  assert.match(
     JSON.parse(
       (await veronaFrame.locator("#playerConfig").textContent()) ?? "{}"
     ).directDownloadUrl,
-    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/resources`
+    new RegExp(String.raw`^${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/resources/\.access/r1\.[A-Za-z0-9_-]{43}$`)
   );
   await veronaFrame.locator("#playerEnd").click();
   await veronaFrame
@@ -9639,7 +9665,7 @@ try {
     1,
     "Outbox retries should not duplicate Verona Player logs."
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
     )}`,
@@ -9705,7 +9731,7 @@ try {
       }
     }
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
     )}`,
@@ -10239,7 +10265,7 @@ try {
     false,
     "Simulation responses must not survive in local storage."
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       simulationSessionId
     )}`,
@@ -10566,7 +10592,7 @@ try {
     3,
     "The running Verona Player must receive the updated adaptive Unit count."
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalAdaptiveParticipantSessionId
     )}`,
@@ -11139,7 +11165,7 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: legacyPlayerFirstUnitKey })
     .waitFor();
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       legacyPlayerParticipantSessionId
     )}`,
@@ -11453,7 +11479,7 @@ try {
         .inputValue(),
       protocolResponse
     );
-    await page.goto(
+    await participantHttpActor.goto(page,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         protocolParticipantSessionId
       )}`,
@@ -11652,7 +11678,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       abiParticipantSessionId
     )}`,
@@ -11879,7 +11905,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentAbiParticipantSessionId
     )}`,
@@ -12074,7 +12100,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       evaParticipantSessionId
     )}`,
@@ -12275,7 +12301,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       danParticipantSessionId
     )}`,
@@ -12498,7 +12524,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentDanParticipantSessionId
     )}`,
@@ -12735,7 +12761,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       historicalDanParticipantSessionId
     )}`,
@@ -12937,7 +12963,7 @@ try {
     `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/resume`,
     { body: { bookletKey: starsBookletKey } }
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       starsParticipantSessionId
     )}`,
@@ -13023,7 +13049,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       starsParticipantSessionId
     )}`,
@@ -13420,7 +13446,7 @@ try {
     parallelStarsReloadSaveOrder.push(responseUnitKey);
   };
   page.on("request", recordParallelStarsReloadSaveOrder);
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       parallelStarsParticipantSessionId
     )}`,
@@ -13459,7 +13485,7 @@ try {
     starsUnitKeys,
     "Opening the second run must deliver its isolated 28-Unit queue."
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       starsParticipantSessionId
     )}`,
@@ -13623,7 +13649,7 @@ try {
     const crashingStarsPage =
       crashingStarsContext.pages()[0] ??
       (await crashingStarsContext.newPage());
-    await crashingStarsPage.goto(
+    await participantHttpActor.goto(crashingStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
       )}`,
@@ -13723,7 +13749,7 @@ try {
     const recoveredStarsPage =
       recoveredStarsContext.pages()[0] ??
       (await recoveredStarsContext.newPage());
-    await recoveredStarsPage.goto(
+    await participantHttpActor.goto(recoveredStarsPage,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         starsParticipantSessionId
       )}`,
@@ -14235,7 +14261,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentStarsParticipantSessionId
     )}`,
@@ -14523,7 +14549,7 @@ try {
     await restoredSpeedtestFrame.locator('[value="A"]').isChecked(),
     true
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       speedtestParticipantSessionId
     )}`,
@@ -14790,7 +14816,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentSpeedtestParticipantSessionId
     )}`,
@@ -15060,7 +15086,7 @@ try {
     `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/resume`,
     { body: { bookletKey: currentOriginalSpeedPackage.booklet.bookletKey } }
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentOriginalSpeedParticipantSessionId
     )}`,
@@ -15220,7 +15246,7 @@ try {
       .locator('[data-cy="question-text"]')
       .filter({ hasText: "Instruktionen" })
       .waitFor({ timeout: 30_000 });
-    await page.goto(
+    await participantHttpActor.goto(page,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         currentOriginalSpeedParticipantSessionId
       )}`,
@@ -15518,7 +15544,7 @@ try {
       ),
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       sharedParameterSessionId
     )}`,
@@ -15817,7 +15843,7 @@ try {
       JSON.stringify(secondLottieParameters),
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       lottieParticipantSessionId
     )}`,
@@ -16098,7 +16124,7 @@ try {
     },
     30_000
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       currentAspectParticipantSessionId
     )}`,
@@ -16286,7 +16312,7 @@ try {
   const ibRuntimeScriptResponse = page.waitForResponse(
     response =>
       response.url().includes(
-        "/resources/IB_SAMPLE_2025/runtimes/9.9.0/main.220e1b93.js"
+        "/IB_SAMPLE_2025/runtimes/9.9.0/main.220e1b93.js"
       ) && response.status() === 200,
     { timeout: 30_000 }
   );
@@ -16321,11 +16347,11 @@ try {
   const ibRuntimeReloadResponse = page.waitForResponse(
     response =>
       response.url().includes(
-        "/resources/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html"
+        "/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html"
       ) && response.status() === 200,
     { timeout: 30_000 }
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       ibParticipantSessionId
     )}`,
@@ -16651,7 +16677,7 @@ try {
   await aspectFrame.getByText("Unit 1", { exact: true }).waitFor({
     timeout: 30_000
   });
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       aspectParticipantSessionId
     )}`,
@@ -16891,7 +16917,7 @@ try {
     await originalSampleResourceResponse.text(),
     originalSampleResourceContent
   );
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalSampleParticipantSessionId
     )}`,
@@ -17131,7 +17157,7 @@ try {
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
       { body: { bookletKey } }
     );
-    await page.goto(
+    await participantHttpActor.goto(page,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
       )}&ui=${interfaceMode}`,
@@ -18028,7 +18054,7 @@ try {
       { body: { bookletKey } }
     );
     const resumePayload = await resumeResponse.json();
-    await page.goto(
+    await participantHttpActor.goto(page,
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
       )}&ui=${interfaceMode}`,

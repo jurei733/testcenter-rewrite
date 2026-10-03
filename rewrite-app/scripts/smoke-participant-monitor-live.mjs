@@ -6,6 +6,10 @@ import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { chromium } from "playwright";
+import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+
+const participantHttpActor = createParticipantHttpTestActor();
+const fetch = participantHttpActor.fetch;
 
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 const sqliteFile = resolve(".data/smoke-participant-monitor-live.sqlite");
@@ -216,6 +220,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const participantPage = await context.newPage();
+  participantHttpActor.observePage(participantPage);
   let participantStreamAttemptCount = 0;
   let releaseParticipantReconnect;
   const participantReconnectGate = new Promise(resolvePromise => {
@@ -233,7 +238,7 @@ try {
       await route.continue();
     }
   );
-  await participantPage.goto(
+  await participantHttpActor.goto(participantPage,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(participantSessionId)}`,
     { waitUntil: "domcontentloaded" }
   );

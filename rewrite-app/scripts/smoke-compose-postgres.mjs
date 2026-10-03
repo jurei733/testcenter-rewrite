@@ -4,6 +4,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+
+const fetch = createParticipantHttpTestActor().fetch;
 
 const parseBooleanFlag = (value, label = "boolean flag") => {
   const normalizedValue = value.trim().toLowerCase();

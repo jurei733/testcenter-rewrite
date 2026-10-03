@@ -7,6 +7,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
+import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+
+const participantHttpActor = createParticipantHttpTestActor();
+const fetch = participantHttpActor.fetch;
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
@@ -167,6 +171,7 @@ try {
   await pollReady(`${baseUrl}/readyz`);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  participantHttpActor.observePage(page);
   const corpus = JSON.parse(
     await readFile("test-fixtures/original-testcenter/corpus.json", "utf8")
   );
@@ -352,7 +357,7 @@ try {
     savedScores.find(score => score.id === "nbUserInteractions")?.value >= 2
   );
 
-  await page.goto(
+  await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantSessionId
     )}`,

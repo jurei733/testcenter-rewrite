@@ -2474,6 +2474,47 @@ const returnToStarterPattern = createRoutePattern(
 const completeRunPattern = createRoutePattern(
   productionApiRoutes.participant.completeRun
 );
+const participantSignOutPattern = createRoutePattern(productionApiRoutes.participant.signOut);
+const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
+const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
+  ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
+  ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
+  ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
+  ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
+  ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
+  ["POST", selectAdaptiveStatePattern],
+  ["GET", participantReviewListPattern], ["POST", participantReviewListPattern],
+  ["PATCH", participantReviewDetailPattern], ["DELETE", participantReviewDetailPattern],
+  ["POST", unlockTestletPattern], ["POST", resumeRunPattern],
+  ["POST", returnToStarterPattern], ["POST", completeRunPattern]
+];
+
+const authorizeParticipantRoute = async (
+  services: FirstSliceServices, request: IncomingMessage, pathname: string
+): Promise<void> => {
+  for (const [method, pattern] of ownedParticipantRouteChecks) {
+    if (request.method !== method) continue;
+    const groups = pattern.exec(pathname)?.groups;
+    if (!groups) continue;
+    const participantSessionId = decodeRouteGroup(groups.participantSessionId)?.trim() || undefined;
+    const testRunId = decodeRouteGroup(groups.testRunId)?.trim() || undefined;
+    // Leave missing/blank identifier validation to the existing route handler.
+    if (!participantSessionId && !testRunId) return;
+    const resourcePath = decodeRouteGroup(groups.resourcePath);
+    if (pattern === participantResourcePattern && resourcePath?.startsWith(".access/")) {
+      const [, resourceToken, ...parts] = resourcePath.split("/");
+      await services.participantAccess.authorizeResource({
+        participantSessionId: participantSessionId!, resourceToken: resourceToken ?? ""
+      });
+      participantResourcePathByRequest.set(request, parts.join("/"));
+    } else {
+      await services.participantAccess.authorize({
+        participantSessionId, testRunId, sessionToken: readBearerToken(request) ?? ""
+      });
+    }
+    return;
+  }
+};
 const monitorOpenRunsPattern = createRoutePattern(
   productionApiRoutes.monitor.openRuns
 );
@@ -3673,6 +3714,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["DELETE", participantReviewDetailPattern, productionApiRoutes.participant.deleteReview],
     ["POST", unlockTestletPattern, productionApiRoutes.participant.unlockTestlet],
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
+    ["DELETE", participantSignOutPattern, productionApiRoutes.participant.signOut],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
     [
       "POST",
@@ -4147,7 +4189,9 @@ const streamParticipantEvents = async (input: {
   response: ServerResponse;
   participantRuntime: FirstSliceServices["participantRuntime"];
   participantSessionId: string;
+  validateAccess: () => Promise<unknown>;
 }): Promise<void> => {
+  await input.validateAccess();
   const initialState = await input.participantRuntime.getCurrentRunState({
     participantSessionId: input.participantSessionId
   });
@@ -4203,10 +4247,10 @@ const streamParticipantEvents = async (input: {
       return;
     }
     polling = true;
-    void input.participantRuntime
-      .getCurrentRunState({
+    void input.validateAccess()
+      .then(() => input.participantRuntime.getCurrentRunState({
         participantSessionId: input.participantSessionId
-      })
+      }))
       .then(currentState => {
         if (closed) {
           return;
@@ -4407,7 +4451,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         requestId,
         method,
         route: routeLabel,
-        path: requestPathname,
+        // Resource URLs carry a purpose-limited capability. Redact the entire
+        // suffix, including percent-encoded spellings, before operational logs.
+        path: participantResourcePattern.test(requestPathname)
+          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath")
+          : requestPathname,
         statusCode: response.statusCode,
         durationMs: Number(durationMs.toFixed(3)),
         storageKind: runtime.repositoryConfig.kind
@@ -4445,6 +4493,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       : userAgentHeader ?? null;
 
     try {
+      await authorizeParticipantRoute(services, request, pathname);
       if (request.method === "GET" && isParticipantEntryPath(pathname)) {
         sendRedirect(response, 302, `/app/participant${url.search}`);
         return;
@@ -8280,7 +8329,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const runtimeState = await services.participantRuntime.getRuntimeState({
           participantSessionId: participantSession.participantSessionId
         });
+        const sessionToken = await services.participantAccess.issueCredential({
+          participantSessionId: participantSession.participantSessionId
+        });
+        response.setHeader("cache-control", "private, no-store");
         sendJson<ParticipantSignInResponse>(response, 200, {
+          sessionToken,
           participantSession,
           participantRosterEntry: runtimeState.participantRosterEntry,
           booklets: runtimeState.booklets
@@ -8333,7 +8387,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           request,
           response,
           participantRuntime: services.participantRuntime,
-          participantSessionId
+          participantSessionId,
+          validateAccess: () => services.participantAccess.authorize({
+            participantSessionId, sessionToken: readBearerToken(request) ?? ""
+          })
         });
         return;
       }
@@ -8357,6 +8414,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           includeBookletAssets:
             url.searchParams.get("includeBookletAssets") === "true"
         });
+        if (currentRunState.resourceBasePath) {
+          const resourceToken = await services.participantAccess.issueResourceCredential({
+            participantSessionId, sessionToken: readBearerToken(request) ?? ""
+          });
+          currentRunState.resourceBasePath += `/.access/${resourceToken}`;
+        }
         sendJson<ParticipantCurrentRunStateResponse>(response, 200, {
           currentRunState
         });
@@ -8380,7 +8443,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const participantSessionId = decodeRouteGroup(
           participantResourceMatch.groups.participantSessionId
         );
-        const resourcePath = decodeRouteGroup(
+        const resourcePath = participantResourcePathByRequest.get(request) ?? decodeRouteGroup(
           participantResourceMatch.groups.resourcePath
         );
         if (!participantSessionId || !resourcePath) {
@@ -8487,6 +8550,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           body.participantSessionId !== undefined &&
           body.participantSessionId !== null
         ) {
+          const participantSessionId = typeof body.participantSessionId === "string"
+            ? body.participantSessionId.trim() : "";
+          if (!participantSessionId) {
+            sendError(response, 400, "participant_session_id_required", "participantSessionId is required.");
+            return;
+          }
+          await services.participantAccess.authorize({
+            participantSessionId, sessionToken: readBearerToken(request) ?? ""
+          });
           const testRun = await services.participantRuntime.launch({
             participantSessionId: body.participantSessionId,
             bookletKey: body.bookletKey
@@ -8531,7 +8603,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const runtimeState = await services.participantRuntime.getRuntimeState({
           participantSessionId: testRun.participantSessionId
         });
+        const sessionToken = await services.participantAccess.issueCredential({
+          participantSessionId: participantSession.participantSessionId
+        });
+        response.setHeader("cache-control", "private, no-store");
         sendJson<ParticipantLaunchResponse>(response, 200, {
+          sessionToken,
           participantSession: runtimeState.participantSession,
           participantRosterEntry: runtimeState.participantRosterEntry,
           booklets: runtimeState.booklets,
@@ -8541,6 +8618,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const resumeSessionMatch = resumeSessionPattern.exec(pathname);
+      const participantSignOutMatch = participantSignOutPattern.exec(pathname);
+      if (request.method === "DELETE" && participantSignOutMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantSignOutMatch.groups.participantSessionId);
+        if (!participantSessionId) {
+          sendError(response, 400, "invalid_participant_session_id", "participantSessionId is required.");
+          return;
+        }
+        await services.participantAccess.revoke({
+          participantSessionId, sessionToken: readBearerToken(request) ?? ""
+        });
+        response.writeHead(205, { ...securityHeaders, "cache-control": "private, no-store", "content-length": "0" });
+        endResponse(response);
+        return;
+      }
       if (request.method === "POST" && resumeSessionMatch?.groups) {
         const participantSessionId = decodeRouteGroup(
           resumeSessionMatch.groups.participantSessionId

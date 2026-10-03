@@ -830,6 +830,21 @@ blocks and durable continuation through the final instruction alias.
 - the shell persists non-secret form context locally, exposes guided flows for admin bootstrap/sign-in, admin-session reads, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection and CSV export, workspace bootstrap, workspace overview CSV export, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, filtered source-package/import-job/content-release CSV export, runtime with a non-persisted participant-password field, persisted participant roster import/listing/export with validation warnings and local parse preview, a participant launchpad for roster/link/session handoff, participant route session re-entry and local leave/reset, participant-entry API-error guidance for ambiguous workspace and launch issues, CSV/XML/JSON entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, participant test-log inspection plus original-style CSV export, selected-group Original-compatible result archives containing response/log/review CSV and JSON reports, filtered workspace activity reads plus a separate audit CSV export, study-monitor booklet/unit/run progress, monitor status/group/booklet/unit cards that seed participant-matrix filters, a monitor review queue with focused response/review handoff, direct Runtime handoff from monitor run, run-detail review, and unit-detail run cards plus Runtime preparation from monitor detail roster cards, and study-monitor summary/matrix/run-detail CSV export, surfaces operational summaries plus an activity feed, switches authenticated study/group monitors into a reduced role-aware console that performs only monitor-authorized reads, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, tenant/workspace directory export, workspace overview export, file-backed manifest loading, source-package/import-job/content-release CSV export, CSV/XML/JSON participant roster entry-link generation/export, participant launchpad state, typed group-result archive and deletion flows, study-monitor booklet/unit/run progress/export, admin-session reads, admin-user/audit CSV export, response/review/test-log/activity CSV export, operator timeline/session/content/runtime filters, open-run selection filter sync, group-monitor UI isolation, activation-blocking runtime handoff, run-detail review handoff, and unit-detail review handoff
 - participant-matrix retrieval now keeps a 200-row server window independent from the operator's visible-card limit, so totals and hidden-row counts remain correct beyond 25 rows; detailed response cards always expose both session and test-run identity, including when a roster display name is present
 
+## Participant HTTP access
+
+Successful participant sign-in and credential-based launch return a fresh
+`sessionToken`. Session/run API calls require that participant's bearer token;
+operator credentials and session/run IDs alone do not authorize them. The web
+client keeps credentials separately from answer queues, shell snapshots and
+entry links. Re-sign-in restores the same session/run/answers and rotates access.
+
+Players receive a separate resource-only capability in `resourceBasePath`, not
+the general bearer token. Rotation, revocation and existing access deadlines
+invalidate resource access too. `DELETE /api/v1/participant/sessions/:id/access`
+revokes access without deleting answers and returns 205. Existing live streams
+close on their next authorization check. The optional Original account logout
+control remains disabled until its own UI lifecycle gate is implemented.
+
 ## Current Persistence Boundary
 
 - [packages/application/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/application/src/index.ts) now owns use-case logic and repository ports

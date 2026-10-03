@@ -285,6 +285,7 @@ export const productionApiRoutes = {
   },
   participant: {
     signIn: "/api/v1/participant/auth/sign-in",
+    signOut: "/api/v1/participant/sessions/:participantSessionId/access",
     launch: "/api/v1/participant/starter:launch",
     getRuntimeState: "/api/v1/participant/sessions/:participantSessionId/runtime-state",
     getCurrentRunState:
@@ -1437,12 +1438,15 @@ export type ImportSystemCheckReportResponse = {
 };
 
 export type ParticipantSignInResponse = {
+  sessionToken: string;
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
   booklets: ParticipantRuntimeBooklet[];
 };
 
 export type ParticipantLaunchResponse = {
+  /** Present when launching by verified login credentials rather than an existing session. */
+  sessionToken?: string;
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
   booklets: ParticipantRuntimeBooklet[];

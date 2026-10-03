@@ -470,6 +470,35 @@ type JsonResponse<T> = {
   headers: Headers;
 };
 
+// Test actors retain only credentials returned by their real login. Negative
+// authorization cases use raw fetch or an explicit Authorization override.
+const participantHttpTokens = new Map<string, string>();
+const participantHttpOwners = new Map<string, string>();
+const captureParticipantHttpActor = (rootUrl: string, path: string, payload: unknown): void => {
+  if (!path.startsWith("/api/v1/participant/") || !payload || typeof payload !== "object") return;
+  const response = payload as Record<string, any>;
+  const state = response.currentRunState ?? response.runtimeState ?? response;
+  const sessionId = state.participantSession?.participantSessionId;
+  if (typeof sessionId === "string" && typeof response.sessionToken === "string") {
+    participantHttpTokens.set(`${rootUrl}\n${sessionId}`, response.sessionToken);
+  }
+  const run = state.testRun;
+  if (typeof run?.testRunId === "string" && typeof run.participantSessionId === "string") {
+    participantHttpOwners.set(`${rootUrl}\n${run.testRunId}`, run.participantSessionId);
+  }
+};
+const participantHttpHeaders = (rootUrl: string, path: string, body?: unknown): Record<string, string> => {
+  const session = /^\/api\/v1\/participant\/sessions\/([^/]+)\//u.exec(path);
+  const run = /^\/api\/v1\/participant\/test-runs\/([^/]+)\//u.exec(path);
+  const sessionId = session ? decodeURIComponent(session[1]!) : run
+    ? participantHttpOwners.get(`${rootUrl}\n${decodeURIComponent(run[1]!)}`)
+    : path === "/api/v1/participant/starter:launch" && body && typeof body === "object"
+      ? (body as { participantSessionId?: string }).participantSessionId : undefined;
+  if (!sessionId) return {};
+  const sessionToken = participantHttpTokens.get(`${rootUrl}\n${sessionId}`) ?? sessionId;
+  return { authorization: `Bearer ${sessionToken}` };
+};
+
 const requestJsonAt = async <T>(
   rootUrl: string,
   path: string,
@@ -483,14 +512,18 @@ const requestJsonAt = async <T>(
     method: init?.method ?? "GET",
     headers: {
       "content-type": "application/json",
+      ...participantHttpHeaders(rootUrl, path, init?.body),
       ...(init?.headers ?? {})
     },
     body:
       init?.body === undefined ? undefined : JSON.stringify(init.body)
   });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (response.ok) captureParticipantHttpActor(rootUrl, path, payload);
   return {
     status: response.status,
-    body: (await response.json()) as T,
+    body: payload as T,
     headers: response.headers
   };
 };
@@ -607,7 +640,7 @@ const requestText = async (
 ): Promise<{ status: number; body: string; contentType: string | null; cacheControl: string | null }> => {
   const response = await fetch(baseUrl + path, {
     method: init?.method ?? "GET",
-    headers: init?.headers
+    headers: { ...participantHttpHeaders(baseUrl, path), ...(init?.headers ?? {}) }
   });
   return {
     status: response.status,
@@ -627,7 +660,7 @@ const requestTextAt = async (
 ): Promise<{ status: number; body: string; contentType: string | null }> => {
   const response = await fetch(rootUrl + path, {
     method: init?.method ?? "GET",
-    headers: init?.headers
+    headers: { ...participantHttpHeaders(rootUrl, path), ...(init?.headers ?? {}) }
   });
   return {
     status: response.status,
@@ -841,6 +874,144 @@ test("participant access credentials rotate and revoke without changing sessions
   } finally {
     await repository.deleteWorkspaceAggregate(deletion);
     await shutdown();
+  }
+});
+
+test("participant HTTP access binds every owner route and revokes tokens without deleting saved answers", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory", FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false"
+  });
+  const stamp = randomUUID();
+  const tenantKey = `http-access-${stamp}`;
+  const workspaceKey = `http-access-${stamp}`;
+  const workspacePath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const setup = async (path: string, body: unknown) => {
+    const result = await requestJsonAt<Record<string, any>>(isolated.baseUrl, path, { method: "POST", body });
+    assert.ok(result.status >= 200 && result.status < 300, `${path}: ${result.status}`);
+    return result.body;
+  };
+  const raw = (path: string, method = "GET", sessionToken?: string, body?: unknown) =>
+    fetch(isolated.baseUrl + path, {
+      method, headers: { "content-type": "application/json", ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+  const streamAbort = new AbortController();
+  try {
+    await setup("/api/v1/platform/tenants", { tenantKey, displayName: tenantKey });
+    await setup(`/api/v1/tenants/${tenantKey}/workspaces`, { workspaceKey, displayName: workspaceKey });
+    const source = await setup(`${workspacePath}/source-packages`, {
+      fileName: "participant-http-access.zip", mediaType: "application/zip",
+      sourceDocument: createZipBase64([
+        { fileName: "imsmanifest.xml", content: '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources><resource identifier="BOOKLET.ACCESS" href="Booklet.xml"/><resource identifier="UNIT.ACCESS" href="Unit.xml"/><resource identifier="Resource.txt" href="Resource.txt"/></resources></manifest>' },
+        { fileName: "Booklet.xml", content: '<Booklet><Metadata><Id>BOOKLET.ACCESS</Id><Label>Access booklet</Label></Metadata><Units><Unit id="UNIT.ACCESS"/></Units></Booklet>' },
+        { fileName: "Unit.xml", content: '<Unit><Metadata><Id>UNIT.ACCESS</Id><Label>Access unit</Label></Metadata><Definition><![CDATA[<p>Access prompt</p>]]></Definition></Unit>' },
+        { fileName: "access.itcr.zip", content: Buffer.from(createZipBase64([
+          { fileName: "Resource.txt", content: "resource bytes stay exact" }
+        ]), "base64") }
+      ])
+    });
+    const imported = await setup(`${workspacePath}/import-jobs`, { sourcePackageId: source.sourcePackage.sourcePackageId });
+    assert.equal(imported.importJob.status, "completed", JSON.stringify(imported.importJob.diagnostics));
+    await setup(`${workspacePath}/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, {});
+    await setup(`${workspacePath}/participant-roster`, {
+      rosterText: ["owner-a", "owner-b"].map(loginKey => ({ loginKey, groupKey: "http-access", bookletKey: "BOOKLET.ACCESS", executionMode: "run-hot-return" }))
+    });
+    const actor = async (loginKey: string) => {
+      const result = await requestJsonAt<{ sessionToken: string; participantSession: ParticipantSession }>(
+        isolated.baseUrl, "/api/v1/participant/auth/sign-in", { method: "POST", body: { tenantKey, workspaceKey, loginKey } });
+      assert.equal(result.status, 200);
+      assert.equal(result.headers.get("cache-control"), "private, no-store");
+      assert.match(result.body.sessionToken, /^[A-Za-z0-9_-]{43}$/);
+      return result.body;
+    };
+    const owner = await actor("owner-a");
+    const other = await actor("owner-b");
+    const sessionId = owner.participantSession.participantSessionId;
+    const sessionPath = `/api/v1/participant/sessions/${sessionId}`;
+    const resumed = await raw(`${sessionPath}/resume`, "POST", owner.sessionToken, {});
+    assert.equal(resumed.status, 200);
+    const run = (await resumed.json()).testRun as TestRun;
+    const runPath = `/api/v1/participant/test-runs/${run.testRunId}`;
+    const state = await (await raw(`${sessionPath}/current-state`, "GET", owner.sessionToken)).json();
+    const resourceBasePath = state.currentRunState.resourceBasePath as string;
+    assert.match(resourceBasePath, /\/resources\/\.access\/r1\.[A-Za-z0-9_-]{43}$/);
+    const resourceToken = resourceBasePath.split("/").at(-1)!;
+    const resource = await raw(`${resourceBasePath}/access/Resource.txt`);
+    assert.equal(resource.status, 200);
+    assert.equal(resource.headers.get("cache-control"), "private, no-store");
+    assert.equal(await resource.text(), "resource bytes stay exact");
+    const encodedResource = await raw(`${resourceBasePath.replace("/.access/", "/%2eaccess/")}/access/Resource.txt`);
+    assert.equal(encodedResource.status, 200);
+    assert.equal(await encodedResource.text(), "resource bytes stay exact");
+    const savedAnswer = '{"answer":"restore this exact value"}';
+    const saved = await raw(`${runPath}/save-progress`, "POST", owner.sessionToken, {
+      status: "running", responseUnitKey: "UNIT.ACCESS", unitResponse: savedAnswer, deliveryId: "http-access-save-1"
+    });
+    assert.equal(saved.status, 200);
+    const beforeLogout = (await saved.json()).testRun as TestRun;
+    const bootstrap = await setup("/api/v1/admin/auth/bootstrap", { username: `http-admin-${stamp}`, displayName: "HTTP access admin", password: "http-access-admin-password" });
+    assert.ok(bootstrap.adminUser);
+    const admin = await setup("/api/v1/admin/auth/sign-in", { username: `http-admin-${stamp}`, password: "http-access-admin-password" });
+    const ownerRoutes: Array<[string, string, unknown?]> = [
+      ["GET", `${sessionPath}/runtime-state`], ["GET", `${sessionPath}/current-state`],
+      ["GET", `${sessionPath}/events`], ["GET", `${sessionPath}/exports/reviews.csv`],
+      ["GET", `${sessionPath}/exports/reviews`],
+      ["GET", `${sessionPath}/resources/access/Resource.txt`], ["POST", `${sessionPath}/resume`, {}],
+      ["HEAD", `${sessionPath}/resources/access/Resource.txt`],
+      ["DELETE", `${sessionPath}/access`],
+      ["POST", "/api/v1/participant/starter:launch", { participantSessionId: sessionId }],
+      ["POST", `${runPath}/save-progress`, { status: "running", unitResponse: "unauthorized" }],
+      ["POST", `${runPath}/test-logs`, { logs: [] }], ["POST", `${runPath}/adaptive-states/state`, {}],
+      ["GET", `${runPath}/reviews`], ["POST", `${runPath}/reviews`, {}],
+      ["PATCH", `${runPath}/reviews/missing`, {}], ["DELETE", `${runPath}/reviews/missing`],
+      ["POST", `${runPath}/testlets/missing/unlock`, {}], ["POST", `${runPath}/resume`, {}],
+      ["POST", `${runPath}/return-to-starter`, {}], ["POST", `${runPath}/complete`, {}]
+    ];
+    for (const deniedToken of [undefined, other.sessionToken, admin.sessionToken, sessionId, resourceToken]) {
+      for (const [method, path, body] of ownerRoutes) {
+        const denied = await raw(path, method, deniedToken, body);
+        assert.equal(denied.status, 401, `${method} ${path} must require the owner's participant credential`);
+        if (method === "HEAD") assert.equal(await denied.text(), "");
+        else assert.equal((await denied.json()).error, "participant_session_invalid");
+      }
+    }
+    // An owner's token does not bypass the existing execution-mode boundary.
+    const reviewDenied = await raw(`${runPath}/reviews`, "GET", owner.sessionToken);
+    assert.equal(reviewDenied.status, 403);
+    assert.equal((await reviewDenied.json()).error, "participant_review_not_allowed");
+    const stream = await fetch(isolated.baseUrl + `${sessionPath}/events`, {
+      headers: { authorization: `Bearer ${owner.sessionToken}` }, signal: streamAbort.signal
+    });
+    assert.equal(stream.status, 200);
+    const reader = stream.body!.getReader();
+    assert.match(new TextDecoder().decode((await reader.read()).value), /event: snapshot/);
+    const logout = await raw(`${sessionPath}/access`, "DELETE", owner.sessionToken);
+    assert.equal(logout.status, 205);
+    assert.equal(await logout.text(), "");
+    const streamClosed = await Promise.race([reader.read(), delay(3_000).then(() => ({ done: false }))]);
+    assert.equal(streamClosed.done, true, "Revocation must also terminate an already open participant stream.");
+    await reader.cancel();
+    assert.equal((await raw(`${resourceBasePath}/access/Resource.txt`)).status, 401);
+    for (const [method, path, body] of ownerRoutes) {
+      assert.equal((await raw(path, method, owner.sessionToken, body)).status, 401);
+    }
+    const renewed = await actor("owner-a");
+    assert.equal(renewed.participantSession.participantSessionId, sessionId);
+    assert.notEqual(renewed.sessionToken, owner.sessionToken);
+    const restored = await (await raw(`${sessionPath}/current-state`, "GET", renewed.sessionToken)).json();
+    assert.equal(restored.currentRunState.testRun.testRunId, run.testRunId);
+    assert.deepEqual(restored.currentRunState.testRun.unitResponses, beforeLogout.unitResponses);
+    assert.equal(restored.currentRunState.testRun.unitResponses["UNIT.ACCESS"], savedAnswer);
+    assert.equal((await raw(`${sessionPath}/access`, "DELETE", owner.sessionToken)).status, 401);
+    assert.equal((await raw(`${sessionPath}/current-state`, "GET", renewed.sessionToken)).status, 200);
+    assert.equal((await raw(`${resourceBasePath}/access/Resource.txt`)).status, 401);
+    const renewedResource = await raw(`${restored.currentRunState.resourceBasePath}/access/Resource.txt`);
+    assert.equal(renewedResource.status, 200);
+    assert.equal(await renewedResource.text(), "resource bytes stay exact");
+  } finally {
+    streamAbort.abort();
+    await closeServer(isolated.server);
   }
 });
 
@@ -7476,7 +7647,8 @@ test("participant progress accepts bounded GeoGebra-sized state without widening
       )}`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...participantHttpHeaders(isolated.baseUrl,
+          resolveRoutePath(productionApiRoutes.participant.saveProgress, { testRunId: resumed.body.testRun.testRunId })) },
         body: JSON.stringify({
           currentUnitKey: "unit-intro",
           status: "running",
@@ -11448,7 +11620,8 @@ test("participant event stream publishes session snapshots and monitor changes",
     const streamResponse = await fetch(
       `${isolated.baseUrl}/api/v1/participant/sessions/${participantSessionId}/events`,
       {
-        headers: { accept: "text/event-stream" },
+        headers: { accept: "text/event-stream", ...participantHttpHeaders(isolated.baseUrl,
+          `/api/v1/participant/sessions/${participantSessionId}/events`) },
         signal: abortController.signal
       }
     );
@@ -25520,9 +25693,10 @@ test("original Testcenter compatibility corpus imports official independent play
         { method: "POST", body: { bookletKey } }
       );
       assert.equal(resume.status, 200);
-      const resourceBaseUrl =
-        `${baseUrl}/api/v1/participant/sessions/${participantSessionId}` +
-        "/resources/IB_SAMPLE_2025";
+      const resourceState = await requestJson<{ currentRunState: { resourceBasePath: string } }>(
+        `/api/v1/participant/sessions/${participantSessionId}/current-state`);
+      assert.equal(resourceState.status, 200);
+      const resourceBaseUrl = `${baseUrl}${resourceState.body.currentRunState.resourceBasePath}/IB_SAMPLE_2025`;
       const runtimeResponse = await fetch(
         `${resourceBaseUrl}/runtimes/ib-runtime.9.9.0.html`
       );
@@ -31406,10 +31580,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   const currentState = await requestJson<{
     currentRunState: { resourceBasePath?: string };
   }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
-  assert.equal(
-    currentState.body.currentRunState.resourceBasePath,
-    `/api/v1/participant/sessions/${participantSessionId}/resources`
-  );
+  assert.match(currentState.body.currentRunState.resourceBasePath ?? "",
+    new RegExp(`^/api/v1/participant/sessions/${participantSessionId}/resources/\\.access/r1\\.[A-Za-z0-9_-]{43}$`));
   const resourceUrl =
     `${baseUrl}${currentState.body.currentRunState.resourceBasePath}/sample_resource_package/file.text`;
   const resourcePreflightResponse = await fetch(resourceUrl, {
@@ -40009,10 +40181,8 @@ test("original Testcenter compatibility corpus retains separately uploaded Veron
   );
   const resourceBasePath =
     currentState.body.currentRunState.resourceBasePath;
-  assert.equal(
-    resourceBasePath,
-    `/api/v1/participant/sessions/${participantSessionId}/resources`
-  );
+  assert.match(resourceBasePath ?? "",
+    new RegExp(`^/api/v1/participant/sessions/${participantSessionId}/resources/\\.access/r1\\.[A-Za-z0-9_-]{43}$`));
   const resourceUrl =
     `${baseUrl}${resourceBasePath}/sample_resource_package/file.text`;
   const resourceResponse = await fetch(resourceUrl);

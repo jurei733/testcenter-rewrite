@@ -8,6 +8,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
+import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+
+const participantHttpActor = createParticipantHttpTestActor();
+const fetch = participantHttpActor.fetch;
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
@@ -179,6 +183,7 @@ try {
   await pollReady(`${baseUrl}/readyz`);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  participantHttpActor.observePage(page);
   const corpus = JSON.parse(
     await readFile(resolve(fixtureRoot, "corpus.json"), "utf8")
   );

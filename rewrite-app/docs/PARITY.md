@@ -74,19 +74,20 @@ and implementation. Each needs current rewrite evidence before it is closed:
   Unit and memory/file/SQLite store regressions cover rotation, stale logout,
   cross-participant rejection, restart, unchanged session/run/response records,
   preserved access expiry and workspace-deletion cleanup. This service is not
-  yet exposed as a UI logout operation: HTTP participant routes, resource and
-  live channels, and foreground/background saves still need one consistently
-  enforced credential transport before enabling the Original account action.
+  yet exposed as a UI logout operation: the Original account action remains
+  disabled until the newly enforced HTTP transport passes its browser gates.
   The resource-channel foundation now derives a separate HMAC capability
   from the durable credential digest and exact session identity. A sandboxed
-  Player can eventually load relative resources without placing the general
+  Player can load relative resources without placing the general
   participant bearer token in its URL. The resource capability cannot authorize
   answer/Review/command requests, issue another capability or revoke access;
   credential rotation, revocation and the participant's existing access deadline
   also invalidate resource access. Unit and memory/file/SQLite regressions prove
   this separation, cross-session rejection and validity across store restart.
-  HTTP resource URLs and Player resource-base responses are not wired yet;
-  these foundation tests do not claim an enforced HTTP resource boundary.
+  HTTP current-state responses now return a resource-only capability path;
+  credential validation precedes resource reads, including HEAD/ranges, and
+  resource path suffixes are redacted from operational logs, including encoded
+  spellings. Public resource preflight remains available without private data.
   The shared browser request adapter now selects credentials from the exact
   participant session/run instead of forwarding an operator bearer to public
   participant routes. Successful participant responses populate a separate,
@@ -100,9 +101,30 @@ and implementation. Each needs current rewrite evidence before it is closed:
   Chromium gate through Original/Rewrite entry, real Verona offline recovery
   and view-closure background delivery; the browser gate rejects operator-token
   forwarding. A headful check also passed Original footer/account keyboard
-  behavior and same-run return. Current HTTP login still does not issue the
-  new token and route authorization is not yet enforced: this is client
-  transport readiness, not completed participant sign-out/ownership parity.
+  behavior and same-run return. Successful HTTP sign-in and credential-based
+  launch now issue a fresh participant token. Every known session/run HTTP
+  operation requires its exact owner's credential; neither an operator token,
+  foreign participant token, stable ID nor resource capability can bypass it.
+  DELETE session access returns 205 after compare-and-revoke without deleting
+  the session, run or responses. SSE access is rechecked on each poll and
+  revocation closes an existing stream. A dedicated real HTTP test proves
+  unauthorized reads/writes, preserved execution-mode restrictions, revoked
+  resources/streams, stale-logout rejection and exact response restoration after
+  re-login. The full API suites passed with memory, file and SQLite (161 per
+  store); seventeen frontend/worker/test-actor tests passed. PostgreSQL and
+  its current PostgreSQL gate remains pending. A fresh protected SQLite/
+  Chromium gate passed through real Original/Rewrite sign-in and rotation,
+  capability-based Verona resource GET/ranges, offline answer recovery and
+  view-closure background delivery under enforced HTTP ownership. This is not
+  yet the full browser/visual matrix or the enabled Original logout action.
+  Test actors
+  learn credentials from real successful login/state responses only; explicit
+  denial headers are never replaced. Synthetic API-created browser fixtures
+  bootstrap only their real setup-login credentials into the separate test
+  browser's credential store; existing keys and logout tombstones are never
+  overwritten. Actual UI login/rotation cases do not use that fixture bootstrap.
+  A second browser login rotates the first browser's token, so same-run layout
+  tests re-authenticate through the real UI before resuming the first browser.
   As a prerequisite, the shipped background worker now retains its exact
   pending response and delivery ID on 401/403, request timeout, rate limiting,
   network failure and server failure, so renewed authentication can retry it.
