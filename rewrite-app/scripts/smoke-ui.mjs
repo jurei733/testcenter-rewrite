@@ -7235,6 +7235,14 @@ try {
     const logoutCompleted = originalSignInPage.waitForResponse(response => response.request().method() === "DELETE" &&
       response.url().endsWith(`/sessions/${participantEntrySignInSessionId}/access`) && response.status() === 205);
     await originalSignInPage.locator("#originalParticipantLogoutButton").click();
+    await originalSignInPage.locator("#originalParticipantLogoutTitle").waitFor();
+    await originalSignInPage.locator("#originalParticipantLogoutCancelButton").click();
+    await originalSignInPage.locator("#originalParticipantLogoutTitle").waitFor({ state: "detached" });
+    assert.equal((await fetch(`${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
+      { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } })).status, 200);
+    await originalSignInPage.locator("#originalParticipantAccountButton").click();
+    await originalSignInPage.locator("#originalParticipantLogoutButton").click();
+    await originalSignInPage.locator("#originalParticipantLogoutConfirmButton").click();
     await logoutCompleted;
     await originalSignInPage.locator("#originalParticipantLogin").waitFor();
     await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");

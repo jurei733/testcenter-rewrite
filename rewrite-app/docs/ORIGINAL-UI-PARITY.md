@@ -118,7 +118,20 @@ flows, monitors, attachments and Original exports, with final exit 0. Current
 publication CI and matching-reference screenshots remain separate gates;
 this verifies the server-backed logout path, not the complete visual-parity
 row. The pinned Original's confirmation dialog and audience-specific button
-order are the next account interaction to reproduce.
+order are now adapted too. Its source text and companion image precede actual
+revocation; Primar places the filled `Hier bleiben` button first, whereas
+Sekundar and Erwachsene place the outlined `Abmelden` button first. Cancel and
+Escape preserve access and return focus to the account button. A session change
+or component destruction prevents a stale confirmation. A fresh protected
+SQLite/Chromium entry gate passed the cancel/revoke/re-entry sequence. Separate
+headful checks passed all three actual application themes at 1280px and 390px,
+native keyboard focus, real logout failure/retry and byte-identical saved Player
+response restoration. Twenty-five frontend-state tests and backend/shared
+typechecking passed. The production initial bundle is 469.72kB within the
+unchanged 470kB error limit: the dialog is lazy-loaded and repeated identical
+font declarations were consolidated without changing font values. Current
+screenshots show the adapted Rewrite surface, not an equal-fixture comparison
+against a rendered Original; the matrix rows remain open.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

@@ -145,6 +145,21 @@ and implementation. Each needs current rewrite evidence before it is closed:
   exact Original exports and isolated group-result deletion. The final process
   exited 0. Publication CI and equal-reference visual comparisons remain
   separate acceptance gates.
+  Original Starter sign-out now first opens the pinned 19.0 Material
+  confirmation dialog, including its text, companion image and audience-specific
+  button order: Primar offers the filled `Hier bleiben` action first; Sekundar
+  and Erwachsene offer the outlined `Abmelden` action first. Cancel/Escape
+  restores account-button focus without contacting the revocation endpoint.
+  Lazy loading or a changed/destroyed session cannot confirm a stale logout.
+  A fresh protected SQLite/Chromium entry gate passed cancellation, actual
+  revocation and same-run re-entry. Headful checks passed all three actual
+  application themes at desktop/mobile widths, native keyboard focus, transient
+  logout failure/retry, old-key rejection and byte-identical saved Player
+  response restoration. Twenty-five frontend-state tests and backend/shared
+  typechecking passed. The production bundle is now 469.72kB under the unchanged
+  470kB error budget; identical repeated font declarations were consolidated
+  without changing font values, and the dialog is lazy-loaded. These are local
+  checks, not matching Original-reference screenshots or a new all-green CI run.
   A separate headful browser check also passed an actual server 401 after a
   second browser login rotated the first browser's key. Both foreground and
   worker stores retained the exact response and delivery identity. Credential

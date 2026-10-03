@@ -843,8 +843,10 @@ the general bearer token. Rotation, revocation and existing access deadlines
 invalidate resource access too. `DELETE /api/v1/participant/sessions/:id/access`
 revokes access without deleting answers and returns 205. Existing live streams
 close on their next authorization check. On the optional Original Starter,
-open `Nutzerinformationen` and choose `Abmelden` to revoke participant access.
-The client waits for confirmation before returning to login. A failure leaves
+open `Nutzerinformationen`, choose `Abmelden`, then confirm in the Original
+dialog to revoke participant access. `Hier bleiben` or Escape cancels without
+revocation; its button order follows the Primar/Sekundar/Erwachsene theme.
+The client waits for server confirmation before returning to login. A failure leaves
 the account menu open for retry; neither saved responses nor pending answer
 queues are deleted. A concurrent renewed login or a different active
 participant is not cleared by a stale logout completion. Re-entry through real

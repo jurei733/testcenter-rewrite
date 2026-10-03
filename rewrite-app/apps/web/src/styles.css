@@ -28,6 +28,7 @@
 }
 
 :root {
+  --rewrite-ui-font: "Avenir Next", "Segoe UI", sans-serif;
   --bg: #f5f1e8;
   --ink: #1b2430;
   --muted: #6d7278;
@@ -212,7 +213,7 @@ h1 {
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 8px;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .status-pill span {
@@ -303,7 +304,7 @@ h1 {
   border: 1px solid var(--line);
   background: rgba(255, 252, 246, 0.88);
   box-shadow: var(--shadow);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .status-banner strong {
@@ -333,7 +334,7 @@ h1 {
   border-radius: var(--radius-lg);
   background: rgba(255, 244, 220, 0.96);
   box-shadow: 0 8px 24px rgba(56, 39, 21, 0.12);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .browser-compatibility-icon {
@@ -356,7 +357,7 @@ h1 {
   align-items: center;
   border-radius: 999px;
   padding: 11px 16px;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-weight: 700;
   text-decoration: none;
   transition: transform 120ms ease, opacity 120ms ease;
@@ -547,7 +548,7 @@ label {
   gap: 6px;
   font-size: 13px;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 label.inline-check {
@@ -617,7 +618,7 @@ textarea {
 .participant-entry-issue span,
 .participant-entry-issue strong,
 .participant-entry-issue code {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .participant-entry-issue span {
@@ -708,7 +709,7 @@ textarea {
 .technical-session-details > summary {
   color: var(--secondary);
   cursor: pointer;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-weight: 800;
 }
 
@@ -783,7 +784,7 @@ textarea {
 
 .action-group > span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -796,7 +797,7 @@ button {
   padding: 11px 16px;
   cursor: pointer;
   transition: transform 120ms ease, opacity 120ms ease;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-weight: 600;
 }
 
@@ -815,7 +816,7 @@ button:disabled {
   align-items: center;
   border-radius: 999px;
   padding: 11px 16px;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-weight: 600;
   text-decoration: none;
   transition: transform 120ms ease, opacity 120ms ease;
@@ -871,7 +872,7 @@ button:disabled {
 
 .local-demo-startup dt {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -880,7 +881,7 @@ button:disabled {
 .local-demo-startup dd {
   margin: 0;
   overflow-wrap: anywhere;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-weight: 700;
 }
 
@@ -915,7 +916,7 @@ button:disabled {
   padding: 12px 14px;
   background: rgba(27, 36, 48, 0.05);
   border-bottom: 1px solid var(--line);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -942,7 +943,7 @@ button:disabled {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .json-panel-preview {
@@ -951,7 +952,7 @@ button:disabled {
   line-height: 1.55;
   font-size: 13px;
   border-top: 1px solid rgba(27, 36, 48, 0.03);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .response-preview {
@@ -960,7 +961,7 @@ button:disabled {
   color: var(--muted);
   line-height: 1.55;
   font-size: 13px;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 pre {
@@ -998,7 +999,7 @@ pre {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .summary-card h3 {
@@ -1031,7 +1032,7 @@ pre {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .activity-item p {
@@ -1058,7 +1059,7 @@ pre {
 .note {
   font-size: 12px;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .live-context-card {
@@ -1108,7 +1109,7 @@ pre {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .live-context-items {
@@ -1124,7 +1125,7 @@ pre {
 .live-context-item span {
   font-size: 12px;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .live-context-item code {
@@ -1144,7 +1145,7 @@ pre {
   border: 1px dashed var(--line);
   color: var(--muted);
   background: rgba(255, 255, 255, 0.66);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .record-collection-summary {
@@ -1155,7 +1156,7 @@ pre {
   border-radius: 999px;
   background: rgba(31, 92, 84, 0.1);
   color: var(--secondary);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1276,7 +1277,7 @@ app-record-collection {
   margin: 0;
   font-size: 12px;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   overflow-wrap: anywhere;
 }
 
@@ -1293,7 +1294,7 @@ app-record-collection {
   background: rgba(27, 36, 48, 0.08);
   font-size: 11px;
   color: var(--ink);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .record-card-progress {
@@ -1372,7 +1373,7 @@ app-record-collection {
   grid-column: 1 / -1;
   overflow: hidden;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
@@ -1388,7 +1389,7 @@ app-record-collection {
 .record-card-progress-label,
 .record-card-progress-compact {
   overflow: hidden;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -1417,7 +1418,7 @@ app-record-collection {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .record-card-rows dd {
@@ -1427,7 +1428,7 @@ app-record-collection {
 
 .record-card-rows a {
   color: var(--secondary);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 13px;
   font-weight: 700;
   text-decoration-color: rgba(31, 92, 84, 0.35);
@@ -1484,7 +1485,7 @@ app-record-collection {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .entry-link-summary-grid {
@@ -1507,7 +1508,7 @@ app-record-collection {
 
 .entry-link-summary-grid span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1538,7 +1539,7 @@ app-record-collection {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1591,7 +1592,7 @@ app-record-collection {
   border-radius: var(--radius-lg);
   background: rgba(215, 235, 231, 0.72);
   color: #184f48;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .participant-connection-state span {
@@ -1657,7 +1658,7 @@ app-record-collection {
 
 .participant-fullscreen-status {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 13px;
 }
 
@@ -1698,7 +1699,7 @@ app-record-collection {
 
 .participant-meta-grid span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1760,7 +1761,7 @@ app-record-collection {
 .participant-entry-hero > div:first-child > span,
 .participant-entry-status span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1894,7 +1895,7 @@ app-record-collection {
 
 .participant-session-link span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1911,7 +1912,7 @@ app-record-collection {
 
 .participant-session-link input {
   grid-column: 1 / -1;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .participant-session-link-copy-status {
@@ -1941,7 +1942,7 @@ app-record-collection {
 
 .participant-progress header span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1977,7 +1978,7 @@ app-record-collection {
 .participant-adaptive-states > header span,
 .participant-adaptive-state > span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -2022,7 +2023,7 @@ app-record-collection {
 .participant-review-item span,
 .participant-review-item time {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2062,7 +2063,7 @@ app-record-collection {
 .participant-review-categories legend {
   padding: 0 6px;
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -2121,7 +2122,7 @@ app-record-collection {
 
 .participant-draft-state span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2161,7 +2162,7 @@ app-record-collection {
 
 .participant-completion-readiness span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2243,7 +2244,7 @@ app-record-collection {
 
 .participant-testlet-timer span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2338,7 +2339,7 @@ app-record-collection {
 
 .participant-testlet-gate span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2402,7 +2403,7 @@ app-record-collection {
 
 .participant-unit-prompt span {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2573,7 +2574,7 @@ app-record-collection {
   min-height: 42px;
   border-top: 1px solid rgba(31, 92, 84, 0.12);
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 12px;
   font-weight: 700;
 }
@@ -2587,7 +2588,7 @@ app-record-collection {
 .verona-player-shell > header span,
 .verona-player-status small {
   color: var(--muted);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2626,7 +2627,7 @@ app-record-collection {
   padding: 0 14px;
   border-top: 1px solid rgba(31, 92, 84, 0.12);
   color: var(--ink);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--rewrite-ui-font);
 }
 
 .verona-player-page-navigation-prompt {

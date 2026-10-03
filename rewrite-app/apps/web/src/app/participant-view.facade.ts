@@ -2620,9 +2620,10 @@ export class ParticipantViewFacade {
     );
   }
 
-  async signOutParticipant(): Promise<void> {
+  async signOutParticipant(expectedSessionId?: string): Promise<void> {
     if (!this.isParticipantStarter || this.participantSignOutBusy() || this.uiState.activeRequestLabel()) return;
     const participantSessionId = this.runtime.participantSessionId.trim();
+    if (expectedSessionId !== undefined && participantSessionId !== expectedSessionId) return;
     this.participantSignOutBusy.set(true);
     this.participantSignOutNotice.set("");
     try {

@@ -1,10 +1,12 @@
-import { Component, inject } from "@angular/core";
+import { Component, inject, Injector, type OnDestroy } from "@angular/core";
 import { MatButton, MatIconButton } from "@angular/material/button";
 import { MatDivider } from "@angular/material/divider";
 import { MatMenu, MatMenuTrigger } from "@angular/material/menu";
+import type { MatDialogRef } from "@angular/material/dialog";
 import { AppShellFacade } from "./app-shell.facade";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
+import type { OriginalParticipantLogoutDialogComponent } from "./original-participant-logout-dialog.component";
 import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers";
 
 // Adapted from IQB Testcenter 19's header account panel (MIT).
@@ -39,7 +41,7 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
         <mat-divider />
         <button matButton="tonal" class="logout-button" id="originalParticipantLogoutButton"
           data-cy="logout-button" [disabled]="view.participantSignOutBusy()"
-          (click)="$event.stopPropagation(); view.signOutParticipant()"
+          (click)="$event.stopPropagation(); confirmSignOut(trigger)"
           [attr.aria-describedby]="view.participantSignOutNotice() ? 'originalParticipantLogoutNotice' : null">Abmelden</button>
         @if (view.participantSignOutNotice()) {
           <p id="originalParticipantLogoutNotice" class="pending-note" role="alert">{{ view.participantSignOutNotice() }}</p>
@@ -67,9 +69,55 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
   `],
   styleUrl: "./original-login-theme.scss"
 })
-export class OriginalParticipantAccountComponent {
+export class OriginalParticipantAccountComponent implements OnDestroy {
   readonly view = inject(ParticipantViewFacade);
   readonly app = inject(AppShellFacade);
+  private readonly injector = inject(Injector);
+  private logoutDialog: MatDialogRef<OriginalParticipantLogoutDialogComponent, boolean> | null = null;
+  private openingLogoutDialog = false;
+  private destroyed = false;
+
+  async confirmSignOut(trigger: MatMenuTrigger): Promise<void> {
+    if (this.logoutDialog || this.openingLogoutDialog || this.view.participantSignOutBusy() || !this.view.isParticipantStarter) return;
+    const sessionId = this.view.runtime.participantSessionId.trim();
+    this.openingLogoutDialog = true;
+    try {
+      const [{ MatDialog }, { OriginalParticipantLogoutDialogComponent }] = await Promise.all([
+        import("@angular/material/dialog"), import("./original-participant-logout-dialog.component")
+      ]);
+      if (this.destroyed || this.view.runtime.participantSessionId.trim() !== sessionId) return;
+      trigger.closeMenu();
+      this.logoutDialog = this.injector.get(MatDialog).open(OriginalParticipantLogoutDialogComponent, {
+        panelClass: "original-participant-logout-dialog",
+        data: { safeMode: (document.documentElement.dataset["applicationTheme"] ?? "Primar") === "Primar" },
+        autoFocus: "dialog", restoreFocus: false,
+        ariaLabelledBy: "originalParticipantLogoutTitle", ariaDescribedBy: "originalParticipantLogoutMessage"
+      });
+      this.logoutDialog.afterClosed().subscribe(accepted => {
+        this.logoutDialog = null;
+        if (this.destroyed || this.view.runtime.participantSessionId.trim() !== sessionId) return;
+        if (!accepted) {
+          document.getElementById("originalParticipantAccountButton")?.focus();
+          return;
+        }
+        void this.view.signOutParticipant(sessionId).then(() => {
+          if (!this.destroyed && this.view.isParticipantStarter && this.view.participantSignOutNotice()) {
+            trigger.openMenu();
+            queueMicrotask(() => document.getElementById("originalParticipantLogoutButton")?.focus());
+          }
+        });
+      });
+    } catch {
+      if (!this.destroyed) this.view.participantSignOutNotice.set("Die Abmeldebestätigung konnte nicht geladen werden. Bitte erneut versuchen.");
+    } finally {
+      this.openingLogoutDialog = false;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.logoutDialog?.close(false);
+  }
 
   get version(): string {
     const build = readStringValue(parseJsonDocument(this.app.ops.runtimeHealthView),
