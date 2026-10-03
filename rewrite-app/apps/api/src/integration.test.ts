@@ -5609,6 +5609,16 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       "admin_session_missing"
     );
 
+    for (const accept of ["application/json", "text/csv", "*/*"]) {
+      const rejectedNegotiatedReports = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/system-check-reports",
+        { headers: { accept } }
+      );
+      assert.equal(rejectedNegotiatedReports.status, 401);
+      assert.equal(rejectedNegotiatedReports.body.error, "admin_session_missing");
+    }
+
     const rejectedSystemCheckReportImport = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-check-reports/import",
@@ -43047,6 +43057,16 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   );
   assert.equal(emptyParticipantReviewCsv.status, 204);
   assert.equal(emptyParticipantReviewCsv.body, "");
+  const negotiatedReviewPath = `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews`;
+  const emptyReviewJson = await requestJson<unknown[]>(negotiatedReviewPath, {
+    headers: { accept: "application/xml, APPLICATION/JSON; charset=utf-8, text/csv" }
+  });
+  assert.equal(emptyReviewJson.status, 200);
+  assert.deepEqual(emptyReviewJson.body, []);
+  const emptyReviewDefault = await requestText(negotiatedReviewPath, {
+    headers: { accept: "text/html, */*;q=0.8" }
+  });
+  assert.equal(emptyReviewDefault.status, 204);
   const invalidParticipantReviewPriority = await requestJson<{ error: string }>(
     `/api/v1/participant/test-runs/${review.testRunId}/reviews`,
     {
@@ -43442,6 +43462,32 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.match(reviewParticipantCsv.body, /"Retained across review re-entry"/);
   assert.doesNotMatch(reviewParticipantCsv.body, /"mode-trial"/);
   assert.doesNotMatch(reviewParticipantCsv.body, /"Trial participant review"/);
+  const negotiatedReviewJson = await requestJson<Array<Record<string, unknown>>>(negotiatedReviewPath, {
+    headers: { accept: "application/json; charset=utf-8, text/csv" }
+  });
+  assert.equal(negotiatedReviewJson.status, 200);
+  assert.ok(negotiatedReviewJson.body.length > 0);
+  assert.equal(negotiatedReviewJson.body.every(row => row.loginname === "mode-review"), true);
+  assert.equal(negotiatedReviewJson.body.some(row => row.entry === "Retained across review re-entry"), true);
+  assert.equal(negotiatedReviewJson.body.some(row => row.entry === "Trial participant review"), false);
+  assert.equal(negotiatedReviewJson.body.every(row => typeof row.category_general === "boolean"), true);
+  for (const accept of ["TEXT/CSV;charset=utf-8, application/json", "application/xml, text/csv", "*/*"]) {
+    const negotiatedCsv = await requestText(negotiatedReviewPath, { headers: { accept } });
+    assert.equal(negotiatedCsv.status, 200);
+    assert.equal(negotiatedCsv.body, reviewParticipantCsv.body);
+    assert.match(negotiatedCsv.contentType ?? "", /^text\/csv/);
+  }
+  const fixedCsv = await requestText(`/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews.csv`, {
+    headers: { accept: "application/json" }
+  });
+  assert.equal(fixedCsv.body, reviewParticipantCsv.body, "Explicit .csv downloads retain their existing contract.");
+  const deniedDemoJson = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${demo.participantSessionId}/exports/reviews`, {
+      headers: { accept: "application/json" }
+    }
+  );
+  assert.equal(deniedDemoJson.status, 403);
+  assert.equal(deniedDemoJson.body.error, "participant_review_not_allowed");
   const trialParticipantCsv = await requestText(
     `/api/v1/participant/sessions/${trial.participantSessionId}/exports/reviews.csv`
   );
@@ -48935,6 +48981,20 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"DatumTS";"Datum";"FileName";"Betriebssystem";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"/
   );
   assert.match(csv.body, /"SAMPLE SYS-CHECK REPORT";"SYSCHECK\.SAMPLE"/);
+  const negotiatedSystemCheckPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports?checkId=SYSCHECK.SAMPLE`;
+  const fixedJson = await requestText(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.json?checkId=SYSCHECK.SAMPLE`);
+  for (const accept of ["application/json; charset=utf-8, text/csv", "*/*", "application/xml"]) {
+    const negotiated = await requestText(negotiatedSystemCheckPath, { headers: { accept } });
+    assert.equal(negotiated.status, 200);
+    assert.match(negotiated.contentType ?? "", /^application\/json/);
+    assert.equal(negotiated.body, fixedJson.body);
+  }
+  for (const accept of [" TEXT/CSV ;charset=UTF-8, application/json", "application/xml, text/csv"]) {
+    const negotiated = await requestText(negotiatedSystemCheckPath, { headers: { accept } });
+    assert.equal(negotiated.status, 200);
+    assert.match(negotiated.contentType ?? "", /^text\/csv/);
+    assert.equal(negotiated.body, csv.body);
+  }
 
   const rejectedDeletion = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,

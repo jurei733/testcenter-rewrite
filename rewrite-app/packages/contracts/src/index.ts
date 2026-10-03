@@ -80,6 +80,7 @@ export * from "./monitor-event-stream.js";
 export * from "./participant-event-stream.js";
 export * from "./monitor-custom-texts.js";
 export * from "./participant-custom-texts.js";
+export * from "./original-report-format.js";
 import type {
   OriginalTestcenterOperationalLoginCandidate,
   ParticipantRosterSource
@@ -271,6 +272,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports/import",
     exportSystemCheckReportsCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.csv",
+    exportSystemCheckReports:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports",
     exportSystemCheckReportsJson:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.json",
     getContentRelease:
@@ -297,6 +300,8 @@ export const productionApiRoutes = {
     listReviews: "/api/v1/participant/test-runs/:testRunId/reviews",
     exportReviewsCsv:
       "/api/v1/participant/sessions/:participantSessionId/exports/reviews.csv",
+    exportReviews:
+      "/api/v1/participant/sessions/:participantSessionId/exports/reviews",
     createReview: "/api/v1/participant/test-runs/:testRunId/reviews",
     updateReview:
       "/api/v1/participant/test-runs/:testRunId/reviews/:reviewId",

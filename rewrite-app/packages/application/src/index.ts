@@ -742,6 +742,10 @@ export type ParticipantRuntimePort = {
   exportReviewsCsv(input: {
     participantSessionId: string;
   }): Promise<string | null>;
+  exportReviews(input: {
+    participantSessionId: string;
+    format: "csv" | "json";
+  }): Promise<string | null>;
   createReview(input: {
     testRunId: string;
     unitKey?: string | null;
@@ -15961,7 +15965,8 @@ const buildOriginalReviewReportRows = (input: {
   return { rows, categoryColumns };
 };
 
-const formatParticipantReviewCsv = (input: {
+const formatParticipantReviewReport = (input: {
+  format: "csv" | "json";
   participantSession: ParticipantSession;
   participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
@@ -15976,7 +15981,14 @@ const formatParticipantReviewCsv = (input: {
     contentReleases: input.contentReleases,
     groupKeys: [input.participantSession.groupKey]
   });
-  if (reviewReport.rows.length === 0) {
+  const sortedRows = [...reviewReport.rows].sort((left, right) =>
+    String(left.reviewtime ?? "").localeCompare(String(right.reviewtime ?? ""))
+  );
+  if (input.format === "json") {
+    // JSON keeps native category booleans, unlike the CSV TRUE/FALSE dialect.
+    return `${JSON.stringify(sortedRows)}\n`;
+  }
+  if (sortedRows.length === 0) {
     return null;
   }
   const columns = [
@@ -15997,18 +16009,13 @@ const formatParticipantReviewCsv = (input: {
     "unitlabel",
     "bookletlabel"
   ];
-  const rows = reviewReport.rows
+  const rows = sortedRows
     .map(row =>
       Object.fromEntries(
         Object.entries(row).map(([key, value]) => [
           key,
           key.startsWith("category_") ? (value ? "TRUE" : "FALSE") : value
         ])
-      )
-    )
-    .sort((left, right) =>
-      String(left.reviewtime ?? "").localeCompare(
-        String(right.reviewtime ?? "")
       )
     );
   return formatOriginalReviewReportCsv(columns, rows);
@@ -32098,6 +32105,9 @@ export const createFirstSliceServices = (
           );
       },
       async exportReviewsCsv(input) {
+        return this.exportReviews({ ...input, format: "csv" });
+      },
+      async exportReviews(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
@@ -32136,7 +32146,8 @@ export const createFirstSliceServices = (
             review.participantSessionId === participantSessionId &&
             sessionTestRunIds.has(review.testRunId)
         );
-        return formatParticipantReviewCsv({
+        return formatParticipantReviewReport({
+          format: input.format,
           participantSession,
           participantRosterEntries: participantRosterEntries.filter(
             entry => entry.loginKey === participantSession.loginKey

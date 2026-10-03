@@ -120,6 +120,7 @@ import {
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type ListSystemCheckReportsResponse,
+  selectOriginalReportFormat,
   MONITOR_EVENT_STREAM_SCHEMA_VERSION,
   type MonitorEventStreamEvent,
   PARTICIPANT_EVENT_STREAM_SCHEMA_VERSION,
@@ -2420,6 +2421,9 @@ const systemCheckReportCsvExportPattern = createRoutePattern(
 const systemCheckReportJsonExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSystemCheckReportsJson
 );
+const systemCheckReportExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportSystemCheckReports
+);
 const systemCheckSpeedTestDownloadPattern = createRoutePattern(
   productionApiRoutes.system.downloadSpeedTestPackage
 );
@@ -2448,6 +2452,9 @@ const participantReviewListPattern = createRoutePattern(
 );
 const participantReviewCsvExportPattern = createRoutePattern(
   productionApiRoutes.participant.exportReviewsCsv
+);
+const participantReviewExportPattern = createRoutePattern(
+  productionApiRoutes.participant.exportReviews
 );
 const participantReviewDetailPattern = createRoutePattern(
   productionApiRoutes.participant.updateReview
@@ -2554,6 +2561,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", systemCheckReportImportPattern],
   ["GET", systemCheckReportCsvExportPattern],
   ["GET", systemCheckReportJsonExportPattern],
+  ["GET", systemCheckReportExportPattern],
   ["GET", monitorOpenRunsPattern],
   ["GET", monitorEventStreamPattern],
   ["POST", monitorRunCommandsPattern],
@@ -3640,6 +3648,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       systemCheckReportJsonExportPattern,
       productionApiRoutes.workspace.exportSystemCheckReportsJson
     ],
+    ["GET", systemCheckReportExportPattern, productionApiRoutes.workspace.exportSystemCheckReports],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
@@ -3658,6 +3667,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       participantReviewCsvExportPattern,
       productionApiRoutes.participant.exportReviewsCsv
     ],
+    ["GET", participantReviewExportPattern, productionApiRoutes.participant.exportReviews],
     ["POST", participantReviewListPattern, productionApiRoutes.participant.createReview],
     ["PATCH", participantReviewDetailPattern, productionApiRoutes.participant.updateReview],
     ["DELETE", participantReviewDetailPattern, productionApiRoutes.participant.deleteReview],
@@ -7949,6 +7959,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         systemCheckReportCsvExportPattern.exec(pathname);
       const systemCheckReportJsonExportMatch =
         systemCheckReportJsonExportPattern.exec(pathname);
+      const systemCheckReportExportMatch = systemCheckReportExportPattern.exec(pathname);
       if (request.method === "GET" && systemCheckListMatch?.groups) {
         const tenantKey = decodeRouteGroup(systemCheckListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -8102,12 +8113,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "GET" &&
         (systemCheckReportListMatch?.groups ||
           systemCheckReportCsvExportMatch?.groups ||
-          systemCheckReportJsonExportMatch?.groups)
+          systemCheckReportJsonExportMatch?.groups ||
+          systemCheckReportExportMatch?.groups)
       ) {
         const groups =
           systemCheckReportListMatch?.groups ??
           systemCheckReportCsvExportMatch?.groups ??
-          systemCheckReportJsonExportMatch?.groups;
+          systemCheckReportJsonExportMatch?.groups ??
+          systemCheckReportExportMatch?.groups;
         const tenantKey = decodeRouteGroup(groups?.tenantKey);
         const workspaceKey = decodeRouteGroup(groups?.workspaceKey);
         if (!tenantKey || !workspaceKey) {
@@ -8134,7 +8147,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        if (systemCheckReportCsvExportMatch?.groups) {
+        const negotiatedFormat = systemCheckReportExportMatch?.groups
+          ? selectOriginalReportFormat(request.headers.accept, "json") : null;
+        if (systemCheckReportCsvExportMatch?.groups || negotiatedFormat === "csv") {
           const csv =
             await services.workspaceAdminRead.exportSystemCheckReportsCsv({
               tenantKey,
@@ -8150,7 +8165,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        if (systemCheckReportJsonExportMatch?.groups) {
+        if (systemCheckReportJsonExportMatch?.groups || negotiatedFormat === "json") {
           const json =
             await services.workspaceAdminRead.exportSystemCheckReportsJson({
               tenantKey,
@@ -8625,12 +8640,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         participantReviewListPattern.exec(pathname);
       const participantReviewCsvExportMatch =
         participantReviewCsvExportPattern.exec(pathname);
+      const participantReviewExportMatch = participantReviewExportPattern.exec(pathname);
       if (
         request.method === "GET" &&
-        participantReviewCsvExportMatch?.groups
+        (participantReviewCsvExportMatch?.groups || participantReviewExportMatch?.groups)
       ) {
         const participantSessionId = decodeRouteGroup(
-          participantReviewCsvExportMatch.groups.participantSessionId
+          (participantReviewCsvExportMatch?.groups ?? participantReviewExportMatch?.groups)?.participantSessionId
         );
         if (!participantSessionId) {
           sendError(
@@ -8641,10 +8657,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const csv = await services.participantRuntime.exportReviewsCsv({
-          participantSessionId
+        const format = participantReviewCsvExportMatch?.groups ? "csv" :
+          selectOriginalReportFormat(request.headers.accept, "csv");
+        const report = await services.participantRuntime.exportReviews({
+          participantSessionId, format
         });
-        if (csv === null) {
+        if (report === null) {
           response.writeHead(204, {
             ...securityHeaders,
             "cache-control": "no-cache",
@@ -8653,7 +8671,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           endResponse(response);
           return;
         }
-        sendCsv(response, 200, "testcenter-reviews.csv", csv);
+        if (format === "json") {
+          sendAsset(response, 200, "application/json; charset=utf-8", Buffer.from(report, "utf8"));
+        } else {
+          sendCsv(response, 200, "testcenter-reviews.csv", report);
+        }
         return;
       }
       if (request.method === "GET" && participantReviewListMatch?.groups) {

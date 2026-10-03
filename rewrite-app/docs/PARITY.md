@@ -81,8 +81,9 @@ official BookletConfig workspace, the participant-list payload fell from
 Memory/file/SQLite regressions exercise a 1.5MB source and four sessions, exact
 detail/download retention and metadata-only lists. Three frontend-state tests
 also gate non-overlapping polling, foreground priority, timer rescheduling,
-failure recovery and route selection. The full UI and current CI remain
-independent acceptance gates.
+failure recovery and route selection. A fresh complete SQLite/Chromium UI gate
+passed on 2026-10-03, including the late import-repair and attachment workflows.
+Current GitHub CI remains an independent acceptance gate.
 
 The Original 19 CSV encoding portion is implemented on 2026-10-03 against
 upstream `0435f3bb003d4189d8fcaca66f9ee208c2434c86`: participant Review downloads,
@@ -93,8 +94,22 @@ archived log string retains its original backslashes. Review category booleans
 use the Original CSV `TRUE`/`FALSE` representation while JSON retains booleans.
 Tests cover adversarial headers/log values, archive CSV versus JSON log
 identity, participant isolation, and official SysCheck report exports. This
-closes the encoding subrequirement; timestamp shapes, current Systemcheck
-labels/units and Accept negotiation still require the current-version audit.
+closes the encoding subrequirement; timestamp shapes still require the
+current-version audit.
+
+Participant Review and Systemcheck reports now also reproduce 19.0's ordered
+Accept negotiation: case-insensitive `text/csv` and `application/json` may have
+parameters, the first supported alternative wins, and unsupported/wildcard
+headers retain the route default (Review CSV, Systemcheck JSON). Explicit
+`.csv`/`.json` routes keep their format. Empty Review CSV remains 204; empty
+Review JSON is 200 with `[]`, category values remain JSON booleans, and only
+the authenticated participant's reviews are included. Systemcheck's generic
+route retains operator authorization for every format. The upstream
+`ReportFormat.php` test matrix and API regressions passed with memory, file and
+SQLite stores; PostgreSQL remains CI-gated. The fresh protected SQLite/Chromium
+Systemcheck gate also passed saving and exporting both checks and the corrected
+`RoundTrip in ms` / `Anwendungs-Latenz in ms` labels. Negotiation for standalone
+workspace response/log/review reports is not covered by this slice.
 
 The zoneless Attachment Capture view now explicitly notifies Angular after
 camera, QR, target lookup, photo encoding and upload callbacks. The isolated

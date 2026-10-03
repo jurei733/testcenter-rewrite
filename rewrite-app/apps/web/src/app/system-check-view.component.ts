@@ -998,7 +998,7 @@ export class SystemCheckViewComponent implements OnInit {
         this.entry("nw-upload", "network", "Uploadgeschwindigkeit", this.humanReadableBitsPerSecond(upload.bytesPerSecond)),
         this.entry("nw-upload-needed", "network", "Uploadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.uploadSpeed.min)),
         this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient"),
-        this.entry("latency", "network", "Anwendungs-Latenz in Ms", average.toFixed(1), average >= 400),
+        this.entry("latency", "network", "Anwendungs-Latenz in ms", average.toFixed(1), average >= 400),
         this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient")
       ];
       if (connection) {
@@ -1007,7 +1007,7 @@ export class SystemCheckViewComponent implements OnInit {
             this.entry(
               "bnni-roundtrip",
               "network",
-              "RoundTrip in Ms",
+              "RoundTrip in ms",
               connection.rtt.toString()
             )
           );

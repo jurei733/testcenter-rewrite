@@ -2781,6 +2781,9 @@ try {
         .waitFor();
     }
     assert.equal(await page.locator("#systemCheckNetwork-bnni-fail").count(), 0);
+    await page.locator("#systemCheckNetwork-bnni-roundtrip").filter({ hasText: "RoundTrip in ms" }).waitFor();
+    await page.locator("#systemCheckNetwork-latency").filter({ hasText: "Anwendungs-Latenz in ms" }).waitFor();
+    assert.equal(await page.locator(".system-check-results").filter({ hasText: /\bin Ms\b/ }).count(), 0);
     assert.equal(
       await page.locator(".system-check-results", { hasText: "not available" }).count(),
       0
