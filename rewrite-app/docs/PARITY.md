@@ -27,6 +27,10 @@ and implementation. Each needs current rewrite evidence before it is closed:
 - Login codes and `CodeToEnter` are case-insensitive; successful login resets
   failed-attempt counters. Current execution-mode/session reuse capabilities
   must agree with the Original definitions.
+  The complete six-mode run-capability/label matrix is now pinned to 19.0 and
+  regression-compared. `run-demo` creates a new session/run on credential entry;
+  explicit session links still address the existing session. Case-insensitive
+  second codes and successful-login counter resets remain separate open checks.
 - Default XML XSD validation, supported schema versions and supported
   `https://w3id.org/iqb/spec/<repo>/<version>` references. Unsupported versions
   and historical GitHub schema locations are rejected when applying this

@@ -1,0 +1,159 @@
+{
+  "sourceCommit": "c35cff81383949b4664e0fdffa3ba1154d144d9d",
+  "sourcePath": "definitions/testtaker/test-mode.json",
+  "sourceSha256": "abbd8746a1f304b5ea6f01177a297b27fbd7c04742b687cfd13bffea1658619e",
+  "definitions": {
+    "RUN-DEMO": {
+      "label": "Nur Ansicht (Demo)",
+      "config": {
+        "alwaysNewSession": true,
+        "monitorable": false,
+        "canReview": false,
+        "saveResponses": false,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": true,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": true,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "MONITOR-GROUP": {
+      "label": "Testgruppen-Monitor (Demo)",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": false,
+        "canReview": false,
+        "saveResponses": false,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": true,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": true,
+        "lockAfterFailedLogins": true
+      }
+    },
+    "MONITOR-STUDY": {
+      "label": "Studien-Monitor (Demo)",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": false,
+        "canReview": false,
+        "saveResponses": false,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": true,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": true,
+        "lockAfterFailedLogins": true
+      }
+    },
+    "RUN-HOT-RETURN": {
+      "label": "Durchführung Test/Befragung",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": true,
+        "canReview": false,
+        "saveResponses": true,
+        "forceTimeRestrictions": true,
+        "forceNaviRestrictions": true,
+        "showCode": false,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": true,
+        "canChangeStateOptions": false,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "RUN-HOT-RESTART": {
+      "label": "Durchführung Test/Befragung",
+      "config": {
+        "alwaysNewSession": true,
+        "monitorable": true,
+        "canReview": false,
+        "saveResponses": true,
+        "forceTimeRestrictions": true,
+        "forceNaviRestrictions": true,
+        "showCode": false,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": true,
+        "canChangeStateOptions": false,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "RUN-REVIEW": {
+      "label": "Prüfdurchgang ohne Speichern",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": false,
+        "canReview": true,
+        "saveResponses": false,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": true,
+        "showTimeLeft": true,
+        "showUnitMenu": true,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": true,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "RUN-TRIAL": {
+      "label": "Prüfdurchgang mit Speichern und Reviewfunktionalität",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": true,
+        "canReview": true,
+        "saveResponses": true,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": true,
+        "showTimeLeft": true,
+        "showUnitMenu": true,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": true,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "RUN-SIMULATION": {
+      "label": "Prüfdurchgang ohne Speichern, ohne Reviewfunktionalität aber mit Beschränkungen",
+      "config": {
+        "alwaysNewSession": false,
+        "monitorable": false,
+        "canReview": false,
+        "saveResponses": false,
+        "forceTimeRestrictions": true,
+        "forceNaviRestrictions": true,
+        "showCode": false,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": false,
+        "canChangeStateOptions": false,
+        "lockAfterFailedLogins": false
+      }
+    },
+    "SYS-CHECK-LOGIN": {
+      "label": "Dieser Modus versteckt für alle anderen Logins den System Check. Der Check kann dann nur noch von Logins durchgeführt werden mit diesem Mode",
+      "config": {
+        "alwaysNewSession": true,
+        "monitorable": false,
+        "canReview": false,
+        "saveResponses": false,
+        "forceTimeRestrictions": false,
+        "forceNaviRestrictions": false,
+        "showCode": false,
+        "showTimeLeft": false,
+        "showUnitMenu": false,
+        "receiveRemoteCommands": false,
+        "lockAfterFailedLogins": false
+      }
+    }
+  }
+}

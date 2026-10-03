@@ -25,7 +25,7 @@ test("participant execution modes match the original Testcenter matrix", () => {
     ),
     {
       "run-demo": {
-        alwaysNewSession: false,
+        alwaysNewSession: true,
         monitorable: false,
         canReview: false,
         saveResponses: false,

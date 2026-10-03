@@ -117,7 +117,7 @@ export const participantExecutionModeDefinitions: Record<
   "run-demo": {
     mode: "run-demo",
     label: "Nur Ansicht (Demo)",
-    alwaysNewSession: false,
+    alwaysNewSession: true,
     monitorable: false,
     canReview: false,
     saveResponses: false,

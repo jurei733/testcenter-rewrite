@@ -6,6 +6,13 @@ paths and executable expectations are declared in `corpus.json`. Newer
 package-level additions are pinned independently to their introducing Original
 Testcenter commit so the historical baseline remains reproducible.
 
+`test-mode-19.0.json` pins the authoritative execution-mode definitions at
+`c35cff81383949b4664e0fdffa3ba1154d144d9d`, source
+`definitions/testtaker/test-mode.json` (MIT). It records the source SHA-256 and
+retains operational definitions independently of the historical corpus. A
+contract test compares every participant run capability and label, including
+19.0's new-session-on-login behavior for `run-demo`.
+
 The complete current `e2e/src/fixtures` directory is additionally pinned at
 commit `a5a6d25a72990d667300804c337cc5b500b01d2f` as a separate generation. Its
 13 byte-exact files cover both valid 18.0 Booklets, the current

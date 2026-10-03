@@ -42509,6 +42509,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
         currentUnitKey: string | null;
         unlockedTestletKeys?: string[];
         testletTimers?: Record<string, unknown>;
+        unitResponses: Record<string, string>;
       };
     }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
       method: "POST"
@@ -42576,7 +42577,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(demo.currentRunState.executionMode, {
     mode: "run-demo",
     label: "Nur Ansicht (Demo)",
-    alwaysNewSession: false,
+    alwaysNewSession: true,
     monitorable: false,
     canReview: false,
     saveResponses: false,
@@ -42589,6 +42590,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     canChangeStateOptions: true
   });
   assert.deepEqual(demo.testRun.unlockedTestletKeys, []);
+  const secondDemoEntry = await start("mode-demo");
+  assert.notEqual(secondDemoEntry.participantSessionId, demo.participantSessionId);
+  assert.notEqual(secondDemoEntry.testRunId, demo.testRunId);
+  assert.deepEqual(secondDemoEntry.testRun.unitResponses, {});
   assert.deepEqual(demo.testRun.testletTimers, {});
   assert.deepEqual(demo.currentRunState.navigation.forwardDeniedReasons, [
     "testlet_code_required"

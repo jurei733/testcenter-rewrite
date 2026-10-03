@@ -31,7 +31,10 @@ Participant Testtakers imports retain the original six execution modes. Their
 session-reuse, response persistence, navigation/time restrictions, participant
 display, monitor visibility, and remote-command policies are enforced from one
 versioned domain matrix across every storage adapter. Matching the current
-Original `showCode` policy, Demo, Review, and Trial display an authored
+Testcenter 19 definitions, credential entry for Demo and Hot Restart creates a
+new session; Hot Return, Review, Trial and Simulation reuse their matching
+session. An explicit existing session link remains an address for that session.
+Matching the Original `showCode` policy, Demo, Review, and Trial display an authored
 `CodeToEnter` value beside the still-locked input; Hot Return, Hot Restart, and
 Simulation keep it secret. Every mode still requires participant entry and a
 successful server-side unlock. Authored `Group/@label`
