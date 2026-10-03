@@ -620,17 +620,6 @@ export class VeronaPlayerHostComponent
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
       : serializeVeronaUnitResponse({});
-    this.persistHostLog({
-      key: "PLAYER",
-      timeStamp: Date.now(),
-      content: "LOADING"
-    }, this.savedResponse);
-
-    if (!this.playerHtml.trim() || !this.unitDefinition.trim()) {
-      this.fail("The release does not contain both player HTML and a unit definition.");
-      return;
-    }
-
     this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
       this.mountFrameRequest = null;
       this.beginPlayerFrameLoad();
@@ -639,6 +628,18 @@ export class VeronaPlayerHostComponent
 
   private beginPlayerFrameLoad(): void {
     if (this.status !== "loading") {
+      return;
+    }
+    // mountPlayer also runs in Angular's input/view lifecycle. Emitting here,
+    // in the cancellable frame callback, keeps the parent save/leave state
+    // stable throughout its current render and dev-mode verification pass.
+    this.persistHostLog({
+      key: "PLAYER",
+      timeStamp: Date.now(),
+      content: "LOADING"
+    }, this.savedResponse);
+    if (!this.playerHtml.trim() || !this.unitDefinition.trim()) {
+      this.fail("The release does not contain both player HTML and a unit definition.");
       return;
     }
     this.loadingPhase = "unknown";

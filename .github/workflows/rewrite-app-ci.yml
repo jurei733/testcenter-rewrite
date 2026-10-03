@@ -110,6 +110,9 @@ jobs:
           - check: ui-full
             command: npm run smoke:ui
             playwright: true
+          - check: ui-verona-development
+            command: npm run smoke:ui:verona-development
+            playwright: true
           - check: local-demo
             command: npm run smoke:local-demo
             playwright: true

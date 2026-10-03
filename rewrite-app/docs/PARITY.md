@@ -205,9 +205,24 @@ The optional UI has its separate complete acceptance matrix in
 [`ORIGINAL-UI-PARITY.md`](./ORIGINAL-UI-PARITY.md). Neither a green historical
 pipeline nor a completed login/starter slice proves current full parity.
 An additional development-build run exposed `NG0100` in the Participant view
-while opening the official ABI Player family. It is an open rendering
-regression, not an accepted visual-parity state. Production-build browser
-verification is kept separate from this development-build finding.
+while opening the official ABI Player family. A fresh headful reproduction
+identified the synchronous Player `LOADING` log/save notification during
+`ngAfterViewInit`/input changes: it changed the parent's already-checked
+`canClearSession` binding. Logging and missing-input error notification now run
+in the existing cancellable frame callback before iframe loading, outside that
+render/verification pass. No Angular guard or global error reporting is disabled.
+The new `smoke:ui:verona-development` gate builds into an owned temporary
+directory and uses a fresh protected SQLite database. Its headful run passed
+both Rewrite and Original layouts, real official ABI text/choice input, durable
+save, authored reload, page reload and forward/back Unit changes, with the same
+run and byte-identical saved response, no page/console errors and final exit 0.
+It is registered as an independent CI matrix job. All 140 unit and 25 frontend
+state tests passed; the production frontend remains 469.72kB within its unchanged
+470kB error budget. A fresh protected SQLite/Chromium production gate also passed
+through all official Player families, resource/response restoration, offline and
+background save recovery, Original/Rewrite entry and logout, with final exit 0
+at `participant-verona-player-families`. Current publication CI remains separate;
+this fixes the rendering regression, not the full Original visual-parity matrix.
 
 Operational verification on 2026-10-03 found repeated full runtime snapshots
 in operator release/session lists. These now return typed release metadata and

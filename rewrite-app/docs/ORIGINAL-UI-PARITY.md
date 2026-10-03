@@ -132,6 +132,14 @@ unchanged 470kB error limit: the dialog is lazy-loaded and repeated identical
 font declarations were consolidated without changing font values. Current
 screenshots show the adapted Rewrite surface, not an equal-fixture comparison
 against a rendered Original; the matrix rows remain open.
+The official ABI development-rendering regression is also fixed: Player loading
+notifications no longer synchronously change the parent save/leave state inside
+Angular's view/input lifecycle. The new isolated `smoke:ui:verona-development`
+gate passed both layouts with actual ABI input/save, authored reload, page
+reload and Unit changes, the same run and exact saved response, no page/console
+errors and final exit 0. This adds a dedicated CI check without disabling
+Angular verification or replacing another runtime's frontend/database. It is
+functional browser evidence, not matching-reference screenshot acceptance.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

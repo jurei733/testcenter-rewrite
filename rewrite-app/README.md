@@ -867,6 +867,14 @@ The Rewrite `Leave Session` action still clears only the local view.
 
 ## Integration Test Matrix
 
+`npm run smoke:ui:verona-development` separately checks the official ABI Player
+under Angular's development-mode rendering guards, in both interfaces. It builds
+into a fresh temporary directory and uses its own protected SQLite database;
+the shared production frontend and any caller-supplied database are untouched.
+It covers actual Player input/save, authored/page reload and Unit changes with
+same-run response restoration. `UI_SMOKE_HEADFUL=true` opens the test browser.
+CI runs it independently from the production-build Player smoke.
+
 The production slice now has a small store matrix:
 
 ```bash
