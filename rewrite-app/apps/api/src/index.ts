@@ -1404,7 +1404,7 @@ const sendCsv = (
     ...securityHeaders,
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": `attachment; filename="${filename}"`,
-    "cache-control": "no-cache"
+    "cache-control": "private, no-store"
   });
   endResponse(response, text);
 };
@@ -1450,7 +1450,7 @@ const sendParticipantResourceAsset = (
   response.writeHead(statusCode, {
     ...participantResourceSecurityHeaders,
     "content-type": contentType,
-    "cache-control": "no-cache",
+    "cache-control": "private, no-store",
     ...additionalHeaders
   });
   endResponse(response, body);
@@ -6232,7 +6232,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             attachmentFile.fileName
           ).replace(/^attachment;/, "inline;"),
           "content-length": String(body.byteLength),
-          "cache-control": "no-store"
+          "cache-control": "private, no-store"
         });
         return;
       }
@@ -6455,6 +6455,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const body = Buffer.from(download.dataBase64, "base64");
         sendAsset(response, 200, download.mediaType, body, {
           "content-disposition": buildAttachmentContentDisposition(download.fileName),
+          "cache-control": "private, no-store",
           "content-length": String(body.byteLength)
         });
         return;
@@ -7674,6 +7675,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
               (groupFilter.groupKey ? [groupFilter.groupKey] : [])
           });
         sendAsset(response, 200, archive.mediaType, archive.body, {
+          "cache-control": "private, no-store",
           "content-disposition": buildAttachmentContentDisposition(
             archive.fileName
           )
@@ -8179,6 +8181,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             "application/json; charset=utf-8",
             Buffer.from(json, "utf8"),
             {
+              "cache-control": "private, no-store",
               "content-disposition": buildAttachmentContentDisposition(
                 `${workspaceKey}-system-check-reports.json`
               )
@@ -8665,14 +8668,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         if (report === null) {
           response.writeHead(204, {
             ...securityHeaders,
-            "cache-control": "no-cache",
+            "cache-control": "private, no-store",
             "content-length": "0"
           });
           endResponse(response);
           return;
         }
         if (format === "json") {
-          sendAsset(response, 200, "application/json; charset=utf-8", Buffer.from(report, "utf8"));
+          sendAsset(response, 200, "application/json; charset=utf-8", Buffer.from(report, "utf8"), {
+            "cache-control": "private, no-store"
+          });
         } else {
           sendCsv(response, 200, "testcenter-reviews.csv", report);
         }

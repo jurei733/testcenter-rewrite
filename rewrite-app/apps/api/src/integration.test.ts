@@ -599,7 +599,7 @@ const requestText = async (
     method?: string;
     headers?: Record<string, string>;
   }
-): Promise<{ status: number; body: string; contentType: string | null }> => {
+): Promise<{ status: number; body: string; contentType: string | null; cacheControl: string | null }> => {
   const response = await fetch(baseUrl + path, {
     method: init?.method ?? "GET",
     headers: init?.headers
@@ -607,7 +607,8 @@ const requestText = async (
   return {
     status: response.status,
     body: await response.text(),
-    contentType: response.headers.get("content-type")
+    contentType: response.headers.get("content-type"),
+    cacheControl: response.headers.get("cache-control")
   };
 };
 
@@ -4805,6 +4806,7 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   );
   assert.equal(download.status, 200);
   assert.equal(download.headers.get("content-type"), "image/png");
+  assert.equal(download.headers.get("cache-control"), "private, no-store");
   assert.match(download.headers.get("content-disposition") ?? "", /^inline;/);
   assert.deepEqual(
     Buffer.from(await download.arrayBuffer()),
@@ -9847,6 +9849,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       }
     );
     assert.equal(resultArchiveResponse.status, 200);
+    assert.equal(resultArchiveResponse.headers.get("cache-control"), "private, no-store");
     assert.equal(
       resultArchiveResponse.headers.get("content-type"),
       "application/zip"
@@ -19107,6 +19110,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   assert.equal(schoolAssetDownload.status, 200);
   assert.equal(schoolAssetDownload.headers.get("content-type"), "image/png");
+  assert.equal(schoolAssetDownload.headers.get("cache-control"), "public, max-age=300");
   assert.deepEqual(
     Buffer.from(await schoolAssetDownload.arrayBuffer()),
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
@@ -31318,6 +31322,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
   const resourceResponse = await fetch(resourceUrl);
   assert.equal(resourceResponse.status, 200);
+  assert.equal(resourceResponse.headers.get("cache-control"), "private, no-store");
   assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
   assert.equal(resourceResponse.headers.get("access-control-allow-origin"), "*");
   assert.equal(resourceResponse.headers.get("accept-ranges"), "bytes");
@@ -31341,6 +31346,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     headers: { range: "bytes=5-19" }
   });
   assert.equal(fixedRangeResponse.status, 206);
+  assert.equal(fixedRangeResponse.headers.get("cache-control"), "private, no-store");
   assert.equal(fixedRangeResponse.headers.get("x-frame-options"), null);
   assert.equal(
     fixedRangeResponse.headers.get("content-range"),
@@ -31380,6 +31386,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     headers: { range: "bytes=0-3" }
   });
   assert.equal(rangeHeadResponse.status, 206);
+  assert.equal(rangeHeadResponse.headers.get("cache-control"), "private, no-store");
   assert.equal(rangeHeadResponse.headers.get("content-length"), "4");
   assert.equal(await rangeHeadResponse.text(), "");
 
@@ -31387,6 +31394,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     headers: { range: `bytes=${expectedResourceBytes.byteLength}-` }
   });
   assert.equal(unsatisfiedRangeResponse.status, 416);
+  assert.equal(unsatisfiedRangeResponse.headers.get("cache-control"), "private, no-store");
   assert.equal(
     unsatisfiedRangeResponse.headers.get("content-range"),
     `bytes */${expectedResourceBytes.byteLength}`
@@ -31397,6 +31405,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     headers: { range: "bytes=0-1,4-5" }
   });
   assert.equal(multipleRangeResponse.status, 206);
+  assert.equal(multipleRangeResponse.headers.get("cache-control"), "private, no-store");
   const multipleRangeContentType =
     multipleRangeResponse.headers.get("content-type") ?? "";
   const multipleRangeBoundary =
@@ -43056,6 +43065,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews.csv`
   );
   assert.equal(emptyParticipantReviewCsv.status, 204);
+  assert.equal(emptyParticipantReviewCsv.cacheControl, "private, no-store");
   assert.equal(emptyParticipantReviewCsv.body, "");
   const negotiatedReviewPath = `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews`;
   const emptyReviewJson = await requestJson<unknown[]>(negotiatedReviewPath, {
@@ -43067,6 +43077,13 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     headers: { accept: "text/html, */*;q=0.8" }
   });
   assert.equal(emptyReviewDefault.status, 204);
+  assert.equal(emptyReviewDefault.cacheControl, "private, no-store");
+  const emptyReviewJsonDownload = await requestText(negotiatedReviewPath, {
+    headers: { accept: "application/json" }
+  });
+  assert.equal(emptyReviewJsonDownload.status, 200);
+  assert.equal(emptyReviewJsonDownload.body.trim(), "[]");
+  assert.equal(emptyReviewJsonDownload.cacheControl, "private, no-store");
   const invalidParticipantReviewPriority = await requestJson<{ error: string }>(
     `/api/v1/participant/test-runs/${review.testRunId}/reviews`,
     {
@@ -43455,6 +43472,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     `/api/v1/participant/sessions/${review.participantSessionId}/exports/reviews.csv`
   );
   assert.equal(reviewParticipantCsv.status, 200);
+  assert.equal(reviewParticipantCsv.cacheControl, "private, no-store");
   assert.match(reviewParticipantCsv.contentType ?? "", /^text\/csv/);
   assert.match(reviewParticipantCsv.body, /^"groupname";"loginname";"code";/);
   assert.match(reviewParticipantCsv.body, /category_general/);
@@ -43474,6 +43492,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   for (const accept of ["TEXT/CSV;charset=utf-8, application/json", "application/xml, text/csv", "*/*"]) {
     const negotiatedCsv = await requestText(negotiatedReviewPath, { headers: { accept } });
     assert.equal(negotiatedCsv.status, 200);
+    assert.equal(negotiatedCsv.cacheControl, "private, no-store");
     assert.equal(negotiatedCsv.body, reviewParticipantCsv.body);
     assert.match(negotiatedCsv.contentType ?? "", /^text\/csv/);
   }
@@ -46257,11 +46276,13 @@ test("workspace lists omit inline content while detail and download retain exact
   });
   const downloaded = await fetch(`${baseUrl}${downloadPath}`);
   assert.equal(downloaded.status, 200);
+  assert.equal(downloaded.headers.get("cache-control"), "private, no-store");
   assert.equal(await downloaded.text(), sourceDocument);
   const csv = await fetch(`${baseUrl}${resolveRoutePath(productionApiRoutes.workspace.exportContentReleasesCsv, {
     tenantKey, workspaceKey
   })}`);
   assert.equal(csv.status, 200);
+  assert.equal(csv.headers.get("cache-control"), "private, no-store");
   const csvLines = (await csv.text()).trim().split("\n");
   const columns = csvLines[0]!.split(",");
   const values = csvLines[1]!.split(",").map(value => value.replace(/^"|"$/g, ""));
@@ -48983,16 +49004,20 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.match(csv.body, /"SAMPLE SYS-CHECK REPORT";"SYSCHECK\.SAMPLE"/);
   const negotiatedSystemCheckPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports?checkId=SYSCHECK.SAMPLE`;
   const fixedJson = await requestText(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.json?checkId=SYSCHECK.SAMPLE`);
+  assert.equal(csv.cacheControl, "private, no-store");
+  assert.equal(fixedJson.cacheControl, "private, no-store");
   for (const accept of ["application/json; charset=utf-8, text/csv", "*/*", "application/xml"]) {
     const negotiated = await requestText(negotiatedSystemCheckPath, { headers: { accept } });
     assert.equal(negotiated.status, 200);
     assert.match(negotiated.contentType ?? "", /^application\/json/);
+    assert.equal(negotiated.cacheControl, "private, no-store");
     assert.equal(negotiated.body, fixedJson.body);
   }
   for (const accept of [" TEXT/CSV ;charset=UTF-8, application/json", "application/xml, text/csv"]) {
     const negotiated = await requestText(negotiatedSystemCheckPath, { headers: { accept } });
     assert.equal(negotiated.status, 200);
     assert.match(negotiated.contentType ?? "", /^text\/csv/);
+    assert.equal(negotiated.cacheControl, "private, no-store");
     assert.equal(negotiated.body, csv.body);
   }
 

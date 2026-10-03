@@ -55,6 +55,17 @@ and implementation. Each needs current rewrite evidence before it is closed:
   must not reactivate the old credential. The existing local `clearSession`
   action does not establish this guarantee; Original-preview sign-out stays
   disabled until this server boundary has been implemented and verified.
+  Authenticated downloads now send `Cache-Control: private, no-store`:
+  scoped CSV exports, Original result ZIPs, source packages, Systemcheck and
+  participant Review JSON/CSV (including an empty 204), attachment files/PDFs,
+  and participant resources including HEAD, single/multiple byte ranges and
+  unsatisfied ranges. This reproduces the upstream `FileResponse` shared-cache
+  exclusion and additionally avoids retaining sensitive downloads in the
+  browser cache. Public application assets and hashed frontend files keep
+  their separate cache policies. Current memory/file/SQLite API regressions
+  verify headers alongside exact payload/range behavior; PostgreSQL remains
+  a separate CI gate. This closes the download-cache subrequirement, not
+  participant credential revocation, ownership or internal-error disclosure.
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
