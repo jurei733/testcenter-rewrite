@@ -41,8 +41,9 @@ assigned-booklet/session logic, not a second authentication implementation.
 Local Chromium checks exercised real passwordless and password-protected
 demo-workspace accounts; mocked errors cover the view transitions without
 consuming real login attempts. The main smoke also checks that Original and
-Rewrite sign-in restore the same session/run. That new full smoke gate still
-requires a completed run. Nunito Sans files are copied from the pinned Original
+Rewrite sign-in restore the same session/run. The complete local SQLite/Chromium
+smoke passed on 2026-10-03; publication and current CI remain separate gates.
+Nunito Sans files are copied from the pinned Original
 and shipped with their OFL; adapted Original layout code retains its MIT notice.
 Material 20.2.14 (the Original lockfile version) now provides the login fields
 and primary/tonal buttons under a component-scoped theme. Focus follows name,
@@ -65,11 +66,28 @@ return to the Original card and resuming the exact same session/run. Additional
 local browser checks cover locked/completed cards, retry after a failed resume,
 desktop/mobile widths and an actual Review account's empty CSV response (204)
 with its authored start-button text. Full CI for the new commit is still a
-separate gate. The initial production bundle is 466.01kB under the unchanged
+separate gate. The current production bundle is 466.18kB under the unchanged
 470kB error limit; its 450kB warning remains.
 
 All rows are currently open. Close a row only with matching reference states
 and browser evidence at equal viewport, theme, text and fixture settings.
+
+The optional player now adds the Original's grouped task/page navigation above
+the existing Verona frame. Adapted Material controls, SVGs, labels, readonly
+and hidden modes, page lists and separate global buttons reuse the same
+controller events and server-authoritative permissions; no second iframe or
+session implementation is introduced. A headful Chromium/isolated-SQLite check
+on 2026-10-03 passed nine official Bklt_Config variants within 29–39, real forward/back
+task and page changes, the same-run return to Rewrite, narrow-width grouping,
+and no page errors. The screenshot review still shows Rewrite diagnostic cards
+around this navigation: toolbar, side panels, full-height content and dialogs
+remain open. This is a navigation slice, not a closed Player visual-parity row.
+An additional headful check passed authored Unit/Booklet header titles,
+preservation of a hidden header after cancelling return to the starter, hidden
+and explicit global-forward controls, and the Original `markedNo` interaction:
+the task arrow remains actionable for a completeness explanation, stays on the
+same task when denied, and advances only after the required response and
+presentation are complete. All of these cases are also in the repository smoke.
 
 | Surface | Required comparisons |
 | --- | --- |

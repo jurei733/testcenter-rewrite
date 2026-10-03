@@ -204,8 +204,20 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
+  get participantPageTitle(): string {
+    if (this.interfaceMode.mode() === "original" && this.activeRouteView === "participant") {
+      if (!this.app.runtime.participantSessionId) return "Anmelden";
+      if (!this.app.runtime.testRunId) return "Übersicht";
+      return this.participantShell.headerTitle();
+    }
+    if (this.isAttachmentCaptureView) return "Capture Attachment";
+    if (this.isPublicInfoView) return this.publicInfoTitle;
+    return this.activeRouteView === "system-check" ? "System Check" : "Participant Test";
+  }
+
   leaveParticipantSession(): void {
-    this.participantShell.setHeaderHidden(false);
+    // The shared controller updates the header only after the guarded leave
+    // succeeds. Cancelling must preserve an authored hidden-header layout.
     globalThis.dispatchEvent(new CustomEvent("participant-leave-session"));
   }
 

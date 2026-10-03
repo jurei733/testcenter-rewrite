@@ -1508,6 +1508,14 @@ export class ParticipantViewFacade {
     };
   }
 
+  get unitNavigationLabelMode(): "hidden" | "index" | "label" {
+    return this.readCurrentRunState()?.booklet.policy.navigation.unitLabel ?? "index";
+  }
+
+  get unitNavigationControls(): "both" | "forward_only" | "hidden" {
+    return this.readCurrentRunState()?.booklet.policy.navigation.unitControls ?? "both";
+  }
+
   private describeNavigationDenial(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): string {
@@ -4780,6 +4788,7 @@ export class ParticipantViewFacade {
 
   private syncParticipantHeaderVisibility(): void {
     const currentState = this.currentRunState;
+    this.participantShell.setHeaderTitle(currentState ? this.screenHeaderLabel : "");
     this.participantShell.setHeaderHidden(
       Boolean(
         currentState &&

@@ -41,6 +41,7 @@ import {
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
+import { OriginalPlayerNavigationComponent } from "./original-player-navigation.component";
 
 const controllerRecoveryStorageKey =
   "testcenter-rewrite:participant-controller-recovery:v1";
@@ -76,9 +77,24 @@ type RetiredVeronaFrame = {
 @Component({
   selector: "app-verona-player-host",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, OriginalPlayerNavigationComponent],
   template: `
     <section class="verona-player-shell" aria-label="Verona unit player">
+      @defer (when originalUi) {
+        @if (originalUi && (status === 'running' || status === 'ready')) {
+          <app-original-player-navigation
+            [unitLabelMode]="unitNavigationLabelMode" [unitControls]="unitNavigationControls"
+            [unitTitle]="unitTitle" [unitNumber]="unitNumber" [unitCount]="unitCount"
+            [canPreviousUnit]="canRequestPreviousUnit" [canNextUnit]="canRequestNextUnit"
+            [pageLabelMode]="pageNavigationLabelMode" [pageControlsHidden]="pageNavigationControlsHidden"
+            [pageLabel]="pages[currentPageIndex]?.label ?? ''" [pageCount]="pages.length"
+            [currentPageIndex]="currentPageIndex" [hasPreviousPage]="hasPreviousPage" [hasNextPage]="hasNextPage"
+            [showGlobalBackward]="showGlobalBackwardButton" [showGlobalForward]="showGlobalForwardButton"
+            (previousUnit)="navigationRequest.emit('previous')" (nextUnit)="navigationRequest.emit('next')"
+            (previousPage)="goToRelativePage(-1)" (nextPage)="goToRelativePage(1)"
+            (globalBackward)="goGlobalBackward()" (globalForward)="goGlobalForward()" />
+        }
+      }
       <header>
         <div>
           <span>Verona Player</span>
@@ -117,7 +133,7 @@ type RetiredVeronaFrame = {
       </section>
       <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
       <nav
-        *ngIf="showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton"
+        *ngIf="!originalUi && (showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton)"
         class="verona-player-page-navigation"
         id="participantVeronaPageNavigation"
         aria-label="Test navigation"
@@ -245,6 +261,11 @@ export class VeronaPlayerHostComponent
   @Input() sharedParameters: VeronaSharedParameter[] = [];
   @Input() unitNumber = 1;
   @Input() unitCount = 1;
+  @Input() originalUi = false;
+  @Input() unitNavigationLabelMode: "hidden" | "index" | "label" = "index";
+  @Input() unitNavigationControls: "both" | "forward_only" | "hidden" = "both";
+  @Input() canRequestPreviousUnit = false;
+  @Input() canRequestNextUnit = false;
   @Input() canGoPrevious = false;
   @Input() canGoNext = false;
   @Input() canComplete = false;

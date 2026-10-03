@@ -17085,7 +17085,7 @@ try {
       ["Bklt_Config-4", "Cy-Bklt_BkltConfig-4", true]
     ]
   );
-  const openOriginalBookletConfig = async (loginKey, bookletKey) => {
+  const openOriginalBookletConfig = async (loginKey, bookletKey, interfaceMode = "rewrite") => {
     const signInResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/participant/auth/sign-in`,
       {
@@ -17108,7 +17108,7 @@ try {
     await page.goto(
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
-      )}`,
+      )}&ui=${interfaceMode}`,
       { waitUntil: "domcontentloaded" }
     );
     await page
@@ -17344,6 +17344,11 @@ try {
     .locator("#participantConfirmationTitle")
     .filter({ hasText: "Return to test selection?" })
     .waitFor();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page.locator("#participantStandaloneLogo").waitFor();
+  assert.equal(await page.locator("#participantApplicationHeader").count(), 0);
+  await page.locator("#participantStandaloneLogo").click();
+  await page.locator("#participantConfirmationContinueButton").waitFor();
   await page.locator("#participantConfirmationContinueButton").click();
   await page.locator("#participantRouteEntry").waitFor();
   await page.locator("#participantApplicationHeader").waitFor();
@@ -17669,6 +17674,79 @@ try {
     await page.locator("#participantRouteTimerLifecycleEvent").count(),
     0
   );
+  logStep("optional-original-player-navigation");
+  const openOriginalNavigation = async number => {
+    const opened = await openOriginalBookletConfig(
+      `Bklt_Config-${number}`, `Cy-Bklt_BkltConfig-${number}`, "original"
+    );
+    await page.locator("#originalPlayerNavigation").waitFor({ state: "attached" });
+    assert.equal(await page.locator("#participantVeronaPageNavigation").count(), 0);
+    return opened;
+  };
+  await openOriginalNavigation(29);
+  await page.locator("#originalUnitNavigation-label").filter({ hasText: /Aufgabe\s+1\/2/ }).waitFor();
+  await expectButtonSelectorDisabled("#originalUnitNavigation-backward");
+  await expectButtonSelectorEnabled("#originalUnitNavigation-forward");
+  await page.locator("#originalUnitNavigation-forward").click();
+  await page.locator("#originalUnitNavigation-label").filter({ hasText: /2\/2/ }).waitFor();
+  await page.locator("#originalUnitNavigation-backward").click();
+  await page.locator("#originalUnitNavigation-label").filter({ hasText: /1\/2/ }).waitFor();
+  await openOriginalNavigation(30);
+  await page.locator("#originalUnitNavigation-label").filter({ hasText: "Aufgabe1" }).waitFor();
+  await openOriginalNavigation(31);
+  assert.equal(await page.locator("#originalUnitNavigation-label").count(), 0);
+  await openOriginalNavigation(33);
+  await page.locator("#originalUnitNavigation-label").waitFor();
+  assert.equal(await page.locator("#originalUnitNavigation-backward").count(), 0);
+  assert.equal(await page.locator("#originalUnitNavigation-forward").count(), 0);
+  const originalIndexedPages = await openOriginalNavigation(34);
+  await page.locator("#originalPageNavigation-label").filter({ hasText: /Teilaufgabe\s+1\/2/ }).waitFor();
+  await expectButtonSelectorDisabled("#originalPageNavigation-backward");
+  await expectButtonSelectorEnabled("#originalPageNavigation-forward");
+  await page.locator("#originalPageNavigation-forward").click();
+  await page.locator("#originalPageNavigation-label").filter({ hasText: /2\/2/ }).waitFor();
+  await expectButtonSelectorDisabled("#originalPageNavigation-forward");
+  await page.locator("#originalPageNavigation-backward").click();
+  await page.locator("#originalPageNavigation-label").filter({ hasText: /1\/2/ }).waitFor();
+  const originalIndexedRunId = (await page.locator("#participantRouteRunId").textContent())?.trim();
+  await page.goto(`${baseUrl}/participant?participantSessionId=${originalIndexedPages.participantSessionId}&ui=rewrite`);
+  await page.locator("#participantVeronaPageNavigation").waitFor();
+  assert.equal(await page.locator("#originalPlayerNavigation").count(), 0);
+  assert.equal((await page.locator("#participantRouteRunId").textContent())?.trim(), originalIndexedRunId);
+  await openOriginalNavigation(35);
+  await page.locator("#originalPageNavigation-label").filter({ hasText: "Aufgabe1: Fieldset1" }).waitFor();
+  await openOriginalNavigation(36);
+  const originalPageTabs = page.locator("#originalPlayerNavigation .list-item");
+  await originalPageTabs.first().waitFor();
+  assert.equal(await originalPageTabs.count(), 2);
+  assert.equal(await originalPageTabs.first().getAttribute("aria-current"), "page");
+  await page.locator("#originalPageNavigation-forward").click();
+  await page.waitForFunction(() => document.querySelector("#originalPlayerNavigation .list-item:last-child")?.getAttribute("aria-current") === "page");
+  await openOriginalNavigation(37);
+  assert.equal(await page.locator("#originalPageNavigation-label").count(), 0);
+  await openOriginalNavigation(39);
+  await page.locator("#originalPageNavigation-label").waitFor();
+  assert.equal(await page.locator("#originalPageNavigation-backward").count(), 0);
+  assert.equal(await page.locator("#originalPageNavigation-forward").count(), 0);
+  await openOriginalNavigation(2);
+  await page.locator("#participantApplicationHeader h1").filter({ hasText: "Aufgabe1" }).waitFor();
+  await openOriginalNavigation(3);
+  await page.locator("#participantApplicationHeader h1").filter({ hasText: "Bklt-config-3" }).waitFor();
+  await openOriginalNavigation(16);
+  await page.locator("#participantStandaloneLogo").waitFor();
+  assert.equal(await page.locator("#participantApplicationHeader").count(), 0);
+  await page.locator("#participantStandaloneLogo").click();
+  await page.locator("#participantConfirmationStayButton").click();
+  await page.locator("#participantStandaloneLogo").waitFor();
+  assert.equal(await page.locator("#participantApplicationHeader").count(), 0);
+  await openOriginalNavigation(23);
+  assert.equal(await page.locator("#participantVeronaGlobalForwardButton").count(), 0);
+  await openOriginalNavigation(25);
+  await page.locator("#participantVeronaGlobalForwardButton").click();
+  await page.locator("#participantRouteUnitKey").filter({ hasText: "cpy" }).waitFor();
+  await page.goto(`${baseUrl}/participant?participantSessionId=${originalIndexedPages.participantSessionId}&ui=rewrite`);
+  await page.locator("#participantVeronaPlayerVersion").filter({ hasText: "API 6.0" }).waitFor();
+  stopAfter("optional-original-player-navigation");
   stopAfter("participant-original-booklet-config");
 
   logStep("participant-original-test-controller");
@@ -17847,21 +17925,23 @@ try {
       ["Test_Ctrl-3", "Cy-Bklt_TC-3", true]
     ]
   );
-  const openOriginalTestController = async (loginKey, bookletKey) => {
-    const signInResponse = await sendSmokeJson(
-      `${baseUrl}/api/v1/participant/auth/sign-in`,
-      {
-        body: {
-          tenantKey: testControllerTenantKey,
-          workspaceKey: testControllerWorkspaceKey,
-          loginKey,
-          password: "123"
+  const openOriginalTestController = async (loginKey, bookletKey, existingSessionId, interfaceMode = "rewrite") => {
+    let participantSessionId = existingSessionId;
+    if (!participantSessionId) {
+      const signInResponse = await sendSmokeJson(
+        `${baseUrl}/api/v1/participant/auth/sign-in`,
+        {
+          body: {
+            tenantKey: testControllerTenantKey,
+            workspaceKey: testControllerWorkspaceKey,
+            loginKey,
+            password: "123"
+          }
         }
-      }
-    );
-    const signInPayload = await signInResponse.json();
-    const participantSessionId =
-      signInPayload.participantSession?.participantSessionId;
+      );
+      const signInPayload = await signInResponse.json();
+      participantSessionId = signInPayload.participantSession?.participantSessionId;
+    }
     assert.ok(participantSessionId, `${loginKey} should create a session.`);
     const resumeResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
@@ -17871,7 +17951,7 @@ try {
     await page.goto(
       `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
         participantSessionId
-      )}`,
+      )}&ui=${interfaceMode}`,
       { waitUntil: "domcontentloaded" }
     );
     await page
@@ -18142,9 +18222,16 @@ try {
       .isChecked(),
     true
   );
-  const reopenedDemoController = await openOriginalTestController(
+  // Testcenter 19 creates a fresh Demo session on credential entry. An
+  // explicit session link still re-enters the addressed ephemeral run.
+  const freshDemoController = await openOriginalTestController(
     "Test_Ctrl-1b",
     "Cy-Bklt_TC-1b"
+  );
+  assert.notEqual(freshDemoController.participantSessionId, demoController.participantSessionId);
+  assert.notEqual(freshDemoController.testRunId, demoController.testRunId);
+  const reopenedDemoController = await openOriginalTestController(
+    "Test_Ctrl-1b", "Cy-Bklt_TC-1b", demoController.participantSessionId
   );
   assert.equal(
     reopenedDemoController.participantSessionId,
@@ -18580,7 +18667,7 @@ try {
 
   const completionController = await openOriginalTestController(
     "Test_Ctrl-23",
-    "Cy-Bklt_TC-14"
+    "Cy-Bklt_TC-14", undefined, "original"
   );
   const completionControllerFrame = completionController.frame;
   await completionControllerFrame
@@ -18595,7 +18682,8 @@ try {
     aliasedStartPlayerFrame,
     "The aliased Test Controller start unit should have a mounted player frame."
   );
-  await page.locator("#participantRouteNextUnitButton").click();
+  await expectButtonSelectorEnabled("#originalUnitNavigation-forward");
+  await page.locator("#originalUnitNavigation-forward").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
@@ -18622,7 +18710,10 @@ try {
     await page.locator("#participantRouteNavigationNotice").count(),
     0
   );
-  await page.locator("#participantRouteNextUnitButton").click();
+  // Original markedNo remains clickable so the controller can explain
+  // incomplete presentation/response without moving to another task.
+  await expectButtonSelectorEnabled("#originalUnitNavigation-forward");
+  await page.locator("#originalUnitNavigation-forward").click();
   await page.locator("#participantRouteNavigationNotice").waitFor();
   await page
     .locator("#participantRouteUnitKey")

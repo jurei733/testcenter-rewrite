@@ -7,6 +7,13 @@ For a short German walkthrough with the local demo credentials, participant
 link, restart behavior, and verification commands, see
 [`docs/LOCAL-TRYOUT.md`](./docs/LOCAL-TRYOUT.md).
 
+The Start page offers a reversible, browser-local interface choice. Direct
+links can use `?ui=original` or `?ui=rewrite`; both use the same application,
+permissions and stored sessions. The optional Original 19 layout is still a
+preview: participant login, starter and grouped Player navigation are adapted,
+while the remaining full-page comparisons stay open in
+[`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
+
 This folder is the starting point for the real production implementation.
 
 It is intentionally separate from `rewrite-spike/`:

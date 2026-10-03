@@ -1,0 +1,8 @@
+/* Adapted from IQB Testcenter 19; see assets/ORIGINAL-UI-LICENSE.txt. */
+:host { display: block; font: 16px 'Nunito Sans', sans-serif; }
+nav { display: flex; align-items: center; background: var(--mat-sys-secondary); padding: 8px 24px; gap: 12px; }
+nav:empty { padding: 0; }
+.nav-button { background: white; }
+svg { width: 24px; height: 24px; fill: currentColor; display: inline-flex; vertical-align: middle; }
+/* Preserve the Original grouping while keeping controls usable on small screens. */
+@media (max-width: 640px) { nav { flex-wrap: wrap; padding-inline: 12px; } }
