@@ -1220,6 +1220,12 @@ try {
         waitUntil: "networkidle"
       });
       await offlineShellPage.locator("#participantLoginKey").waitFor();
+      // CI can observe the registered worker while its activate work is still
+      // running. Wait for the state the offline navigation actually requires.
+      await offlineShellPage.waitForFunction(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return registration?.active?.state === "activated";
+      }, undefined, { timeout: 15_000 });
       const serviceWorkerRegistration = await offlineShellPage.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;
       return {
