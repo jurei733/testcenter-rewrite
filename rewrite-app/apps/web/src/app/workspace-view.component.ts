@@ -46,8 +46,8 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
                 id="autoRefreshEnabled"
                 name="autoRefreshEnabled"
                 type="checkbox"
-                [ngModel]="view.workspace.autoRefreshEnabled"
-                (ngModelChange)="view.setAutoRefreshEnabled($event)"
+                [checked]="view.workspace.autoRefreshEnabled"
+                (change)="onAutoRefreshChange($event)"
               />
               Refresh workspace, content, runtime, and diagnostics views automatically
             </span>
@@ -594,6 +594,12 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
 })
 export class WorkspaceViewComponent implements OnInit {
   readonly view = inject(WorkspaceViewFacade);
+
+  onAutoRefreshChange(event: Event): void {
+    if (event.target instanceof HTMLInputElement) {
+      this.view.setAutoRefreshEnabled(event.target.checked);
+    }
+  }
 
   ngOnInit(): void {
     this.view.init();

@@ -79,8 +79,8 @@ and implementation. Each needs current rewrite evidence before it is closed:
   enforced credential transport before enabling the Original account action.
   The complete API suite passed with memory, file and SQLite stores (160 tests
   per store), together with 138 unit and three frontend-state tests. PostgreSQL
-  validation of the new credential table remains its own unpublished-change
-  CI gate; the earlier PostgreSQL success does not establish this migration.
+  validation of the new credential table remains its own pending CI gate;
+  the earlier PostgreSQL success does not establish this migration.
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
@@ -152,8 +152,16 @@ default value. A fresh protected SQLite/Chromium attachment/camera gate passed
 with refresh disabled, including lookup, capture, upload, preview and deletion;
 the complete post-fix CI still needs its own successful result.
 At `5578bb9cfcbad611e81fdc6bde2b763c2d3cbd67`, full UI, Quick, PostgreSQL
-integration and PostgreSQL UI passed. Ops failed and its exact failure is
-under investigation; the overall pipeline is not green.
+integration and PostgreSQL UI passed. Ops failed because `locator.check()`
+reported that clicking the refresh checkbox did not change its state. This
+differs from the earlier storage-preference timeout. Angular's `ngModel`
+initializes its control through a deferred Promise; this checkbox now uses
+the native synchronous `checked` binding and an explicit change handler.
+Thirty headful Chromium route round trips passed immediate check/uncheck and
+storage assertions from both initial preferences without sleeps/forced clicks.
+A fresh protected SQLite/Chromium attachment/camera gate also passed lookup,
+capture, upload, preview and deletion with refresh disabled. The post-change
+Ops CI result remains a separate gate; the overall prior pipeline is not green.
 
 The zoneless Attachment Capture view now explicitly notifies Angular after
 camera, QR, target lookup, photo encoding and upload callbacks. The isolated
