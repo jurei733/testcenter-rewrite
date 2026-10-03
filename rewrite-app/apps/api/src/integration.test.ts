@@ -47509,20 +47509,45 @@ test("Original 19 successful participant logins reset durable failure counters",
     FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_FILE: join(temporaryDirectory, "store.json"),
     FIRST_SLICE_SQLITE_FILE: join(temporaryDirectory, "store.sqlite"),
-    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
     FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "4",
     FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "60000"
   };
   let isolated = await createIsolatedServer(environment);
+  const tenantKey = `login-reset-${Date.now()}`;
+  const workspaceKey = "login-reset-workspace";
+  const scope = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
   try {
+    // PostgreSQL uses the suite database. Keep this test's starter-created runs
+    // outside the demo workspace used by later all-open-runs command gates.
+    assert.equal((await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/platform/tenants", { method: "POST",
+        body: { tenantKey, displayName: "Login Reset Acceptance" } })).status, 201);
+    assert.equal((await requestJsonAt<unknown>(isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces`, { method: "POST",
+        body: { workspaceKey, displayName: "Login Reset Acceptance" } })).status, 201);
+    const source = await requestJsonAt<{ sourcePackage: { sourcePackageId: string } }>(
+      isolated.baseUrl, `${scope}/source-packages`, { method: "POST", body: {
+        fileName: "login-reset.json", mediaType: "application/json",
+        contentStructure: { bookletEntries: [{ bookletKey: "reset-booklet", displayLabel: "Reset",
+          unitEntries: [{ unitKey: "reset-unit", displayLabel: "Reset Unit" }] }] }
+      } });
+    assert.equal(source.status, 201);
+    const importedContent = await requestJsonAt<{ stagedContentRelease: { contentReleaseId: string } }>(
+      isolated.baseUrl, `${scope}/import-jobs`, { method: "POST",
+        body: { sourcePackageId: source.body.sourcePackage.sourcePackageId } });
+    assert.equal(importedContent.status, 201);
+    assert.equal((await requestJsonAt<unknown>(isolated.baseUrl,
+      `${scope}/content-releases/${importedContent.body.stagedContentRelease.contentReleaseId}/activate`,
+      { method: "POST", body: { activatedByActorId: "login-reset-acceptance" } })).status, 200);
     const imported = await requestJsonAt<unknown>(isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+      `${scope}/participant-roster`, {
         method: "POST", body: { rosterText: [
           "loginKey,groupKey,bookletKey,displayName,pw,executionMode",
-          "reset-reuse,reset-group,booklet:demo,Reuse,correct-secret,run-hot-return",
-          "reset-fresh,reset-group,booklet:demo,Fresh,correct-secret,run-hot-restart",
-          "reset-other,reset-group,booklet:demo,Other,other-secret,run-hot-return"
+          "reset-reuse,reset-group,reset-booklet,Reuse,correct-secret,run-hot-return",
+          "reset-fresh,reset-group,reset-booklet,Fresh,correct-secret,run-hot-restart",
+          "reset-other,reset-group,reset-booklet,Other,other-secret,run-hot-return"
         ].join("\n") }
       });
     assert.equal(imported.status, 201);
@@ -47530,7 +47555,7 @@ test("Original 19 successful participant logins reset durable failure counters",
       requestJsonAt<{ error?: string; participantSession?: { participantSessionId: string } }>(
         isolated.baseUrl,
         starter ? "/api/v1/participant/starter:launch" : "/api/v1/participant/auth/sign-in",
-        { method: "POST", body: { tenantKey: "demo-tenant", workspaceKey: "demo-workspace",
+        { method: "POST", body: { tenantKey, workspaceKey,
           loginKey, password } });
     for (let attempt = 0; attempt < 4; attempt += 1) {
       assert.equal((await signIn("reset-other", "wrong-secret")).status, 401);
