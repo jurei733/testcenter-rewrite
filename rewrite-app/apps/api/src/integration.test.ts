@@ -793,9 +793,14 @@ test("participant access credentials rotate and revoke without changing sessions
     assert.equal(credential?.tokenHash, createHash("sha256").update(token).digest("hex"));
     assert.doesNotMatch(JSON.stringify(credential), new RegExp(token));
     assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: token }), session);
+    const resourceToken = await access().issueResourceCredential({ testRunId: run.testRunId, sessionToken: token });
+    const resourceAccess = { participantSessionId: session.participantSessionId, resourceToken };
+    assert.deepEqual(await access().authorizeResource(resourceAccess), session);
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: resourceToken }), invalid);
     const renewedToken = await access().issueCredential({ participantSessionId: session.participantSessionId });
     assert.notEqual(renewedToken, token);
     await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: token }), invalid);
+    await assert.rejects(access().authorizeResource(resourceAccess), invalid);
     assert.equal(await repository.revokeParticipantAccessCredential({ participantSessionId: session.participantSessionId, expectedTokenHash: credential!.tokenHash, updatedAt: stamp }), false);
     assert.equal(await repository.revokeParticipantAccessCredential({ participantSessionId: session.participantSessionId, expectedTokenHash: null, updatedAt: stamp }), false);
     assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: renewedToken }), session);
@@ -807,6 +812,11 @@ test("participant access credentials rotate and revoke without changing sessions
     const returnedToken = await access().issueCredential({ participantSessionId: session.participantSessionId });
     assert.notEqual(returnedToken, renewedToken);
     assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: returnedToken }), session);
+    const returnedResourceToken = await access().issueResourceCredential({ testRunId: run.testRunId, sessionToken: returnedToken });
+    const returnedResourceAccess = { participantSessionId: session.participantSessionId, resourceToken: returnedResourceToken };
+    await shutdown();
+    repository = await openRepository();
+    assert.deepEqual(await access().authorizeResource(returnedResourceAccess), session);
     const otherSession = { ...session, participantSessionId: randomUUID(), loginKey: "other-credential-login" };
     const otherRun = { ...run, testRunId: randomUUID(), participantSessionId: otherSession.participantSessionId };
     await repository.saveParticipantSession(otherSession);
@@ -814,6 +824,7 @@ test("participant access credentials rotate and revoke without changing sessions
     await assert.rejects(access().authorize({ testRunId: otherRun.testRunId, sessionToken: returnedToken }), invalid);
     const otherToken = await access().issueCredential({ participantSessionId: otherSession.participantSessionId });
     await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: otherToken }), invalid);
+    await assert.rejects(access().authorizeResource({ ...returnedResourceAccess, participantSessionId: otherSession.participantSessionId }), invalid);
     assert.deepEqual(await access().authorize({ testRunId: otherRun.testRunId, sessionToken: otherToken }), otherSession);
     await assert.rejects(access().revoke({ participantSessionId: session.participantSessionId, sessionToken: renewedToken }), invalid);
     assert.deepEqual(await repository.getParticipantSessionById(session.participantSessionId), session);
@@ -822,6 +833,7 @@ test("participant access credentials rotate and revoke without changing sessions
     await repository.saveParticipantSession(expiredSession);
     await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: returnedToken }), { errorCode: "participant_access_expired" });
     await assert.rejects(access().issueCredential({ participantSessionId: session.participantSessionId }), { errorCode: "participant_access_expired" });
+    await assert.rejects(access().authorizeResource(returnedResourceAccess), { errorCode: "participant_access_expired" });
     await repository.saveParticipantSession(session);
     await repository.deleteWorkspaceAggregate(deletion);
     assert.equal(await repository.getParticipantAccessCredential(session.participantSessionId), null);

@@ -107,3 +107,42 @@ test("a delayed participant logout cannot revoke a token issued by a newer login
   assert.deepEqual(await access.authorize({ testRunId: run.testRunId, sessionToken: newToken }), session);
   await assert.rejects(access.authorize({ testRunId: run.testRunId, sessionToken: token }), /invalid access/);
 });
+
+test("resource capabilities cannot authorize answers, commands, reviews or logout", async () => {
+  const { access, repository } = fixture(false);
+  const token = await access.issueCredential({ participantSessionId: session.participantSessionId });
+  const resourceToken = await access.issueResourceCredential({ testRunId: run.testRunId, sessionToken: token });
+  assert.match(resourceToken, /^r1\.[A-Za-z0-9_-]{43}$/);
+  assert.equal(resourceToken.includes(token), false);
+  assert.equal(JSON.stringify(await repository.getParticipantAccessCredential(session.participantSessionId)).includes(resourceToken), false);
+  const resourceAccess = { participantSessionId: session.participantSessionId, resourceToken };
+  assert.deepEqual(await access.authorizeResource(resourceAccess), session);
+  await assert.rejects(access.authorize({ testRunId: run.testRunId, sessionToken: resourceToken }), /invalid access/);
+  await assert.rejects(access.revoke({ participantSessionId: session.participantSessionId, sessionToken: resourceToken }), /invalid access/);
+  await assert.rejects(access.issueResourceCredential({ testRunId: run.testRunId, sessionToken: resourceToken }), /invalid access/);
+  for (const invalidResourceToken of ["", token, resourceToken + "a", "r1." + "a".repeat(43)]) {
+    await assert.rejects(access.authorizeResource({ ...resourceAccess, resourceToken: invalidResourceToken }), /invalid access/);
+  }
+  await assert.rejects(access.authorizeResource({ ...resourceAccess, participantSessionId: "session-b" }), /invalid access/);
+});
+
+test("resource capabilities rotate and revoke with their parent participant credential", async () => {
+  const { access } = fixture();
+  const legacy = { participantSessionId: session.participantSessionId, sessionToken: session.participantSessionId };
+  const legacyResourceToken = await access.issueResourceCredential(legacy);
+  const resourceAccess = { participantSessionId: session.participantSessionId, resourceToken: legacyResourceToken };
+  assert.deepEqual(await access.authorizeResource(resourceAccess), session);
+  const token = await access.issueCredential(legacy);
+  await assert.rejects(access.authorizeResource(resourceAccess), /invalid access/);
+  const resourceToken = await access.issueResourceCredential({ ...legacy, sessionToken: token });
+  assert.notEqual(resourceToken, legacyResourceToken);
+  assert.deepEqual(await access.authorizeResource({ ...resourceAccess, resourceToken }), session);
+  await access.revoke({ ...legacy, sessionToken: token });
+  await assert.rejects(access.authorizeResource({ ...resourceAccess, resourceToken }), /invalid access/);
+  await assert.rejects(access.authorizeResource(resourceAccess), /invalid access/);
+  const renewed = await access.issueCredential(legacy);
+  const renewedResource = await access.issueResourceCredential({ ...legacy, sessionToken: renewed });
+  assert.notEqual(renewedResource, resourceToken);
+  await assert.rejects(access.authorizeResource({ ...resourceAccess, resourceToken }), /invalid access/);
+  assert.deepEqual(await access.authorizeResource({ ...resourceAccess, resourceToken: renewedResource }), session);
+});

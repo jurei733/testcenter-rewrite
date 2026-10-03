@@ -77,6 +77,16 @@ and implementation. Each needs current rewrite evidence before it is closed:
   yet exposed as a UI logout operation: HTTP participant routes, resource and
   live channels, and foreground/background saves still need one consistently
   enforced credential transport before enabling the Original account action.
+  The resource-channel foundation now derives a separate HMAC capability
+  from the durable credential digest and exact session identity. A sandboxed
+  Player can eventually load relative resources without placing the general
+  participant bearer token in its URL. The resource capability cannot authorize
+  answer/Review/command requests, issue another capability or revoke access;
+  credential rotation, revocation and the participant's existing access deadline
+  also invalidate resource access. Unit and memory/file/SQLite regressions prove
+  this separation, cross-session rejection and validity across store restart.
+  HTTP resource URLs and Player resource-base responses are not wired yet;
+  these foundation tests do not claim an enforced HTTP resource boundary.
   As a prerequisite, the shipped background worker now retains its exact
   pending response and delivery ID on 401/403, request timeout, rate limiting,
   network failure and server failure, so renewed authentication can retry it.
@@ -88,9 +98,12 @@ and implementation. Each needs current rewrite evidence before it is closed:
   delivery, controller-error recovery and exact response restoration. This
   does not yet prove the future credential transport or a real browser 401.
   The complete API suite passed with memory, file and SQLite stores (160 tests
-  per store), together with 138 unit and three frontend-state tests. PostgreSQL
-  validation of the new credential table remains its own pending CI gate;
-  the earlier PostgreSQL success does not establish this migration.
+  per store), together with 138 unit and three frontend-state tests at the
+  credential-table checkpoint. Its PostgreSQL integration and protected UI
+  jobs also passed in run 37135454646 for commit 6f78b267. That run nevertheless
+  failed its full/operational browser jobs at the workspace refresh checkbox;
+  it was not an all-green CI run. The later resource-capability extension has
+  its own pending PostgreSQL/CI gate.
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.

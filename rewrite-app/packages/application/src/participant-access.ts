@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
@@ -35,6 +35,12 @@ export type ParticipantAccessPort = {
   /** Trusted login operation; never expose credential issuance by session ID alone. */
   issueCredential(input: { participantSessionId: string }): Promise<string>;
   authorize(input: ParticipantAccessInput): Promise<ParticipantSession>;
+  /** Resource-only capability for sandboxed players, never a general bearer token. */
+  issueResourceCredential(input: ParticipantAccessInput): Promise<string>;
+  authorizeResource(input: {
+    participantSessionId: string;
+    resourceToken: string;
+  }): Promise<ParticipantSession>;
   revoke(input: {
     participantSessionId: string;
     sessionToken: string;
@@ -58,6 +64,11 @@ export function createParticipantAccessService(input: {
       timingSafeEqual(actualBytes, expectedBytes)
     );
   };
+  const resourceTokenFor = (participantSessionId: string, tokenHash: string) =>
+    `r1.${createHmac("sha256", tokenHash)
+      .update("testcenter-participant-resource:v1\0")
+      .update(participantSessionId)
+      .digest("base64url")}`;
   const authorize = async (access: ParticipantAccessInput) => {
     const token = access.sessionToken;
     if (typeof token !== "string" || !token || token.length > 256) {
@@ -99,6 +110,30 @@ export function createParticipantAccessService(input: {
     },
     async authorize(access) {
       return (await authorize(access)).session;
+    },
+    async issueResourceCredential(access) {
+      const { session, credential } = await authorize(access);
+      return resourceTokenFor(
+        session.participantSessionId,
+        credential?.tokenHash ?? hash(access.sessionToken)
+      );
+    },
+    async authorizeResource({ participantSessionId, resourceToken }) {
+      if (
+        typeof participantSessionId !== "string" || !participantSessionId ||
+        typeof resourceToken !== "string" ||
+        !/^r1\.[A-Za-z0-9_-]{43}$/.test(resourceToken)
+      ) throw input.invalidAccess();
+      const credential = await input.repository.getParticipantAccessCredential(
+        participantSessionId
+      );
+      const tokenHash = credential
+        ? credential.tokenHash
+        : input.allowLegacySessionIds ? hash(participantSessionId) : null;
+      if (!tokenHash || !matches(
+        resourceToken, resourceTokenFor(participantSessionId, tokenHash)
+      )) throw input.invalidAccess();
+      return input.getAccessibleSession(participantSessionId);
     },
     async revoke(access) {
       const { session, credential } = await authorize(access);
