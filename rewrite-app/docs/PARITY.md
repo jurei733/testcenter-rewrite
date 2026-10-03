@@ -53,8 +53,8 @@ and implementation. Each needs current rewrite evidence before it is closed:
   Participant account sign-out must also reproduce `deletePersonToken`: revoke
   its access credential without deleting the session/answers, and re-entry
   must not reactivate the old credential. The existing local `clearSession`
-  action does not establish this guarantee; Original-preview sign-out stays
-  disabled until this server boundary has been implemented and verified.
+  action does not establish this guarantee. The Original-preview account now
+  exposes the separately verified server-backed logout described below.
   Authenticated downloads now send `Cache-Control: private, no-store`:
   scoped CSV exports, Original result ZIPs, source packages, Systemcheck and
   participant Review JSON/CSV (including an empty 204), attachment files/PDFs,
@@ -73,9 +73,9 @@ and implementation. Each needs current rewrite evidence before it is closed:
   session's first token issuance or revocation; it cannot reactivate afterward.
   Unit and memory/file/SQLite store regressions cover rotation, stale logout,
   cross-participant rejection, restart, unchanged session/run/response records,
-  preserved access expiry and workspace-deletion cleanup. This service is not
-  yet exposed as a UI logout operation: the Original account action remains
-  disabled until the newly enforced HTTP transport passes its browser gates.
+  preserved access expiry and workspace-deletion cleanup. The HTTP boundary
+  and Original Starter account logout now use this service; local session
+  clearing remains a distinct operation.
   The resource-channel foundation now derives a separate HMAC capability
   from the durable credential digest and exact session identity. A sandboxed
   Player can load relative resources without placing the general
@@ -111,12 +111,16 @@ and implementation. Each needs current rewrite evidence before it is closed:
   unauthorized reads/writes, preserved execution-mode restrictions, revoked
   resources/streams, stale-logout rejection and exact response restoration after
   re-login. The full API suites passed with memory, file and SQLite (161 per
-  store); seventeen frontend/worker/test-actor tests passed. PostgreSQL and
-  its current PostgreSQL gate remains pending. A fresh protected SQLite/
+  store); seventeen frontend/worker/test-actor tests passed. The PostgreSQL
+  integration gate and all three Compose PostgreSQL smoke variants passed in
+  the HTTP-ownership checkpoint's CI run. That run is not overall green:
+  repeated Test Controller setup logins rotate credentials that the browser
+  then incorrectly reuses. These fixtures now reauthenticate through the real
+  UI without relaxing owner checks. A fresh protected SQLite/
   Chromium gate passed through real Original/Rewrite sign-in and rotation,
   capability-based Verona resource GET/ranges, offline answer recovery and
   view-closure background delivery under enforced HTTP ownership. This is not
-  yet the full browser/visual matrix or the enabled Original logout action.
+  yet the full browser/visual matrix.
   Test actors
   learn credentials from real successful login/state responses only; explicit
   denial headers are never replaced. Synthetic API-created browser fixtures
@@ -125,6 +129,28 @@ and implementation. Each needs current rewrite evidence before it is closed:
   overwritten. Actual UI login/rotation cases do not use that fixture bootstrap.
   A second browser login rotates the first browser's token, so same-run layout
   tests re-authenticate through the real UI before resuming the first browser.
+  Original Starter logout waits for actual HTTP revocation before clearing the
+  visible session. Errors stay in the open account menu for retry. The local
+  credential tombstone uses compare-and-forget; a renewed key or a different
+  active participant is not cleared by a stale completion. Pending foreground
+  and worker answer queues remain intact. Twenty-five frontend/worker/test-actor/
+  logout-state regressions passed. A headful Chromium/owned-SQLite check passed
+  a real Player answer save, temporary logout failure and retry, old-key 401,
+  real re-login with the same run and byte-identical saved response restored in
+  the Player, desktop focus and mobile keyboard logout without overflow or
+  page errors. The production frontend remains 469.00kB under the unchanged
+  470kB error budget. A fresh complete protected SQLite/Chromium production
+  browser gate passed through Original logout/re-entry, all official Player
+  families, repeated Test Controller logins, monitor operations, attachments,
+  exact Original exports and isolated group-result deletion. The final process
+  exited 0. Publication CI and equal-reference visual comparisons remain
+  separate acceptance gates.
+  A separate headful browser check also passed an actual server 401 after a
+  second browser login rotated the first browser's key. Both foreground and
+  worker stores retained the exact response and delivery identity. Credential
+  re-entry restored the same run with a new key; with foreground saves blocked,
+  the actual worker delivered the byte-identical response and removed only
+  the delivered record. This is local browser evidence, not a new CI result.
   As a prerequisite, the shipped background worker now retains its exact
   pending response and delivery ID on 401/403, request timeout, rate limiting,
   network failure and server failure, so renewed authentication can retry it.
@@ -163,6 +189,10 @@ and implementation. Each needs current rewrite evidence before it is closed:
 The optional UI has its separate complete acceptance matrix in
 [`ORIGINAL-UI-PARITY.md`](./ORIGINAL-UI-PARITY.md). Neither a green historical
 pipeline nor a completed login/starter slice proves current full parity.
+An additional development-build run exposed `NG0100` in the Participant view
+while opening the official ABI Player family. It is an open rendering
+regression, not an accepted visual-parity state. Production-build browser
+verification is kept separate from this development-build finding.
 
 Operational verification on 2026-10-03 found repeated full runtime snapshots
 in operator release/session lists. These now return typed release metadata and

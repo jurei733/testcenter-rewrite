@@ -42,6 +42,16 @@ test("confirmed participant logout preserves responses and owners but prevents l
   assert.equal(access.readParticipantRunCredential("run-a", store), second);
 });
 
+test("stale local logout cannot erase a renewed participant credential", () => {
+  const store = storage();
+  access.rememberParticipantSessionCredential("session-a", second, store);
+  const before = store.getItem(access.PARTICIPANT_ACCESS_STORAGE_KEY);
+  assert.equal(access.forgetParticipantSessionCredential("session-a", store, first), false);
+  assert.equal(store.getItem(access.PARTICIPANT_ACCESS_STORAGE_KEY), before);
+  assert.equal(access.forgetParticipantSessionCredential("session-a", store, second), true);
+  assert.equal(access.readParticipantSessionCredential("session-a", store), null);
+});
+
 test("participant storage rejects malformed data, resource tokens and conflicting identities", () => {
   const store = storage();
   for (const invalid of ["", "r1." + first, "a".repeat(257), null]) {

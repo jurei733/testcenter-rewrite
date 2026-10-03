@@ -88,7 +88,7 @@ opening and closing them does not replace the iframe. Headful Chromium checks
 cover keyboard trapping and return, draft retention, actual comment save/delete,
 nested confirmation focus, mobile bounds, authored menu permissions, actual
 reload of the same run and return to Rewrite. The integrated smoke has the same
-surface gate. Remaining sidebar contents, account sign-out, dialogs and matching
+surface gate. Remaining sidebar contents, dialogs and matching
 reference screenshots keep the Player visual-parity row open. This is not a
 completed visual-identity claim.
 The Original login footer now has the source's Material-link order and German
@@ -100,12 +100,25 @@ passed both surfaces, viewport-height login composition, opaque themed CDK
 overlays, mobile menu bounds, Escape/close focus restoration and same-run
 return to Rewrite. A fresh protected SQLite/Chromium entry gate also passed
 the footer/account assertions and the same-session/run Starter resume. The
-sign-out control is explicitly disabled in
-this development preview until the backend can reproduce Original
+sign-out control now reproduces the verified access lifecycle of Original
 `deletePersonToken`: revoke access without deleting responses, issue a fresh
 credential on re-entry, and keep the old credential invalid. Local
-`clearSession` is not equivalent to that operation. This remains a functional
-requirement as well as an open account-menu interaction state.
+`clearSession` is not equivalent to that operation. Logout waits for server
+confirmation; a failed attempt keeps the account menu and error notice open
+for retry. It preserves pending answer queues and does not erase a concurrently
+renewed key or another participant's visible session. A headful Chromium/
+owned-SQLite check passed an actual Player answer save, temporary failure,
+successful retry, old-key rejection, real UI re-login into the same run and
+byte-identical answer restoration, desktop focus and mobile keyboard logout.
+Twenty-five frontend/worker/test-actor/logout-state tests passed. The current
+production bundle is 469.00kB, below the unchanged 470kB error threshold.
+The fresh complete protected SQLite/Chromium production browser gate also
+passed through this logout/re-entry path, official Player and Test Controller
+flows, monitors, attachments and Original exports, with final exit 0. Current
+publication CI and matching-reference screenshots remain separate gates;
+this verifies the server-backed logout path, not the complete visual-parity
+row. The pinned Original's confirmation dialog and audience-specific button
+order are the next account interaction to reproduce.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

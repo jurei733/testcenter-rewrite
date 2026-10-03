@@ -38,9 +38,12 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
         </dl>
         <mat-divider />
         <button matButton="tonal" class="logout-button" id="originalParticipantLogoutButton"
-          data-cy="logout-button" disabled
-          aria-describedby="originalParticipantLogoutPending">Abmelden</button>
-        <p id="originalParticipantLogoutPending" class="pending-note">In dieser Vorschau noch nicht verfügbar.</p>
+          data-cy="logout-button" [disabled]="view.participantSignOutBusy()"
+          (click)="$event.stopPropagation(); view.signOutParticipant()"
+          [attr.aria-describedby]="view.participantSignOutNotice() ? 'originalParticipantLogoutNotice' : null">Abmelden</button>
+        @if (view.participantSignOutNotice()) {
+          <p id="originalParticipantLogoutNotice" class="pending-note" role="alert">{{ view.participantSignOutNotice() }}</p>
+        }
       </mat-menu>
     }
   `,

@@ -55,10 +55,13 @@ export function readParticipantRunCredential(
 
 /** Call only after server logout; never delete responses or the run-owner index. */
 export function forgetParticipantSessionCredential(
-  participantSessionId: string, storage = browserStorage()
+  participantSessionId: string, storage = browserStorage(), expectedSessionToken?: string
 ): boolean {
   if (!identifier(participantSessionId)) return false;
   const state = read(storage);
+  const existing = state.sessions.find(([id]) => id === participantSessionId);
+  if (expectedSessionToken !== undefined &&
+    (existing ? existing[1] : participantSessionId) !== expectedSessionToken) return false;
   state.sessions = [...state.sessions.filter(([id]) => id !== participantSessionId), [participantSessionId, null]];
   return write(state, storage);
 }

@@ -7204,7 +7204,7 @@ try {
       participantEntrySignInLoginKey);
     assert.equal((await originalSignInPage.locator("#originalParticipantAccountGroup").textContent())?.trim(),
       participantEntrySignInGroupKey);
-    assert.equal(await originalSignInPage.locator("#originalParticipantLogoutButton").isDisabled(), true);
+    assert.equal(await originalSignInPage.locator("#originalParticipantLogoutButton").isDisabled(), false);
     await originalSignInPage.keyboard.press("Escape");
     await originalSignInPage.locator("#originalParticipantAccountLogin").waitFor({ state: "detached" });
     assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").evaluate(el => el === document.activeElement), true);
@@ -7219,6 +7219,39 @@ try {
         document.querySelector("#participantRouteStatus")?.textContent?.trim() === "running",
       [participantEntrySignInSessionId, participantEntryStartedRunId]
     );
+    await originalSignInPage.locator("#participantApplicationLogoButton").click();
+    await originalSignInPage.locator("#participantConfirmationContinueButton").click();
+    await originalSignInPage.locator("#originalParticipantStarter").waitFor();
+    const originalCredentialBeforeLogout = await originalSignInPage.evaluate(sessionId => {
+      const state = JSON.parse(localStorage.getItem("testcenter-rewrite:participant-access:v1") ?? "{}");
+      return state.sessions?.find(([id]) => id === sessionId)?.[1];
+    }, participantEntrySignInSessionId);
+    assert.match(originalCredentialBeforeLogout, /^[A-Za-z0-9_-]{43}$/u);
+    const originalStateBeforeLogout = await (await fetch(
+      `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
+      { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } }
+    )).json();
+    await originalSignInPage.locator("#originalParticipantAccountButton").click();
+    const logoutCompleted = originalSignInPage.waitForResponse(response => response.request().method() === "DELETE" &&
+      response.url().endsWith(`/sessions/${participantEntrySignInSessionId}/access`) && response.status() === 205);
+    await originalSignInPage.locator("#originalParticipantLogoutButton").click();
+    await logoutCompleted;
+    await originalSignInPage.locator("#originalParticipantLogin").waitFor();
+    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    assert.equal(new URL(originalSignInPage.url()).searchParams.has("participantSessionId"), false);
+    assert.equal((await fetch(`${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
+      { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } })).status, 401);
+    await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
+    await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
+    await originalSignInPage.waitForFunction(expectedRunId =>
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() === expectedRunId,
+      participantEntryStartedRunId);
+    const restoredOriginalState = await (await fetch(
+      `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`
+    )).json();
+    assert.equal(restoredOriginalState.currentRunState.testRun.testRunId, participantEntryStartedRunId);
+    assert.deepEqual(restoredOriginalState.currentRunState.testRun.unitResponses,
+      originalStateBeforeLogout.currentRunState.testRun.unitResponses);
   } finally {
     await originalSignInContext.close();
   }
@@ -18047,6 +18080,30 @@ try {
       );
       const signInPayload = await signInResponse.json();
       participantSessionId = signInPayload.participantSession?.participantSessionId;
+      // A repeated credential login rotates the same session's access. An
+      // existing browser credential must be renewed through the real UI,
+      // never silently overwritten by synthetic fixture bootstrapping.
+      const browserAlreadyKnowsSession = await page.evaluate(sessionId => {
+        const state = JSON.parse(localStorage.getItem("testcenter-rewrite:participant-access:v1") ?? "{}");
+        return state.sessions?.some(([id]) => id === sessionId) ?? false;
+      }, participantSessionId);
+      if (browserAlreadyKnowsSession) {
+        await page.goto(`${baseUrl}/app/participant?${new URLSearchParams({
+          tenantKey: testControllerTenantKey, workspaceKey: testControllerWorkspaceKey, ui: "rewrite"
+        })}`, { waitUntil: "domcontentloaded" });
+        await page.locator("#participantRouteClearSessionButton").click();
+        await page.locator("#participantRouteEntry").waitFor();
+        await fillAndCommit("#participantLoginKey", loginKey);
+        await fillAndCommit("#participantPassword", "123");
+        const renewedLogin = page.waitForResponse(response => response.url().endsWith("/participant/auth/sign-in") && response.ok());
+        await page.locator("#participantRouteSignInButton").click();
+        const renewedPayload = await (await renewedLogin).json();
+        assert.equal(renewedPayload.participantSession.participantSessionId, participantSessionId);
+        await page.waitForFunction(sessionId =>
+          document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() === sessionId &&
+          document.querySelector("#participantRouteRunId")?.textContent?.trim() &&
+          !document.querySelector(".page")?.classList.contains("is-busy"), participantSessionId);
+      }
     }
     assert.ok(participantSessionId, `${loginKey} should create a session.`);
     const resumeResponse = await sendSmokeJson(

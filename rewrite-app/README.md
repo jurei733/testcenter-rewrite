@@ -110,7 +110,7 @@ exits stay in the Player, confirmations apply the authored timer/lock transition
 `lock_test_on_termination` reaches the Starter only after the durable whole-test
 lock is visible. The Starter then refreshes its in-progress/locked card from the
 server and can resume the same run; `Leave Session` remains the separate local
-sign-out action.
+session-clear action, not server credential revocation.
 
 Participant-authored and monitor-authored pauses are distinct durable states.
 A monitor pause removes the active Player and fallback response controls, cannot
@@ -842,8 +842,14 @@ Players receive a separate resource-only capability in `resourceBasePath`, not
 the general bearer token. Rotation, revocation and existing access deadlines
 invalidate resource access too. `DELETE /api/v1/participant/sessions/:id/access`
 revokes access without deleting answers and returns 205. Existing live streams
-close on their next authorization check. The optional Original account logout
-control remains disabled until its own UI lifecycle gate is implemented.
+close on their next authorization check. On the optional Original Starter,
+open `Nutzerinformationen` and choose `Abmelden` to revoke participant access.
+The client waits for confirmation before returning to login. A failure leaves
+the account menu open for retry; neither saved responses nor pending answer
+queues are deleted. A concurrent renewed login or a different active
+participant is not cleared by a stale logout completion. Re-entry through real
+credentials restores the same resumable run and its responses with a new key.
+The Rewrite `Leave Session` action still clears only the local view.
 
 ## Current Persistence Boundary
 

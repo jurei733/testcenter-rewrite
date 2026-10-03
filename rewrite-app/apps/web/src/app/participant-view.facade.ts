@@ -279,6 +279,8 @@ export class ParticipantViewFacade {
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
+  readonly participantSignOutBusy = signal(false);
+  readonly participantSignOutNotice = signal("");
 
   get participantConnectionState() {
     return this.participantEvents.connectionState();
@@ -2618,6 +2620,46 @@ export class ParticipantViewFacade {
     );
   }
 
+  async signOutParticipant(): Promise<void> {
+    if (!this.isParticipantStarter || this.participantSignOutBusy() || this.uiState.activeRequestLabel()) return;
+    const participantSessionId = this.runtime.participantSessionId.trim();
+    this.participantSignOutBusy.set(true);
+    this.participantSignOutNotice.set("");
+    try {
+      const access = await import("./participant-access-credentials");
+      const { performParticipantSignOut } = await import("./participant-sign-out");
+      const result = await performParticipantSignOut({
+        participantSessionId,
+        readCredential: access.readParticipantSessionCredential,
+        revoke: (sessionId, token) => this.requestState.request("Participant Sign Out", "DELETE",
+          resolveRoutePath(productionApiRoutes.participant.signOut, { participantSessionId: sessionId }),
+          undefined, { quiet: true, headers: { authorization: `Bearer ${token}` } }),
+        forgetCredential: (sessionId, token) => access.forgetParticipantSessionCredential(sessionId, undefined, token),
+        readActiveSessionId: () => this.runtime.participantSessionId.trim(),
+        clearSignedInState: () => {
+          this.clearStoredParticipantSession("Signed out. Sign in again to continue your saved test.", true);
+          this.runtime.loginKey = "";
+          this.runtime.groupKey = "";
+          this.runtime.bookletKey = "";
+          this.runtime.participantPassword = "";
+          this.runtime.participantDisplayName = "";
+          this.runtime.runtimeMonitorView = "Signed out.";
+          const url = new URL(globalThis.location.href);
+          for (const key of ["participantSessionId", "loginKey", "groupKey", "bookletKey", "currentUnitKey", "unitResponse", "participantCode", "password", "legacyShortLink"]) url.searchParams.delete(key);
+          url.hash = "";
+          globalThis.history.replaceState(globalThis.history.state, "", url);
+          this.requestState.clearErrorMessage();
+          this.persistState();
+        }
+      });
+      if (result === "renewed" && this.runtime.participantSessionId.trim() === participantSessionId) this.participantSignOutNotice.set("Die Anmeldung wurde inzwischen erneuert. Bitte bei Bedarf erneut abmelden.");
+    } catch {
+      if (this.runtime.participantSessionId.trim() === participantSessionId) this.participantSignOutNotice.set("Abmelden fehlgeschlagen. Bitte erneut versuchen. Ihre gespeicherten Antworten bleiben erhalten.");
+    } finally {
+      this.participantSignOutBusy.set(false);
+    }
+  }
+
   customText(key: ParticipantCustomTextKey, fallback?: string): string {
     return resolveParticipantCustomText(
       this.participantCustomTexts,
@@ -2972,12 +3014,13 @@ export class ParticipantViewFacade {
   }
 
   private clearStoredParticipantSession(
-    message = "Stored participant session is gone. Use the starter test action."
+    message = "Stored participant session is gone. Use the starter test action.",
+    preservePendingAnswers = false
   ): void {
     this.participantEvents.stop();
     this.invalidateCurrentStateRefreshes();
     const previousTestRunId = this.runtime.testRunId.trim();
-    if (previousTestRunId) {
+    if (previousTestRunId && !preservePendingAnswers) {
       discardParticipantSaveOutboxForRun(previousTestRunId);
     }
     this.copiedSessionEntryLink = "";
