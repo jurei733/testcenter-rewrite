@@ -632,6 +632,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         ) ?? null
       );
     },
+    async resetParticipantLoginAttempts(tenantId, workspaceId, loginKey) {
+      state.participantLoginAttempts.delete(
+        participantLoginAttemptKey(tenantId, workspaceId, loginKey)
+      );
+    },
     async recordParticipantLoginFailure(input) {
       const attemptKey = participantLoginAttemptKey(
         input.tenantId,

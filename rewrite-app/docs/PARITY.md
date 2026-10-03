@@ -29,8 +29,19 @@ and implementation. Each needs current rewrite evidence before it is closed:
   must agree with the Original definitions.
   The complete six-mode run-capability/label matrix is now pinned to 19.0 and
   regression-compared. `run-demo` creates a new session/run on credential entry;
-  explicit session links still address the existing session. Case-insensitive
-  second codes and successful-login counter resets remain separate open checks.
+  explicit session links still address the existing session. Second codes now
+  compare ASCII case-insensitively throughout assignment filtering, starter
+  visibility and session reuse, matching `Login::codeExists`/`SessionDAO` at
+  `c35cff81`. New sessions retain the authored code spelling; older sessions
+  with another spelling remain reusable without rewriting their identity or
+  extending their access window. First login names and passwords remain exact.
+  Successful fresh and reused sign-ins reset only that tenant/workspace/login's
+  failure counter in all four adapters; an active lockout still rejects even
+  the correct password. Memory/file/SQLite API gates cover mixed-case codes,
+  re-imported spelling, assignment isolation, both entry routes, durable
+  restart, independent login counters, and unchanged lockout enforcement.
+  Existing `CodeToEnter` comparison already ignores case; its durable unlock
+  gate covers uppercase and mixed-case input. PostgreSQL remains CI-gated.
 - Default XML XSD validation, supported schema versions and supported
   `https://w3id.org/iqb/spec/<repo>/<version>` references. Unsupported versions
   and historical GitHub schema locations are rejected when applying this

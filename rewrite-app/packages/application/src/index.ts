@@ -1392,6 +1392,11 @@ export type FirstSliceRepository = {
     attemptedAt: string;
     expiresAt: string;
   }): Promise<ParticipantLoginAttempt>;
+  resetParticipantLoginAttempts(
+    tenantId: string,
+    workspaceId: string,
+    loginKey: string
+  ): Promise<void>;
   getTestRunById(testRunId: string): Promise<TestRun | null>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
@@ -5769,6 +5774,10 @@ const participantRosterRequiresCode = (
     assignment => (assignment.accessCodes?.length ?? 0) > 0
   );
 
+// Original PHP strtolower folds ASCII codes without conflating Unicode letters.
+const normalizeParticipantCode = (code: string | null | undefined): string =>
+  String(code ?? "").trim().replace(/[A-Z]/g, letter => letter.toLowerCase());
+
 const getParticipantCodeBookletAssignments = (
   entry: ParticipantRosterEntry | null | undefined,
   participantCode: string | null | undefined
@@ -5777,14 +5786,16 @@ const getParticipantCodeBookletAssignments = (
   if (!assignments.some(assignment => (assignment.accessCodes?.length ?? 0) > 0)) {
     return assignments;
   }
-  const normalizedCode = String(participantCode ?? "").trim();
+  const normalizedCode = normalizeParticipantCode(participantCode);
   if (!normalizedCode) {
     return [];
   }
   return assignments.filter(
     assignment =>
       !assignment.accessCodes?.length ||
-      assignment.accessCodes.includes(normalizedCode)
+      assignment.accessCodes.some(
+        code => normalizeParticipantCode(code) === normalizedCode
+      )
   );
 };
 
@@ -31521,12 +31532,15 @@ export const createFirstSliceServices = (
             }
           );
         }
-        if (
-          codeRequired &&
-          !getParticipantRosterBookletAssignments(rosterEntry).some(
-            assignment => assignment.accessCodes?.includes(participantCode)
-          )
-        ) {
+        const matchedParticipantCode = codeRequired
+          ? getParticipantRosterBookletAssignments(rosterEntry)
+              .flatMap(assignment => assignment.accessCodes ?? [])
+              .find(code =>
+                normalizeParticipantCode(code) ===
+                  normalizeParticipantCode(participantCode)
+              )
+          : undefined;
+        if (codeRequired && matchedParticipantCode === undefined) {
           throw new FirstSliceError(
             400,
             "participant_code_invalid",
@@ -31537,7 +31551,7 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const effectiveParticipantCode = codeRequired ? participantCode : null;
+        const effectiveParticipantCode = matchedParticipantCode ?? null;
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
@@ -31554,8 +31568,8 @@ export const createFirstSliceServices = (
           .filter(
             participantSession =>
               participantSession.loginKey === loginKey &&
-              (participantSession.participantCode ?? null) ===
-                effectiveParticipantCode
+              normalizeParticipantCode(participantSession.participantCode) ===
+                normalizeParticipantCode(effectiveParticipantCode)
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
         const accessStartedAt = loginSessions[0]?.createdAt ?? signInTimestamp;
@@ -31572,8 +31586,8 @@ export const createFirstSliceServices = (
                 participantSession =>
                   participantSession.loginKey === loginKey &&
                   participantSession.groupKey === groupKey &&
-                  (participantSession.participantCode ?? null) ===
-                    effectiveParticipantCode &&
+                  normalizeParticipantCode(participantSession.participantCode) ===
+                    normalizeParticipantCode(effectiveParticipantCode) &&
                   participantSession.contentReleaseId ===
                     activeRelease.contentReleaseId &&
                   normalizeParticipantExecutionMode(
@@ -31603,6 +31617,11 @@ export const createFirstSliceServices = (
               reused: true
             }
           });
+          await repository.resetParticipantLoginAttempts(
+            workspace.tenantId,
+            workspace.workspaceId,
+            loginKey
+          );
           return reusableSession;
         }
 
@@ -31636,6 +31655,11 @@ export const createFirstSliceServices = (
             rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
           }
         });
+        await repository.resetParticipantLoginAttempts(
+          workspace.tenantId,
+          workspace.workspaceId,
+          loginKey
+        );
         return participantSession;
       },
       async getRuntimeState(input) {

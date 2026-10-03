@@ -2858,6 +2858,13 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapParticipantLoginAttempt
       );
     },
+    async resetParticipantLoginAttempts(tenantId, workspaceId, loginKey) {
+      await pool.query(
+        `DELETE FROM participant_login_attempts
+         WHERE tenant_id = $1 AND workspace_id = $2 AND login_key = $3`,
+        [tenantId, workspaceId, loginKey]
+      );
+    },
     async recordParticipantLoginFailure(input) {
       const result = await pool.query<Row>(
         `INSERT INTO participant_login_attempts (

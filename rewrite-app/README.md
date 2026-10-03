@@ -41,6 +41,10 @@ versioned domain matrix across every storage adapter. Matching the current
 Testcenter 19 definitions, credential entry for Demo and Hot Restart creates a
 new session; Hot Return, Review, Trial and Simulation reuse their matching
 session. An explicit existing session link remains an address for that session.
+Second participant codes are case-insensitive, including booklet scope and
+existing-session reuse; the first login name and password remain case-sensitive.
+Successful fresh/reused sign-ins reset only the matching failure counter, while
+an active rate-limit lockout cannot be bypassed with correct credentials.
 Matching the Original `showCode` policy, Demo, Review, and Trial display an authored
 `CodeToEnter` value beside the still-locked input; Hot Return, Hot Restart, and
 Simulation keep it secret. Every mode still requires participant entry and a

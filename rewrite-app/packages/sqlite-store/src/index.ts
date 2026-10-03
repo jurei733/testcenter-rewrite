@@ -3000,6 +3000,12 @@ export const createSqliteFirstSliceRepository = (
           | undefined
       );
     },
+    async resetParticipantLoginAttempts(tenantId, workspaceId, loginKey) {
+      database.prepare(
+        `DELETE FROM participant_login_attempts
+         WHERE tenant_id = ? AND workspace_id = ? AND login_key = ?`
+      ).run(tenantId, workspaceId, loginKey);
+    },
     async recordParticipantLoginFailure(input) {
       const row = database
         .prepare(

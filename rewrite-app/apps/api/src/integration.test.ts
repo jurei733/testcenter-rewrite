@@ -32395,7 +32395,7 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     testRun: { unlockedTestletKeys?: string[] };
   }>(`/api/v1/participant/test-runs/${testRunId}/testlets/${testletKey}/unlock`, {
     method: "POST",
-    body: { code: "HASE" }
+    body: { code: "hAsE" }
   });
   assert.equal(replayedUnlock.status, 200);
   assert.deepEqual(replayedUnlock.body.testRun.unlockedTestletKeys, [
@@ -47502,7 +47502,81 @@ test("password-protected participant logins use a shared persistent login sink",
   }
 });
 
-test("original Testcenter participant codes gate and scope reusable sessions", async () => {
+test("Original 19 successful participant logins reset durable failure counters", async () => {
+  const isolatedStore = process.env.FIRST_SLICE_STORE ?? "memory";
+  const temporaryDirectory = mkdtempSync(join(tmpdir(), "participant-login-reset-"));
+  const environment = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_FILE: join(temporaryDirectory, "store.json"),
+    FIRST_SLICE_SQLITE_FILE: join(temporaryDirectory, "store.sqlite"),
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "4",
+    FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "60000"
+  };
+  let isolated = await createIsolatedServer(environment);
+  try {
+    const imported = await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+        method: "POST", body: { rosterText: [
+          "loginKey,groupKey,bookletKey,displayName,pw,executionMode",
+          "reset-reuse,reset-group,booklet:demo,Reuse,correct-secret,run-hot-return",
+          "reset-fresh,reset-group,booklet:demo,Fresh,correct-secret,run-hot-restart",
+          "reset-other,reset-group,booklet:demo,Other,other-secret,run-hot-return"
+        ].join("\n") }
+      });
+    assert.equal(imported.status, 201);
+    const signIn = (loginKey: string, password: string, starter = false) =>
+      requestJsonAt<{ error?: string; participantSession?: { participantSessionId: string } }>(
+        isolated.baseUrl,
+        starter ? "/api/v1/participant/starter:launch" : "/api/v1/participant/auth/sign-in",
+        { method: "POST", body: { tenantKey: "demo-tenant", workspaceKey: "demo-workspace",
+          loginKey, password } });
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      assert.equal((await signIn("reset-other", "wrong-secret")).status, 401);
+    }
+    for (const loginKey of ["reset-reuse", "reset-fresh"]) {
+      // Both entry routes contribute to the same durable counter.
+      assert.equal((await signIn(loginKey, "wrong-secret")).status, 401);
+      assert.equal((await signIn(loginKey, "wrong-secret", true)).status, 401);
+      const firstSuccess = await signIn(loginKey, "correct-secret");
+      assert.equal(firstSuccess.status, 200);
+      if (isolatedStore !== "memory") {
+        await closeServer(isolated.server);
+        isolated = await createIsolatedServer(environment);
+      }
+      // Three failures must still fit after success, also after durable restart.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        assert.equal((await signIn(loginKey, "wrong-secret", attempt === 1)).status, 401);
+      }
+      const secondSuccess = await signIn(loginKey, "correct-secret", true);
+      assert.equal(secondSuccess.status, 200);
+      if (loginKey === "reset-reuse") {
+        assert.equal(secondSuccess.body.participantSession?.participantSessionId,
+          firstSuccess.body.participantSession?.participantSessionId);
+      } else {
+        assert.notEqual(secondSuccess.body.participantSession?.participantSessionId,
+          firstSuccess.body.participantSession?.participantSessionId);
+      }
+      // The reusable-session return path must reset too, not just session creation.
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const refused = await signIn(loginKey, "wrong-secret");
+        assert.equal(refused.status, 401);
+        assert.equal(refused.body.error, "participant_password_invalid");
+      }
+      const blocked = await signIn(loginKey, "correct-secret");
+      assert.equal(blocked.status, 429, "Success cannot bypass an active lockout.");
+      assert.equal(blocked.body.error, "participant_login_rate_limited");
+      const otherBlocked = await signIn("reset-other", "other-secret");
+      assert.equal(otherBlocked.status, 429, "Reset must not clear another login's counter.");
+    }
+  } finally {
+    await closeServer(isolated.server);
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("original Testcenter participant codes are case-insensitive and scope reusable sessions", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
     FIRST_SLICE_BOOTSTRAP_DEMO: "true",
@@ -47510,27 +47584,45 @@ test("original Testcenter participant codes gate and scope reusable sessions", a
   });
 
   try {
+    const rosterXml = [
+      "<Testtakers>",
+      "  <Group id=\"group:participant-code\">",
+      "    <Login mode=\"run-hot-return\" name=\"participant-code-user\" pw=\"participant-secret\">",
+      "      <Booklet codes=\"AlPhA\">booklet:demo</Booklet>",
+      "      <Booklet codes=\"beta\">booklet:other</Booklet>",
+      "      <Booklet>booklet:shared</Booklet>",
+      "    </Login>",
+      "  </Group>",
+      "</Testtakers>"
+    ].join("\n");
     const rosterImport = await requestJsonAt<{ updatedCount: number }>(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
       {
         method: "POST",
         body: {
-          rosterText: [
-            "<Testtakers>",
-            "  <Group id=\"group:participant-code\">",
-            "    <Login mode=\"run-hot-return\" name=\"participant-code-user\" pw=\"participant-secret\">",
-            "      <Booklet codes=\"alpha\">booklet:demo</Booklet>",
-            "      <Booklet codes=\"beta\">booklet:other</Booklet>",
-            "      <Booklet>booklet:shared</Booklet>",
-            "    </Login>",
-            "  </Group>",
-            "</Testtakers>"
-          ].join("\n")
+          rosterText: rosterXml
         }
       }
     );
     assert.equal(rosterImport.status, 201);
+
+    const wrongLoginCase = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in", { method: "POST", body: {
+        tenantKey: "demo-tenant", workspaceKey: "demo-workspace",
+        loginKey: "PARTICIPANT-CODE-USER", password: "participant-secret",
+        participantCode: "alpha"
+      } });
+    assert.equal(wrongLoginCase.status, 401);
+    assert.equal(wrongLoginCase.body.error, "participant_login_invalid");
+    const wrongPasswordCase = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in", { method: "POST", body: {
+        tenantKey: "demo-tenant", workspaceKey: "demo-workspace",
+        loginKey: "participant-code-user", password: "PARTICIPANT-SECRET",
+        participantCode: "alpha"
+      } });
+    assert.equal(wrongPasswordCase.status, 401);
+    assert.equal(wrongPasswordCase.body.error, "participant_password_invalid");
 
     const missingPassword = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -47604,9 +47696,9 @@ test("original Testcenter participant codes gate and scope reusable sessions", a
         }
       });
 
-    const alpha = await signInWithCode("alpha");
+    const alpha = await signInWithCode("ALPHA");
     assert.equal(alpha.status, 200);
-    assert.equal(alpha.body.participantSession.participantCode, "alpha");
+    assert.equal(alpha.body.participantSession.participantCode, "AlPhA");
     assert.deepEqual(
       alpha.body.booklets.map(booklet => booklet.sourceBookletKey),
       ["booklet:demo"]
@@ -47625,12 +47717,23 @@ test("original Testcenter participant codes gate and scope reusable sessions", a
     );
 
     const alphaReentry = await signInWithCode("alpha");
+    assert.equal(alphaReentry.status, 200);
     assert.equal(
       alphaReentry.body.participantSession.participantSessionId,
       alpha.body.participantSession.participantSessionId
     );
+    assert.deepEqual(alphaReentry.body.booklets, alpha.body.booklets);
+    assert.deepEqual(
+      alphaReentry.body.participantRosterEntry,
+      alpha.body.participantRosterEntry
+    );
 
-    const beta = await signInWithCode("beta");
+    const mixedReentry = await signInWithCode("  aLpHa  ");
+    assert.equal(mixedReentry.status, 200);
+    assert.equal(mixedReentry.body.participantSession.participantSessionId,
+      alpha.body.participantSession.participantSessionId);
+
+    const beta = await signInWithCode("BeTa");
     assert.equal(beta.status, 200);
     assert.equal(beta.body.participantSession.participantCode, "beta");
     assert.deepEqual(
@@ -47643,6 +47746,19 @@ test("original Testcenter participant codes gate and scope reusable sessions", a
       beta.body.participantSession.participantSessionId,
       alpha.body.participantSession.participantSessionId
     );
+    const reimported = await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+        method: "POST", body: { rosterText: rosterXml.replace("AlPhA", "ALPHA") }
+      });
+    assert.equal(reimported.status, 201);
+    const legacyReentry = await signInWithCode("aLpHa");
+    assert.equal(legacyReentry.status, 200);
+    assert.equal(legacyReentry.body.participantSession.participantSessionId,
+      alpha.body.participantSession.participantSessionId,
+      "An older session with differently cased stored code must remain reusable.");
+    assert.equal(legacyReentry.body.participantSession.participantCode, "AlPhA",
+      "Re-entry does not rewrite the stored participant identity.");
+    assert.deepEqual(legacyReentry.body.booklets, alpha.body.booklets);
   } finally {
     await closeServer(isolated.server);
   }

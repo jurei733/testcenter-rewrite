@@ -1219,6 +1219,13 @@ export const createFileFirstSliceRepository = (
         ] ?? null
       );
     },
+    async resetParticipantLoginAttempts(tenantId, workspaceId, loginKey) {
+      await mutate(state => {
+        delete state.participantLoginAttempts[
+          participantLoginAttemptKey(tenantId, workspaceId, loginKey)
+        ];
+      });
+    },
     async recordParticipantLoginFailure(input) {
       let result: ParticipantLoginAttempt | null = null;
       await mutate(state => {
