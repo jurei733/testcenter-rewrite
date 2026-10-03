@@ -330,7 +330,21 @@ The public challenge is signed, short-lived, bound to the exact credential input
 
 Rotate the signing secret in two bounded deployments: first place the new value in `FIRST_SLICE_PROOF_OF_WORK_SECRET` and the old value in `FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET`; after at least the configured challenge TTL and after all old application instances have drained, remove the previous value. Only the current and explicitly configured previous key IDs are accepted. The previous value must differ from the current value and also contain at least 32 characters. Inject both values from the deployment secret manager rather than source control, image defaults, command-line arguments, or logs.
 
-Password-protected participant accounts use the original login-sink threshold by default: after five failed password attempts, the same tenant/workspace/login is blocked for 30 minutes, including attempts with the correct password. The persisted counter is shared by participant sign-in and starter launch across all storage adapters; unknown and passwordless logins do not increase it. Tune the positive integer settings with `FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES` and `FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS`. Blocked requests return `429 participant_login_rate_limited` and a `Retry-After` header.
+`REQUIRE_LOGIN_PASSWORD=true` enables the Original Testcenter 19 installation-wide
+password policy (default: `false`). Both participant sign-in and starter launch
+then reject existing passwordless logins, even if the caller supplies an invented
+password. CSV, native JSON, Original Testtakers XML and packaged Testtakers imports
+are validated completely before changing any roster or operational migration
+candidate; a missing password prevents staging the package's release. The only
+Original import exception is `sys-check-login`; monitor logins are not exempt.
+This does not weaken the rewrite's separate operator-account password policy:
+migrating a system-check candidate into an operator account still requires a new
+password. Diagnostics/Ops show the active non-secret policy. Disable demo
+bootstrap when enabling it, because the built-in demo participant has no password;
+the conflicting settings fail before storage/bootstrap writes. Switching the
+policy does not delete existing accounts, answers or sessions.
+
+Password-protected participant accounts use the original login-sink threshold by default: after five failed password attempts, the same tenant/workspace/login is blocked for 30 minutes, including attempts with the correct password. The persisted counter is shared by participant sign-in and starter launch across all storage adapters; unknown logins and permitted passwordless logins do not increase it. Tune the positive integer settings with `FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES` and `FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS`. Blocked requests return `429 participant_login_rate_limited` and a `Retry-After` header.
 
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 

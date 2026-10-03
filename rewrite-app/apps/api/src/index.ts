@@ -733,10 +733,19 @@ const createApiRuntime = async () => {
   );
   const participantAccessTimeZone =
     process.env.FIRST_SLICE_PARTICIPANT_TIME_ZONE?.trim() || "Europe/Berlin";
+  const requireLoginPassword = parseBooleanEnvironmentFlag(
+    "REQUIRE_LOGIN_PASSWORD",
+    false
+  );
   const demoBootstrapEnabled = parseBooleanEnvironmentFlag(
     "FIRST_SLICE_BOOTSTRAP_DEMO",
     false
   );
+  if (requireLoginPassword && demoBootstrapEnabled) {
+    throw new Error(
+      "REQUIRE_LOGIN_PASSWORD cannot be combined with FIRST_SLICE_BOOTSTRAP_DEMO: the demo login is passwordless."
+    );
+  }
   const bootstrapAdmin = await readBootstrapAdminConfig();
   if (demoBootstrapEnabled && bootstrapAdmin) {
     throw new Error(
@@ -781,7 +790,8 @@ const createApiRuntime = async () => {
     adminPasswordPolicy: configuredAdminPasswordPolicy,
     participantAccessTimeZone,
     participantLoginMaxFailures,
-    participantLoginFailureWindowMs
+    participantLoginFailureWindowMs,
+    requireLoginPassword
   });
 
   if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
@@ -842,6 +852,7 @@ const createApiRuntime = async () => {
       adminPasswordPolicy: configuredAdminPasswordPolicy,
       proofOfWork: proofOfWork.publicConfig,
       participantLoginProtection: {
+        requirePassword: requireLoginPassword,
         maxFailures: participantLoginMaxFailures,
         failureWindowMs: participantLoginFailureWindowMs
       },

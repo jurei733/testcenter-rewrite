@@ -47157,6 +47157,169 @@ test("participant access windows enforce Original Testcenter timing semantics", 
   }
 });
 
+test("Original 19 login password policy guards existing logins and atomic Testtakers imports", async () => {
+  const store = process.env.FIRST_SLICE_STORE === "sqlite" ? "sqlite" : "file";
+  const directory = mkdtempSync(join(tmpdir(), "testcenter-login-password-policy-"));
+  const environment = {
+    FIRST_SLICE_STORE: store,
+    FIRST_SLICE_FILE: join(directory, "store.json"),
+    FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    REQUIRE_LOGIN_PASSWORD: "false"
+  };
+  let isolated = await createIsolatedServer(environment);
+  const scope = "/api/v1/tenants/demo-tenant/workspaces/demo-workspace";
+  const credentials = {
+    tenantKey: "demo-tenant", workspaceKey: "demo-workspace", loginKey: "student-demo"
+  };
+  try {
+    const defaultLogin = await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in", { method: "POST", body: credentials });
+    assert.equal(defaultLogin.status, 200, "Default remains passwordless-compatible.");
+    await closeServer(isolated.server);
+    isolated = await createIsolatedServer({ ...environment,
+      FIRST_SLICE_BOOTSTRAP_DEMO: "false", REQUIRE_LOGIN_PASSWORD: "true" });
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(
+      isolated.baseUrl, "/diagnostics/config");
+    assert.equal(config.body.runtimeConfig.participantLoginProtection.requirePassword, true);
+
+    for (const path of ["/api/v1/participant/auth/sign-in", "/api/v1/participant/starter:launch"]) {
+      for (const password of [undefined, "invented-password"]) {
+        const rejected = await requestJsonAt<{ error: string }>(isolated.baseUrl, path,
+          { method: "POST", body: { ...credentials, password } });
+        assert.equal(rejected.status, 401);
+        assert.equal(rejected.body.error, "participant_password_invalid");
+      }
+    }
+
+    const importRoster = (rosterText: string) => requestJsonAt<{
+      error?: string; details?: { loginKeys: string[] };
+      importedCount: number;
+      operationalLoginCandidates: Array<{ loginKey: string; passwordRequired: boolean }>;
+    }>(isolated.baseUrl, `${scope}/participant-roster`, { method: "POST", body: { rosterText } });
+    const protectedRoster = await importRoster(
+      "loginKey,groupKey,bookletKey,pw\npolicy-protected,policy-group,booklet:demo,correct-secret");
+    assert.equal(protectedRoster.status, 201);
+    const systemCheckException = await importRoster(
+      '<Testtakers><Group id="checks"><Login mode="sys-check-login" name="passwordless-check" /></Group></Testtakers>');
+    assert.equal(systemCheckException.status, 201);
+    assert.deepEqual(systemCheckException.body.operationalLoginCandidates.map(candidate => ({
+      loginKey: candidate.loginKey, passwordRequired: candidate.passwordRequired
+    })), [{ loginKey: "passwordless-check", passwordRequired: false }]);
+    const beforeInvalid = await requestJsonAt<unknown>(isolated.baseUrl, `${scope}/participant-roster`);
+    const modes = ["run-demo", "run-review", "run-hot-return", "run-hot-restart",
+      "run-trial", "run-simulation", "monitor-study", "monitor-group"];
+    const invalidXml = `<Testtakers><Group id="policy-group">${modes.map((mode, index) =>
+      `<Login mode="${mode}" name="passwordless-${index}"><Booklet>booklet:demo</Booklet></Login>`
+    ).join("")}</Group></Testtakers>`;
+    for (const rosterText of [
+      invalidXml,
+      "loginKey,groupKey,bookletKey,pw\npolicy-protected,policy-group,booklet:demo,replacement-secret\ninvalid-csv,policy-group,booklet:demo,",
+      JSON.stringify([{ loginKey: "invalid-json", groupKey: "policy-group", bookletKey: "booklet:demo" }])
+    ]) {
+      const rejected = await importRoster(rosterText);
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.body.error, "participant_roster_password_required");
+      assert.ok(rejected.body.details?.loginKeys.length);
+      const afterInvalid = await requestJsonAt<unknown>(isolated.baseUrl, `${scope}/participant-roster`);
+      assert.deepEqual(afterInvalid.body, beforeInvalid.body, "No partial roster/candidate writes.");
+    }
+
+    const source = await requestJsonAt<{ sourcePackage: { sourcePackageId: string } }>(
+      isolated.baseUrl, `${scope}/source-packages`, { method: "POST", body: {
+        fileName: "password-policy.zip", mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${createZipBase64([
+          { fileName: "Testtakers.xml", content: invalidXml }
+        ])}`,
+        contentStructure: { bookletEntries: [{ bookletKey: "policy-booklet", displayLabel: "Policy",
+          unitEntries: [{ unitKey: "policy-unit", displayLabel: "Policy Unit" }] }] }
+      } });
+    assert.equal(source.status, 201);
+    const failedPackage = await requestJsonAt<{
+      importJob: { status: string; diagnostics: Array<{ code: string; message: string }> };
+      stagedContentRelease: unknown;
+    }>(isolated.baseUrl, `${scope}/import-jobs`, { method: "POST",
+      body: { sourcePackageId: source.body.sourcePackage.sourcePackageId } });
+    assert.equal(failedPackage.body.importJob.status, "failed");
+    assert.equal(failedPackage.body.stagedContentRelease, null);
+    assert.ok(failedPackage.body.importJob.diagnostics.some(diagnostic =>
+      diagnostic.code === "source_document_testtakers_import_failed" &&
+      diagnostic.message.includes("participant_roster_password_required")),
+      JSON.stringify(failedPackage.body.importJob.diagnostics));
+    const afterPackage = await requestJsonAt<unknown>(isolated.baseUrl, `${scope}/participant-roster`);
+    assert.deepEqual(afterPackage.body, beforeInvalid.body);
+
+    const protectedCredentials = { ...credentials, loginKey: "policy-protected" };
+    const invalidPassword = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in", { method: "POST", body: protectedCredentials });
+    assert.equal(invalidPassword.status, 401);
+    const allowed = await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/participant/starter:launch", { method: "POST",
+        body: { ...protectedCredentials, password: "correct-secret" } });
+    assert.equal(allowed.status, 200, "Rejected import did not replace the stored password.");
+    assert.equal(JSON.stringify(afterPackage.body).includes("correct-secret"), false);
+    await closeServer(isolated.server);
+    isolated = await createIsolatedServer({ ...environment, FIRST_SLICE_BOOTSTRAP_DEMO: "false" });
+    const restoredDefault = await requestJsonAt<unknown>(isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in", { method: "POST", body: credentials });
+    assert.equal(restoredDefault.status, 200, "Switching policy never deletes existing logins/sessions.");
+  } finally {
+    await closeServer(isolated.server);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Original 19 login password policy closes the empty-roster fallback in memory", async () => {
+  const isolated = await createIsolatedServer({ FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    REQUIRE_LOGIN_PASSWORD: "true" });
+  const tenantKey = "policy-tenant";
+  const workspaceKey = "policy-workspace";
+  const scope = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  try {
+    assert.equal((await requestJsonAt<unknown>(isolated.baseUrl, "/api/v1/platform/tenants",
+      { method: "POST", body: { tenantKey, displayName: tenantKey } })).status, 201);
+    assert.equal((await requestJsonAt<unknown>(isolated.baseUrl, `/api/v1/tenants/${tenantKey}/workspaces`,
+      { method: "POST", body: { workspaceKey, displayName: workspaceKey } })).status, 201);
+    const source = await requestJsonAt<{ sourcePackage: { sourcePackageId: string } }>(
+      isolated.baseUrl, `${scope}/source-packages`, { method: "POST", body: {
+        fileName: "policy.json", mediaType: "application/json",
+        contentStructure: { bookletEntries: [{ bookletKey: "policy-booklet", displayLabel: "Policy",
+          unitEntries: [{ unitKey: "policy-unit", displayLabel: "Policy Unit" }] }] }
+      } });
+    assert.equal(source.status, 201);
+    const imported = await requestJsonAt<{ stagedContentRelease: { contentReleaseId: string } }>(
+      isolated.baseUrl, `${scope}/import-jobs`, { method: "POST",
+        body: { sourcePackageId: source.body.sourcePackage.sourcePackageId } });
+    assert.equal(imported.status, 201);
+    const activated = await requestJsonAt<unknown>(isolated.baseUrl,
+      `${scope}/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`,
+      { method: "POST", body: { activatedByActorId: "policy-acceptance" } });
+    assert.equal(activated.status, 200);
+    const refused = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      "/api/v1/participant/starter:launch", { method: "POST",
+        body: { tenantKey, workspaceKey, loginKey: "unregistered", password: "invented-password" } });
+    assert.equal(refused.status, 401);
+    assert.equal(refused.body.error, "participant_password_invalid");
+    const sessions = await requestJsonAt<{ items: unknown[] }>(isolated.baseUrl,
+      `${scope}/participant-sessions`);
+    assert.deepEqual(sessions.body.items, [], "No session was created by the fallback.");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("Original 19 login password policy rejects invalid configuration before demo bootstrap", async () => {
+  for (const environment of [
+    { REQUIRE_LOGIN_PASSWORD: "perhaps", FIRST_SLICE_BOOTSTRAP_DEMO: "false" },
+    { REQUIRE_LOGIN_PASSWORD: "true", FIRST_SLICE_BOOTSTRAP_DEMO: "true" }
+  ]) {
+    await assert.rejects(createIsolatedServer({ FIRST_SLICE_STORE: "memory", ...environment }),
+      /REQUIRE_LOGIN_PASSWORD/);
+  }
+});
+
 test("password-protected participant logins use a shared persistent login sink", async () => {
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
@@ -47195,6 +47358,7 @@ test("password-protected participant logins use a shared persistent login sink",
       };
     }>(isolated.baseUrl, "/diagnostics/config");
     assert.deepEqual(config.body.runtimeConfig.participantLoginProtection, {
+      requirePassword: false,
       maxFailures: 2,
       failureWindowMs: 500
     });

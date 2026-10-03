@@ -3740,6 +3740,10 @@ export class OpsViewFacade {
             value: `${config.participantLoginProtection.maxFailures} failures / ${config.participantLoginProtection.failureWindowMs}ms`
           },
           {
+            label: "Login Password Required",
+            value: config.participantLoginProtection.requirePassword ? "yes" : "no"
+          },
+          {
             label: "JSON Body Limit",
             value: `${config.maxJsonBodyBytes} bytes`
           },

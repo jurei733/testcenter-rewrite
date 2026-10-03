@@ -1434,6 +1434,7 @@ export type FirstSliceDependencies = {
   participantAccessTimeZone?: string;
   participantLoginMaxFailures?: number;
   participantLoginFailureWindowMs?: number;
+  requireLoginPassword?: boolean;
 };
 
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
@@ -24146,6 +24147,10 @@ export const createFirstSliceServices = (
   const participantLoginFailureWindowMs =
     dependencies.participantLoginFailureWindowMs ??
     DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS;
+  const requireLoginPassword = dependencies.requireLoginPassword ?? false;
+  if (typeof requireLoginPassword !== "boolean") {
+    throw new Error("requireLoginPassword must be a boolean.");
+  }
   if (!Number.isInteger(adminLoginMaxFailures) || adminLoginMaxFailures <= 0) {
     throw new Error("adminLoginMaxFailures must be a positive integer.");
   }
@@ -25161,6 +25166,26 @@ export const createFirstSliceServices = (
         "participant_roster_empty",
         "Participant roster did not contain any participant login entries."
       );
+    }
+
+    // Validate the complete input before changing any stored roster row or
+    // migration candidate. Original Testcenter 19 exempts only sys-check-login.
+    if (requireLoginPassword) {
+      const passwordlessLoginKeys = [
+        ...parsedEntries.filter(entry => !entry.password).map(entry => entry.loginKey),
+        ...operationalLoginCandidates
+          .filter(candidate => candidate.loginMode !== "sys-check-login" &&
+            !candidate.passwordRequired)
+          .map(candidate => candidate.loginKey)
+      ];
+      if (passwordlessLoginKeys.length > 0) {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_password_required",
+          "Testtakers contain logins without passwords, but passwords are required on this instance.",
+          { loginKeys: passwordlessLoginKeys }
+        );
+      }
     }
 
     const seenLoginKeys = new Set<string>();
@@ -31427,7 +31452,7 @@ export const createFirstSliceServices = (
           );
         }
         const signInTimestamp = now();
-        if (rosterEntry?.passwordRequired) {
+        if (requireLoginPassword || rosterEntry?.passwordRequired) {
           const loginAttempt = await repository.getParticipantLoginAttempt(
             workspace.tenantId,
             workspace.workspaceId,

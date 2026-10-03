@@ -14,6 +14,16 @@ and implementation. Each needs current rewrite evidence before it is closed:
   administrator's password retains its distinct authorization boundary.
 - Optional installation-wide refusal of passwordless logins and rejection of
   Testtakers files containing them, with the Original `sys-check-login` exception.
+  Implemented through `REQUIRE_LOGIN_PASSWORD` (default false): existing
+  passwordless participant sign-in/starter launch and direct/packaged roster
+  imports are refused before roster changes or release staging. Monitor
+  migration candidates also require source passwords; `sys-check-login`
+  candidates remain importable without one. The rewrite's separately created
+  operator accounts still require passwords; passwordless system-check-account
+  sign-in is not claimed as Original UI/auth parity. Regression gates exercise
+  durable policy changes, all six participant modes and both monitor modes,
+  CSV/JSON/XML/ZIP input, unchanged existing passwords/candidates, and startup
+  rejection of invalid settings or conflicting passwordless demo bootstrap.
 - Login codes and `CodeToEnter` are case-insensitive; successful login resets
   failed-attempt counters. Current execution-mode/session reuse capabilities
   must agree with the Original definitions.

@@ -1629,6 +1629,7 @@ export type GetRuntimeConfigResponse = {
       previousKeyConfigured: boolean;
     };
     participantLoginProtection: {
+      requirePassword: boolean;
       maxFailures: number;
       failureWindowMs: number;
     };
