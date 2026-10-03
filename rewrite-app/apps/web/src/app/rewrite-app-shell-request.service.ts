@@ -22,6 +22,7 @@ export class RewriteAppShellRequestService {
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private adminSessionResetStarted = false;
+  private participantAccess: Promise<typeof import("./participant-access-credentials")> | null = null;
 
   requestJson<T = Record<string, unknown>>(
     label: string,
@@ -46,18 +47,21 @@ export class RewriteAppShellRequestService {
     if (!options.quiet) {
       beginForegroundShellRequest(this.createRequestStateHost(), label);
     }
-    const requestHeaders = this.createRequestHeaders(options.headers);
-    const requestAdminSessionToken = this.readBearerToken(
-      requestHeaders.authorization
-    );
+    let requestAdminSessionToken: string | null = null;
 
     try {
+      const requestHeaders = await this.createRequestHeaders(path, body, options.headers);
+      requestAdminSessionToken = this.readBearerToken(requestHeaders.authorization);
       const { statusCode, payload } = await this.api.send<T>(
         method,
         path,
         body,
         requestHeaders
       );
+      if (path.startsWith("/api/v1/participant/") &&
+        !(await this.getParticipantAccess()).rememberParticipantAccessResponse(path, payload)) {
+        throw new Error("Participant access could not be secured in browser storage.");
+      }
       if (!options.quiet) {
         applyForegroundShellResponse(
           this.createRequestStateHost(),
@@ -91,11 +95,10 @@ export class RewriteAppShellRequestService {
 
   async requestDownload(label: string, path: string): Promise<ApiDownload> {
     beginForegroundShellRequest(this.createRequestStateHost(), label);
-    const requestHeaders = this.createRequestHeaders(undefined);
-    const requestAdminSessionToken = this.readBearerToken(
-      requestHeaders.authorization
-    );
+    let requestAdminSessionToken: string | null = null;
     try {
+      const requestHeaders = await this.createRequestHeaders(path, undefined, undefined);
+      requestAdminSessionToken = this.readBearerToken(requestHeaders.authorization);
       const download = await this.api.download(path, requestHeaders);
       applyForegroundShellResponse(
         this.createRequestStateHost(),
@@ -156,16 +159,24 @@ export class RewriteAppShellRequestService {
     });
   }
 
-  private createRequestHeaders(
+  private async createRequestHeaders(
+    path: string,
+    body: unknown,
     headers: Record<string, string> | undefined
-  ): Record<string, string> {
-    const adminSessionToken = this.uiState.ops.adminSessionToken.trim();
+  ): Promise<Record<string, string>> {
+    const sessionToken = path.startsWith("/api/v1/participant/")
+      ? (await this.getParticipantAccess()).participantRequestToken(path, body)
+      : this.uiState.ops.adminSessionToken.trim();
     return {
-      ...(adminSessionToken
-        ? { authorization: `Bearer ${adminSessionToken}` }
+      ...(sessionToken
+        ? { authorization: `Bearer ${sessionToken}` }
         : {}),
       ...(headers ?? {})
     };
+  }
+
+  private getParticipantAccess(): Promise<typeof import("./participant-access-credentials")> {
+    return this.participantAccess ??= import("./participant-access-credentials");
   }
 
   private readBearerToken(authorization: string | undefined): string | null {

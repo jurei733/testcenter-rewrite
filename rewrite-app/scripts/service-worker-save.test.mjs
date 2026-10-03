@@ -87,3 +87,28 @@ test("background saves keep permanent rejection behavior and reject malformed re
   assert.equal(pending.size, 0);
   assert.equal(sent.length, 0);
 });
+
+test("background delivery renews only the bearer envelope, preserving the answer and delivery ID", async () => {
+  const item = { ...record(), sessionToken: "a".repeat(43) };
+  const { pending, sent, run } = fixture([item]);
+  await assert.rejects(run(async () => response(401)), /remain queued/);
+  pending.get(item.key).sessionToken = "b".repeat(43);
+  await run(async () => response(200));
+  assert.equal(sent[0].init.headers.authorization, `Bearer ${item.sessionToken}`);
+  assert.equal(sent[1].init.headers.authorization, `Bearer ${"b".repeat(43)}`);
+  assert.equal(sent[0].init.body, sent[1].init.body);
+  assert.equal(sent[0].url, sent[1].url);
+  assert.equal(sent[0].init.body.includes(item.sessionToken), false);
+  assert.equal(pending.size, 0);
+});
+
+test("invalid background bearer metadata cannot discard an otherwise valid answer", async () => {
+  for (const sessionToken of ["r1." + "a".repeat(43), "Bearer injected\r\nheader", {}, "x".repeat(257)]) {
+    const item = { ...record(), sessionToken };
+    const { pending, sent, run } = fixture([item]);
+    await assert.rejects(run(async () => response(401)), /remain queued/);
+    assert.equal(pending.size, 1);
+    assert.equal(sent[0].init.headers.authorization, undefined);
+    assert.deepEqual(JSON.parse(sent[0].init.body).unitResponse, item.entry.response);
+  }
+});

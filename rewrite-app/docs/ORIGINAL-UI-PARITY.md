@@ -67,7 +67,9 @@ local browser checks cover locked/completed cards, retry after a failed resume,
 desktop/mobile widths and an actual Review account's empty CSV response (204)
 with its authored start-button text. Full CI for the new commit is still a
 separate gate. The current production bundle is 468.47kB under the unchanged
-470kB error limit; its 450kB warning remains.
+470kB error limit; its 450kB warning remains. The subsequent lazy participant
+credential adapter brings the current bundle to 468.94kB without raising
+either budget; Original theme-size warnings remain unchanged.
 
 All rows are currently open. Close a row only with matching reference states
 and browser evidence at equal viewport, theme, text and fixture settings.

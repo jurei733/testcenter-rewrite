@@ -1,4 +1,5 @@
 import type { ParticipantSaveOutboxEntry } from "./participant-save-outbox";
+import { readParticipantRunCredential } from "./participant-access-credentials";
 
 const PARTICIPANT_SAVE_UPSERT_MESSAGE =
   "testcenter-participant-save-outbox-upsert-v1";
@@ -12,7 +13,8 @@ export function queueParticipantSaveForBackgroundDelivery(
 ): void {
   postParticipantSaveWorkerMessage({
     type: PARTICIPANT_SAVE_UPSERT_MESSAGE,
-    entry
+    entry,
+    sessionToken: readParticipantRunCredential(entry.testRunId)
   });
 }
 

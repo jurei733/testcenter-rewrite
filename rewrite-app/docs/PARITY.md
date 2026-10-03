@@ -87,6 +87,22 @@ and implementation. Each needs current rewrite evidence before it is closed:
   this separation, cross-session rejection and validity across store restart.
   HTTP resource URLs and Player resource-base responses are not wired yet;
   these foundation tests do not claim an enforced HTTP resource boundary.
+  The shared browser request adapter now selects credentials from the exact
+  participant session/run instead of forwarding an operator bearer to public
+  participant routes. Successful participant responses populate a separate,
+  bounded owner/credential store; rotation replaces only the token, and a
+  confirmed-logout tombstone preserves owners and pending answers while
+  disabling local legacy fallback. Participant SSE and worker saves use the
+  same credential selection. Worker credentials are delivery metadata only:
+  answer bytes, request body, delivery ID and foreground outbox stay unchanged.
+  Invalid metadata cannot discard a valid queued answer. Fourteen actual
+  frontend/worker-state tests passed, along with a fresh protected SQLite/
+  Chromium gate through Original/Rewrite entry, real Verona offline recovery
+  and view-closure background delivery; the browser gate rejects operator-token
+  forwarding. A headful check also passed Original footer/account keyboard
+  behavior and same-run return. Current HTTP login still does not issue the
+  new token and route authorization is not yet enforced: this is client
+  transport readiness, not completed participant sign-out/ownership parity.
   As a prerequisite, the shipped background worker now retains its exact
   pending response and delivery ID on 401/403, request timeout, rate limiting,
   network failure and server failure, so renewed authentication can retry it.

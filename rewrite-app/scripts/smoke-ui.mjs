@@ -401,6 +401,7 @@ try {
   const configuredAdminPasswordPattern =
     process.env.FIRST_SLICE_ADMIN_PASSWORD_PATTERN ?? "^.*$";
   let totalApiRequestCount = 0;
+  let participantOperatorCredentialLeakCount = 0;
   const observedProofOfWorkScopes = new Set();
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
@@ -409,6 +410,8 @@ try {
     if (stopAfterStep !== step) {
       return;
     }
+    assert.equal(participantOperatorCredentialLeakCount, 0,
+      "Participant browser requests must not carry the signed-in operator credential.");
 
     process.stdout.write(
       `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`
@@ -423,6 +426,11 @@ try {
       }
 
       totalApiRequestCount += 1;
+      if (new URL(url).pathname.startsWith("/api/v1/participant/") &&
+        smokeAdminSessionToken &&
+        request.headers().authorization === `Bearer ${smokeAdminSessionToken}`) {
+        participantOperatorCredentialLeakCount += 1;
+      }
       if (
         request.method() === "POST" &&
         new URL(url).pathname === "/api/v1/system/proof-of-work/challenges"
@@ -24922,6 +24930,8 @@ try {
   await selectedResultGroup.waitFor({ state: "detached" });
   stopAfter("delete-group-results");
 
+  assert.equal(participantOperatorCredentialLeakCount, 0,
+    "Participant browser requests must not carry the signed-in operator credential.");
   process.stdout.write(
     `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
   );

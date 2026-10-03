@@ -8,6 +8,7 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { readParticipantSessionCredential } from "./participant-access-credentials";
 
 type ParticipantRefresh = () => Promise<void>;
 type ParticipantConnectionModeChange = (
@@ -123,13 +124,17 @@ export class ParticipantEventStreamService {
       );
     }
     try {
+      const sessionToken = readParticipantSessionCredential(input.participantSessionId);
       const response = await fetch(
         resolveRoutePath(productionApiRoutes.participant.eventStream, {
           participantSessionId: input.participantSessionId
         }),
         {
           method: "GET",
-          headers: { accept: "text/event-stream" },
+          headers: {
+            accept: "text/event-stream",
+            ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {})
+          },
           cache: "no-store",
           signal: controller.signal
         }

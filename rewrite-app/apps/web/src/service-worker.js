@@ -156,9 +156,13 @@ const isParticipantSaveEntry = entry => {
 
 const participantSaveKey = entry => `${entry.testRunId}\n${entry.unitKey}`;
 
-const upsertParticipantBackgroundSave = entry =>
+const isParticipantSaveToken = token =>
+  typeof token === "string" && /^[A-Za-z0-9_-]{1,256}$/.test(token);
+
+const upsertParticipantBackgroundSave = (entry, sessionToken) =>
   runParticipantSaveTransaction("readwrite", store => {
-    store.put({ key: participantSaveKey(entry), entry });
+    store.put({ key: participantSaveKey(entry), entry,
+      sessionToken: isParticipantSaveToken(sessionToken) ? sessionToken : null });
   });
 
 const deleteParticipantBackgroundSaveByKey = (key, deliveryId) =>
@@ -236,7 +240,11 @@ const drainParticipantBackgroundSaves = async ({
         {
           method: "POST",
           credentials: "same-origin",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(isParticipantSaveToken(record.sessionToken)
+              ? { authorization: `Bearer ${record.sessionToken}` } : {})
+          },
           body: JSON.stringify({
             deliveryId: entry.deliveryId,
             responseUnitKey: entry.unitKey,
@@ -277,7 +285,7 @@ self.addEventListener("message", event => {
     isParticipantSaveEntry(message.entry)
   ) {
     event.waitUntil(
-      upsertParticipantBackgroundSave(message.entry)
+      upsertParticipantBackgroundSave(message.entry, message.sessionToken)
         .then(() => drainParticipantBackgroundSaves())
         .catch(() => registerParticipantSaveSync())
     );
