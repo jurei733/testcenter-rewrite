@@ -66,6 +66,21 @@ and implementation. Each needs current rewrite evidence before it is closed:
   verify headers alongside exact payload/range behavior; PostgreSQL remains
   a separate CI gate. This closes the download-cache subrequirement, not
   participant credential revocation, ownership or internal-error disclosure.
+  The backend credential foundation is implemented separately from session
+  records: random 256-bit tokens, durable SHA-256 digests, permanent revocation
+  tombstones, run-owner binding and compare-and-revoke against a newer login.
+  A legacy opaque session-ID credential is a migration path only until that
+  session's first token issuance or revocation; it cannot reactivate afterward.
+  Unit and memory/file/SQLite store regressions cover rotation, stale logout,
+  cross-participant rejection, restart, unchanged session/run/response records,
+  preserved access expiry and workspace-deletion cleanup. This service is not
+  yet exposed as a UI logout operation: HTTP participant routes, resource and
+  live channels, and foreground/background saves still need one consistently
+  enforced credential transport before enabling the Original account action.
+  The complete API suite passed with memory, file and SQLite stores (160 tests
+  per store), together with 138 unit and three frontend-state tests. PostgreSQL
+  validation of the new credential table remains its own unpublished-change
+  CI gate; the earlier PostgreSQL success does not establish this migration.
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
@@ -136,6 +151,9 @@ enabled and disabled states instead of trusting a newly rendered input's
 default value. A fresh protected SQLite/Chromium attachment/camera gate passed
 with refresh disabled, including lookup, capture, upload, preview and deletion;
 the complete post-fix CI still needs its own successful result.
+At `5578bb9cfcbad611e81fdc6bde2b763c2d3cbd67`, full UI, Quick, PostgreSQL
+integration and PostgreSQL UI passed. Ops failed and its exact failure is
+under investigation; the overall pipeline is not green.
 
 The zoneless Attachment Capture view now explicitly notifies Angular after
 camera, QR, target lookup, photo encoding and upload callbacks. The isolated

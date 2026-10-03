@@ -15,6 +15,15 @@ import type {
   Element as XmlElement
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv } from "./original-report-csv.js";
+import {
+  createParticipantAccessService,
+  type ParticipantAccessPort,
+  type ParticipantAccessRepository
+} from "./participant-access.js";
+export type {
+  ParticipantAccessCredential,
+  ParticipantAccessRepository
+} from "./participant-access.js";
 import { CodingSchemeFactory } from "@iqb/responses";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
@@ -1094,6 +1103,7 @@ export type FirstSlicePorts = {
   workspaceResults: WorkspaceResultsPort;
   workspaceReview: WorkspaceReviewPort;
   participantRuntime: ParticipantRuntimePort;
+  participantAccess: ParticipantAccessPort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
   systemCheck: SystemCheckPort;
@@ -1241,7 +1251,7 @@ export type FirstSliceServices = FirstSlicePorts & {
   }): Promise<CreateImportJobResult>;
 };
 
-export type FirstSliceRepository = {
+export type FirstSliceRepository = ParticipantAccessRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   listApplicationAssets(): Promise<ApplicationAsset[]>;
@@ -31432,6 +31442,17 @@ export const createFirstSliceServices = (
       }
     },
     createImportJobWithRelease,
+    participantAccess: createParticipantAccessService({
+      repository,
+      getAccessibleSession: requireAccessibleParticipantSession,
+      invalidAccess: () => new FirstSliceError(
+        401,
+        "participant_session_invalid",
+        "Participant access is invalid or has expired."
+      ),
+      now,
+      allowLegacySessionIds: true
+    }),
     participantRuntime: {
       async signIn(input) {
         const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);

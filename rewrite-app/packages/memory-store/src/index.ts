@@ -1,7 +1,8 @@
 import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
-  type FirstSliceRepository
+  type FirstSliceRepository,
+  type ParticipantAccessCredential
 } from "@testcenter-rewrite-app/application";
 import { selectLatestParticipantTestStateLogs } from "@testcenter-rewrite-app/domain";
 import type {
@@ -51,6 +52,7 @@ type InMemoryFirstSliceState = {
   importJobs: Map<string, ImportJob>;
   contentReleases: Map<string, ContentRelease>;
   participantSessions: Map<string, ParticipantSession>;
+  participantAccessCredentials: Map<string, ParticipantAccessCredential>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
   operationalLoginMigrationCandidates: Map<
     string,
@@ -82,6 +84,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   importJobs: new Map(),
   contentReleases: new Map(),
   participantSessions: new Map(),
+  participantAccessCredentials: new Map(),
   participantRosterEntries: new Map(),
   operationalLoginMigrationCandidates: new Map(),
   participantRosterPasswordHashes: new Map(),
@@ -293,6 +296,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       };
       const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+      for (const session of state.participantSessions.values()) {
+        if (workspaceMatches(session)) state.participantAccessCredentials.delete(session.participantSessionId);
+      }
       const counts = {
         deletedWorkspaceCount: 1,
         deletedAdminRoleAssignmentCount: deleteMatching(
@@ -563,6 +569,21 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return state.participantSessions.get(participantSessionId) ?? null;
+    },
+    async getParticipantAccessCredential(participantSessionId) {
+      const credential = state.participantAccessCredentials.get(participantSessionId);
+      return credential ? { ...credential } : null;
+    },
+    async saveParticipantAccessCredential(credential) {
+      state.participantAccessCredentials.set(credential.participantSessionId, { ...credential });
+    },
+    async revokeParticipantAccessCredential(input) {
+      const current = state.participantAccessCredentials.get(input.participantSessionId);
+      if ((current?.tokenHash ?? null) !== input.expectedTokenHash) return false;
+      state.participantAccessCredentials.set(input.participantSessionId, {
+        participantSessionId: input.participantSessionId, tokenHash: null, updatedAt: input.updatedAt
+      });
+      return true;
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return Array.from(state.participantSessions.values()).filter(

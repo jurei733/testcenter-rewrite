@@ -1428,6 +1428,17 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_consumed_proof_of_work_challenges_expiry
         ON consumed_proof_of_work_challenges (expires_at);
     `
+  },
+  {
+    version: 51,
+    name: "add_participant_access_credentials",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_access_credentials (
+        participant_session_id TEXT PRIMARY KEY REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+        token_hash TEXT,
+        updated_at TEXT NOT NULL
+      );
+    `
   }
 ];
 
@@ -2707,6 +2718,31 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [participantSessionId],
         mapParticipantSession
       );
+    },
+    async getParticipantAccessCredential(participantSessionId) {
+      const result = await pool.query("SELECT token_hash, updated_at FROM participant_access_credentials WHERE participant_session_id = $1", [participantSessionId]);
+      const row = result.rows[0];
+      return row ? {
+        participantSessionId, tokenHash: row.token_hash === null ? null : String(row.token_hash), updatedAt: String(row.updated_at)
+      } : null;
+    },
+    async saveParticipantAccessCredential(credential) {
+      await pool.query(`INSERT INTO participant_access_credentials (participant_session_id, token_hash, updated_at)
+        VALUES ($1, $2, $3) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash = excluded.token_hash, updated_at = excluded.updated_at`,
+        [credential.participantSessionId, credential.tokenHash, credential.updatedAt]);
+    },
+    async revokeParticipantAccessCredential(input) {
+      if (input.expectedTokenHash !== null) {
+        const result = await pool.query(`UPDATE participant_access_credentials SET token_hash = NULL, updated_at = $1
+          WHERE participant_session_id = $2 AND token_hash = $3`,
+          [input.updatedAt, input.participantSessionId, input.expectedTokenHash]);
+        return (result.rowCount ?? 0) > 0;
+      }
+      const result = await pool.query(`INSERT INTO participant_access_credentials (participant_session_id, token_hash, updated_at)
+        VALUES ($1, NULL, $2) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash = NULL, updated_at = excluded.updated_at
+        WHERE participant_access_credentials.token_hash IS NOT DISTINCT FROM $3::text`,
+        [input.participantSessionId, input.updatedAt, input.expectedTokenHash]);
+      return (result.rowCount ?? 0) > 0;
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(

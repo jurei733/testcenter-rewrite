@@ -13,7 +13,8 @@ import { dirname, join } from "node:path";
 import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
-  type FirstSliceRepository
+  type FirstSliceRepository,
+  type ParticipantAccessCredential
 } from "@testcenter-rewrite-app/application";
 import {
   defaultApplicationSettings,
@@ -65,6 +66,7 @@ type PersistedFirstSliceState = {
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
   participantSessions: Record<string, ParticipantSession>;
+  participantAccessCredentials: Record<string, ParticipantAccessCredential>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
   operationalLoginMigrationCandidates: Record<
     string,
@@ -110,6 +112,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   importJobs: {},
   contentReleases: {},
   participantSessions: {},
+  participantAccessCredentials: {},
   participantRosterEntries: {},
   operationalLoginMigrationCandidates: {},
   participantRosterPasswordHashes: {},
@@ -845,6 +848,9 @@ export const createFileFirstSliceRepository = (
         };
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+        for (const session of Object.values(state.participantSessions)) {
+          if (workspaceMatches(session)) delete state.participantAccessCredentials[session.participantSessionId];
+        }
         for (const sourcePackage of Object.values(state.sourcePackages)) {
           if (workspaceMatches(sourcePackage)) {
             dirtySourcePackageIds.add(sourcePackage.sourcePackageId);
@@ -1143,6 +1149,25 @@ export const createFileFirstSliceRepository = (
     async getParticipantSessionById(participantSessionId) {
       const state = await getState();
       return state.participantSessions[participantSessionId] ?? null;
+    },
+    async getParticipantAccessCredential(participantSessionId) {
+      const credential = (await getState()).participantAccessCredentials[participantSessionId];
+      return credential ? { ...credential } : null;
+    },
+    async saveParticipantAccessCredential(credential) {
+      await mutate(state => {
+        state.participantAccessCredentials[credential.participantSessionId] = { ...credential };
+      });
+    },
+    async revokeParticipantAccessCredential(input) {
+      return mutate(state => {
+        const current = state.participantAccessCredentials[input.participantSessionId];
+        if ((current?.tokenHash ?? null) !== input.expectedTokenHash) return false;
+        state.participantAccessCredentials[input.participantSessionId] = {
+          participantSessionId: input.participantSessionId, tokenHash: null, updatedAt: input.updatedAt
+        };
+        return true;
+      });
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const state = await getState();

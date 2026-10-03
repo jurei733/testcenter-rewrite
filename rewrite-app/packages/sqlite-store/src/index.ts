@@ -1497,6 +1497,17 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX idx_consumed_proof_of_work_challenges_expiry
         ON consumed_proof_of_work_challenges (expires_at);
     `
+  },
+  {
+    version: 57,
+    name: "add_participant_access_credentials",
+    sql: `
+      CREATE TABLE participant_access_credentials (
+        participant_session_id TEXT PRIMARY KEY REFERENCES participant_sessions(participant_session_id) ON DELETE CASCADE,
+        token_hash TEXT,
+        updated_at TEXT NOT NULL
+      );
+    `
   }
 ];
 
@@ -2821,6 +2832,30 @@ export const createSqliteFirstSliceRepository = (
         )
         .get(participantSessionId) as Record<string, unknown> | undefined;
       return mapParticipantSession(row);
+    },
+    async getParticipantAccessCredential(participantSessionId) {
+      const row = database.prepare("SELECT token_hash, updated_at FROM participant_access_credentials WHERE participant_session_id = ?")
+        .get(participantSessionId) as Record<string, unknown> | undefined;
+      return row ? {
+        participantSessionId, tokenHash: row.token_hash === null ? null : String(row.token_hash), updatedAt: String(row.updated_at)
+      } : null;
+    },
+    async saveParticipantAccessCredential(credential) {
+      database.prepare(`INSERT INTO participant_access_credentials (participant_session_id, token_hash, updated_at)
+        VALUES (?, ?, ?) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash = excluded.token_hash, updated_at = excluded.updated_at`)
+        .run(credential.participantSessionId, credential.tokenHash, credential.updatedAt);
+    },
+    async revokeParticipantAccessCredential(input) {
+      if (input.expectedTokenHash !== null) {
+        return Number(database.prepare(`UPDATE participant_access_credentials SET token_hash = NULL, updated_at = ?
+          WHERE participant_session_id = ? AND token_hash = ?`)
+          .run(input.updatedAt, input.participantSessionId, input.expectedTokenHash).changes) > 0;
+      }
+      const result = database.prepare(`INSERT INTO participant_access_credentials (participant_session_id, token_hash, updated_at)
+        VALUES (?, NULL, ?) ON CONFLICT(participant_session_id) DO UPDATE SET token_hash = NULL, updated_at = excluded.updated_at
+        WHERE participant_access_credentials.token_hash IS ?`)
+        .run(input.participantSessionId, input.updatedAt, input.expectedTokenHash);
+      return Number(result.changes) > 0;
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database

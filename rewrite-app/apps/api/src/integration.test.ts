@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -32,6 +32,11 @@ import {
   type ProofOfWorkSolution
 } from "@testcenter-rewrite-app/contracts";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
+import { createFileFirstSliceRepository } from "@testcenter-rewrite-app/file-store";
+import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
+import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
+import { createFirstSliceServices, type FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createProductionApiServer } from "./index.js";
 import { ProofOfWorkManager } from "./proof-of-work.js";
@@ -725,6 +730,106 @@ before(async () => {
 
 after(async () => {
   await closeServer(server);
+});
+
+test("participant access credentials rotate and revoke without changing sessions or saved answers", async () => {
+  const storeKind = process.env.FIRST_SLICE_STORE ?? "memory";
+  const directory = mkdtempSync(join(tmpdir(), "participant-access-credentials-"));
+  const memoryRepository = createInMemoryFirstSliceRepository();
+  let shutdown = async () => {};
+  const openRepository = async (): Promise<FirstSliceRepository> => {
+    if (storeKind === "file") return createFileFirstSliceRepository(join(directory, "store.json"));
+    if (storeKind === "sqlite") return createSqliteFirstSliceRepository(join(directory, "store.sqlite"));
+    if (storeKind === "postgres") {
+      const storage = await createPostgresFirstSliceStorage(process.env.FIRST_SLICE_POSTGRES_URL!);
+      shutdown = storage.shutdown;
+      return storage.repository;
+    }
+    return memoryRepository;
+  };
+  let repository = await openRepository();
+  const fixtureId = randomUUID();
+  const tenantId = `credential-tenant-${fixtureId}`;
+  const workspaceId = `credential-workspace-${fixtureId}`;
+  const stamp = "2026-10-03T12:00:00.000Z";
+  const deletion = {
+    tenantKey: tenantId, tenantId, workspaceKey: workspaceId, workspaceId,
+    auditEvent: { adminAuditEventId: randomUUID(), eventType: "workspace_deleted" as const,
+      actorAdminUserId: null, subjectAdminUserId: null, occurredAt: stamp,
+      summary: "Remove isolated credential test workspace", details: { workspaceId } }
+  };
+  const session: ParticipantSession = {
+    participantSessionId: randomUUID(), tenantId, workspaceId, contentReleaseId: randomUUID(),
+    loginKey: "credential-login", groupKey: "credential-group", executionMode: "run-hot-return",
+    status: "launched", participantCode: null, validUntil: null, createdAt: stamp
+  };
+  const run: TestRun = {
+    testRunId: randomUUID(), participantSessionId: session.participantSessionId, tenantId, workspaceId,
+    contentReleaseId: session.contentReleaseId, bookletKey: "credential-booklet", status: "running",
+    currentUnitKey: "credential-unit", unitResponses: { "credential-unit": '{"value":"retained answer"}' },
+    createdAt: stamp, updatedAt: stamp, completedAt: null
+  };
+  const invalid = (error: unknown) => typeof error === "object" && error !== null && "errorCode" in error && error.errorCode === "participant_session_invalid";
+  const access = () => createFirstSliceServices({ repository }).participantAccess;
+  try {
+    await repository.saveTenant({ tenantId, tenantKey: tenantId, displayName: tenantId, status: "active", createdAt: stamp });
+    await repository.saveWorkspace({ tenantKey: tenantId, workspaceKey: workspaceId,
+      workspace: { workspaceId, tenantId, workspaceKey: workspaceId, displayName: workspaceId, status: "active", createdAt: stamp } });
+    await repository.saveParticipantSession(session);
+    await repository.saveTestRun(run);
+    const storedRunBeforeAccess = structuredClone(await repository.getTestRunById(run.testRunId));
+    assert.deepEqual(storedRunBeforeAccess?.unitResponses, run.unitResponses);
+    assert.equal(await repository.revokeParticipantAccessCredential({ participantSessionId: session.participantSessionId, expectedTokenHash: "missing", updatedAt: stamp }), false);
+    assert.equal(await repository.getParticipantAccessCredential(session.participantSessionId), null);
+    assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: session.participantSessionId }), session);
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: "wrong" }), invalid);
+    await assert.rejects(access().authorize({ participantSessionId: randomUUID(), testRunId: run.testRunId, sessionToken: session.participantSessionId }), invalid);
+    assert.equal(await access().revoke({ participantSessionId: session.participantSessionId, sessionToken: session.participantSessionId }), true);
+    assert.equal((await repository.getParticipantAccessCredential(session.participantSessionId))?.tokenHash, null);
+    await assert.rejects(access().authorize({ participantSessionId: session.participantSessionId, sessionToken: session.participantSessionId }), invalid);
+    const token = await access().issueCredential({ participantSessionId: session.participantSessionId });
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+    const credential = await repository.getParticipantAccessCredential(session.participantSessionId);
+    assert.equal(credential?.tokenHash, createHash("sha256").update(token).digest("hex"));
+    assert.doesNotMatch(JSON.stringify(credential), new RegExp(token));
+    assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: token }), session);
+    const renewedToken = await access().issueCredential({ participantSessionId: session.participantSessionId });
+    assert.notEqual(renewedToken, token);
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: token }), invalid);
+    assert.equal(await repository.revokeParticipantAccessCredential({ participantSessionId: session.participantSessionId, expectedTokenHash: credential!.tokenHash, updatedAt: stamp }), false);
+    assert.equal(await repository.revokeParticipantAccessCredential({ participantSessionId: session.participantSessionId, expectedTokenHash: null, updatedAt: stamp }), false);
+    assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: renewedToken }), session);
+    assert.equal(await access().revoke({ participantSessionId: session.participantSessionId, sessionToken: renewedToken }), true);
+    await shutdown();
+    repository = await openRepository();
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: renewedToken }), invalid);
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: session.participantSessionId }), invalid);
+    const returnedToken = await access().issueCredential({ participantSessionId: session.participantSessionId });
+    assert.notEqual(returnedToken, renewedToken);
+    assert.deepEqual(await access().authorize({ testRunId: run.testRunId, sessionToken: returnedToken }), session);
+    const otherSession = { ...session, participantSessionId: randomUUID(), loginKey: "other-credential-login" };
+    const otherRun = { ...run, testRunId: randomUUID(), participantSessionId: otherSession.participantSessionId };
+    await repository.saveParticipantSession(otherSession);
+    await repository.saveTestRun(otherRun);
+    await assert.rejects(access().authorize({ testRunId: otherRun.testRunId, sessionToken: returnedToken }), invalid);
+    const otherToken = await access().issueCredential({ participantSessionId: otherSession.participantSessionId });
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: otherToken }), invalid);
+    assert.deepEqual(await access().authorize({ testRunId: otherRun.testRunId, sessionToken: otherToken }), otherSession);
+    await assert.rejects(access().revoke({ participantSessionId: session.participantSessionId, sessionToken: renewedToken }), invalid);
+    assert.deepEqual(await repository.getParticipantSessionById(session.participantSessionId), session);
+    assert.deepEqual(await repository.getTestRunById(run.testRunId), storedRunBeforeAccess);
+    const expiredSession = { ...session, validUntil: "2000-01-01T00:00:00.000Z" };
+    await repository.saveParticipantSession(expiredSession);
+    await assert.rejects(access().authorize({ testRunId: run.testRunId, sessionToken: returnedToken }), { errorCode: "participant_access_expired" });
+    await assert.rejects(access().issueCredential({ participantSessionId: session.participantSessionId }), { errorCode: "participant_access_expired" });
+    await repository.saveParticipantSession(session);
+    await repository.deleteWorkspaceAggregate(deletion);
+    assert.equal(await repository.getParticipantAccessCredential(session.participantSessionId), null);
+    assert.equal(await repository.getParticipantAccessCredential(otherSession.participantSessionId), null);
+  } finally {
+    await repository.deleteWorkspaceAggregate(deletion);
+    await shutdown();
+  }
 });
 
 test("proof-of-work challenges bind credentials, expire, rotate, and reject replay", async () => {
