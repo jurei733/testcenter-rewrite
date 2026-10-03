@@ -13863,21 +13863,35 @@ try {
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
-  await page.waitForFunction(
-    ({ storageKey, deliveredUnitKeys, expectedCount }) => {
+  try {
+    await page.waitForFunction(
+      ({ storageKey, deliveredUnitKeys, expectedCount }) => {
+        const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+        return stored?.entries?.length === expectedCount &&
+          stored.entries.every(
+            entry => !deliveredUnitKeys.includes(entry.unitKey)
+          );
+      },
+      {
+        storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+        deliveredUnitKeys: [...permittedStarsMidDrainUnits],
+        expectedCount: starsUnitKeys.length - permittedStarsMidDrainUnits.size
+      },
+      { timeout: store === "postgres" ? 60_000 : 30_000 }
+    );
+  } catch (error) {
+    // Preserve the strict recovery gate and expose only queue identity/counts,
+    // never response content, when a runner cannot reach the expected state.
+    const queueState = await page.evaluate(storageKey => {
       const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-      return stored?.entries?.length === expectedCount &&
-        stored.entries.every(
-          entry => !deliveredUnitKeys.includes(entry.unitKey)
-        );
-    },
-    {
-      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
-      deliveredUnitKeys: [...permittedStarsMidDrainUnits],
-      expectedCount: starsUnitKeys.length - permittedStarsMidDrainUnits.size
-    },
-    { timeout: store === "postgres" ? 60_000 : 30_000 }
-  );
+      return { unitKeys: stored?.entries?.map(entry => entry.unitKey) ?? [],
+        entryCount: stored?.entries?.length ?? 0 };
+    }, "testcenter-rewrite:participant-save-outbox:v1");
+    process.stdout.write(`ui_smoke_mid_drain_queue=${JSON.stringify({
+      ...queueState, deliveredUnitKeys: [...permittedStarsMidDrainUnits]
+    })}\n`);
+    throw error;
+  }
   const restoredStarsMidDrainEntries = await page.evaluate(storageKey => {
     const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
     return stored?.entries ?? [];
@@ -19919,8 +19933,12 @@ try {
   await savedRosterBenCard
     .getByRole("button", { name: "Open Participant Entry", exact: true })
     .waitFor();
+  // Download time starts only after the busy shell has made this action
+  // clickable. A long pending refresh must not consume the download timeout.
+  const rosterExportButton = page.locator("#exportParticipantRosterCsvButton");
+  await rosterExportButton.click({ trial: true });
   const participantRosterDownloadPromise = page.waitForEvent("download");
-  await page.locator("#exportParticipantRosterCsvButton").click();
+  await rosterExportButton.click();
   const participantRosterDownload = await participantRosterDownloadPromise;
   assert.equal(
     participantRosterDownload.suggestedFilename(),
@@ -24308,7 +24326,10 @@ try {
 
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
-  await fillAndCommit("#workspaceKey", attachmentWorkspaceKey);
+  await fillAndCommitUntilValue("#workspaceKey", attachmentWorkspaceKey);
+  await page.waitForFunction(expectedWorkspaceKey =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+      .workspaceKey === expectedWorkspaceKey, attachmentWorkspaceKey);
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   const attachmentManager = page.locator("#attachmentManagerCard");
