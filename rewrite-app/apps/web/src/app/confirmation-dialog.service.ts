@@ -15,6 +15,7 @@ export type ConfirmationDialogRequest = {
   showCancel?: boolean;
   tone?: ConfirmationDialogTone;
   verification?: ConfirmationDialogVerification;
+  presentation?: "original-system-check-saved";
 };
 
 export type ActiveConfirmationDialog = {
@@ -26,6 +27,7 @@ export type ActiveConfirmationDialog = {
   showCancel: boolean;
   tone: ConfirmationDialogTone;
   verification: ConfirmationDialogVerification | null;
+  presentation?: "original-system-check-saved";
 };
 
 @Injectable({ providedIn: "root" })
@@ -53,7 +55,8 @@ export class ConfirmationDialogService {
         cancelLabel: request.cancelLabel ?? "Cancel",
         showCancel: request.showCancel ?? true,
         tone: request.tone ?? "danger",
-        verification: request.verification ?? null
+        verification: request.verification ?? null,
+        ...(request.presentation ? { presentation: request.presentation } : {})
       });
     });
   }

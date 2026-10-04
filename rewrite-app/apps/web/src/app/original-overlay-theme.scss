@@ -1,10 +1,31 @@
 @use './original-material-theme' as theme;
+@use '@angular/material' as mat;
 
 // CDK overlays live under body, outside the component's themed host.
 // Scope their theme explicitly; never affect a Rewrite menu or dialog.
 :root[data-interface-mode='original'] .original-participant-account-menu,
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
+:root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-player-menu {
   @include theme.apply();
+}
+
+// Pinned 19.0 theme/material-overrides.scss. Only Original overlays inherit
+// these tokens; the native Rewrite confirmation renderer stays untouched.
+:root[data-interface-mode='original'] .original-participant-logout-dialog,
+:root[data-interface-mode='original'] .original-system-check-save-report-dialog,
+:root[data-interface-mode='original'] .original-system-check-saved-dialog {
+  color: var(--mat-sys-on-surface);
+  @include mat.dialog-overrides((
+    container-max-width: 720px,
+    subhead-size: 30px,
+    supporting-text-size: 16px,
+    supporting-text-line-height: 24px
+  ));
+  // The Rewrite's global disabled-button opacity must not be applied again
+  // on top of Material's already dimmed disabled colours.
+  button.mat-mdc-button-base:disabled {
+    opacity: 1;
+  }
 }

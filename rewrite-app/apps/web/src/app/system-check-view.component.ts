@@ -1240,6 +1240,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
           "Der Bericht wurde erfolgreich gespeichert. Sie werden nach der Bestätigung weitergeleitet.",
         confirmLabel: "Verstanden",
         showCancel: false,
+        presentation: "original-system-check-saved",
         tone: "primary"
       });
       await new Promise(resolve => globalThis.setTimeout(resolve, 500));

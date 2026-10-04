@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Latest verified Original Systemcheck acknowledgement
+
+The optional Original report-success dialog now adapts the pinned 19.0
+Material confirm template and MessageService behavior: two German actions,
+child-safe order in Primar, adult order in Sekundar/Erwachsene and for signed-in
+administrators/monitors regardless of theme. Only this already-saved report
+acknowledgement selects the lazy presentation; verified destructive dialogs
+and Rewrite confirmations retain their existing renderer. Request IDs guard
+against an old overlay resolving a newer confirmation. Either close result
+uses the existing 500ms return-to-Start controller and preserves the report.
+
+Fresh production and development builds passed. A protected SQLite/headful
+production Systemcheck flow passed real submission, adult ordering, keyboard
+trapping, cancel-after-save, mobile bounds, return and export of the unchanged
+Unit answers. A separate owned-API/SQLite/headful regression passed all three
+themes in both builds, including cancel, confirm, Escape, three retained
+questionnaire answers and no Angular errors. It is part of the quick CI gate.
+The production initial bundle is 467.73kB under the unchanged 470kB error budget.
+The published `3abb98e6` push CI completed with 35/35 successful jobs; CI for
+this new acknowledgement step is a separate, not-yet-published check.
+
+An isolated, unmodified Original frontend at `c35cff81` now also builds with its
+own pinned lockfile dependencies (Angular 20.3.29, Material 20.2.14). Actual
+rendering exposed and corrected the 30px title, 16px/24px supporting text,
+720px maximum width and double-applied disabled-button opacity. The Original
+save form now matches the actual 19.0 rendering without a visible password
+suffix: the upstream template's unimported suffix is not projected. Rewrite's
+separate password reveal remains available.
+
+On 2026-10-04, all twelve equal-fixture dialog comparisons passed: save form
+and saved acknowledgement, Primar/Sekundar/Erwachsene, 1280x720 and 390x844.
+The comparison asserts visible text, surface and child geometry, typography,
+colours, spacing, shape, opacity and button token/child values against the
+real pinned frontend; screenshots were retained. Only the Original backend is
+a synthetic API fixture, with unknown API calls rejected; Rewrite saves use
+the real API and isolated SQLite. This is not Original-backend compatibility
+or whole-page pixel identity. Evidence is retained locally in the ignored
+`.data/original-dialog-reference-20261004.gFehUo` directory. Corrected production
+and development three-theme regressions, typechecking, 140 core/29 frontend
+unit tests and the full protected production Systemcheck flow passed again.
+All eight Original UI matrix rows, operator layout and the remaining 19.0
+functional delta stay open.
+
 ## Current 19.0 delta to verify
 
 On 2026-10-03, the Original fetch advanced to

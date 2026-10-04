@@ -8,14 +8,24 @@ import {
 import type { AfterViewChecked, DoCheck, OnDestroy } from "@angular/core";
 
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
+import { InterfaceModeService } from "./interface-mode.service";
+import { OriginalSystemCheckSavedDialogLauncherComponent } from "./original-system-check-saved-dialog.component";
 
 @Component({
   selector: "app-confirmation-dialog",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, OriginalSystemCheckSavedDialogLauncherComponent],
   template: `
+    <ng-container *ngIf="confirmation.dialog() as dialog">
+    @if (useOriginalSavedReportDialog) {
+      @for (request of [dialog]; track request.requestId) {
+      @defer (when useOriginalSavedReportDialog) {
+        <app-original-system-check-saved-dialog-launcher [title]="request.title" [message]="request.message"
+          (closed)="resolveOriginalSavedDialog(request.requestId, $event)" />
+      }
+      }
+    } @else {
     <section
-      *ngIf="confirmation.dialog() as dialog"
       id="globalConfirmationBackdrop"
       class="confirmation-backdrop"
       (keydown)="handleKeydown($event)"
@@ -72,6 +82,8 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
         </div>
       </article>
     </section>
+    }
+    </ng-container>
   `,
   styles: `
     .confirmation-backdrop {
@@ -134,6 +146,17 @@ export class ConfirmationDialogComponent
   implements AfterViewChecked, DoCheck, OnDestroy
 {
   readonly confirmation = inject(ConfirmationDialogService);
+  private readonly interfaceMode = inject(InterfaceModeService);
+  get useOriginalSavedReportDialog(): boolean {
+    const dialog = this.confirmation.dialog();
+    return this.interfaceMode.mode() === "original" && dialog?.presentation === "original-system-check-saved" && dialog.verification === null;
+  }
+
+  resolveOriginalSavedDialog(requestId: number, confirmed: boolean): void {
+    if (this.confirmation.dialog()?.requestId === requestId) {
+      this.confirmation.resolve(confirmed);
+    }
+  }
 
   verificationValue = "";
 
@@ -159,6 +182,7 @@ export class ConfirmationDialogComponent
   }
 
   ngAfterViewChecked(): void {
+    if (this.useOriginalSavedReportDialog) { this.focusedRequestId = null; return; }
     const requestId = this.confirmation.dialog()?.requestId ?? null;
     if (requestId === null) {
       this.focusedRequestId = null;

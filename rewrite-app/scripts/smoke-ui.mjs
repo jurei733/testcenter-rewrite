@@ -2954,12 +2954,8 @@ try {
     await fillAndCommit("#systemCheckSaveReportKey", "sa");
     await fillAndCommit("#systemCheckSaveReportId", "UI");
     await expectButtonSelectorDisabled("#systemCheckSaveReportConfirmButton");
-    await page.locator("#systemCheckSaveReportPasswordToggle").click();
-    await page.waitForFunction(() => document.querySelector("#systemCheckSaveReportKey")?.getAttribute("type") === "text");
-    assert.equal(await page.locator("#systemCheckSaveReportKey").getAttribute("type"), "text");
-    assert.equal(await page.locator("#systemCheckSaveReportPasswordToggle").getAttribute("aria-pressed"), "true");
-    await page.locator("#systemCheckSaveReportPasswordToggle").click();
-    await page.waitForFunction(() => document.querySelector("#systemCheckSaveReportKey")?.getAttribute("type") === "password");
+    assert.equal(await page.locator("#systemCheckSaveReportPasswordToggle").count(), 0,
+      "Pinned Original 19.0 does not render its unimported password suffix; Rewrite retains reveal");
     assert.equal(await page.locator("#systemCheckSaveReportKey").getAttribute("type"), "password");
     await page.locator("#systemCheckSaveReportCancelButton").focus();
     await page.keyboard.press("Tab");
@@ -3012,7 +3008,29 @@ try {
     assert.ok(originalSavePayload.network.some(entry => entry.id === "latency"), "The display filter does not strip shared durable diagnostics");
     assert.match(JSON.stringify(originalSavePayload.responses), /Original second-page answer/);
     await page.locator("#globalConfirmationTitle").filter({ hasText: "Bericht gespeichert" }).waitFor();
-    await page.locator("#globalConfirmationConfirmButton").click();
+    const originalSavedDialog = page.locator(".original-system-check-saved-dialog");
+    await originalSavedDialog.waitFor();
+    assert.equal(await page.locator("#globalConfirmationBackdrop").count(), 0,
+      "Only the Original acknowledgement is displayed for an Original report save");
+    assert.equal(await originalSavedDialog.getByRole("button").count(), 2);
+    // The bootstrap platform administrator is still signed in here. Source
+    // MessageService treats all admins/monitors as adults, even in Primar.
+    assert.deepEqual(await originalSavedDialog.getByRole("button").allTextContents(), ["Bestätigen", "Abbrechen"]);
+    await originalSavedDialog.getByText("Der Bericht wurde erfolgreich gespeichert.", { exact: false }).waitFor();
+    await originalSavedDialog.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => undefined))));
+    assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest(".original-system-check-saved-dialog"))), true);
+    await page.keyboard.press("Tab");
+    assert.equal(await page.locator("#globalConfirmationConfirmButton").evaluate(element => element === document.activeElement), true);
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await page.locator("#globalConfirmationCancelButton").evaluate(element => element === document.activeElement), true);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-saved-dialog-desktop.png"), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-saved-dialog-mobile.png"), fullPage: true });
+    await page.setViewportSize(choiceViewport);
+    // Source closes this acknowledgement on either result. Cancel must not
+    // undo the already successful POST, which is checked again in the export.
+    await page.locator("#globalConfirmationCancelButton").click();
     await page.waitForURL(url => url.pathname === "/app/home");
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckStarter button[data-system-check-id='syscheck-2']").click();

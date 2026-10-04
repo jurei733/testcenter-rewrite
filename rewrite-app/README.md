@@ -728,16 +728,32 @@ remain independently gated.
 Anonymous report submission now also follows the Original dialog sequence:
 `Bericht senden` opens a focused, keyboard-contained form with blank report key
 and title fields, enforces the Original three-character minimum for both, and
-offers password visibility without exposing the value by default. Dedicated
-system-check accounts continue to save immediately under their forced login
-title. Both paths show the Original one-action success confirmation and return
-to the application start page after acknowledgement; production Chromium gates
+keeps the key hidden by default. Rewrite offers password visibility; the
+optional Original form matches 19.0's actually rendered field without a
+visible suffix toggle. Dedicated system-check accounts continue to save
+immediately under their forced login
+title. Both paths return to the application start page after acknowledgement.
+Rewrite keeps its single-action success dialog; the optional Original interface
+uses the 19.0 Material acknowledgement with `Abbrechen` and `Bestätigen`, its
+audience-dependent button order and administrator/monitor adult override.
+Either close result returns to Start after 500 ms; it cannot undo a report
+that has already been saved. Production Chromium gates
 validation, cancellation, focus restoration, persistence, confirmation, and
 the redirect. The report action row likewise keeps only the Original participant
 choices: `Bericht senden` and `System-Check abbrechen`. The latter returns
 directly to Start without persisting a report; the former rewrite-only local
 JSON download is no longer exposed. Chromium aborts one complete check, repeats
 it from clean component state, and then verifies the normal save/export path.
+
+`UI_SMOKE_HEADFUL=true npm run smoke:ui:system-check-saved` adds an isolated,
+three-theme browser regression with its own API and database. It checks real
+report saves, keyboard containment, cancel/confirm/Escape, 390px bounds, the
+return to Start and all three retained answers. `ci:browser:quick` includes its
+built variant. It never resets the local tryout database or uses port 4311.
+The save form and saved acknowledgement were additionally compared against an
+actual unmodified 19.0 frontend build, in all three themes at desktop/mobile
+widths. Their measured rendering matches; complete-page visual parity remains
+open. See `docs/ORIGINAL-UI-PARITY.md` for the fixture boundary and evidence.
 
 The added read side now makes the first slice inspectable:
 

@@ -27,6 +27,38 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest acknowledgement step: the Original Systemcheck success notice now uses
+the pinned 19.0 Material confirm template, two actions and audience-dependent
+ordering, including the adult override for live administrator/monitor access.
+Its lazy overlay is request-ID guarded and does not replace Rewrite or
+destructive verification dialogs. Fresh headful production and development
+three-theme tests passed real persistence, focus containment, desktop/390px
+bounds, cancel/confirm/Escape and the return to Start. The complete protected
+production Systemcheck regression also passed adult ordering and confirms
+that cancelling the notice cannot remove the already-saved report or answers.
+Initial output is 467.73kB with the unchanged 470kB error budget.
+
+The `3abb98e6` push CI completed successfully (35/35). The new acknowledgement
+step still needs its own publication CI. An isolated, unmodified build of
+Original `c35cff81` with its own locked Angular 20.3.29/Material 20.2.14 is now
+available for source-rendered comparisons; a successful build alone does not
+close any visual-parity row.
+
+The first actual comparison corrected dialog typography (30px heading,
+16px/24px content), 720px maximum width and duplicate disabled-button dimming.
+The save form follows the actual 19.0 field without a visible password suffix;
+the upstream unimported suffix does not render. Rewrite retains its reveal.
+All twelve dialog-state comparisons passed on 2026-10-04 at 1280x720/390x844
+in all three themes: visible text, geometry and computed styles/tokens,
+including button children. The reference runs the unmodified Original frontend
+with a bounded synthetic backend fixture, not the Original backend. Rewrite
+uses its real API/SQLite and retains the submitted answers. Locally retained
+screenshots and comparison metrics are in the ignored
+`.data/original-dialog-reference-20261004.gFehUo` directory. Corrected builds,
+three-theme production/development regressions and the full protected
+production Systemcheck gate passed again. These narrow dialog comparisons do
+not establish whole-page pixel identity or close the Systemcheck matrix row.
+
 Implementation in progress: the home page now offers a browser-local interface
 choice. `?ui=original` and `?ui=rewrite` also select it for a direct entry. The
 choice survives navigation/reload and leaves unrelated URL parameters intact.
