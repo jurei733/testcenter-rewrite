@@ -63,6 +63,14 @@ credentials and answers. Intentional stop and stale deadlines cannot restart
 the channel. This is the browser-channel timeout, not a replacement for the
 remaining server-side participant-presence/connection-loss guarantee.
 
+SQLite connections wait up to five seconds for a competing reader/writer
+instead of failing a durable save immediately. Journal mode and schema stay
+unchanged. Tests cover short-lock success, bounded long-lock failure without
+partial data, later retry and actual browser Player saves under both lock
+types. This synchronous wait blocks the API event loop; PostgreSQL remains the
+production option for concurrent multi-process workloads. Long SQLite locks
+still return errors and must not be mistaken for a saved answer.
+
 It is intentionally separate from `rewrite-spike/`:
 
 - `rewrite-spike/` proves architecture and semantics

@@ -3,6 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { once } from "node:events";
+import { Worker } from "node:worker_threads";
 import test from "node:test";
 
 import { createWorkspaceSourcePackageReferenceRevision } from "@testcenter-rewrite-app/application";
@@ -19,7 +21,70 @@ import type {
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
-import { createSqliteFirstSliceRepository } from "./index.js";
+import { createSqliteFirstSliceRepository, SQLITE_BUSY_TIMEOUT_MS } from "./index.js";
+
+const startExternalSqliteLock = (databasePath: string, lock: "reader" | "writer", durationMs: number) => {
+  const worker = new Worker(`
+    const { DatabaseSync } = require('node:sqlite');
+    const { parentPort, workerData } = require('node:worker_threads');
+    const database = new DatabaseSync(workerData.path);
+    database.exec(workerData.lock === 'writer' ? 'BEGIN IMMEDIATE' : 'BEGIN');
+    database.prepare('SELECT COUNT(*) FROM tenants').get();
+    parentPort.postMessage('locked');
+    setTimeout(() => { database.exec('ROLLBACK'); database.close(); }, workerData.durationMs);
+  `, { eval: true, workerData: { path: databasePath, lock, durationMs } });
+  return { ready: once(worker, "message"), finished: once(worker, "exit") };
+};
+
+for (const lock of ["reader", "writer"] as const) {
+  test(`SQLite waits for a short external ${lock} lock instead of rejecting a durable write`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sqlite-contention-"));
+    const databasePath = join(directory, "store.sqlite");
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    const tenant = { tenantId: "contention-tenant", tenantKey: "contention-tenant", displayName: "Before lock",
+      status: "active" as const, createdAt: "2026-10-04T00:00:00.000Z" };
+    await repository.saveTenant(tenant);
+    const worker = startExternalSqliteLock(databasePath, lock, 250);
+    try {
+      assert.deepEqual(await worker.ready, ["locked"]);
+      const startedAt = performance.now();
+      await assert.doesNotReject(repository.saveTenant({ ...tenant, displayName: "After lock" }));
+      const elapsed = performance.now() - startedAt;
+      assert.ok(elapsed >= 100 && elapsed < 5_000, `Expected bounded contention wait, received ${elapsed}ms.`);
+      assert.equal((await repository.getTenantByKey(tenant.tenantKey))?.displayName, "After lock");
+    } finally {
+      await worker.finished;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  test(`SQLite bounds a persistent external ${lock} lock and preserves data for a later retry`, { timeout: 15_000 }, async () => {
+    assert.equal(SQLITE_BUSY_TIMEOUT_MS, 5_000);
+    const directory = await mkdtemp(join(tmpdir(), "sqlite-bounded-contention-"));
+    const databasePath = join(directory, "store.sqlite");
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    const tenant = { tenantId: "bounded-contention", tenantKey: "bounded-contention", displayName: "Before lock",
+      status: "active" as const, createdAt: "2026-10-04T00:00:00.000Z" };
+    await repository.saveTenant(tenant);
+    const worker = startExternalSqliteLock(databasePath, lock, SQLITE_BUSY_TIMEOUT_MS + 1_000);
+    try {
+      assert.deepEqual(await worker.ready, ["locked"]);
+      const startedAt = performance.now();
+      await assert.rejects(repository.saveTenant({ ...tenant, displayName: "Rejected write" }), /database is locked/);
+      const elapsed = performance.now() - startedAt;
+      assert.ok(elapsed >= SQLITE_BUSY_TIMEOUT_MS - 250 && elapsed < SQLITE_BUSY_TIMEOUT_MS + 1_000,
+        `Expected bounded failed write, received ${elapsed}ms.`);
+      assert.deepEqual(await repository.getTenantByKey(tenant.tenantKey), tenant, "A failed write cannot leave partial data.");
+      await worker.finished;
+      const retried = { ...tenant, displayName: "After successful retry" };
+      await repository.saveTenant(retried);
+      assert.deepEqual(await repository.getTenantByKey(tenant.tenantKey), retried);
+    } finally {
+      await worker.finished;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 test("SQLite atomically reserves only one workspace dependency snapshot per revision", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-snapshot-race-"));

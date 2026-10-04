@@ -68,11 +68,32 @@ re-entry. Browser evidence is retained locally in ignored
 `.data/stream-watchdog-reference-20261004.783OA9`. These checks do not establish the
 server-side `CONNECTION=LOST` projection when an entire participant disappears.
 
-A separate concurrent raw-SQLite inspection exposed one `database is locked`
-log-write failure with rollback journalling and no busy timeout. It affected
-only an owned synthetic test database, not private tryout data. Deterministic
-contention coverage and bounded SQLite handling remain a storage-hardening
-requirement; the passing normal-API watchdog checks do not close that finding.
+### Latest verified bounded SQLite contention handling
+
+A separate concurrent raw-SQLite inspection exposed an immediate `database is
+locked` failure with rollback journalling and no busy timeout. The regression
+was reproduced deterministically with both external readers and writers on
+owned synthetic databases. All SQLite connection entry points now configure
+a 5,000ms busy timeout without changing journal mode, schema version (57),
+credentials, answers or migration data. Short contention waits for release;
+longer contention still fails within the limit instead of waiting indefinitely.
+
+Four storage regressions prove both short-lock successes and both persistent-
+lock failures, unchanged records after rejection and a successful later retry.
+The complete unit gates passed 144 core and 45 frontend tests; all 161 SQLite
+API integration tests and the schema-57 startup smoke passed. A headful
+Chromium check held each external lock until after the actual Player save was
+released to the API: both real POSTs waited approximately 790ms and returned
+200, preserving the answer in the same run without HTTP 5xx or page errors.
+Request interception only synchronizes the lock; it does not mock the backend,
+alter the payload or change the normal five-second response buffer.
+
+Evidence is retained locally in ignored
+`.data/sqlite-contention-reference-20261004`. This closes the reproduced
+short-contention finding, not general multi-process scalability: synchronous
+SQLite waiting blocks the API event loop, and long locks remain errors.
+PostgreSQL deployment and server-side connection-loss parity remain distinct
+acceptance requirements.
 
 ## Current 19.0 delta to verify
 

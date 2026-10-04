@@ -1566,11 +1566,27 @@ export type SqliteFirstSliceStorageDiagnostics = {
   targetSchemaVersion: number;
 };
 
+export const SQLITE_BUSY_TIMEOUT_MS = 5_000;
+
+const openSqliteDatabase = (filePath: string): DatabaseSync => {
+  const database = new DatabaseSync(filePath);
+  try {
+    // Short-lived readers (e.g. diagnostics/backups) and other writers must
+    // not make a durable save fail immediately. SQLite performs the bounded
+    // wait inside each statement; longer contention still fails for retry.
+    database.exec(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+    return database;
+  } catch (error) {
+    database.close();
+    throw error;
+  }
+};
+
 export const inspectSqliteFirstSliceStorage = async (
   filePath: string
 ): Promise<SqliteFirstSliceStorageDiagnostics> => {
   mkdirSync(dirname(filePath), { recursive: true });
-  const database = new DatabaseSync(filePath);
+  const database = openSqliteDatabase(filePath);
 
   try {
     return {
@@ -1586,7 +1602,7 @@ export const migrateSqliteFirstSliceStorage = async (
   filePath: string
 ): Promise<SqliteFirstSliceStorageDiagnostics> => {
   mkdirSync(dirname(filePath), { recursive: true });
-  const database = new DatabaseSync(filePath);
+  const database = openSqliteDatabase(filePath);
 
   try {
     applyMigrations(database);
@@ -1603,7 +1619,7 @@ export const checkSqliteFirstSliceReadiness = async (
   filePath: string
 ): Promise<void> => {
   mkdirSync(dirname(filePath), { recursive: true });
-  const database = new DatabaseSync(filePath);
+  const database = openSqliteDatabase(filePath);
 
   try {
     database.prepare("SELECT 1").get();
@@ -1616,7 +1632,7 @@ export const createSqliteFirstSliceRepository = (
   filePath: string
 ): FirstSliceRepository => {
   mkdirSync(dirname(filePath), { recursive: true });
-  const database = new DatabaseSync(filePath);
+  const database = openSqliteDatabase(filePath);
   applyMigrations(database);
 
   return {
