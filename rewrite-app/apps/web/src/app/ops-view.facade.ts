@@ -1216,6 +1216,22 @@ export class OpsViewFacade {
     });
   }
 
+  async signInFromOriginalInterface(): Promise<void> {
+    // The Source form can accept three spaces. Do not silently resolve that
+    // attempt as success: the same service/server validates the normalized
+    // credentials and returns the structured failure to its local renderer.
+    this.clearAdminBatches();
+    try {
+      // Keep structured credential failures available to the local renderer.
+      // After acknowledged authentication, an asset-read failure must not turn
+      // a valid session into a second login attempt or reset its permissions.
+      await this.opsService.signInAdmin();
+      await this.viewState.runActionAsync(() => this.loadApplicationAssetsIfAllowed());
+    } finally {
+      this.uiState.renderVersion.update(version => version + 1);
+    }
+  }
+
   refreshAdminSession(): void {
     if (!this.canUseAdminSession) {
       return;

@@ -128,6 +128,10 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.activeRouteView === "ops" && !this.app.hasAdminSession;
   }
 
+  get isOriginalAdminLogin(): boolean {
+    return this.interfaceMode.mode() === "original" && this.isSignedOutOpsView;
+  }
+
   get activeRouteView(): AppView {
     this.routeVersion();
     const routeSegment = this.router.url.split("?", 1)[0]?.split("/")[1];
@@ -209,6 +213,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get participantPageTitle(): string {
+    if (this.isOriginalAdminLogin) return "Anmelden";
     if (this.interfaceMode.mode() === "original" && this.activeRouteView === "participant") {
       if (!this.app.runtime.participantSessionId) return "Anmelden";
       if (!this.app.runtime.testRunId) return "Übersicht";
@@ -220,6 +225,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   leaveParticipantSession(): void {
+    if (this.isOriginalAdminLogin) {
+      void this.router.navigateByUrl("/participant");
+      return;
+    }
     if (this.activeRouteView === "system-check") {
       void this.router.navigateByUrl("/home");
       return;

@@ -90,6 +90,17 @@ login without storing its secret; browser-solved proof-of-work was also tested.
 Some raw screenshot edge differences and the remaining error/admin/custom
 states stay open, so this is not complete UI/pixel parity.
 
+The optional signed-out administrator entry now also adapts the actual Original
+19 form, card, header/footer and Testtaker link. All 48 equal-fixture rendered
+states passed in each production/development build, with the same authorized
+operator service and return-route logic. Real browser gates cover password
+errors, scheduled/expired access, proof-of-work, pending duplicate submits,
+failed post-login asset reads and lazy-renderer fallback. Native administrator
+entry and first-deployment setup remain available via the interface selection
+or `?ui=rewrite`. This is not an Original-rendered signed-in administration
+console or a completed full UI comparison; screenshot raster differences and
+the remaining matrix rows are still recorded in the acceptance document.
+
 This folder is the starting point for the real production implementation.
 
 Operator lists are metadata views: import/source lists omit document bytes and

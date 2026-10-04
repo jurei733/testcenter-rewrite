@@ -13,6 +13,8 @@ import { JsonPanelComponent } from "./json-panel.component";
 import { OpsViewFacade } from "./ops-view.facade";
 import { RecordCollectionComponent } from "./record-collection.component";
 import { SummaryCardsComponent } from "./summary-cards.component";
+import { InterfaceModeService } from "./interface-mode.service";
+import { OriginalAdminLoginComponent } from "./original-admin-login.component";
 
 @Component({
   selector: "app-ops-view",
@@ -23,9 +25,18 @@ import { SummaryCardsComponent } from "./summary-cards.component";
     AdministrationNavComponent,
     JsonPanelComponent,
     SummaryCardsComponent,
-    RecordCollectionComponent
+    RecordCollectionComponent,
+    OriginalAdminLoginComponent
   ],
   template: `
+    @if (interfaceMode.mode() === 'original' && !view.canUseAdminSession) {
+      @defer (when true) {
+        <app-original-admin-login [authenticate]="authenticateOriginal" />
+      } @error {
+        <p role="alert">Die Original-Anmeldung konnte nicht geladen werden.</p>
+        <button type="button" (click)="interfaceMode.select('rewrite')">Rewrite-Anmeldung öffnen</button>
+      }
+    } @else {
     <div class="stack">
       <article class="card" *ngIf="view.canUseAdminSession">
         <h2>Diagnostics</h2>
@@ -1214,14 +1225,22 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Runtime Config" subtitle="Effective Config" viewId="runtimeConfigView" [content]="view.ops.runtimeConfigView"></app-json-panel>
       </ng-container>
     </div>
+    }
   `
 })
 export class OpsViewComponent implements OnInit {
+  readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(OpsViewFacade);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   activeAdminSection: AdministrationSection = "users";
+  // A captured callback survives the authorized shell transition. An output
+  // emitted after that transition would be lost with the old lazy component.
+  readonly authenticateOriginal = async (): Promise<void> => {
+    await this.view.signInFromOriginalInterface();
+    await this.continueToRequestedView();
+  };
 
   ngOnInit(): void {
     this.view.init();

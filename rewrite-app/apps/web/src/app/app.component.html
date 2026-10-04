@@ -1,7 +1,7 @@
 <div
   class="page"
   [class.is-busy]="app.activeRequestLabel() !== null"
-  [class.is-participant-page]="isParticipantView"
+  [class.is-participant-page]="isParticipantView || isOriginalAdminLogin"
 >
   <span hidden>{{ app.renderVersion() }}</span>
   @defer (when confirmation.dialog() !== null) {
@@ -175,7 +175,7 @@
       </div>
     </form>
   </section>
-  <ng-container *ngIf="isParticipantView; else operatorShell">
+  <ng-template #entryHeader>
     <header
       *ngIf="!isParticipantHeaderHidden; else standaloneParticipantLogo"
       id="participantApplicationHeader"
@@ -225,6 +225,9 @@
         />
       </button>
     </ng-template>
+  </ng-template>
+  <ng-container *ngIf="isParticipantView; else operatorShell">
+    <ng-container [ngTemplateOutlet]="entryHeader"></ng-container>
 
     <section
       class="status-banner"
@@ -251,7 +254,8 @@
   </ng-container>
 
   <ng-template #operatorShell>
-    <section class="hero" [class.is-home-hero]="isFocusedEntryView">
+    <ng-container *ngIf="isOriginalAdminLogin" [ngTemplateOutlet]="entryHeader"></ng-container>
+    <section *ngIf="!isOriginalAdminLogin" class="hero" [class.is-home-hero]="isFocusedEntryView">
       <div class="hero-panel">
         <div class="application-brand operator-brand">
           <img
@@ -359,7 +363,7 @@
 
     <section
       class="status-banner"
-      *ngIf="app.activeRequestLabel() || app.errorMessage()"
+      *ngIf="!isOriginalAdminLogin && (app.activeRequestLabel() || app.errorMessage())"
       [class.is-error]="!!app.errorMessage()"
     >
       <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
@@ -376,7 +380,7 @@
       >Fehlerbericht</button>
     </section>
 
-    <nav class="view-nav" aria-label="Application Views">
+    <nav *ngIf="!isOriginalAdminLogin" class="view-nav" aria-label="Application Views">
       <a
         *ngFor="let view of app.views"
         [routerLink]="view.link"
@@ -448,7 +452,7 @@
       >Sign out</button>
     </nav>
 
-    <main class="home-stage" *ngIf="isFocusedEntryView; else operationalWorkspace">
+    <main class="home-stage" [class.participant-stage]="isOriginalAdminLogin" *ngIf="isFocusedEntryView; else operationalWorkspace">
       <router-outlet></router-outlet>
     </main>
 
@@ -480,8 +484,8 @@
       </section>
     </ng-template>
   </ng-template>
-  @if (interfaceMode.mode() === 'original' && isParticipantView) {
-    @if (activeRouteView === 'participant' && !app.runtime.participantSessionId) {
+  @if (interfaceMode.mode() === 'original' && (isParticipantView || isOriginalAdminLogin)) {
+    @if (isOriginalAdminLogin || (activeRouteView === 'participant' && !app.runtime.participantSessionId)) {
       @defer (when true) { <app-original-footer /> }
     }
   } @else {

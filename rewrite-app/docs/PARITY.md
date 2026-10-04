@@ -1,5 +1,54 @@
 # Testcenter parity checklist
 
+### Latest verified Original administrator login rendering
+
+The optional signed-out operator entry now adapts the actual pinned 19.0
+AdminLogin: centered 400px raised card, secondary border, outlined name/password
+fields, German title/actions, source toolbar/footer and bottom Testtaker link.
+It uses the existing authorized operator service, browser proof-of-work,
+session persistence and guarded return URL. The Native entry and first-instance
+setup remain available through the reversible Rewrite choice or `?ui=rewrite`.
+The actual Source field has no rendered password suffix (MatSuffix is not
+imported); this renderer follows that actual output, not the intended template.
+
+Credential, scheduled/expired access and rate-limit errors map by semantic
+identifiers to Source copy, not by mismatching Rewrite/Source HTTP codes.
+Secrets are form-local until the shared sign-in call, cleared on success/error
+and destruction, never persisted. Pending Enter/duplicate submits cannot start
+a second action. A late failure cannot erase a replacement form's password.
+An acknowledged login survives a failed following asset read and continues to
+the requested protected route. A failed lazy renderer offers the safe Native
+entry, including deployment setup, without sending an authentication request.
+
+All 48 equal-fixture states passed in each final production/development build:
+three themes × 1280x720/390x844/599x844/600x844 × empty/filled/Caps Lock/wrong
+password. The unmodified `c35cff81` frontend uses a bounded Source API fixture;
+Rewrite uses real protected API/SQLite. Text, geometry and visible computed
+styles match. The matched `margin:auto` rule and actual form position are
+compared; Chromium's inconsistent resolved auto-margin values are retained
+as diagnostics, not used as a visual difference. Raw screenshot RGBA is
+identical in 41/48 production and 44/48 development pairs; remaining raster
+edges differ by at most 1,291 pixels and 24/255 channel units. No full-page
+pixel-identity or complete Original UI matrix-row claim follows from this.
+
+Both builds passed twelve real browser login configurations, scheduled and
+expired accounts, blank normalized names, pending duplicates, retained sessions
+after failed asset reads and the actual failed-renderer fallback. Each solved
+24 real browser admin proof-of-work challenges. The protected SQLite flow passed
+through workspace deletion; participant-login and deletion-dialog regressions
+also passed. All 157 core and 78 frontend/preflight tests passed. Initial output
+is 469.31kB under the unchanged 470kB error budget. Scripts, screenshots,
+metrics and logs are retained in ignored `.data/original-admin-reference-20261004`.
+Fresh publication CI for this step remains separate proof.
+
+The preceding XML publication `9201af97` is fully CI-green (35/35, push run
+`37222355479`), including PostgreSQL UI and participant-detail review. The
+account-deletion renderer `1f8cb927` and its fresh Entire checkpoint are
+verified on GitHub; its own full CI remains distinct from that XML result.
+The private local instance now serves this published renderer with an explicit
+legacy intake profile, an integrity-checked database backup and unchanged MaP
+response/PPTX hashes. No private answer, session or release was reset.
+
 ### Latest verified Original administrator-deletion dialog rendering
 
 The optional Original account-deletion dialog now uses the pinned 19.0

@@ -47,3 +47,38 @@
 :root[data-interface-mode="original"] .participant-stage:has(#originalParticipantLogin) {
   overflow: auto;
 }
+
+/* Source administrator login uses the same viewport-height root/header/footer,
+   but its own centered form. Never restructure a signed-in operator view. */
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+:root[data-interface-mode="original"] .home-stage:has(#originalAdminLogin),
+:root[data-interface-mode="original"] app-ops-view:has(#originalAdminLogin) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+:root[data-interface-mode="original"] .home-stage:has(#originalAdminLogin) {
+  overflow: auto;
+}
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) #participantApplicationHeader h1,
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) #participantApplicationHeader img,
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) #originalApplicationFooter .version-label {
+  box-sizing: content-box;
+}
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) #participantApplicationHeader img {
+  display: inline;
+}
+:root[data-interface-mode="original"] .page:has(#originalAdminLogin) .application-logo-button {
+  display: block;
+  line-height: 0;
+}

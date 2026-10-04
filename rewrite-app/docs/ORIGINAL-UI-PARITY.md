@@ -27,6 +27,42 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest administrator-login comparison (2026-10-04): the optional signed-out
+operator entry now uses the pinned 19.0 400px Material card, bordered centered
+form, German labels/actions, shared Source header/footer and Testtaker link.
+It calls the same authorized operator login, proof-of-work, persistence and
+return-route logic as Rewrite; there is no second credential store. Native
+setup remains accessible through the interface selection or `?ui=rewrite`.
+Structured error identifiers preserve Source copy despite different HTTP
+codes. Passwords are cleared after results and on destruction. Duplicate
+pending Enter is rejected, late failures cannot clear a replacement secret,
+post-login asset failures do not erase accepted authorization, and a failed
+lazy renderer exposes the safe Native entry without attempting authentication.
+
+All 48 equal-fixture states passed in each final production/development build
+across three themes, desktop/mobile and both sides of the 600px breakpoint,
+with empty/filled/Caps Lock/wrong-password forms. Source is the unmodified
+`c35cff81` frontend with a bounded API fixture; Rewrite uses real protected
+API/SQLite. Text, geometry and visible styles match. Both matched CSS rules
+specify `margin:auto`; inconsistent Chromium resolved margin values remain
+in the recorded diagnostics while actual form positions are compared exactly.
+Raw RGBA is identical in 41/48 production and 44/48 development screenshots;
+other pairs retain raster-edge differences up to 1,291 pixels and 24/255
+channel units. This is not complete pixel identity, Source-backend proof or
+a closed shell/login/administration row. Evidence is retained in ignored
+`.data/original-admin-reference-20261004`.
+
+Each build also passed twelve real login configurations with 24 browser-solved
+admin security challenges, actual scheduled/expired access rejection, normalized
+blank-name errors, retained authorization after a failed asset read and the
+actual failed-component chunk fallback. Full protected SQLite passed through
+workspace deletion; participant login and deletion dialog regressions stayed
+green. All 157 core plus 78 frontend/preflight tests passed; initial output is
+469.31kB below the unchanged 470kB limit. Full fresh publication CI is still
+required. The preceding XML commit `9201af97` separately passed all 35 CI jobs,
+including PostgreSQL UI and participant-detail review; it does not prove the
+new login publication.
+
 Latest administration-dialog comparison (2026-10-04): the optional Original
 account-deletion confirmation now adapts the pinned 19.0 Material template,
 600px dialog, German singular/plural prompt, seven-character form gate,
