@@ -12,6 +12,7 @@ import type {
   CreateAdminUserRequest,
   CreateAdminUserResponse,
   DeleteAdminUserResponse,
+  DeleteAdminUserRequest,
   GetAdminCurrentSessionResponse,
   ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
@@ -820,7 +821,8 @@ export class RewriteAppOpsService {
   }
 
   async deleteAdminUsers(
-    adminUserIds: string[]
+    adminUserIds: string[],
+    confirmationPassword: string
   ): Promise<AdminUserDeletionBatchResult> {
     if (!this.hasAdminSession()) {
       return { requestedCount: 0, deletions: [], failures: [] };
@@ -831,16 +833,18 @@ export class RewriteAppOpsService {
     ].slice(0, 50);
     const deletions: DeleteAdminUserResponse[] = [];
     const failures: AdminUserDeletionBatchResult["failures"] = [];
+    const sessionToken = this.opsState.adminSessionToken.trim();
 
     for (const adminUserId of uniqueAdminUserIds) {
       try {
+        if (this.opsState.adminSessionToken.trim() !== sessionToken) throw new Error("Administrator session changed.");
         deletions.push(
           await this.requestState.request<DeleteAdminUserResponse>(
             "Delete Selected Admin User",
             "DELETE",
             resolveRoutePath(productionApiRoutes.admin.deleteUser, { adminUserId }),
-            undefined,
-            { headers: this.createAdminHeaders(), quiet: true }
+            { confirmationPassword } satisfies DeleteAdminUserRequest,
+            { headers: { authorization: `Bearer ${sessionToken}` }, quiet: true }
           )
         );
       } catch (error) {
@@ -857,7 +861,18 @@ export class RewriteAppOpsService {
       "Admin User Batch Deleted",
       `${deletions.length}/${uniqueAdminUserIds.length} selected account(s) were deleted with their sessions and role assignments; ${failures.length} failed.`
     );
-    await this.refreshAdminUsers();
+    if (deletions.length > 0) {
+      try {
+        await this.refreshAdminUsers();
+      } catch {
+        // Keep acknowledged deletions even if the subsequent directory read
+        // fails. A read failure must never invite retrying a completed delete.
+        this.feedback.rememberActivity(
+          "Admin Directory Refresh Required",
+          "The acknowledged accounts were deleted. Refresh the directory to update the retained view."
+        );
+      }
+    }
     return {
       requestedCount: uniqueAdminUserIds.length,
       deletions,

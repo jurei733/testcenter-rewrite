@@ -90,12 +90,13 @@ export class RewriteAppWorkspaceService {
     return payload.workspace.displayName;
   }
 
-  async deleteWorkspace(confirmation: string): Promise<DeleteWorkspaceResponse> {
-    if (!this.hasWorkspaceScope()) {
+  async deleteWorkspace(input: {
+    tenantKey: string; workspaceKey: string; sessionToken: string; confirmationPassword: string;
+  }): Promise<DeleteWorkspaceResponse> {
+    const { tenantKey, workspaceKey, sessionToken, confirmationPassword } = input;
+    if (!tenantKey || !workspaceKey || !sessionToken) {
       throw new Error("Workspace scope is required for deletion.");
     }
-    const tenantKey = this.workspaceState.tenantKey.trim();
-    const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload = await this.requestState.request<DeleteWorkspaceResponse>(
       "Delete Workspace",
       "DELETE",
@@ -103,9 +104,9 @@ export class RewriteAppWorkspaceService {
         tenantKey,
         workspaceKey
       }),
-      { confirmation } satisfies DeleteWorkspaceRequest
+      { confirmation: workspaceKey, confirmationPassword } satisfies DeleteWorkspaceRequest,
+      { quiet: true, headers: { authorization: `Bearer ${sessionToken}` } }
     );
-    await this.refreshWorkspaceDirectory();
     const removedDataCount = Object.entries(payload.deletion.counts)
       .filter(([key]) => key !== "deletedWorkspaceCount")
       .reduce((total, [, count]) => total + count, 0);
@@ -113,6 +114,10 @@ export class RewriteAppWorkspaceService {
       "Workspace Deleted",
       `${tenantKey}/${workspaceKey} and ${removedDataCount} dependent record(s) were permanently deleted; the admin audit remains.`
     );
+    // A failed directory read after an acknowledged deletion must not offer
+    // the irreversible operation for retry as though it had failed.
+    try { await this.refreshWorkspaceDirectory(); }
+    catch { this.feedback.rememberActivity("Workspace Directory Refresh Failed", "Workspace deletion was acknowledged; refresh the directory to update its display."); }
     return payload;
   }
 

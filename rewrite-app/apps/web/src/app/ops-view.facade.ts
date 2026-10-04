@@ -1644,24 +1644,28 @@ export class OpsViewFacade {
     if (!this.canDeleteAdminUserBatch) {
       return;
     }
-    const confirmed = await this.confirmation.confirm({
+    const selectedAdminUserIds = [...this.adminUserBatchSelection];
+    const sessionToken = this.ops.adminSessionToken.trim();
+    const deletions: AdminUserDeletionBatchResult["deletions"] = [];
+    await this.confirmation.confirm({
       title: "Permanently delete selected accounts?",
       message: `Permanently delete ${this.adminUserBatchCount} selected admin user(s)? Their sessions and role assignments will be removed; audit evidence will be retained. This cannot be undone.`,
-      confirmLabel: "Delete accounts"
-    });
-    if (!confirmed || !this.canDeleteAdminUserBatch) {
-      return;
-    }
-
-    const selectedAdminUserIds = [...this.adminUserBatchSelection];
-    this.viewState.onActionAsync(async () => {
-      this.adminUserPasswordBatchResult = null;
-      const result = await this.opsService.deleteAdminUsers(selectedAdminUserIds);
-      this.adminUserStatusBatchResult = null;
-      this.adminUserRoleBatchResult = null;
-      this.adminUserDeletionBatchResult = result;
-      for (const deletion of result.deletions) {
-        this.adminUserBatchSelection.delete(deletion.adminUserId);
+      confirmLabel: "Delete accounts",
+      passwordSubmit: async password => {
+        if (!this.canDeleteAdminUserBatch || this.ops.adminSessionToken.trim() !== sessionToken) {
+          return "The administrator session or selection changed. Cancel and review the operation again.";
+        }
+        const result = await this.opsService.deleteAdminUsers(
+          selectedAdminUserIds.filter(id => this.adminUserBatchSelection.has(id)), password);
+        this.adminUserPasswordBatchResult = null;
+        this.adminUserStatusBatchResult = null;
+        this.adminUserRoleBatchResult = null;
+        deletions.push(...result.deletions);
+        this.adminUserDeletionBatchResult = { ...result, requestedCount: selectedAdminUserIds.length, deletions: [...deletions] };
+        for (const deletion of result.deletions) this.adminUserBatchSelection.delete(deletion.adminUserId);
+        this.uiState.renderVersion.update(version => version + 1);
+        return result.failures.some(failure => failure.error === "admin_password_confirmation_invalid")
+          ? "Incorrect current administrator password. Please try again." : null;
       }
     });
   }

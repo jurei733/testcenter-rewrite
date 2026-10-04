@@ -41,6 +41,7 @@ import {
   type CreateAdminUserRequest,
   type CreateAdminUserResponse,
   type DeleteAdminUserResponse,
+  type DeleteAdminUserRequest,
   type CreateImportJobRequest,
   type CreateImportJobResponse,
   type CreateParticipantReviewRequest,
@@ -5376,9 +5377,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const body = (await readOptionalRequestJsonBody<DeleteAdminUserRequest>()) ?? {};
         const deletion = await services.adminDirectory.deleteAdminUser({
           sessionToken,
-          adminUserId
+          adminUserId,
+          confirmationPassword: body.confirmationPassword
         });
         sendJson<DeleteAdminUserResponse>(response, 200, deletion);
         return;
@@ -5737,12 +5740,17 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        // These irreversible operations always require an active platform
+        // administrator, including when general diagnostic-route auth is off.
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) return;
         const body = await readRequestJsonBody<DeleteWorkspaceRequest>();
         const deletion = await services.platform.deleteWorkspace({
+          sessionToken,
           tenantKey,
           workspaceKey,
           confirmation: body.confirmation,
-          actorId: operatorAdminUserIdByRequest.get(request)
+          confirmationPassword: body.confirmationPassword
         });
         sendJson<DeleteWorkspaceResponse>(response, 200, { deletion });
         return;

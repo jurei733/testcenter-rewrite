@@ -197,10 +197,11 @@ export type PlatformPort = {
     actorId?: string | null;
   }): Promise<Workspace>;
   deleteWorkspace(input: {
+    sessionToken: string;
     tenantKey: string;
     workspaceKey: string;
     confirmation: string;
-    actorId?: string | null;
+    confirmationPassword?: string;
   }): Promise<WorkspaceDeletion>;
 };
 
@@ -1023,6 +1024,7 @@ export type AdminDirectoryPort = {
   deleteAdminUser(input: {
     sessionToken: string;
     adminUserId: string;
+    confirmationPassword?: string;
   }): Promise<{
     adminUserId: string;
     username: string;
@@ -5028,7 +5030,7 @@ const requireAdminPasswordConfirmation = (
     throw new FirstSliceError(
       400,
       "admin_password_confirmation_required",
-      "The acting administrator password is required for platform admin role changes."
+      "The acting administrator password is required for this sensitive action."
     );
   }
   if (
@@ -27897,6 +27899,7 @@ export const createFirstSliceServices = (
           targetRoleAssignments
         );
 
+        requireAdminPasswordConfirmation(currentSession.adminUser, input.confirmationPassword);
         const deletion = await repository.deleteAdminUser(adminUser.adminUserId);
         await recordAdminAuditEvent({
           eventType: "admin_user_deleted",
@@ -28361,6 +28364,8 @@ export const createFirstSliceServices = (
         return updatedWorkspace;
       },
       async deleteWorkspace(input) {
+        const currentSession = await requireActiveAdminSession(repository, input.sessionToken, now());
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
         const workspace = await requireWorkspace(
           repository,
           input.tenantKey,
@@ -28373,11 +28378,12 @@ export const createFirstSliceServices = (
             "Workspace deletion confirmation must exactly match the workspace key."
           );
         }
+        requireAdminPasswordConfirmation(currentSession.adminUser, input.confirmationPassword);
         const occurredAt = now();
         const auditEvent: AdminAuditEvent = {
           adminAuditEventId: idGenerator(),
           eventType: "workspace_deleted",
-          actorAdminUserId: input.actorId ?? null,
+          actorAdminUserId: currentSession.adminUser.adminUserId,
           subjectAdminUserId: null,
           occurredAt,
           summary: `Workspace '${workspace.workspaceKey}' permanently deleted.`,

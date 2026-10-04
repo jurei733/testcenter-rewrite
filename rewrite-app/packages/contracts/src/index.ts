@@ -363,6 +363,7 @@ export type UpdateWorkspaceRequest = {
 
 export type DeleteWorkspaceRequest = {
   confirmation: string;
+  confirmationPassword?: string;
 };
 
 export type SourceDocumentSource =
@@ -1130,6 +1131,10 @@ export type DeleteAdminUserResponse = {
   username: string;
   deletedRoleAssignmentCount: number;
   deletedSessionCount: number;
+};
+
+export type DeleteAdminUserRequest = {
+  confirmationPassword?: string;
 };
 
 export type ResetAdminUserPasswordResponse = AdminUserDirectoryItem;

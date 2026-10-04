@@ -176,6 +176,23 @@ and implementation. Each needs current rewrite evidence before it is closed:
 - Required current-password confirmation for self-service password changes
   and for superadmin deletion of administrators/workspaces; resetting another
   administrator's password retains its distinct authorization boundary.
+  Administrator and workspace DELETE now require the acting administrator's
+  current password in `confirmationPassword`, after active-session and role /
+  delegation checks and before any deletion. Workspace deletion always requires
+  a platform administrator, even in diagnostic auth-off mode; its exact-key
+  confirmation remains required and the audit actor comes from that session.
+  The shared dialog keeps wrong-password errors inline, retains the selection
+  for correction, traps focus, prevents duplicate submissions while pending,
+  and clears its local secret on completion/cancellation/destruction. No secret
+  enters shell persistence or audit records. A failed directory read after an
+  acknowledged delete preserves the result instead of offering that deletion
+  again. Full Memory/file/SQLite suites pass 161 each; 144 core and 60 frontend
+  tests pass. Production/development builds remain within existing budgets.
+  Desktop/mobile gates exercise both interface preferences with the real API,
+  wrong-password retry, no-request cancellation, pending responses and failed
+  post-delete reads. The full protected SQLite operator sequence passes through
+  workspace and account batch deletion. This closes that functional deletion
+  gap, not pixel identity of the Original superadmin dialog or PostgreSQL proof.
 - Optional installation-wide refusal of passwordless logins and rejection of
   Testtakers files containing them, with the Original `sys-check-login` exception.
   Implemented through `REQUIRE_LOGIN_PASSWORD` (default false): existing

@@ -27,6 +27,22 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The Original 19.0 deletion password requirement is now enforced in shared
+administrator/workspace services and the UI. Both interface preferences use the
+same safe confirmation flow; desktop/mobile production/development tests cover
+wrong-password retry, focus, no-request cancellation, pending duplicate guards,
+and directory-read failure after a real acknowledged deletion. The password is
+dialog-local, never persisted. Its readable opaque surface is regression-tested.
+This is functional parity, not the Original Material superadmin dialog rendering;
+that page/dialog remains part of the open administration row below.
+
+The previous login publication's PostgreSQL UI job raced the Material saved-report
+dialog autofocus immediately after its animation. The full smoke now waits for
+the required in-dialog focus state itself before testing Tab/Shift+Tab; no focus
+assertion or timeout is removed. The protected SQLite full operator gate passes
+this save/focus sequence and continues through workspace/account deletion.
+Fresh complete PostgreSQL and publication CI proof remain separate requirements.
+
 Latest login comparison: both name and password fixtures now match the actual
 19.0 rendering in all three themes at 1280x720, 390x844, 599x844 and 600x844,
 in each fresh production/development build (24 states each). Source viewport

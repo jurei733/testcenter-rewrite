@@ -412,6 +412,21 @@ Admin sign-in reproduces the original login sink with a durable global username 
 
 New administrator passwords use one deployment-wide policy in the API and Angular. `FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH` configures the minimum length from 1 through the fixed 60-character maximum (default `8`), while `FIRST_SLICE_ADMIN_PASSWORD_PATTERN` accepts a JavaScript regular expression (default `^.*$`). The policy applies to bootstrap, account creation, reset, mandatory change, voluntary change, and bulk-reset validation; existing credentials remain usable for sign-in and current-password confirmation after a stricter policy is deployed. Invalid settings stop startup and runtime preflight, and the effective secret-free policy is exposed through `/diagnostics/config` so clients can render the same feedback and native input constraints.
 
+Irreversible administrator and workspace deletion require the signed-in actor's
+current password, not the deleted user's password. Send `confirmationPassword`
+in the DELETE JSON body. Workspace deletion additionally requires its exact
+`confirmation` key and an active platform administrator, including when general
+diagnostic operator authentication is disabled. Missing confirmation returns
+`400 admin_password_confirmation_required`; incorrect or overlong confirmation
+returns `403 admin_password_confirmation_invalid` without deleting data. Existing
+role, delegation and self-deletion guards remain in force. The UI asks again in
+a local password dialog and keeps a wrong-password failure open for correction.
+Cancellation sends no DELETE, pending submission cannot be duplicated, and
+secrets never enter browser persistence or audit payloads. Directory-read failure
+after an acknowledged deletion is reported separately and does not erase the
+successful result. `npm run smoke:ui:deletion-confirmation:built` verifies these
+paths against an owned SQLite API at desktop/mobile sizes in both UI preferences.
+
 Optional browser-computed proof of work can protect the three Original Testcenter credential boundaries independently. Set `FIRST_SLICE_PROOF_OF_WORK_SCOPES` to a comma- or whitespace-separated subset of `admin`, `participant`, and `second_code`; production deployments should normally enable all three. The admin and participant scopes protect every non-empty login identity, including empty-password attempts and passwordless roster entries, so omitting a required password cannot bypass the work factor and cheaply fill a login failure sink. Any enabled scope requires a server-only `FIRST_SLICE_PROOF_OF_WORK_SECRET` of at least 32 characters. `FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER` controls the SHA-256 search range from 1 through 10,000,000 (default `1000000`), and `FIRST_SLICE_PROOF_OF_WORK_TTL_MS` controls challenge lifetime from 1,000 through 600,000 milliseconds (default `120000`). With no enabled scopes, the existing sign-in contracts remain compatible and no challenge is computed.
 
 The public challenge is signed, short-lived, bound to the exact credential input through a keyed digest, and contains no plaintext password or second code. Angular solves it in Web Workers with the same `altcha-lib` mechanism used by Testcenter 18.2. A valid solution is atomically consumed by memory, file, SQLite, or Postgres storage before authentication, so it cannot be replayed across requests, processes, or restarts; rejected or missing proof does not advance the existing login-failure sink. `/diagnostics/config` and runtime preflight expose only the non-secret algorithm, limits, enabled scopes, current key ID, and whether a previous key is configured.

@@ -5293,6 +5293,35 @@ test("admin deletion removes roles and sessions while retaining audit evidence",
   assert.equal(missingDeletionSession.status, 401);
   assert.equal(missingDeletionSession.body.error, "admin_session_missing");
 
+  for (const [confirmationPassword, status, error] of [
+    [undefined, 400, "admin_password_confirmation_required"],
+    ["incorrect-deletion-password", 403, "admin_password_confirmation_invalid"],
+    ["delete-me-secret", 403, "admin_password_confirmation_invalid"],
+    ["x".repeat(61), 403, "admin_password_confirmation_invalid"]
+  ] as const) {
+    const rejected = await requestJson<{ error: string }>(
+      `/api/v1/admin/users/${victim.body.adminUser.adminUserId}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${platformSignIn.body.sessionToken}` },
+        body: { confirmationPassword }
+      }
+    );
+    assert.equal(rejected.status, status);
+    assert.equal(rejected.body.error, error);
+    assert.equal(JSON.stringify(rejected.body).includes("incorrect-deletion-password"), false);
+    const retainedSession = await requestJson("/api/v1/admin/auth/current-session", {
+      headers: { authorization: `Bearer ${victimSignIn.body.sessionToken}` }
+    });
+    assert.equal(retainedSession.status, 200, "Rejected step-up must retain the account and its live session.");
+  }
+  const auditBeforeDeletion = await requestJson<{ items: unknown[] }>(
+    `/api/v1/admin/audit-events?eventType=admin_user_deleted&subjectAdminUserId=${victim.body.adminUser.adminUserId}`,
+    { headers: { authorization: `Bearer ${platformSignIn.body.sessionToken}` } }
+  );
+  assert.equal(auditBeforeDeletion.status, 200);
+  assert.equal(auditBeforeDeletion.body.items.length, 0);
+
   const deletion = await requestJson<{
     adminUserId: string;
     username: string;
@@ -5300,6 +5329,7 @@ test("admin deletion removes roles and sessions while retaining audit evidence",
     deletedSessionCount: number;
   }>(`/api/v1/admin/users/${victim.body.adminUser.adminUserId}`, {
     method: "DELETE",
+    body: { confirmationPassword: "integration-secret" },
     headers: {
       authorization: `Bearer ${platformSignIn.body.sessionToken}`
     }
@@ -5366,6 +5396,8 @@ test("admin deletion removes roles and sessions while retaining audit evidence",
     1
   );
   assert.equal(deletionAudit.body.items[0]?.details["deletedSessionCount"], 1);
+  assert.equal(JSON.stringify(deletionAudit.body).includes("integration-secret"), false);
+  assert.equal(JSON.stringify(deletionAudit.body).includes("confirmationPassword"), false);
 
   const repeatedDeletion = await requestJson<{ error: string }>(
     `/api/v1/admin/users/${victim.body.adminUser.adminUserId}`,
@@ -5383,6 +5415,20 @@ test("admin deletion removes roles and sessions while retaining audit evidence",
 test("workspace aggregate deletion runs on the configured integration store", async () => {
   const tenantKey = "workspace-delete-store-tenant";
   const workspaceKey = "workspace-delete-store-workspace";
+  let signIn = await requestJson<{ sessionToken: string }>("/api/v1/admin/auth/sign-in", {
+    method: "POST", body: { username: "integration.admin", password: "integration-secret" }
+  });
+  if (signIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST", body: { username: "integration.admin", displayName: "Integration Admin", password: "integration-secret" }
+    });
+    assert.equal(bootstrap.status, 201);
+    signIn = await requestJson<{ sessionToken: string }>("/api/v1/admin/auth/sign-in", {
+      method: "POST", body: { username: "integration.admin", password: "integration-secret" }
+    });
+  }
+  assert.equal(signIn.status, 200);
+  const adminHeaders = { authorization: `Bearer ${signIn.body.sessionToken}` };
 
   const tenant = await requestJson<{ tenant: { tenantKey: string } }>(
     "/api/v1/platform/tenants",
@@ -5419,6 +5465,47 @@ test("workspace aggregate deletion runs on the configured integration store", as
   );
   assert.equal(sourcePackage.status, 201);
 
+  const workspacePath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const anonymousDeletion = await requestJson<{ error: string }>(workspacePath, {
+    method: "DELETE", body: { confirmation: workspaceKey, confirmationPassword: "integration-secret" }
+  });
+  assert.equal(anonymousDeletion.status, 401, "Even diagnostic auth-off mode requires a session for irreversible workspace deletion.");
+  assert.equal(anonymousDeletion.body.error, "admin_session_missing");
+  const scopedUser = await requestJson("/api/v1/admin/users", {
+    method: "POST", headers: adminHeaders,
+    body: { username: "workspace.delete.scoped", password: "scoped-delete-secret",
+      roleAssignments: [{ role: "workspace_admin", tenantKey, workspaceKey }] }
+  });
+  assert.equal(scopedUser.status, 201);
+  const scopedSignIn = await requestJson<{ sessionToken: string }>("/api/v1/admin/auth/sign-in", {
+    method: "POST", body: { username: "workspace.delete.scoped", password: "scoped-delete-secret" }
+  });
+  assert.equal(scopedSignIn.status, 200);
+  const scopedSessionToken = await completeRequiredAdminPasswordChangeAt(
+    baseUrl, scopedSignIn.body.sessionToken, "workspace.delete.scoped", "scoped-delete-final-secret"
+  );
+  const scopedDeletion = await requestJson<{ error: string }>(workspacePath, {
+    method: "DELETE", headers: { authorization: `Bearer ${scopedSessionToken}` },
+    body: { confirmation: workspaceKey, confirmationPassword: "scoped-delete-final-secret" }
+  });
+  assert.equal(scopedDeletion.status, 403, "Auth-off mode must not bypass the platform administrator requirement.");
+  assert.equal(scopedDeletion.body.error, "admin_role_required");
+  for (const [confirmationPassword, status, error] of [
+    [undefined, 400, "admin_password_confirmation_required"],
+    ["incorrect-workspace-password", 403, "admin_password_confirmation_invalid"],
+    ["x".repeat(61), 403, "admin_password_confirmation_invalid"]
+  ] as const) {
+    const rejected = await requestJson<{ error: string }>(workspacePath, {
+      method: "DELETE", headers: adminHeaders,
+      body: { confirmation: workspaceKey, confirmationPassword }
+    });
+    assert.equal(rejected.status, status);
+    assert.equal(rejected.body.error, error);
+    assert.equal((await requestJson(workspacePath)).status, 200, "A rejected step-up must retain the workspace.");
+    assert.equal((await requestJson(`${workspacePath}/source-packages/${sourcePackage.body.sourcePackage.sourcePackageId}`)).status, 200,
+      "A rejected step-up must retain source data.");
+  }
+
   const deletion = await requestJson<{
     deletion: {
       workspace: { workspaceKey: string; workspaceId: string };
@@ -5432,7 +5519,8 @@ test("workspace aggregate deletion runs on the configured integration store", as
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
     {
       method: "DELETE",
-      body: { confirmation: workspaceKey }
+      headers: adminHeaders,
+      body: { confirmation: workspaceKey, confirmationPassword: "integration-secret" }
     }
   );
   assert.equal(deletion.status, 200);
@@ -7226,7 +7314,8 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     }>(
       isolated.baseUrl,
       `/api/v1/admin/users/${delegatedStudyMonitor.body.adminUser.adminUserId}`,
-      { method: "DELETE", headers: tenantAdminHeaders }
+      { method: "DELETE", headers: tenantAdminHeaders,
+        body: { confirmationPassword: "tenant-required-final-secret" } }
     );
     assert.equal(delegatedDeletion.status, 200);
     assert.equal(
@@ -7321,7 +7410,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       {
         method: "DELETE",
         headers: adminHeaders,
-        body: { confirmation: "other-admin-workspace" }
+        body: { confirmation: "other-admin-workspace", confirmationPassword: "required-secret" }
       }
     );
     assert.equal(deletedWorkspace.status, 200);

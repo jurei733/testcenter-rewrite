@@ -43,6 +43,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
+import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 
 type WorkspaceDirectorySortBy = "displayName" | "latestFileModificationAt";
 type WorkspaceDirectorySortDirection = "asc" | "desc";
@@ -57,6 +58,7 @@ export class WorkspaceViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly requestState = inject(RewriteAppShellRequestService);
 
   readonly workspace = this.uiState.workspace;
   workspaceDisplayNameDraft = "";
@@ -2476,26 +2478,39 @@ export class WorkspaceViewFacade {
     }
     const tenantKey = this.workspace.tenantKey.trim();
     const workspaceKey = this.workspace.workspaceKey.trim();
-    const confirmed = await this.confirmation.confirm({
+    const sessionToken = this.uiState.ops.adminSessionToken.trim();
+    await this.confirmation.confirm({
       title: "Permanently delete workspace?",
       message: `Permanently delete '${tenantKey}/${workspaceKey}' and all content, sessions, results, reports, attachments, and scoped role assignments? This cannot be undone.`,
       confirmLabel: "Delete workspace",
       verification: {
         label: "Exact workspace key",
         expectedValue: workspaceKey
+      },
+      passwordSubmit: async password => {
+        if (!this.canDeleteWorkspace || this.uiState.ops.adminSessionToken.trim() !== sessionToken
+          || this.workspace.tenantKey.trim() !== tenantKey || this.workspace.workspaceKey.trim() !== workspaceKey) {
+          return "The administrator session or workspace changed. Cancel and review the operation again.";
+        }
+        try {
+          await this.workspaceService.deleteWorkspace({ tenantKey, workspaceKey, sessionToken, confirmationPassword: password });
+        } catch (error) {
+          if (this.requestState.isApiError(error) && error.error === "admin_password_confirmation_invalid") {
+            return "Incorrect current administrator password. Please try again.";
+          }
+          throw error;
+        }
+        if (this.workspace.tenantKey.trim() === tenantKey && this.workspace.workspaceKey.trim() === workspaceKey) {
+          this.workspace.workspaceKey = "";
+          this.workspaceDisplayNameDraft = "";
+          this.workspace.workspaceOverviewView = 'Use "Refresh Workspace Overview".';
+          this.workspace.workspaceActivityView = 'Use "Refresh Content Reads".';
+          this.workspace.workspaceLoaded = false;
+          this.persistState();
+          this.uiState.renderVersion.update(version => version + 1);
+        }
+        return null;
       }
-    });
-    if (!confirmed || !this.canDeleteWorkspace) {
-      return;
-    }
-    this.viewState.onActionAsync(async () => {
-      await this.workspaceService.deleteWorkspace(workspaceKey);
-      this.workspace.workspaceKey = "";
-      this.workspaceDisplayNameDraft = "";
-      this.workspace.workspaceOverviewView = 'Use "Refresh Workspace Overview".';
-      this.workspace.workspaceActivityView = 'Use "Refresh Content Reads".';
-      this.workspace.workspaceLoaded = false;
-      this.persistState();
     });
   }
 

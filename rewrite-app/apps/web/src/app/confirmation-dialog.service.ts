@@ -16,6 +16,9 @@ export type ConfirmationDialogRequest = {
   tone?: ConfirmationDialogTone;
   verification?: ConfirmationDialogVerification;
   presentation?: "original-system-check-saved";
+  // Only closures and dialog-local inputs retain the confirmation secret.
+  // null means success; a message keeps the dialog open for a safe retry.
+  passwordSubmit?: (password: string) => Promise<string | null>;
 };
 
 export type ActiveConfirmationDialog = {
@@ -28,6 +31,7 @@ export type ActiveConfirmationDialog = {
   tone: ConfirmationDialogTone;
   verification: ConfirmationDialogVerification | null;
   presentation?: "original-system-check-saved";
+  passwordSubmit?: (password: string) => Promise<string | null>;
 };
 
 @Injectable({ providedIn: "root" })
@@ -56,7 +60,8 @@ export class ConfirmationDialogService {
         showCancel: request.showCancel ?? true,
         tone: request.tone ?? "danger",
         verification: request.verification ?? null,
-        ...(request.presentation ? { presentation: request.presentation } : {})
+        ...(request.presentation ? { presentation: request.presentation } : {}),
+        ...(request.passwordSubmit ? { passwordSubmit: request.passwordSubmit } : {})
       });
     });
   }

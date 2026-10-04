@@ -10,14 +10,19 @@ import type { AfterViewChecked, DoCheck, OnDestroy } from "@angular/core";
 import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalSystemCheckSavedDialogLauncherComponent } from "./original-system-check-saved-dialog.component";
+import { PasswordConfirmationDialogComponent } from "./password-confirmation-dialog.component";
 
 @Component({
   selector: "app-confirmation-dialog",
   standalone: true,
-  imports: [CommonModule, OriginalSystemCheckSavedDialogLauncherComponent],
+  imports: [CommonModule, OriginalSystemCheckSavedDialogLauncherComponent, PasswordConfirmationDialogComponent],
   template: `
     <ng-container *ngIf="confirmation.dialog() as dialog">
-    @if (useOriginalSavedReportDialog) {
+    @if (dialog.passwordSubmit) {
+      @for (request of [dialog]; track request.requestId) {
+        @defer (on immediate) { <app-password-confirmation-dialog /> }
+      }
+    } @else if (useOriginalSavedReportDialog) {
       @for (request of [dialog]; track request.requestId) {
       @defer (when useOriginalSavedReportDialog) {
         <app-original-system-check-saved-dialog-launcher [title]="request.title" [message]="request.message"
@@ -104,7 +109,7 @@ import { OriginalSystemCheckSavedDialogLauncherComponent } from "./original-syst
       padding: clamp(24px, 5vw, 42px);
       border: 1px solid var(--line);
       border-radius: var(--radius-xl);
-      background: var(--surface);
+      background: var(--surface, #fff);
       box-shadow: 0 28px 80px rgba(8, 22, 25, 0.36);
     }
 
@@ -137,7 +142,7 @@ import { OriginalSystemCheckSavedDialogLauncherComponent } from "./original-syst
     }
 
     .confirmation-verification code {
-      color: var(--text);
+      color: var(--text, var(--ink));
       overflow-wrap: anywhere;
     }
   `
@@ -182,7 +187,7 @@ export class ConfirmationDialogComponent
   }
 
   ngAfterViewChecked(): void {
-    if (this.useOriginalSavedReportDialog) { this.focusedRequestId = null; return; }
+    if (this.useOriginalSavedReportDialog || this.confirmation.dialog()?.passwordSubmit) { this.focusedRequestId = null; return; }
     const requestId = this.confirmation.dialog()?.requestId ?? null;
     if (requestId === null) {
       this.focusedRequestId = null;

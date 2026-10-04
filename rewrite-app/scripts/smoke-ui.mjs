@@ -980,6 +980,8 @@ try {
       expectedTitlePattern,
       expectedMessagePattern
     );
+    const passwordInput = page.locator("#globalConfirmationPasswordInput");
+    if (await passwordInput.count()) await passwordInput.fill(adminPassword);
     await page.locator("#globalConfirmationConfirmButton").click();
     await backdrop.waitFor({ state: "detached" });
   };
@@ -996,6 +998,8 @@ try {
       "#globalConfirmationVerificationInput"
     );
     await verificationInput.fill(verificationText);
+    const passwordInput = page.locator("#globalConfirmationPasswordInput");
+    if (await passwordInput.count()) await passwordInput.fill(adminPassword);
     await expectButtonSelectorEnabled("#globalConfirmationConfirmButton");
     await page.locator("#globalConfirmationConfirmButton").click();
     await backdrop.waitFor({ state: "detached" });
@@ -1567,11 +1571,11 @@ try {
   }
   await sendSmokeJson(
     `${baseUrl}/api/v1/admin/users/${scheduledAdminPayload.adminUser.adminUserId}`,
-    { method: "DELETE" }
+    { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
   await sendSmokeJson(
     `${baseUrl}/api/v1/admin/users/${expiredAdminPayload.adminUser.adminUserId}`,
-    { method: "DELETE" }
+    { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
   stopAfter("admin-access-window-copy");
   logStep("admin-current-session");
@@ -3018,7 +3022,9 @@ try {
     assert.deepEqual(await originalSavedDialog.getByRole("button").allTextContents(), ["Bestätigen", "Abbrechen"]);
     await originalSavedDialog.getByText("Der Bericht wurde erfolgreich gespeichert.", { exact: false }).waitFor();
     await originalSavedDialog.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => undefined))));
-    assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest(".original-system-check-saved-dialog"))), true);
+    // Material applies autofocus after opening the animated overlay. Wait
+    // for the required focus state itself rather than racing its scheduler.
+    await page.waitForFunction(() => Boolean(document.activeElement?.closest(".original-system-check-saved-dialog")));
     await page.keyboard.press("Tab");
     assert.equal(await page.locator("#globalConfirmationConfirmButton").evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Shift+Tab");
