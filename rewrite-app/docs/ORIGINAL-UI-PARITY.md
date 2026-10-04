@@ -271,6 +271,21 @@ answer notification; it now awaits the active frame's exact two-answer state
 before testing restoration, without weakening the saved-answer assertions.
 Current complete push/PR CI is not yet confirmed.
 
+The anonymous report form now adapts the source's actual Material dialog,
+500px width/600px height, outlined key/title fields, suffix password toggle and
+raised save/cancel buttons. The Original overlay theme is scoped to this unique
+panel class and does not alter Rewrite dialogs. The lazy launcher returns only
+form values to the existing save controller and closes on destruction, with
+no independent authorization or report engine. Minimum lengths, blank fields,
+show/hide state, keyboard focus trapping, Escape/cancel focus return, cleared
+reopening and desktop/mobile bounds pass protected SQLite/headful production
+and development gates. A real Enter submission returns 201, retains both exact
+Unit answers and the display-hidden diagnostic in the shared payload, appears
+in the report export and is removed by the existing synthetic-data deletion
+flow. The initial bundle is still 467.64kB. Viewport-height bounding and
+whitespace-only rejection are deliberate safety adaptations; confirmation,
+operator layout and the rendered upstream comparison remain open.
+
 | Surface | Required comparisons |
 | --- | --- |
 | Shell and login | Header/logo/footer, welcome panel, name/password steps, errors, admin entry |

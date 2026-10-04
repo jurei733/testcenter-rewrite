@@ -3,13 +3,14 @@ import { NgFor, NgIf } from "@angular/common";
 import { MatButton } from "@angular/material/button";
 import { MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle } from "@angular/material/card";
 import type { SystemCheckViewComponent } from "./system-check-view.component";
+import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-save-report.component";
 
 // Adapted from IQB Testcenter 19 sys-check/report (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt. The shared controller remains responsible
 // for required answers, authorized submission, confirmation and cancellation.
 @Component({
   selector: "app-original-system-check-report", standalone: true,
-  imports: [NgFor, NgIf, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle],
+  imports: [NgFor, NgIf, MatButton, MatCard, MatCardActions, MatCardContent, MatCardHeader, MatCardTitle, OriginalSystemCheckSaveReportComponent],
   template: `
     <div class="sys-check-body flex-row-center" id="originalSystemCheckReport">
       <mat-card appearance="raised">
@@ -40,6 +41,15 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
         </mat-card-actions>
       </mat-card>
     </div>
+    @defer (when view.reportSaveDialogOpen) {
+      @if (view.reportSaveDialogOpen) {
+        <app-original-system-check-save-report
+          [aboutPassword]="view.customText('syscheck_report_aboutPassword', 'Nur berechtigten Personen ist das Speichern erlaubt. Bitte geben Sie unten das Systemcheck-Kennwort ein, das Sie von der Projektleitung erhalten haben!')"
+          [aboutReportId]="view.customText('syscheck_report_aboutReportId', 'Die ermittelten bzw. eingegebenen Informationen werden in der Datenbank so gespeichert, dass eine zusammenfassende Auswertung für eine bestimmte Studie möglich ist. Um den Bericht einem bestimmten Projekt oder einer Studie zuordnen zu können, geben Sie bitte einen kurzen Text ein, der dann als Titel für den Bericht verwendet wird!')"
+          [reportIdLabel]="view.customText('syscheck_report_id', 'Schul-ID')"
+          (cancel)="view.closeReportSaveDialog()" (save)="view.submitAnonymousReport($event)" />
+      }
+    }
   `,
   styles: [`
     :host { display:block; min-width:0; }

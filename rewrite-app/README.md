@@ -34,9 +34,15 @@ environment, network measurements and report submission controller. Additional
 Rewrite diagnostics stay in the stored payload without appearing in the
 Original lists. Production/development browser checks cover required-answer
 warnings, keyboard opening/cancellation without a POST, focus restoration,
-desktop/mobile layout and cancellation back to Start. The anonymous save dialog,
-confirmation and operator layout still require Original adaptation and rendered
-upstream comparison; the report card is not a full parity claim.
+desktop/mobile layout and cancellation back to Start. The anonymous save dialog
+now uses the source's 500×600 Material layout, outlined fields and password
+toggle. It validates both fields, traps focus, supports Enter/Escape, clears
+values on reopening and sends the same report request through the shared
+controller. Production/development checks save and export both exact Unit
+answers through this interface. Its maximum height is bounded on short screens,
+and whitespace-only values remain invalid as in the Rewrite form. Confirmation
+and operator layout still require Original adaptation; rendered upstream
+comparison remains open.
 
 This folder is the starting point for the real production implementation.
 

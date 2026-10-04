@@ -447,6 +447,22 @@ timeout or answer assertion is weakened. A failure screenshot capture also
 cannot mask the original test error if storage is full. Current complete push
 and PR CI remain unconfirmed; partial passing jobs are not full CI success.
 
+The anonymous Original report form now uses a lazy 500×600 Material dialog
+adapted from the pinned save-report template: outlined password/title fields,
+suffix visibility toggle and raised save/cancel actions. Its unique overlay
+theme stays outside Rewrite dialogs; destruction unsubscribes and closes the
+overlay. Shared submission, authorization, confirmation and report data remain
+unchanged. Fresh protected SQLite/headful production and development gates
+passed minimum lengths, password toggle, focus trapping, Escape/cancel without
+a report POST, empty/hidden-password reopening, desktop/mobile geometry and a
+real Enter submission (201). Export verifies both exact restored Unit answers
+and the Rewrite-only diagnostic remains in the durable payload. The synthetic
+report joins the existing scoped deletion check. Initial output stays 467.64kB
+under the unchanged budget. Bounding height on short screens and rejecting
+whitespace-only values are intentional safety adaptations, not a claim of
+pixel-identical upstream acceptance. Original confirmation/operator layout,
+equal-fixture rendered references and complete CI remain open.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit

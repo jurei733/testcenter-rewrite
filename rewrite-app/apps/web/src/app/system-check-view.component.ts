@@ -434,7 +434,7 @@ const readSystemCheckUnitResponse = (
       </ng-container>
 
       <app-system-check-save-report-dialog
-        *ngIf="reportSaveDialogOpen"
+        *ngIf="reportSaveDialogOpen && interfaceMode.mode() !== 'original'"
         [aboutPassword]="customText('syscheck_report_aboutPassword', 'Nur berechtigten Personen ist das Speichern erlaubt. Bitte geben Sie unten das System-Check-Kennwort ein, das Sie von der Projektleitung erhalten haben!')"
         [aboutReportId]="customText('syscheck_report_aboutReportId', 'Die ermittelten bzw. eingegebenen Informationen werden in der Datenbank so gespeichert, dass eine zusammenfassende Auswertung für eine bestimmte Studie möglich ist. Um den Bericht einem bestimmten Projekt oder einer Studie zuordnen zu können, geben Sie bitte einen kurzen Text ein, der dann als Titel für den Bericht verwendet wird!')"
         [reportIdLabel]="customText('syscheck_report_id', 'Schul-ID')"

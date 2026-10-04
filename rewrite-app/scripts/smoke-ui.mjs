@@ -2944,19 +2944,84 @@ try {
     await originalReport.locator("#saveSystemCheckReportButton").focus();
     await page.keyboard.press("Enter");
     await page.locator("#systemCheckSaveReportBackdrop").waitFor();
+    assert.equal(await page.locator(".original-system-check-save-report-dialog").count(), 1);
+    assert.equal(await page.locator("app-system-check-save-report-dialog").count(), 0);
+    await page.waitForFunction(() => document.activeElement?.id === "systemCheckSaveReportKey");
     assert.equal(await page.locator("#systemCheckSaveReportKey").inputValue(), "");
     assert.equal(await page.locator("#systemCheckSaveReportId").inputValue(), "");
+    await expectButtonSelectorDisabled("#systemCheckSaveReportConfirmButton");
+    await fillAndCommit("#systemCheckSaveReportKey", "sa");
+    await fillAndCommit("#systemCheckSaveReportId", "UI");
+    await expectButtonSelectorDisabled("#systemCheckSaveReportConfirmButton");
+    await page.locator("#systemCheckSaveReportPasswordToggle").click();
+    await page.waitForFunction(() => document.querySelector("#systemCheckSaveReportKey")?.getAttribute("type") === "text");
+    assert.equal(await page.locator("#systemCheckSaveReportKey").getAttribute("type"), "text");
+    assert.equal(await page.locator("#systemCheckSaveReportPasswordToggle").getAttribute("aria-pressed"), "true");
+    await page.locator("#systemCheckSaveReportPasswordToggle").click();
+    await page.waitForFunction(() => document.querySelector("#systemCheckSaveReportKey")?.getAttribute("type") === "password");
+    assert.equal(await page.locator("#systemCheckSaveReportKey").getAttribute("type"), "password");
+    await page.locator("#systemCheckSaveReportCancelButton").focus();
+    await page.keyboard.press("Tab");
+    await page.waitForFunction(() => document.activeElement?.id === "systemCheckSaveReportKey");
+    await page.keyboard.press("Shift+Tab");
+    await page.waitForFunction(() => document.activeElement?.id === "systemCheckSaveReportCancelButton");
+    const originalReportDialogBox = await page.locator(".original-system-check-save-report-dialog").boundingBox();
+    assert.equal(Math.round(originalReportDialogBox.width), 500);
+    assert.equal(Math.round(originalReportDialogBox.height), 600);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-save-dialog-desktop.png"), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.equal(await page.locator(".original-system-check-save-report-dialog").evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight;
+    }), true);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-save-dialog-mobile.png"), fullPage: true });
+    await page.setViewportSize(choiceViewport);
     await page.keyboard.press("Escape");
     await page.locator("#systemCheckSaveReportBackdrop").waitFor({ state: "hidden" });
     await page.waitForFunction(() => document.activeElement?.id === "saveSystemCheckReportButton");
     assert.equal(unwantedOriginalReportSaves, 0, "Opening and cancelling the report dialog never registers a report");
+    await originalReport.locator("#saveSystemCheckReportButton").click();
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor();
+    assert.equal(await page.locator("#systemCheckSaveReportKey").inputValue(), "");
+    assert.equal(await page.locator("#systemCheckSaveReportId").inputValue(), "");
+    assert.equal(await page.locator("#systemCheckSaveReportKey").getAttribute("type"), "password");
+    await page.locator("#systemCheckSaveReportCancelButton").click();
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.activeElement?.id === "saveSystemCheckReportButton");
+    assert.equal(unwantedOriginalReportSaves, 0, "The Original Cancel action never creates a report");
     page.off("request", observeReportSave);
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-report-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-report-mobile.png"), fullPage: true });
     await page.setViewportSize(choiceViewport);
-    await originalReport.locator("#cancelSystemCheckReportButton").click();
+    await originalReport.locator("#saveSystemCheckReportButton").click();
+    await fillAndCommit("#systemCheckSaveReportKey", "saveme");
+    await fillAndCommit("#systemCheckSaveReportId", "Original UI Smoke System Check");
+    await expectButtonSelectorEnabled("#systemCheckSaveReportConfirmButton");
+    const originalSaveResponsePromise = page.waitForResponse(response => response.request().method() === "POST" &&
+      new URL(response.url()).pathname.endsWith("/system-checks/SYSCHECK.SAMPLE/reports"));
+    await page.locator("#systemCheckSaveReportId").focus();
+    await page.keyboard.press("Enter");
+    const originalSaveResponse = await originalSaveResponsePromise;
+    assert.equal(originalSaveResponse.status(), 201);
+    const originalSavePayload = originalSaveResponse.request().postDataJSON();
+    assert.equal(originalSavePayload.title, "Original UI Smoke System Check");
+    assert.ok(originalSavePayload.network.some(entry => entry.id === "latency"), "The display filter does not strip shared durable diagnostics");
+    assert.match(JSON.stringify(originalSavePayload.responses), /Original second-page answer/);
+    await page.locator("#globalConfirmationTitle").filter({ hasText: "Bericht gespeichert" }).waitFor();
+    await page.locator("#globalConfirmationConfirmButton").click();
+    await page.waitForURL(url => url.pathname === "/app/home");
+    await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
+    await page.locator("#originalSystemCheckStarter button[data-system-check-id='syscheck-2']").click();
+    await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#originalSystemCheckUnit").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#originalSystemCheckQuestionnaire").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#originalSystemCheckReport #cancelSystemCheckReportButton").click();
     await page.waitForURL(url => url.pathname === "/app/home");
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${headerOnlyCheckId}']`).click();
@@ -3501,7 +3566,11 @@ try {
     const exportedSystemCheckReports = JSON.parse(
       await readFile(systemCheckReportJsonPath, "utf8")
     );
-    assert.equal(exportedSystemCheckReports.length, 2);
+    assert.equal(exportedSystemCheckReports.length, 3);
+    const originalSavedReport = exportedSystemCheckReports.find(report => report.title === "Original UI Smoke System Check");
+    assert.ok(originalSavedReport, "The real Original dialog submission is retained in the shared export");
+    assert.match(JSON.stringify(originalSavedReport.responses), /Original Systemcheck Unit answer/);
+    assert.match(JSON.stringify(originalSavedReport.responses), /Original second-page answer/);
     const savedSystemCheckReport = exportedSystemCheckReports.find(
       report => report.title === "UI Smoke System Check"
     );
@@ -3554,7 +3623,7 @@ try {
     await deleteSampleReportsDialog;
     await page
       .locator("#systemCheckReportOperatorStatus")
-      .filter({ hasText: "2 report(s) deleted." })
+      .filter({ hasText: "3 report(s) deleted." })
       .waitFor({ timeout: 15_000 });
 
     await page.getByRole("button", { name: "Choose Another Check" }).click();
