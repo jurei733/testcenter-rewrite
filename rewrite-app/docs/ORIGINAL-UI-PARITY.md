@@ -249,7 +249,11 @@ Mobile title/label clipping prevention and Material keyboard-change handling
 are deliberate safety/accessibility adaptations. Equal-fixture upstream
 comparison, the report/operator layout and all eight complete rows remain open.
 The `01249459` push CI is complete (35/35); its separate PR timer-integration
-failure still requires investigation, so full current PR CI is not green.
+failure used a blind wall-clock sleep rather than the service's returned timer
+expiry. The test now validates and waits for that bounded authoritative deadline
+without changing production timer behavior or weakening terminal-state checks.
+Fresh complete Memory and isolated SQLite integration suites each passed
+161/161; full CI for the newly published steps is still pending.
 
 | Surface | Required comparisons |
 | --- | --- |

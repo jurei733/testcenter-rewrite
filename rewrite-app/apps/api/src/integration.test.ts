@@ -33008,7 +33008,9 @@ test("original Testcenter root restrictions govern the complete booklet", async 
   ]);
 
   const shortenedTimer = await requestJson<{
-    command: { testRun: { testletTimers?: Record<string, { durationSeconds: number }> } };
+    command: { testRun: { testletTimers?: Record<string, {
+      durationSeconds: number; status: string; expiresAt: string | null;
+    }> } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
     {
@@ -33026,7 +33028,18 @@ test("original Testcenter root restrictions govern the complete booklet", async 
     shortenedTimer.body.command.testRun.testletTimers?.["[0]"]?.durationSeconds,
     1
   );
-  await delay(1_100);
+  const rootTimer = shortenedTimer.body.command.testRun.testletTimers?.["[0]"];
+  assert.equal(rootTimer?.status, "running");
+  assert.ok(rootTimer?.expiresAt, "The active root timer must have an authoritative expiry");
+  const expiresAtMs = Date.parse(rootTimer.expiresAt);
+  assert.ok(Number.isFinite(expiresAtMs), "The root timer expiry must be a valid timestamp");
+  // Services keep operation timestamps strictly monotonic. A fast in-memory
+  // suite can temporarily put that clock ahead of the client's wall clock,
+  // so the command's returned deadline, not a blind 1.1-second sleep, governs
+  // when the same unchanged completion/expired-state assertions are valid.
+  const untilExpiryMs = Math.max(0, expiresAtMs - Date.now());
+  assert.ok(untilExpiryMs < 10_000, "A one-second timer must not acquire an unbounded future deadline");
+  await delay(untilExpiryMs + 20);
   const stateAfterExpiry = await requestJson<{
     currentRunState: {
       testRun: {

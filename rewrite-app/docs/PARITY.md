@@ -415,8 +415,14 @@ production initial bundle remains below the unchanged 470kB error limit at
 
 The network publication `01249459` push CI completed with 35/35 successful jobs.
 Its separate PR run found the root-booklet timer integration test returning
-`running` instead of `completed`; that failure remains to investigate and is
-not a successful complete PR-CI result.
+`running` instead of `completed`. That test used a blind client-side 1.1-second
+sleep even though operation timestamps are strictly monotonic and can briefly
+lead wall time during a fast in-memory suite. It now validates the returned
+running timer and finite, bounded `expiresAt`, waits for that authoritative
+deadline, and retains every completion/current-unit/expired/active-timer
+assertion. No production timer or clock behavior changed. Fresh complete
+Memory and isolated SQLite integration runs both passed all 161 tests; newly
+pushed full CI remains a separate gate, not a retroactive PR-CI success.
 
 ## Historical broad baseline
 
