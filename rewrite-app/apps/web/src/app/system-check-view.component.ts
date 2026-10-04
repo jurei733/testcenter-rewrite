@@ -1,9 +1,8 @@
 import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, inject } from "@angular/core";
-import type { OnInit } from "@angular/core";
+import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import UAParser from "ua-parser-js";
 
 import {
   productionApiRoutes,
@@ -218,7 +217,7 @@ const readSystemCheckUnitResponse = (
           <button class="ghost" type="button" (click)="captureEnvironment()">Capture Again</button>
         </article>
 
-        <article class="card" *ngIf="step === 'network'">
+        <article class="card" *ngIf="step === 'network' && interfaceMode.mode() !== 'original'">
           <h2>Network</h2>
           <p>Configured upload and download packages measure throughput against this test server; application latency and browser-provided connection estimates are included.</p>
           <p id="systemCheckNetworkStatus">{{ networkStatusMessage }}</p>
@@ -486,7 +485,7 @@ const readSystemCheckUnitResponse = (
     @media (max-width: 680px) { .system-check-hero { display: grid; } .system-check-facts, .system-check-results { grid-template-columns: 1fr; } }
   `]
 })
-export class SystemCheckViewComponent implements OnInit {
+export class SystemCheckViewComponent implements OnInit, OnDestroy {
   readonly interfaceMode = inject(InterfaceModeService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -512,6 +511,13 @@ export class SystemCheckViewComponent implements OnInit {
   networkRating = "not measured";
   networkStatusMessage = "Measurement has not started.";
   networkBusy = false;
+  networkDownloadBytesPerSecond = -1;
+  networkUploadBytesPerSecond = -1;
+  networkDownloadPoints: [number, number][][] = [];
+  networkUploadPoints: [number, number][][] = [];
+  private networkController: AbortController | null = null;
+  private environmentCaptureGeneration = 0;
+  private destroyed = false;
   unitResponse = "";
   reportTitle = "System Check Report";
   reportKey = "";
@@ -545,6 +551,11 @@ export class SystemCheckViewComponent implements OnInit {
     } else if (this.canLoad) {
       await this.loadSystemChecks(checkId || undefined);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.cancelNetworkCheck();
   }
 
   get canLoad(): boolean {
@@ -702,11 +713,12 @@ export class SystemCheckViewComponent implements OnInit {
       else await this.loadSystemChecks();
     } finally {
       this.systemCheckAuthenticationBusy = false;
-      this.changeDetectorRef.detectChanges();
+      this.refreshView();
     }
   }
 
   async signOutSystemCheck(): Promise<void> {
+    this.cancelNetworkCheck();
     await this.run(async () => {
       await this.opsService.signOutAdmin();
       this.systemCheckPassword = "";
@@ -732,7 +744,7 @@ export class SystemCheckViewComponent implements OnInit {
       });
     } finally {
       this.systemCheckChoicesLoaded = true;
-      this.changeDetectorRef.detectChanges();
+      this.refreshView();
     }
   }
 
@@ -802,6 +814,7 @@ export class SystemCheckViewComponent implements OnInit {
 
   async selectSystemCheck(checkId: string): Promise<void> {
     await this.run(async () => {
+      this.cancelNetworkCheck();
       const { payload } = await this.api.send<GetSystemCheckResponse>(
         "GET",
         this.workspaceRoute(productionApiRoutes.workspace.getSystemCheck, {
@@ -812,6 +825,7 @@ export class SystemCheckViewComponent implements OnInit {
       this.reportTitle = `${payload.systemCheck.displayLabel} Report`;
       this.answers = {};
       this.networkEntries = [];
+      this.resetNetworkMeasurements();
       this.networkRating = payload.systemCheck.skipNetwork ? "skipped" : "not measured";
       this.networkStatusMessage = payload.systemCheck.skipNetwork
         ? "Network measurement is skipped by configuration."
@@ -825,6 +839,7 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   chooseAnother(): void {
+    this.cancelNetworkCheck();
     this.systemCheck = null;
     this.step = "welcome";
     this.errorMessage = "";
@@ -835,6 +850,7 @@ export class SystemCheckViewComponent implements OnInit {
 
   setStep(step: SystemCheckStep): void {
     if (!this.steps.includes(step)) return;
+    if (step !== "network") this.cancelNetworkCheck();
     this.step = step;
   }
 
@@ -850,7 +866,11 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   async captureEnvironment(): Promise<void> {
+    const check = this.systemCheck;
+    const generation = ++this.environmentCaptureGeneration;
     const userAgent = navigator.userAgent;
+    const { default: UAParser } = await import("ua-parser-js");
+    if (this.destroyed || this.systemCheck !== check || this.environmentCaptureGeneration !== generation) return;
     const userAgentInfo = new UAParser(userAgent).getResult();
     const browserTimeZone =
       Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
@@ -992,37 +1012,49 @@ export class SystemCheckViewComponent implements OnInit {
         )
       );
     }
+    if (this.destroyed || this.systemCheck !== check || this.environmentCaptureGeneration !== generation) return;
     this.environmentEntries = entries.sort((left, right) =>
       left.label > right.label ? 1 : -1
     );
+    this.refreshView();
   }
 
   async runNetworkCheck(): Promise<void> {
     const check = this.systemCheck;
-    if (!check) return;
+    if (!check || check.skipNetwork || this.networkBusy || this.destroyed) return;
+    const controller = new AbortController();
+    this.networkController = controller;
+    const signal = controller.signal;
+    this.resetNetworkMeasurements();
+    this.networkEntries = [];
+    this.networkRating = "not measured";
     this.networkBusy = true;
     this.errorMessage = "";
-    this.networkStatusMessage = "Measuring application latency…";
-    this.changeDetectorRef.detectChanges();
+    this.networkStatusMessage = this.interfaceMode.mode() === "original"
+      ? "Netzwerk-Analyse wird gestartet" : "Measuring application latency…";
+    this.refreshView();
     try {
       const measurements: number[] = [];
       for (let index = 0; index < 3; index += 1) {
         const startedAt = performance.now();
-        const response = await fetch(`/healthz?systemCheck=${Date.now()}-${index}`, {
-          method: "HEAD",
-          cache: "no-store"
-        });
-        if (!response.ok) throw new Error(`Health request returned HTTP ${response.status}.`);
-        measurements.push(performance.now() - startedAt);
+        const timeout = window.setTimeout(() => controller.abort(), 10_000);
+        try {
+          const response = await fetch(`/healthz?systemCheck=${Date.now()}-${index}`, {
+            method: "HEAD", cache: "no-store", signal
+          });
+          signal.throwIfAborted();
+          if (!response.ok) throw new Error(`Health request returned HTTP ${response.status}.`);
+          measurements.push(performance.now() - startedAt);
+        } finally {
+          window.clearTimeout(timeout);
+        }
       }
       const average = measurements.reduce((sum, value) => sum + value, 0) /
         measurements.length;
-      this.networkStatusMessage = "Measuring configured download packages…";
-      this.changeDetectorRef.detectChanges();
-      const download = await this.measureThroughput("download", check.downloadSpeed);
-      this.networkStatusMessage = "Measuring configured upload packages…";
-      this.changeDetectorRef.detectChanges();
-      const upload = await this.measureThroughput("upload", check.uploadSpeed);
+      const download = await this.measureThroughput("download", check.downloadSpeed, signal);
+      const upload = await this.measureThroughput("upload", check.uploadSpeed, signal);
+      signal.throwIfAborted();
+      if (this.networkController !== controller || this.systemCheck !== check || this.destroyed) return;
       const downloadRating = this.rateThroughput(
         download,
         check.downloadSpeed.min,
@@ -1109,17 +1141,24 @@ export class SystemCheckViewComponent implements OnInit {
         );
       }
       this.networkEntries = networkEntries;
-      this.networkStatusMessage = `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
+      this.networkStatusMessage = this.interfaceMode.mode() === "original"
+        ? "Die folgenden Netzwerkeigenschaften wurden festgestellt:"
+        : `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
     } catch (error) {
+      if (this.networkController !== controller || this.systemCheck !== check || this.destroyed) return;
       this.networkRating = "unstable";
       this.networkEntries = [
         this.entry("nw-overall", "network", "Gesamtbewertung", "unstable")
       ];
-      this.networkStatusMessage = "Network measurement failed.";
+      this.networkStatusMessage = this.interfaceMode.mode() === "original"
+        ? "Die folgenden Netzwerkeigenschaften wurden festgestellt:" : "Network measurement failed.";
       this.errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
-      this.networkBusy = false;
-      this.changeDetectorRef.detectChanges();
+      if (this.networkController === controller) {
+        this.networkController = null;
+        this.networkBusy = false;
+        this.refreshView();
+      }
     }
   }
 
@@ -1226,7 +1265,7 @@ export class SystemCheckViewComponent implements OnInit {
     if (files.length > 200) {
       this.errorMessage = "Select at most 200 report files per migration batch.";
       input.value = "";
-      this.changeDetectorRef.detectChanges();
+      this.refreshView();
       return;
     }
     await this.run(async () => {
@@ -1365,7 +1404,8 @@ export class SystemCheckViewComponent implements OnInit {
 
   private async measureThroughput(
     direction: "download" | "upload",
-    parameters: SystemCheckSpeedParameters
+    parameters: SystemCheckSpeedParameters,
+    signal: AbortSignal
   ): Promise<ThroughputResult> {
     const sequenceSizes = parameters.sequenceSizes.filter(
       size => Number.isSafeInteger(size) && size >= 16 && size <= 64 * 1024 * 1024
@@ -1382,14 +1422,24 @@ export class SystemCheckViewComponent implements OnInit {
     let unstable = false;
 
     for (let repetition = 1; repetition <= maxRepetitions; repetition += 1) {
+      signal.throwIfAborted();
       const successfulSpeeds: number[] = [];
+      const points: [number, number][] = [];
       let errors = 0;
       for (const size of sequenceSizes) {
+        signal.throwIfAborted();
+        const packageSize = this.interfaceMode.mode() === "original"
+          ? this.humanReadableNetworkBytes(size) : `${size}`;
+        const suffix = this.interfaceMode.mode() === "original" && direction === "upload" ? ")" : " bytes";
+        this.networkStatusMessage = `${direction === "download" ? "Downloadgeschwindigkeit" : "Uploadgeschwindigkeit"} Testrunde ${repetition} - Testgröße: ${packageSize}${suffix}`;
+        this.refreshView();
         try {
-          successfulSpeeds.push(
-            await this.measureSpeedTestPackage(direction, size, repetition)
-          );
+          const speed = await this.measureSpeedTestPackage(direction, size, repetition, signal);
+          signal.throwIfAborted();
+          successfulSpeeds.push(speed);
+          points.push([size, 1000 * size / speed]);
         } catch {
+          signal.throwIfAborted();
           errors += 1;
         }
       }
@@ -1405,6 +1455,15 @@ export class SystemCheckViewComponent implements OnInit {
           sequenceAverages.length
         : null;
       sequenceAverages.push(sequenceAverage);
+      const runningAverage = sequenceAverages.reduce((sum, value) => sum + value, 0) / sequenceAverages.length;
+      if (direction === "download") {
+        this.networkDownloadBytesPerSecond = runningAverage;
+        this.networkDownloadPoints = [...this.networkDownloadPoints, points];
+      } else {
+        this.networkUploadBytesPerSecond = runningAverage;
+        this.networkUploadPoints = [...this.networkUploadPoints, points];
+      }
+      this.refreshView();
       const stable =
         sequenceAverages.length >= 3 &&
         previousAverage != null &&
@@ -1427,9 +1486,13 @@ export class SystemCheckViewComponent implements OnInit {
   private async measureSpeedTestPackage(
     direction: "download" | "upload",
     size: number,
-    repetition: number
+    repetition: number,
+    signal: AbortSignal
   ): Promise<number> {
+    signal.throwIfAborted();
     const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
     const timeout = window.setTimeout(
       () => controller.abort(),
       direction === "download" ? 45_000 : 10_000
@@ -1474,9 +1537,11 @@ export class SystemCheckViewComponent implements OnInit {
         }
       }
       const durationMs = Math.max(performance.now() - startedAt, 0.1);
+      signal.throwIfAborted();
       return size / (durationMs / 1000);
     } finally {
       window.clearTimeout(timeout);
+      signal.removeEventListener("abort", abort);
     }
   }
 
@@ -1512,6 +1577,11 @@ export class SystemCheckViewComponent implements OnInit {
       unitIndex += 1;
     }
     return `${value.toFixed(2)} ${units[unitIndex]}`;
+  }
+
+  private humanReadableNetworkBytes(bytes: number): string {
+    const index = Math.min(4, Math.floor(Math.log(bytes) / Math.log(1000)));
+    return `${(bytes / 1000 ** index).toFixed(2)} ${["B", "kB", "MB", "GB", "TB"][index]}`;
   }
 
   private reportPayload(includeKey: boolean): SaveSystemCheckReportRequest {
@@ -1594,7 +1664,7 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   private async run(action: () => Promise<void>): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || this.destroyed) return;
     this.busy = true;
     this.errorMessage = "";
     try {
@@ -1607,7 +1677,30 @@ export class SystemCheckViewComponent implements OnInit {
           : String(error);
     } finally {
       this.busy = false;
-      this.changeDetectorRef.detectChanges();
+      this.refreshView();
     }
+  }
+
+  private resetNetworkMeasurements(): void {
+    this.networkDownloadBytesPerSecond = -1;
+    this.networkUploadBytesPerSecond = -1;
+    this.networkDownloadPoints = [];
+    this.networkUploadPoints = [];
+  }
+
+  private cancelNetworkCheck(): void {
+    const controller = this.networkController;
+    if (!controller) return;
+    this.networkController = null;
+    controller.abort();
+    this.networkBusy = false;
+    this.networkEntries = [];
+    this.networkRating = "not measured";
+    this.networkStatusMessage = "Measurement has not started.";
+    this.resetNetworkMeasurements();
+  }
+
+  private refreshView(): void {
+    if (!this.destroyed) this.changeDetectorRef.detectChanges();
   }
 }

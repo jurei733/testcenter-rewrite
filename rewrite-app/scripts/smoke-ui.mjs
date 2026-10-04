@@ -2673,6 +2673,136 @@ try {
     await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
     await originalChoices.first().waitFor();
     await page.waitForURL(url => !url.searchParams.has("checkId"));
+    const networkPageErrors = [];
+    const recordNetworkPageError = error => networkPageErrors.push(error.message);
+    page.on("pageerror", recordNetworkPageError);
+    const speedPackageRoute = /\/speed-test\/random-package(?:\/\d+)?(?:\?.*)?$/;
+    const verifyCancelledNetworkMeasurement = async (interfaceName, leaveRoute, direction = "download") => {
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      let entered;
+      const intercepted = new Promise(resolve => { entered = resolve; });
+      let interceptionTimeout;
+      const interceptionDeadline = () => new Promise((_, reject) => {
+        interceptionTimeout = setTimeout(() => reject(new Error(`The network measurement did not reach the held ${direction} request.`)), 15_000);
+      });
+      let heldRequest;
+      const heldMethod = direction === "latency" ? "HEAD" : direction === "upload" ? "POST" : "GET";
+      const heldRoute = direction === "latency" ? /\/healthz\?systemCheck=/ : speedPackageRoute;
+      const holdFirstDownload = async route => {
+        if (!heldRequest && route.request().method() === heldMethod) {
+          heldRequest = route.request();
+          entered();
+          await held;
+          // A cancelled browser fetch is expected to close this route already.
+          await route.continue().catch(() => {});
+        } else await route.continue();
+      };
+      await context.route(heldRoute, holdFirstDownload);
+      try {
+        if (interfaceName === "original") {
+          await page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}'][data-system-check-id='SYSCHECK.SAMPLE']`).click();
+          await page.locator("#originalSystemCheckWelcome").waitFor();
+          await page.locator("#syscheck-next-step").click();
+        } else {
+          await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").click();
+          await page.locator("#systemCheckNextButton").click();
+          await page.locator("#runSystemCheckNetworkButton").click();
+        }
+        await Promise.race([intercepted, interceptionDeadline()]);
+        clearTimeout(interceptionTimeout);
+        if (interfaceName === "original" && direction !== "latency") {
+          assert.match(await page.locator("#systemCheckNetworkStatus").innerText(), direction === "download"
+            ? /Downloadgeschwindigkeit Testrunde 1 - Testgröße: 400\.00 kB bytes/
+            : /Uploadgeschwindigkeit Testrunde 1 - Testgröße: 100\.00 kB\)/);
+        }
+        assert.equal(await page.locator(interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton").isDisabled(), true);
+        assert.equal(await page.locator("#runSystemCheckNetworkButton").isDisabled(), true);
+        const cancelled = page.waitForEvent("requestfailed", { predicate: request => request === heldRequest });
+        if (leaveRoute) {
+          await page.locator("#participantApplicationLogoButton").click();
+          await page.waitForURL(url => url.pathname === "/app/home");
+        } else {
+          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+          const choice = interfaceName === "original"
+            ? page.locator(`#originalSystemCheckStarter button[data-system-check-id='${noSaveSystemCheckId}']`)
+            : page.locator(`[data-system-check-id='${noSaveSystemCheckId}']`);
+          await choice.click();
+        }
+        release();
+        await cancelled;
+        // Flush a rendering boundary after the actual aborted request settles.
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        assert.equal(await page.locator(".status-banner.is-error").count(), 0);
+        assert.equal(await page.locator("#originalSystemCheckNetwork").count(), 0);
+        assert.equal(await page.locator("#systemCheckNetworkRating").count(), 0);
+        if (!leaveRoute) {
+          await page.locator(interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton").click();
+          assert.equal(await page.getByRole("textbox", { name: /Assigned device/ }).inputValue(), "",
+            "The new check has its own clean answers, not late state from the cancelled check");
+          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+        }
+      } finally {
+        clearTimeout(interceptionTimeout);
+        release();
+        await context.unroute(heldRoute, holdFirstDownload);
+      }
+    };
+    await verifyCancelledNetworkMeasurement("original", false);
+    await verifyCancelledNetworkMeasurement("original", false, "latency");
+    await verifyCancelledNetworkMeasurement("original", true, "upload");
+    await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
+    await originalChoices.first().waitFor();
+    await originalChoices.filter({ hasText: "System-Check Beispiel" }).click();
+    await page.locator("#originalSystemCheckWelcome").waitFor();
+    const automaticNetworkStart = page.waitForRequest(request =>
+      request.method() === "GET" && new URL(request.url()).pathname.startsWith("/speed-test/random-package/"));
+    await page.locator("#syscheck-next-step").click();
+    await automaticNetworkStart;
+    const originalNetwork = page.locator("#originalSystemCheckNetwork");
+    await originalNetwork.locator("mat-card-title").filter({ hasText: "Netzwerk" }).waitFor();
+    await page.waitForFunction(() => !document.querySelector("#runSystemCheckNetworkButton")?.disabled,
+      undefined, { timeout: 45_000 });
+    assert.equal(await originalNetwork.locator("canvas").count(), 2);
+    assert.equal(await originalNetwork.locator("canvas").first().evaluate(canvas => canvas.height), 240);
+    assert.match(await originalNetwork.locator("#originalSystemCheckDownload").innerText(), /⌀ .*bit\/s/);
+    assert.match(await originalNetwork.locator("#originalSystemCheckUpload").innerText(), /⌀ .*bit\/s/);
+    assert.match(await originalNetwork.locator("mat-card-subtitle").innerText(), /Ihre Verbindung zum Testserver ist/);
+    assert.equal(await originalNetwork.locator("mat-card").evaluate(element => Math.round(element.getBoundingClientRect().width)), 810);
+    await page.mouse.move(0, 0);
+    await page.locator(".mat-mdc-tooltip").waitFor({ state: "hidden" });
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-network-desktop.png"), fullPage: true });
+    const failingNetwork = route => route.fulfill({ status: 503, contentType: "text/plain", body: "Synthetic unstable measurement" });
+    await context.route(speedPackageRoute, failingNetwork);
+    await originalNetwork.getByRole("button", { name: "Neustart", exact: true }).click();
+    await originalNetwork.locator("mat-card-subtitle").filter({ hasText: "sehr instabil" }).waitFor();
+    assert.equal(await page.locator("#syscheck-next-step").isDisabled(), false,
+      "An unstable completed measurement retains the Original's forward navigation and report semantics");
+    await context.unroute(speedPackageRoute, failingNetwork);
+    const repeatedNetwork = page.waitForRequest(request => request.method() === "GET" &&
+      new URL(request.url()).pathname.startsWith("/speed-test/random-package/"));
+    await originalNetwork.getByRole("button", { name: "Neustart", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await repeatedNetwork;
+    await page.waitForFunction(() => !document.querySelector("#runSystemCheckNetworkButton")?.disabled,
+      undefined, { timeout: 45_000 });
+    const completedDownload = await originalNetwork.locator("#originalSystemCheckDownload").innerText();
+    let repeatedOnReturn = 0;
+    const countUnwantedRestart = request => { if (new URL(request.url()).pathname.startsWith("/speed-test/random-package/")) repeatedOnReturn += 1; };
+    page.on("request", countUnwantedRestart);
+    await page.locator("#syscheck-previous-step").click();
+    await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await originalNetwork.waitFor();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(repeatedOnReturn, 0, "A completed measurement is retained when revisiting the Network step");
+    assert.equal(await originalNetwork.locator("#originalSystemCheckDownload").innerText(), completedDownload);
+    page.off("request", countUnwantedRestart);
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-network-mobile.png"), fullPage: true });
+    await page.setViewportSize(choiceViewport);
+    await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
     await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${headerOnlyCheckId}']`).click();
     await page.locator("#originalSystemCheckWelcome").waitFor();
     assert.equal(await page.locator("#originalSystemCheckWelcome ol li").count(), 2,
@@ -2698,6 +2828,11 @@ try {
       .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
       .waitFor();
     assert.equal(await page.locator(".system-check-option").count(), 4);
+    await verifyCancelledNetworkMeasurement("rewrite", false);
+    await verifyCancelledNetworkMeasurement("rewrite", false, "latency");
+    await verifyCancelledNetworkMeasurement("rewrite", false, "upload");
+    assert.deepEqual(networkPageErrors, [], "Network cancellation and deferred charts must not raise Angular/browser errors");
+    page.off("pageerror", recordNetworkPageError);
     await page
       .locator(`[data-system-check-id='${noSaveSystemCheckId}']`)
       .click();

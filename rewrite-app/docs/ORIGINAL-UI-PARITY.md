@@ -199,6 +199,34 @@ inspected. The production initial bundle is 469.90kB under the unchanged 470kB
 error limit; 140 unit tests and 25 frontend-state tests passed. These are adapted
 Rewrite screenshots, not equal-fixture rendered Original comparisons. Current
 publication CI and the complete visual-parity row remain open.
+The Original network step now adapts the source's centered 810px Material card,
+automatic start, German progress/rating copy, side-by-side logarithmic canvas
+plots, live sequence averages and keyboard-operable `Neustart`. It uses only the
+shared configured byte measurements and report entries. Returning to a completed
+network step retains its results instead of starting another measurement.
+The shared controller cancels its pending latency/download/upload fetches when
+the check changes, the account signs out, the step leaves or the route destroys
+the view. An old measurement cannot install its results/errors or release the
+busy state of a newer check; request timeouts and abort listeners are cleaned up.
+The protected SQLite/headful Chromium report gate exercises real successful
+measurements, failed packages followed by a real restart, all three request-stage
+cancellations in both interfaces, same-step retention, native keyboard restart,
+actual 1280px/390px bounds and the existing report/export flows. Its controlled
+held requests verify actual browser aborts and no page errors. Screenshots are
+inspected as adapted Rewrite evidence, not matching rendered Original reference
+images. The chart preserves the source's canvas/projections/grid/dot output but
+iterates only labelled x ticks, avoiding millions of empty four-byte iterations
+for a large package. UAParser now loads on environment capture rather than the
+initial shell; capture generations suppress stale results and refresh the
+zoneless view. Current complete CI, the Unit/report/protected-entry surfaces and
+the full Systemcheck reference comparison remain separate acceptance gates.
+The final fresh protected SQLite/headful Chromium production report gate exited
+0 on 2026-10-04, including all six held-request cancellation cases and the
+source's in-progress package-size copy. Both final screenshots were inspected.
+The production initial bundle passed at 469.52kB under the unchanged 470kB error
+limit; 140 unit and 25 frontend-state tests passed. The previous publication's
+push and PR workflows each had 33/35 successful jobs with Ops/Quick still
+running at this checkpoint, not a confirmed complete CI result.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

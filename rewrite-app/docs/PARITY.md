@@ -362,6 +362,30 @@ and local headful execution is explicit through `UI_SMOKE_HEADFUL=true`.
 Current complete CI must prove the monitor-selection assertion and the broader
 corpus; these test-harness changes do not close any product-parity matrix row.
 
+The optional Original Systemcheck network stage now uses the pinned source's
+810px Material card, automatic start, progress/rating copy, download/upload
+canvas charts, live measured averages and `Neustart`. The shared measurement
+engine aborts pending latency and package requests on check/account/step/route
+change and rejects stale results/errors instead of contaminating a newly
+selected check. Completed results survive a step round trip. A protected
+SQLite/headful Chromium report gate covers successful and unstable measurements,
+actual keyboard restart and actual held latency/download/upload request aborts
+in both interfaces, clean new-check state, no page errors, mobile/desktop bounds
+and the existing report save/download/export flows. Adapted screenshots are
+inspected, not treated as rendered Original-reference acceptance. Source chart
+projections/grid/dots are retained without the expensive scan of every four
+bytes. Environment parsing is lazy and generation-bound, with explicit zoneless
+refresh; current complete CI and all full Original visual-parity rows remain
+separate gates.
+
+The final fresh protected SQLite/headful Chromium network/report gate exited
+0 on 2026-10-04. All six controlled request cancellations, actual completed
+measurements/restarts and report/export flows passed; both final screenshots
+were inspected. The unchanged initial-bundle budget passed at 469.52kB, and
+140 unit plus 25 frontend-state tests passed. The previous publication's push
+and PR workflows had 33/35 successful jobs, with Ops/Quick still running;
+that snapshot is not a completed CI success.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit
