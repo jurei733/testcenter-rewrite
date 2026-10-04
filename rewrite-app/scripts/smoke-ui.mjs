@@ -4325,13 +4325,24 @@ try {
   );
 
   logStep("admin-workspace-access-matrix-revoke");
+  // The API acknowledgement can precede the directory refresh and its DOM
+  // replacement. Bind the visible action to the actual returned assignment,
+  // not a forced click on the first (potentially detached) matrix action.
+  const adminWorkspaceRevokeAction = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Admin Workspace Access", exact: true })
+  }).locator(".record-card")
+    .filter({ hasText: workspaceKey })
+    .filter({ hasText: adminWorkspaceRoleAssignmentId })
+    .filter({ hasText: "Read only (RO)" })
+    .getByRole("button", { name: "Revoke Access", exact: true });
+  await adminWorkspaceRevokeAction.waitFor({ state: "visible" });
   const revokeAdminWorkspaceAccessDialog = acceptAppConfirmation(
     /Revoke role assignment\?/,
     new RegExp(
       `Revoke role assignment '${adminWorkspaceRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
     )
   );
-  await clickCardAction("Admin Workspace Access", "Revoke Access");
+  await adminWorkspaceRevokeAction.click();
   await revokeAdminWorkspaceAccessDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/users`,
