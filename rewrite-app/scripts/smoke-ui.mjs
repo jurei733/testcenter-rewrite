@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
@@ -16,6 +17,10 @@ const fetch = participantHttpActor.fetch;
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const browserChannel = process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined;
+const headful = ["1", "true", "yes", "on"].includes(
+  String(process.env.UI_SMOKE_HEADFUL ?? "").toLowerCase()
+);
+const artifactDirectory = process.env.UI_SMOKE_ARTIFACT_DIR?.trim();
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
@@ -359,6 +364,7 @@ const stopChild = child =>
   });
 
 await ensureDataDirectory();
+if (artifactDirectory) await mkdir(artifactDirectory, { recursive: true });
 
 const port = process.env.FIRST_SLICE_UI_PORT
   ? Number.parseInt(process.env.FIRST_SLICE_UI_PORT, 10)
@@ -381,7 +387,7 @@ try {
 
   browser = await chromium.launch({
     channel: browserChannel,
-    headless: true,
+    headless: !headful,
     args: [
       "--use-fake-device-for-media-stream",
       "--use-fake-ui-for-media-stream"
@@ -2540,7 +2546,13 @@ try {
             "    <Label>System Check Without Report</Label>",
             "  </Metadata>",
             '  <Config skipnetwork="true">',
-            '    <Q id="device" type="string" prompt="Assigned device"/>',
+            '    <CustomText key="syscheck_questionsintro">UI Fragebogen-Anleitung</CustomText>',
+            '    <Q id="feedback-header" type="header" prompt="Fallback header">Original questionnaire heading</Q>',
+            '    <Q id="device" type="string" prompt="Assigned device" required="true"/>',
+            '    <Q id="feedback-select" type="select" prompt="Choose device">Desktop#Mobile</Q>',
+            '    <Q id="feedback-text" type="text" prompt="Your feedback"/>',
+            '    <Q id="feedback-check" type="check" prompt="Device checked"/>',
+            '    <Q id="feedback-radio" type="radio" prompt="Device rating">Good#Needs work</Q>',
             "  </Config>",
             "</SysCheck>"
           ].join("\n")
@@ -2610,9 +2622,52 @@ try {
       "The navigation has an accessible name; Material deliberately omits an identical duplicate description");
     await page.locator("#syscheck-next-step").click();
     await page.locator("#systemCheckQuestionsIntro").waitFor();
+    const originalQuestionnaire = page.locator("#originalSystemCheckQuestionnaire");
+    await originalQuestionnaire.locator("mat-card-title").filter({ hasText: "Fragen" }).waitFor();
+    assert.equal(await originalQuestionnaire.locator("mat-form-field").count(), 3);
+    assert.equal(await originalQuestionnaire.locator("input[required], textarea[required]").count(), 0,
+      "Original required fields produce report warnings, not native validation or invented label asterisks");
+    await originalQuestionnaire.locator("#systemCheckQuestionsIntro").filter({ hasText: "UI Fragebogen-Anleitung" }).waitFor();
+    await originalQuestionnaire.getByRole("heading", { name: "Original questionnaire heading", exact: true }).waitFor();
+    await originalQuestionnaire.getByRole("textbox", { name: "Assigned device", exact: true }).fill("Original device");
+    await originalQuestionnaire.getByRole("textbox", { name: "Your feedback", exact: true }).fill("Original multiline feedback");
+    await originalQuestionnaire.getByRole("combobox", { name: "Choose device", exact: true }).click();
+    await page.getByRole("option", { name: "Mobile", exact: true }).click();
+    await originalQuestionnaire.getByRole("checkbox", { name: "Device checked", exact: true }).check();
+    await originalQuestionnaire.getByRole("radio", { name: "Good", exact: true }).check();
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await originalQuestionnaire.getByRole("radio", { name: "Needs work", exact: true }).isChecked(), true);
+    assert.equal(await originalQuestionnaire.locator("textarea").evaluate(element => {
+      const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
+      return element.clientHeight >= 4 * lineHeight && element.clientHeight <= 5 * lineHeight;
+    }), true, "Autosize must measure four actual text rows, not the Rewrite textarea's global minimum height");
+    assert.equal(await originalQuestionnaire.locator("mat-radio-button .mdc-label").first().evaluate(label => {
+      const actual = getComputedStyle(label);
+      const inherited = getComputedStyle(label.parentElement);
+      return actual.color === inherited.color && actual.fontSize === inherited.fontSize &&
+        actual.fontFamily === inherited.fontFamily && actual.display !== "grid";
+    }), true, "Material labels retain their own typography and foreground, not Rewrite form-label styles");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (artifactDirectory) await page.screenshot({
+      path: resolve(artifactDirectory, "original-system-check-questionnaire-mobile.png"), fullPage: true
+    });
     assert.equal(await page.locator("#syscheck-next-step").isDisabled(), true);
     await page.locator("#syscheck-previous-step").click();
     await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await originalQuestionnaire.waitFor();
+    assert.equal(await originalQuestionnaire.getByRole("textbox", { name: "Assigned device", exact: true }).inputValue(), "Original device");
+    assert.equal(await originalQuestionnaire.getByRole("textbox", { name: "Your feedback", exact: true }).inputValue(), "Original multiline feedback");
+    assert.match(await originalQuestionnaire.getByRole("combobox", { name: "Choose device", exact: true }).innerText(), /Mobile/);
+    assert.equal(await originalQuestionnaire.getByRole("checkbox", { name: "Device checked", exact: true }).isChecked(), true);
+    assert.equal(await originalQuestionnaire.getByRole("radio", { name: "Needs work", exact: true }).isChecked(), true);
+    await page.setViewportSize(choiceViewport);
+    assert.equal(await originalQuestionnaire.locator("mat-card").evaluate(element => Math.round(element.getBoundingClientRect().width)), 810);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (artifactDirectory) await page.screenshot({
+      path: resolve(artifactDirectory, "original-system-check-questionnaire-desktop.png"), fullPage: true
+    });
+    await page.locator("#syscheck-previous-step").click();
     await page.reload({ waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
     await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
@@ -2669,7 +2724,7 @@ try {
       0
     );
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page
       .locator("#systemCheckStepStatus")
       .filter({ hasText: "2 / 2" })
@@ -2902,7 +2957,7 @@ try {
       .filter({ hasText: "UI system-check pages:" })
       .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page
       .getByRole("heading", { name: "UI authored heading", exact: true })
       .waitFor();
@@ -2934,7 +2989,7 @@ try {
     );
     await expectButtonSelectorDisabled("#saveSystemCheckReportButton");
     await page.locator("#systemCheckBackButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");
     await selectAndCommit("#systemCheckQuestion-3", "Option B");
     await fillAndCommit("#systemCheckQuestion-4", "Browser flow verified");
@@ -3027,7 +3082,7 @@ try {
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Player and unit" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
@@ -3247,7 +3302,7 @@ try {
       .filter({ hasText: "running" })
       .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await expectButtonSelectorEnabled("#systemCheckNextButton");
     await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
     await selectAndCommit("#systemCheckQuestion-3", "Option A");
@@ -3280,7 +3335,7 @@ try {
       "Second system check answer"
     );
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
     await selectAndCommit("#systemCheckQuestion-3", "Option A");
     await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
@@ -3312,7 +3367,7 @@ try {
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Player and unit" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
@@ -9801,45 +9856,111 @@ try {
   logStep("participant-verona-background-sync");
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   const backgroundSyncedResponse = "Saved after participant closed";
-  await resumedVeronaFrame
-    .locator("#playerAnswer")
-    .fill(backgroundSyncedResponse);
-  await page.waitForFunction(
-    ({ storageKey, testRunId, expectedAnswer }) => {
-      const rawValue = localStorage.getItem(storageKey);
-      if (!rawValue) return false;
-      try {
-        const document = JSON.parse(rawValue);
-        return document.entries?.some(entry => {
-          if (entry.testRunId !== testRunId) return false;
-          return JSON.parse(entry.response).unitState?.dataParts?.answer ===
-            expectedAnswer;
+  const isBackgroundAnswerRequest = request => {
+    if (request.method() !== "POST") return false;
+    try {
+      return JSON.parse(request.postDataJSON()?.unitResponse)
+        .unitState?.dataParts?.answer === backgroundSyncedResponse;
+    } catch {
+      return false;
+    }
+  };
+  let allowBackgroundDelivery;
+  const backgroundDeliveryReleased = new Promise(resolvePromise => {
+    allowBackgroundDelivery = resolvePromise;
+  });
+  const holdBackgroundAnswer = async route => {
+    if (isBackgroundAnswerRequest(route.request())) {
+      if (!route.request().serviceWorker()) {
+        await route.abort("internetdisconnected");
+        return;
+      }
+      await backgroundDeliveryReleased;
+    }
+    await route.continue();
+  };
+  // Retain a real pending save until the participant view has closed. Fast
+  // foreground delivery must not make a transient local-storage entry the
+  // acceptance condition for durable Service Worker delivery.
+  await context.route(veronaSaveProgressUrl, holdBackgroundAnswer);
+  try {
+    const workerSaveRequestPromise = context.waitForEvent("request", {
+      predicate: request => !!request.serviceWorker() &&
+        request.url().endsWith(`/test-runs/${veronaTestRunId}/save-progress`) &&
+        isBackgroundAnswerRequest(request),
+      timeout: 20_000
+    });
+    await resumedVeronaFrame
+      .locator("#playerAnswer")
+      .fill(backgroundSyncedResponse);
+    await page.waitForFunction(
+      ({ storageKey, testRunId, expectedAnswer }) => {
+        const rawValue = localStorage.getItem(storageKey);
+        if (!rawValue) return false;
+        try {
+          const document = JSON.parse(rawValue);
+          return document.entries?.some(entry => {
+            if (entry.testRunId !== testRunId) return false;
+            return JSON.parse(entry.response).unitState?.dataParts?.answer ===
+              expectedAnswer;
+          });
+        } catch {
+          return false;
+        }
+      },
+      {
+        storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+        testRunId: veronaTestRunId,
+        expectedAnswer: backgroundSyncedResponse
+      }
+    );
+    const workerSaveRequest = await workerSaveRequestPromise;
+    const pendingBackgroundEntries = await page.evaluate(
+      () => new Promise((resolvePromise, reject) => {
+        const request = indexedDB.open("testcenter-participant-save-outbox-v1", 1);
+        request.addEventListener("error", () => reject(request.error));
+        request.addEventListener("success", () => {
+          const database = request.result;
+          const transaction = database.transaction("pending-saves", "readonly");
+          const entries = transaction.objectStore("pending-saves").getAll();
+          entries.addEventListener("error", () => reject(entries.error));
+          entries.addEventListener("success", () => {
+            database.close();
+            resolvePromise(entries.result);
+          });
         });
-      } catch {
-        return false;
+      })
+    );
+    const workerSaveBody = workerSaveRequest.postDataJSON();
+    assert.ok(pendingBackgroundEntries.some(record =>
+      record.entry?.testRunId === veronaTestRunId &&
+      record.entry?.unitKey === veronaUnitKey &&
+      record.entry?.deliveryId === workerSaveBody.deliveryId &&
+      record.entry?.response === workerSaveBody.unitResponse
+    ), "The exact background response and delivery ID must be durable before closing the participant view.");
+    assert.ok(workerSaveRequest.headers().authorization?.startsWith("Bearer "));
+    assert.notEqual(workerSaveRequest.headers().authorization, `Bearer ${smokeAdminSessionToken}`);
+    await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
+    allowBackgroundDelivery();
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+      payload => {
+        const response =
+          payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+        if (typeof response !== "string") return false;
+        try {
+          return JSON.parse(response).unitState?.dataParts?.answer ===
+            backgroundSyncedResponse;
+        } catch {
+          return false;
+        }
       }
-    },
-    {
-      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
-      testRunId: veronaTestRunId,
-      expectedAnswer: backgroundSyncedResponse
-    }
-  );
-  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
-    payload => {
-      const response =
-        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
-      if (typeof response !== "string") return false;
-      try {
-        return JSON.parse(response).unitState?.dataParts?.answer ===
-          backgroundSyncedResponse;
-      } catch {
-        return false;
-      }
-    }
-  );
+    );
+  } finally {
+    allowBackgroundDelivery();
+    await context.unroute(veronaSaveProgressUrl, holdBackgroundAnswer);
+  }
   await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
@@ -18439,6 +18560,7 @@ try {
     .locator("#participantRouteTimerLifecycleMessage")
     .filter({ hasText: "started" })
     .waitFor();
+  await page.locator("#participantVeronaPlayerStatus").filter({ hasText: /^running$/ }).waitFor();
   await demoController.frame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .check();
@@ -21361,7 +21483,9 @@ try {
   logStep("open-run-select-sync");
   await fillAndCommit("#detailedResponseLoginFilter", "stale-login");
   await selectAndCommit("#detailedResponseStatusFilter", "paused");
-  await selectAndCommit("#openRunStatusFilter", "paused");
+  // This run was resumed above. A paused-only filter correctly removes it on
+  // the next automatic refresh, so it cannot be the target of Select + Sync.
+  await selectAndCommit("#openRunStatusFilter", "running");
   await openRunStudentCard
     .getByRole("button", { name: "Select + Sync" })
     .click();
@@ -25110,6 +25234,11 @@ try {
   );
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
+    if (page && !page.isClosed()) {
+      const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+      await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true }).catch(() => undefined);
+      process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
+    }
     const bugReport = await page
       ?.locator("#bugReportText")
       .innerText({ timeout: 1_000 })

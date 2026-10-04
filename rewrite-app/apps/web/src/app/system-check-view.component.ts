@@ -238,7 +238,7 @@ const readSystemCheckUnitResponse = (
           </button>
         </article>
 
-        <article class="card" *ngIf="step === 'questionnaire'">
+        <article class="card" *ngIf="step === 'questionnaire' && interfaceMode.mode() !== 'original'">
           <h2>Questionnaire</h2>
           <p id="systemCheckQuestionsIntro">{{ customText('syscheck_questionsintro', 'Please answer all fields marked as required.') }}</p>
           <div class="system-check-questionnaire">

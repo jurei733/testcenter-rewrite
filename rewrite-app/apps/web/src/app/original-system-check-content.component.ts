@@ -4,13 +4,14 @@ import { MatFabButton } from "@angular/material/button";
 import { MatCard, MatCardContent, MatCardHeader, MatCardTitle } from "@angular/material/card";
 import { MatTooltip } from "@angular/material/tooltip";
 import type { SystemCheckViewComponent } from "./system-check-view.component";
+import { OriginalSystemCheckQuestionnaireComponent } from "./original-system-check-questionnaire.component";
 
 // Adapted from IQB Testcenter 19 sys-check/welcome and sys-check.component (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt. The shared controller owns every step,
 // measurement and response; this surface does not create another check state.
 @Component({
   selector: "app-original-system-check-content", standalone: true,
-  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip],
+  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, OriginalSystemCheckQuestionnaireComponent],
   template: `
     <ng-container *ngIf="view.systemCheck as check">
       <div class="header">
@@ -24,6 +25,11 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
           <svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m400-240-56-56 184-184-184-184 56-56 240 240-240 240Z" /></svg>
         </button>
       </div>
+      @defer (when view.step === 'questionnaire') {
+        @if (view.step === 'questionnaire') {
+          <app-original-system-check-questionnaire [view]="view" />
+        }
+      }
       <div class="sys-check-body" *ngIf="view.step === 'welcome'" id="originalSystemCheckWelcome">
         <div class="welcome-cards">
           <mat-card appearance="raised">

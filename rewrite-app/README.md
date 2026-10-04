@@ -12,7 +12,7 @@ links can use `?ui=original` or `?ui=rewrite`; both use the same application,
 permissions and stored sessions. The optional Original 19 layout is still a
 preview: participant login, starter, grouped Player navigation, full-height
 content, toolbar, modal task/comment side panels and public/authorized
-Systemcheck selection, welcome cards and step navigation are adapted,
+Systemcheck selection, welcome cards, step navigation and questionnaire are adapted,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 

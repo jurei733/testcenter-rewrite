@@ -165,7 +165,7 @@ reports now use the current Original labels/IDs (`Browserversion`,
 `Betriebssystem`, `Betriebssystemversion`, `Bildschirmauflösung`, `Browsersprache`,
 `Fenstergröße`); existing reports are not rewritten. Navigation now also has
 the source's Material tooltips and accessible control names. Network, Unit,
-questionnaire/report composition, the protected-account card, remaining header
+report composition, the protected-account card, remaining header
 details and equal-reference screenshot acceptance are still open.
 The final headful welcome check and fresh protected SQLite/Chromium report gate
 both exited 0, including reload, cleared selection, header-only questions and
@@ -182,6 +182,23 @@ authored reload, page reload and Unit changes with exact response retention and
 no page/console errors. The headful welcome gate passed the real visible
 Material tooltip. The production initial bundle is now 467.76kB, under the
 unchanged 470kB error limit; this is not rendered Original-reference acceptance.
+The 2026-10-04 questionnaire adaptation uses the pinned Original's centered
+810px Material card, authored introduction/header text, outlined string/select/
+multiline fields, four-row textarea autosizing, separate checkbox prompt and
+vertical radio group. It writes only the existing controller's answers; step
+round trips preserve all five input types. Required questions retain the shared
+report warnings rather than gaining native validation or invented label
+asterisks. The lazy view explicitly excludes Rewrite textarea minimum-height
+and form-label styles: browser assertions verify actual text-row height and
+Material label typography/color, not just presence of a Material class.
+A fresh protected SQLite/headful Chromium production gate exited 0 through
+all six question types, native option/checkbox/radio interaction, keyboard radio
+navigation, answer retention, header-only questions, 390px/1280px bounds and the
+existing report save/download/export paths. Both actual screenshots were
+inspected. The production initial bundle is 469.90kB under the unchanged 470kB
+error limit; 140 unit tests and 25 frontend-state tests passed. These are adapted
+Rewrite screenshots, not equal-fixture rendered Original comparisons. Current
+publication CI and the complete visual-parity row remain open.
 An additional headful check passed authored Unit/Booklet header titles,
 preservation of a hidden header after cancelling return to the starter, hidden
 and explicit global-forward controls, and the Original `markedNo` interaction:

@@ -336,6 +336,32 @@ including an unknown-code error, camera startup, QR-image resolution, target
 confirmation, frame preview, upload, preview in the manager and deletion.
 This closes that async-rendering defect, not the optional Original visual row.
 
+The Original 19 questionnaire is now a lazy, source-adapted Material surface
+over the shared Systemcheck answers and report controller. On 2026-10-04, the
+fresh protected SQLite/headful Chromium production gate exited 0 through the
+schema-conformant six-type questionnaire fixture, actual mouse/keyboard input,
+desktop/mobile layout, step round-trip answer retention, header-only questions
+and the existing report save/download/export flows. Visual inspection exposed
+and fixed leakage of Rewrite textarea minimum-height and form-label styles;
+the browser gate now checks actual four-row autosizing and inherited Material
+label typography/color. The production bundle passed at 469.90kB under the
+unchanged 470kB limit, and 140 unit plus 25 frontend-state tests passed. Full
+Original-reference comparisons, protected-account/network/Unit/report layout
+and current CI remain separate acceptance requirements.
+
+The published `66c20ab4` push workflow completed successfully; its separate PR
+workflow failed on an open-run Select + Sync timeout and a transient background
+outbox observation. The browser gate now filters the resumed run as `running`,
+not `paused`, and intentionally retains a real Service Worker save until after
+the Participant view has closed. It checks the exact durable response/delivery
+ID and participant credential before release, then server delivery, restoration
+and queue cleanup. Two fresh headful runs passed that background-save section
+but stopped later at independent official Test Controller/IB corpus checks;
+neither is a successful full browser run. Failure screenshots are now retained,
+and local headful execution is explicit through `UI_SMOKE_HEADFUL=true`.
+Current complete CI must prove the monitor-selection assertion and the broader
+corpus; these test-harness changes do not close any product-parity matrix row.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit
