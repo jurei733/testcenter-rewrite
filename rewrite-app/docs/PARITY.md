@@ -1,5 +1,35 @@
 # Testcenter parity checklist
 
+### Latest verified Original Systemcheck welcome rendering
+
+Actual pinned 19.0 rendering exposed Rewrite leakage into the Original view:
+the 980px shell cap, non-white raised cards, inherited text colour, duplicated
+disabled-button dimming, different FAB font/baseline and table wrapping. These
+are now scoped back to the Original values. The shared optional Original header
+also uses the source's 22px/28px centred title and 64px/56px toolbar with an
+unconstrained proportional logo; the breakpoint is below 600px, not 720px.
+The Rewrite layout, controllers, authorization and private test data stay intact.
+
+Twelve equal-fixture comparisons passed in each fresh production/development
+build: Primar/Sekundar/Erwachsene at 1280x720, 390x844, 599x844 and 600x844.
+They compare actual visible text, card/table/FAB/title/logo geometry, typography,
+colours, spacing, shadow and disabled opacity against the unmodified `c35cff81`
+frontend. The opaque bitmap's inherited text font/colour are not visual inputs;
+its visible shape and position are compared. Reference API fixtures reject
+unknown calls, while each Rewrite instance has its own real API/SQLite database.
+Screenshots, metrics, comparison script and logs are retained in ignored
+`.data/original-welcome-reference-20261004`.
+
+The dedicated CI browser regression now checks these welcome tokens, both
+toolbar breakpoint sides, real report persistence and native asynchronous focus
+containment without moving focus itself. Both builds passed all three themes.
+The complete protected production Systemcheck and participant-entry gates
+passed; the latter still revokes/re-enters into the same session/run. The initial
+production bundle is 467.94kB under the unchanged 470kB error budget.
+This is one matched welcome fixture, not whole-page pixel identity, Original
+backend compatibility, all Systemcheck configurations or complete UI parity.
+Every matrix row remains open.
+
 ### Latest verified Original Systemcheck acknowledgement
 
 The optional Original report-success dialog now adapts the pinned 19.0
@@ -18,8 +48,10 @@ Unit answers. A separate owned-API/SQLite/headful regression passed all three
 themes in both builds, including cancel, confirm, Escape, three retained
 questionnaire answers and no Angular errors. It is part of the quick CI gate.
 The production initial bundle is 467.73kB under the unchanged 470kB error budget.
-The published `3abb98e6` push CI completed with 35/35 successful jobs; CI for
-this new acknowledgement step is a separate, not-yet-published check.
+The published `bc8a7bf1` push CI, including the acknowledgement and subsequent
+watchdog steps, completed with 35/35 successful jobs (`37208362997`). The
+acknowledgement-only run was superseded, not itself fully green. Newer SQLite
+and welcome changes need their own publication CI.
 
 An isolated, unmodified Original frontend at `c35cff81` now also builds with its
 own pinned lockfile dependencies (Angular 20.3.29, Material 20.2.14). Actual

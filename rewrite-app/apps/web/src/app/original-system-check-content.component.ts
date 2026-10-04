@@ -74,7 +74,7 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
     </ng-container>
   `,
   styles: [`
-    :host { display: block; min-width: 0; overflow: auto; }
+    :host { display: block; min-width: 0; overflow: auto; color: var(--mat-sys-on-surface); }
     .header { display: flex; justify-content: center; align-items: center; gap: 15px; padding-top: 10px; }
     .header h2 { min-width: 0; overflow-wrap: anywhere; font-size: 1.5em; font-weight: bold; line-height: normal; margin: .83em 0; }
     .sys-check-body { padding: 5px; }
@@ -82,10 +82,12 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
     mat-card { flex-basis: 400px; min-width: 0; max-width: 100%; }
     .mat-mdc-card-title { margin-bottom: 10px; }
     table { width: 100%; }
-    td:last-child { overflow-wrap: anywhere; }
-    svg { width: 24px; height: 24px; fill: currentColor; }
+    table, tbody, tr, td { box-sizing: content-box; }
+    button.mat-mdc-fab { font: revert; }
+    button.mat-mdc-fab:disabled { opacity: 1; }
+    svg { display: block; width: 24px; height: 24px; fill: currentColor; }
   `],
-  styleUrl: "./original-login-theme.scss"
+  styleUrl: "./original-system-check-content-theme.scss"
 })
 export class OriginalSystemCheckContentComponent {
   @Input({ required: true }) view!: SystemCheckViewComponent;

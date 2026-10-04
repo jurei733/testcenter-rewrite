@@ -27,6 +27,21 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest welcome comparison: the unmodified 19.0 frontend exposed the inherited
+980px cap, card/text colours, disabled-FAB dimming, icon baseline and table
+wrapping. These Original-only styles now match the rendered source. Its shared
+header has the 22px/28px centred title, proportional logo and actual 64px/56px
+toolbar breakpoint below 600px. Native Rewrite layout remains separate.
+Twelve equal-fixture comparisons passed in each production/development build,
+across three themes at 1280x720, 390x844, 599x844 and 600x844. Visible text,
+geometry and visible computed styles match, with screenshots retained locally
+in ignored `.data/original-welcome-reference-20261004`. The Original frontend
+uses a bounded synthetic backend; every Rewrite comparison uses its own real
+API/SQLite. The CI regression checks both breakpoint sides and real report
+persistence; the full protected Systemcheck and participant-entry gates passed.
+This does not close the Systemcheck row, other fixtures or full-page pixel
+identity. Initial production output is 467.94kB under the unchanged 470kB limit.
+
 Latest acknowledgement step: the Original Systemcheck success notice now uses
 the pinned 19.0 Material confirm template, two actions and audience-dependent
 ordering, including the adult override for live administrator/monitor access.
@@ -38,8 +53,9 @@ production Systemcheck regression also passed adult ordering and confirms
 that cancelling the notice cannot remove the already-saved report or answers.
 Initial output is 467.73kB with the unchanged 470kB error budget.
 
-The `3abb98e6` push CI completed successfully (35/35). The new acknowledgement
-step still needs its own publication CI. An isolated, unmodified build of
+The `bc8a7bf1` push CI completed successfully (35/35), including the
+acknowledgement and watchdog steps; its acknowledgement-only predecessor was
+superseded. Newer changes still require their own CI. An isolated, unmodified build of
 Original `c35cff81` with its own locked Angular 20.3.29/Material 20.2.14 is now
 available for source-rendered comparisons; a successful build alone does not
 close any visual-parity row.

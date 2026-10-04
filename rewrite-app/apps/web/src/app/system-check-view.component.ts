@@ -121,7 +121,7 @@ const readSystemCheckUnitResponse = (
     OriginalSystemCheckStarterComponent
   ],
   template: `
-    <div class="stack system-check-shell">
+    <div class="stack system-check-shell" [class.original-system-check-shell]="interfaceMode.mode() === 'original'">
       @defer (when interfaceMode.mode() === 'original' && canUseSystemChecks) {
         @if (interfaceMode.mode() === 'original' && canUseSystemChecks) {
           <app-original-system-check-starter [view]="this" [choices]="systemCheckChoices"
@@ -449,6 +449,7 @@ const readSystemCheckUnitResponse = (
   `,
   styles: [`
     .system-check-shell { max-width: 980px; margin: 0 auto; }
+    .system-check-shell.original-system-check-shell { max-width: none; }
     .system-check-hero { display: flex; justify-content: space-between; gap: 20px; align-items: center; }
     .system-check-hero h2 { font-size: clamp(26px, 5vw, 42px); }
     .system-check-hero > strong { padding: 10px 14px; border-radius: 999px; background: var(--secondary); color: white; white-space: nowrap; }

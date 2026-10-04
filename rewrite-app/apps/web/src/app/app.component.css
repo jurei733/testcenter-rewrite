@@ -26,12 +26,14 @@
 
 .original-participant-topbar .application-logo {
   height: 48px;
+  max-width: none;
 }
 
 .original-participant-topbar .application-brand > div {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .original-participant-topbar .eyebrow {
@@ -40,10 +42,17 @@
 
 .participant-topbar.original-participant-topbar h1 {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
+  font-family: 'Nunito Sans';
+  font-size: 22px;
+  line-height: 28px;
   font-weight: 400;
   letter-spacing: normal;
+}
+
+/* Material's pinned toolbar changes from 64px to 56px below 600px. */
+@media (max-width: 599px) {
+  .participant-topbar.original-participant-topbar { min-height: 56px; }
+  .original-participant-topbar .application-logo { height: 40px; }
 }
 
 .participant-topbar {

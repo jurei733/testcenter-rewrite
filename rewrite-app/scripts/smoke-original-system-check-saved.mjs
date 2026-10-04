@@ -69,11 +69,49 @@ try {
     page.on("console", message => { if (message.type() === "error" && /NG\d{4}/u.test(message.text())) errors.push(message.text()); });
     await page.goto(`${baseUrl}/app/system-check?ui=original&tenantKey=ack-tenant&workspaceKey=ack-workspace&checkId=ACK.SAMPLE`, { waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    // Values verified against the unmodified 19.0 frontend, not a screenshot
+    // of this adaptation. Scope the assertions to the matched welcome state.
+    for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
+      await page.setViewportSize({ width, height });
+      const appearance = await page.locator("app-original-system-check-content").evaluate(element => {
+        const header = element.querySelector(".header");
+        const button = element.querySelector("#syscheck-previous-step");
+        const icon = button.querySelector("svg");
+        const cards = [...element.querySelectorAll("mat-card")];
+        const title = document.querySelector("#participantApplicationHeader h1");
+        const titleStyle = getComputedStyle(title);
+        const titleBounds = title.getBoundingClientRect();
+        const toolbar = document.querySelector("#participantApplicationHeader").getBoundingClientRect();
+        const logo = document.querySelector("#participantApplicationHeader img").getBoundingClientRect();
+        return { width: header.getBoundingClientRect().width,
+          color: getComputedStyle(header).color,
+          backgrounds: cards.map(card => getComputedStyle(card).backgroundColor),
+          disabled: button.disabled, opacity: getComputedStyle(button).opacity,
+          iconSize: [icon.getBoundingClientRect().width, icon.getBoundingClientRect().height],
+          tableSizing: getComputedStyle(element.querySelector("td")).boxSizing,
+          topbarHeight: toolbar.height,
+          logoSize: [logo.width, logo.height],
+          titleTypography: [titleStyle.fontFamily, titleStyle.fontSize, titleStyle.lineHeight],
+          titleCentered: Math.abs(titleBounds.x + titleBounds.width / 2 - toolbar.x - toolbar.width / 2) < .01
+            && Math.abs(titleBounds.y + titleBounds.height / 2 - toolbar.y - toolbar.height / 2) < .01 };
+      });
+      assert.deepEqual(appearance, { width, color: "rgb(25, 28, 29)",
+        backgrounds: ["rgb(255, 255, 255)", "rgb(255, 255, 255)"], disabled: true,
+        opacity: "1", iconSize: [24, 24], tableSizing: "content-box",
+        topbarHeight: width < 600 ? 56 : 64,
+        logoSize: width < 600 ? [92.8671875, 40] : [111.4375, 48],
+        titleTypography: ['"Nunito Sans"', "22px", "28px"], titleCentered: true });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.locator("#syscheck-next-step").click();
     await page.locator("#originalSystemCheckQuestionnaire").waitFor();
     await page.getByRole("textbox", { name: "Feedback", exact: true }).fill(`Owned ${theme} response`);
     await page.locator("#syscheck-next-step").click();
     await page.locator("#originalSystemCheckReport").waitFor();
+    await page.bringToFront();
     await page.locator("#saveSystemCheckReportButton").click();
     await page.locator("#systemCheckSaveReportKey").fill("ack-save");
     await page.locator("#systemCheckSaveReportId").fill(`Owned ${theme} acknowledgement`);
@@ -86,6 +124,9 @@ try {
     const labels = theme === "Primar" ? ["Abbrechen", "Bestätigen"] : ["Bestätigen", "Abbrechen"];
     assert.deepEqual(await dialog.getByRole("button").allTextContents(), labels);
     assert.equal(await page.locator("#globalConfirmationBackdrop").count(), 0);
+    // CDK installs the native focus trap asynchronously after the overlay
+    // opens. Wait for that behavior; never move focus in the test itself.
+    await page.waitForFunction(() => Boolean(document.activeElement?.closest(".original-system-check-saved-dialog")), undefined, { timeout: 5_000 });
     assert.equal(await page.evaluate(() => Boolean(document.activeElement?.closest(".original-system-check-saved-dialog"))), true);
     await page.keyboard.press("Tab");
     assert.equal(await dialog.getByRole("button", { name: labels[0], exact: true }).evaluate(element => element === document.activeElement), true);

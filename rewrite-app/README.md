@@ -47,6 +47,14 @@ Twelve dialog-state rendering comparisons against the actual Original frontend
 passed across three themes and desktop/mobile widths; full-page comparisons
 and operator layout remain open.
 
+The Original Systemcheck welcome now also has source-rendered evidence in
+production/development: twelve equal-fixture states across all three themes at
+desktop, mobile and both sides of the 600px toolbar breakpoint. Cards, text,
+table wrapping, disabled navigation, the centred header title and logo geometry
+match the unmodified 19.0 frontend. The CI browser gate checks those tokens and
+persists real reports. This remains a narrow comparison with an Original API
+fixture, not completed whole-page/UI or backend parity; see the acceptance matrix.
+
 This folder is the starting point for the real production implementation.
 
 Operator lists are metadata views: import/source lists omit document bytes and
