@@ -9,6 +9,7 @@ import {
 
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
+import { createEventStreamWatchdog } from "./event-stream-watchdog";
 
 type ParticipantRefresh = () => Promise<void>;
 type ParticipantConnectionModeChange = (
@@ -116,6 +117,7 @@ export class ParticipantEventStreamService {
     }
 
     const controller = new AbortController();
+    const watchdog = createEventStreamWatchdog(controller);
     this.abortController = controller;
     if (input.reconnecting) {
       this.setConnectionState(
@@ -154,13 +156,13 @@ export class ParticipantEventStreamService {
         "live",
         "Live participant updates are connected."
       );
-      await this.consume(response.body, input.generation);
+      await this.consume(response.body, input.generation, watchdog.receivedEvent);
       if (input.generation === this.generation) {
         throw new Error("Participant channel closed.");
       }
     } catch {
       if (
-        controller.signal.aborted ||
+        (controller.signal.aborted && !watchdog.timedOut) ||
         input.generation !== this.generation
       ) {
         return;
@@ -180,12 +182,15 @@ export class ParticipantEventStreamService {
         this.connectHandle = null;
         void this.connect({ ...input, reconnecting: true });
       }, 3_000) ?? null;
+    } finally {
+      watchdog.stop();
     }
   }
 
   private async consume(
     stream: ReadableStream<Uint8Array>,
-    generation: number
+    generation: number,
+    receivedEvent: () => void
   ): Promise<void> {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
@@ -202,7 +207,7 @@ export class ParticipantEventStreamService {
         while (match?.index != null) {
           const frame = buffer.slice(0, match.index);
           buffer = buffer.slice(match.index + match[0].length);
-          this.handleFrame(frame, generation);
+          if (this.handleFrame(frame, generation)) receivedEvent();
           match = /\r?\n\r?\n/.exec(buffer);
         }
       }
@@ -211,9 +216,9 @@ export class ParticipantEventStreamService {
     }
   }
 
-  private handleFrame(frame: string, generation: number): void {
+  private handleFrame(frame: string, generation: number): boolean {
     if (generation !== this.generation) {
-      return;
+      return false;
     }
     const data = frame
       .split(/\r?\n/)
@@ -221,17 +226,17 @@ export class ParticipantEventStreamService {
       .map(line => line.slice("data:".length).trimStart())
       .join("\n");
     if (!data) {
-      return;
+      return false;
     }
 
     let event: ParticipantEventStreamEvent | null = null;
     try {
       event = parseParticipantEventStreamEvent(JSON.parse(data));
     } catch {
-      return;
+      return false;
     }
     if (!event || event.participantSessionId !== this.activeParticipantSessionId) {
-      return;
+      return false;
     }
     this.setConnectionState(
       "live",
@@ -240,6 +245,7 @@ export class ParticipantEventStreamService {
     if (event.eventType === "snapshot" || event.eventType === "change") {
       this.queueRefresh();
     }
+    return true;
   }
 
   private queueRefresh(): void {

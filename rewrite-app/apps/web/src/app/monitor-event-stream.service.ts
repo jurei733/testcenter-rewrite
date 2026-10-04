@@ -8,6 +8,7 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { createEventStreamWatchdog } from "./event-stream-watchdog";
 
 type MonitorRefresh = () => Promise<void>;
 
@@ -83,6 +84,7 @@ export class MonitorEventStreamService {
     }
 
     const controller = new AbortController();
+    const watchdog = createEventStreamWatchdog(controller);
     this.abortController = controller;
     this.setState(
       input.reconnecting ? "reconnecting" : "connecting",
@@ -119,13 +121,13 @@ export class MonitorEventStreamService {
       }
 
       this.setState("live", "Connected; waiting for the first monitor snapshot.");
-      await this.consume(response.body, input.generation);
+      await this.consume(response.body, input, watchdog.receivedEvent);
       if (input.generation === this.generation) {
         throw new Error("Monitor channel closed.");
       }
     } catch (error) {
       if (
-        controller.signal.aborted ||
+        (controller.signal.aborted && !watchdog.timedOut) ||
         input.generation !== this.generation
       ) {
         return;
@@ -135,26 +137,29 @@ export class MonitorEventStreamService {
         offline ? "offline" : "polling",
         offline
           ? "Network unavailable; the monitor will reconnect automatically."
-          : `${error instanceof Error ? error.message : "Monitor channel unavailable"} Using polling until reconnect.`
+          : `${watchdog.timedOut ? "Monitor channel heartbeat timed out." : error instanceof Error ? error.message : "Monitor channel unavailable"} Using polling until reconnect.`
       );
       this.queueRefresh();
       this.reconnectHandle = window.setTimeout(() => {
         this.reconnectHandle = null;
         void this.connect({ ...input, reconnecting: true });
       }, 3_000);
+    } finally {
+      watchdog.stop();
     }
   }
 
   private async consume(
     stream: ReadableStream<Uint8Array>,
-    generation: number
+    scope: { generation: number; tenantKey: string; workspaceKey: string },
+    receivedEvent: () => void
   ): Promise<void> {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
     try {
-      while (generation === this.generation) {
+      while (scope.generation === this.generation) {
         const chunk = await reader.read();
         if (chunk.done) {
           return;
@@ -164,7 +169,7 @@ export class MonitorEventStreamService {
         while (match?.index != null) {
           const frame = buffer.slice(0, match.index);
           buffer = buffer.slice(match.index + match[0].length);
-          this.handleFrame(frame, generation);
+          if (this.handleFrame(frame, scope)) receivedEvent();
           match = /\r?\n\r?\n/.exec(buffer);
         }
       }
@@ -173,9 +178,12 @@ export class MonitorEventStreamService {
     }
   }
 
-  private handleFrame(frame: string, generation: number): void {
-    if (generation !== this.generation) {
-      return;
+  private handleFrame(
+    frame: string,
+    scope: { generation: number; tenantKey: string; workspaceKey: string }
+  ): boolean {
+    if (scope.generation !== this.generation) {
+      return false;
     }
     const data = frame
       .split(/\r?\n/)
@@ -183,17 +191,17 @@ export class MonitorEventStreamService {
       .map(line => line.slice("data:".length).trimStart())
       .join("\n");
     if (!data) {
-      return;
+      return false;
     }
 
     let event: MonitorEventStreamEvent | null = null;
     try {
       event = parseMonitorEventStreamEvent(JSON.parse(data));
     } catch {
-      return;
+      return false;
     }
-    if (!event) {
-      return;
+    if (!event || event.tenantKey !== scope.tenantKey || event.workspaceKey !== scope.workspaceKey) {
+      return false;
     }
 
     this.uiState.runtime.monitorConnectionLastEventAt = event.emittedAt;
@@ -205,6 +213,7 @@ export class MonitorEventStreamService {
     if (event.eventType === "snapshot" || event.eventType === "change") {
       this.queueRefresh();
     }
+    return true;
   }
 
   private queueRefresh(): void {

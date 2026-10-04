@@ -35,14 +35,17 @@ Rewrite diagnostics stay in the stored payload without appearing in the
 Original lists. Production/development browser checks cover required-answer
 warnings, keyboard opening/cancellation without a POST, focus restoration,
 desktop/mobile layout and cancellation back to Start. The anonymous save dialog
-now uses the source's 500×600 Material layout, outlined fields and password
-toggle. It validates both fields, traps focus, supports Enter/Escape, clears
+now uses the source's 500×600 Material layout and outlined fields, matching
+the actual upstream password field without a visible suffix toggle. It
+validates both fields, traps focus, supports Enter/Escape, clears
 values on reopening and sends the same report request through the shared
 controller. Production/development checks save and export both exact Unit
 answers through this interface. Its maximum height is bounded on short screens,
-and whitespace-only values remain invalid as in the Rewrite form. Confirmation
-and operator layout still require Original adaptation; rendered upstream
-comparison remains open.
+and whitespace-only values remain invalid as in the Rewrite form. The saved
+acknowledgement follows the source's two actions and audience-dependent order.
+Twelve dialog-state rendering comparisons against the actual Original frontend
+passed across three themes and desktop/mobile widths; full-page comparisons
+and operator layout remain open.
 
 This folder is the starting point for the real production implementation.
 
@@ -52,6 +55,13 @@ status and booklet/unit counts instead of duplicating full runtime snapshots
 for every participant. Detail routes and downloads retain the complete exact
 content. Automatic shell polling never overlaps a pending background batch and
 yields to foreground actions, so slow imports cannot accumulate refresh work.
+Participant and monitor live channels also stop claiming to be live after
+60 seconds without a valid event for their exact scope. The same bounded
+watchdog covers a request that never receives headers, aborts the blocked read,
+starts the existing quiet polling/reconnect path and retains participant
+credentials and answers. Intentional stop and stale deadlines cannot restart
+the channel. This is the browser-channel timeout, not a replacement for the
+remaining server-side participant-presence/connection-loss guarantee.
 
 It is intentionally separate from `rewrite-spike/`:
 

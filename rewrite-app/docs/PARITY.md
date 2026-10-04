@@ -43,6 +43,37 @@ unit tests and the full protected production Systemcheck flow passed again.
 All eight Original UI matrix rows, operator layout and the remaining 19.0
 functional delta stay open.
 
+### Latest verified live-channel watchdog
+
+Both browser SSE consumers now enforce a 60-second deadline from connect or
+the last valid correctly scoped event. This adapts the effective one-minute
+silence boundary of 19.0's two 30-second WebSocket heartbeat rounds to the
+Rewrite's 15-second SSE heartbeats. Header hangs are bounded too. Expiry aborts
+the blocked read, leaves `live`, requests a quiet state refresh and reconnects
+after the existing three seconds; manual stop and stale timers stay stopped.
+Monitor events now additionally require the exact connected tenant/workspace.
+Malformed and foreign-scope traffic cannot refresh data or keep the channel
+alive. No credential, response, outbox or durable run state is reset.
+
+Production and development builds passed with the unchanged 467.73kB initial
+bundle and 470kB limit. Sixteen new deterministic tests run the production
+watchdog and both consumers/parsers with only Angular injection/signal storage
+stubbed; the complete unit gates passed 140 core and 45 frontend tests.
+Headful Chromium checks with owned API/SQLite and a silent-socket proxy passed
+both real 60-second expiries and automatic reconnects in both builds. Normal
+authorized current-state reads prove byte-identical saved answers and the same
+run, without HTTP 5xx or Angular errors. The complete protected production
+participant-entry gate passed too, through Original logout and same-run
+re-entry. Browser evidence is retained locally in ignored
+`.data/stream-watchdog-reference-20261004.783OA9`. These checks do not establish the
+server-side `CONNECTION=LOST` projection when an entire participant disappears.
+
+A separate concurrent raw-SQLite inspection exposed one `database is locked`
+log-write failure with rollback journalling and no busy timeout. It affected
+only an owned synthetic test database, not private tryout data. Deterministic
+contention coverage and bounded SQLite handling remain a storage-hardening
+requirement; the passing normal-API watchdog checks do not close that finding.
+
 ## Current 19.0 delta to verify
 
 On 2026-10-03, the Original fetch advanced to
@@ -229,6 +260,8 @@ and implementation. Each needs current rewrite evidence before it is closed:
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
+  Browser-channel silence is now bounded as described above; the distinct
+  server-side participant-presence/lost-state requirement remains open.
 - Navigation to the starter/route dispatcher applies active-unit completeness,
   timer and leave-lock checks, including manually entered routes. A player
   reporting no Verona version produces a clear controller error.
