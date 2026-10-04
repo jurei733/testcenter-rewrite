@@ -12,6 +12,7 @@ import { FormsModule } from "@angular/forms";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
+import { ParticipantStatusStylesComponent } from "./participant-status-styles.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
@@ -28,8 +29,9 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, ParticipantStatusStylesComponent],
   template: `
+    <app-participant-status-styles />
     <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
       @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
         @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {

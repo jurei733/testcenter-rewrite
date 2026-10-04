@@ -234,6 +234,23 @@ the task arrow remains actionable for a completeness explanation, stays on the
 same task when denied, and advances only after the required response and
 presentation are complete. All of these cases are also in the repository smoke.
 
+The Unit stage now adapts the pinned task title/divider, full-height frame and
+bottom-right numbered Material controls using the existing guarded Verona
+host. It sends the Original's disabled log policy in both interfaces and keeps
+the same saved answer envelope. Protected SQLite/headful production and
+development gates exercise two actual pages, both answers, leaving/returning,
+keyboard controls, wrong-source messages and runtime-error restoration. The
+development entry no longer raises a busy-state `NG0100`. Participant-only
+status/Review/timer styles are unchanged but lazy; real save/readiness computed
+styles match their former global placement at desktop/mobile widths in both
+interfaces. Initial production output is 467.64kB with unchanged budgets.
+Inspected screenshots are of the adaptation, not the rendered upstream.
+Mobile title/label clipping prevention and Material keyboard-change handling
+are deliberate safety/accessibility adaptations. Equal-fixture upstream
+comparison, the report/operator layout and all eight complete rows remain open.
+The `01249459` push CI is complete (35/35); its separate PR timer-integration
+failure still requires investigation, so full current PR CI is not green.
+
 | Surface | Required comparisons |
 | --- | --- |
 | Shell and login | Header/logo/footer, welcome panel, name/password steps, errors, admin entry |

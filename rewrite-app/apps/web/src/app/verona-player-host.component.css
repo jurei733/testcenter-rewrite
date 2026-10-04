@@ -67,6 +67,23 @@
   background: white;
 }
 
+/* Source-adapted Systemcheck task frame; never applies to Participant hosts. */
+.original-system-check-player {
+  height: 100%;
+  display: block;
+  border: 0;
+  border-radius: 0;
+  background: white;
+}
+.original-system-check-player > header,
+.original-system-check-player > footer,
+.original-system-check-player > .verona-player-error,
+.original-system-check-player > .verona-player-loading { display: none; }
+.original-system-check-player > .verona-player-content,
+.original-system-check-player .verona-player-frame-host,
+.original-system-check-player .verona-player-frame { height: 100%; min-height: 0; }
+.original-system-check-player.has-system-check-error > .verona-player-content { display: none; }
+
 .verona-player-page-navigation {
   display: flex;
   flex-wrap: wrap;
@@ -218,4 +235,3 @@
   cursor: pointer;
   font-weight: 800;
 }
-

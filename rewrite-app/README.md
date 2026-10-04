@@ -13,9 +13,20 @@ permissions and stored sessions. The optional Original 19 layout is still a
 preview: participant login, starter, grouped Player navigation, full-height
 content, toolbar, modal task/comment side panels and public/authorized
 Systemcheck selection, welcome cards, step navigation, automatic network test
-with the source's two charts/restart action, and questionnaire are adapted,
+with the source's two charts/restart action, questionnaire, and full-height Unit
+surface with numbered Material page navigation are adapted,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
+
+The optional Systemcheck Unit surface uses the same sandboxed Verona host and
+in-memory answers as the Rewrite layout. Both disable Player logging as in the
+Original. Previous/next and numbered navigation support keyboard activation;
+leaving and revisiting the Unit restores both pages' answers, including after
+a Player runtime error. On narrow screens the task frame follows the wrapped
+prompt instead of covering it. This is an adaptation, not a completed rendered
+Original-reference comparison. For isolated frontend browser checks,
+`UI_SMOKE_FRONTEND_ROOT` can point to an owned directory containing
+`dist/apps/web/browser/index.html`; invalid roots fail before runtime startup.
 
 This folder is the starting point for the real production implementation.
 

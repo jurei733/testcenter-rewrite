@@ -148,6 +148,7 @@ try {
     // Moving unchanged Player-only CSS out of the initial shell must preserve
     // its real layout, including Original's higher-specificity overrides.
     const playerCss = await readFile(resolve(appRoot, "apps/web/src/app/verona-player-host.component.css"), "utf8");
+    const statusCss = await readFile(resolve(appRoot, "apps/web/src/app/participant-status-styles.component.css"), "utf8");
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: 900 });
       const comparison = await page.evaluate(css => {
@@ -178,6 +179,35 @@ try {
       }, playerCss);
       assert.deepEqual(comparison.actual, comparison.originalPlacement,
         `${layout} Player CSS remains identical at ${width}px after lazy delivery`);
+      const statusComparison = await page.evaluate(css => {
+        const elements = [...document.querySelectorAll(
+          ".participant-draft-state, .participant-draft-state *, .participant-completion-readiness, .participant-completion-readiness *"
+        )];
+        if (elements.length === 0) throw new Error("Participant save/readiness widgets must be present");
+        const properties = ["display", "position", "width", "height", "padding", "gap", "border", "border-radius",
+          "background", "color", "font-family", "font-size", "font-weight", "text-transform"];
+        const snapshot = () => elements.map(element => {
+          const computed = getComputedStyle(element);
+          return Object.fromEntries(properties.map(property => [property, computed.getPropertyValue(property)]));
+        });
+        const statusStyle = [...document.head.querySelectorAll("style")].find(style =>
+          style.textContent?.includes(".participant-review-panel") && !style.textContent?.includes(".is-original-player"));
+        if (!statusStyle) throw new Error("Status stylesheet must be delivered with the participant route");
+        const actual = snapshot(), parent = statusStyle.parentNode, sibling = statusStyle.nextSibling;
+        statusStyle.remove();
+        const oldPlacement = document.createElement("style");
+        oldPlacement.textContent = css;
+        const initialStyles = document.head.querySelector("link[rel='stylesheet']");
+        if (initialStyles) initialStyles.after(oldPlacement); else document.head.prepend(oldPlacement);
+        const originalPlacement = snapshot();
+        oldPlacement.remove();
+        parent.insertBefore(statusStyle, sibling);
+        const styleHost = document.querySelector("app-participant-status-styles");
+        return { actual, originalPlacement, styleHostDisplay: styleHost ? getComputedStyle(styleHost).display : null };
+      }, statusCss);
+      assert.deepEqual(statusComparison.actual, statusComparison.originalPlacement,
+        `${layout} save/readiness CSS remains identical at ${width}px after lazy delivery`);
+      assert.equal(statusComparison.styleHostDisplay, "none", "Style delivery must not add a visible row or grid gap");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     }
     await page.setViewportSize({ width: 1280, height: 900 });

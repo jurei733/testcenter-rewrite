@@ -84,7 +84,8 @@ type RetiredVeronaFrame = {
   encapsulation: ViewEncapsulation.None,
   styleUrl: "./verona-player-host.component.css",
   template: `
-    <section class="verona-player-shell" aria-label="Verona unit player">
+    <section class="verona-player-shell" [class.original-system-check-player]="originalSystemCheckUi"
+      [class.has-system-check-error]="originalSystemCheckUi && !!errorMessage" aria-label="Verona unit player">
       @defer (when originalUi) {
         @if (originalUi && (status === 'running' || status === 'ready')) {
           <app-original-player-navigation
@@ -141,8 +142,9 @@ type RetiredVeronaFrame = {
         <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
         <ng-content select="[original-player-sidebar]" />
       </div>
+      <ng-content select="[original-system-check-page-controls]" />
       <nav
-        *ngIf="!originalUi && (showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton)"
+        *ngIf="!originalUi && !originalSystemCheckUi && (showGlobalBackwardButton || showPageNavigation || showGlobalForwardButton)"
         class="verona-player-page-navigation"
         id="participantVeronaPageNavigation"
         aria-label="Test navigation"
@@ -271,6 +273,7 @@ export class VeronaPlayerHostComponent
   @Input() unitNumber = 1;
   @Input() unitCount = 1;
   @Input() originalUi = false;
+  @Input() originalSystemCheckUi = false;
   @Input() unitNavigationLabelMode: "hidden" | "index" | "label" = "index";
   @Input() unitNavigationControls: "both" | "forward_only" | "hidden" = "both";
   @Input() canRequestPreviousUnit = false;
@@ -317,6 +320,7 @@ export class VeronaPlayerHostComponent
     "The unit could not be loaded. Reload the player or ask the test supervisor for help.";
 
   @Output() readonly responseChange = new EventEmitter<string>();
+  @Output() readonly viewStateChange = new EventEmitter<void>(true);
   @Output() readonly responseUpdate = new EventEmitter<VeronaResponseChange>();
   @Output() readonly logEntries = new EventEmitter<VeronaLogChange>();
   @Output() readonly testLogEntries =
@@ -876,7 +880,10 @@ export class VeronaPlayerHostComponent
   }
 
   goToRelativePage(offset: -1 | 1): void {
-    const targetIndex = this.currentPageIndex + offset;
+    this.goToPage(this.currentPageIndex + offset);
+  }
+
+  goToPage(targetIndex: number): void {
     const targetPage = this.pages[targetIndex];
     if (!targetPage || !this.frame?.contentWindow || this.status !== "running") {
       return;
@@ -896,6 +903,7 @@ export class VeronaPlayerHostComponent
     const projection = projectVeronaPageState(playerState);
     this.pages = projection.pages;
     this.currentPageIndex = projection.currentPageIndex;
+    if (this.originalSystemCheckUi) this.viewStateChange.emit();
     return projection.logEntries;
   }
 
@@ -1097,6 +1105,7 @@ export class VeronaPlayerHostComponent
     this.clearScheduledFrames();
     this.status = "error";
     this.errorMessage = message;
+    if (this.originalSystemCheckUi) this.viewStateChange.emit();
     if (!this.controllerErrorLoggedForFrame) {
       this.controllerErrorLoggedForFrame = true;
       this.controllerRecoveryTestRunId = this.frameTestRunId;

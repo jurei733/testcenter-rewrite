@@ -386,6 +386,38 @@ were inspected. The unchanged initial-bundle budget passed at 469.52kB, and
 and PR workflows had 33/35 successful jobs, with Ops/Quick still running;
 that snapshot is not a completed CI success.
 
+The optional Original Systemcheck Unit now adapts the source's task prompt,
+divider, full-height frame, bottom-right numbered Material page controls and
+German error card. It delegates to the existing sandboxed/source-validated
+Verona host and shared answers, never a second Player/controller. Both layouts
+send `logPolicy: disabled`. The Material group's change event, rather than only
+a DOM click, also forwards Enter/Space/arrow-key selections to the actual Player.
+The frame follows a wrapped mobile title so it does not obscure the prompt;
+page-label layout rejects clipped mobile numbers. Synthetic two-page browser
+coverage checks real page changes, answer restoration after step changes and a
+runtime error, single-frame ownership, wrong-window message rejection, hidden
+Rewrite diagnostics and keyboard activation. These safety/accessibility
+adaptations and inspected Rewrite screenshots do not close the source-rendered
+visual-parity requirement; the report and operator surfaces remain open.
+
+A development-mode Systemcheck run exposed a restored-entry busy-state
+`NG0100` that production hid. Busy transitions now notify Angular's scheduled
+zoneless change detection rather than nesting synchronous checks. Production
+and development protected SQLite/headful report gates both passed after the
+fix, including the Unit lifecycle and six actual aborted network requests.
+Participant-only Review/save/readiness/timer/testlet styles now travel with the
+lazy participant route; all 60 selector/declaration sets are unchanged. The
+development Participant gate compares actual save/readiness computed styles
+with their former global placement at 1280/390px in both interfaces and passes
+real load/save/reload/unit-change restoration without Angular errors. The
+production initial bundle remains below the unchanged 470kB error limit at
+467.64kB; 140 unit and 25 frontend-state tests passed.
+
+The network publication `01249459` push CI completed with 35/35 successful jobs.
+Its separate PR run found the root-booklet timer integration test returning
+`running` instead of `completed`; that failure remains to investigate and is
+not a successful complete PR-CI result.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit

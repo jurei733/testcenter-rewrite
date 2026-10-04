@@ -276,7 +276,7 @@ const readSystemCheckUnitResponse = (
           </div>
         </article>
 
-        <article class="card" *ngIf="step === 'unit'">
+        <article class="card" *ngIf="step === 'unit' && interfaceMode.mode() !== 'original'">
           <h2>{{ customText('syscheck_unitPrompt', 'Player and unit') }}</h2>
           <p *ngIf="check.unit">Configured item: {{ check.unit.displayLabel }} ({{ check.unit.unitKey }})</p>
           <app-verona-player-host
@@ -289,6 +289,7 @@ const readSystemCheckUnitResponse = (
             [unitDefinition]="check.unit!.unitDefinition!"
             [unitDefinitionType]="check.unit!.unitDefinitionType || ''"
             [canComplete]="true"
+            logPolicy="disabled"
             [savedResponse]="unitResponse"
             [pageNavigationPrompt]="customText('login_pagesNaviPrompt', 'Weitere Seiten:')"
             (responseChange)="onUnitResponse($event)"
@@ -1667,6 +1668,7 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     if (this.busy || this.destroyed) return;
     this.busy = true;
     this.errorMessage = "";
+    this.refreshView();
     try {
       await action();
     } catch (error) {
@@ -1701,6 +1703,6 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
   }
 
   private refreshView(): void {
-    if (!this.destroyed) this.changeDetectorRef.detectChanges();
+    if (!this.destroyed) this.changeDetectorRef.markForCheck();
   }
 }

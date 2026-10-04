@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -21,6 +21,7 @@ const headful = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_HEADFUL ?? "").toLowerCase()
 );
 const artifactDirectory = process.env.UI_SMOKE_ARTIFACT_DIR?.trim();
+const frontendRoot = process.env.UI_SMOKE_FRONTEND_ROOT?.trim();
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
@@ -365,12 +366,14 @@ const stopChild = child =>
 
 await ensureDataDirectory();
 if (artifactDirectory) await mkdir(artifactDirectory, { recursive: true });
+if (frontendRoot) await access(resolve(frontendRoot, "dist/apps/web/browser/index.html"));
 
 const port = process.env.FIRST_SLICE_UI_PORT
   ? Number.parseInt(process.env.FIRST_SLICE_UI_PORT, 10)
   : await allocatePort();
 
 const child = spawn(process.execPath, [serverEntry], {
+  cwd: frontendRoot ? resolve(frontendRoot) : undefined,
   stdio: "inherit",
   env: {
     ...process.env,
@@ -2438,7 +2441,7 @@ try {
       )
       .replace(
         "    </div>\n  ]]></Definition>",
-        "    </div>\n    </fieldset>\n  ]]></Definition>"
+        '    </div>\n    </fieldset>\n    <fieldset><legend>System-check second page</legend><label for="syscheckPage2">Second page answer</label><input id="syscheckPage2" name="syscheckPage2" type="text"/></fieldset>\n  ]]></Definition>'
       );
     for (const dependency of [
       {
@@ -2716,8 +2719,10 @@ try {
             ? /Downloadgeschwindigkeit Testrunde 1 - Testgröße: 400\.00 kB bytes/
             : /Uploadgeschwindigkeit Testrunde 1 - Testgröße: 100\.00 kB\)/);
         }
-        assert.equal(await page.locator(interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton").isDisabled(), true);
-        assert.equal(await page.locator("#runSystemCheckNetworkButton").isDisabled(), true);
+        await page.waitForFunction(nextSelector =>
+          document.querySelector(nextSelector)?.disabled === true &&
+          document.querySelector("#runSystemCheckNetworkButton")?.disabled === true,
+        interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton");
         const cancelled = page.waitForEvent("requestfailed", { predicate: request => request === heldRequest });
         if (leaveRoute) {
           await page.locator("#participantApplicationLogoButton").click();
@@ -2802,6 +2807,92 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-network-mobile.png"), fullPage: true });
     await page.setViewportSize(choiceViewport);
+    await page.addInitScript(() => {
+      window.addEventListener("message", event => {
+        if (event.data?.type === "vopStartCommand") {
+          window.__systemCheckLogPolicy = event.data.playerConfig?.logPolicy;
+          window.__systemCheckPlayerSessionId = event.data.sessionId;
+        }
+      });
+    });
+    await page.locator("#syscheck-next-step").click();
+    const originalUnit = page.locator("#originalSystemCheckUnit");
+    await originalUnit.waitFor();
+    const originalUnitFrame = page.frameLocator("iframe.verona-player-frame");
+    await originalUnitFrame.locator("#var1").fill("Original Systemcheck Unit answer");
+    await originalUnitFrame.locator("#var1").blur();
+    assert.equal(await originalUnitFrame.locator("body").evaluate(() => window.__systemCheckLogPolicy), "disabled");
+    assert.equal(await originalUnit.locator("iframe").count(), 1);
+    assert.equal(await originalUnit.locator(".verona-player-shell > header").isVisible(), false);
+    assert.equal(await originalUnit.locator(".verona-player-shell > footer").isVisible(), false);
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-forward']").click();
+    await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).fill("Original second-page answer");
+    await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).blur();
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click();
+    await originalUnitFrame.locator("#var1").waitFor();
+    assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-1'] button").click();
+    await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).waitFor();
+    assert.equal(await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).inputValue(), "Original second-page answer");
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").focus();
+    await page.keyboard.press("Enter");
+    await originalUnitFrame.locator("#var1").waitFor();
+    await page.waitForFunction(() => document.querySelector("#originalSystemCheckPageNavigation [data-cy='page-navigation-forward']")?.disabled === false);
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-forward']").focus();
+    await page.keyboard.press("Enter");
+    await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).waitFor();
+    await page.waitForFunction(() => document.querySelector("#originalSystemCheckPageNavigation [data-cy='page-navigation-backward']")?.disabled === false);
+    await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-backward']").focus();
+    await page.keyboard.press("Space");
+    await originalUnitFrame.locator("#var1").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#originalSystemCheckQuestionnaire").waitFor();
+    assert.equal(await page.locator("iframe.verona-player-frame").count(), 0);
+    await page.locator("#syscheck-previous-step").click();
+    await page.waitForFunction(() => document.querySelector("#participantVeronaPlayerStatus")?.textContent?.trim() === "running");
+    assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
+    assert.equal(await originalUnitFrame.locator("#syscheckPage2").inputValue(), "Original second-page answer");
+    await page.mouse.move(0, 0);
+    await page.locator(".mat-mdc-tooltip").waitFor({ state: "hidden" });
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-unit-desktop.png"), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => document.querySelector("#originalSystemCheckUnitTitle").getBoundingClientRect().bottom <=
+      document.querySelector("#originalSystemCheckUnit").getBoundingClientRect().top);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.equal(await page.locator("#originalSystemCheckPageNavigation mat-button-toggle-group").evaluate(group => {
+      const bounds = group.getBoundingClientRect();
+      return [...group.querySelectorAll(".mat-button-toggle-label-content")].every(label => {
+        const text = document.createRange();
+        text.selectNodeContents(label);
+        const rect = text.getBoundingClientRect();
+        return rect.left >= bounds.left && rect.right <= bounds.right;
+      });
+    }), true, "Both numbered page labels must remain inside the visible toggle group on mobile");
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-unit-mobile.png"), fullPage: true });
+    await page.setViewportSize(choiceViewport);
+    await page.evaluate(() => {
+      window.postMessage({ type: "vopRuntimeErrorNotification", code: "untrusted", message: "Wrong-source Systemcheck message" }, "*");
+      return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    assert.equal(await page.locator("#originalSystemCheckUnitError").count(), 0,
+      "A message outside the active sandboxed Player cannot corrupt Systemcheck state");
+    await originalUnitFrame.locator("body").evaluate(() => parent.postMessage({
+      type: "vopRuntimeErrorNotification", sessionId: window.__systemCheckPlayerSessionId,
+      code: "system-check-fixture", message: "Synthetic Systemcheck player failure"
+    }, "*"));
+    await page.locator("#originalSystemCheckUnitError").getByText("Fehler!", { exact: true }).waitFor();
+    assert.match(await page.locator("#originalSystemCheckUnitError").innerText(), /Beim Abspielen der Unit ist folgender Laufzeitfehler aufgetreten:.*Synthetic Systemcheck player failure/);
+    assert.equal(await page.locator("#originalSystemCheckUnitTitle").count(), 0);
+    assert.equal(await page.locator("#originalSystemCheckPageNavigation").count(), 0);
+    assert.equal(await originalUnit.locator(".verona-player-content").isVisible(), false);
+    await page.locator("#syscheck-next-step").click();
+    await page.locator("#originalSystemCheckQuestionnaire").waitFor();
+    await page.locator("#syscheck-previous-step").click();
+    await page.waitForFunction(() => document.querySelector("#participantVeronaPlayerStatus")?.textContent?.trim() === "running");
+    assert.equal(await page.locator("#originalSystemCheckUnitError").count(), 0);
+    assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
+    assert.equal(await originalUnitFrame.locator("#syscheckPage2").inputValue(), "Original second-page answer");
+    await page.locator("#syscheck-next-step").click();
     await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
     await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${headerOnlyCheckId}']`).click();
     await page.locator("#originalSystemCheckWelcome").waitFor();
