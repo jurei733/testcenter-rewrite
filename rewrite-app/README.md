@@ -55,6 +55,17 @@ match the unmodified 19.0 frontend. The CI browser gate checks those tokens and
 persists real reports. This remains a narrow comparison with an Original API
 fixture, not completed whole-page/UI or backend parity; see the acceptance matrix.
 
+The optional Original participant login now has matching source-rendered
+name/password fixtures in all three themes and four desktop/mobile/breakpoint
+viewports, in production and development. This includes viewport-height
+composition, the 56px footer, Original narrow-screen columns, form spacing,
+icons and browser-warning wrapping. Version formatting in this warning does
+not change browser support or the Rewrite interface. A quick-CI regression
+checks the layout, password fallback/reveal/back and a real authorized password
+login without storing its secret; browser-solved proof-of-work was also tested.
+Some raw screenshot edge differences and the remaining error/admin/custom
+states stay open, so this is not complete UI/pixel parity.
+
 This folder is the starting point for the real production implementation.
 
 Operator lists are metadata views: import/source lists omit document bytes and

@@ -4,7 +4,7 @@
       <img [src]="illustration" alt="" />
     }
     <div>
-      <p class="heading">{{ view.customText('login_sidepanel_title', 'Willkommen im IQB-Testcenter') }}</p>
+      <p class="heading">{{ view.customText('login_sidepanel_title', 'Willkommen im IQB‑Testcenter') }}</p>
       <p>{{ view.customText('login_sidepanel_subtitle', 'Das IQB-Testcenter ist eine Anwendung des Instituts zur Qualitätsentwicklung im Bildungswesen (IQB) zur Durchführung digitaler Tests und Befragungen. Der Zugang ist mit den Zugangsdaten möglich, die Sie vorab erhalten haben.') }}</p>
     </div>
   </aside>
@@ -43,13 +43,16 @@
       @if (capsLock()) { <p id="originalLoginCapsLock" role="status">Feststelltaste ist aktiviert!</p> }
       <button matButton="filled" class="login-submit" type="submit" [disabled]="busy() || !view.canSignIn || view.runtime.loginKey.trim().length < 3">
         @if (!passwordStep() && !busy()) {
-          <svg class="mat-icon" matButtonIcon aria-hidden="true" viewBox="0 -960 960 960" focusable="false"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" /></svg>
+          <span class="mat-icon" matButtonIcon aria-hidden="true"><svg width="100%" height="100%" viewBox="0 -960 960 960" focusable="false"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" /></svg></span>
         }
         {{ busy() ? 'Bitte warten …' : passwordStep() ? 'Anmelden' : 'Weiter' }}
       </button>
     </form>
-    @if (browserCompatibility.warning; as warning) {
-      <p class="login-warning" role="status">{{ warning.message }}</p>
+    @if (browserCompatibility.originalWarning; as warning) {
+      <mat-card class="help-box" role="status">
+        <svg class="mat-icon warning-icon" aria-hidden="true" viewBox="0 -960 960 960" focusable="false"><path d="m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm330.5-51.5Q520-263 520-280t-11.5-28.5Q497-320 480-320t-28.5 11.5Q440-297 440-280t11.5 28.5Q463-240 480-240t28.5-11.5ZM440-360h80v-200h-80v200Zm40-100Z" /></svg>
+        <mat-card-content>{{ warning.message }}</mat-card-content>
+      </mat-card>
     }
     <div class="button-section"><a matButton="tonal" routerLink="/ops">Adminbereich</a></div>
   </div>

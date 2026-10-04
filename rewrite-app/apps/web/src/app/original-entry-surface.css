@@ -29,3 +29,21 @@
   min-height: 0;
   min-width: 0;
 }
+
+/* The pinned login occupies the viewport between the toolbar and 56px footer.
+   Its own welcome/root containers scroll; the footer must not grow offscreen. */
+:root[data-interface-mode="original"] .page.is-participant-page:has(#originalParticipantLogin) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+:root[data-interface-mode="original"] .participant-stage:has(#originalParticipantLogin),
+:root[data-interface-mode="original"] app-participant-view:has(#originalParticipantLogin),
+:root[data-interface-mode="original"] app-participant-view > .stack:has(#originalParticipantLogin),
+:root[data-interface-mode="original"] app-original-participant-entry:has(#originalParticipantLogin),
+:root[data-interface-mode="original"] app-original-participant-login {
+  min-height: 0;
+}
+:root[data-interface-mode="original"] .participant-stage:has(#originalParticipantLogin) {
+  overflow: auto;
+}

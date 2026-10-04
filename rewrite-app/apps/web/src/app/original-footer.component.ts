@@ -21,12 +21,11 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
   `,
   styles: [`
     :host { display: block; flex: 0 0 auto; }
-    footer { height: 24px; padding: 16px; background: var(--theme-gray-05, #F4F2F2);
+    footer { height: 24px; padding: 16px; box-sizing: content-box; color: var(--mat-sys-on-surface); background: var(--theme-gray-05, #F4F2F2);
       display: flex; flex-direction: row; justify-content: space-between;
       font-family: 'Nunito Sans', sans-serif; font-size: 16px; }
     .all-buttons { display: flex; flex-direction: row; justify-content: space-around;
       align-items: center; }
-    a { max-height: 100%; }
   `],
   styleUrl: "./original-login-theme.scss"
 })

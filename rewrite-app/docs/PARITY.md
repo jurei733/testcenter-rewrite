@@ -1,5 +1,42 @@
 # Testcenter parity checklist
 
+### Latest verified Original participant login rendering
+
+The optional Original login now matches the pinned 19.0 viewport composition:
+64/56px toolbar, remaining-height two-column login and 56px footer, including
+the Original's narrow-screen overflow instead of Rewrite's mobile stacking.
+Welcome typography/text, form spacing, Material button/icon baselines and the
+warning card's border-box wrapping match the actual source rendering. Browser
+versions in this Original-only warning use the source's three-part semver;
+Rewrite's raw browser identity and compatibility policy remain unchanged.
+The footer still truthfully labels this application as Rewrite.
+
+All 24 equal-fixture name/password comparisons passed in each fresh production
+and development build: Primar/Sekundar/Erwachsene, 1280x720, 390x844, 599x844
+and 600x844. The unmodified `c35cff81` frontend uses a bounded synthetic backend
+that rejects unknown calls; Rewrite uses real isolated API/SQLite instances.
+Visible text, geometry, styles and warning/icon children match. Raw screenshot
+RGBA is identical in 17/24 production and 21/24 development pairs; other pairs
+retain small edge differences (at most 114 pixels and 12/255 channel units).
+These results are not a claim of complete pixel identity.
+
+A new quick-CI regression checks all twelve theme/viewport configurations,
+focus, name validity, real 401-to-password transitions, reveal/hide and back,
+then creates a real password-authorized session without persisting its secret.
+Both builds passed; a separate production run solved fourteen actual browser
+proof-of-work challenges. Four presentation regressions protect raw identity,
+three-part labels, custom texts and supported/no-browser behavior. All 144 core
+and 49 frontend tests passed, as did the full protected production entry gate
+through password sign-in and the three-theme real-report acknowledgement gate.
+The initial production bundle is 467.99kB under the unchanged 470kB limit.
+
+Evidence is retained locally in ignored `.data/original-login-reference-20261004`.
+The Linux CI logo-width assertion was separately corrected to allow one 1/64px
+layout unit, with exact logo height retained; code and its fresh Entire checkpoint
+are verified on GitHub (`5aa72bf0`). The new login needs its own publication CI.
+Error/custom-branding/admin-entry comparisons and every complete UI matrix row
+remain open. Private MaP answer hash and the protected PPTX are unchanged.
+
 ### Latest verified Original Systemcheck welcome rendering
 
 Actual pinned 19.0 rendering exposed Rewrite leakage into the Original view:

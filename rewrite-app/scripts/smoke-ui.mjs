@@ -7677,7 +7677,7 @@ try {
     assert.deepEqual(await originalSignInPage.locator("#originalApplicationFooter nav a").allTextContents(),
       ["Barrierefreiheit", "Datenschutz", "Impressum"]);
     assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").count(), 0);
-    await originalSignInPage.locator(".login-submit svg[matButtonIcon]").waitFor();
+    await originalSignInPage.locator(".login-submit [matButtonIcon] svg").waitFor();
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
     await originalSignInPage.waitForFunction(

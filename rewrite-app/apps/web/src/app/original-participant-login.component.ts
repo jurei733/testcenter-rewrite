@@ -3,6 +3,7 @@ import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
+import { MatCard, MatCardContent } from "@angular/material/card";
 import { RouterLink } from "@angular/router";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
@@ -12,7 +13,7 @@ import { BrowserCompatibilityService } from "./browser-compatibility.service";
 @Component({
   selector: "app-original-participant-login",
   standalone: true,
-  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatCard, MatCardContent],
   templateUrl: "./original-participant-login.component.html",
   styleUrls: ["./original-participant-login.component.css", "./original-login-theme.scss"]
 })

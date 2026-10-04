@@ -27,6 +27,34 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest login comparison: both name and password fixtures now match the actual
+19.0 rendering in all three themes at 1280x720, 390x844, 599x844 and 600x844,
+in each fresh production/development build (24 states each). Source viewport
+height/footer sizing, two-column mobile overflow, heading margins, Material
+icon baseline, label styling and bordered browser-warning card replace the
+earlier approximations. The Original warning formats three-part semver only;
+the shared support policy and Rewrite's raw browser version are unchanged.
+The actual Rewrite build identity remains truthful in the footer.
+
+The bounded Source backend fixture rejects unknown calls; each Rewrite instance
+uses real API/SQLite. Text, geometry and computed styles match. Raw screenshots
+are fully RGBA-identical in 17/24 production and 21/24 development pairs; the
+others retain small edge differences, at most 114 pixels and 12 channel units.
+This is not completed pixel identity, all configurations, Source-backend proof
+or a closed shell/login row. Error/custom-branding/admin-login states and the
+other complete surfaces remain open. Evidence, scripts and logs are retained in
+ignored `.data/original-login-reference-20261004`.
+
+The new twelve-configuration quick-CI regression also exercises actual 401
+responses, password fallback, focus, reveal/back and a real password-authorized
+session without storing its password. Production/development gates passed;
+another production run solved fourteen real browser proof-of-work challenges.
+The protected entry gate through password sign-in and the three-theme real
+Systemcheck-save gate passed. All 144 core/49 frontend tests passed. Initial
+production output is 467.99kB, below the unchanged 470kB error budget. The
+portable Linux logo assertion is separately published with a fresh checkpoint
+(`5aa72bf0`); latest login publication CI remains a separate requirement.
+
 Latest welcome comparison: the unmodified 19.0 frontend exposed the inherited
 980px cap, card/text colours, disabled-FAB dimming, icon baseline and table
 wrapping. These Original-only styles now match the rendered source. Its shared
