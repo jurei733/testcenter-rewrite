@@ -27,6 +27,20 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The shared file-intake view now explains its strict Original 19 XSD policy or
+explicit legacy compatibility setting. Real API/SQLite browser gates pass valid
+and invalid imports in both interface preferences at desktop/mobile widths,
+in production/development. This is shared import behavior, not an Original
+administrator-page rendering comparison; the administration row stays open.
+
+The `0da8fbfe` publication's PostgreSQL UI job has now passed the full protected
+flow, including saved-dialog focus and workspace-access revocation. Its overall
+CI is not green: a separate participant-detail job hit a forced click while an
+entry-link record was replaced. Normal actionability-checked clicks replace
+those two forced entry-link clicks; the protected SQLite full flow passes
+through the real participant popup and `participant-launch-status-session-link`.
+Fresh complete publication CI remains required.
+
 The Original 19.0 deletion password requirement is now enforced in shared
 administrator/workspace services and the UI. Both interface preferences use the
 same safe confirmation flow; desktop/mobile production/development tests cover

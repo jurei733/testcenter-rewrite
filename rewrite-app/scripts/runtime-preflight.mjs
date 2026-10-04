@@ -1,7 +1,8 @@
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { selectFrontendEntryBundles } from "./frontend-bundle-references.mjs";
 
 const reportFatalPreflightError = error => {
   const message = error instanceof Error ? error.message : String(error);
@@ -288,6 +289,11 @@ const parseBooleanFlag = (value, defaultValue = false) => {
 const store = normalizeStore(process.env.FIRST_SLICE_STORE);
 const adminPasswordPolicy = resolveAdminPasswordPolicy();
 const proofOfWork = resolveProofOfWorkConfig();
+const xmlSchemaProfile = process.env.FIRST_SLICE_XML_SCHEMA_PROFILE?.trim() || "original-19";
+if (!["original-19", "legacy-compatibility"].includes(xmlSchemaProfile)) {
+  throw Error("FIRST_SLICE_XML_SCHEMA_PROFILE must be original-19 or legacy-compatibility.");
+}
+parseBooleanFlag(process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD, true);
 const hstsEnabled = parseBooleanFlag(
   process.env.FIRST_SLICE_HSTS_ENABLED,
   false
@@ -424,6 +430,16 @@ for (const filePath of requiredBuiltFiles) {
   await ensureFile(filePath);
 }
 
+if (xmlSchemaProfile === "original-19") {
+  const { prepareOriginalXmlSchemaValidator } = await import(
+    "../packages/application/dist/packages/application/src/original-xml-schema.js"
+  );
+  // Read-only preflight: provision separately; never silently fetch in a check.
+  await prepareOriginalXmlSchemaValidator(
+    resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || ".data/original-xml-schemas"), false
+  );
+}
+
 const appHtml = await readFile(frontendIndexPath, "utf8");
 for (const marker of [
   "<app-root></app-root>",
@@ -472,27 +488,7 @@ if (webManifest.scope !== "/app/") {
   throw new Error("Frontend web manifest must stay scoped to /app/.");
 }
 
-const frontendFiles = await readdir(frontendBuildDirectory);
-const mainBundle = frontendFiles.find(fileName => /^main-.*\.js$/.test(fileName));
-const stylesheetBundle = frontendFiles.find(fileName =>
-  /^styles-.*\.css$/.test(fileName)
-);
-if (!mainBundle) {
-  throw new Error("Frontend build is missing a hashed main JavaScript bundle.");
-}
-if (!stylesheetBundle) {
-  throw new Error("Frontend build is missing a hashed stylesheet bundle.");
-}
-if (!frontendAssetReferences.includes(mainBundle)) {
-  throw new Error(
-    `Frontend index does not reference the hashed main bundle ${mainBundle}.`
-  );
-}
-if (!frontendAssetReferences.includes(stylesheetBundle)) {
-  throw new Error(
-    `Frontend index does not reference the hashed stylesheet bundle ${stylesheetBundle}.`
-  );
-}
+const { mainBundle, stylesheetBundle } = selectFrontendEntryBundles(frontendAssetReferences);
 await access(resolve(frontendBuildDirectory, mainBundle));
 await access(resolve(frontendBuildDirectory, stylesheetBundle));
 
@@ -520,6 +516,7 @@ process.stdout.write(
       store,
       adminPasswordPolicy,
       proofOfWork,
+      xmlSchema: { profile: xmlSchemaProfile, validatedByXsd: xmlSchemaProfile === "original-19" },
       transportSecurity: {
         hstsEnabled
       },

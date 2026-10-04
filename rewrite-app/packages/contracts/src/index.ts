@@ -1640,6 +1640,14 @@ export type GetRuntimeConfigResponse = {
       failureWindowMs: number;
     };
     adminPasswordPolicy: AdminPasswordPolicy;
+    xmlSchema: {
+      profile: "original-19" | "legacy-compatibility";
+      validatedByXsd: boolean;
+      supportedVersions: { root: "Booklet" | "Unit" | "Testtakers" | "SysCheck"; version: string }[];
+      supportedMajorRanges: Record<"Booklet" | "Unit" | "Testtakers" | "SysCheck", {
+        repo: string; min: number; max: number;
+      }>;
+    };
     proofOfWork: {
       enabledScopes: ProofOfWorkScope[];
       algorithm: "SHA-256";

@@ -69,6 +69,7 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, [resolve("apps/api/dist/apps/api/src/index.js")], {
   cwd: root, stdio: "inherit",
   env: { ...process.env, PORT: String(port), FIRST_SLICE_STORE: "sqlite",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility",
     FIRST_SLICE_SQLITE_FILE: join(root, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", REQUIRE_LOGIN_PASSWORD: "false" }
 });

@@ -233,6 +233,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Loose File Assembly</h2>
+        <p id="xmlSchemaProfileSummary" role="note">{{ view.xmlSchemaProfileSummary }}</p>
         <p>Upload up to 200 related booklet or system-check, unit, coding-scheme, player, resource, and manifest files together. Every file is processed independently, so accepted files remain available when another file is rejected. Importing the booklet or system check captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
         <div class="form-grid full">
           <label>

@@ -11,6 +11,10 @@ import { ProofOfWorkManager } from "./proof-of-work.js";
 
 import {
   createFirstSliceServices,
+  prepareOriginalXmlSchemaValidator,
+  originalXmlSchemaPolicy,
+  originalXmlSchemaVersions,
+  type XmlSchemaProfile,
   type FirstSliceError,
   type FirstSliceRepository,
   type FirstSliceServices,
@@ -777,6 +781,16 @@ const createApiRuntime = async () => {
       "BUG_REPORT_GITHUB_REPOSITORY must use the 'owner/repository' format."
     );
   }
+  const xmlSchemaProfile = process.env.FIRST_SLICE_XML_SCHEMA_PROFILE?.trim() || "original-19";
+  if (!["original-19", "legacy-compatibility"].includes(xmlSchemaProfile)) {
+    throw Error("FIRST_SLICE_XML_SCHEMA_PROFILE must be original-19 or legacy-compatibility.");
+  }
+  const originalXmlSchemaValidator = xmlSchemaProfile === "original-19"
+    ? await prepareOriginalXmlSchemaValidator(
+        resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || ".data/original-xml-schemas"),
+        parseBooleanEnvironmentFlag("FIRST_SLICE_XML_SCHEMA_DOWNLOAD", true)
+      )
+    : undefined;
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
   const proofOfWork = new ProofOfWorkManager(repository, {
@@ -794,7 +808,9 @@ const createApiRuntime = async () => {
     participantAccessTimeZone,
     participantLoginMaxFailures,
     participantLoginFailureWindowMs,
-    requireLoginPassword
+    requireLoginPassword,
+    xmlSchemaProfile: xmlSchemaProfile as XmlSchemaProfile,
+    originalXmlSchemaValidator
   });
 
   if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
@@ -860,6 +876,12 @@ const createApiRuntime = async () => {
         failureWindowMs: participantLoginFailureWindowMs
       },
       participantAccessTimeZone,
+      xmlSchema: {
+        profile: xmlSchemaProfile as XmlSchemaProfile,
+        validatedByXsd: xmlSchemaProfile === "original-19",
+        supportedVersions: originalXmlSchemaVersions,
+        supportedMajorRanges: originalXmlSchemaPolicy
+      },
       environment: {
         firstSliceStore: store,
         firstSliceFilePresent: Boolean(process.env.FIRST_SLICE_FILE),
@@ -4723,6 +4745,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             bootstrapAdmin: runtime.config.bootstrapAdmin,
             adminLoginProtection: runtime.config.adminLoginProtection,
             adminPasswordPolicy: runtime.config.adminPasswordPolicy,
+            xmlSchema: runtime.config.xmlSchema,
             proofOfWork: runtime.config.proofOfWork,
             participantLoginProtection:
               runtime.config.participantLoginProtection,

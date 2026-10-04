@@ -13,6 +13,7 @@ COPY packages ./packages
 COPY scripts ./scripts
 
 RUN npm ci
+ENV FIRST_SLICE_XML_SCHEMA_CACHE=/app/xml-schemas
 RUN npm run build
 
 FROM node:22-alpine AS runtime
@@ -35,6 +36,9 @@ ENV FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=1000000
 ENV FIRST_SLICE_PROOF_OF_WORK_TTL_MS=120000
 ENV FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES=5
 ENV FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS=1800000
+ENV FIRST_SLICE_XML_SCHEMA_PROFILE=original-19
+ENV FIRST_SLICE_XML_SCHEMA_CACHE=/app/xml-schemas
+ENV FIRST_SLICE_XML_SCHEMA_DOWNLOAD=false
 ENV APP_BUILD_SHA=${APP_BUILD_SHA}
 ENV APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP}
 
@@ -55,12 +59,13 @@ COPY --from=build /app/packages/memory-store/dist ./packages/memory-store/dist
 COPY --from=build /app/packages/file-store/dist ./packages/file-store/dist
 COPY --from=build /app/packages/sqlite-store/dist ./packages/sqlite-store/dist
 COPY --from=build /app/packages/postgres-store/dist ./packages/postgres-store/dist
+COPY --from=build /app/xml-schemas ./xml-schemas
+
+RUN npm ci --omit=dev && chown -R node:node /app
 
 RUN RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true \
   RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=false \
   node ./scripts/runtime-preflight.mjs
-
-RUN npm ci --omit=dev && chown -R node:node /app
 
 USER node
 

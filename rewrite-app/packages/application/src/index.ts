@@ -15,6 +15,14 @@ import type {
   Element as XmlElement
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv } from "./original-report-csv.js";
+import type {
+  OriginalXmlRoot, OriginalXmlSchemaValidator, XmlSchemaProfile
+} from "./original-xml-schema.js";
+export {
+  originalXmlSchemaPolicy, originalXmlSchemaVersions,
+  prepareOriginalXmlSchemaValidator
+} from "./original-xml-schema.js";
+export type { XmlSchemaProfile } from "./original-xml-schema.js";
 import {
   createParticipantAccessService,
   type ParticipantAccessPort,
@@ -1461,6 +1469,13 @@ export type FirstSliceDependencies = {
   participantLoginMaxFailures?: number;
   participantLoginFailureWindowMs?: number;
   requireLoginPassword?: boolean;
+  xmlSchemaProfile?: XmlSchemaProfile;
+  originalXmlSchemaValidator?: OriginalXmlSchemaValidator;
+};
+
+type XmlValidationContext = {
+  profile: XmlSchemaProfile;
+  validateSchema?: OriginalXmlSchemaValidator;
 };
 
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
@@ -10805,7 +10820,8 @@ const validateTestcenterBookletCondition = (
 
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
-  sourceFileName: string
+  sourceFileName: string,
+  context: XmlValidationContext
 ): ImportJobDiagnostic[] => {
   if (/<!DOCTYPE\b/i.test(sourceDocument)) {
     return [
@@ -10833,7 +10849,8 @@ const validateTestcenterXmlSourceDocument = (
       createImportDiagnostic(
         "source_document_xml_malformed",
         `Source package '${sourceFileName}' contained malformed XML${
-          parserErrors[0] ? `: ${parserErrors[0]}` : "."
+          context.profile === "legacy-compatibility" && parserErrors[0]
+            ? `: ${parserErrors[0]}` : "."
         }`
       )
     ];
@@ -10845,11 +10862,23 @@ const validateTestcenterXmlSourceDocument = (
     candidate => candidate.toLowerCase() === rootName.toLowerCase()
   );
   if (!canonicalRootName) {
-    return [];
+    return context.profile === "original-19"
+      ? [createImportDiagnostic("testcenter_xml_root_invalid",
+          "Original Testcenter XML requires Booklet, Unit, Testtakers or SysCheck as its root element.")]
+      : [];
   }
 
   const schemaLocation = getTestcenterXmlSchemaLocation(root);
-  if (!declaresTestcenterXmlSchemaProfile(root)) {
+  if (context.profile === "original-19") {
+    const schemaProblem = context.validateSchema
+      ? context.validateSchema(canonicalRootName as OriginalXmlRoot, schemaLocation, sourceDocument)
+      : { code: "testcenter_xml_schema_validator_unavailable",
+          message: "The Original Testcenter XSD validator has not been provisioned." };
+    if (schemaProblem) {
+      return [createImportDiagnostic(schemaProblem.code, schemaProblem.message)];
+    }
+  }
+  if (context.profile === "legacy-compatibility" && !declaresTestcenterXmlSchemaProfile(root)) {
     return [];
   }
 
@@ -18961,7 +18990,8 @@ const collectTestcenterAdaptiveVariableReferences = (
 };
 
 const validateZipXmlEntries = (
-  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
+  context: XmlValidationContext
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
   const validatedPlayerKeys = new Set<string>();
@@ -19243,7 +19273,7 @@ const validateZipXmlEntries = (
       continue;
     }
     diagnostics.push(
-      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
+      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName, context)
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
     let hasDuplicateXmlIdentity = false;
@@ -19638,7 +19668,8 @@ const zipEntryPathIdentity = (fileName: string): string =>
   normalizeZipEntryPath(fileName).toLowerCase();
 
 const quarantineInvalidZipEntryGraphs = (
-  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
+  context: XmlValidationContext
 ): ZipEntryAcceptanceResult => {
   const rejectedEntryPaths = new Set<string>();
   const directlyRejectedXmlEntryPaths = new Set<string>();
@@ -19701,7 +19732,8 @@ const quarantineInvalidZipEntryGraphs = (
               ? []
               : validateTestcenterXmlSourceDocument(
                   sourceDocument,
-                  entry.fileName
+                  entry.fileName,
+                  context
                 ))
           ];
       const entryErrors = entryDiagnostics.filter(
@@ -20166,7 +20198,8 @@ const extractNestedResourcePackages = (
 };
 
 const deriveRuntimeSnapshotFromSourceDocument = (
-  sourcePackage: SourcePackage
+  sourcePackage: SourcePackage,
+  context: XmlValidationContext
 ): {
   runtimeSnapshot: ContentReleaseRuntimeSnapshot | null;
   diagnostics: ImportJobDiagnostic[];
@@ -20259,7 +20292,8 @@ const deriveRuntimeSnapshotFromSourceDocument = (
         ? []
         : validateTestcenterXmlSourceDocument(
             decodedSourceDocument,
-            sourcePackage.fileName
+            sourcePackage.fileName,
+            context
           ))
     ];
     if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
@@ -20276,7 +20310,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
       sourcePackage.sourceDocument
     );
     if (manifestExtraction.status === "found") {
-      const fullZipDiagnostics = validateZipXmlEntries(manifestExtraction);
+      const fullZipDiagnostics = validateZipXmlEntries(manifestExtraction, context);
       const hasPackageWideDiagnostic = fullZipDiagnostics.some(diagnostic =>
         [
           "source_document_zip_entry_path_invalid",
@@ -20291,7 +20325,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
         )
       );
       const entryAcceptance = quarantineInvalidZipEntryGraphs(
-        manifestExtraction
+        manifestExtraction, context
       );
       const canRetainAcceptedMembers =
         !hasPackageWideDiagnostic &&
@@ -20306,7 +20340,7 @@ const deriveRuntimeSnapshotFromSourceDocument = (
       const diagnostics = [
         ...(canRetainAcceptedMembers ? entryAcceptance.diagnostics : []),
         ...(canRetainAcceptedMembers
-          ? validateZipXmlEntries(acceptedManifestExtraction)
+          ? validateZipXmlEntries(acceptedManifestExtraction, context)
           : fullZipDiagnostics),
         ...resourceExtraction.diagnostics
       ];
@@ -20376,12 +20410,23 @@ const deriveRuntimeSnapshotFromSourceDocument = (
 };
 
 const buildRuntimeSnapshot = (
-  sourcePackage: SourcePackage
+  sourcePackage: SourcePackage,
+  context: XmlValidationContext
 ): {
   runtimeSnapshot: ContentReleaseRuntimeSnapshot | null;
   diagnostics: ImportJobDiagnostic[];
   acceptedZipEntryPaths?: string[];
 } => {
+  // A caller-authored projection cannot bypass validation of the uploaded
+  // source. In strict mode the validated document is authoritative.
+  if (context.profile === "original-19" && sourcePackage.sourceDocument) {
+    const derived = deriveRuntimeSnapshotFromSourceDocument(sourcePackage, context);
+    return derived.runtimeSnapshot || derived.diagnostics.some(item => item.severity === "error")
+      ? derived
+      : { ...derived, diagnostics: [...derived.diagnostics,
+          createImportDiagnostic("source_document_runtime_structure_invalid",
+            "The validated source document does not contain a supported runtime structure.")] };
+  }
   if (hasStructuredContent(sourcePackage.contentStructure)) {
     const preservesAuthoredEmptyXmlLabels =
       typeof sourcePackage.sourceDocument === "string" &&
@@ -20410,7 +20455,7 @@ const buildRuntimeSnapshot = (
 
   if (sourcePackage.sourceDocument) {
     const derivedFromSourceDocument = deriveRuntimeSnapshotFromSourceDocument(
-      sourcePackage
+      sourcePackage, context
     );
     if (derivedFromSourceDocument.runtimeSnapshot) {
       return {
@@ -24149,6 +24194,10 @@ export const createFirstSliceServices = (
   dependencies: FirstSliceDependencies
 ): FirstSliceServices => {
   const repository = dependencies.repository;
+  const xmlValidationContext: XmlValidationContext = {
+    profile: dependencies.xmlSchemaProfile ?? "original-19",
+    validateSchema: dependencies.originalXmlSchemaValidator
+  };
   const idGenerator = dependencies.idGenerator ?? randomUUID;
   const rawNow = dependencies.now ?? (() => new Date().toISOString());
   let lastTimestampMs = 0;
@@ -25197,7 +25246,8 @@ export const createFirstSliceServices = (
       ) {
         const xmlDiagnostics = validateTestcenterXmlSourceDocument(
           rosterDocument.rosterText,
-          rosterDocument.sourceFileName
+          rosterDocument.sourceFileName,
+          xmlValidationContext
         );
         if (xmlDiagnostics.some(diagnostic => diagnostic.severity === "error")) {
           throw new FirstSliceError(
@@ -25553,9 +25603,13 @@ export const createFirstSliceServices = (
       );
     }
 
-    const standaloneImportResolution = buildRuntimeSnapshot(sourcePackage);
+    const standaloneImportResolution = buildRuntimeSnapshot(sourcePackage, xmlValidationContext);
+    const sourceDocumentRejected = xmlValidationContext.profile === "original-19" &&
+      standaloneImportResolution.diagnostics.some(diagnostic =>
+        diagnostic.severity === "error" && diagnostic.code !== "source_document_runtime_structure_invalid");
     let workspaceDependencyDiagnostic: ImportJobDiagnostic | null = null;
     if (
+      !sourceDocumentRejected &&
       options.resolveWorkspaceDependencies !== false &&
       (standaloneImportResolution.runtimeSnapshot ||
         readStandaloneTestcenterFileIdentity(sourcePackage)?.fileType ===

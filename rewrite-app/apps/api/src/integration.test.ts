@@ -724,6 +724,7 @@ const createIsolatedServer = async (
   server: Awaited<ReturnType<typeof createProductionApiServer>>;
   baseUrl: string;
 }> => {
+  environment = { FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", ...environment };
   const previousEnvironment = new Map(
     Object.keys(environment).map(key => [key, process.env[key]])
   );
@@ -753,16 +754,180 @@ const createIsolatedServer = async (
 };
 
 before(async () => {
-  server = await createProductionApiServer();
-  await new Promise<void>(resolve => {
-    server.listen(0, "127.0.0.1", () => resolve());
+  // Historical rewrite fixtures deliberately cover schema-less XML and IMS
+  // manifests. Keep that extension explicit; strict Original gates create
+  // their own original-19 runtime and cannot inherit this compatibility mode.
+  const compatibilityRuntime = await createIsolatedServer({
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility"
   });
-  const address = server.address() as AddressInfo;
-  baseUrl = `http://127.0.0.1:${address.port}`;
+  server = compatibilityRuntime.server;
+  baseUrl = compatibilityRuntime.baseUrl;
 });
 
 after(async () => {
   await closeServer(server);
+});
+
+test("Original 19 strict XSD intake validates imports and cannot be bypassed by contentStructure", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "testcenter-strict-xsd-api-"));
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+    FIRST_SLICE_FILE: join(directory, "store.json"),
+    FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false", FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19",
+    FIRST_SLICE_XML_SCHEMA_CACHE: resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || ".data/original-xml-schemas")
+  });
+  const tenantKey = `strict-xsd-${randomUUID()}`;
+  const workspacePath = `/api/v1/tenants/${tenantKey}/workspaces/strict`;
+  const post = (path: string, body: unknown) => requestJsonAt<any>(isolated.baseUrl, path, { method: "POST", body });
+  const xml = (root: string, repo: string, version: string, body: string) =>
+    `<${root} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${repo}/${version}">${body}</${root}>`;
+  const metadata = '<Metadata><Id>STRICT.ROOT</Id><Label>Strict XSD</Label></Metadata>';
+  try {
+    assert.equal((await post("/api/v1/platform/tenants", { tenantKey, displayName: tenantKey })).status, 201);
+    assert.equal((await post(`/api/v1/tenants/${tenantKey}/workspaces`, { workspaceKey: "strict", displayName: "Strict" })).status, 201);
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.xmlSchema.profile, "original-19");
+    assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, true);
+    assert.equal(config.body.runtimeConfig.xmlSchema.supportedVersions.length, 6);
+    const compatibilityConfig = await requestJson<GetRuntimeConfigResponse>(productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(compatibilityConfig.body.runtimeConfig.xmlSchema.profile, "legacy-compatibility");
+
+    const source = xml("SysCheck", "testcenter-syscheck-xml", "18.0", metadata + '<Config skipnetwork="true"/>');
+    const importDocument = async (text: string, contentStructure?: unknown) => {
+      const uploaded = await post(`${workspacePath}/source-packages`, {
+        fileName: `strict-${randomUUID()}.xml`, mediaType: "application/xml",
+        sourceDocument: text.replace("<Id>STRICT.ROOT</Id>", `<Id>STRICT.${randomUUID().replaceAll("-", "")}</Id>`),
+        ...(contentStructure ? { contentStructure } : {})
+      });
+      assert.equal(uploaded.status, 201);
+      return post(`${workspacePath}/import-jobs`, { sourcePackageId: uploaded.body.sourcePackage.sourcePackageId });
+    };
+    const valid = await importDocument(source);
+    assert.equal(valid.body.importJob.status, "completed", JSON.stringify(valid.body.importJob.diagnostics));
+    const bypassStructure = { bookletEntries: [{ bookletKey: "bypass", displayLabel: "Bypass", unitEntries: [
+      { unitKey: "unit", displayLabel: "Unit", content: "Bypass" }
+    ] }] };
+    const validatedSourceWins = await importDocument(source, bypassStructure);
+    assert.equal(validatedSourceWins.body.importJob.status, "completed");
+    assert.equal(validatedSourceWins.body.stagedContentRelease, null);
+    for (const [invalid, code] of [
+      [source.replace(/ xsi:noNamespaceSchemaLocation="[^"]+"/u, ""), "testcenter_xml_schema_reference_missing"],
+      [source.replace("/18.0", "/17.4"), "testcenter_xml_schema_version_unsupported"],
+      [source.replace("/18.0", "/18.99"), "testcenter_xml_schema_version_unavailable"],
+      [source.replace("/18.0", "/18.0.1"), "testcenter_xml_schema_reference_invalid"],
+      [source.replace("https://w3id.org/iqb/spec/testcenter-syscheck-xml/18.0", "http://127.0.0.1:4311/private"), "testcenter_xml_schema_reference_invalid"],
+      [source.replace('skipnetwork="true"', 'skipnetwork="perhaps"'), "testcenter_xml_xsd_invalid"],
+      [source.replace("<Id>STRICT.ROOT</Id>", "<Id>invalid identifier</Id>"), "testcenter_xml_xsd_invalid"],
+      [source.replaceAll("SysCheck", "syscheck"), "testcenter_xml_xsd_invalid"],
+      ['<Unknown><Metadata/></Unknown>', "testcenter_xml_root_invalid"],
+      ['<!DOCTYPE SysCheck [<!ENTITY secret SYSTEM "file:///private/secret">]>' + source, "source_document_xml_doctype_unsupported"]
+    ]) {
+      const rejected = await importDocument(invalid!, bypassStructure);
+      assert.equal(rejected.body.importJob.status, "failed", code);
+      assert.equal(rejected.body.stagedContentRelease, null);
+      assert.ok(rejected.body.importJob.diagnostics.some((item: { code: string }) => item.code === code),
+        JSON.stringify(rejected.body.importJob.diagnostics));
+    }
+
+    const roster = xml("Testtakers", "testcenter-testtaker-xml", "18.0",
+      '<Metadata/><Group id="strict-group" label="Strict"><Login name="strict-user" pw="owned-fixture-password"><Booklet>STRICT.ROOT</Booklet></Login></Group>');
+    const importedRoster = await post(`${workspacePath}/participant-roster`, { rosterText: roster });
+    assert.equal(importedRoster.status, 201, JSON.stringify(importedRoster.body));
+    const beforeRoster = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/participant-roster`);
+    const badRoster = await post(`${workspacePath}/participant-roster`, {
+      rosterText: roster.replace('label="Strict"', 'unexpected="owned-fixture-password"')
+    });
+    assert.equal(badRoster.status, 400);
+    assert.equal(badRoster.body.error, "participant_roster_xml_invalid");
+    assert.doesNotMatch(JSON.stringify(badRoster.body), /owned-fixture-password/u);
+    const afterRoster = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/participant-roster`);
+    assert.deepEqual(afterRoster.body, beforeRoster.body);
+
+    // Dependency assembly and ZIP intake must use the same strict validator.
+    const archive = createZipBase64([
+      { fileName: "SYS.CHECK.xml", content: source },
+      { fileName: "BROKEN.CHECK.xml", content: source.replace("STRICT.ROOT", "BROKEN.ROOT").replace('skipnetwork="true"', 'skipnetwork="perhaps"') }
+    ]);
+    const packageUpload = await post(`${workspacePath}/source-packages`, {
+      fileName: "strict-mixed.zip", mediaType: "application/zip", sourceDocument: `data:application/zip;base64,${archive}`
+    });
+    const mixed = await post(`${workspacePath}/import-jobs`, { sourcePackageId: packageUpload.body.sourcePackage.sourcePackageId });
+    assert.equal(mixed.body.importJob.status, "completed", JSON.stringify(mixed.body));
+    assert.ok(mixed.body.importJob.diagnostics.some((item: { code: string; severity: string }) =>
+      item.code === "testcenter_xml_xsd_invalid" && item.severity === "warning"));
+    const releases = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/content-releases`);
+    assert.equal(releases.body.items.length, 0, "Rejected XML/projection must not stage a playable release");
+
+    const playable = createZipBase64([
+      { fileName: "STRICT.PLAY.xml", content: xml("Booklet", "testcenter-booklet-xml", "18.0",
+        '<Metadata><Id>STRICT.PLAY</Id><Label>Strict playable</Label></Metadata><Units><Unit id="STRICT.UNIT" label="Unit"/></Units>') },
+      { fileName: "STRICT.UNIT.xml", content: xml("Unit", "unit-xml", "17.6",
+        '<Metadata><Id>STRICT.UNIT</Id><Label>Strict Unit</Label></Metadata><Definition player="verona-player-simple@6.0.4">Strict fixture</Definition>') },
+      { fileName: "verona-player-simple-6.0.4.html",
+        content: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2()}</script><main>Owned strict fixture player</main>` },
+      { fileName: "STRICT.ROSTER.xml", content: xml("Testtakers", "testcenter-testtaker-xml", "17.4",
+        '<Metadata/><Group id="strict-package" label="Strict"><Login name="strict-package-user"><Booklet>STRICT.PLAY</Booklet></Login></Group>') }
+    ]);
+    const playableUpload = await post(`${workspacePath}/source-packages`, {
+      fileName: "strict-playable.zip", mediaType: "application/zip", sourceDocument: `data:application/zip;base64,${playable}`
+    });
+    const playableImport = await post(`${workspacePath}/import-jobs`, { sourcePackageId: playableUpload.body.sourcePackage.sourcePackageId });
+    assert.equal(playableImport.body.importJob.status, "completed", JSON.stringify(playableImport.body));
+    assert.equal(playableImport.body.stagedContentRelease.runtimeSnapshot.bookletEntries[0].bookletKey, "STRICT.PLAY");
+    assert.equal(playableImport.body.stagedContentRelease.runtimeSnapshot.bookletEntries[0].unitEntries[0].unitKey, "STRICT.UNIT");
+    assert.equal(playableImport.body.participantRosterImport.importedCount, 1);
+
+    const looseSources = [
+      { fileName: "STRICT.LOOSE.xml", mediaType: "application/xml", sourceDocument: xml("Booklet", "testcenter-booklet-xml", "18.0",
+        '<Metadata><Id>STRICT.LOOSE</Id><Label>Loose strict booklet</Label></Metadata><Units><Unit id="STRICT.LOOSE.UNIT" label="Unit"/></Units>') },
+      { fileName: "STRICT.LOOSE.UNIT.xml", mediaType: "application/xml", sourceDocument: xml("Unit", "unit-xml", "17.4",
+        '<Metadata><Id>STRICT.LOOSE.UNIT</Id><Label>Unit</Label></Metadata><Definition player="strict-loose-player@6.0.4">Strict fixture</Definition>') },
+      { fileName: "strict-loose-player-6.0.4.html", mediaType: "text/html",
+        sourceDocument: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2({ id: "strict-loose-player" })}</script><main>Owned fixture</main>` }
+    ];
+    for (const loose of looseSources) assert.equal((await post(`${workspacePath}/source-packages`, loose)).status, 201);
+    const invalidStandaloneRoster = xml("Testtakers", "testcenter-testtaker-xml", "18.0",
+      '<Metadata/><Group id="strict-rejected" label="Rejected"><Login name="strict-rejected"><Booklet>STRICT.LOOSE</Booklet></Login></Group>')
+      .replace(/ xsi:noNamespaceSchemaLocation="[^"]+"/u, "");
+    const rejectedSource = await post(`${workspacePath}/source-packages`, {
+      fileName: "STRICT.REJECTED.ROSTER.xml", mediaType: "application/xml", sourceDocument: invalidStandaloneRoster
+    });
+    assert.equal(rejectedSource.status, 201);
+    const beforePackages = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/source-packages`);
+    const beforeReleases = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/content-releases`);
+    const beforeRejectedRoster = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/participant-roster`);
+    const rejectedRosterImport = await post(`${workspacePath}/import-jobs`, { sourcePackageId: rejectedSource.body.sourcePackage.sourcePackageId });
+    assert.equal(rejectedRosterImport.body.importJob.status, "failed");
+    assert.equal(rejectedRosterImport.body.stagedContentRelease, null);
+    assert.ok(rejectedRosterImport.body.importJob.diagnostics.some((item: { code: string }) => item.code === "testcenter_xml_schema_reference_missing"),
+      JSON.stringify(rejectedRosterImport.body.importJob.diagnostics));
+    const afterPackages = await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/source-packages`);
+    assert.deepEqual(afterPackages.body.items.map((item: any) => item.sourcePackage.sourcePackageId).sort(),
+      beforePackages.body.items.map((item: any) => item.sourcePackage.sourcePackageId).sort(),
+      "Invalid standalone roster must not create an immutable dependency assembly");
+    assert.deepEqual((await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/content-releases`)).body, beforeReleases.body);
+    assert.deepEqual((await requestJsonAt<any>(isolated.baseUrl, `${workspacePath}/participant-roster`)).body, beforeRejectedRoster.body);
+  } finally {
+    await closeServer(isolated.server);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Original 19 schema policy is runtime-local and invalid/offline configuration fails before readiness", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "testcenter-xsd-policy-isolation-"));
+  const originalProfile = process.env.FIRST_SLICE_XML_SCHEMA_PROFILE;
+  try {
+    await assert.rejects(createIsolatedServer({ FIRST_SLICE_XML_SCHEMA_PROFILE: "unknown" }), /FIRST_SLICE_XML_SCHEMA_PROFILE/u);
+    await assert.rejects(createIsolatedServer({ FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19",
+      FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false", FIRST_SLICE_XML_SCHEMA_CACHE: join(directory, "missing") }), /cache is unavailable/u);
+    const config = await requestJson<GetRuntimeConfigResponse>(productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(config.body.runtimeConfig.xmlSchema.profile, "legacy-compatibility");
+    assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, false);
+    assert.equal(process.env.FIRST_SLICE_XML_SCHEMA_PROFILE, originalProfile);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("participant access credentials rotate and revoke without changing sessions or saved answers", async () => {

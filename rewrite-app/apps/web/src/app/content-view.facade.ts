@@ -6,6 +6,7 @@ import type {
   GetContentReleaseActivationReadinessResponse,
   GetContentReleaseResponse,
   GetImportJobResponse,
+  GetRuntimeConfigResponse,
   ListParticipantSessionsResponse,
   GetSourcePackageResponse,
   GetSourcePackageDeletionReadinessResponse,
@@ -69,6 +70,13 @@ export class ContentViewFacade {
   private readonly router = inject(Router);
 
   readonly content = this.uiState.content;
+  get xmlSchemaProfileSummary(): string {
+    const policy = parseJsonDocument<GetRuntimeConfigResponse>(this.uiState.ops.runtimeConfigView)?.runtimeConfig.xmlSchema;
+    if (!policy) return "XML validation profile is being loaded; consult Runtime Configuration before importing.";
+    return policy.profile === "original-19"
+      ? "Original Testcenter 19: XSD reference and schema validation required. Booklet 18.0; Unit 17.4/17.6; Testtakers 17.4/18.0; SysCheck 18.0."
+      : "Legacy compatibility: historical schema-less XML, schema aliases and IMS manifests are enabled. This is not strict Testcenter 19 validation.";
+  }
   readonly sourcePackageStatusOptions = sourcePackageStatuses;
   readonly sourcePackageFileTypeOptions = workspaceFileTypes;
   readonly importJobStatusOptions = importJobStatuses;

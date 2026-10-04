@@ -3,6 +3,30 @@
 The source-backed implementation priorities and current original-product gaps are
 tracked in [`docs/PARITY.md`](./docs/PARITY.md).
 
+XML intake defaults to the **Original Testcenter 19** contract. Booklet requires
+18.0; Unit supports 17.4/17.6; Testtakers supports 17.4/18.0; SysCheck requires
+18.0. A matching `http(s)://w3id.org/iqb/spec/<repo>/<major>.<minor>` reference
+is mandatory. Actual libxml2 XSD validation runs before runtime projection,
+dependency assembly, or roster mutation; a caller-supplied `contentStructure`
+cannot override invalid source XML. The file view and runtime diagnostics show
+the active profile. Missing/malformed/unsupported references fail explicitly.
+
+`npm run build` provisions the six hash-pinned specifications in the private
+installation cache; no third-party XSDs are republished in Git. Use
+`npm run provision:xml-schemas:built` after a core build, then set
+`FIRST_SLICE_XML_SCHEMA_DOWNLOAD=false` for offline startup. Configure the
+cache with `FIRST_SLICE_XML_SCHEMA_CACHE`. Preflight only verifies existing
+cache bytes; it never downloads or creates a missing offline cache. Docker
+builds provision `/app/xml-schemas` and run offline as the non-root user.
+
+Historical schema-less XML, old schema aliases and IMS manifests remain an
+explicit extension through `FIRST_SLICE_XML_SCHEMA_PROFILE=legacy-compatibility`.
+This is not strict Original 19 validation. Historical regression fixtures use
+that profile explicitly; separate native/API/desktop-mobile browser gates use
+`original-19`. Changing the intake profile does not revalidate saved releases,
+modify existing answers, or reset participant sessions. PostgreSQL/Docker
+verification for this publication remains distinct from local green tests.
+
 For a short German walkthrough with the local demo credentials, participant
 link, restart behavior, and verification commands, see
 [`docs/LOCAL-TRYOUT.md`](./docs/LOCAL-TRYOUT.md).

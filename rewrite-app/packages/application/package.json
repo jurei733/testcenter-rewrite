@@ -11,6 +11,7 @@
     "@iqbspecs/response": "2.0.0",
     "@testcenter-rewrite-app/contracts": "0.0.0",
     "@testcenter-rewrite-app/domain": "0.0.0",
-    "@xmldom/xmldom": "^0.9.10"
+    "@xmldom/xmldom": "^0.9.10",
+    "libxml2-wasm": "0.7.2"
   }
 }

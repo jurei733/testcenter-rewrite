@@ -163,7 +163,8 @@ const port = await allocatePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, [serverEntry], {
   stdio: "inherit",
-  env: { ...process.env, PORT: String(port), FIRST_SLICE_STORE: store }
+  env: { ...process.env, PORT: String(port), FIRST_SLICE_STORE: store,
+    FIRST_SLICE_XML_SCHEMA_PROFILE: process.env.FIRST_SLICE_XML_SCHEMA_PROFILE || "legacy-compatibility" }
 });
 let browser;
 

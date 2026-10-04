@@ -379,6 +379,9 @@ const child = spawn(process.execPath, [serverEntry], {
   env: {
     ...process.env,
     PORT: String(port),
+    // This suite intentionally retains historic schema-less/IMS fixtures;
+    // strict Original XML intake has separate original-19 API/browser gates.
+    FIRST_SLICE_XML_SCHEMA_PROFILE: process.env.FIRST_SLICE_XML_SCHEMA_PROFILE || "legacy-compatibility",
     FIRST_SLICE_STORE: store
   }
 });
@@ -21034,7 +21037,7 @@ try {
     .waitFor({ state: "visible" });
   await directEntryLinkCard
     .getByRole("button", { name: "Use Entry Link", exact: true })
-    .click({ force: true });
+    .click();
   await expectInputValue("#loginKey", "entry-student-direct-xml");
   await expectInputValue("#groupKey", "group:direct-xml");
   await expectInputValue("#bookletKey", participantRouteBookletKey);
@@ -21051,7 +21054,7 @@ try {
   await openParticipantEntryButton.waitFor({ state: "visible" });
   const [participantEntryPopup] = await Promise.all([
     page.waitForEvent("popup", { timeout: 15_000 }),
-    openParticipantEntryButton.click({ force: true })
+    openParticipantEntryButton.click()
   ]);
   await participantEntryPopup.locator("#participantLoginKey").waitFor();
   await participantEntryPopup.waitForFunction(

@@ -167,7 +167,10 @@ acceptance requirements.
 ## Current 19.0 delta to verify
 
 On 2026-10-03, the Original fetch advanced to
-`c35cff81383949b4664e0fdffa3ba1154d144d9d` (version 19.0). The broad historical
+`c35cff81383949b4664e0fdffa3ba1154d144d9d` (version 19.0).
+GitHub `HEAD`, `master` and tag `19.0.0` were independently reverified on
+2026-10-04 at the same revision (not the stale default HEAD of the local clone).
+The broad historical
 audit below remains useful, but its 94% estimate is **not a verified estimate
 against 19.0** and does not include the newly requested identical optional UI.
 The following additional acceptance requirements come from the 19.0 changelog
@@ -227,6 +230,33 @@ and implementation. Each needs current rewrite evidence before it is closed:
   `https://w3id.org/iqb/spec/<repo>/<version>` references. Unsupported versions
   and historical GitHub schema locations are rejected when applying this
   current contract; the operator file view explains supported versions.
+  Implemented as the default `original-19` intake profile, pinned to the
+  Original `definitions/compatibility.json` at `c35cff81`: Booklet major 18,
+  Unit major 17, Testtakers majors 17–18, SysCheck major 18. All six currently
+  published supported schemas are pinned by immutable revision and raw SHA-256
+  in a private installation cache, not vendored into Git. Actual libxml2/WASM
+  XSD validation enforces required attributes, order, namespaces, booleans,
+  identifiers, uniqueness and schema-specific facets. Uploaded schema URLs are
+  identifiers only, never network targets or paths; DOCTYPE is rejected and
+  native parser errors cannot expose roster passwords or document lines.
+  Invalid/missing/unsupported references fail before normalization, staging,
+  or roster changes; a supplied projection cannot bypass its source document.
+  The same runtime-local policy flows through direct XML/roster imports, ZIP
+  member quarantine and immutable workspace dependency assembly. The optional
+  `legacy-compatibility` profile explicitly retains historical schema-less,
+  alias and IMS fixtures; no global mutable mode or silent fallback is used.
+  Existing saved runs/releases are not retroactively rewritten. File intake
+  and diagnostics explain the selected profile and published versions.
+  Current local evidence: 157 core plus 63 frontend/preflight tests; 163 API
+  tests each in Memory/file/SQLite; four real SQLite browser configurations in
+  both production and development (both interfaces × desktop/mobile). Strict
+  tests cover native acceptance of all six schemas, invalid inputs, unchanged
+  roster after rejection, mixed-ZIP quarantine, Booklet/Unit/player/roster
+  staging, projection bypass, independent profiles, cache integrity, byte
+  limits, non-network validation and offline startup failure. Read-only offline
+  preflight passes. It now selects active HTML-referenced bundles instead of
+  rejecting retained assets from an older build. Docker provisioning is
+  implemented; fresh publication PostgreSQL/Docker CI remains separate proof.
 - Ownership and mode checks for participant answers, unit states, command
   reads/acknowledgements and Review CRUD; authenticated file paths remain
   inside their workspace, authenticated downloads use private caching, and
