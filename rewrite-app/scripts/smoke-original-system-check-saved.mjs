@@ -96,11 +96,18 @@ try {
           titleCentered: Math.abs(titleBounds.x + titleBounds.width / 2 - toolbar.x - toolbar.width / 2) < .01
             && Math.abs(titleBounds.y + titleBounds.height / 2 - toolbar.y - toolbar.height / 2) < .01 };
       });
-      assert.deepEqual(appearance, { width, color: "rgb(25, 28, 29)",
+      const { logoSize, ...exactAppearance } = appearance;
+      const expectedLogo = width < 600 ? [92.8671875, 40] : [111.4375, 48];
+      // Chromium quantizes proportional image widths differently on Linux
+      // and macOS (one 1/128px half-step). Retain the rendered-reference
+      // dimensions with a single 1/64px layout-unit tolerance, not a pixel.
+      assert.ok(Math.abs(logoSize[0] - expectedLogo[0]) <= 1 / 64,
+        `Original logo width: ${logoSize[0]} instead of ${expectedLogo[0]}`);
+      assert.equal(logoSize[1], expectedLogo[1]);
+      assert.deepEqual(exactAppearance, { width, color: "rgb(25, 28, 29)",
         backgrounds: ["rgb(255, 255, 255)", "rgb(255, 255, 255)"], disabled: true,
         opacity: "1", iconSize: [24, 24], tableSizing: "content-box",
         topbarHeight: width < 600 ? 56 : 64,
-        logoSize: width < 600 ? [92.8671875, 40] : [111.4375, 48],
         titleTypography: ['"Nunito Sans"', "22px", "28px"], titleCentered: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: true });
