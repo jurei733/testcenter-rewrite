@@ -11,6 +11,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { chromium } from "playwright";
 import QRCode from "qrcode";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -14163,8 +14164,11 @@ try {
     payload =>
       starsUnitKeys.every(
         unitKey =>
-          payload?.currentRunState?.testRun?.unitResponses?.[unitKey] ===
-          starsBackgroundResponses[unitKey]
+          matchesVeronaSavedResponse(
+            payload?.currentRunState?.testRun?.unitResponses?.[unitKey],
+            starsBackgroundResponses[unitKey],
+            unitKey === "2"
+          )
       ),
     45_000
   );
@@ -14196,6 +14200,7 @@ try {
     { timeout: 30_000 }
   );
 
+  stopAfter("participant-original-stars-28-unit-background-sync");
   logStep("participant-original-stars-browser-process-crash-recovery");
   const starsRendererCrashResponses = Object.fromEntries(
     starsUnitKeys.map((unitKey, index) => [

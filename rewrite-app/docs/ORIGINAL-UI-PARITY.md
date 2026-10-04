@@ -286,6 +286,15 @@ flow. The initial bundle is still 467.64kB. Viewport-height bounding and
 whitespace-only rejection are deliberate safety adaptations; confirmation,
 operator layout and the rendered upstream comparison remain open.
 
+The later STARS background-test CI failure was an active Player removing only
+the test's artificial trailing outer-JSON whitespace, not losing a raw answer.
+The background matcher now compares the entire canonical envelope only for
+the active Unit; inactive Units stay byte-exact and raw dataPart strings remain
+exact. Four negative/positive matcher tests and all 29 frontend-state tests
+passed. A fresh protected SQLite/headful production run passed the foreground,
+parallel hard-reload and 28-Unit background sequence, with both queues empty.
+Production answer behavior is unchanged and full current CI stays unconfirmed.
+
 | Surface | Required comparisons |
 | --- | --- |
 | Shell and login | Header/logo/footer, welcome panel, name/password steps, errors, admin entry |

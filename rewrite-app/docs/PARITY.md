@@ -463,6 +463,20 @@ whitespace-only values are intentional safety adaptations, not a claim of
 pixel-identical upstream acceptance. Original confirmation/operator layout,
 equal-fixture rendered references and complete CI remain open.
 
+The `b4483080` PR monitor-browser job also failed its 28-Unit STARS background
+check. Its logged active Unit 2 response has exactly the same complete envelope
+and raw dataPart strings as the expected answer, but the running Player had
+republished it without the test's artificial trailing whitespace marker. The
+background gate now permits only that complete outer-JSON canonicalization for
+the active Unit; all other Units remain byte-exact, and no field or dataPart
+string is projected away. Four new matcher regressions reject changed answers,
+raw dataPart spacing, progress, page, type, version and malformed envelopes.
+All 29 frontend-state tests passed. A fresh protected SQLite/headful production
+gate passed actual foreground recovery, isolated parallel 28-Unit hard reloads
+and background recovery through `participant-original-stars-28-unit-background-sync`,
+including complete foreground and IndexedDB queue clearance. This is not a
+production answer change, crash-recovery gate or completed publication CI.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit
