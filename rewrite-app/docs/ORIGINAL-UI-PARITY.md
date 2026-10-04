@@ -255,6 +255,22 @@ without changing production timer behavior or weakening terminal-state checks.
 Fresh complete Memory and isolated SQLite integration suites each passed
 161/161; full CI for the newly published steps is still pending.
 
+The report stage now adapts the source's 810px raised Material card, required
+question warnings, three bulleted lists and send/cancel actions. The shared
+answers, measurement results, save controller and stored report payload are
+unchanged; only the additional Rewrite application probe is excluded from the
+Original list. Public Original reports no longer include Rewrite operator
+tools or an extra English check-selector action. Fresh protected SQLite/headful
+production and development report gates passed keyboard opening/cancellation,
+no accidental report POST, focus return, warning/valid states, cancellation to
+Start and 390px layout. Desktop/mobile adaptation screenshots were inspected.
+The anonymous save and confirmation dialogs, operator layout and rendered
+upstream reference comparison remain open. The production budget is unchanged
+at 467.64kB. CI caught the Unit test leaving before the Simple Player's debounced
+answer notification; it now awaits the active frame's exact two-answer state
+before testing restoration, without weakening the saved-answer assertions.
+Current complete push/PR CI is not yet confirmed.
+
 | Surface | Required comparisons |
 | --- | --- |
 | Shell and login | Header/logo/footer, welcome panel, name/password steps, errors, admin entry |

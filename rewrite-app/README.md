@@ -15,6 +15,7 @@ content, toolbar, modal task/comment side panels and public/authorized
 Systemcheck selection, welcome cards, step navigation, automatic network test
 with the source's two charts/restart action, questionnaire, and full-height Unit
 surface with numbered Material page navigation are adapted,
+as is the report card with the source's three lists and send/cancel actions,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 
@@ -27,6 +28,15 @@ prompt instead of covering it. This is an adaptation, not a completed rendered
 Original-reference comparison. For isolated frontend browser checks,
 `UI_SMOKE_FRONTEND_ROOT` can point to an owned directory containing
 `dist/apps/web/browser/index.html`; invalid roots fail before runtime startup.
+
+The optional Original Systemcheck report reuses the same required answers,
+environment, network measurements and report submission controller. Additional
+Rewrite diagnostics stay in the stored payload without appearing in the
+Original lists. Production/development browser checks cover required-answer
+warnings, keyboard opening/cancellation without a POST, focus restoration,
+desktop/mobile layout and cancellation back to Start. The anonymous save dialog,
+confirmation and operator layout still require Original adaptation and rendered
+upstream comparison; the report card is not a full parity claim.
 
 This folder is the starting point for the real production implementation.
 

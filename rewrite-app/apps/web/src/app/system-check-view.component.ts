@@ -302,7 +302,7 @@ const readSystemCheckUnitResponse = (
           </ng-template>
         </article>
 
-        <article class="card" *ngIf="step === 'report'">
+        <article class="card" *ngIf="step === 'report' && interfaceMode.mode() !== 'original'">
           <h2>Report</h2>
           <section
             id="systemCheckQuestionnaireWarnings"
@@ -426,7 +426,7 @@ const readSystemCheckUnitResponse = (
           </section>
         </article>
 
-        <div class="actions system-check-navigation">
+        <div class="actions system-check-navigation" *ngIf="interfaceMode.mode() !== 'original' || step !== 'report'">
           <button id="systemCheckBackButton" class="ghost" type="button" *ngIf="interfaceMode.mode() !== 'original'" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
           <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report' && interfaceMode.mode() !== 'original'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
           <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>

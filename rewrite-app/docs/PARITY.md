@@ -424,6 +424,29 @@ assertion. No production timer or clock behavior changed. Fresh complete
 Memory and isolated SQLite integration runs both passed all 161 tests; newly
 pushed full CI remains a separate gate, not a retroactive PR-CI success.
 
+The optional Original Systemcheck report now adapts the pinned 810px Material
+card, required-answer warning list, environment/network/questionnaire lists
+and send/cancel actions. The shared controller and durable report remain
+unchanged. The extra Rewrite application probe is omitted only from this
+presentation, and Rewrite operator tools do not intrude into the Original
+public report. Fresh isolated, protected SQLite/headful production and
+development report gates passed, including keyboard opening, Escape/focus
+return without creating a report, required fields, mobile overflow prevention
+and cancellation to Start. The initial production bundle remains 467.64kB
+under the unchanged 470kB limit. The existing save/confirmation dialogs and
+operator surface are not yet Original adaptations, and equal-fixture rendered
+upstream comparison remains open.
+
+The `b4483080` push CI's full browser job caught the new two-page restoration
+test reading an empty second answer after a step return. The official Simple
+Player debounces its state messages for 50ms: filling/blurring a field does
+not itself prove that the controller received that answer. The gate now waits
+for an actual state notification from the active frame containing both exact
+answers before exercising return/restoration; no production Player behavior,
+timeout or answer assertion is weakened. A failure screenshot capture also
+cannot mask the original test error if storage is full. Current complete push
+and PR CI remain unconfirmed; partial passing jobs are not full CI success.
+
 ## Historical broad baseline
 
 This checklist uses IQB Testcenter commit

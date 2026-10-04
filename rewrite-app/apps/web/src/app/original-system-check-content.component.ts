@@ -7,13 +7,14 @@ import type { SystemCheckViewComponent } from "./system-check-view.component";
 import { OriginalSystemCheckQuestionnaireComponent } from "./original-system-check-questionnaire.component";
 import { OriginalSystemCheckNetworkComponent } from "./original-system-check-network.component";
 import { OriginalSystemCheckUnitComponent } from "./original-system-check-unit.component";
+import { OriginalSystemCheckReportComponent } from "./original-system-check-report.component";
 
 // Adapted from IQB Testcenter 19 sys-check/welcome and sys-check.component (MIT).
 // See assets/ORIGINAL-UI-LICENSE.txt. The shared controller owns every step,
 // measurement and response; this surface does not create another check state.
 @Component({
   selector: "app-original-system-check-content", standalone: true,
-  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, OriginalSystemCheckQuestionnaireComponent, OriginalSystemCheckNetworkComponent, OriginalSystemCheckUnitComponent],
+  imports: [NgFor, NgIf, MatFabButton, MatCard, MatCardContent, MatCardHeader, MatCardTitle, MatTooltip, OriginalSystemCheckQuestionnaireComponent, OriginalSystemCheckNetworkComponent, OriginalSystemCheckUnitComponent, OriginalSystemCheckReportComponent],
   template: `
     <ng-container *ngIf="view.systemCheck as check">
       <div class="header">
@@ -40,6 +41,11 @@ import { OriginalSystemCheckUnitComponent } from "./original-system-check-unit.c
       @defer (when view.step === 'unit') {
         @if (view.step === 'unit') {
           <app-original-system-check-unit [view]="view" />
+        }
+      }
+      @defer (when view.step === 'report') {
+        @if (view.step === 'report') {
+          <app-original-system-check-report [view]="view" />
         }
       }
       <div class="sys-check-body" *ngIf="view.step === 'welcome'" id="originalSystemCheckWelcome">

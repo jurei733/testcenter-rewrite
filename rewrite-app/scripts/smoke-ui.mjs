@@ -2819,6 +2819,15 @@ try {
     const originalUnit = page.locator("#originalSystemCheckUnit");
     await originalUnit.waitFor();
     const originalUnitFrame = page.frameLocator("iframe.verona-player-frame");
+    await page.evaluate(() => {
+      window.__originalSystemCheckReportedAnswers = [];
+      window.addEventListener("message", event => {
+        if (event.source !== document.querySelector("iframe.verona-player-frame")?.contentWindow ||
+          event.data?.type !== "vopStateChangedNotification") return;
+        const answers = event.data.unitState?.dataParts?.answers;
+        if (typeof answers === "string") window.__originalSystemCheckReportedAnswers = JSON.parse(answers);
+      });
+    });
     await originalUnitFrame.locator("#var1").fill("Original Systemcheck Unit answer");
     await originalUnitFrame.locator("#var1").blur();
     assert.equal(await originalUnitFrame.locator("body").evaluate(() => window.__systemCheckLogPolicy), "disabled");
@@ -2828,6 +2837,12 @@ try {
     await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-forward']").click();
     await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).fill("Original second-page answer");
     await originalUnitFrame.getByRole("textbox", { name: "Second page answer" }).blur();
+    // The official Simple Player debounces state messages for 50ms. A visible
+    // input value is not proof that the shared controller has received it yet.
+    await page.waitForFunction(() =>
+      window.__originalSystemCheckReportedAnswers.some(answer => answer.id === "var1" && answer.value === "Original Systemcheck Unit answer") &&
+      window.__originalSystemCheckReportedAnswers.some(answer => answer.id === "syscheckPage2" && answer.value === "Original second-page answer")
+    );
     await page.locator("#originalSystemCheckPageNavigation [data-cy='page-navigation-0'] button").click();
     await originalUnitFrame.locator("#var1").waitFor();
     assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
@@ -2893,7 +2908,57 @@ try {
     assert.equal(await originalUnitFrame.locator("#var1").inputValue(), "Original Systemcheck Unit answer");
     assert.equal(await originalUnitFrame.locator("#syscheckPage2").inputValue(), "Original second-page answer");
     await page.locator("#syscheck-next-step").click();
-    await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+    await page.locator("#originalSystemCheckQuestionnaire").waitFor();
+    await page.locator("#syscheck-next-step").click();
+    const originalReport = page.locator("#originalSystemCheckReport");
+    await originalReport.locator("mat-card-title").getByText("Bericht", { exact: true }).waitFor();
+    assert.equal(await originalReport.locator("#systemCheckQuestionnaireWarnings li").count(), 1);
+    assert.equal(await originalReport.locator("#saveSystemCheckReportButton").isDisabled(), true);
+    assert.equal(await page.locator(".system-check-operator").count(), 0,
+      "Rewrite-only operator tools do not intrude into the Original public report");
+    await page.locator("#syscheck-previous-step").click();
+    const reportQuestionnaire = page.locator("#originalSystemCheckQuestionnaire");
+    await reportQuestionnaire.getByRole("textbox", { name: "Eingabefeld", exact: true }).fill("Original report device");
+    await reportQuestionnaire.getByRole("combobox", { name: "Auswahl", exact: true }).click();
+    await page.getByRole("option", { name: "Option B", exact: true }).click();
+    await reportQuestionnaire.getByRole("textbox", { name: "Eingabebereich", exact: true }).fill("Original report browser flow");
+    await reportQuestionnaire.getByRole("checkbox", { name: "Kontrollkästchen", exact: true }).check();
+    await reportQuestionnaire.getByRole("radio", { name: "Option A", exact: true }).check();
+    await page.locator("#syscheck-next-step").click();
+    await originalReport.waitFor();
+    assert.equal(await originalReport.locator("#systemCheckQuestionnaireWarnings").count(), 0);
+    await originalReport.locator("#systemCheckReportQuestionnaire").filter({ hasText: "Original report device" })
+      .filter({ hasText: "Original report browser flow" }).filter({ hasText: "Option B" }).filter({ hasText: "Option A" }).waitFor();
+    assert.equal(await originalReport.locator("#systemCheckReportQuestionnaire li").count(), 5);
+    assert.ok(await originalReport.locator("#systemCheckReportEnvironment li").count() > 0);
+    assert.ok(await originalReport.locator("#systemCheckReportNetwork li").count() > 0);
+    assert.equal(await originalReport.locator("#systemCheckReportNetwork-latency").count(), 0,
+      "The extra Rewrite application probe stays out of the Original report presentation");
+    assert.equal(await page.getByRole("button", { name: "Choose Another Check", exact: true }).count(), 0);
+    let unwantedOriginalReportSaves = 0;
+    const observeReportSave = request => {
+      if (request.method() === "POST" && new URL(request.url()).pathname.includes("system-check")) unwantedOriginalReportSaves += 1;
+    };
+    page.on("request", observeReportSave);
+    await page.waitForFunction(() => document.querySelector("#saveSystemCheckReportButton")?.disabled === false);
+    await originalReport.locator("#saveSystemCheckReportButton").focus();
+    await page.keyboard.press("Enter");
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor();
+    assert.equal(await page.locator("#systemCheckSaveReportKey").inputValue(), "");
+    assert.equal(await page.locator("#systemCheckSaveReportId").inputValue(), "");
+    await page.keyboard.press("Escape");
+    await page.locator("#systemCheckSaveReportBackdrop").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.activeElement?.id === "saveSystemCheckReportButton");
+    assert.equal(unwantedOriginalReportSaves, 0, "Opening and cancelling the report dialog never registers a report");
+    page.off("request", observeReportSave);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-report-desktop.png"), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-report-mobile.png"), fullPage: true });
+    await page.setViewportSize(choiceViewport);
+    await originalReport.locator("#cancelSystemCheckReportButton").click();
+    await page.waitForURL(url => url.pathname === "/app/home");
+    await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     await page.locator(`#originalSystemCheckStarter button[data-system-check-id='${headerOnlyCheckId}']`).click();
     await page.locator("#originalSystemCheckWelcome").waitFor();
     assert.equal(await page.locator("#originalSystemCheckWelcome ol li").count(), 2,
@@ -25461,9 +25526,14 @@ try {
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
     if (page && !page.isClosed()) {
-      const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
-      await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true }).catch(() => undefined);
-      process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
+      try {
+        const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
+        process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
+      } catch (captureError) {
+        // A full disk or a closed browser must not replace the actual test failure.
+        process.stderr.write(`UI smoke failure screenshot unavailable: ${String(captureError)}\n`);
+      }
     }
     const bugReport = await page
       ?.locator("#bugReportText")
