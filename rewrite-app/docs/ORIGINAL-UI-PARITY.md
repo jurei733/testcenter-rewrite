@@ -27,6 +27,33 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest administration-dialog comparison (2026-10-04): the optional Original
+account-deletion confirmation now adapts the pinned 19.0 Material template,
+600px dialog, German singular/plural prompt, seven-character form gate,
+submit-before-cancel order and inline `Falsches Kennwort.` alert. The secret,
+authorization callback, pending duplicate guard and stale-request checks still
+belong to the shared controller. Wrong-password focus waits for the actually
+re-enabled Material button and preserves its mouse/keyboard origin. Native
+Rewrite confirmations and the workspace's additional exact-key guard remain
+unchanged; the workspace dialog is still not Original-rendered.
+
+All 18 equal-fixture dialog states passed in each fresh production/development
+build (three themes × desktop/mobile × empty/filled/wrong password). Text,
+geometry, visible computed styles and focus match the unmodified `c35cff81`
+frontend. Source uses a bounded fixture backend rejecting unknown calls;
+Rewrite uses its real API and isolated SQLite. Screenshots, metrics, script
+and logs are retained in ignored `.data/original-password-reference-20261004`.
+This is a narrow renderer comparison, not full-page pixel identity or a closed
+administration row. Both builds also passed four real protected deletion
+configurations and a failed-network-renderer fallback gate: cancellation sends
+no DELETE, wrong passwords preserve accounts, pending Escape/backdrop/duplicate
+submits cannot dismiss an action, failed directory refreshes do not repeat
+acknowledged deletions, and the safe Native fallback preserves the selection.
+The separate full protected SQLite flow passed through `workspace-delete`.
+All 157 core and 70 frontend/preflight tests passed. Initial production output
+is 468.25kB, below the unchanged 470kB error budget. Fresh publication CI is
+still separate proof; no complete Original UI matrix row is closed by this step.
+
 The shared file-intake view now explains its strict Original 19 XSD policy or
 explicit legacy compatibility setting. Real API/SQLite browser gates pass valid
 and invalid imports in both interface preferences at desktop/mobile widths,
@@ -47,8 +74,9 @@ same safe confirmation flow; desktop/mobile production/development tests cover
 wrong-password retry, focus, no-request cancellation, pending duplicate guards,
 and directory-read failure after a real acknowledged deletion. The password is
 dialog-local, never persisted. Its readable opaque surface is regression-tested.
-This is functional parity, not the Original Material superadmin dialog rendering;
-that page/dialog remains part of the open administration row below.
+This paragraph records the preceding shared functional step. The narrow
+Original account-deletion renderer comparison is now described above; the
+complete administrator/workspace pages remain part of the open row below.
 
 The previous login publication's PostgreSQL UI job raced the Material saved-report
 dialog autofocus immediately after its animation. The full smoke now waits for

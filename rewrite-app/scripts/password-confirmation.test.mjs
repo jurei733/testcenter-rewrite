@@ -8,7 +8,13 @@ const core = dataModule(`
   export const Injectable = () => target => target;
   export const Component = () => target => target;
   export const ViewChild = () => () => {};
+  export class ElementRef {}
+  export const Output = () => () => {};
+  export class EventEmitter {
+    values = []; emit(value) { this.values.push(value); }
+  }
   export const inject = token => globalThis.__passwordConfirmationHost[token.name];
+  export const afterRenderEffect = callback => (globalThis.__passwordConfirmationHost.effects ||= []).push(callback);
   export const signal = initial => {
     let value = initial; const read = () => value;
     read.set = next => { value = next; };
@@ -21,12 +27,34 @@ const transpile = file => ts.transpileModule(readFileSync(new URL(
 }).outputText.replace('"@angular/core"', JSON.stringify(core));
 const serviceUrl = dataModule(transpile("confirmation-dialog.service"));
 const { ConfirmationDialogService } = await import(serviceUrl);
-const { PasswordConfirmationDialogComponent } = await import(dataModule(
+const passwordControllerUrl = dataModule(
   transpile("password-confirmation-dialog.component")
-    .replace('"./confirmation-dialog.service"', JSON.stringify(serviceUrl))));
+    .replace('"./confirmation-dialog.service"', JSON.stringify(serviceUrl)));
+const { PasswordConfirmationDialogComponent } = await import(passwordControllerUrl);
+const material = dataModule(`
+  export const MatButton = {}, MatDialogTitle = {}, MatDialogContent = {},
+    MatDialogActions = {}, MatFormField = {}, MatInput = {};
+`);
+const originalControllerUrl = dataModule(
+  transpile("original-password-confirmation-dialog.component")
+    .replace('"./password-confirmation-dialog.component"', JSON.stringify(passwordControllerUrl))
+    .replace('"@angular/cdk/a11y"', JSON.stringify(dataModule("export class FocusMonitor {}")))
+    .replace('"@angular/forms"', JSON.stringify(dataModule(`
+      export const ReactiveFormsModule = {}, Validators = { required: {}, minLength: () => ({}) };
+      export class FormControl { constructor(value) { this.value = value; } }
+      export class FormGroup { constructor(controls) { this.controls = controls; } reset(values) { for (const key of Object.keys(values)) this.controls[key].value = values[key]; } }
+    `)))
+    .replace(/"@angular\/material\/[^"]+"/gu, JSON.stringify(material)));
+const { OriginalPasswordConfirmationDialogComponent } = await import(originalControllerUrl);
+const launcherSource = transpile("original-password-confirmation-launcher.component")
+  .replace('"./confirmation-dialog.service"', JSON.stringify(serviceUrl))
+  .replace('"./original-overlay-styles.component"', JSON.stringify(dataModule("export class OriginalOverlayStylesComponent {}")))
+  .replace('"@angular/material/dialog"', JSON.stringify(dataModule("export class MatDialog {}")));
+const { OriginalPasswordConfirmationLauncherComponent } = await import(dataModule(
+  launcherSource.replace('"./original-password-confirmation-dialog.component"', JSON.stringify(originalControllerUrl))));
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
-const withDialog = async (submit, action, verification) => {
+const withDialog = async (submit, action, verification, Dialog = PasswordConfirmationDialogComponent) => {
   const previous = { host: globalThis.__passwordConfirmationHost, document: globalThis.document,
     HTMLElement: globalThis.HTMLElement, HTMLInputElement: globalThis.HTMLInputElement };
   class Element { disabled = false; isConnected = true; focus() { globalThis.document.activeElement = this; } }
@@ -36,15 +64,17 @@ const withDialog = async (submit, action, verification) => {
   globalThis.HTMLInputElement = Input;
   globalThis.document = { activeElement: trigger };
   const confirmation = new ConfirmationDialogService();
-  globalThis.__passwordConfirmationHost = { ConfirmationDialogService: confirmation };
+  globalThis.__passwordConfirmationHost = { ConfirmationDialogService: confirmation,
+    FocusMonitor: { focusVia(element) { element.focus(); } } };
   const result = confirmation.confirm({ title: "Delete", message: "Owned test", confirmLabel: "Delete",
     passwordSubmit: submit, ...(verification ? { verification } : {}) });
-  const component = new PasswordConfirmationDialogComponent();
+  const component = new Dialog();
   component.passwordInput = { nativeElement: new Input() };
   component.cancelButton = { nativeElement: new Element() };
   component.confirmButton = { nativeElement: new Element() };
   if (verification) component.verificationInput = { nativeElement: new Input() };
-  try { await action({ component, confirmation, result, trigger }); }
+  try { await action({ component, confirmation, result, trigger,
+    render() { for (const effect of globalThis.__passwordConfirmationHost.effects || []) effect(); } }); }
   finally {
     component.ngOnDestroy(); confirmation.resolve(false); await Promise.resolve();
     for (const [key, value] of Object.entries(previous)) {
@@ -150,6 +180,106 @@ test("workspace focus starts on exact-text input and Tab wraps both directions",
     component.passwordValue.set("owned-test-password"); component.ngOnDestroy();
     assert.equal(component.passwordValue(), "");
   }, { label: "Workspace", expectedValue: "workspace" });
+});
+
+test("Original password renderer retains Source's seven-character gate and wrong-password retry", async () => {
+  const passwords = [];
+  await withDialog(async password => { passwords.push(password); return password === "correct-password"
+    ? null : "Incorrect current administrator password. Please try again."; },
+    async ({ component, result, render }) => {
+      component.passwordValue.set("123456");
+      assert.equal(component.canConfirm(), false); await component.submit(); assert.deepEqual(passwords, []);
+      component.passwordValue.set("wrong-password"); component.confirmButton.nativeElement.focus(); await component.submit();
+      assert.equal(component.originalError, "Falsches Kennwort."); assert.equal(component.busy(), false);
+      render();
+      assert.equal(document.activeElement, component.confirmButton.nativeElement);
+      component.updatePassword({ target: { value: "correct-password" } });
+      assert.equal(component.error(), ""); await component.submit();
+      assert.equal(await result, true); assert.equal(component.passwordValue(), "");
+      assert.deepEqual(passwords, ["wrong-password", "correct-password"]);
+    }, undefined, OriginalPasswordConfirmationDialogComponent);
+});
+
+test("Original password renderer cannot duplicate, edit or dismiss a pending deletion", async () => {
+  const pending = deferred(); let calls = 0;
+  await withDialog(() => { calls++; return pending.promise; }, async ({ component, confirmation, result }) => {
+    component.passwordValue.set("owned-test-password"); const submission = component.submit();
+    await component.submit(); component.cancel(); component.updatePassword({ target: { value: "edited" } });
+    component.handleKeydown({ key: "Escape", preventDefault() {} });
+    assert.ok(confirmation.dialog()); assert.equal(component.busy(), true); assert.equal(calls, 1);
+    assert.equal(component.passwordValue(), "owned-test-password");
+    pending.resolve(null); await submission; assert.equal(await result, true);
+    assert.equal(component.passwordValue(), "");
+  }, undefined, OriginalPasswordConfirmationDialogComponent);
+});
+
+test("Original form control clears its local secret immediately on cancel and destruction", async () => {
+  await withDialog(async () => null, async ({ component, result }) => {
+    component.form.controls.pw.value = "owned-local-secret"; component.passwordValue.set("owned-local-secret");
+    component.cancel(); assert.equal(await result, false);
+    assert.equal(component.form.controls.pw.value, ""); assert.equal(component.passwordValue(), "");
+    component.form.controls.pw.value = "owned-local-secret"; component.ngOnDestroy();
+    assert.equal(component.form.controls.pw.value, "");
+  }, undefined, OriginalPasswordConfirmationDialogComponent);
+});
+
+test("Original password renderer ignores stale completion and never exposes server secrets", async () => {
+  const pending = deferred();
+  await withDialog(() => pending.promise, async ({ component, confirmation, result }) => {
+    component.passwordValue.set("owned-test-password"); const submission = component.submit();
+    const replacement = confirmation.confirm({ title: "Replacement", message: "Other", confirmLabel: "Confirm" });
+    assert.equal(await result, false); const id = confirmation.dialog().requestId;
+    pending.resolve(null); await submission; assert.equal(confirmation.dialog().requestId, id);
+    component.error.set("private-secret-server-error"); assert.equal(component.originalError.includes("private-secret"), false);
+    component.ngOnDestroy(); assert.equal(component.passwordValue(), "");
+    confirmation.resolve(false); assert.equal(await replacement, false);
+  }, undefined, OriginalPasswordConfirmationDialogComponent);
+});
+
+test("Original lazy launcher cannot open after its request is destroyed or replaced", async () => {
+  await withDialog(async () => null, async ({ confirmation }) => {
+    const request = confirmation.dialog(); request.originalPasswordDialog = { title: "Original", message: "Owned", confirmLabel: "Löschen" };
+    let opens = 0;
+    globalThis.__passwordConfirmationHost.MatDialog = { open() { opens++; throw Error("Stale overlay opened"); } };
+    const destroyed = new OriginalPasswordConfirmationLauncherComponent();
+    const loading = destroyed.ngOnInit(); destroyed.ngOnDestroy(); await loading; assert.equal(opens, 0);
+    const replaced = new OriginalPasswordConfirmationLauncherComponent(); const loadingReplacement = replaced.ngOnInit();
+    const other = confirmation.confirm({ title: "Other", message: "Other", confirmLabel: "Confirm" });
+    await loadingReplacement; assert.equal(opens, 0); assert.equal(confirmation.dialog().title, "Other");
+    replaced.ngOnDestroy(); confirmation.resolve(false); await other;
+  });
+});
+
+test("Original lazy launcher guards Material dismissal while pending and stale close callbacks", async () => {
+  await withDialog(async () => null, async ({ confirmation }) => {
+    confirmation.dialog().originalPasswordDialog = { title: "Original", message: "Owned", confirmLabel: "Löschen" };
+    const component = { busy: () => false }; component.busy.set = next => { component.busy = Object.assign(() => next, { set: component.busy.set }); };
+    let config, closedCallback, closed = 0, unsubscribed = 0;
+    globalThis.__passwordConfirmationHost.MatDialog = { open(_Component, options) {
+      config = options; return { componentInstance: component, close() { closed++; },
+        afterClosed() { return { subscribe(callback) { closedCallback = callback; return { unsubscribe() { unsubscribed++; } }; } }; } };
+    } };
+    const launcher = new OriginalPasswordConfirmationLauncherComponent(); await launcher.ngOnInit();
+    assert.equal(config.width, "600px"); assert.equal(config.autoFocus, "#globalConfirmationPasswordInput");
+    assert.equal(config.closePredicate(undefined, config, component), true);
+    component.busy.set(true); assert.equal(config.closePredicate(undefined, config, component), false);
+    const other = confirmation.confirm({ title: "Other", message: "Other", confirmLabel: "Confirm" });
+    closedCallback(); assert.equal(confirmation.dialog().title, "Other");
+    launcher.ngOnDestroy(); assert.equal(closed, 1); assert.equal(unsubscribed, 1); assert.equal(component.busy(), false);
+    confirmation.resolve(false); await other;
+  });
+});
+
+test("a failed Original renderer chunk falls back only for the still-current request", async () => {
+  const { OriginalPasswordConfirmationLauncherComponent: FailingLauncher } = await import(dataModule(
+    launcherSource.replace('"./original-password-confirmation-dialog.component"', JSON.stringify(dataModule('throw Error("Owned chunk fault");')))));
+  await withDialog(async () => null, async ({ confirmation }) => {
+    confirmation.dialog().originalPasswordDialog = { title: "Original", message: "Owned", confirmLabel: "Löschen" };
+    globalThis.__passwordConfirmationHost.MatDialog = { open() { throw Error("Should not open"); } };
+    const current = new FailingLauncher(); await current.ngOnInit(); assert.equal(current.failed.values.length, 1); assert.ok(confirmation.dialog());
+    const stale = new FailingLauncher(); const loading = stale.ngOnInit(); stale.ngOnDestroy(); await loading;
+    assert.equal(stale.failed.values.length, 0); current.ngOnDestroy();
+  });
 });
 
 // Execute complete production services, with Angular DI and unused external

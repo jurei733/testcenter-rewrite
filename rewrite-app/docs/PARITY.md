@@ -1,5 +1,34 @@
 # Testcenter parity checklist
 
+### Latest verified Original administrator-deletion dialog rendering
+
+The optional Original account-deletion dialog now uses the pinned 19.0
+Material structure, 600px width, singular/plural administrator prompt,
+seven-character form gate, original action order and inline password alert.
+It reuses the shared dialog-local secret and authorized deletion controller;
+no second credential store or authorization path is introduced. The Native
+Rewrite renderer and its extra workspace-key verification are unchanged.
+After an expected error, Original restores submit focus only after Angular
+has actually re-enabled its button, with the Source mouse/keyboard origin.
+Every inherited button query explicitly reads its actual native ElementRef,
+not a Material component instance. Late lazy loads and stale close callbacks
+cannot resolve a replacement request. A failed renderer chunk falls back to
+the safe Native dialog without deleting or losing the selected accounts.
+
+All 18 equal-fixture states passed in each fresh production/development build:
+Primar/Sekundar/Erwachsene, 1280x720/390x844, empty/filled/wrong password.
+Text, geometry, visible styles and focus match the actual unmodified `c35cff81`
+frontend. Only Source's backend is a bounded fixture rejecting unknown calls;
+Rewrite uses real isolated API/SQLite. Five real-browser regression cases
+passed per build, including cancellation, wrong-password retry, pending
+Escape/backdrop/duplicate guards, failed post-delete reads and lazy-chunk
+fallback. The separate protected SQLite flow passed through workspace deletion.
+All 157 core plus 70 frontend/preflight tests passed; initial output is
+468.25kB under the unchanged 470kB error budget. Evidence is retained locally
+in ignored `.data/original-password-reference-20261004`. This is not whole-page
+pixel identity, an Original-rendered workspace deletion or a completed
+administration matrix row. Fresh full publication CI remains required.
+
 ### Latest verified Original participant login rendering
 
 The optional Original login now matches the pinned 19.0 viewport composition:

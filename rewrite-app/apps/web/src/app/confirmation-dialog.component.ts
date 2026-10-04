@@ -11,16 +11,21 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalSystemCheckSavedDialogLauncherComponent } from "./original-system-check-saved-dialog.component";
 import { PasswordConfirmationDialogComponent } from "./password-confirmation-dialog.component";
+import { OriginalPasswordConfirmationLauncherComponent } from "./original-password-confirmation-launcher.component";
 
 @Component({
   selector: "app-confirmation-dialog",
   standalone: true,
-  imports: [CommonModule, OriginalSystemCheckSavedDialogLauncherComponent, PasswordConfirmationDialogComponent],
+  imports: [CommonModule, OriginalSystemCheckSavedDialogLauncherComponent, PasswordConfirmationDialogComponent, OriginalPasswordConfirmationLauncherComponent],
   template: `
     <ng-container *ngIf="confirmation.dialog() as dialog">
     @if (dialog.passwordSubmit) {
       @for (request of [dialog]; track request.requestId) {
+        @if (useOriginalPasswordDialog) {
+          @defer (on immediate) { <app-original-password-confirmation-launcher (failed)="fallbackPasswordDialog(request.requestId)" /> }
+        } @else {
         @defer (on immediate) { <app-password-confirmation-dialog /> }
+        }
       }
     } @else if (useOriginalSavedReportDialog) {
       @for (request of [dialog]; track request.requestId) {
@@ -176,6 +181,14 @@ export class ConfirmationDialogComponent
 
   private activeRequestId: number | null = null;
   private focusedRequestId: number | null = null;
+  private originalPasswordRequestId: number | null = null;
+  get useOriginalPasswordDialog(): boolean {
+    return this.originalPasswordRequestId !== null
+      && this.confirmation.dialog()?.requestId === this.originalPasswordRequestId;
+  }
+  fallbackPasswordDialog(requestId: number): void {
+    if (this.confirmation.dialog()?.requestId === requestId) this.originalPasswordRequestId = null;
+  }
 
   ngDoCheck(): void {
     const requestId = this.confirmation.dialog()?.requestId ?? null;
@@ -183,6 +196,11 @@ export class ConfirmationDialogComponent
       return;
     }
     this.activeRequestId = requestId;
+    const dialog = this.confirmation.dialog();
+    // Pin a renderer for the entire request. Changing interface preference
+    // cannot remount a pending controller, erase its busy guard or resubmit it.
+    this.originalPasswordRequestId = this.interfaceMode.mode() === "original"
+      && dialog?.passwordSubmit && dialog.originalPasswordDialog && !dialog.verification ? requestId : null;
     this.verificationValue = "";
   }
 

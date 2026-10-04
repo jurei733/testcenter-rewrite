@@ -1647,10 +1647,20 @@ export class OpsViewFacade {
     const selectedAdminUserIds = [...this.adminUserBatchSelection];
     const sessionToken = this.ops.adminSessionToken.trim();
     const deletions: AdminUserDeletionBatchResult["deletions"] = [];
+    const directory = parseJsonDocument<ListAdminUsersResponse>(this.ops.adminUsersView);
+    const selectedName = directory?.items.find(item =>
+      item.adminUser.adminUserId === selectedAdminUserIds[0])?.adminUser.username ?? selectedAdminUserIds[0];
     await this.confirmation.confirm({
       title: "Permanently delete selected accounts?",
       message: `Permanently delete ${this.adminUserBatchCount} selected admin user(s)? Their sessions and role assignments will be removed; audit evidence will be retained. This cannot be undone.`,
       confirmLabel: "Delete accounts",
+      originalPasswordDialog: {
+        title: "Löschen von Administrator:innen",
+        message: selectedAdminUserIds.length > 1
+          ? `Sollen ${selectedAdminUserIds.length} Administrator:innen gelöscht werden?`
+          : `Soll Administrator:in "${selectedName}" gelöscht werden?`,
+        confirmLabel: "Administrator:in löschen"
+      },
       passwordSubmit: async password => {
         if (!this.canDeleteAdminUserBatch || this.ops.adminSessionToken.trim() !== sessionToken) {
           return "The administrator session or selection changed. Cancel and review the operation again.";

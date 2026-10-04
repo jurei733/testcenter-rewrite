@@ -7,15 +7,23 @@
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
+:root[data-interface-mode='original'] .original-password-confirmation-dialog,
 :root[data-interface-mode='original'] .original-player-menu {
   @include theme.apply();
+}
+
+// Rewrite's general button hover lifts by one pixel; the pinned Material
+// superadmin dialog does not. Keep this correction local to that renderer.
+:root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover {
+  transform: none;
 }
 
 // Pinned 19.0 theme/material-overrides.scss. Only Original overlays inherit
 // these tokens; the native Rewrite confirmation renderer stays untouched.
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
-:root[data-interface-mode='original'] .original-system-check-saved-dialog {
+:root[data-interface-mode='original'] .original-system-check-saved-dialog,
+:root[data-interface-mode='original'] .original-password-confirmation-dialog {
   color: var(--mat-sys-on-surface);
   @include mat.dialog-overrides((
     container-max-width: 720px,

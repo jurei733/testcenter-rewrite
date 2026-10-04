@@ -66,10 +66,10 @@ export class PasswordConfirmationDialogComponent implements AfterViewInit, OnDes
   readonly verificationValue = signal("");
   readonly busy = signal(false);
   readonly error = signal("");
-  @ViewChild("verificationInput") private verificationInput?: ElementRef<HTMLInputElement>;
-  @ViewChild("passwordInput") private passwordInput?: ElementRef<HTMLInputElement>;
-  @ViewChild("cancelButton") private cancelButton?: ElementRef<HTMLButtonElement>;
-  @ViewChild("confirmButton") private confirmButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild("verificationInput", { read: ElementRef }) private verificationInput?: ElementRef<HTMLInputElement>;
+  @ViewChild("passwordInput", { read: ElementRef }) private passwordInput?: ElementRef<HTMLInputElement>;
+  @ViewChild("cancelButton", { read: ElementRef }) private cancelButton?: ElementRef<HTMLButtonElement>;
+  @ViewChild("confirmButton", { read: ElementRef }) protected confirmButton?: ElementRef<HTMLButtonElement>;
 
   ngAfterViewInit(): void {
     (this.verificationInput ?? this.passwordInput)?.nativeElement.focus();
