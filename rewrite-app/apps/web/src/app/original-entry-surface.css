@@ -48,6 +48,26 @@
   overflow: auto;
 }
 
+/* The Source starter scrolls inside AppRoot, beneath the fixed-size header.
+   Its content keeps the Source's intrinsic width even on narrow viewports. */
+:root[data-interface-mode="original"] .page.is-participant-page:has(#originalParticipantStarter) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+:root[data-interface-mode="original"] .participant-stage:has(#originalParticipantStarter),
+:root[data-interface-mode="original"] app-participant-view:has(#originalParticipantStarter),
+:root[data-interface-mode="original"] app-participant-view > .stack:has(#originalParticipantStarter),
+:root[data-interface-mode="original"] app-original-participant-entry:has(#originalParticipantStarter) {
+  min-height: 0;
+}
+:root[data-interface-mode="original"] .participant-stage:has(#originalParticipantStarter) {
+  overflow: auto;
+}
+:root[data-interface-mode="original"] app-original-participant-starter .starter {
+  min-height: auto;
+}
+
 /* Source administrator login uses the same viewport-height root/header/footer,
    but its own centered form. Never restructure a signed-in operator view. */
 :root[data-interface-mode="original"] .page:has(#originalAdminLogin) {

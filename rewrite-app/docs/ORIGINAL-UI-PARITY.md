@@ -27,6 +27,41 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Latest participant-starter comparison (2026-10-05): the optional renderer now
+matches the pinned 19.0 intrinsic 684px card/intro width, 24px gaps, 94px companion,
+normal paragraph typography, flex-column margins, Material icon baselines,
+completed-button opacity and bordered Review action. The scrolling content is
+viewport-bounded below the Source toolbar, including the authenticated account
+control at both sides of the 600px breakpoint. The native scroll button sends
+the actual Source's smooth 300px increment rather than jumping to the bottom.
+The Source's narrow-screen clipping is retained in this optional interface;
+the responsive Rewrite interface remains independently available.
+
+All 48 equal-fixture states passed in each final production/development build:
+three themes × four viewports × fresh, mixed/completed with custom action labels,
+long/wrapped/unbreakable labels and Review-enabled starters. The reference uses
+the unmodified `c35cff81` frontend with a bounded API fixture; Rewrite uses real
+protected API/SQLite. Text, geometry and measured visible styles match,
+including the account control and disabled opacity. Raw RGBA is identical in
+33/48 production and 29/48 development pairs. Remaining pairs retain differences
+up to 7,733 pixels and 67/255 channel units; complete pixel identity is not
+established. Scripts, metrics, screenshots and logs are retained in ignored
+`.data/original-starter-reference-20261005.*`.
+
+The new mandatory quick-CI browser regression passes all 48 states in both builds
+and exercises real login, keyboard scrolling, non-lifting account hover, a
+blocked duplicate pending start, exact saved-answer resumption and participant
+bearer authorization for the actual HTTP 204 Review export. The separate login
+regression and all 165 core, 12 presence and 83 frontend/preflight tests passed.
+Initial production output is 469.61kB below the unchanged 470kB hard limit.
+Fresh publication CI remains separate proof. This narrow comparison does not
+close the complete starter/shell row: empty/error/custom-branding states,
+Source snackbar feedback and other claims remain open. A functional P0 gap was
+also reproduced: another unfinished Booklet blocks an otherwise available
+selection, and current-state selection follows answer-update chronology. The
+mixed rendering fixture completes one Booklet before starting the other; it
+does not prove that blocked workflow. See PARITY.md's explicit acceptance.
+
 Latest administrator-login comparison (2026-10-04): the optional signed-out
 operator entry now uses the pinned 19.0 400px Material card, bordered centered
 form, German labels/actions, shared Source header/footer and Testtaker link.

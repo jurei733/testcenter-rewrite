@@ -101,6 +101,15 @@ or `?ui=rewrite`. This is not an Original-rendered signed-in administration
 console or a completed full UI comparison; screenshot raster differences and
 the remaining matrix rows are still recorded in the acceptance document.
 
+The optional participant starter now has source-rendered verification of its
+fixed-width cards, typography, completed/Review actions, viewport scrolling and
+account control. All 48 equal-fixture states passed in production/development;
+the mandatory quick-CI gate additionally verifies keyboard scrolling, pending
+duplicate rejection, exact answer resumption and participant-bound Review
+export. Rewrite remains a separate responsive choice. Pixel differences,
+additional starter states and the reproduced unfinished multi-Booklet selection
+gap remain explicit open requirements, not completed 100% parity.
+
 This folder is the starting point for the real production implementation.
 
 Operator lists are metadata views: import/source lists omit document bytes and

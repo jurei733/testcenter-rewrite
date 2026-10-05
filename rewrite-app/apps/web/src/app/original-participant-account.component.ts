@@ -51,8 +51,9 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
   `,
   styles: [`
     :host { display: block; position: relative; z-index: 1; }
-    .account-button { background: white; color: var(--secondary); border-radius: 12px; }
-    svg { height: 24px; width: 24px; fill: currentColor; }
+    .account-button { display: block; font-family: revert; font-weight: revert; background: white; color: var(--secondary); border-radius: 12px; }
+    .account-button:hover { transform: none; }
+    svg { box-sizing: content-box; height: 24px; width: 24px; fill: currentColor; }
     ::ng-deep :root[data-interface-mode="original"] .original-participant-account-menu { width: 330px; padding: 12px;
       max-width: calc(100vw - 24px); box-sizing: border-box; font-family: 'Nunito Sans', sans-serif; }
     ::ng-deep :root[data-interface-mode="original"] .original-participant-account-menu .heading { display: flex;

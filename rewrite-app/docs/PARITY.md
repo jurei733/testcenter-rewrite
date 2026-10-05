@@ -1,5 +1,57 @@
 # Testcenter parity checklist
 
+### Source-rendered participant starter verification
+
+The optional Original starter now follows the pinned 19.0 viewport scrolling,
+intrinsic 684px intro/card width, typography, margins, Material controls and
+completed/Review appearance. Its scroll action advances the actual container
+by 300px, including keyboard activation; the account control remains correctly
+centered below/at/above the 600px breakpoint and does not inherit Native hover
+movement. Source narrow-screen clipping is retained only in the optional
+Original interface; Rewrite remains available independently.
+
+All 48 equal-fixture Source comparisons passed in each final production and
+development build (three themes, four viewports, fresh/mixed/long/Review states).
+The reference is the unmodified `c35cff81` frontend with a bounded API fixture,
+not its backend; every Rewrite fixture uses an owned protected API/SQLite.
+Text, geometry and measured styles match. Raw pixels are identical in 33/48
+production and 29/48 development pairs; remaining differences reach 7,733 pixels
+and 67/255 channel units. Full pixel identity and a complete UI row stay open.
+
+The new mandatory quick-CI starter gate passes all 48 configurations in both
+builds and tests actual participant login, keyboard scrolling, account hover,
+pending duplicate rejection, exact saved answers and participant-authenticated
+empty Review CSV export. The existing login regression plus all 165 core,
+12 presence and 83 frontend/preflight tests passed. Production remains 469.61kB
+under the unchanged 470kB limit. Evidence is retained in ignored
+`.data/original-starter-reference-20261005.*`; publication CI remains independent.
+The functional multi-Booklet gap below was found by this verification and is
+not covered by the mixed-state rendering seed order.
+
+### Newly reproduced multi-Booklet starter gap (P0, open)
+
+Original `c35cff81` `TestController::put` resolves/creates a test by the exact
+person and requested Booklet name; `TestDAO::getTestByPerson` does not reject
+it merely because another Booklet remains unfinished. The Rewrite instead
+selects any open session run in both `launch` and `resumeSession` and rejects
+a different Booklet with `participant_session_open_run_booklet_conflict`.
+An owned authorized SQLite fixture reproduced that HTTP 409 even after the
+first run returned to the starter. This is not completed multi-Booklet parity.
+Both current-state readers also select a run by `updatedAt`, not by an explicit
+participant selection. Removing the conflict alone would let a later background
+answer save select an unrelated run. The fix must persist/authorize selection
+independently of response chronology and atomically reuse each assignment's run.
+
+Next acceptance must cover starting a second assigned Booklet while the first
+is safely left/paused, re-entering each exact run with independent answers,
+timers and restrictions, correct active-run selection after background saves,
+assignment variants, monitor pauses/locks and concurrent same-assignment
+launches across all stores. Active leave/time/completeness guards must remain
+enforced; unauthorized or completed/locked Booklets must not become launchable.
+The layout fixture can render a completed second Booklet plus an unfinished
+first by completing the second before starting the first; that rendered
+fixture does not prove the blocked workflow above.
+
 ### STARS partial-delivery CI boundary
 
 The first durable-presence publication (`a095936b`, push run `37270016809`)
@@ -22,8 +74,12 @@ production and development frontends, including foreground/background recovery,
 parallel-run isolation, whole-browser process crash and the corrected hard
 reload boundary. Development also passed the unchanged 200-entry capacity and
 manual-retry assertions. All 83 frontend/preflight tests remain green. Evidence
-is retained in ignored `.data/stars-network-boundary-20261005`; the complete
-preceding production flow and fresh remote publication gate are still pending.
+is retained in ignored `.data/stars-network-boundary-20261005`. The complete
+preceding production flow through the official STARS family subsequently
+passed on an owned memory repository. Publication `c676e5e5` also passed the
+full GitHub browser flow and PostgreSQL UI gate; at this verification point
+33 of its 35 push jobs succeeded and two remained running. Overall publication
+success must still be confirmed separately.
 
 ### Durable participant connection presence
 

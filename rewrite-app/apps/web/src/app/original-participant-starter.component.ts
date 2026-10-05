@@ -21,6 +21,7 @@ export class OriginalParticipantStarterComponent implements OnDestroy {
   readonly pendingBooklet = signal("");
   readonly problem = signal("");
   readonly showScrollButton = signal(false);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private bottomElement: HTMLElement | null = null;
   private readonly observer = typeof IntersectionObserver === "undefined" ? null :
     new IntersectionObserver(([entry]) => this.showScrollButton.set(Boolean(entry && !entry.isIntersecting)));
@@ -60,7 +61,8 @@ export class OriginalParticipantStarterComponent implements OnDestroy {
   }
 
   scrollDown(): void {
-    this.bottomElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+    this.host.nativeElement.closest<HTMLElement>(".participant-stage")
+      ?.scrollBy({ top: 300, behavior: "smooth" });
   }
 
   ngOnDestroy(): void {
