@@ -1131,6 +1131,8 @@ export type ParticipantTestLog = {
   logKey: string;
   logContent: string;
   timestamp: number;
+  /** Original's server-generated connection logs carry client epoch 0. */
+  originalTimestamp?: 0;
   recordedAt: string;
 };
 

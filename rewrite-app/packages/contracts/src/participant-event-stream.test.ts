@@ -21,6 +21,13 @@ test("participant event stream payloads require the versioned session contract",
     ...event,
     revision: "a".repeat(64)
   });
+  const connectionId = "11111111-1111-4111-8111-111111111111";
+  assert.deepEqual(parseParticipantEventStreamEvent({ ...event, connectionId }), {
+    ...event, revision: "a".repeat(64), connectionId
+  });
+  for (const connectionId of [null, 123, "short", "invalid/connection-id", "a".repeat(81)]) {
+    assert.equal(parseParticipantEventStreamEvent({ ...event, connectionId }), null);
+  }
   assert.equal(
     parseParticipantEventStreamEvent({ ...event, schemaVersion: 2 }),
     null

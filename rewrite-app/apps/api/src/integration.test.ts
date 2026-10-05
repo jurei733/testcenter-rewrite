@@ -9550,7 +9550,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","","booklet:demo","\{\}","\{""CONTROLLER"":""RUNNING"",""CURRENT_UNIT_ID"":""unit-practice""\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","","booklet:demo","\{\}","\{""CONTROLLER"":""RUNNING"",""CURRENT_UNIT_ID"":""unit-practice"",""CONNECTION"":""POLLING""\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -11903,6 +11903,7 @@ test("participant event stream publishes session snapshots and monitor changes",
       participantSessionId: string;
       testRunId: string;
       revision: string;
+      connectionId: string;
     }> => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
@@ -11925,6 +11926,7 @@ test("participant event stream publishes session snapshots and monitor changes",
               participantSessionId: string;
               testRunId: string;
               revision: string;
+              connectionId: string;
             };
           }
           boundary = buffer.indexOf("\n\n");
@@ -11965,6 +11967,28 @@ test("participant event stream publishes session snapshots and monitor changes",
     assert.equal(snapshot.participantSessionId, participantSessionId);
     assert.equal(snapshot.testRunId, resumed.body.testRun.testRunId);
     assert.match(snapshot.revision, /^[a-f0-9]{64}$/);
+    assert.match(snapshot.connectionId, /^[a-f0-9-]{36}$/);
+    const acknowledgementPath = `/api/v1/participant/sessions/${participantSessionId}/events/acknowledgements`;
+    const acknowledgement = { testRunId: snapshot.testRunId, connectionId: snapshot.connectionId };
+    assert.equal((await fetch(`${isolated.baseUrl}${acknowledgementPath}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(acknowledgement)
+    })).status, 401, "Lease renewals require the existing participant credential.");
+    assert.equal((await requestJsonAt(isolated.baseUrl, acknowledgementPath, {
+      method: "POST", body: { ...acknowledgement, testRunId: "foreign-run" }
+    })).status, 409);
+    assert.equal((await requestJsonAt(isolated.baseUrl, acknowledgementPath, {
+      method: "POST", body: { ...acknowledgement, connectionId: "unknown" }
+    })).status, 400);
+    assert.equal((await requestJsonAt(isolated.baseUrl, acknowledgementPath, {
+      method: "POST", body: acknowledgement
+    })).status, 200);
+    const openRunsPath = "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs";
+    const connection = async () => {
+      const result = await requestJsonAt<{ items: Array<{ testRunId: string; testState: { CONNECTION?: string } }> }>(
+        isolated.baseUrl, openRunsPath);
+      return result.body.items.find(run => run.testRunId === snapshot.testRunId)?.testState.CONNECTION;
+    };
+    assert.equal(await connection(), "WEBSOCKET");
 
     const pause = await requestJsonAt<{
       command: { testRun: { status: string } };
@@ -11984,6 +12008,32 @@ test("participant event stream publishes session snapshots and monitor changes",
     assert.equal(change.participantSessionId, participantSessionId);
     assert.equal(change.testRunId, resumed.body.testRun.testRunId);
     assert.notEqual(change.revision, snapshot.revision);
+    abortController.abort();
+    const lostDeadline = Date.now() + 5_000;
+    while (await connection() !== "LOST" && Date.now() < lostDeadline) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    assert.equal(await connection(), "LOST", "A real stream close records server-side loss.");
+    assert.equal((await requestJsonAt(isolated.baseUrl, acknowledgementPath, {
+      method: "POST", body: acknowledgement
+    })).status, 409, "An old token cannot revive the closed stream.");
+    await requestJsonAt(isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSessionId}/current-state`);
+    assert.equal(await connection(), "POLLING", "A real participant read restores polling after loss.");
+    const connectionLogs = await requestTextAt(isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv?testRunId=${snapshot.testRunId}&logKey=CONNECTION`);
+    assert.equal(connectionLogs.status, 200);
+    assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : LOST"'));
+    assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : POLLING"'));
+    const completed = await requestJsonAt(isolated.baseUrl,
+      `${openRunsPath}/${snapshot.testRunId}/commands`, {
+        method: "POST", body: { commandType: "complete", actorId: "participant-stream-test" }
+      });
+    assert.equal(completed.status, 200);
+    const closedStream = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSessionId}/events`);
+    assert.equal(closedStream.status, 409, "An ended run is unavailable, not a server failure.");
+    assert.equal(closedStream.body.error, "participant_connection_unavailable");
   } finally {
     abortController.abort();
     await closeServer(isolated.server);

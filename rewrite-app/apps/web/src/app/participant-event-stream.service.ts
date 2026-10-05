@@ -10,6 +10,7 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 import { createEventStreamWatchdog } from "./event-stream-watchdog";
+import { createParticipantEventAcknowledgements } from "./participant-event-acknowledgements";
 
 type ParticipantRefresh = () => Promise<void>;
 type ParticipantConnectionModeChange = (
@@ -51,7 +52,7 @@ export class ParticipantEventStreamService {
   start(
     participantSessionId: string,
     refresh: ParticipantRefresh,
-    connectionModeChange: ParticipantConnectionModeChange
+    connectionModeChange: ParticipantConnectionModeChange | null = null
   ): void {
     const normalizedParticipantSessionId = participantSessionId.trim();
     if (!normalizedParticipantSessionId) {
@@ -118,6 +119,11 @@ export class ParticipantEventStreamService {
 
     const controller = new AbortController();
     const watchdog = createEventStreamWatchdog(controller);
+    let acknowledgementFailed = false;
+    const acknowledge = createParticipantEventAcknowledgements(controller, input.participantSessionId, () => {
+      acknowledgementFailed = true;
+      controller.abort();
+    });
     this.abortController = controller;
     if (input.reconnecting) {
       this.setConnectionState(
@@ -156,13 +162,13 @@ export class ParticipantEventStreamService {
         "live",
         "Live participant updates are connected."
       );
-      await this.consume(response.body, input.generation, watchdog.receivedEvent);
+      await this.consume(response.body, input.generation, watchdog.receivedEvent, acknowledge);
       if (input.generation === this.generation) {
         throw new Error("Participant channel closed.");
       }
     } catch {
       if (
-        (controller.signal.aborted && !watchdog.timedOut) ||
+        (controller.signal.aborted && !watchdog.timedOut && !acknowledgementFailed) ||
         input.generation !== this.generation
       ) {
         return;
@@ -190,7 +196,8 @@ export class ParticipantEventStreamService {
   private async consume(
     stream: ReadableStream<Uint8Array>,
     generation: number,
-    receivedEvent: () => void
+    receivedEvent: () => void,
+    acknowledge: (event: ParticipantEventStreamEvent) => void
   ): Promise<void> {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
@@ -207,7 +214,7 @@ export class ParticipantEventStreamService {
         while (match?.index != null) {
           const frame = buffer.slice(0, match.index);
           buffer = buffer.slice(match.index + match[0].length);
-          if (this.handleFrame(frame, generation)) receivedEvent();
+          if (this.handleFrame(frame, generation, acknowledge)) receivedEvent();
           match = /\r?\n\r?\n/.exec(buffer);
         }
       }
@@ -216,7 +223,8 @@ export class ParticipantEventStreamService {
     }
   }
 
-  private handleFrame(frame: string, generation: number): boolean {
+  private handleFrame(frame: string, generation: number,
+    acknowledge: (event: ParticipantEventStreamEvent) => void): boolean {
     if (generation !== this.generation) {
       return false;
     }
@@ -238,6 +246,7 @@ export class ParticipantEventStreamService {
     if (!event || event.participantSessionId !== this.activeParticipantSessionId) {
       return false;
     }
+    acknowledge(event);
     this.setConnectionState(
       "live",
       `Live participant updates are connected; ${event.eventType} #${event.sequence}.`

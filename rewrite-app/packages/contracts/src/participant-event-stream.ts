@@ -17,6 +17,8 @@ export type ParticipantEventStreamEvent = {
   testRunId: string;
   emittedAt: string;
   revision: string;
+  /** Opaque server-registered lease; only received frames may renew it. */
+  connectionId?: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -46,7 +48,9 @@ export const parseParticipantEventStreamEvent = (
     typeof value.emittedAt !== "string" ||
     !Number.isFinite(Date.parse(value.emittedAt)) ||
     typeof value.revision !== "string" ||
-    !/^[a-f0-9]{64}$/i.test(value.revision)
+    !/^[a-f0-9]{64}$/i.test(value.revision) ||
+    (value.connectionId !== undefined &&
+      (typeof value.connectionId !== "string" || !/^[a-zA-Z0-9-]{16,80}$/.test(value.connectionId)))
   ) {
     return null;
   }
@@ -58,6 +62,7 @@ export const parseParticipantEventStreamEvent = (
     participantSessionId: value.participantSessionId,
     testRunId: value.testRunId,
     emittedAt: value.emittedAt,
-    revision: value.revision.toLowerCase()
+    revision: value.revision.toLowerCase(),
+    ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : {})
   };
 };

@@ -458,15 +458,6 @@ export class ParticipantViewFacade {
   };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
     this.refreshCurrentStateInternal(true);
-  private readonly logParticipantConnectionMode = (
-    mode: "WEBSOCKET" | "POLLING"
-  ): void => {
-    this.saveVeronaTestLogs([{
-      key: "CONNECTION",
-      timeStamp: Date.now(),
-      content: mode
-    }]);
-  };
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -4111,8 +4102,7 @@ export class ParticipantViewFacade {
       } else {
         this.participantEvents.start(
           payload.currentRunState.participantSession.participantSessionId,
-          this.refreshFromParticipantEvents,
-          this.logParticipantConnectionMode
+          this.refreshFromParticipantEvents
         );
       }
       this.persistState();
@@ -4250,11 +4240,6 @@ export class ParticipantViewFacade {
               key: "LOADCOMPLETE",
               timeStamp: completedAtMs,
               content: JSON.stringify(environment)
-            },
-            {
-              key: "CONNECTION",
-              timeStamp: completedAtMs,
-              content: "POLLING"
             }
           ]
         }]

@@ -3,6 +3,8 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
+  transitionParticipantPresence,
+  type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import type {
@@ -755,6 +757,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
         logKey: String(row.log_key),
         logContent: String(row.log_content),
         timestamp: Number(row.timestamp),
+        ...(row.original_timestamp === 0 ? { originalTimestamp: 0 as const } : {}),
         recordedAt: String(row.recorded_at)
       }
     : null;
@@ -1438,6 +1441,22 @@ const migrations: PostgresMigration[] = [
         token_hash TEXT,
         updated_at TEXT NOT NULL
       );
+    `
+  },
+  {
+    version: 52,
+    name: "add_participant_connection_presence",
+    sql: `
+      ALTER TABLE participant_test_logs ADD COLUMN original_timestamp INTEGER
+        CHECK (original_timestamp IS NULL OR original_timestamp = 0);
+      CREATE TABLE participant_connection_presence (
+        test_run_id TEXT PRIMARY KEY REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        participant_session_id TEXT NOT NULL,
+        presence_json JSONB NOT NULL,
+        next_expiry BIGINT
+      );
+      CREATE INDEX idx_participant_connection_presence_expiry
+        ON participant_connection_presence(next_expiry) WHERE next_expiry IS NOT NULL;
     `
   }
 ];
@@ -3037,7 +3056,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+        `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
          FROM participant_test_logs
          WHERE tenant_id = $1 AND workspace_id = $2
          ORDER BY timestamp DESC, recorded_at DESC`,
@@ -3055,7 +3074,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
       return many(
         `SELECT DISTINCT ON (test_run_id, log_key)
-                participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+                participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
          FROM participant_test_logs
          WHERE tenant_id = $1
            AND workspace_id = $2
@@ -3076,8 +3095,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         for (const testLog of testLogs) {
           await client.query(
             `INSERT INTO participant_test_logs (
-              participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT(participant_test_log_id) DO UPDATE SET
               tenant_id = EXCLUDED.tenant_id,
               workspace_id = EXCLUDED.workspace_id,
@@ -3088,7 +3107,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               log_key = EXCLUDED.log_key,
               log_content = EXCLUDED.log_content,
               timestamp = EXCLUDED.timestamp,
-              recorded_at = EXCLUDED.recorded_at`,
+              recorded_at = EXCLUDED.recorded_at,
+              original_timestamp = EXCLUDED.original_timestamp`,
             [
               testLog.participantTestLogId,
               testLog.tenantId,
@@ -3100,7 +3120,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               testLog.logKey,
               testLog.logContent,
               testLog.timestamp,
-              testLog.recordedAt
+              testLog.recordedAt,
+              testLog.originalTimestamp ?? null
             ]
           );
         }
@@ -3111,6 +3132,52 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       } finally {
         client.release();
       }
+    },
+    async updateParticipantPresence(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Lock the existing parent, including the first transition with no presence row.
+        // Independent processes therefore cannot both register or log one revision.
+        const run = mapTestRun((await client.query(
+          "SELECT * FROM test_runs WHERE test_run_id = $1 FOR UPDATE", [input.testRunId])).rows[0]);
+        const session = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1", [input.participantSessionId])).rows[0]);
+        const row = (await client.query(
+          "SELECT presence_json FROM participant_connection_presence WHERE test_run_id = $1", [input.testRunId])).rows[0];
+        const latest = (await client.query(`SELECT MAX(timestamp) AS timestamp FROM participant_test_logs
+          WHERE test_run_id = $1 AND unit_key IS NULL AND log_key = 'CONNECTION'`, [input.testRunId])).rows[0];
+        const result = transitionParticipantPresence(input,
+          row ? row.presence_json as ParticipantPresence : null, run, session, Number(latest?.timestamp ?? 0));
+        if (result.presence) {
+          await client.query(`INSERT INTO participant_connection_presence
+            (test_run_id, participant_session_id, presence_json, next_expiry) VALUES ($1, $2, $3::jsonb, $4)
+            ON CONFLICT(test_run_id) DO UPDATE SET presence_json = EXCLUDED.presence_json,
+              next_expiry = EXCLUDED.next_expiry`, [input.testRunId,
+            result.presence.participantSessionId, JSON.stringify(result.presence), result.presence.nextExpiry]);
+        } else await client.query("DELETE FROM participant_connection_presence WHERE test_run_id = $1", [input.testRunId]);
+        if (result.testLog) {
+          const log = result.testLog;
+          await client.query(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id,
+             unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES ($1, $2, $3, $4, $5, NULL, NULL, 'CONNECTION', $6, $7, $8, $9)`,
+            [log.participantTestLogId, log.tenantId, log.workspaceId, log.participantSessionId,
+             log.testRunId, log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+        }
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
+    },
+    async listExpiredParticipantPresence(timestamp, limit) {
+      const result = await pool.query(`SELECT test_run_id, participant_session_id FROM participant_connection_presence
+        WHERE next_expiry <= $1 ORDER BY next_expiry, test_run_id LIMIT $2`, [timestamp, limit]);
+      return result.rows.map(row => ({
+        testRunId: String(row.test_run_id), participantSessionId: String(row.participant_session_id)
+      }));
     },
     async deleteParticipantTestLogsByTestRunIds(testRunIds) {
       if (testRunIds.length === 0) {

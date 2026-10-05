@@ -9,12 +9,17 @@ import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
+import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
+export { transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
+  PARTICIPANT_PRESENCE_MAX_CONNECTIONS } from "./participant-presence.js";
+export type { ParticipantPresence, ParticipantPresenceMutation,
+  ParticipantPresenceTransition } from "./participant-presence.js";
 import { DOMParser } from "@xmldom/xmldom";
 import type {
   Document as XmlDocument,
   Element as XmlElement
 } from "@xmldom/xmldom";
-import { formatOriginalReportCsv } from "./original-report-csv.js";
+import { formatOriginalReportCsv, formatOriginalParticipantLogEntry } from "./original-report-csv.js";
 import type {
   OriginalXmlRoot, OriginalXmlSchemaValidator, XmlSchemaProfile
 } from "./original-xml-schema.js";
@@ -706,6 +711,11 @@ export type WorkspaceReviewPort = {
 };
 
 export type ParticipantRuntimePort = {
+  updateConnection(input: {
+    participantSessionId: string; testRunId: string;
+    action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
+  }): Promise<boolean>;
+  expireConnections(): Promise<void>;
   signIn(input: {
     tenantKey?: string | null;
     workspaceKey?: string;
@@ -1446,6 +1456,11 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     logKeys: string[]
   ): Promise<ParticipantTestLog[]>;
   saveParticipantTestLogs(testLogs: ParticipantTestLog[]): Promise<void>;
+  /** Lease transition and its CONNECTION log commit atomically under a run lock. */
+  updateParticipantPresence(input: ParticipantPresenceMutation): Promise<ParticipantPresenceTransition>;
+  listExpiredParticipantPresence(timestamp: number, limit: number): Promise<Array<{
+    testRunId: string; participantSessionId: string;
+  }>>;
   deleteParticipantTestLogsByTestRunIds(testRunIds: string[]): Promise<number>;
   getWorkspaceReviewById(reviewId: string): Promise<WorkspaceReview | null>;
   listWorkspaceReviewsByWorkspace(
@@ -7453,10 +7468,7 @@ const formatParticipantTestLogCsv = (
   return formatOriginalReportCsv(
     columns,
     chronologicalItems.map(item => {
-      const separator = item.testLog.unitKey ? " = " : " : ";
-      const logEntry = item.testLog.logContent
-        ? `${item.testLog.logKey}${separator}${JSON.stringify(item.testLog.logContent)}`
-        : item.testLog.logKey;
+      const logEntry = formatOriginalParticipantLogEntry(item.testLog);
       return {
         groupname: item.groupKey,
         loginname: item.loginKey,
@@ -7464,7 +7476,7 @@ const formatParticipantTestLogCsv = (
         bookletname: item.bookletAssignmentKey,
         unitname: item.testLog.unitKey ?? "",
         originalUnitId: item.testLog.originalUnitId ?? "",
-        timestamp: item.testLog.timestamp,
+        timestamp: item.testLog.originalTimestamp ?? item.testLog.timestamp,
         logentry: logEntry
       };
     })
@@ -15932,10 +15944,8 @@ const buildOriginalLogReportRows = (input: {
       bookletname: item.bookletAssignmentKey,
       unitname: item.testLog.unitKey ?? "",
       originalUnitId: item.testLog.originalUnitId ?? "",
-      timestamp: String(item.testLog.timestamp),
-      logentry: item.testLog.logContent
-        ? `${item.testLog.logKey}${item.testLog.unitKey ? " = " : " : "}${JSON.stringify(item.testLog.logContent)}`
-        : item.testLog.logKey
+      timestamp: String(item.testLog.originalTimestamp ?? item.testLog.timestamp),
+      logentry: formatOriginalParticipantLogEntry(item.testLog)
     }))
     .sort(
       (left, right) =>
@@ -31518,6 +31528,27 @@ export const createFirstSliceServices = (
       allowLegacySessionIds: true
     }),
     participantRuntime: {
+      async updateConnection(input) {
+        const participantSessionId = normalizeParticipantSessionId(input.participantSessionId);
+        await requireAccessibleParticipantSession(participantSessionId);
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const run = await repository.getTestRunById(testRunId);
+        if (run?.participantSessionId !== participantSessionId) return false;
+        const result = await repository.updateParticipantPresence({
+          ...input, participantSessionId, testRunId,
+          // Presence deadlines use actual wall time, not the business-event
+          // sequence clock (which can run ahead under sustained request load).
+          timestamp: Date.parse(rawNow())
+        });
+        return result.accepted;
+      },
+      async expireConnections() {
+        const timestamp = Date.parse(rawNow());
+        const expired = await repository.listExpiredParticipantPresence(timestamp, 500);
+        for (const presence of expired) {
+          await repository.updateParticipantPresence({ ...presence, action: "expire", timestamp });
+        }
+      },
       async signIn(input) {
         const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
         const requestedWorkspaceKey = String(input.workspaceKey ?? "").trim();

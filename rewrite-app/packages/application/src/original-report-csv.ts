@@ -13,3 +13,15 @@ export const formatOriginalReportCsv = (
   columns.map(originalReportCsvCell).join(";"),
   ...rows.map(row => columns.map(column => originalReportCsvCell(row[column])).join(";"))
 ].join("\n")}`;
+
+export const formatOriginalParticipantLogEntry = (log: {
+  unitKey: string | null; logKey: string; logContent: string; originalTimestamp?: 0;
+}): string => {
+  // TestController::updateTestState quotes the key, not the server value.
+  if (log.originalTimestamp === 0 && log.unitKey === null && log.logKey === "CONNECTION") {
+    return `${JSON.stringify(log.logKey)} : ${log.logContent}`;
+  }
+  return log.logContent
+    ? `${log.logKey}${log.unitKey ? " = " : " : "}${JSON.stringify(log.logContent)}`
+    : log.logKey;
+};

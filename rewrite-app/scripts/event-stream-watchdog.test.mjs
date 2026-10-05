@@ -20,6 +20,10 @@ const coreUrl = dataModule(`
 const stateUrl = dataModule("export class RewriteAppUiStateService {}");
 const credentialsUrl = dataModule(transpile("../apps/web/src/app/participant-access-credentials.ts"));
 const contractsUrl = import.meta.resolve("@testcenter-rewrite-app/contracts");
+const acknowledgementUrl = dataModule(transpile("../apps/web/src/app/participant-event-acknowledgements.ts")
+  .replace('"@testcenter-rewrite-app/contracts"', JSON.stringify(contractsUrl))
+  .replace('"./participant-access-credentials"', JSON.stringify(credentialsUrl)));
+const { createParticipantEventAcknowledgements } = await import(acknowledgementUrl);
 const loadService = async name => {
   // Only Angular injection/signal storage is stubbed. The production service,
   // credential reader, event parsers and watchdog execute unchanged.
@@ -28,6 +32,7 @@ const loadService = async name => {
     .replace('"@testcenter-rewrite-app/contracts"', JSON.stringify(contractsUrl))
     .replace('"./rewrite-app-ui-state.service"', JSON.stringify(stateUrl))
     .replace('"./participant-access-credentials"', JSON.stringify(credentialsUrl))
+    .replace('"./participant-event-acknowledgements"', JSON.stringify(acknowledgementUrl))
     .replace('"./event-stream-watchdog"', JSON.stringify(watchdogUrl));
   const module = await import(dataModule(source));
   return module[name === "participant" ? "ParticipantEventStreamService" : "MonitorEventStreamService"];
@@ -55,7 +60,7 @@ const withClock = async action => {
     }
     now = target; await flush();
   };
-  try { await action({ timers, advance }); }
+  try { await action({ timers, advance, now: () => now }); }
   finally {
     globalThis.setTimeout = previous.setTimeout; globalThis.clearTimeout = previous.clearTimeout;
     globalThis.fetch = previous.fetch;
@@ -129,6 +134,79 @@ const withService = async (kind, action, stallHeaders = false) => withClock(asyn
   try { await action({ ...clock, service, host, requests, modes, event, send, status, refreshes: () => refreshes }); }
   finally { service.stop(); await flush(); assert.equal(clock.timers.size, 0); }
 });
+
+const withAcknowledgements = action => withClock(async clock => {
+  const actualNow = Date.now;
+  const performanceDescriptor = Object.getOwnPropertyDescriptor(globalThis, "performance");
+  Object.defineProperty(globalThis, "performance", { configurable: true, value: { now: () => 100_000 + clock.now() } });
+  Date.now = () => 100_000 + clock.now();
+  const requests = [];
+  let failures = 0;
+  const streamController = new AbortController();
+  globalThis.fetch = (path, options) => new Promise((resolve, reject) => {
+    const record = { path, options, resolve, reject };
+    requests.push(record);
+    options.signal.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
+  });
+  const acknowledge = createParticipantEventAcknowledgements(streamController, "session-a", () => failures++);
+  const event = overrides => ({ participantSessionId: "session-a", testRunId: "run-a",
+    connectionId: "11111111-1111-4111-8111-111111111111", ...overrides });
+  try { await action({ ...clock, requests, streamController, acknowledge, event, failures: () => failures }); }
+  finally {
+    streamController.abort(); await flush(); Date.now = actualNow;
+    if (performanceDescriptor) Object.defineProperty(globalThis, "performance", performanceDescriptor);
+    else delete globalThis.performance;
+    assert.equal(clock.timers.size, 0);
+  }
+});
+
+test("participant acknowledgements only renew received scoped frames using the same credential", async () => withAcknowledgements(async host => {
+  host.acknowledge(host.event({ connectionId: undefined }));
+  host.acknowledge(host.event({ participantSessionId: "foreign" }));
+  assert.equal(host.requests.length, 0);
+  host.acknowledge(host.event());
+  host.acknowledge(host.event());
+  assert.equal(host.requests.length, 1, "A burst cannot create concurrent renewal writes.");
+  assert.equal(host.requests[0].path, "/api/v1/participant/sessions/session-a/events/acknowledgements");
+  assert.equal(host.requests[0].options.headers.authorization, "Bearer session-a");
+  assert.deepEqual(JSON.parse(host.requests[0].options.body), { testRunId: "run-a", connectionId: host.event().connectionId });
+  host.requests[0].resolve({ ok: true }); await flush();
+  host.acknowledge(host.event()); assert.equal(host.requests.length, 1);
+  await host.advance(9_999); host.acknowledge(host.event()); assert.equal(host.requests.length, 1);
+  await host.advance(1); host.acknowledge(host.event()); assert.equal(host.requests.length, 2);
+  host.requests[1].resolve({ ok: true }); await flush();
+  host.acknowledge(host.event({ testRunId: "run-b" })); assert.equal(host.requests.length, 3);
+}));
+
+test("a rejected live acknowledgement requests quiet reconnect instead of false live presence", async () => withAcknowledgements(async host => {
+  host.acknowledge(host.event());
+  host.requests[0].resolve({ ok: false }); await flush();
+  assert.equal(host.failures(), 1);
+  assert.equal(host.timers.size, 0);
+}));
+
+test("a stalled acknowledgement is bounded to five seconds", async () => withAcknowledgements(async host => {
+  host.acknowledge(host.event());
+  await host.advance(4_999); assert.equal(host.failures(), 0);
+  await host.advance(1); assert.equal(host.requests[0].options.signal.aborted, true);
+  assert.equal(host.failures(), 1);
+}));
+
+test("a corrected device wall clock cannot suppress heartbeat renewals", async () => withAcknowledgements(async host => {
+  host.acknowledge(host.event());
+  host.requests[0].resolve({ ok: true }); await flush();
+  Date.now = () => -1_000_000;
+  await host.advance(10_000); host.acknowledge(host.event());
+  assert.equal(host.requests.length, 2, "Renewal throttling must use monotonic time.");
+}));
+
+test("stopping an old stream cancels its acknowledgement without reconnecting or renewing", async () => withAcknowledgements(async host => {
+  host.acknowledge(host.event());
+  host.streamController.abort(); await flush();
+  assert.equal(host.requests[0].options.signal.aborted, true);
+  assert.equal(host.failures(), 0);
+  host.acknowledge(host.event()); assert.equal(host.requests.length, 1);
+}));
 
 for (const kind of ["participant", "monitor"]) {
   test(`${kind} silent channel leaves live state, refreshes quietly and reconnects with the same credential`, async () => withService(kind, async host => {

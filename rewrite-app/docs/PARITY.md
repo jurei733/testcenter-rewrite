@@ -1,5 +1,52 @@
 # Testcenter parity checklist
 
+### Durable participant connection presence
+
+The Source `c35cff81` broadcaster's two 30-second heartbeat rounds and its
+last-connected-token rule are adapted to the shared participant SSE channel.
+Registration is pending until an actual received, correctly scoped frame is
+acknowledged with the existing participant bearer credential. Only that
+acknowledgement renews the 60-second lease; server writes cannot do so. The last
+confirmed socket's close or expiry records `CONNECTION=LOST` exactly once;
+another confirmed tab prevents false loss. An authenticated current-state read
+restores `POLLING`, while reconnection restores `WEBSOCKET`. Unknown,
+expired and foreign-run acknowledgements cannot revive a connection, and
+duplicate registrations cannot extend or demote a confirmed lease. Finished
+runs reject new streams with an explicit conflict rather than HTTP 500.
+
+Presence and the corresponding log commit atomically in every repository.
+SQLite uses its writer transaction; PostgreSQL locks the existing parent run,
+including the first registration when no presence row exists. Durable leases
+survive a new repository/process; file storage remains single-process. Closed,
+expired and completed sessions clear leases without resetting log counters.
+Transitions do not modify answers, status or timers, and respect modes that do
+not save response logs. Source server logs preserve client epoch `0` and exact
+`"CONNECTION" : LOST` / `"CONNECTION" : POLLING` export text; server chronology
+is retained independently. SQLite migration 58 and PostgreSQL migration 52 are
+additive; the protected private database has not been migrated in this step.
+
+Local verification passed 165 core, 12 cross-repository presence and 83
+frontend/preflight tests. Full API suites passed 163 tests each with memory,
+file and SQLite; the subsequent finished-stream conflict also passed its
+focused API gate and a fresh complete memory run. Production/development
+headful Chromium passed both interfaces at 1280/390 pixels: real participant
+login, received-frame acknowledgement with the same bearer, two-tab isolation,
+last-tab close and visible lost monitor state, Original CSV epoch/text, real
+polling restoration, same-run reconnection and byte-identical saved answers.
+A real open SSE socket without renewed acknowledgements remained live at 55
+seconds and expired after 60.193/61.042 seconds. No page errors remained.
+An earlier development run timed out during re-entry; its unhandled test-wait
+promise was corrected to retain failure diagnostics, and the serial rerun
+passed without increasing the deadline or suppressing errors. An earlier
+full memory run aborted without a complete error report; subsequent complete
+runs passed, but its cause is not asserted. Initial production output remains
+469.59kB below the unchanged 470kB hard budget. Logs/screenshots are retained
+in ignored `.data/participant-presence-reference-20261005`; old generated
+integration/Smoke fixtures were removed to free disk space, not private data.
+PostgreSQL's independent-storage-pool race proof and the browser regression
+are now mandatory CI steps; their fresh publication results remain pending.
+This functional connection guarantee does not close any full Original UI row.
+
 ### Latest verified Original administrator login rendering
 
 The optional signed-out operator entry now adapts the actual pinned 19.0
@@ -39,7 +86,8 @@ through workspace deletion; participant-login and deletion-dialog regressions
 also passed. All 157 core and 78 frontend/preflight tests passed. Initial output
 is 469.31kB under the unchanged 470kB error budget. Scripts, screenshots,
 metrics and logs are retained in ignored `.data/original-admin-reference-20261004`.
-Fresh publication CI for this step remains separate proof.
+Publication `fae90ea5` passed all 35 push-CI jobs (run `37226072648`),
+including PostgreSQL. This does not prove the later presence changes.
 
 The preceding XML publication `9201af97` is fully CI-green (35/35, push run
 `37222355479`), including PostgreSQL UI and participant-detail review. The
@@ -212,8 +260,9 @@ authorized current-state reads prove byte-identical saved answers and the same
 run, without HTTP 5xx or Angular errors. The complete protected production
 participant-entry gate passed too, through Original logout and same-run
 re-entry. Browser evidence is retained locally in ignored
-`.data/stream-watchdog-reference-20261004.783OA9`. These checks do not establish the
-server-side `CONNECTION=LOST` projection when an entire participant disappears.
+`.data/stream-watchdog-reference-20261004.783OA9`. These preceding browser checks
+alone did not establish server-side loss; the later independent durable
+presence implementation is described above.
 
 ### Latest verified bounded SQLite contention handling
 
@@ -475,8 +524,9 @@ and implementation. Each needs current rewrite evidence before it is closed:
 - Live-connection registration rejects unknown/duplicate tokens, tokens are
   unpredictable, and silent disconnects become lost within one minute.
   Internal broadcaster endpoints remain inaccessible to public clients.
-  Browser-channel silence is now bounded as described above; the distinct
-  server-side participant-presence/lost-state requirement remains open.
+  Browser-channel silence and server-side participant presence are now bounded
+  independently as described above; fresh PostgreSQL/publication verification
+  for the presence changes remains separate from the preceding green CI.
 - Navigation to the starter/route dispatcher applies active-unit completeness,
   timer and leave-lock checks, including manually entered routes. A player
   reporting no Verona version produces a clear controller error.

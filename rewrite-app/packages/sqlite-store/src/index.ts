@@ -5,6 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
+  transitionParticipantPresence,
+  type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
 import type {
@@ -770,6 +772,7 @@ const mapParticipantTestLog = (
         logKey: String(row.log_key),
         logContent: String(row.log_content),
         timestamp: Number(row.timestamp),
+        ...(row.original_timestamp === 0 ? { originalTimestamp: 0 as const } : {}),
         recordedAt: String(row.recorded_at)
       }
     : null;
@@ -1507,6 +1510,22 @@ const sqliteMigrations: SqliteMigration[] = [
         token_hash TEXT,
         updated_at TEXT NOT NULL
       );
+    `
+  },
+  {
+    version: 58,
+    name: "add_participant_connection_presence",
+    sql: `
+      ALTER TABLE participant_test_logs ADD COLUMN original_timestamp INTEGER
+        CHECK (original_timestamp IS NULL OR original_timestamp = 0);
+      CREATE TABLE participant_connection_presence (
+        test_run_id TEXT PRIMARY KEY REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        participant_session_id TEXT NOT NULL,
+        presence_json TEXT NOT NULL,
+        next_expiry INTEGER
+      );
+      CREATE INDEX idx_participant_connection_presence_expiry
+        ON participant_connection_presence(next_expiry) WHERE next_expiry IS NOT NULL;
     `
   }
 ];
@@ -3200,7 +3219,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
            FROM participant_test_logs
            WHERE tenant_id = ? AND workspace_id = ?
            ORDER BY timestamp DESC, recorded_at DESC`
@@ -3221,9 +3240,9 @@ export const createSqliteFirstSliceRepository = (
       const placeholders = logKeys.map(() => "?").join(", ");
       const rows = database
         .prepare(
-          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
            FROM (
-             SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at,
+             SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp,
                     ROW_NUMBER() OVER (
                       PARTITION BY test_run_id, log_key
                       ORDER BY timestamp DESC, recorded_at DESC, participant_test_log_id DESC
@@ -3247,8 +3266,8 @@ export const createSqliteFirstSliceRepository = (
       }
       const statement = database.prepare(
         `INSERT INTO participant_test_logs (
-          participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(participant_test_log_id) DO UPDATE SET
           tenant_id = excluded.tenant_id,
           workspace_id = excluded.workspace_id,
@@ -3259,7 +3278,8 @@ export const createSqliteFirstSliceRepository = (
           log_key = excluded.log_key,
           log_content = excluded.log_content,
           timestamp = excluded.timestamp,
-          recorded_at = excluded.recorded_at`
+          recorded_at = excluded.recorded_at,
+          original_timestamp = excluded.original_timestamp`
       );
       database.exec("BEGIN");
       try {
@@ -3275,7 +3295,8 @@ export const createSqliteFirstSliceRepository = (
             testLog.logKey,
             testLog.logContent,
             testLog.timestamp,
-            testLog.recordedAt
+            testLog.recordedAt,
+            testLog.originalTimestamp ?? null
           );
         }
         database.exec("COMMIT");
@@ -3283,6 +3304,52 @@ export const createSqliteFirstSliceRepository = (
         database.exec("ROLLBACK");
         throw error;
       }
+    },
+    async updateParticipantPresence(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const session = mapParticipantSession(database.prepare(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const row = database.prepare("SELECT presence_json FROM participant_connection_presence WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined;
+        const latest = database.prepare(`SELECT MAX(timestamp) AS timestamp FROM participant_test_logs
+          WHERE test_run_id = ? AND unit_key IS NULL AND log_key = 'CONNECTION'`)
+          .get(input.testRunId) as Record<string, unknown>;
+        const result = transitionParticipantPresence(input,
+          row ? JSON.parse(String(row.presence_json)) as ParticipantPresence : null,
+          run, session, Number(latest.timestamp ?? 0));
+        if (result.presence) {
+          database.prepare(`INSERT INTO participant_connection_presence
+            (test_run_id, participant_session_id, presence_json, next_expiry) VALUES (?, ?, ?, ?)
+            ON CONFLICT(test_run_id) DO UPDATE SET presence_json = excluded.presence_json,
+              next_expiry = excluded.next_expiry`).run(input.testRunId,
+            result.presence.participantSessionId, JSON.stringify(result.presence), result.presence.nextExpiry);
+        } else database.prepare("DELETE FROM participant_connection_presence WHERE test_run_id = ?").run(input.testRunId);
+        if (result.testLog) {
+          const log = result.testLog;
+          database.prepare(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id,
+             unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES (?, ?, ?, ?, ?, NULL, NULL, 'CONNECTION', ?, ?, ?, ?)`).run(log.participantTestLogId,
+            log.tenantId, log.workspaceId, log.participantSessionId, log.testRunId,
+            log.logContent, log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+        }
+        database.exec("COMMIT");
+        return result;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
+    async listExpiredParticipantPresence(timestamp, limit) {
+      const rows = database.prepare(`SELECT test_run_id, participant_session_id FROM participant_connection_presence
+        WHERE next_expiry <= ? ORDER BY next_expiry, test_run_id LIMIT ?`).all(timestamp, limit) as Array<Record<string, unknown>>;
+      return rows.map(row => ({
+          testRunId: String(row.test_run_id), participantSessionId: String(row.participant_session_id)
+        }));
     },
     async deleteParticipantTestLogsByTestRunIds(testRunIds) {
       if (testRunIds.length === 0) {

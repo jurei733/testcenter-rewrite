@@ -13,6 +13,8 @@ import { dirname, join } from "node:path";
 import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
+  transitionParticipantPresence,
+  type ParticipantPresence,
   type FirstSliceRepository,
   type ParticipantAccessCredential
 } from "@testcenter-rewrite-app/application";
@@ -76,6 +78,7 @@ type PersistedFirstSliceState = {
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
   participantTestLogs: Record<string, ParticipantTestLog>;
+  participantPresence: Record<string, ParticipantPresence>;
 };
 
 type ExternalizedCollectionManifest = {
@@ -118,7 +121,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
-  participantTestLogs: {}
+  participantTestLogs: {},
+  participantPresence: {}
 });
 
 const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
@@ -848,6 +852,9 @@ export const createFileFirstSliceRepository = (
         };
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+        for (const run of Object.values(state.testRuns)) {
+          if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
+        }
         for (const session of Object.values(state.participantSessions)) {
           if (workspaceMatches(session)) delete state.participantAccessCredentials[session.participantSessionId];
         }
@@ -1313,6 +1320,7 @@ export const createFileFirstSliceRepository = (
       let deletedCount = 0;
       await mutate(state => {
         for (const testRunId of testRunIds) {
+          delete state.participantPresence[testRunId];
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             deletedCount += 1;
@@ -1348,6 +1356,28 @@ export const createFileFirstSliceRepository = (
           state.participantTestLogs[testLog.participantTestLogId] = testLog;
         }
       });
+    },
+    async updateParticipantPresence(input) {
+      return mutate(state => {
+        const result = transitionParticipantPresence(input,
+          state.participantPresence[input.testRunId] ?? null,
+          state.testRuns[input.testRunId] ?? null,
+          state.participantSessions[input.participantSessionId] ?? null,
+          Object.values(state.participantTestLogs).reduce((latest, log) =>
+            log.testRunId === input.testRunId && log.unitKey === null && log.logKey === "CONNECTION"
+              ? Math.max(latest, log.timestamp) : latest, 0));
+        if (result.presence) state.participantPresence[input.testRunId] = result.presence;
+        else delete state.participantPresence[input.testRunId];
+        if (result.testLog) state.participantTestLogs[result.testLog.participantTestLogId] = result.testLog;
+        return structuredClone(result);
+      });
+    },
+    async listExpiredParticipantPresence(timestamp, limit) {
+      const state = await getState();
+      return Object.values(state.participantPresence)
+        .filter(presence => presence.nextExpiry !== null && presence.nextExpiry <= timestamp)
+        .sort((left, right) => left.nextExpiry! - right.nextExpiry!)
+        .slice(0, limit).map(({ testRunId, participantSessionId }) => ({ testRunId, participantSessionId }));
     },
     async deleteParticipantTestLogsByTestRunIds(testRunIds) {
       const testRunIdSet = new Set(testRunIds);

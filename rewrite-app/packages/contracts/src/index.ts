@@ -293,6 +293,8 @@ export const productionApiRoutes = {
       "/api/v1/participant/sessions/:participantSessionId/current-state",
     eventStream:
       "/api/v1/participant/sessions/:participantSessionId/events",
+    acknowledgeEventStream:
+      "/api/v1/participant/sessions/:participantSessionId/events/acknowledgements",
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",

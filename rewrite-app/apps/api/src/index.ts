@@ -845,6 +845,15 @@ const createApiRuntime = async () => {
     await bootstrapLocalDemoState({ repository, services });
   }
 
+  let presenceSweep: Promise<void> | null = null;
+  const presenceSweepHandle = setInterval(() => {
+    if (presenceSweep) return;
+    presenceSweep = services.participantRuntime.expireConnections()
+      .catch(() => { process.stderr.write("participant_presence_sweep_failed\n"); })
+      .finally(() => { presenceSweep = null; });
+  }, 1_000);
+  presenceSweepHandle.unref();
+
   return {
     config: {
       port: configuredPort,
@@ -972,7 +981,11 @@ const createApiRuntime = async () => {
       commitSha: process.env.APP_BUILD_SHA ?? null,
       builtAt: process.env.APP_BUILD_TIMESTAMP ?? null
     },
-    shutdown: repositoryConfig.shutdown
+    shutdown: async () => {
+      clearInterval(presenceSweepHandle);
+      await presenceSweep;
+      await repositoryConfig.shutdown();
+    }
   };
 };
 
@@ -2460,6 +2473,9 @@ const currentRunStatePattern = createRoutePattern(
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
+const participantEventAcknowledgementPattern = createRoutePattern(
+  productionApiRoutes.participant.acknowledgeEventStream
+);
 const participantResourcePattern =
   /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
@@ -2503,6 +2519,7 @@ const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
+  ["POST", participantEventAcknowledgementPattern],
   ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
   ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
   ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
@@ -3718,6 +3735,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
+    ["POST", participantEventAcknowledgementPattern, productionApiRoutes.participant.acknowledgeEventStream],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -4221,6 +4239,15 @@ const streamParticipantEvents = async (input: {
     participantSessionId: input.participantSessionId
   });
   let testRunId = initialState.testRun.testRunId;
+  const connectionId = randomUUID();
+  const register = () => input.participantRuntime.updateConnection({
+    participantSessionId: input.participantSessionId, testRunId, action: "open", connectionId
+  });
+  if (!await register()) {
+    sendError(input.response, 409, "participant_connection_unavailable",
+      "A live connection is unavailable for this run. Refresh the participant state.");
+    return;
+  }
   let revision = participantCurrentStateRevision(initialState);
   let sequence = 0;
   let lastEventAt = Date.now();
@@ -4237,6 +4264,9 @@ const streamParticipantEvents = async (input: {
       clearInterval(pollHandle);
       pollHandle = null;
     }
+    void input.participantRuntime.updateConnection({
+      participantSessionId: input.participantSessionId, testRunId, action: "close", connectionId
+    }).catch(() => undefined);
   };
   const publish = (
     eventType: ParticipantEventStreamEvent["eventType"]
@@ -4250,7 +4280,8 @@ const streamParticipantEvents = async (input: {
       participantSessionId: input.participantSessionId,
       testRunId,
       emittedAt: new Date(lastEventAt).toISOString(),
-      revision
+      revision,
+      connectionId
     });
   };
 
@@ -4276,12 +4307,25 @@ const streamParticipantEvents = async (input: {
       .then(() => input.participantRuntime.getCurrentRunState({
         participantSessionId: input.participantSessionId
       }))
-      .then(currentState => {
+      .then(async currentState => {
         if (closed) {
           return;
         }
         const nextRevision = participantCurrentStateRevision(currentState);
         if (nextRevision !== revision) {
+          if (testRunId !== currentState.testRun.testRunId) {
+            await input.participantRuntime.updateConnection({
+              participantSessionId: input.participantSessionId, testRunId, action: "close", connectionId
+            });
+            testRunId = currentState.testRun.testRunId;
+            if (!await register()) throw new Error("Participant live run is no longer available.");
+            if (closed) {
+              await input.participantRuntime.updateConnection({
+                participantSessionId: input.participantSessionId, testRunId, action: "close", connectionId
+              });
+              return;
+            }
+          }
           testRunId = currentState.testRun.testRunId;
           revision = nextRevision;
           publish("change");
@@ -8415,6 +8459,25 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const currentRunStateMatch = currentRunStatePattern.exec(pathname);
+      const participantEventAcknowledgementMatch = participantEventAcknowledgementPattern.exec(pathname);
+      if (request.method === "POST" && participantEventAcknowledgementMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantEventAcknowledgementMatch.groups.participantSessionId);
+        const body = await readRequestJsonBody<{ testRunId?: unknown; connectionId?: unknown }>();
+        if (!participantSessionId || typeof body?.testRunId !== "string" ||
+            typeof body?.connectionId !== "string" || !/^[a-zA-Z0-9-]{16,80}$/.test(body.connectionId)) {
+          sendError(response, 400, "participant_connection_acknowledgement_invalid", "A run and connection identifier are required.");
+          return;
+        }
+        const accepted = await services.participantRuntime.updateConnection({
+          participantSessionId, testRunId: body.testRunId, connectionId: body.connectionId, action: "acknowledge"
+        });
+        if (!accepted) {
+          sendError(response, 409, "participant_connection_expired", "The live connection is no longer available. Reconnect to renew it.");
+          return;
+        }
+        sendJson(response, 200, { acknowledged: true });
+        return;
+      }
       const participantEventStreamMatch =
         participantEventStreamPattern.exec(pathname);
       if (request.method === "GET" && participantEventStreamMatch?.groups) {
@@ -8461,6 +8524,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           participantSessionId,
           includeBookletAssets:
             url.searchParams.get("includeBookletAssets") === "true"
+        });
+        await services.participantRuntime.updateConnection({
+          participantSessionId, testRunId: currentRunState.testRun.testRunId, action: "poll"
         });
         if (currentRunState.resourceBasePath) {
           const resourceToken = await services.participantAccess.issueResourceCredential({

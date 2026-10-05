@@ -114,8 +114,19 @@ Participant and monitor live channels also stop claiming to be live after
 watchdog covers a request that never receives headers, aborts the blocked read,
 starts the existing quiet polling/reconnect path and retains participant
 credentials and answers. Intentional stop and stale deadlines cannot restart
-the channel. This is the browser-channel timeout, not a replacement for the
-remaining server-side participant-presence/connection-loss guarantee.
+the channel. The server independently records participant presence: only a
+correctly scoped received frame acknowledged with the existing participant
+credential confirms or renews its 60-second lease. Writing SSE heartbeats alone
+does not keep an absent browser connected. Closing the last confirmed tab or
+expiring its lease records `CONNECTION=LOST`; another confirmed tab prevents
+false loss, and a real participant current-state read restores `POLLING`.
+Presence and its log transition commit together, without changing saved answers,
+run status or timers. SQLite/PostgreSQL retain leases across process restarts;
+file storage retains its existing single-process writer model. Source-compatible
+server loss/restored-polling exports retain the Original zero client timestamp
+and quoted-key log entry, separately from the server's ordering timestamp.
+`npm run smoke:ui:participant-presence:built` exercises both interfaces and a
+real one-minute silent socket on an owned SQLite fixture, never your tryout.
 
 SQLite connections wait up to five seconds for a competing reader/writer
 instead of failing a durable save immediately. Journal mode and schema stay

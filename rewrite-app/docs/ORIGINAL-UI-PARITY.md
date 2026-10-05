@@ -58,10 +58,10 @@ blank-name errors, retained authorization after a failed asset read and the
 actual failed-component chunk fallback. Full protected SQLite passed through
 workspace deletion; participant login and deletion dialog regressions stayed
 green. All 157 core plus 78 frontend/preflight tests passed; initial output is
-469.31kB below the unchanged 470kB limit. Full fresh publication CI is still
-required. The preceding XML commit `9201af97` separately passed all 35 CI jobs,
-including PostgreSQL UI and participant-detail review; it does not prove the
-new login publication.
+469.31kB below the unchanged 470kB limit. Publication `fae90ea5` subsequently
+passed all 35 push-CI jobs (run `37226072648`), including PostgreSQL UI and
+participant-detail review. The later durable participant-presence step has its
+own pending publication gate; neither result closes a full Original UI row.
 
 Latest administration-dialog comparison (2026-10-04): the optional Original
 account-deletion confirmation now adapts the pinned 19.0 Material template,
