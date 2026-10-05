@@ -27,6 +27,15 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The shared backend now permits exact preset-assignment resumption after returning
+to the starter, rather than rejecting its variant key against the source Booklet
+key. Both interfaces passed real participant login, Unicode draft preservation,
+confirmed starter return, same-run resumption and session-link/hard-reload
+restoration with owned protected SQLite in production/development; production
+also passed headlessly. The mandatory quick-CI variant smoke retains exact
+run/answer assertions. This does not close the other-unfinished-Booklet P0 gap,
+the full starter row or any pixel-identity claim.
+
 Latest participant-starter comparison (2026-10-05): the optional renderer now
 matches the pinned 19.0 intrinsic 684px card/intro width, 24px gaps, 94px companion,
 normal paragraph typography, flex-column margins, Material icon baselines,

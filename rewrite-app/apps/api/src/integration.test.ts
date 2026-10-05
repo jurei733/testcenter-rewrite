@@ -35464,6 +35464,43 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   );
   assert.equal(firstVariantRun.body.testRun.presetBookletStates.level, "advanced");
   assert.equal(firstVariantRun.body.testRun.bookletStates.level, "advanced");
+  const exactVariantAnswer = "Owned variant answer: ä/β, exact bytes retained";
+  const savedVariant = await requestJson<{ testRun: { unitResponses: Record<string, string> } }>(
+    `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/save-progress`,
+    { method: "POST", body: { currentUnitKey: "decision-unit", unitResponse: exactVariantAnswer, status: "running" } }
+  );
+  assert.equal(savedVariant.status, 200);
+  const returnedVariant = await requestJson<{ testRun: { status: string } }>(
+    `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(returnedVariant.status, 200);
+  assert.equal(returnedVariant.body.testRun.status, "paused");
+  const resumedVariant = await requestJson<{
+    testRun: {
+      testRunId: string;
+      status: string;
+      bookletAssignmentKey: string;
+      unitResponses: Record<string, string>;
+      presetBookletStates: Record<string, string>;
+      bookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${variantSessionId}/resume`, {
+    method: "POST", body: { bookletKey: firstVariantAssignmentKey }
+  });
+  assert.equal(resumedVariant.status, 200, "The same preset assignment must resume its exact existing run.");
+  assert.equal(resumedVariant.body.testRun.testRunId, firstVariantRun.body.testRun.testRunId);
+  assert.equal(resumedVariant.body.testRun.status, "running");
+  assert.equal(resumedVariant.body.testRun.bookletAssignmentKey, firstVariantAssignmentKey);
+  assert.deepEqual(resumedVariant.body.testRun.unitResponses, { "decision-unit": exactVariantAnswer });
+  assert.deepEqual(resumedVariant.body.testRun.presetBookletStates, firstVariantRun.body.testRun.presetBookletStates);
+  assert.deepEqual(resumedVariant.body.testRun.bookletStates, firstVariantRun.body.testRun.bookletStates);
+  const otherVariantWhileOpen = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${variantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: variantSignIn.body.booklets[1]!.bookletKey } }
+  );
+  assert.equal(otherVariantWhileOpen.status, 409);
+  assert.equal(otherVariantWhileOpen.body.error, "participant_session_open_run_booklet_conflict");
   await requestJson(
     `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/complete`,
     { method: "POST", body: {} }

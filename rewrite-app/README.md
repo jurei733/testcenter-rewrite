@@ -43,6 +43,14 @@ as is the report card with the source's three lists and send/cancel actions,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 
+Preset Booklet variants can return to the starter and resume their exact saved
+run in either interface. `npm run smoke:ui:participant-variant:built` verifies
+real participant login, confirmed return, exact Unicode answer preservation and
+authenticated session-link restoration after a hard reload on an owned
+protected SQLite API. It is also a mandatory quick browser CI step. This narrow
+fix does not yet permit switching to another unfinished Booklet; that separate
+P0 and full Original-UI acceptance remain explicitly open in `docs/PARITY.md`.
+
 The optional Systemcheck Unit surface uses the same sandboxed Verona host and
 in-memory answers as the Rewrite layout. Both disable Player logging as in the
 Original. Previous/next and numbered navigation support keyboard activation;

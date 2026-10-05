@@ -1,5 +1,27 @@
 # Testcenter parity checklist
 
+### Exact preset-variant re-entry
+
+Returning a preset Booklet variant to the starter and selecting that same
+assignment previously failed with HTTP 409: `resumeSession` compared its
+assignment key only with the source Booklet key. It now also recognizes the
+existing run's exact `bookletAssignmentKey`, consistently with `launch`.
+Resumption preserves the run ID, preset/adaptive states and exact opaque answer
+bytes. Other assignments are not aliased onto that run; the broader
+multi-Booklet conflict below remains open. No lifecycle, authorization,
+monitor-pause, lock, timer or non-saving-mode guards were removed.
+
+The regression failed before the change and passes afterwards. All 163 API
+tests pass independently in memory, File and SQLite with the suite's correct
+non-demo bootstrap configuration. Real protected SQLite/browser flows pass in
+both Rewrite and Original with production and development frontends, and in
+headless production CI mode: participant login, draft entry, confirmed return
+to starter, exact-assignment resumption and authenticated session-link re-entry
+after a hard reload. The workspace-only login URL is not a session re-entry
+link. `smoke:ui:participant-variant:built` is mandatory in quick browser CI.
+Evidence is retained in ignored `.data/variant-reentry-20261005.*`.
+PostgreSQL and publication CI remain separate verification boundaries.
+
 ### Source-rendered participant starter verification
 
 The optional Original starter now follows the pinned 19.0 viewport scrolling,
@@ -77,9 +99,9 @@ manual-retry assertions. All 83 frontend/preflight tests remain green. Evidence
 is retained in ignored `.data/stars-network-boundary-20261005`. The complete
 preceding production flow through the official STARS family subsequently
 passed on an owned memory repository. Publication `c676e5e5` also passed the
-full GitHub browser flow and PostgreSQL UI gate; at this verification point
-33 of its 35 push jobs succeeded and two remained running. Overall publication
-success must still be confirmed separately.
+full GitHub browser flow and PostgreSQL UI gate. Its push run `37271624443`
+subsequently completed successfully with all 35 jobs green. This is evidence
+for that exact publication, not automatic proof for later commits.
 
 ### Durable participant connection presence
 

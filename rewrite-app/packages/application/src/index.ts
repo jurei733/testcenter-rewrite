@@ -32733,7 +32733,9 @@ export const createFirstSliceServices = (
           requireParticipantTestRunUnlocked(normalizedExistingRun);
           if (
             requestedBookletKey &&
-            existingRun.bookletKey !== requestedBookletKey
+            existingRun.bookletKey !== requestedBookletKey &&
+            (existingRun.bookletAssignmentKey ?? existingRun.bookletKey) !==
+              requestedBookletKey
           ) {
             throw new FirstSliceError(
               409,
