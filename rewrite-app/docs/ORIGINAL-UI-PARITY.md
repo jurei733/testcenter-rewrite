@@ -60,8 +60,14 @@ workspace deletion; participant login and deletion dialog regressions stayed
 green. All 157 core plus 78 frontend/preflight tests passed; initial output is
 469.31kB below the unchanged 470kB limit. Publication `fae90ea5` subsequently
 passed all 35 push-CI jobs (run `37226072648`), including PostgreSQL UI and
-participant-detail review. The later durable participant-presence step has its
-own pending publication gate; neither result closes a full Original UI row.
+participant-detail review. The later durable participant-presence publication
+`a095936b` finished with 20 successful and 15 failed push jobs: the browser
+failures share the STARS partial-delivery fault boundary, which failed to block
+actual worker-owned network sends. An owned reproduction confirmed all exact
+answers were durably saved; the regression now intercepts both network owners
+and additionally checks the actual server-side seven-Unit boundary. Fresh
+publication verification remains required. Neither result closes a full
+Original UI row.
 
 Latest administration-dialog comparison (2026-10-04): the optional Original
 account-deletion confirmation now adapts the pinned 19.0 Material template,

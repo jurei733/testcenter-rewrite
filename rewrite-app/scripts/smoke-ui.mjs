@@ -14472,7 +14472,11 @@ try {
     }
     await route.abort("failed");
   };
-  await page.route(starsSaveProgressUrl, starsMidDrainRoute);
+  // A reload hands queued answers to the still-live background worker. A
+  // page-only route cannot intercept that worker's own fetches, so it would
+  // accidentally deliver the supposedly blocked Units. Keep the real worker
+  // and apply the same partial-delivery boundary to both network owners.
+  await context.route(starsSaveProgressUrl, starsMidDrainRoute);
   await page.evaluate(
     ({ storageKey, testRunId, currentUnitKey, responses }) => {
       const queuedAt = Date.now();
@@ -14548,6 +14552,18 @@ try {
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${starsPlayerPackage.player.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
+  const starsStateAfterMidDrainReload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload => Boolean(payload?.currentRunState?.testRun)
+  );
+  assert.deepEqual(
+    starsUnitKeys.filter(unitKey => matchesStarsMidDrainResponse(
+      unitKey,
+      starsStateAfterMidDrainReload.currentRunState.testRun.unitResponses[unitKey]
+    )),
+    starsUnitKeys.filter(unitKey => permittedStarsMidDrainUnits.has(unitKey)),
+    "The reload boundary must actually block undelivered answers on both network channels."
+  );
   try {
     await page.waitForFunction(
       ({ storageKey, deliveredUnitKeys, expectedCount }) => {
@@ -14597,7 +14613,7 @@ try {
     ),
     "Hard reload during a partial drain must preserve every remaining response."
   );
-  await page.unroute(starsSaveProgressUrl, starsMidDrainRoute);
+  await context.unroute(starsSaveProgressUrl, starsMidDrainRoute);
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
@@ -14616,6 +14632,8 @@ try {
     "testcenter-rewrite:participant-save-outbox:v1",
     { timeout: 30_000 }
   );
+
+  stopAfter("participant-original-stars-mid-drain-hard-reload");
 
   logStep("participant-original-stars-outbox-capacity");
   await page.evaluate(async () => {

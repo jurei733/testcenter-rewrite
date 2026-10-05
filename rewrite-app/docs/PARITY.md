@@ -1,5 +1,30 @@
 # Testcenter parity checklist
 
+### STARS partial-delivery CI boundary
+
+The first durable-presence publication (`a095936b`, push run `37270016809`)
+finished with 20 successful and 15 failed jobs. PostgreSQL integration passed
+all 179 tests, but browser jobs failed at the same strict partial-delivery
+recovery gate. This publication is not globally CI-green.
+
+An owned SQLite/browser reproduction confirmed that all 28 exact STARS answers
+were saved: the page-only fault route let the real background worker bypass
+the supposed seven-Unit delivery boundary. The test now intercepts both page
+and worker network owners at context scope. After the hard reload it separately
+asserts that only the permitted seven answers reached the server, retains the
+strict 21-entry undelivered queue/content checks, and proves all 28 answers
+reach durable storage once the boundary is lifted. No response algorithm,
+timeout, expected queue count or private tryout data was changed. The focused
+stop point is `participant-original-stars-mid-drain-hard-reload`.
+
+The real shared STARS steps passed headfully on owned SQLite in both frozen
+production and development frontends, including foreground/background recovery,
+parallel-run isolation, whole-browser process crash and the corrected hard
+reload boundary. Development also passed the unchanged 200-entry capacity and
+manual-retry assertions. All 83 frontend/preflight tests remain green. Evidence
+is retained in ignored `.data/stars-network-boundary-20261005`; the complete
+preceding production flow and fresh remote publication gate are still pending.
+
 ### Durable participant connection presence
 
 The Source `c35cff81` broadcaster's two 30-second heartbeat rounds and its
@@ -23,7 +48,9 @@ Transitions do not modify answers, status or timers, and respect modes that do
 not save response logs. Source server logs preserve client epoch `0` and exact
 `"CONNECTION" : LOST` / `"CONNECTION" : POLLING` export text; server chronology
 is retained independently. SQLite migration 58 and PostgreSQL migration 52 are
-additive; the protected private database has not been migrated in this step.
+additive. After publication, the private runtime was refreshed only after an
+integrity-checked backup: schema 58 retained the running MaP session and its
+exact saved-answer hash; no session or response reset was performed.
 
 Local verification passed 165 core, 12 cross-repository presence and 83
 frontend/preflight tests. Full API suites passed 163 tests each with memory,
@@ -44,7 +71,9 @@ runs passed, but its cause is not asserted. Initial production output remains
 in ignored `.data/participant-presence-reference-20261005`; old generated
 integration/Smoke fixtures were removed to free disk space, not private data.
 PostgreSQL's independent-storage-pool race proof and the browser regression
-are now mandatory CI steps; their fresh publication results remain pending.
+are mandatory CI steps. The first publication passed all 179 PostgreSQL API
+and presence tests; the overall browser gate remains blocked by the fault
+boundary described above until the corrected publication completes.
 This functional connection guarantee does not close any full Original UI row.
 
 ### Latest verified Original administrator login rendering
