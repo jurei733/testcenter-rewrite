@@ -11,6 +11,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 import { createEventStreamWatchdog } from "./event-stream-watchdog";
 import { createParticipantEventAcknowledgements } from "./participant-event-acknowledgements";
+import { withSelectedParticipantRun } from "./participant-session-links";
 
 type ParticipantRefresh = () => Promise<void>;
 type ParticipantConnectionModeChange = (
@@ -35,6 +36,7 @@ export class ParticipantEventStreamService {
   private abortController: AbortController | null = null;
   private connectHandle: number | null = null;
   private activeParticipantSessionId = "";
+  private activeTestRunId = "";
   private generation = 0;
   private refreshRunning = false;
   private refreshPending = false;
@@ -52,9 +54,11 @@ export class ParticipantEventStreamService {
   start(
     participantSessionId: string,
     refresh: ParticipantRefresh,
-    connectionModeChange: ParticipantConnectionModeChange | null = null
+    connectionModeChange: ParticipantConnectionModeChange | null = null,
+    testRunId = ""
   ): void {
     const normalizedParticipantSessionId = participantSessionId.trim();
+    const normalizedTestRunId = testRunId.trim();
     if (!normalizedParticipantSessionId) {
       this.stop();
       return;
@@ -64,6 +68,7 @@ export class ParticipantEventStreamService {
     this.connectionModeChange = connectionModeChange;
     if (
       this.activeParticipantSessionId === normalizedParticipantSessionId &&
+      this.activeTestRunId === normalizedTestRunId &&
       (this.abortController || this.connectHandle != null)
     ) {
       return;
@@ -72,6 +77,7 @@ export class ParticipantEventStreamService {
     this.stopConnection();
     this.lastReportedConnectionMode = null;
     this.activeParticipantSessionId = normalizedParticipantSessionId;
+    this.activeTestRunId = normalizedTestRunId;
     this.setConnectionState(
       "connecting",
       "Opening the live participant update channel."
@@ -91,6 +97,7 @@ export class ParticipantEventStreamService {
   stop(): void {
     this.stopConnection();
     this.activeParticipantSessionId = "";
+    this.activeTestRunId = "";
     this.refresh = null;
     this.connectionModeChange = null;
     this.lastReportedConnectionMode = null;
@@ -134,9 +141,9 @@ export class ParticipantEventStreamService {
     try {
       const sessionToken = readParticipantSessionCredential(input.participantSessionId);
       const response = await fetch(
-        resolveRoutePath(productionApiRoutes.participant.eventStream, {
+        withSelectedParticipantRun(resolveRoutePath(productionApiRoutes.participant.eventStream, {
           participantSessionId: input.participantSessionId
-        }),
+        }), this.activeTestRunId),
         {
           method: "GET",
           headers: {
@@ -147,6 +154,7 @@ export class ParticipantEventStreamService {
           signal: controller.signal
         }
       );
+      if (input.generation !== this.generation) return;
       if (!response.ok || !response.body) {
         throw new Error(`Participant channel returned HTTP ${response.status}.`);
       }
@@ -243,7 +251,8 @@ export class ParticipantEventStreamService {
     } catch {
       return false;
     }
-    if (!event || event.participantSessionId !== this.activeParticipantSessionId) {
+    if (!event || event.participantSessionId !== this.activeParticipantSessionId ||
+      this.activeTestRunId && event.testRunId !== this.activeTestRunId) {
       return false;
     }
     acknowledge(event);

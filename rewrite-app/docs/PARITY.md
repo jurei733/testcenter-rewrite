@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Run-bound state, assets, links and live updates
+
+Original `TestController::get` addresses the selected test by its explicit ID;
+the Rewrite's current-state endpoint previously ignored a requested Run ID and
+returned the run with the latest `updatedAt`. Current-state and SSE now accept
+an optional `testRunId`, validate ownership against the authenticated session,
+tenant and workspace, and read that exact run. Unknown/foreign IDs return the
+same HTTP 404; an explicit empty ID fails rather than falling back. Reading a
+completed or monitor-paused run does not resume/reset it. A completed selected
+run cannot open a live stream for an unrelated running run.
+
+Participant state and asset-preload requests bind the selected ID. Live clients
+reconnect when the selected Run changes, reject another run's frames before
+acknowledging them, and ignore late headers from a replaced generation.
+Participant/monitor/detail re-entry links now carry the exact Run ID; participant
+links also preserve the preset assignment key. The URL, not another tab's
+persisted runtime, owns explicit re-entry selection. Historical session-only
+links and unselected API readers retain their chronological fallback. No schema,
+saved answer, lifecycle guard or participant credential was changed.
+
+The API regression fails before the change with the wrong Run ID; the preceding
+frontend fails the new real-link assertion. All 163 API tests pass in each of
+memory, File and SQLite, plus 165 core, 12 presence and 91 frontend tests. Real
+protected SQLite/browser flows pass in both interfaces with frozen production
+and development frontends, including actual generated links, hard reload,
+scoped live acknowledgement, monitor pause/resume and independent background
+answer saves. Production also passes headlessly. Its mandatory variant smoke
+seeds the second open Run through the owned repository: this proves selection
+isolation, not the still-blocked second starter launch. The preceding shared
+browser flow through completed session re-entry/clear and all 48 production
+starter states also pass. Production is 469.82kB under the unchanged 470kB limit.
+Evidence is retained in ignored `.data/run-selection-20261005.*`; PostgreSQL and
+complete publication CI remain independent proof.
+
 ### Exact preset-variant re-entry
 
 Returning a preset Booklet variant to the starter and selecting that same
@@ -44,7 +78,7 @@ The new mandatory quick-CI starter gate passes all 48 configurations in both
 builds and tests actual participant login, keyboard scrolling, account hover,
 pending duplicate rejection, exact saved answers and participant-authenticated
 empty Review CSV export. The existing login regression plus all 165 core,
-12 presence and 83 frontend/preflight tests passed. Production remains 469.61kB
+12 presence and 83 frontend/preflight tests passed. That layout build was 469.61kB
 under the unchanged 470kB limit. Evidence is retained in ignored
 `.data/original-starter-reference-20261005.*`; publication CI remains independent.
 The functional multi-Booklet gap below was found by this verification and is
@@ -59,10 +93,10 @@ selects any open session run in both `launch` and `resumeSession` and rejects
 a different Booklet with `participant_session_open_run_booklet_conflict`.
 An owned authorized SQLite fixture reproduced that HTTP 409 even after the
 first run returned to the starter. This is not completed multi-Booklet parity.
-Both current-state readers also select a run by `updatedAt`, not by an explicit
-participant selection. Removing the conflict alone would let a later background
-answer save select an unrelated run. The fix must persist/authorize selection
-independently of response chronology and atomically reuse each assignment's run.
+The explicit run-bound selection prerequisite above is now implemented and
+tested independently of response chronology. Legacy session-only readers still
+use an `updatedAt` fallback. The launch conflict itself and atomic per-assignment
+run creation/reuse remain open; removing the conflict alone is not sufficient.
 
 Next acceptance must cover starting a second assigned Booklet while the first
 is safely left/paused, re-entering each exact run with independent answers,

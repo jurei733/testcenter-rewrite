@@ -1237,6 +1237,7 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
       groupKey: query.get("groupKey"),
       bookletKey: query.get("bookletKey"),
       participantSessionId: query.get("participantSessionId"),
+      testRunId: query.get("testRunId"),
       currentUnitKey: query.get("currentUnitKey"),
       unitResponse: query.get("unitResponse"),
       legacyShortLink: query.get("legacyShortLink") === "true"

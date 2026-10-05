@@ -729,6 +729,7 @@ export type ParticipantRuntimePort = {
   }): Promise<ParticipantRuntimeState>;
   getCurrentRunState(input: {
     participantSessionId: string;
+    testRunId?: string;
     includeBookletAssets?: boolean;
   }): Promise<ParticipantCurrentRunState>;
   getResource(input: {
@@ -6866,6 +6867,26 @@ const getLatestParticipantSessionRun = async (
   return normalizeTestRun(
     testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]!
   );
+};
+
+const getSelectedParticipantSessionRun = async (
+  repository: FirstSliceRepository,
+  participantSession: ParticipantSession,
+  requestedTestRunId?: string
+): Promise<TestRun | null> => {
+  if (requestedTestRunId === undefined) {
+    // Preserve historical session-only links. New run-specific links must not
+    // follow answer-update chronology or select a different browser tab's run.
+    return getLatestParticipantSessionRun(repository, participantSession.participantSessionId);
+  }
+  const testRunId = normalizeTestRunId(requestedTestRunId);
+  const run = await repository.getTestRunById(testRunId);
+  if (!run || run.participantSessionId !== participantSession.participantSessionId ||
+    run.tenantId !== participantSession.tenantId || run.workspaceId !== participantSession.workspaceId) {
+    // Do not disclose whether an unknown or foreign run exists.
+    throw new FirstSliceError(404, "test_run_not_found", `Test run '${testRunId}' was not found.`);
+  }
+  return normalizeTestRun(run);
 };
 
 const normalizeTestRun = (testRun: TestRun): TestRun => {
@@ -31919,9 +31940,10 @@ export const createFirstSliceServices = (
           repository,
           participantSession
         );
-        const latestTestRun = await getLatestParticipantSessionRun(
+        const latestTestRun = await getSelectedParticipantSessionRun(
           repository,
-          participantSession.participantSessionId
+          participantSession,
+          input.testRunId
         );
 
         if (!latestTestRun) {

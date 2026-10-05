@@ -66,7 +66,7 @@ import {
   removeParticipantSaveOutboxEntry,
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
-import { buildParticipantSessionEntryUrl } from "./participant-session-links";
+import { buildParticipantSessionEntryUrl, withSelectedParticipantRun } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantEventStreamService } from "./participant-event-stream.service";
@@ -228,6 +228,7 @@ type ParticipantEntryParameters = {
   groupKey?: string | null;
   bookletKey?: string | null;
   participantSessionId?: string | null;
+  testRunId?: string | null;
   currentUnitKey?: string | null;
   unitResponse?: string | null;
   legacyShortLink?: boolean;
@@ -240,6 +241,7 @@ type NormalizedParticipantEntryParameters = {
   groupKey: string;
   bookletKey: string;
   participantSessionId: string;
+  testRunId: string;
   currentUnitKey: string;
   unitResponse: string;
   hasUnitResponse: boolean;
@@ -586,6 +588,7 @@ export class ParticipantViewFacade {
       groupKey: parameters.groupKey?.trim() ?? "",
       bookletKey: parameters.bookletKey?.trim() ?? "",
       participantSessionId: parameters.participantSessionId?.trim() ?? "",
+      testRunId: parameters.testRunId?.trim() ?? "",
       currentUnitKey: parameters.currentUnitKey?.trim() ?? "",
       unitResponse: parameters.unitResponse ?? "",
       hasUnitResponse: parameters.unitResponse != null,
@@ -644,6 +647,8 @@ export class ParticipantViewFacade {
     }
     if (normalized.participantSessionId) {
       this.runtime.participantSessionId = normalized.participantSessionId;
+      // The link, not another tab's persisted runtime, owns re-entry selection.
+      this.runtime.testRunId = normalized.testRunId;
     }
     if (normalized.currentUnitKey) {
       this.runtime.currentUnitKey = normalized.currentUnitKey;
@@ -2637,7 +2642,7 @@ export class ParticipantViewFacade {
           this.runtime.participantDisplayName = "";
           this.runtime.runtimeMonitorView = "Signed out.";
           const url = new URL(globalThis.location.href);
-          for (const key of ["participantSessionId", "loginKey", "groupKey", "bookletKey", "currentUnitKey", "unitResponse", "participantCode", "password", "legacyShortLink"]) url.searchParams.delete(key);
+          for (const key of ["participantSessionId", "testRunId", "loginKey", "groupKey", "bookletKey", "currentUnitKey", "unitResponse", "participantCode", "password", "legacyShortLink"]) url.searchParams.delete(key);
           url.hash = "";
           globalThis.history.replaceState(globalThis.history.state, "", url);
           this.requestState.clearErrorMessage();
@@ -4042,9 +4047,9 @@ export class ParticipantViewFacade {
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
           "Participant Current State",
           "GET",
-          resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
+          withSelectedParticipantRun(resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
             participantSessionId: this.runtime.participantSessionId.trim()
-          }),
+          }), this.runtime.testRunId),
           undefined,
           { quiet }
         );
@@ -4102,7 +4107,9 @@ export class ParticipantViewFacade {
       } else {
         this.participantEvents.start(
           payload.currentRunState.participantSession.participantSessionId,
-          this.refreshFromParticipantEvents
+          this.refreshFromParticipantEvents,
+          null,
+          payload.currentRunState.testRun.testRunId
         );
       }
       this.persistState();
@@ -4146,10 +4153,10 @@ export class ParticipantViewFacade {
     const request = this.requestState.request<ParticipantCurrentRunStateResponse>(
       "Preload Participant Booklet",
       "GET",
-      `${resolveRoutePath(
+      withSelectedParticipantRun(`${resolveRoutePath(
         productionApiRoutes.participant.getCurrentRunState,
         { participantSessionId }
-      )}?includeBookletAssets=true`,
+      )}?includeBookletAssets=true`, testRunId),
       undefined,
       { quiet: true }
     );
@@ -4613,11 +4620,12 @@ export class ParticipantViewFacade {
 
     const currentState = this.readCurrentRunState();
     return buildParticipantSessionEntryUrl(participantSessionId, {
+      testRunId: currentState?.testRun.testRunId ?? this.runtime.testRunId,
       tenantKey: currentState?.scope.tenantKey ?? this.workspace.tenantKey,
       workspaceKey: currentState?.scope.workspaceKey ?? this.workspace.workspaceKey,
       loginKey: currentState?.participantSession.loginKey ?? this.runtime.loginKey,
       groupKey: currentState?.participantSession.groupKey ?? this.runtime.groupKey,
-      bookletKey: currentState?.testRun.bookletKey ?? this.runtime.bookletKey
+      bookletKey: currentState?.testRun.bookletAssignmentKey ?? currentState?.testRun.bookletKey ?? this.runtime.bookletKey
     });
   }
 

@@ -4232,11 +4232,13 @@ const streamParticipantEvents = async (input: {
   response: ServerResponse;
   participantRuntime: FirstSliceServices["participantRuntime"];
   participantSessionId: string;
+  testRunId?: string;
   validateAccess: () => Promise<unknown>;
 }): Promise<void> => {
   await input.validateAccess();
   const initialState = await input.participantRuntime.getCurrentRunState({
-    participantSessionId: input.participantSessionId
+    participantSessionId: input.participantSessionId,
+    testRunId: input.testRunId
   });
   let testRunId = initialState.testRun.testRunId;
   const connectionId = randomUUID();
@@ -4305,7 +4307,8 @@ const streamParticipantEvents = async (input: {
     polling = true;
     void input.validateAccess()
       .then(() => input.participantRuntime.getCurrentRunState({
-        participantSessionId: input.participantSessionId
+        participantSessionId: input.participantSessionId,
+        testRunId: input.testRunId
       }))
       .then(async currentState => {
         if (closed) {
@@ -8499,6 +8502,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           response,
           participantRuntime: services.participantRuntime,
           participantSessionId,
+          testRunId: url.searchParams.get("testRunId") ?? undefined,
           validateAccess: () => services.participantAccess.authorize({
             participantSessionId, sessionToken: readBearerToken(request) ?? ""
           })
@@ -8522,6 +8526,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
         const currentRunState = await services.participantRuntime.getCurrentRunState({
           participantSessionId,
+          testRunId: url.searchParams.get("testRunId") ?? undefined,
           includeBookletAssets:
             url.searchParams.get("includeBookletAssets") === "true"
         });

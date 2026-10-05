@@ -894,6 +894,7 @@ export class RuntimeViewFacade {
                 workspaceKey: this.uiState.workspace.workspaceKey,
                 loginKey: item.participantSession.loginKey,
                 groupKey: item.participantSession.groupKey,
+                testRunId: item.latestTestRun?.testRunId,
                 bookletKey:
                   item.participantRosterEntry?.bookletKey ??
                   item.latestTestRun?.bookletKey
@@ -983,7 +984,8 @@ export class RuntimeViewFacade {
               groupKey: detail.participantSession.groupKey,
               bookletKey:
                 detail.participantRosterEntry?.bookletKey ??
-                detail.testRuns[0]?.bookletKey
+                detail.testRuns[0]?.bookletKey,
+              testRunId: detail.testRuns[0]?.testRunId
             }
           ),
           {
@@ -1453,7 +1455,8 @@ export class RuntimeViewFacade {
             workspaceKey: this.uiState.workspace.workspaceKey.trim(),
             loginKey: link.loginKey,
             groupKey: link.groupKey,
-            bookletKey: link.bookletKey
+            bookletKey: link.bookletKey,
+            testRunId: latestRun?.testRunId
           }),
           {
             label: "Entry URL",
@@ -1896,7 +1899,8 @@ export class RuntimeViewFacade {
               workspaceKey: this.uiState.workspace.workspaceKey.trim(),
               loginKey: detail.participantSession.loginKey,
               groupKey: detail.participantSession.groupKey,
-              bookletKey: detail.latestTestRun?.bookletKey
+              bookletKey: detail.latestTestRun?.bookletKey,
+              testRunId: detail.latestTestRun?.testRunId
             }
           ),
           {
@@ -1951,7 +1955,8 @@ export class RuntimeViewFacade {
               workspaceKey: this.uiState.workspace.workspaceKey.trim(),
               loginKey: detail.participantSession.loginKey,
               groupKey: detail.participantSession.groupKey,
-              bookletKey: detail.testRun.bookletKey
+              bookletKey: detail.testRun.bookletKey,
+              testRunId: detail.testRun.testRunId
             }
           ),
           {
@@ -2775,7 +2780,8 @@ export class RuntimeViewFacade {
               workspaceKey: this.uiState.workspace.workspaceKey,
               loginKey: openRun.loginKey,
               groupKey: openRun.groupKey,
-              bookletKey: openRun.bookletKey
+              bookletKey: openRun.bookletKey,
+              testRunId: openRun.testRunId
             }),
             ...(displaySettings.groupColumn === "show"
               ? [{

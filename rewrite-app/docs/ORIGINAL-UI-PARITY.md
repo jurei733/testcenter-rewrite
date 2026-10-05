@@ -27,6 +27,15 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Both interfaces now bind the selected Run ID through state, asset preload,
+live updates and actual generated re-entry links. Exact preset assignment,
+Unicode answers and Run ID survive hard reload; another run's later background
+saves cannot steal selection or bypass the selected run's monitor pause.
+Production/development protected SQLite browsers and headless production pass.
+The second open run in this focused fixture is repository-seeded, not started
+through the still-blocked P0 workflow. These shared functional safeguards do not
+close any full rendered-UI acceptance row or pixel-identity claim.
+
 The shared backend now permits exact preset-assignment resumption after returning
 to the starter, rather than rejecting its variant key against the source Booklet
 key. Both interfaces passed real participant login, Unicode draft preservation,
@@ -62,12 +71,13 @@ and exercises real login, keyboard scrolling, non-lifting account hover, a
 blocked duplicate pending start, exact saved-answer resumption and participant
 bearer authorization for the actual HTTP 204 Review export. The separate login
 regression and all 165 core, 12 presence and 83 frontend/preflight tests passed.
-Initial production output is 469.61kB below the unchanged 470kB hard limit.
+Initial production output for that layout step was 469.61kB below the unchanged 470kB hard limit.
 Fresh publication CI remains separate proof. This narrow comparison does not
 close the complete starter/shell row: empty/error/custom-branding states,
 Source snackbar feedback and other claims remain open. A functional P0 gap was
 also reproduced: another unfinished Booklet blocks an otherwise available
-selection, and current-state selection follows answer-update chronology. The
+selection. Explicit run-bound reads now avoid answer-update chronology, while
+historical session-only links retain that fallback. The
 mixed rendering fixture completes one Booklet before starting the other; it
 does not prove that blocked workflow. See PARITY.md's explicit acceptance.
 

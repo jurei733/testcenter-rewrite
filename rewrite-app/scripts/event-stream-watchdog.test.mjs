@@ -19,6 +19,7 @@ const coreUrl = dataModule(`
 `);
 const stateUrl = dataModule("export class RewriteAppUiStateService {}");
 const credentialsUrl = dataModule(transpile("../apps/web/src/app/participant-access-credentials.ts"));
+const sessionLinksUrl = dataModule(transpile("../apps/web/src/app/participant-session-links.ts"));
 const contractsUrl = import.meta.resolve("@testcenter-rewrite-app/contracts");
 const acknowledgementUrl = dataModule(transpile("../apps/web/src/app/participant-event-acknowledgements.ts")
   .replace('"@testcenter-rewrite-app/contracts"', JSON.stringify(contractsUrl))
@@ -33,6 +34,7 @@ const loadService = async name => {
     .replace('"./rewrite-app-ui-state.service"', JSON.stringify(stateUrl))
     .replace('"./participant-access-credentials"', JSON.stringify(credentialsUrl))
     .replace('"./participant-event-acknowledgements"', JSON.stringify(acknowledgementUrl))
+    .replace('"./participant-session-links"', JSON.stringify(sessionLinksUrl))
     .replace('"./event-stream-watchdog"', JSON.stringify(watchdogUrl));
   const module = await import(dataModule(source));
   return module[name === "participant" ? "ParticipantEventStreamService" : "MonitorEventStreamService"];
@@ -105,7 +107,7 @@ test("an expired SSE watchdog cannot be resurrected by queued activity", async (
   assert.equal(aborts, 1); assert.equal(clock.timers.size, 0);
 }));
 
-const withService = async (kind, action, stallHeaders = false) => withClock(async clock => {
+const withService = async (kind, action, stallHeaders = false, testRunId = "") => withClock(async clock => {
   const host = { workspace: { tenantKey: "tenant-a", workspaceKey: "workspace-a" },
     ops: { adminSessionToken: "synthetic-operator-token" }, runtime: {}, renderVersion: { update() {} } };
   globalThis.__eventStreamTestHost = host;
@@ -120,7 +122,7 @@ const withService = async (kind, action, stallHeaders = false) => withClock(asyn
   };
   const service = new Service[kind]();
   const start = () => kind === "participant"
-    ? service.start("session-a", async () => { refreshes += 1; }, mode => modes.push(mode))
+    ? service.start("session-a", async () => { refreshes += 1; }, mode => modes.push(mode), testRunId)
     : service.start(async () => { refreshes += 1; });
   const event = overrides => ({ schemaVersion: 1, eventType: "heartbeat", sequence: 1,
     tenantKey: "tenant-a", workspaceKey: "workspace-a", participantSessionId: "session-a", testRunId: "run-a",
@@ -134,6 +136,50 @@ const withService = async (kind, action, stallHeaders = false) => withClock(asyn
   try { await action({ ...clock, service, host, requests, modes, event, send, status, refreshes: () => refreshes }); }
   finally { service.stop(); await flush(); assert.equal(clock.timers.size, 0); }
 });
+
+test("a run-bound participant channel ignores another run's frames and reconnects on explicit selection", async () =>
+  withService("participant", async host => {
+    assert.equal(host.requests[0].path, "/api/v1/participant/sessions/session-a/events?testRunId=run-a");
+    await host.send(host.event({ eventType: "change", testRunId: "run-b" }));
+    assert.equal(host.refreshes(), 0, "Another run cannot change this tab's selected state.");
+    await host.send(host.event({ eventType: "change" }));
+    assert.equal(host.refreshes(), 1);
+    const old = host.requests[0];
+    host.service.start("session-a", async () => {}, null, "run-b");
+    assert.equal(old.options.signal.aborted, true);
+    await host.advance(1_000);
+    assert.equal(host.requests[1].path, "/api/v1/participant/sessions/session-a/events?testRunId=run-b");
+    const acknowledged = [];
+    const frame = JSON.stringify(host.event({ connectionId: "11111111-1111-4111-8111-111111111111" }));
+    assert.equal(host.service.handleFrame(`data: ${frame}`, host.service.generation, event => acknowledged.push(event)), false);
+    assert.deepEqual(acknowledged, [], "A previous run's frame cannot renew this run's presence.");
+  }, false, "run-a"));
+
+test("late headers from a replaced participant run cannot mark the new channel live", async () => withClock(async clock => {
+  globalThis.__eventStreamTestHost = { renderVersion: { update() {} } };
+  const requests = [];
+  globalThis.fetch = (path, options) => new Promise(resolve => requests.push({ path, options, resolve }));
+  const service = new Service.participant();
+  const header = () => ({ ok: true, status: 200, body: new ReadableStream(),
+    headers: new Headers({ "content-type": "text/event-stream" }) });
+  try {
+    service.start("session-a", async () => {}, null, "run-a");
+    await clock.advance(1_000);
+    service.start("session-a", async () => {}, null, "run-b");
+    await clock.advance(1_000);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].options.signal.aborted, true);
+    requests[0].resolve(header());
+    await flush();
+    assert.equal(service.connectionState().status, "connecting");
+    assert.equal(requests[1].options.signal.aborted, false);
+  } finally {
+    service.stop();
+    requests[1]?.resolve(header());
+    await flush();
+    assert.equal(clock.timers.size, 0);
+  }
+}));
 
 const withAcknowledgements = action => withClock(async clock => {
   const actualNow = Date.now;

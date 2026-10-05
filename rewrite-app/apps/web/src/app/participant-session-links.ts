@@ -6,6 +6,7 @@ export type ParticipantSessionEntryLinkContext = {
   loginKey?: string | null;
   groupKey?: string | null;
   bookletKey?: string | null;
+  testRunId?: string | null;
 };
 
 export type ParticipantEntryLinkOptions = {
@@ -34,6 +35,7 @@ export function buildParticipantSessionEntryUrl(
   options: ParticipantEntryLinkOptions = {}
 ): string {
   const query = new URLSearchParams({ participantSessionId });
+  appendParticipantLinkParam(query, "testRunId", context.testRunId);
   appendParticipantLinkParam(query, "tenantKey", context.tenantKey);
   appendParticipantLinkParam(query, "workspaceKey", context.workspaceKey);
   appendParticipantLinkParam(query, "loginKey", context.loginKey);
@@ -41,6 +43,16 @@ export function buildParticipantSessionEntryUrl(
   appendParticipantLinkParam(query, "bookletKey", context.bookletKey);
   const participantPath = `/participant?${query.toString()}`;
   return withOptionalBrowserOrigin(participantPath, options);
+}
+
+export function withSelectedParticipantRun(path: string, testRunId?: string | null): string {
+  const selected = testRunId?.trim();
+  if (!selected) return path;
+  const separator = path.indexOf("?");
+  const pathname = separator < 0 ? path : path.slice(0, separator);
+  const query = new URLSearchParams(separator < 0 ? "" : path.slice(separator + 1));
+  query.set("testRunId", selected);
+  return `${pathname}?${query.toString()}`;
 }
 
 export function buildParticipantEntryUrl(

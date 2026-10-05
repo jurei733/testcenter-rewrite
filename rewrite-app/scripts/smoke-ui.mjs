@@ -2020,7 +2020,7 @@ try {
     brandedParticipantPage.waitForResponse(response =>
       response.request().method() === "GET" &&
       response.url().includes("/api/v1/participant/sessions/") &&
-      response.url().endsWith("/current-state") &&
+      new URL(response.url()).pathname.endsWith("/current-state") &&
       response.status() === 200
     );
   await brandedParticipantPage.locator("#participantRouteSignInButton").click();
@@ -8577,7 +8577,8 @@ try {
           participantSession?.loginKey === participantRouteLoginKey &&
           participantSession?.groupKey === participantRouteGroupKey &&
           typeof participantSession?.participantSessionId === "string" &&
-          participantSession.participantSessionId.length > 0
+          participantSession.participantSessionId.length > 0 &&
+          typeof item.latestTestRun?.testRunId === "string"
         );
       })
   );
@@ -8591,6 +8592,8 @@ try {
   );
   const participantRouteSessionLink = `${baseUrl}/participant?${new URLSearchParams({
     participantSessionId: participantRouteSessionId,
+    testRunId: participantRouteSessionsPayload.items.find(item =>
+      item.participantSession?.participantSessionId === participantRouteSessionId)?.latestTestRun.testRunId,
     tenantKey,
     workspaceKey,
     loginKey: participantRouteLoginKey,

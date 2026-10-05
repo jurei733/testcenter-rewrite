@@ -46282,6 +46282,33 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(alphaRun.status, 200);
   assert.equal(alphaRun.body.testRun.bookletKey, "booklet:alpha");
 
+  const firstSessionStatePath = `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/current-state`;
+  const selectedBetaState = await requestJson<{
+    currentRunState: { testRun: { testRunId: string; bookletKey: string; status: string } };
+  }>(`${firstSessionStatePath}?testRunId=${encodeURIComponent(betaRun.body.testRun.testRunId)}`);
+  assert.equal(selectedBetaState.status, 200);
+  assert.equal(selectedBetaState.body.currentRunState.testRun.testRunId, betaRun.body.testRun.testRunId,
+    "An explicitly selected owned run must not be replaced by a newer Booklet.");
+  assert.equal(selectedBetaState.body.currentRunState.testRun.bookletKey, "booklet:beta");
+  assert.equal(selectedBetaState.body.currentRunState.testRun.status, "completed",
+    "Reading an explicit completed run must not resume or reset it.");
+  const selectedFinishedEvents = await requestJson<{ error: string }>(
+    `${firstSessionStatePath.replace("/current-state", "/events")}?testRunId=${encodeURIComponent(betaRun.body.testRun.testRunId)}`
+  );
+  assert.equal(selectedFinishedEvents.status, 409, "A completed explicit run cannot silently stream another open run.");
+  assert.equal(selectedFinishedEvents.body.error, "participant_connection_unavailable");
+  const stillCurrentAlpha = await requestJson<{
+    currentRunState: { testRun: { testRunId: string; status: string } };
+  }>(firstSessionStatePath);
+  assert.equal(stillCurrentAlpha.body.currentRunState.testRun.testRunId, alphaRun.body.testRun.testRunId);
+  assert.equal(stillCurrentAlpha.body.currentRunState.testRun.status, "running");
+  const missingSelectedRun = await requestJson<{ error: string }>(`${firstSessionStatePath}?testRunId=missing-owned-run`);
+  assert.equal(missingSelectedRun.status, 404);
+  assert.equal(missingSelectedRun.body.error, "test_run_not_found");
+  const emptySelectedRun = await requestJson<{ error: string }>(`${firstSessionStatePath}?testRunId=`);
+  assert.equal(emptySelectedRun.status, 400);
+  assert.equal(emptySelectedRun.body.error, "test_run_id_required");
+
   await requestJson(
     `/api/v1/participant/test-runs/${alphaRun.body.testRun.testRunId}/complete`,
     { method: "POST" }
@@ -46307,6 +46334,7 @@ test("participant session launch can target a specific booklet", async () => {
       status: string;
     };
     testRun: {
+      testRunId: string;
       participantSessionId: string;
       bookletKey: string;
       currentUnitKey: string | null;
@@ -46338,6 +46366,17 @@ test("participant session launch can target a specific booklet", async () => {
   );
   assert.equal(directLaunch.body.testRun.bookletKey, "booklet:beta");
   assert.equal(directLaunch.body.testRun.currentUnitKey, "unit-beta-1");
+
+  const foreignSelectedRun = await requestJson<{ error: string }>(
+    `${firstSessionStatePath}?testRunId=${encodeURIComponent(directLaunch.body.testRun.testRunId)}`
+  );
+  assert.equal(foreignSelectedRun.status, 404, "An authorized session cannot select another participant's run.");
+  assert.equal(foreignSelectedRun.body.error, "test_run_not_found");
+  const foreignSelectedEvents = await requestJson<{ error: string }>(
+    `${firstSessionStatePath.replace("/current-state", "/events")}?testRunId=${encodeURIComponent(directLaunch.body.testRun.testRunId)}`
+  );
+  assert.equal(foreignSelectedEvents.status, 404);
+  assert.equal(foreignSelectedEvents.body.error, "test_run_not_found");
 
   const secondSignIn = await requestJson<{
     participantSession: { participantSessionId: string };

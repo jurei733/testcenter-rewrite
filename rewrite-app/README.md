@@ -51,6 +51,13 @@ protected SQLite API. It is also a mandatory quick browser CI step. This narrow
 fix does not yet permit switching to another unfinished Booklet; that separate
 P0 and full Original-UI acceptance remain explicitly open in `docs/PARITY.md`.
 
+New session re-entry links include the exact Run ID and preset assignment.
+Both interfaces bind state, asset loading and live updates to that authorized
+Run, so another test's background saves cannot replace the selected test.
+Historical session-only links remain supported. The focused smoke also proves
+selection isolation and monitor pause/resume with an explicitly owned two-run
+repository fixture; it does not claim the second starter launch is implemented.
+
 The optional Systemcheck Unit surface uses the same sandboxed Verona host and
 in-memory answers as the Rewrite layout. Both disable Player logging as in the
 Original. Previous/next and numbered navigation support keyboard activation;
