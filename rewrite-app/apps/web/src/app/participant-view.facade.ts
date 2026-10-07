@@ -3472,6 +3472,16 @@ export class ParticipantViewFacade {
           ? "queued_offline"
           : "save_failed";
         this.persistState();
+        if (
+          retrySave.testRunId !== save.testRunId ||
+          retrySave.deliveryId !== save.deliveryId
+        ) {
+          // A Player answer queued during the failed request has not had its
+          // own attempt yet. Keep the failed packet durable, but do not strand
+          // this newer one behind the old drain's offline status. The loop
+          // still stops on failure when no distinct packet arrived meanwhile.
+          continue;
+        }
         return;
       }
     }

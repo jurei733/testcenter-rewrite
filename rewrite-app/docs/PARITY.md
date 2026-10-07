@@ -1,5 +1,44 @@
 # Testcenter parity checklist
 
+### New Player answers during a failed save drain (2026-10-08)
+
+An owned protected SQLite/production browser run retained 22 entries after the
+STARS partial-delivery hard reload: the 21 deliberately blocked Units plus the
+already permitted visible Unit `2`. A deterministic regression executing the
+actual facade methods and durable browser outbox confirms a foreground race.
+While an older request is pending, a new Player answer queues its own packet,
+but the existing drain prevents another scheduler from starting. The older
+request's failure then marked the new, never-attempted packet offline and stopped
+the drain; its finalizer deliberately does not restart an offline queue.
+
+The drain now gives a distinct newly queued packet its own network attempt.
+Failure without a distinct packet still stops, including a requeued identical
+delivery, so this is not an automatic busy-retry loop. Previously secured failed
+independent Unit packets remain durable. Foreground navigation settlement continues
+to pause
+automatic sends, storage failure stays visible as `save_failed`, and responses,
+logs and delivery IDs remain unchanged. Foreign Run/unknown Unit messages retain
+the existing rejection boundary; sibling Run outboxes remain untouched.
+
+Nine actual-method regressions cover these cases, including the exact 28-Unit
+partial-delivery shape. Four of the first eight cases fail on the unchanged
+implementation and all nine pass with the correction. All 411 unit/frontend
+checks, typecheck and production Angular build pass; the initial bundle remains
+469.82 kB under the unchanged 470-kB error budget. The owned immutable-production
+headful Chrome/SQLite long sequence now passes the unchanged STARS crash,
+partial-drain hard-reload and capacity assertions: exactly seven delivered Units,
+exactly 21 retained undelivered responses, then successful delivery of all 28
+after removing the network fault. The same long sequence then passes both native
+ItemBuilder resource/re-entry proofs, Aspect and the optional Original Player
+surface, but still fails the unchanged radio `.check()` in `Test_Ctrl-26a` /
+`Cy-Bklt_TC-17a` on its second Unit `unit2`. Earlier radio checks record trusted
+input/change events; the failing check records no matching input event. This
+does not yet establish whether the remaining problem is in rendering, runtime
+replacement or native browser input. Its isolated 24/25 predecessor checks are
+not coverage of this failing 26a/second-Unit path. Controller/full-flow acceptance,
+fresh complete publication CI, all eight complete Original-UI rows and broader
+production acceptance remain open.
+
 ### Native shared-target ItemBuilder binding (2026-10-07)
 
 Fresh publication `fb391947` is not CI-green. Its PR monitor-review job fails at

@@ -74,6 +74,15 @@ and timers through the existing authorized resume use case instead. Reads and
 polling do not reset them; completed/locked Runs and monitor pauses stay guarded.
 The same mandatory gate covers all three non-saving modes in both interfaces.
 
+If a new Player answer arrives while an older automatic save is in flight, an
+older request failure no longer leaves the new packet unattempted behind that
+drain's offline status. Each distinct newly queued packet gets its own attempt;
+failure without a new packet stops and retains the exact durable response.
+Actual facade/outbox regressions run in `npm run test:frontend-state`. The strict
+28-Unit STARS partial-reload browser gate still requires seven confirmed Units
+and exactly 21 retained packets before the network fault is removed. This is
+separate from complete browser, CI, Original-UI and production acceptance.
+
 Run-bound browser addresses are synchronized through Angular Router, not native
 history replacement. Prevented Back/Forward keeps the exact selected Run and
 current draft; explicit interface selection survives reload. Reload actions wait
