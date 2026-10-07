@@ -989,17 +989,6 @@ export class ParticipantViewFacade {
       !this.canRequestUnitNavigation(forwardDeniedReasons)
         ? navigationDenial
         : "";
-    const unitNavigationLabelMode =
-      policy.navigation.unitLabel ?? "index";
-    const unitNavigationLabel =
-      unitNavigationLabelMode === "hidden"
-        ? ""
-        : unitNavigationLabelMode === "label"
-          ? unitLabel
-          : unitIndex >= 0
-            ? `Unit ${unitIndex + 1} / ${bookletUnits.length}`
-            : "";
-
     return {
       headline: unitLabel,
       detail: currentState.booklet.displayLabel,
@@ -1017,7 +1006,7 @@ export class ParticipantViewFacade {
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
-      unitNavigationLabel,
+      unitNavigationLabel: this.unitNavigationLabel,
       executionMode: executionMode.mode,
       executionModeLabel: executionMode.label,
       responsePersistenceLabel: executionMode.saveResponses
@@ -1195,7 +1184,30 @@ export class ParticipantViewFacade {
   }
 
   get showUnitTitle(): boolean {
-    return this.readCurrentRunState()?.booklet.policy.display.unitTitle ?? true;
+    const display = this.readCurrentRunState()?.booklet.policy.display;
+    return display?.toolbarUnitLabel !== undefined
+      ? display.toolbarUnitLabel !== "hidden" : display?.unitTitle ?? true;
+  }
+
+  get shortUnitLabel(): string {
+    const state = this.readCurrentRunState();
+    return state?.bookletUnits.find(unit => unit.unitKey === state.currentUnit.unitKey)?.shortLabel ||
+      state?.currentUnit.displayLabel || state?.currentUnit.unitKey || "";
+  }
+
+  get unitToolbarLabel(): string {
+    const state = this.readCurrentRunState();
+    return state?.booklet.policy.display.toolbarUnitLabel === "label_short"
+      ? this.shortUnitLabel : state?.currentUnit.displayLabel ?? state?.currentUnit.unitKey ?? "";
+  }
+
+  get unitNavigationLabel(): string {
+    const state = this.readCurrentRunState();
+    if (!state || this.unitNavigationLabelMode === "hidden") return "";
+    if (this.unitNavigationLabelMode === "label_short") return this.shortUnitLabel;
+    if (this.unitNavigationLabelMode === "label") return state.currentUnit.displayLabel ?? state.currentUnit.unitKey ?? "";
+    const index = state.bookletUnits.findIndex(unit => unit.unitKey === state.currentUnit.unitKey);
+    return index < 0 ? "" : `Unit ${index + 1} / ${state.bookletUnits.length}`;
   }
 
   get screenHeaderLabel(): string {
@@ -1221,6 +1233,8 @@ export class ParticipantViewFacade {
       }
       case "unit":
         return currentState.currentUnit.displayLabel ?? "";
+      case "unit_short":
+        return this.shortUnitLabel;
       default:
         return "";
     }
@@ -1524,7 +1538,7 @@ export class ParticipantViewFacade {
     };
   }
 
-  get unitNavigationLabelMode(): "hidden" | "index" | "label" {
+  get unitNavigationLabelMode(): "hidden" | "index" | "label" | "label_short" {
     return this.readCurrentRunState()?.booklet.policy.navigation.unitLabel ?? "index";
   }
 

@@ -945,7 +945,8 @@ export type ContentReleaseTestletEntry = SourcePackageTestletEntry;
 export type BookletLeaveRestriction = "off" | "forward" | "always";
 export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
 export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
-export type BookletUnitNavigationLabel = "hidden" | "index" | "label";
+export type BookletUnitNavigationLabel = "hidden" | "index" | "label" | "label_short";
+export type BookletUnitToolbarLabel = "hidden" | "label" | "label_short";
 export type BookletPageNavigationLabel = "hidden" | "index" | "label" | "list";
 export type BookletGlobalNavigationMode =
   | "hidden"
@@ -1001,7 +1002,9 @@ export type BookletRuntimePolicy = {
   display: {
     /** Optional so runtime snapshots created before global header visibility policy remain readable. */
     headerHidden?: boolean;
-    headerContent: "none" | "booklet" | "block" | "unit";
+    headerContent: "none" | "booklet" | "block" | "unit" | "unit_short";
+    /** Optional so pre-short-label snapshots retain their existing unitTitle visibility. */
+    toolbarUnitLabel?: BookletUnitToolbarLabel;
     unitTitle: boolean;
     fullscreenPrompt: boolean;
     fullscreenButton: boolean;

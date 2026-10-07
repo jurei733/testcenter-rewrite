@@ -7,10 +7,11 @@ an optional interface identical to the Original Testcenter. This is a separate
 acceptance axis from functional parity; the historical 94% estimate in
 PARITY.md does not measure it.
 
-Current upstream target, reverified on 2026-10-07:
+Current upstream target, reverified on 2026-10-08:
 `14c98284590195631750bb2352cb398ca669fe7d`. The protected-login busy states,
-insecure-context HTTPS notice, short Unit labels and toolbar on-primary colors
-require current acceptance evidence, not only the historical comparisons.
+insecure-context HTTPS notice and independent short Unit labels have current
+functional browser evidence. Toolbar on-primary colors and full-page visual
+identity require fresh comparison, not only the historical comparisons.
 See `PARITY.md` for the source-backed delta and separate deployment boundaries.
 
 Historical rendered reference: `iqb-berlin/testcenter` commit
@@ -32,6 +33,19 @@ Compare source files from that revision, not the older local checkout.
   them into the Original participant workflow.
 
 ## Acceptance matrix
+
+The current independent header/navigation/toolbar short-label keys now compile
+and render in both interfaces, including missing-short-label fallback, modern
+toolbar-key precedence and read-only projection of older stored source keys.
+The complete repository browser smoke includes seven native XML configurations
+at 1280 and 390 pixels, real UI login, native Controller radio input, Unit
+navigation and byte-exact same-Run reload. The owned production Chrome repetition
+passes all 28 cases, as does an independent bundled Chromium repetition. Smaller
+mobile Rewrite card padding fixes a reproduced
+vendor-content clipping failure without changing Original geometry or vendor
+files. These functional label gates are separate from freshly rendering the
+unmodified current upstream and comparing complete pages: none of the eight
+full-page rows below is closed by this implementation.
 
 The shared-target ItemBuilder correction retains the same exact native
 Participant/iframe/runtime binding when headless Chromium does not create a

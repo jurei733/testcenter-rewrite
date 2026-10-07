@@ -90,7 +90,7 @@ type RetiredVeronaFrame = {
         @if (originalUi && (status === 'running' || status === 'ready')) {
           <app-original-player-navigation
             [unitLabelMode]="unitNavigationLabelMode" [unitControls]="unitNavigationControls"
-            [unitTitle]="unitTitle" [unitNumber]="unitNumber" [unitCount]="unitCount"
+            [unitTitle]="unitNavigationLabel || unitTitle" [unitNumber]="unitNumber" [unitCount]="unitCount"
             [canPreviousUnit]="canRequestPreviousUnit" [canNextUnit]="canRequestNextUnit"
             [pageLabelMode]="pageNavigationLabelMode" [pageControlsHidden]="pageNavigationControlsHidden"
             [pageLabel]="pages[currentPageIndex]?.label ?? ''" [pageCount]="pages.length"
@@ -274,7 +274,8 @@ export class VeronaPlayerHostComponent
   @Input() unitCount = 1;
   @Input() originalUi = false;
   @Input() originalSystemCheckUi = false;
-  @Input() unitNavigationLabelMode: "hidden" | "index" | "label" = "index";
+  @Input() unitNavigationLabelMode: "hidden" | "index" | "label" | "label_short" = "index";
+  @Input() unitNavigationLabel = "";
   @Input() unitNavigationControls: "both" | "forward_only" | "hidden" = "both";
   @Input() canRequestPreviousUnit = false;
   @Input() canRequestNextUnit = false;

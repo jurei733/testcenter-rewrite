@@ -52,8 +52,13 @@ disable its code keypad and start action. Inactive protection and secure
 localhost remain usable; existing deployment protection is never switched off.
 `npm run smoke:ui:original-login-protected:built` verifies participant and
 second-code scopes on an owned API using a real insecure browser origin and is
-part of quick CI. Current upstream also adds short Unit labels and toolbar
-colors; those separate open requirements are tracked in `docs/PARITY.md`.
+part of quick CI. Current upstream's independent short Unit labels are supported
+in the header, navigation and toolbar, including full-label fallback and legacy
+toolbar-key precedence. The complete browser smoke tests seven native XML
+configurations in both interfaces at desktop and mobile widths, with real Player
+input and exact saved-answer reload. Narrow Rewrite Player cards use smaller
+padding without changing vendor files. Toolbar colors and complete Original-UI
+comparison remain separate requirements tracked in `docs/PARITY.md`.
 
 Assigned Booklets and preset variants can start independently while another
 Booklet is unfinished, then return to the starter and resume their exact saved

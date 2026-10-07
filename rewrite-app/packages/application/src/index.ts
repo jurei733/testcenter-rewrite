@@ -20580,6 +20580,14 @@ const resolveRuntimeBooklet = (
   const policyDefaults = compileBookletRuntimePolicy(
     bookletEntry.policy?.sourceConfig ?? {}
   );
+  // Project new presentation keys from old immutable snapshots without
+  // rewriting their policy, responses or navigation/locking state.
+  const toolbarUnitLabel = bookletEntry.policy?.display.toolbarUnitLabel ?? (
+    Object.keys(bookletEntry.policy?.sourceConfig ?? {}).some(
+      key => key.toLowerCase() === "toolbar_unit_label"
+    ) ? policyDefaults.display.toolbarUnitLabel
+      : bookletEntry.policy?.display.unitTitle === false ? "hidden" : "label"
+  );
 
   return {
     bookletKey: bookletEntry.bookletKey,
@@ -20590,8 +20598,9 @@ const resolveRuntimeBooklet = (
           navigation: {
             ...bookletEntry.policy.navigation,
             unitLabel:
-              bookletEntry.policy.navigation.unitLabel ??
-              policyDefaults.navigation.unitLabel,
+              policyDefaults.navigation.unitLabel === "label_short"
+                ? "label_short"
+                : bookletEntry.policy.navigation.unitLabel ?? policyDefaults.navigation.unitLabel,
             unitListEnabled:
               bookletEntry.policy.navigation.unitListEnabled ??
               policyDefaults.navigation.unitListEnabled
@@ -20601,6 +20610,13 @@ const resolveRuntimeBooklet = (
             loadingMode:
               bookletEntry.policy.player.loadingMode ??
               policyDefaults.player.loadingMode
+          },
+          display: {
+            ...bookletEntry.policy.display,
+            headerContent: policyDefaults.display.headerContent === "unit_short"
+              ? "unit_short" : bookletEntry.policy.display.headerContent,
+            toolbarUnitLabel,
+            unitTitle: toolbarUnitLabel !== "hidden"
           },
           persistence:
             bookletEntry.policy.persistence ?? policyDefaults.persistence

@@ -520,7 +520,7 @@ interface ParticipantVisibleCodeNotice {
           <ng-template #participantRunnableState>
           <header>
             <div>
-              <h3 *ngIf="view.showUnitTitle" id="participantRouteUnit">{{ view.player.headline }}</h3>
+              <h3 *ngIf="view.showUnitTitle" id="participantRouteUnit">{{ view.unitToolbarLabel }}</h3>
               <span id="participantRouteBooklet">{{ view.player.detail }}</span>
             </div>
             <span id="participantRouteStatus">{{ view.player.runStatus }}</span>
@@ -624,6 +624,7 @@ interface ParticipantVisibleCodeNotice {
               [unitCount]="verona.unitCount"
               [originalUi]="interfaceMode.mode() === 'original'"
               [unitNavigationLabelMode]="view.unitNavigationLabelMode"
+              [unitNavigationLabel]="view.unitNavigationLabel"
               [unitNavigationControls]="view.unitNavigationControls"
               [canRequestPreviousUnit]="view.player.canRequestPreviousUnit"
               [canRequestNextUnit]="view.player.canRequestNextUnit"

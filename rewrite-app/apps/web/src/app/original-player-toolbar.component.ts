@@ -15,7 +15,7 @@ import { OriginalOverlayStylesComponent } from "./original-overlay-styles.compon
     <app-original-overlay-styles />
     <app-original-player-surface-styles />
     <div id="originalPlayerToolbar" class="toolbar-header" data-cy="unit-screenheader">
-      @if (view.showUnitTitle) { <p data-cy="unit-title">{{ view.player.headline }}</p> }
+      @if (view.showUnitTitle) { <p data-cy="unit-title">{{ view.unitToolbarLabel }}</p> }
       <div class="toolbar-right" data-cy="toolbar-right">
         @if (view.player.testletTimer?.showTimeLeft) {
           <p data-cy="time-value">Verbleibende Zeit: {{ view.player.testletTimer?.remainingLabel }}</p>

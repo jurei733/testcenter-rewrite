@@ -1,5 +1,61 @@
 # Testcenter parity checklist
 
+### Current independent short Unit labels (2026-10-08)
+
+The upstream target remains `14c98284590195631750bb2352cb398ca669fe7d`,
+independently reverified against remote `master` on 2026-10-08. Actual source
+configuration defaults the header to the Booklet label, navigation to the Unit
+index and toolbar to the full Unit label. Header `UNIT_LABEL_SHORT`, navigation
+`LABEL_SHORT` and toolbar `LABEL_SHORT` now compile and render independently.
+Absent or empty `labelshort` falls back to the selected Unit's full label.
+Modern `toolbar_unit_label` takes precedence by key presence, followed by
+`toolbar_show_unit_title` and then older `unit_title`; explicit newer empty keys
+do not fall through to older values. `HIDDEN` remains a rendering decision,
+not an authorization or Player-metadata change.
+
+Older immutable snapshots project their previously unsupported short-label
+source keys when read. Explicit historical values without those source keys,
+including a hidden header/title, remain unchanged. This does not rewrite a
+release, create/reset a Run, replace a saved answer or alter navigation locks.
+The actual facade's Verona `unitTitle` and iframe title remain the full label;
+the visual navigation label does not remount or reconfigure the Player.
+
+Four compiler and twelve actual-facade/projection/corpus regressions run in
+the normal test commands. All 432 core/frontend checks, typecheck and the
+production build pass. All 164 API tests pass separately in memory, file and
+SQLite (492 total). The official historical corpus's literal policy expectations
+add only the new toolbar mode; its other exact assertions and vendor bytes are
+unchanged. The production initial bundle is 469.98 kB, still under the unchanged
+470-kB error budget; its existing warning thresholds are not raised.
+
+The new `participant-current-unit-labels` section of the complete repository
+browser smoke uses seven checked-in, source-derived configurations and native
+Booklet 18.0 XML with aliases of the unchanged pinned Controller Unit/Player.
+It performs real UI login in fresh contexts, independent exact labels, a
+missing-short-label second Unit, trusted native radio input, forward/backward
+navigation, exact durable answer and same-Run hard reload. Its owned strict
+Original-19/immutable-production Chrome 154 run passes all 28 combinations
+(seven configurations, both interfaces, 1280/390 widths). Operator credential
+leaks and browser page errors must be zero. Bundled Chromium 147 independently
+passes the same 28 cases on its own fixture (56 browser cases total). The newly
+extended whole sequence and fresh publication CI are separate checks.
+
+The initial mobile Rewrite repetition fails because its nested cards shrink
+the unchanged Player to 280 pixels while the vendor reserves `9em` on each
+side. The native radio is clipped behind the form's hit target. Original's
+390-pixel surface passes the same real input. Only mobile Rewrite Player/card
+padding is reduced; the final seven mobile Rewrite cases pass without forced
+clicks, synthetic events, added retry loops, vendor/CSS injection or sandbox changes.
+
+The preceding unchanged `5e69fb1d` complete protected SQLite/production Chrome
+sequence also passes through monitor, exports and teardown. It is not proof
+of these new label changes. That publication still has a remote PostgreSQL UI
+failure: group deletion reports 45 logs against a previously captured 44-log
+snapshot. Its cause and exact deletion evidence remain to be resolved; local
+SQLite success is not PostgreSQL or merge acceptance. Toolbar on-primary
+colors, all eight full-page Original-UI rows and broader production acceptance
+remain open. This step is not a 100-percent or merge-ready claim.
+
 ### Original Controller native input after viewport rendering (2026-10-08)
 
 The remaining `Test_Ctrl-26a` / `Cy-Bklt_TC-17a` second-Unit radio failure
@@ -1093,7 +1149,7 @@ acceptance requirements.
 
 ## Current 19.0 delta to verify
 
-GitHub `master` was fetched and independently reverified on 2026-10-07 at
+GitHub `master` was fetched and independently reverified on 2026-10-08 at
 `14c98284590195631750bb2352cb398ca669fe7d`. Its twelve commits after `a570587f`
 add two product requirements beyond the earlier audit:
 
@@ -1101,9 +1157,10 @@ add two product requirements beyond the earlier audit:
   `navbar_unit_label=LABEL_SHORT` and the new `toolbar_unit_label=LABEL_SHORT`.
   Missing `labelshort` falls back to the full Unit label. The toolbar setting
   also supports `LABEL` and `HIDDEN`; deprecated `toolbar_show_unit_title` and
-  older `unit_title` retain their resolved precedence. Update intake contracts,
-  runtime presentation, current fixtures and both interfaces' rendering gates
-  before counting this new requirement as complete.
+  older `unit_title` retain their resolved precedence. Intake contracts,
+  read-only historical projection, both interfaces and a permanent native
+  desktop/mobile browser corpus now implement this requirement; see the
+  2026-10-08 acceptance section above. This does not close complete visual parity.
 - Original Material toolbars now use `on-primary` for text and icons, including
   Review panels; disabled icons use its 38-percent transparent mixture. Fresh
   three-theme header, Player and side-panel comparisons are required.

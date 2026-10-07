@@ -16,6 +16,7 @@ import { matchesParticipantRunRequest } from "./participant-run-request-match.mj
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
+import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -20070,6 +20071,16 @@ try {
     )
   );
   stopAfter("participant-original-test-controller");
+
+  await restorePlatformAdminSession();
+  logStep("participant-current-unit-labels");
+  await runParticipantUnitLabelSmoke({ browser, baseUrl,
+    tenantKey: `${tenantKey}-unit-labels`, workspaceKey: `${workspaceKey}-unit-labels`,
+    sendJson: sendSmokeJson, createZip: createStoredZipBuffer,
+    unitDocument: testControllerUnitDocuments.find(document => document.unitKey === "CY-Unit.Sample-101").content,
+    playerDocument: testControllerPlayerDocument, operatorToken: smokeAdminSessionToken
+  });
+  stopAfter("participant-current-unit-labels");
 
   await restorePlatformAdminSession();
   logStep("nav-runtime");

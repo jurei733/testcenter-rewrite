@@ -22947,6 +22947,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
     display: {
       headerHidden: boolean;
       headerContent: string;
+      toolbarUnitLabel: string;
       unitTitle: boolean;
       fullscreenPrompt: boolean;
       fullscreenButton: boolean;
@@ -23020,6 +23021,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       display: {
         headerHidden: false,
         headerContent: "none",
+        toolbarUnitLabel: "label",
         unitTitle: true,
         fullscreenPrompt: false,
         fullscreenButton: false,
@@ -23053,6 +23055,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       display: {
         headerHidden: false,
         headerContent: "unit",
+        toolbarUnitLabel: "hidden",
         unitTitle: false,
         fullscreenPrompt: true,
         fullscreenButton: true,
@@ -23086,6 +23089,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       display: {
         headerHidden: false,
         headerContent: "booklet",
+        toolbarUnitLabel: "label",
         unitTitle: true,
         fullscreenPrompt: false,
         fullscreenButton: false,
@@ -23119,6 +23123,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       display: {
         headerHidden: false,
         headerContent: "block",
+        toolbarUnitLabel: "label",
         unitTitle: true,
         fullscreenPrompt: false,
         fullscreenButton: false,

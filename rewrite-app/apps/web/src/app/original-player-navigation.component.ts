@@ -41,7 +41,7 @@ import { OriginalNavigationControlComponent } from "./original-navigation-contro
   styleUrls: ["./original-player-navigation.component.css", "./original-login-theme.scss"]
 })
 export class OriginalPlayerNavigationComponent {
-  @Input() unitLabelMode: "hidden" | "index" | "label" = "index";
+  @Input() unitLabelMode: "hidden" | "index" | "label" | "label_short" = "index";
   @Input() unitTitle = "";
   @Input() unitNumber = 1;
   @Input() unitCount = 1;

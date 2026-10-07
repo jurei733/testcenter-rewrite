@@ -188,6 +188,74 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   }
 });
 
+test("current Original defaults and independent short Unit label settings are compiled", () => {
+  const defaults = compileBookletRuntimePolicy({});
+  assert.equal(defaults.display.headerContent, "booklet");
+  assert.equal(defaults.display.toolbarUnitLabel, "label");
+  assert.equal(defaults.display.unitTitle, true);
+
+  const short = compileBookletRuntimePolicy({
+    header_content: "UNIT_LABEL_SHORT",
+    navbar_unit_label: "LABEL_SHORT",
+    toolbar_unit_label: "LABEL_SHORT"
+  });
+  assert.equal(short.display.headerContent, "unit_short");
+  assert.equal(short.navigation.unitLabel, "label_short");
+  assert.equal(short.display.toolbarUnitLabel, "label_short");
+  assert.equal(short.display.unitTitle, true);
+
+  const independent = compileBookletRuntimePolicy({
+    header_content: "UNIT_LABEL", navbar_unit_label: "LABEL_SHORT", toolbar_unit_label: "HIDDEN"
+  });
+  assert.equal(independent.display.headerContent, "unit");
+  assert.equal(independent.navigation.unitLabel, "label_short");
+  assert.equal(independent.display.toolbarUnitLabel, "hidden");
+  assert.equal(independent.display.unitTitle, false);
+});
+
+test("modern toolbar labels win over both legacy title keys without changing source values", () => {
+  for (const [value, expected] of [["LABEL", "label"], ["LABEL_SHORT", "label_short"], ["HIDDEN", "hidden"]] as const) {
+    for (const legacy of ["TRUE", "FALSE", "ON", "OFF"]) {
+      const source = { toolbar_unit_label: value, toolbar_show_unit_title: legacy, unit_title: legacy };
+      const policy = compileBookletRuntimePolicy(source);
+      assert.equal(policy.display.toolbarUnitLabel, expected);
+      assert.equal(policy.display.unitTitle, expected !== "hidden");
+      assert.deepEqual(policy.sourceConfig, source);
+    }
+  }
+});
+
+test("toolbar title migration preserves configured-key precedence, TRUE/FALSE and ON/OFF", () => {
+  for (const [config, expected] of [
+    [{ unit_title: "OFF" }, "hidden"], [{ unit_title: "ON" }, "label"],
+    [{ toolbar_show_unit_title: "FALSE" }, "hidden"], [{ toolbar_show_unit_title: "TRUE" }, "label"],
+    [{ toolbar_show_unit_title: "OFF" }, "hidden"], [{ toolbar_show_unit_title: "ON" }, "label"],
+    [{ toolbar_show_unit_title: "TRUE", unit_title: "OFF" }, "label"],
+    [{ toolbar_show_unit_title: "FALSE", unit_title: "ON" }, "hidden"],
+    [{ toolbar_unit_label: "", toolbar_show_unit_title: "FALSE" }, "label"],
+    [{ toolbar_show_unit_title: "", unit_title: "OFF" }, "label"]
+  ] as const) {
+    const policy = compileBookletRuntimePolicy(config);
+    assert.equal(policy.display.toolbarUnitLabel, expected, JSON.stringify(config));
+    assert.equal(policy.display.unitTitle, expected !== "hidden", JSON.stringify(config));
+  }
+});
+
+test("short Unit label config arrays and legacy header aliases stay compatible", () => {
+  const policy = compileBookletRuntimePolicy([
+    { key: "header_content", text: "UNIT_LABEL_SHORT" },
+    { key: "navbar_unit_label", value: "LABEL_SHORT" },
+    { key: "toolbar_unit_label", value: "LABEL_SHORT" }
+  ]);
+  assert.equal(policy.display.headerContent, "unit_short");
+  assert.equal(policy.navigation.unitLabel, "label_short");
+  assert.equal(policy.display.toolbarUnitLabel, "label_short");
+  for (const [value, expected] of [
+    ["OFF", "none"], ["EMPTY", "none"], ["WITH_UNIT_TITLE", "unit"],
+    ["WITH_BOOKLET_TITLE", "booklet"], ["WITH_BLOCK_TITLE", "block"]
+  ] as const) assert.equal(compileBookletRuntimePolicy({ unit_screenheader: value }).display.headerContent, expected);
+});
+
 test("booklet config arrays and completeness rules are normalized", () => {
   const config = readBookletConfigValues([
     { key: "force_presentation_complete", value: "ALWAYS" },

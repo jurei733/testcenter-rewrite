@@ -144,7 +144,7 @@ const compileLegacyUnitNavigation = (value: string): {
 };
 
 const compileUnitNavigationLabel = (value: string): BookletUnitNavigationLabel =>
-  choice(value, ["hidden", "index", "label"] as const, "index");
+  choice(value, ["hidden", "index", "label", "label_short"] as const, "index");
 
 const compilePageNavigationLabel = (
   modernValue: string,
@@ -221,10 +221,17 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
     "navbar_unit_controls_hidden"
   );
   const modernUnitLabel = findSourceValue("navbar_unit_label");
+  const modernToolbarLabel = findSourceValue("toolbar_unit_label");
+  const legacyToolbarTitle =
+    findSourceValue("toolbar_show_unit_title") ?? read("unit_title");
+  const toolbarUnitLabel = modernToolbarLabel !== undefined
+    ? choice(modernToolbarLabel, ["hidden", "label", "label_short"] as const, "label")
+    : on(legacyToolbarTitle, true) ? "label" : "hidden";
   const playerEnd = read("allow_player_to_terminate_test");
-  const headerContent = read("header_content", "unit_screenheader")
+  const headerValue = (findSourceValue("header_content") ?? read("unit_screenheader")).toUpperCase();
+  const headerContent = ["OFF", "EMPTY"].includes(headerValue) ? "none" : headerValue
     .replace(/^WITH_/, "")
-    .replace(/_(?:TITLE|LABEL)$/, "");
+    .replace(/_(?:TITLE|LABEL)(?=_SHORT$|$)/, "");
 
   return {
     version: 1,
@@ -289,10 +296,11 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       headerHidden: on(read("header_hidden"), false),
       headerContent: choice(
         headerContent,
-        ["none", "booklet", "block", "unit"] as const,
-        "none"
+        ["none", "booklet", "block", "unit", "unit_short"] as const,
+        "booklet"
       ),
-      unitTitle: on(read("toolbar_show_unit_title", "unit_title"), true),
+      toolbarUnitLabel,
+      unitTitle: toolbarUnitLabel !== "hidden",
       fullscreenPrompt: on(read("ask_for_fullscreen"), false),
       fullscreenButton: on(
         read("toolbar_show_fullscreen_button", "show_fullscreen_button"),
