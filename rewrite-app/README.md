@@ -69,6 +69,16 @@ for URL synchronization rather than reopening a stale assignment. These shared
 safeguards are covered by the mandatory variant browser gate and actual facade
 regressions, not a claim of complete Original-UI identity.
 
+The focused ItemBuilder smoke also accepts `UI_SMOKE_FRONTEND_ROOT` for immutable
+production assets, `UI_SMOKE_BROWSER_CHANNEL` and `UI_SMOKE_HEADFUL`. With
+operator authentication enabled it signs in through the real operator API only
+for fixture setup; participant browser requests never receive that credential.
+Owned temporary screenshots/traces and redacted native Chromium frame diagnostics
+are retained on failure without replacing the original assertion. These native
+observations are diagnostic evidence, not a substitute for passing interactive
+Player tests. The unresolved ItemBuilder/headful gate and full CI remain tracked
+separately in `docs/PARITY.md`.
+
 Workspace Study Monitor, historical activity and Content Run-specific cards
 also bind the Run they represent. Full Run records retain the exact preset
 assignment, while genuinely session-only cards keep their fallback. Actual

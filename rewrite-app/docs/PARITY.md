@@ -1,5 +1,36 @@
 # Testcenter parity checklist
 
+### Protected ItemBuilder failure evidence (2026-10-07)
+
+Publication `428f1a68` has advanced to 32 successful push-CI jobs, but its native
+PostgreSQL UI job fails the post-deletion Result Group removal assertion at
+`smoke-ui.mjs:25687`. The DELETE and follow-up reads return 200; the group card
+remains visible. This is separate from the locally retained headful ItemBuilder
+failure. Two other push jobs are still live at this observation; this is not
+complete green CI or merge acceptance.
+
+The owned protected SQLite/immutable production ItemBuilder smoke repeatedly
+reproduces its strict nested-frame wait failure in both Chrome and bundled
+Chromium. Actual protected HTTP probes return the expected runtime HTML and
+JavaScript with both hash-pinned compatibility adapters. Native Chromium frame
+inspection finds the missing-from-Playwright nested runtime, its adapter, two
+inputs and nonzero visible control geometry. That does not establish rendered
+or interactive acceptance. Neither scrolling the outer Player into view nor a
+discarded diagnostic-only test-library change resolves the existing assertion;
+no runtime, sandbox, production frontend or raw fixture bytes were changed.
+
+The focused smoke now supports an immutable frontend root, real operator sign-in
+when that guard is enabled, selected browser channel and an explicit headful
+mode. It retains owned screenshots/traces plus bounded, read-only native frame
+diagnostics on failure, redacts resource capabilities and credentials, and never
+prints participant input values. Diagnostic errors, deadlines and late session
+attachment cannot replace the original test failure. Five helper regressions
+and all 358 unit/frontend checks pass. Every original nested-frame, control,
+interaction-score and byte-exact durable-reload assertion remains mandatory;
+the local ItemBuilder cause and PostgreSQL Result Group failure remain open.
+This diagnostic implementation closes no complete Original-UI matrix row or
+production-compatibility requirement.
+
 ### Router-synchronized participant re-entry (2026-10-07)
 
 Publication `529ca629` passes 20 jobs but fails 15 UI jobs in its completed

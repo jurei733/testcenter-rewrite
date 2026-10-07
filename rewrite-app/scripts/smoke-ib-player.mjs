@@ -1,19 +1,25 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import { captureChromiumFrameDiagnostics, redactBrowserDiagnostic } from "./chromium-frame-diagnostics.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
+const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
+const artifacts = await mkdtemp(join(tmpdir(), "testcenter-ib-player-"));
+process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const ibRuntimeReadyTimeoutMs = 60_000;
 
 const readBrotliBase64Text = async fixturePath =>
@@ -118,10 +124,14 @@ const pollReady = async url => {
   throw lastError ?? new Error(`Timed out waiting for ${url}`);
 };
 
+let operatorToken;
 const sendJson = async (url, body) => {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(operatorToken ? { authorization: `Bearer ${operatorToken}` } : {})
+    },
     body: JSON.stringify(body)
   });
   assert.equal(
@@ -162,16 +172,44 @@ if (store === "sqlite") {
 const port = await allocatePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, [serverEntry], {
+  cwd: frontendRoot,
   stdio: "inherit",
   env: { ...process.env, PORT: String(port), FIRST_SLICE_STORE: store,
     FIRST_SLICE_XML_SCHEMA_PROFILE: process.env.FIRST_SLICE_XML_SCHEMA_PROFILE || "legacy-compatibility" }
 });
 let browser;
+let context;
+let page;
+let participantOperatorCredentialLeaks = 0;
 
 try {
   await pollReady(`${baseUrl}/readyz`);
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  if (["1", "true", "yes", "on"].includes(String(process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED || "").toLowerCase())) {
+    const signedIn = await sendJson(`${baseUrl}/api/v1/admin/auth/sign-in`, {
+      username: process.env.UI_SMOKE_ADMIN_USERNAME || "demo-admin",
+      password: process.env.UI_SMOKE_ADMIN_PASSWORD || "demo-admin-password"
+    });
+    operatorToken = (await signedIn.json()).sessionToken;
+    assert.ok(operatorToken, "Protected fixture setup requires a real operator session.");
+  }
+  const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
+  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+    channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined });
+  context = await browser.newContext();
+  await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  page = await context.newPage();
+  page.on("request", request => {
+    if (operatorToken && request.url().startsWith(`${baseUrl}/api/v1/participant/`) &&
+        request.headers().authorization === `Bearer ${operatorToken}`) {
+      participantOperatorCredentialLeaks += 1;
+    }
+  });
+  page.on("pageerror", error => process.stderr.write(`ib_page_error=${redactBrowserDiagnostic(error)}\n`));
+  page.on("requestfailed", request => {
+    if (request.url().includes("/IB_SAMPLE_2025/")) {
+      process.stderr.write(redactBrowserDiagnostic(`ib_resource_failure=${request.url()}: ${request.failure()?.errorText}\n`));
+    }
+  });
   participantHttpActor.observePage(page);
   const corpus = JSON.parse(
     await readFile("test-fixtures/original-testcenter/corpus.json", "utf8")
@@ -380,9 +418,19 @@ try {
     restoredState.currentRunState.testRun.unitResponses[unitKey],
     savedUnitResponse
   );
+  assert.equal(participantOperatorCredentialLeaks, 0,
+    "Participant browser requests must never carry the fixture operator credential.");
   process.stdout.write(
     `IB player smoke passed interactive state capture and reload for store=${store}\n`
   );
+  await page.screenshot({ path: join(artifacts, "restored.png"), fullPage: true });
+  await context.tracing.stop({ path: join(artifacts, "trace.zip") });
+} catch (error) {
+  if (page && context) await captureChromiumFrameDiagnostics(context, page,
+    line => process.stderr.write(`${line}\n`)).catch(() => undefined);
+  await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => undefined);
+  await context?.tracing.stop({ path: join(artifacts, "failure-trace.zip") }).catch(() => undefined);
+  throw error;
 } finally {
   await browser?.close();
   await stopChild(child);
