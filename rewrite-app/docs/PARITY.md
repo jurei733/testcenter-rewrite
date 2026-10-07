@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Workspace and Content operator re-entry links (2026-10-07)
+
+The third immutable protected SQLite flow passes the generated-entry and Runtime
+session-link assertions, then fails the exact Study Monitor Group Detail link at
+`smoke-ui.mjs:24344`. This is a confirmed application omission, not another obsolete
+expected URL: Workspace cards know the represented Run but omit its ID from the
+Participant link. The same omission exists on Content activation blockers and
+release Run cards. Group session cards also prefer the first roster Booklet over
+the represented latest Run, which can point at the wrong assignment variant.
+
+All eight Workspace link projections and both Run-specific Content projections
+now include the Run actually represented by their card. Complete Run records use
+their exact preset assignment; participant Unit rows resolve it from their own
+Run ID. Group session cards prefer that latest Run's assignment/Booklet before
+the roster fallback. Historical activity links use a Run subject's ID, or an
+explicit Run ID in another event's details, never a chronological Run inferred
+from the current session. Session-only cards and sessions without a Run retain
+their legitimate fallback. No API authorization, answer, status or launch guard
+is changed.
+
+Thirteen regressions execute the actual facade getters/helpers, including two
+preset variants in one session, historical subject/detail disagreement, missing
+Run/session data, fallback links and credential exclusion. Ten fail before the
+application change; all thirteen pass afterward. All 165 core, 12 presence and
+108 frontend tests, typecheck and the 469.82kB production build pass. The initial
+450kB warning remains below the unchanged 470kB hard budget.
+
+An owned protected SQLite/headful Chrome check passes in both interfaces: real
+operator/participant login and generated entry, exact Group/Participant/Booklet/
+Unit detail links, actual link opening, exact answer restoration after hard
+reload, and Content release Run links. Both participants' opaque answers and
+running status stay unchanged. The first focused attempt reached successful
+monitor re-entry/reload, but did not explicitly load the Content release detail;
+that test-only setup omission is retained separately. The corrected attempt uses
+the actual `Select + Load` action. Evidence is ignored under
+`.data/operator-run-links-20261007.*`.
+
+The complete protected SQLite flow is being repeated against an immutable copy
+of this production build. Fresh remote CI, PostgreSQL browser acceptance, the
+Memory/headful ItemBuilder failure, the multi-Booklet P0 and complete Original-UI
+acceptance remain separate open gates; these narrow green checks do not prove
+100% parity or merge readiness.
+
 ### Generated entry and selected-run re-entry acceptance (2026-10-07)
 
 The `a88f166f` publication passes the selected-Run monitor reconnect gate, but
@@ -31,7 +74,8 @@ immutable protected SQLite flow then fails an immediate Player geometry read;
 its retained failure screenshot already shows the full-height Original layout.
 That gate now waits for the same height/top-position invariant, with its
 existing 15-second settling deadline, before sampling and asserting it. The
-complete SQLite flow is being repeated. The separate immutable Memory/headful
+complete SQLite flow was repeated; its later Group Detail failure is tracked
+above. The separate immutable Memory/headful
 Chrome flow fails the ItemBuilder runtime-download wait at `smoke-ui.mjs:16979`
 with a blank Player frame, despite the displayed correct IB participant/Run.
 The same failure occurred earlier; it is not explained away by the previously

@@ -1782,6 +1782,7 @@ export class ContentViewFacade {
             ...this.participantSessionLinkRows(participantSessionId, {
               loginKey: openRun.loginKey,
               groupKey: openRun.groupKey,
+              testRunId: openRun.testRunId,
               bookletKey: openRun.bookletKey
             }),
             { label: "Booklet", value: openRun.bookletKey },
@@ -2216,7 +2217,8 @@ export class ContentViewFacade {
             ...this.participantSessionLinkRows(testRun.participantSessionId, {
               loginKey: matchingParticipantSession?.loginKey,
               groupKey: matchingParticipantSession?.groupKey,
-              bookletKey: testRun.bookletKey
+              testRunId: testRun.testRunId,
+              bookletKey: testRun.bookletAssignmentKey ?? testRun.bookletKey
             }),
             {
               label: "Current Unit",

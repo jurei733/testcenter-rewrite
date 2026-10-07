@@ -51,6 +51,17 @@ Player invariant after layout settling. This closes no full UI row. The separate
 immutable Memory/headful Chrome ItemBuilder blank-frame failure remains open;
 see `PARITY.md` for the retained evidence and publication boundaries.
 
+The subsequent full SQLite flow exposed omitted Run IDs in Workspace/Content
+operator links. Their Run-specific cards now bind the represented Run and exact
+preset assignment instead of an unrelated roster/default selection. Real owned
+protected SQLite/headful Chrome checks pass in both interfaces for Group,
+Participant, Booklet and Unit detail links, actual link opening, hard-reload
+answer restoration and Content release Run links; both participants' answers and
+statuses are preserved. Thirteen actual-getter regressions cover variant and
+historical/fallback boundaries. This shared functional fix changes no rendered
+Original-reference acceptance row and proves neither full UI identity nor the
+still-blocked second unfinished Booklet launch.
+
 The shared backend now permits exact preset-assignment resumption after returning
 to the starter, rather than rejecting its variant key against the source Booklet
 key. Both interfaces passed real participant login, Unicode draft preservation,

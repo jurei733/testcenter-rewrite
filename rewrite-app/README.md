@@ -58,6 +58,14 @@ Historical session-only links remain supported. The focused smoke also proves
 selection isolation and monitor pause/resume with an explicitly owned two-run
 repository fixture; it does not claim the second starter launch is implemented.
 
+Workspace Study Monitor, historical activity and Content Run-specific cards
+also bind the Run they represent. Full Run records retain the exact preset
+assignment, while genuinely session-only cards keep their fallback. Actual
+facade regressions run in `npm run test:frontend-state`; protected SQLite/browser
+checks cover both interfaces' monitor links, link opening and answer restoration
+after reload. Full CI, multi-Booklet launch and Original-UI acceptance remain
+independent gates in `docs/PARITY.md`.
+
 The optional Systemcheck Unit surface uses the same sandboxed Verona host and
 in-memory answers as the Rewrite layout. Both disable Player logging as in the
 Original. Previous/next and numbered navigation support keyboard activation;

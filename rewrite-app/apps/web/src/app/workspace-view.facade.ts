@@ -444,7 +444,11 @@ export class WorkspaceViewFacade {
             { label: "Test Run", value: row.testRunId ?? "none" },
             ...this.participantSessionLinkRows(row.participantSessionId, {
               loginKey: row.loginKey,
-              bookletKey: row.bookletKey
+              groupKey: row.groupKey,
+              testRunId: row.testRunId,
+              bookletKey:
+                detail.testRuns.find(item => item.testRun.testRunId === row.testRunId)
+                  ?.testRun.bookletAssignmentKey ?? row.bookletKey
             }),
             { label: "Response Length", value: String(row.responseLength) },
             {
@@ -492,7 +496,8 @@ export class WorkspaceViewFacade {
               {
                 loginKey: item.participantSession?.loginKey,
                 groupKey: item.participantSession?.groupKey,
-                bookletKey: item.testRun.bookletKey
+                testRunId: item.testRun.testRunId,
+                bookletKey: item.testRun.bookletAssignmentKey ?? item.testRun.bookletKey
               }
             ),
             { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -1217,7 +1222,8 @@ export class WorkspaceViewFacade {
               {
                 loginKey: this.monitorParticipantLogin(item),
                 groupKey: item.participantSession?.groupKey,
-                bookletKey: item.testRun.bookletKey
+                testRunId: item.testRun.testRunId,
+                bookletKey: item.testRun.bookletAssignmentKey ?? item.testRun.bookletKey
               }
             ),
             { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -1360,9 +1366,11 @@ export class WorkspaceViewFacade {
             {
               loginKey: session.participantSession.loginKey,
               groupKey: session.participantSession.groupKey,
+              testRunId: session.latestTestRun?.testRunId,
               bookletKey:
-                session.participantRosterEntry?.bookletKey ??
-                session.latestTestRun?.bookletKey
+                session.latestTestRun?.bookletAssignmentKey ??
+                session.latestTestRun?.bookletKey ??
+                session.participantRosterEntry?.bookletKey
             }
           ),
           {
@@ -1453,7 +1461,8 @@ export class WorkspaceViewFacade {
               {
                 loginKey: this.monitorParticipantLogin(item),
                 groupKey: item.participantSession?.groupKey,
-                bookletKey: item.testRun.bookletKey
+                testRunId: item.testRun.testRunId,
+                bookletKey: item.testRun.bookletAssignmentKey ?? item.testRun.bookletKey
               }
             ),
             { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -1591,7 +1600,8 @@ export class WorkspaceViewFacade {
               {
                 loginKey: this.monitorParticipantLogin(item),
                 groupKey: item.participantSession?.groupKey,
-                bookletKey: item.testRun.bookletKey
+                testRunId: item.testRun.testRunId,
+                bookletKey: item.testRun.bookletAssignmentKey ?? item.testRun.bookletKey
               }
             ),
             { label: "Booklet", value: item.testRun.bookletKey },
@@ -2258,7 +2268,10 @@ export class WorkspaceViewFacade {
             {
               loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
               groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
-              bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
+              testRunId: this.getActivityTestRunId(item.activityEvent),
+              bookletKey:
+                readStringValue(item.activityEvent.details, ["bookletAssignmentKey"]) ??
+                readStringValue(item.activityEvent.details, ["bookletKey"])
             }
           ),
           { label: "Event Id", value: item.activityEvent.activityEventId }
@@ -2359,7 +2372,10 @@ export class WorkspaceViewFacade {
               {
                 loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
                 groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
-                bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
+                testRunId: this.getActivityTestRunId(item.activityEvent),
+                bookletKey:
+                  readStringValue(item.activityEvent.details, ["bookletAssignmentKey"]) ??
+                  readStringValue(item.activityEvent.details, ["bookletKey"])
               }
             ),
             ...detailRows
@@ -3184,6 +3200,14 @@ export class WorkspaceViewFacade {
     }
 
     return detailParticipantSessionId;
+  }
+
+  private getActivityTestRunId(
+    event: ListWorkspaceActivityEventsResponse["items"][number]["activityEvent"]
+  ): string | null {
+    return event.subjectType === "test_run"
+      ? event.subjectId
+      : readStringValue(event.details, ["testRunId"]);
   }
 
   private isActivitySubjectSelected(subjectType: string, subjectId: string): boolean {
