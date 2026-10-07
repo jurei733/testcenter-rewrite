@@ -18764,6 +18764,11 @@ try {
     };
   };
   const completeOriginalControllerUnit = async frame => {
+    // Complete a real viewport render of the opaque frame before native input.
+    // Chrome can target its owner when check() combines an off-screen scroll
+    // and immediate radio click. Keep the checked-state assertion unchanged.
+    await page.locator("#participantVeronaPlayerFrame").scrollIntoViewIfNeeded();
+    await page.locator("#participantVeronaPlayerFrame").screenshot();
     await frame
       .locator('[data-cy="TestController-radio1-Aufg1"]')
       .check();

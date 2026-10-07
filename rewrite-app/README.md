@@ -83,6 +83,13 @@ Actual facade/outbox regressions run in `npm run test:frontend-state`. The stric
 and exactly 21 retained packets before the network fault is removed. This is
 separate from complete browser, CI, Original-UI and production acceptance.
 
+The Original Controller smoke completes a render of the scrolled exact Player
+iframe before its native radio check. This avoids a reproduced Chrome 154
+off-screen input-targeting failure; native checked-state, saved response and
+navigation-lock assertions remain unchanged. Actual-helper regressions run in
+`npm run test:frontend-state`. The eight-case Chrome/Chromium passes do not replace
+complete-flow, publication CI or full Original-UI acceptance.
+
 Run-bound browser addresses are synchronized through Angular Router, not native
 history replacement. Prevented Back/Forward keeps the exact selected Run and
 current draft; explicit interface selection survives reload. Reload actions wait

@@ -1,5 +1,43 @@
 # Testcenter parity checklist
 
+### Original Controller native input after viewport rendering (2026-10-08)
+
+The remaining `Test_Ctrl-26a` / `Cy-Bklt_TC-17a` second-Unit radio failure
+reproduces in an owned isolated protected SQLite/production Chrome 154 run.
+Its trace records a trusted click on the outer Player iframe, no radio
+input/change event and an unchanged unchecked radio. The pre-click DOM contains
+one visible enabled radio at the expected inner coordinates, while its owner
+starts outside the parent viewport. This establishes an input-targeting failure
+in that smoke invocation, not an application response bug or a proven frame
+replacement. The unchanged isolated case passes in bundled Chromium 147.
+
+Explicit owner scrolling alone passes isolated 26a, but still fails its second
+Unit in the complete eight-case Chrome matrix. The actual repository helper now
+completes a browser screenshot of the scrolled exact Player owner before the
+unchanged native `.check()`. There are no force-click, synthetic input, retry,
+application/vendor/library patches or sandbox changes. The same native next-page
+click and exact presentation-complete assertion remain mandatory. A failed
+scroll/render/input/page action fails instead of bypassing the corresponding gate.
+
+Five regressions extract and execute the actual smoke helper, proving that native
+input waits for render completion and that unavailable owners, failed renders,
+failed checks and failed page clicks propagate. All 416 unit/frontend checks,
+typecheck and production build pass; the initial bundle remains 469.82 kB under
+the unchanged 470-kB error budget. The actual eight Original Controller cases
+18, 19, 20a, 20b, 24, 25, 26a and 26b pass with the final render boundary in
+headful Chrome 154 and bundled Chromium 147 on separate owned protected SQLite
+fixtures. Real inputs, exact persisted responses and both directions' original
+completeness policies remain checked. The unchanged actual repository sequence
+also completes through `participant-original-test-controller` in headful Chrome
+on its own protected SQLite fixture and immutable production frontend. That
+includes the preceding offline shell, strict STARS recovery/capacity, both
+ItemBuilder resource/re-entry proofs, Aspect and optional Original Player gates,
+then all Controller checks through automatic Testlet locking. The explicit stop
+after that section is not a pass for the later Runtime/monitor/export/full-flow
+sections. A whole-flow repetition, fresh complete publication CI, all eight
+complete Original-UI rows and broader production acceptance remain independent
+gates.
+
 ### New Player answers during a failed save drain (2026-10-08)
 
 An owned protected SQLite/production browser run retained 22 entries after the
