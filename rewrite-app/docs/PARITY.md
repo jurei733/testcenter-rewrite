@@ -1,5 +1,46 @@
 # Testcenter parity checklist
 
+### Group-deletion fixture scope correction (2026-10-07)
+
+The full browser flow no longer expects its separately created monitor-command
+Run to be removed with the original participant group. Immediately before the
+confirmed deletion, authorized group/session details capture every selected
+Run, including historical and zero-answer Runs. Independent group counts detect
+an incomplete snapshot; fixtures fail closed at their Session/log read limits.
+The actual DELETE must report exactly those Run IDs and matching Run, response,
+review and log counts. Group-only reports and every selected Session detail
+prove removal without the former unrelated-Run filter. The unchanged mandatory
+group-card DOM removal and activity-event assertions remain in place.
+
+The unselected monitor-command group is captured independently, with its exact
+Run and saved answer, then compared after deletion: all Runs, answer bytes,
+reviews, logs and group counts must remain identical. Five new helper
+regressions cover historical/empty Runs, incorrect deletion IDs/counts,
+incomplete/foreign inventories, vacuous filtered reads and mutated retained
+answers/reviews/logs. They run in the normal unit/frontend command.
+
+All 381 unit/frontend checks and typecheck pass. Owned protected SQLite and
+native PostgreSQL/immutable production/headful Chrome workflows use the same
+assertions in both interfaces (four successful cases):
+two selected Runs (one without answers) are removed through the actual verified
+UI confirmation, the other group remains visible and byte-exact, and a stale
+participant save returns HTTP 401 without recreating results. No application,
+authorization, persistence or Player behavior is changed. The longer owned
+protected SQLite/headful flow passes the preceding entry, offline recovery,
+Verona, StarS, Speedtest and other Player stages, but stops in the ItemBuilder
+stage at its unchanged runtime-script response wait (`smoke-ui.mjs:16981`),
+before reaching the nested-frame visibility assertion or group deletion. This
+is distinct from the focused headed iframe-visibility failure already recorded
+below and does not establish complete-flow acceptance. The published `3cc7eff7` native
+PostgreSQL UI job also reproduces the original wrong-Run assertion; its log is
+separate from the corrected local fixture. Complete fresh publication CI remains
+an independent gate. This correction closes no complete Original-UI acceptance
+row and does not prove in-flight/multi-process deletion atomicity. Logs,
+screenshots, traces, isolated fixtures and the initial PostgreSQL wrapper's
+incorrect screenshot-selector failure are retained under ignored
+`.data/group-results-scope-20261007.*`. PostgreSQL readiness reports the actual
+native store; its disposable localhost container is removed after verification.
+
 ### Secure-context protected entry (2026-10-07)
 
 The shared proof-of-work service now rejects a required administrator,

@@ -13,6 +13,8 @@ import QRCode from "qrcode";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
+import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
+  assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -25568,6 +25570,19 @@ try {
       Array.isArray(payload.items) &&
       payload.items.some(item => item?.groupKey === participantGroupKey)
   );
+  const resultWorkspaceUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const readGroupResultJson = async url =>
+    (await sendSmokeJson(url, { method: "GET" })).json();
+  const selectedGroupSnapshot = await captureResultGroupSnapshot(
+    readGroupResultJson, resultWorkspaceUrl, participantGroupKey
+  );
+  const retainedGroupSnapshot = await captureResultGroupSnapshot(
+    readGroupResultJson, resultWorkspaceUrl, monitorCommandGroupKey
+  );
+  assert.ok(retainedGroupSnapshot.testRunIds.includes(pausedTestRunId));
+  assert.ok(!selectedGroupSnapshot.testRunIds.includes(pausedTestRunId));
+  assert.equal(retainedGroupSnapshot.testRuns.find(run => run.testRunId === pausedTestRunId)
+    .unitResponses["unit-paused"], "Filtered response smoke");
   await clickAction("Load Result Groups");
   const resultGroups = page
     .locator("app-record-collection")
@@ -25673,7 +25688,7 @@ try {
   assert.ok(groupDeletion.deletedResponseCount > 0);
   assert.ok(groupDeletion.deletedReviewCount > 0);
   assert.ok(groupDeletion.deletedTestLogCount > 0);
-  assert.ok(groupDeletion.deletedTestRunIds.includes(pausedTestRunId));
+  assertGroupDeletionMatchesSnapshot(groupDeletion, selectedGroupSnapshot);
   // Prove the backend inventory separately from the mandatory DOM removal.
   // A successful DELETE/filtered response read alone cannot establish that
   // every selected group's Run was removed or distinguish stale UI state.
@@ -25686,7 +25701,7 @@ try {
       !payload.items.some(item => item?.groupKey === participantGroupKey)
   );
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?groupKey=${encodeURIComponent(participantGroupKey)}&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
@@ -25694,13 +25709,15 @@ try {
       payload.items.length === 0
   );
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?groupKey=${encodeURIComponent(participantGroupKey)}&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.length === 0
   );
+  await assertResultGroupRemoved(readGroupResultJson, selectedGroupSnapshot);
+  await assertResultGroupRetained(readGroupResultJson, retainedGroupSnapshot);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=group_results_deleted&subjectType=workspace&limit=1`,
     payload =>
