@@ -122,7 +122,16 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
     assert.equal(await evaluate("globalThis.origin"), "null");
     assert.equal(await evaluate("globalThis.origin", outerExecution), "null");
     assert.ok(await evaluate("location.href") === runtime.url, "The exact authorized runtime document is required.");
-    assert.equal(await evaluate(`!!document.querySelector('script[data-testcenter-compatibility="dipf-opaque-parent-origin"]')`), true);
+    let documentReady = false;
+    while (Date.now() < deadline) {
+      const readyState = await evaluate("document.readyState");
+      if (readyState === "interactive" || readyState === "complete") { documentReady = true; break; }
+      assert.equal(readyState, "loading", "The native runtime must expose an actual document readiness state.");
+      await bounded(() => delay(50));
+    }
+    assert.ok(documentReady, "The authorized runtime document must finish parsing before verification.");
+    assert.equal(await evaluate(`!!document.querySelector('script[data-testcenter-compatibility="dipf-opaque-parent-origin"]')`), true,
+      "The parsed authorized runtime must include its compatibility adapter.");
     const proofKey = `__testcenterIbInputProof_${Date.now()}`;
     await evaluate(`(() => {const key=${JSON.stringify(proofKey)};window[key]=[];
       for(const type of ['click','input','change'])document.addEventListener(type,event=>{

@@ -141,7 +141,8 @@ test("a genuine resource reload invalidates the old native driver before further
       }
     }
     const value = params.expression === "globalThis.origin" ? "null" :
-      params.expression === "location.href" ? runtimeUrl : true;
+      params.expression === "location.href" ? runtimeUrl :
+      params.expression === "document.readyState" ? "complete" : true;
     return { result: { value } };
   };
   const newLoader = await withChromiumIbRuntime(fixture.context, fixture.page, "session-a", async runtime => {
@@ -155,4 +156,26 @@ test("a genuine resource reload invalidates the old native driver before further
   assert.equal(newLoader, "new-load");
   assert.equal(reloaded, true); assert.equal(fixture.detached(), 1);
   assert.equal(fixture.session.listenerCount("Network.responseReceived"), 0);
+});
+
+test("native runtime waits for the real document parser but still rejects a missing parsed adapter", async () => {
+  for (const adapterPresent of [false, true]) {
+    const fixture = runtimeFixture(); const originalSend = fixture.session.send;
+    let readinessReads = 0, adapterReads = 0, verified = false;
+    fixture.session.send = async (method, params) => {
+      if (method !== "Runtime.evaluate") return originalSend(method, params);
+      let value = true;
+      if (params.expression === "globalThis.origin") value = "null";
+      if (params.expression === "location.href") value = runtimeUrl;
+      if (params.expression === "document.readyState") value = ++readinessReads < 3 ? "loading" : "interactive";
+      if (params.expression.includes("dipf-opaque-parent-origin")) {
+        assert.equal(readinessReads, 3); adapterReads += 1; value = adapterPresent;
+      }
+      return { result: { value } };
+    };
+    const verify = withChromiumIbRuntime(fixture.context, fixture.page, "session-a", async () => { verified = true; });
+    if (adapterPresent) await verify;
+    else await assert.rejects(verify, /parsed authorized runtime must include/u);
+    assert.equal(verified, adapterPresent); assert.equal(adapterReads, 1); assert.equal(fixture.detached(), 1);
+  }
 });

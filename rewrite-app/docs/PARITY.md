@@ -1,5 +1,27 @@
 # Testcenter parity checklist
 
+### Native runtime parsing boundary (2026-10-07)
+
+The final exact-rebind full-flow repetition passes the first ItemBuilder browser
+resource marker, then rejects participant re-entry at the native compatibility
+adapter assertion (`chromium-ib-runtime.mjs:125`). It does not reach the later
+Original Controller radio failure from the preceding run. This new negative
+evidence is retained, and complete-flow acceptance is still open.
+
+The native driver now explicitly observes `document.readyState` until the exact
+authorized runtime finishes parsing (`interactive` or `complete`) before checking
+its required compatibility script. An execution context alone is not parsed DOM
+evidence. Each readiness read retains the same Session/capability, Frame, loader,
+unique context and connected Player checks, with the existing bounded deadline
+and disposal. A parsed document without its adapter still fails immediately; the
+adapter is neither added nor made optional. A regression proves delayed parsing
+and rejection of a genuinely missing parsed adapter. All 398 unit/frontend checks
+and typecheck pass. Owned protected SQLite/immutable production/headful Chrome
+and bundled Chromium pass both interfaces (four cases), including the exact
+resource-loader rebind, trusted inputs and byte-exact saved response after
+re-entry. A new whole-flow repetition remains separate from these focused passes,
+initial successful resource loads and fresh complete publication CI.
+
 ### Bound ItemBuilder browser resource reload proof (2026-10-07)
 
 The long-sequence ItemBuilder resource wait now uses an explicit additional
