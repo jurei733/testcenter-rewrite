@@ -32,6 +32,15 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+Run-bound re-entry now distinguishes saving and non-saving modes in the shared
+facade. Real protected SQLite/headful Chrome verifies Demo, Review and Simulation
+login, code unlock, transient response and hard reload in both interfaces: the
+same Run is retained but its transient answer, unlocks and timer are reset.
+Saving A/B answers and monitor restrictions remain unchanged. All six paths are
+included in the mandatory variant browser gate, with fifteen actual-entry-method
+regressions. This fixes the shared Simulation reload CI failure locally; complete
+publication CI and every full rendered Original-reference row remain separate.
+
 The updated 2026-10-07 mandatory variant smoke creates both unfinished Runs
 through the real protected Starter workflow, without repository seeding. Owned
 SQLite/headful Chrome passes A/B answer preservation, exact preset selection,
@@ -39,8 +48,9 @@ automatic run-bound browser addresses, hard reload of each assignment,
 background-save isolation, monitor pause/resume and completing B without closing
 A, in both interfaces. Full Memory/File/SQLite API suites also pass concurrent
 assignment creation, same-named timer isolation and monitor/completed denial.
-Native PostgreSQL and complete publication CI for this controller change are
-separate pending gates. This shared functional implementation changes no full
+Publication `09942c4c` passes native PostgreSQL (219 tests); its complete CI still
+fails at the shared Simulation re-entry boundary described above. Full CI remains
+an independent gate. This shared functional implementation changes no full
 rendered Original-reference acceptance row or pixel-identity claim.
 
 Both interfaces now bind the selected Run ID through state, asset preload,

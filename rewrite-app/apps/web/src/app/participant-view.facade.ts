@@ -2890,8 +2890,8 @@ export class ParticipantViewFacade {
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
     const lifecycleSequence = this.viewLifecycleSequence;
-    // A session-only re-entry URL is authoritative. Load an existing run
-    // without changing its status so a reload cannot bypass a monitor pause.
+    // Load the authorized selected Run before deciding whether entry resets
+    // transient state. Saving Runs and monitor restrictions remain read-only.
     // Do not let a booklet from a previously persisted browser session
     // constrain which assigned booklet the server starts when no run exists.
     this.runtime.bookletKey = normalized.bookletKey;
@@ -2900,7 +2900,17 @@ export class ParticipantViewFacade {
       if (lifecycleSequence !== this.viewLifecycleSequence) {
         return;
       }
-      if (!this.currentRunState) {
+      const currentState = this.currentRunState;
+      const testRun = currentState?.testRun;
+      if (
+        !currentState ||
+        (!currentState.executionMode.saveResponses &&
+          testRun?.status !== "completed" &&
+          !testRun?.locked &&
+          !(testRun?.status === "paused" && testRun.pauseSource === "monitor"))
+      ) {
+        // Refresh already synchronized the exact server-authorized assignment.
+        // Do not use a stale browser/URL Booklet to reset another variant.
         await this.resumeSessionInternal({ quiet: true });
       }
       if (lifecycleSequence !== this.viewLifecycleSequence) {

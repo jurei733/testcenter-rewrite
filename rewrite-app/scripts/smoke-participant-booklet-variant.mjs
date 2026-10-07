@@ -244,6 +244,87 @@ try {
     await context.close();
     process.stdout.write(`participant_variant=${ui}: same assignment/run/answer after real starter return and hard reload\n`);
     process.stdout.write(`participant_selection=${ui}: two real unfinished Starter launches, exact URLs and hard reloads, scoped live acknowledgement, pause/resume, completion and background-save isolation\n`);
+
+    // Non-saving entries share the same facade, but must not inherit the
+    // read-only re-entry behavior that preserves saved A/B answers above.
+    // Use real login, unlock and reload; never seed or reset repository data.
+    const entryWorkspaceKey = `ephemeral-${ui}`;
+    await api("/api/v1/tenants/demo-tenant/workspaces", {
+      workspaceKey: entryWorkspaceKey, displayName: `Owned ephemeral ${ui}`
+    });
+    const entryWorkspace = `/api/v1/tenants/demo-tenant/workspaces/${entryWorkspaceKey}`;
+    const entrySource = await api(`${entryWorkspace}/source-packages`, {
+      fileName: "Booklet-entry.xml", mediaType: "application/xml",
+      sourceDocument: '<Booklet><Metadata><Id>entry-booklet</Id><Label>Owned transient entry</Label></Metadata><Units>' +
+        '<Testlet id="entry-block"><Restrictions><CodeToEnter code="ENTRY-CODE">Owned code</CodeToEnter>' +
+        '<TimeMax minutes="5" leave="allowed"/></Restrictions><Unit id="entry-unit" label="Owned answer"><Definition>Owned response fixture</Definition></Unit></Testlet>' +
+        '</Units></Booklet>'
+    });
+    const entryImport = await api(`${entryWorkspace}/import-jobs`, { sourcePackageId: entrySource.sourcePackage.sourcePackageId });
+    await api(`${entryWorkspace}/content-releases/${entryImport.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-entry-smoke" });
+    const nonSavingModes = ["run-demo", "run-review", "run-simulation"];
+    await api(`${entryWorkspace}/participant-roster`, {
+      rosterText: '<Testtakers><Group id="entry-group">' + nonSavingModes.map(mode =>
+        `<Login name="${mode}" mode="${mode}"><Booklet>entry-booklet</Booklet></Login>`).join("") + '</Group></Testtakers>'
+    });
+    for (const mode of nonSavingModes) {
+      const entryContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      activeContext = entryContext;
+      await entryContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
+      const entryPage = await entryContext.newPage();
+      activePage = entryPage;
+      const entryErrors = [];
+      entryPage.on("pageerror", error => entryErrors.push(String(error)));
+      await entryPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey: "demo-tenant", workspaceKey: entryWorkspaceKey })}`, { waitUntil: "networkidle" });
+      if (ui === "original") await entryPage.getByLabel("Anmeldename", { exact: true }).fill(mode);
+      else await entryPage.locator("#participantLoginKey").fill(mode);
+      const identityResponse = entryPage.waitForResponse(value =>
+        new URL(value.url()).pathname === "/api/v1/participant/auth/sign-in" && value.request().method() === "POST");
+      if (ui === "original") await entryPage.getByRole("button", { name: "Weiter", exact: true }).click();
+      else await entryPage.locator("#participantRouteSignInButton").click();
+      const entrySignedIn = await identityResponse;
+      assert.equal(entrySignedIn.status(), 200);
+      const entryIdentity = await entrySignedIn.json();
+      const entrySessionPath = `/api/v1/participant/sessions/${entryIdentity.participantSession.participantSessionId}`;
+      const readEntry = async () => {
+        const value = await fetch(`${baseUrl}${entrySessionPath}/current-state`, {
+          headers: { authorization: `Bearer ${entryIdentity.sessionToken}` }
+        });
+        assert.equal(value.status, 200);
+        return (await value.json()).currentRunState;
+      };
+      await entryPage.locator("#participantRouteTestletUnlockCode").fill("ENTRY-CODE");
+      await entryPage.locator("#participantRouteTestletUnlockButton").click();
+      const entryAnswer = entryPage.locator("#participantRouteUnitResponse");
+      await entryAnswer.waitFor();
+      const transientAnswer = `Owned ephemeral answer ä/β · ${mode}/${ui}`;
+      await entryAnswer.fill(transientAnswer);
+      const beforeEntry = await readEntry();
+      assert.equal(beforeEntry.executionMode.saveResponses, false);
+      assert.equal(beforeEntry.testRun.currentUnitKey, "entry-unit");
+      assert.deepEqual(beforeEntry.testRun.unlockedTestletKeys, ["entry-block"]);
+      assert.ok(beforeEntry.testRun.testletTimers["entry-block"]);
+      assert.deepEqual(beforeEntry.testRun.unitResponses, {});
+      const entryRunId = beforeEntry.testRun.testRunId;
+      assert.equal(new URL(entryPage.url()).searchParams.get("testRunId"), entryRunId);
+      await entryPage.reload({ waitUntil: "networkidle" });
+      const afterEntry = await readEntry();
+      assert.equal(afterEntry.testRun.testRunId, entryRunId);
+      assert.equal(afterEntry.testRun.currentUnitKey, null, "Non-saving hard reload must restore the code gate.");
+      assert.deepEqual(afterEntry.testRun.unlockedTestletKeys, []);
+      assert.deepEqual(afterEntry.testRun.testletTimers, {});
+      assert.deepEqual(afterEntry.testRun.lockedTestletKeys, []);
+      assert.deepEqual(afterEntry.testRun.lockedUnitKeys, []);
+      assert.deepEqual(afterEntry.testRun.unitResponses, {});
+      assert.equal(await entryPage.evaluate(answerValue =>
+        Object.values(localStorage).some(value => value.includes(answerValue)), transientAnswer), false);
+      await entryPage.locator("#participantRouteTestletUnlockCode").waitFor();
+      assert.deepEqual(entryErrors, []);
+      await entryPage.screenshot({ path: join(artifacts, `${ui}-${mode}.png`) });
+      await entryContext.tracing.stop({ path: join(artifacts, `${ui}-${mode}-trace.zip`) });
+      await entryContext.close();
+      process.stdout.write(`participant_entry=${ui}/${mode}: exact Run, transient answer cleared, code gate and timers reset\n`);
+    }
   }
 } catch (error) {
   await activePage?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => undefined);

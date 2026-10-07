@@ -43,28 +43,32 @@ as is the report card with the source's three lists and send/cancel actions,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 
-Preset Booklet variants can return to the starter and resume their exact saved
-run in either interface. `npm run smoke:ui:participant-variant:built` verifies
-real participant login, confirmed return, exact Unicode answer preservation and
-authenticated session-link restoration after a hard reload on an owned
-protected SQLite API. It is also a mandatory quick browser CI step. This narrow
-fix does not yet permit switching to another unfinished Booklet; that separate
-P0 and full Original-UI acceptance remain explicitly open in `docs/PARITY.md`.
+Assigned Booklets and preset variants can start independently while another
+Booklet is unfinished, then return to the starter and resume their exact saved
+Run. `npm run smoke:ui:participant-variant:built` verifies the actual A/B Starter
+workflow, exact Unicode answers, hard reload and monitor restrictions in both
+interfaces on an owned protected SQLite API. It is a mandatory quick browser CI
+step. The full CI and Original-UI acceptance remain separate gates in
+`docs/PARITY.md`; a local passing workflow is not 100% parity or merge readiness.
 
 New session re-entry links include the exact Run ID and preset assignment.
 Both interfaces bind state, asset loading and live updates to that authorized
 Run, so another test's background saves cannot replace the selected test.
-Historical session-only links remain supported. The focused smoke also proves
-selection isolation and monitor pause/resume with an explicitly owned two-run
-repository fixture; it does not claim the second starter launch is implemented.
+Historical session-only links remain supported. The focused smoke creates both
+unfinished Runs through real Starter actions, not repository seeding. A normal
+reload preserves saving-mode answers and monitor pauses. In non-saving Demo,
+Review and Simulation modes, actual re-entry resets transient answers, codes
+and timers through the existing authorized resume use case instead. Reads and
+polling do not reset them; completed/locked Runs and monitor pauses stay guarded.
+The same mandatory gate covers all three non-saving modes in both interfaces.
 
 Workspace Study Monitor, historical activity and Content Run-specific cards
 also bind the Run they represent. Full Run records retain the exact preset
 assignment, while genuinely session-only cards keep their fallback. Actual
 facade regressions run in `npm run test:frontend-state`; protected SQLite/browser
 checks cover both interfaces' monitor links, link opening and answer restoration
-after reload. Full CI, multi-Booklet launch and Original-UI acceptance remain
-independent gates in `docs/PARITY.md`.
+after reload. Full CI and Original-UI acceptance remain independent gates in
+`docs/PARITY.md`.
 
 The optional Systemcheck Unit surface uses the same sandboxed Verona host and
 in-memory answers as the Rewrite layout. Both disable Player logging as in the
@@ -130,8 +134,8 @@ account control. All 48 equal-fixture states passed in production/development;
 the mandatory quick-CI gate additionally verifies keyboard scrolling, pending
 duplicate rejection, exact answer resumption and participant-bound Review
 export. Rewrite remains a separate responsive choice. Pixel differences,
-additional starter states and the reproduced unfinished multi-Booklet selection
-gap remain explicit open requirements, not completed 100% parity.
+additional starter states and full publication acceptance remain explicit open
+requirements, not completed 100% parity.
 
 This folder is the starting point for the real production implementation.
 

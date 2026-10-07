@@ -1,5 +1,45 @@
 # Testcenter parity checklist
 
+### Non-saving Run-bound re-entry reset (2026-10-07)
+
+Publication `09942c4c` passes its native PostgreSQL job with 219 tests, including
+the actual multi-Booklet/execution-mode API cases, but is not globally green.
+All fifteen failed UI jobs in its completed push run fail at the shared Simulation reload assertion
+(`smoke-ui.mjs:10706`), before reaching their named Review/Monitor checks:
+`currentUnitKey` remains active instead of returning to its code gate.
+The new automatic Run-bound address reaches the existing read-only entry path,
+which preserved every existing Run without invoking the non-saving entry reset.
+An immutable production/owned SQLite browser reproduces that exact failure.
+
+Actual entry now reads the authorized selected Run first, then invokes the
+existing resume/reset use case only for an unfinished, unlocked non-saving Run
+not paused by the monitor. The refresh's server-authorized assignment selects
+the reset; stale browser/URL Booklet values do not choose a sibling. Saving
+Runs, completed Runs, locks and monitor pauses remain read-only. Current-state
+reads, asset preload and ordinary polling themselves still never perform this
+reset. No persistence, timer, authorization or simulation assertion is weakened.
+
+Fifteen actual-entry-method regressions cover all three non-saving modes with
+Run-bound and legacy links, saving/terminal/monitor states, stale view completion,
+missing Runs and denied explicit IDs. Six cases fail before the application fix;
+all fifteen pass after it, together with all 330 unit/frontend tests, typecheck
+and the unchanged 469.82kB production build. Owned protected SQLite/headful Chrome
+passes real login, code unlock, transient answer and normal hard reload for
+Demo/Review/Simulation in both interfaces, retaining the exact Run ID while
+clearing the transient answer, unlocks and timer. The real A/B saving workflow
+also remains green in both interfaces. These six entry paths are now part of
+the existing mandatory quick-CI variant browser gate.
+
+The unchanged longer shared browser flow also passes through the failed
+Simulation assertion, custom/merged leave confirmation, Original Verona surface
+and multi-Unit offline/background-sync outbox removal on owned protected SQLite
+and the immutable production build. Its local run explicitly excludes offline
+app-shell startup and stops at `participant-original-verona-player`; it is not a
+complete UI/Review/Monitor CI or a production deployment. Fresh complete
+publication CI, all eight full Original-UI comparisons and broader production
+acceptance remain open. Evidence is retained under ignored
+`.data/nonsaving-entry-20261007.*`.
+
 ### Exact unfinished-Booklet launch and resume (2026-10-07)
 
 The controller now resolves and authorizes the requested assignment before
