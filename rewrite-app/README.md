@@ -81,15 +81,19 @@ for URL synchronization rather than reopening a stale assignment. These shared
 safeguards are covered by the mandatory variant browser gate and actual facade
 regressions, not a claim of complete Original-UI identity.
 
-The focused ItemBuilder smoke also accepts `UI_SMOKE_FRONTEND_ROOT` for immutable
-production assets, `UI_SMOKE_BROWSER_CHANNEL` and `UI_SMOKE_HEADFUL`. With
-operator authentication enabled it signs in through the real operator API only
-for fixture setup; participant browser requests never receive that credential.
-Owned temporary screenshots/traces and redacted native Chromium frame diagnostics
-are retained on failure without replacing the original assertion. These native
-observations are diagnostic evidence, not a substitute for passing interactive
-Player tests. The unresolved ItemBuilder/headful gate and full CI remain tracked
-separately in `docs/PARITY.md`.
+The focused ItemBuilder smoke accepts `UI_SMOKE_FRONTEND_ROOT` for immutable
+production assets, `UI_SMOKE_BROWSER_CHANNEL` and `UI_SMOKE_HEADFUL`.
+`npm run smoke:ui:ib-player:built` tests both interfaces on separate owned SQLite
+fixtures and is part of quick CI. Its public Chromium DOM reader binds the exact
+selected Session's pinned runtime, rejects replaced contexts and covered inputs,
+and keeps mouse/keyboard input on the real browser path. Visible controls,
+trusted input events, interaction-derived scores and byte-exact durable reload
+remain mandatory. Neither the Player sandbox nor the test library is patched.
+With operator authentication enabled only fixture setup uses the real operator
+sign-in; participant browser requests never receive that credential. Screenshots,
+traces and redacted frame diagnostics are retained. The separate full-sequence
+browser resource-response wait and fresh complete CI remain open; see
+`docs/PARITY.md` for exact proof boundaries.
 
 Group-result deletion tests distinguish backend inventory removal from UI card
 removal and require the actual DELETE's counts and selected Run ID. A separate
@@ -1195,7 +1199,7 @@ full 21-question sequence, confirms all three timed-block exits, verifies each
 alias-scoped question and summary state, reaches the final instruction alias,
 and restores every intermediate instruction position after reload.
 
-The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent historical ABI 3.3.0 and current ABI 5.0.0 scripted-survey packages, current Aspect 2.12.6 assessment, historical DAN 3.0.0 and current DAN 3.1.0 visual-assessment packages, historical STARS 0.6.19 and current official STARS 0.7.2 choice-interaction, historical Speedtest 1.2.0 timed-choice and current Speedtest 3.3.0 multi-question choice, and Lottie 1.2.2 shared-parameter Players, the complete current Original STARS 0.6.40 system-test graph, the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph, and the official `verona-modules-ib` 0.2 ItemBuilder migration feasibility snapshot with DIPF runtime 9.9.0. It gates type-faithful API-2 through API-6 response restoration, including ABI 5.0.0's and DAN 3.1.0's metadata-spec-5/runtime-API-4 splits, Aspect's three JSON-string `iqb-standard@1.0` state parts, DAN's retained `IQBVisualUnitPlayerV2.1.0` state, and ABI's JSON-string `allData` response array, nested-resource delivery, automatic Player navigation, and test-wide shared-parameter restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice. The IB snapshot is intentionally characterized separately: its unmodified nested runtime HTML/CSS/JS/config loads and reloads through participant-isolated embeddable resources, but the legacy runtime rejects the sandboxed Player's opaque `null`-origin controller messages. Because upstream labels the repository a feasibility study rather than a release, interactive response/state parity is not claimed.
+The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent historical ABI 3.3.0 and current ABI 5.0.0 scripted-survey packages, current Aspect 2.12.6 assessment, historical DAN 3.0.0 and current DAN 3.1.0 visual-assessment packages, historical STARS 0.6.19 and current official STARS 0.7.2 choice-interaction, historical Speedtest 1.2.0 timed-choice and current Speedtest 3.3.0 multi-question choice, and Lottie 1.2.2 shared-parameter Players, the complete current Original STARS 0.6.40 system-test graph, the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph, and the official `verona-modules-ib` 0.2 ItemBuilder migration feasibility snapshot with DIPF runtime 9.9.0. It gates type-faithful API-2 through API-6 response restoration, including ABI 5.0.0's and DAN 3.1.0's metadata-spec-5/runtime-API-4 splits, Aspect's three JSON-string `iqb-standard@1.0` state parts, DAN's retained `IQBVisualUnitPlayerV2.1.0` state, and ABI's JSON-string `allData` response array, nested-resource delivery, automatic Player navigation, and test-wide shared-parameter restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice. The IB snapshot remains separate: a hash-pinned immediate-parent-only delivery adapter allows the opaque sandbox's controller messages without modifying raw vendor fixtures or weakening its origin boundary. The focused IB gate proves real trusted input and exact durable response reload in both interfaces. The longer family's resource-response wait still needs separate headful acceptance, and the upstream feasibility Player does not apply supplied Unit state visually after reload; this is not a production-release or full interactive-restoration parity claim.
 
 The named `smoke:ui:participant-confirmation` slice gates the Participant Player's labelled in-app leave confirmation against a Trial default prompt and an imported Simulation override. It verifies the safe cancel path, explicit destructive continuation, and completion after the Player's latest response has settled. It also returns a saving-mode participant from a simultaneously confirm-timed and leave-locked Unit, proving one merged dialog, one request carrying both confirmations, atomic timer cancellation plus Unit locking, and no follow-up dialog.
 

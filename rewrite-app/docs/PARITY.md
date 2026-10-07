@@ -1,5 +1,52 @@
 # Testcenter parity checklist
 
+### Trusted ItemBuilder input with exact native frame binding (2026-10-07)
+
+The focused headful ItemBuilder failure is now isolated from the application:
+an owned, minimal nested iframe reproduces Playwright's missing opaque-srcdoc
+frame inventory without Testcenter or vendor code. Native browser documents
+still load. Earlier actual mouse diagnostics and visible Player crops show the
+checkbox toggling with trusted input events. Merely scrolling, upgrading a
+temporary Playwright package or changing test-library initialization is not the
+published solution; no browser security flag, sandbox, Player, vendor bytes or
+production application implementation is changed.
+
+The focused smoke instead uses public Chromium CDP DOM reads bound to the
+actual Player element, its direct `ib-runtime-host` child, current API origin,
+exact selected participant Session, one resource capability, pinned runtime
+path, loader and unique execution contexts. Wrong/ambiguous frames, replaced
+contexts, a detached Player and expired/late attachment fail closed. Both
+documents must retain opaque `null` origins and the existing compatibility
+adapter. HTML and all controls must be visibly laid out; exact checkbox/text
+counts, `CheckBoxA`, `Next Task` and `Cancel Task` remain required. Mouse points
+include both iframe borders and must hit the correct unobstructed surfaces
+inside the viewport. The old programmatic DOM click/focus is replaced by real
+browser mouse and keyboard input, independently checked for trusted checkbox
+and text input events. No data or response is injected.
+
+Owned protected SQLite/immutable production/headful Chrome and bundled Chromium
+pass both interfaces (four cases), including actual rejection of a foreign
+Session and an intentionally covered checkbox without changing its value.
+Normal input persists both variables and interaction scores with the unchanged
+`iqb-standard@1.4`, `VarA` and interaction-count assertions. Runtime reload
+retains the saved response byte-exact and sends no operator credential through
+participant browser requests. Original intentionally hides its API-version
+diagnostic: its exact handshake text is checked while the actual Player and
+controls must still be visible. The first strengthened wrapper exposes that
+old visible-diagnostic assertion; its failure is retained, not an application
+fix. Both interface cases now run in mandatory quick CI on separate fixtures.
+
+Nine helper regressions and all 390 unit/frontend checks pass, as does typecheck.
+Logs, screenshots, traces, the independent reproduction, rejected diagnostic
+patch and initial wrapper failure are retained in ignored
+`.data/ib-browser-acceptance-20261007.*`. This supersedes only the focused
+iframe/input gate failure. The separate long-sequence browser resource-response
+wait remains unchanged and open, as do fresh complete publication CI, all eight
+full Original-UI rows and broader production acceptance. The vendor's sandboxed
+`localStorage` page error remains visible in logs; it is not suppressed or
+declared repaired. Supplied-state visual restoration remains an explicit
+upstream ItemBuilder feasibility-snapshot limitation.
+
 ### Group-deletion fixture scope correction (2026-10-07)
 
 The full browser flow no longer expects its separately created monitor-command

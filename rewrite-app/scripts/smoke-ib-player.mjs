@@ -10,6 +10,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { chromium } from "playwright";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { captureChromiumFrameDiagnostics, redactBrowserDiagnostic } from "./chromium-frame-diagnostics.mjs";
+import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -21,6 +22,7 @@ await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-ib-player-"));
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const ibRuntimeReadyTimeoutMs = 60_000;
+const interfaceMode = process.env.UI_SMOKE_INTERFACE === "original" ? "original" : "rewrite";
 
 const readBrotliBase64Text = async fixturePath =>
   brotliDecompressSync(
@@ -195,6 +197,7 @@ try {
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
     channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined });
+  process.stdout.write(`ib_browser_version=${browser.version()}, ui=${interfaceMode}, headful=${headful}\n`);
   context = await browser.newContext();
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
@@ -306,57 +309,58 @@ try {
       tenantKey,
       workspaceKey,
       loginKey,
-      bookletKey
+      bookletKey,
+      ui: interfaceMode
     })}`,
     { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${playerPackage.playerApiVersion}` })
-    .waitFor({ timeout: ibRuntimeReadyTimeoutMs });
-  const runtimeFrame = page
-    .frameLocator("#participantVeronaPlayerFrame")
-    .frameLocator("#ib-runtime-host");
-  await runtimeFrame.locator("html").waitFor({
-    timeout: ibRuntimeReadyTimeoutMs
-  });
-  assert.equal(
-    await runtimeFrame.locator("html").evaluate(() =>
-      Boolean(
-        document.querySelector(
-          'script[data-testcenter-compatibility="dipf-opaque-parent-origin"]'
-        )
-      )
-    ),
-    true
-  );
-  await runtimeFrame.locator("input, textarea, button").first().waitFor({
-    state: "visible",
-    timeout: ibRuntimeReadyTimeoutMs
-  });
-  assert.equal(await runtimeFrame.locator("input[type='checkbox']").count(), 1);
-  assert.equal(await runtimeFrame.locator("input[type='text']").count(), 1);
-  assert.deepEqual(
-    await runtimeFrame.locator("button").allTextContents(),
-    ["Next Task", "Cancel Task"]
-  );
+    .waitFor({ state: interfaceMode === "original" ? "attached" : "visible", timeout: ibRuntimeReadyTimeoutMs });
+  assert.equal(await page.locator("html").getAttribute("data-interface-mode"), interfaceMode);
   const participantSessionId = await page
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(participantSessionId);
-  await runtimeFrame
-    .getByText("CheckBoxA", { exact: true })
-    .evaluate(element => element.click());
-  assert.equal(
-    await runtimeFrame.locator("input[type='checkbox']").isChecked(),
-    true
-  );
+  let foreignSessionVerified = false;
+  await assert.rejects(withChromiumIbRuntime(context, page, `${participantSessionId}-foreign`, async () => {
+    foreignSessionVerified = true;
+  }), /selected participant Session/u);
+  assert.equal(foreignSessionVerified, false);
   const responseText = "7";
-  await runtimeFrame
-    .locator("input[type='text']")
-    .evaluate(element => element.focus());
-  await page.keyboard.type(responseText);
-  await page.keyboard.press("Tab");
+  await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    await runtime.waitVisible("html");
+    await runtime.waitVisible("input, textarea, button");
+    assert.equal(await runtime.evaluate("document.querySelectorAll('input[type=checkbox]').length"), 1);
+    assert.equal(await runtime.evaluate("document.querySelectorAll('input[type=text]').length"), 1);
+    assert.deepEqual(await runtime.evaluate("[...document.querySelectorAll('button')].map(button=>button.textContent)"),
+      ["Next Task", "Cancel Task"]);
+    assert.equal(await runtime.evaluate("[...document.querySelectorAll('span,label')].some(element=>element.textContent==='CheckBoxA')"), true);
+    assert.equal(await runtime.evaluate("document.querySelector('input[type=checkbox]').checked"), false);
+    await page.evaluate(() => {
+      const rect = document.querySelector("#participantVeronaPlayerFrame").getBoundingClientRect();
+      const cover = document.createElement("div"); cover.id = "ib-pointer-proof-cover";
+      Object.assign(cover.style, { position: "fixed", left: `${rect.x}px`, top: `${rect.y}px`,
+        width: `${rect.width}px`, height: `${rect.height}px`, zIndex: "2147483647", pointerEvents: "auto" });
+      document.body.append(cover);
+    });
+    try {
+      await assert.rejects(runtime.click("input[type=checkbox]"), /Player must not be covered/u);
+      assert.equal(await runtime.evaluate("document.querySelector('input[type=checkbox]').checked"), false);
+    } finally { await page.locator("#ib-pointer-proof-cover").evaluate(element => element.remove()); }
+    await runtime.click("input[type=checkbox]");
+    assert.equal(await runtime.evaluate("document.querySelector('input[type=checkbox]').checked"), true);
+    await runtime.click("input[type=text]");
+    await page.keyboard.type(responseText);
+    await page.keyboard.press("Tab");
+    assert.equal(await runtime.evaluate("document.querySelector('input[type=text]').value"), responseText);
+    const events = await runtime.inputEvents();
+    for (const inputType of ["checkbox", "text"]) assert.ok(events.some(event =>
+      event.type === "input" && event.inputType === inputType && event.trusted),
+    `The ${inputType} interaction must use a trusted actual browser event.`);
+    await page.locator("#participantVeronaPlayerFrame").screenshot({ path: join(artifacts, "interactive-player.png") });
+  }, ibRuntimeReadyTimeoutMs);
   const stateDeadline = Date.now() + 10_000;
   let savedUnitResponse = "";
   let capturedInteractions = false;
@@ -402,13 +406,11 @@ try {
     )}`,
     { waitUntil: "domcontentloaded" }
   );
-  const restoredRuntimeFrame = page
-    .frameLocator("#participantVeronaPlayerFrame")
-    .frameLocator("#ib-runtime-host");
-  await restoredRuntimeFrame.locator("input[type='text']").waitFor({
-    state: "visible",
-    timeout: ibRuntimeReadyTimeoutMs
-  });
+  await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    await runtime.waitVisible("input[type=text]");
+    assert.equal(await page.locator("html").getAttribute("data-interface-mode"), interfaceMode);
+    await page.locator("#participantVeronaPlayerFrame").screenshot({ path: join(artifacts, "restored-player.png") });
+  }, ibRuntimeReadyTimeoutMs);
   const restoredStateResponse = await fetch(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`
   );
@@ -421,7 +423,7 @@ try {
   assert.equal(participantOperatorCredentialLeaks, 0,
     "Participant browser requests must never carry the fixture operator credential.");
   process.stdout.write(
-    `IB player smoke passed interactive state capture and reload for store=${store}\n`
+    `IB player smoke passed trusted input, rejected foreign/covered targets and exact reload for store=${store}, ui=${interfaceMode}\n`
   );
   await page.screenshot({ path: join(artifacts, "restored.png"), fullPage: true });
   await context.tracing.stop({ path: join(artifacts, "trace.zip") });

@@ -33,6 +33,17 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The 2026-10-07 focused ItemBuilder acceptance now passes in both interfaces with
+headful Chrome and bundled Chromium. Exact native frame/Session binding replaces
+an independently reproduced Playwright opaque-srcdoc inventory failure; the
+Player, vendor bytes, compatibility adapter and sandbox are unchanged. Real
+trusted checkbox/text input, rejection of foreign Sessions and covered controls,
+interaction-derived state and byte-exact durable reload are required. Original's
+intentionally hidden API-version diagnostic is checked for its actual handshake
+text, while the actual Player and controls must be visible. This supersedes the
+earlier focused blank-frame observation, not the separate long-sequence resource
+response wait, visual answer-restoration limitation or any full-page row below.
+
 The current protected-login HTTPS notice is adapted from the actual
 `14c98284` protection service and alert layout. The shared Rewrite protection
 service refuses required challenges before sending credentials in a real
