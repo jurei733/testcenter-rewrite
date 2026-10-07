@@ -23,6 +23,15 @@ const artifacts = await mkdtemp(join(tmpdir(), "testcenter-ib-player-"));
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const ibRuntimeReadyTimeoutMs = 60_000;
 const interfaceMode = process.env.UI_SMOKE_INTERFACE === "original" ? "original" : "rewrite";
+const recordResourceProof = (phase, resources) => process.stdout.write(
+  `ib_browser_resource_proof=${JSON.stringify({ phase, interfaceMode,
+    resources: [resources.document, resources.script].map(response => ({
+      type: response.type, status: response.status, frameId: response.frameId,
+      loaderId: response.loaderId, contentType: response.headers["content-type"],
+      xFrameOptions: response.headers["x-frame-options"] ?? null,
+      fromDiskCache: response.fromDiskCache, fromServiceWorker: response.fromServiceWorker
+    })) })}\n`
+);
 
 const readBrotliBase64Text = async fixturePath =>
   brotliDecompressSync(
@@ -323,6 +332,13 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(participantSessionId);
+  const beforeInputResources = await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    await runtime.waitVisible("input[type=checkbox], input[type=text], button");
+    const resources = await runtime.reloadResources();
+    recordResourceProof("before-input", resources);
+    return resources;
+  }, ibRuntimeReadyTimeoutMs);
+  process.stdout.write(`IB browser Document and Script downloads completed before input, ui=${interfaceMode}\n`);
   let foreignSessionVerified = false;
   await assert.rejects(withChromiumIbRuntime(context, page, `${participantSessionId}-foreign`, async () => {
     foreignSessionVerified = true;
@@ -330,6 +346,8 @@ try {
   assert.equal(foreignSessionVerified, false);
   const responseText = "7";
   await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    assert.equal(runtime.identity.frameId, beforeInputResources.document.frameId);
+    assert.equal(runtime.identity.loaderId, beforeInputResources.document.loaderId);
     await runtime.waitVisible("html");
     await runtime.waitVisible("input, textarea, button");
     assert.equal(await runtime.evaluate("document.querySelectorAll('input[type=checkbox]').length"), 1);
@@ -406,7 +424,16 @@ try {
     )}`,
     { waitUntil: "domcontentloaded" }
   );
+  const reEntryResources = await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    await runtime.waitVisible("input[type=text]");
+    const resources = await runtime.reloadResources();
+    recordResourceProof("after-participant-re-entry", resources);
+    return resources;
+  }, ibRuntimeReadyTimeoutMs);
+  process.stdout.write(`IB browser Document and Script downloads completed after participant re-entry, ui=${interfaceMode}\n`);
   await withChromiumIbRuntime(context, page, participantSessionId, async runtime => {
+    assert.equal(runtime.identity.frameId, reEntryResources.document.frameId);
+    assert.equal(runtime.identity.loaderId, reEntryResources.document.loaderId);
     await runtime.waitVisible("input[type=text]");
     assert.equal(await page.locator("html").getAttribute("data-interface-mode"), interfaceMode);
     await page.locator("#participantVeronaPlayerFrame").screenshot({ path: join(artifacts, "restored-player.png") });

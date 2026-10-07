@@ -15,6 +15,7 @@ import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
+import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -16978,13 +16979,6 @@ try {
       ]
     }
   });
-  const ibRuntimeScriptResponse = page.waitForResponse(
-    response =>
-      response.url().includes(
-        "/IB_SAMPLE_2025/runtimes/9.9.0/main.220e1b93.js"
-      ) && response.status() === 200,
-    { timeout: 30_000 }
-  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey: ibTenantKey,
@@ -16998,44 +16992,45 @@ try {
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${ibPlayerPackage.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
-  const ibRuntimeScript = await ibRuntimeScriptResponse;
-  assert.equal(
-    ibRuntimeScript.headers()["content-type"],
-    "text/javascript; charset=utf-8"
-  );
-  assert.equal(ibRuntimeScript.headers()["x-frame-options"], undefined);
-  const ibOuterFrame = page.frameLocator("#participantVeronaPlayerFrame");
-  const ibRuntimeFrame = ibOuterFrame.frameLocator("#ib-runtime-host");
-  await ibRuntimeFrame
-    .getByText("CheckBoxA", { exact: true })
-    .waitFor({ state: "visible", timeout: 30_000 });
   const ibParticipantSessionId = await page
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(ibParticipantSessionId);
-  const ibRuntimeReloadResponse = page.waitForResponse(
-    response =>
-      response.url().includes(
-        "/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html"
-      ) && response.status() === 200,
-    { timeout: 30_000 }
-  );
+  const verifyIbBrowserResources = async () => {
+    const resources = await withChromiumIbRuntime(context, page, ibParticipantSessionId, async runtime => {
+      await runtime.waitVisible("input[type=checkbox], input[type=text], button");
+      assert.equal(await runtime.evaluate(`[...document.querySelectorAll('span,label')].some(element=>{
+        const r=element.getBoundingClientRect(),s=getComputedStyle(element);
+        return element.textContent==='CheckBoxA' && s.visibility==='visible' && s.display!=='none' && Number(s.opacity)>0 &&
+          r.width>0 && r.height>0 && r.x<innerWidth && r.y<innerHeight && r.right>0 && r.bottom>0;})`), true);
+      return runtime.reloadResources();
+    });
+    // The real resource reload deliberately invalidates the old native loader.
+    // Rebind before proving that its new document and controls are visible.
+    await withChromiumIbRuntime(context, page, ibParticipantSessionId, async runtime => {
+      assert.equal(runtime.identity.frameId, resources.document.frameId);
+      assert.equal(runtime.identity.loaderId, resources.document.loaderId);
+      await runtime.waitVisible("input[type=checkbox], input[type=text], button");
+      assert.equal(await runtime.evaluate(`[...document.querySelectorAll('span,label')].some(element=>{
+        const r=element.getBoundingClientRect(),s=getComputedStyle(element);
+        return element.textContent==='CheckBoxA' && s.visibility==='visible' && s.display!=='none' && Number(s.opacity)>0 &&
+          r.width>0 && r.height>0 && r.x<innerWidth && r.y<innerHeight && r.right>0 && r.bottom>0;})`), true);
+    });
+  };
+  await verifyIbBrowserResources();
+  logStep("participant-ib-runtime-browser-resources");
   await participantHttpActor.goto(page,
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       ibParticipantSessionId
     )}`,
     { waitUntil: "domcontentloaded" }
   );
-  await ibRuntimeReloadResponse;
   await page
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: `API ${ibPlayerPackage.playerApiVersion}` })
     .waitFor({ timeout: 30_000 });
-  await page
-    .frameLocator("#participantVeronaPlayerFrame")
-    .frameLocator("#ib-runtime-host")
-    .getByText("CheckBoxA", { exact: true })
-    .waitFor({ state: "visible", timeout: 30_000 });
+  await verifyIbBrowserResources();
+  logStep("participant-ib-runtime-re-entry-resources");
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import { reloadChromiumIbResources } from "./chromium-ib-resource-reload.mjs";
 
 const runtimeSuffix = "/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html";
 
@@ -155,7 +156,12 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
         "participantVeronaPlayerFrame", "The Player must not be covered at the input point.");
       await bounded(() => page.mouse.click(point.x, point.y));
     };
-    await bounded(() => verify({ evaluate, waitVisible, click,
+    return await bounded(() => verify({ evaluate, waitVisible, click,
+      identity: Object.freeze({ frameId: runtime.id, loaderId: runtime.loaderId }),
+      // Reload invalidates this driver's loader/context binding. Finish this
+      // callback, then bind a new driver before checking or using the new DOM.
+      reloadResources: () => reloadChromiumIbResources(session, runtime,
+        () => evaluate("setTimeout(() => location.reload(), 0)"), Math.min(30_000, deadline - Date.now())),
       inputEvents: () => evaluate(`window[${JSON.stringify(proofKey)}]`) }));
   } finally {
     disposed = true;

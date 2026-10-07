@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Bound ItemBuilder browser resource reload proof (2026-10-07)
+
+The long-sequence ItemBuilder resource wait now uses an explicit additional
+reload of the already authorized, visibly loaded native runtime.
+Independent owned opaque-frame fixtures show why merely enabling Network after
+`frameattached`, page-level raw auto-attachment or browser-level auto-attachment
+does not reliably capture its initial Document/Script responses. Those rejected
+observation strategies are retained; no browser-debug listener, protocol socket,
+test-library patch, vendor alteration or security flag is published.
+
+The actual browser reload starts only after Session/capability, current origin,
+direct Player parent, pinned runtime, opaque origins and unique execution
+contexts pass the existing native binding. Before `location.reload`, its own CDP
+session enables Network. The resource gate requires both the exact runtime HTML
+and `9.9.0/main.220e1b93.js`, HTTP 200, the correct Document/Script types, exact
+content types and no frame-blocking header. Both must belong to that bound frame
+and one new loader, and both must emit `Network.loadingFinished`. Foreign frames,
+Sessions, origins, capabilities, old/mixed loaders, other resources, wrong types,
+bad headers, failed/incomplete transfers and expired commands cannot pass.
+Observation/listeners are bounded and cleaned up. The old driver deliberately
+becomes stale; a fresh authorized binding must prove the new visible controls
+and exact `CheckBoxA` label. No response is fetched or injected by the helper.
+
+Protected SQLite/immutable production/headful Chrome and bundled Chromium pass
+both interfaces (four cases), with completed browser resource loads before real
+trusted input and after actual participant re-entry, followed by byte-exact
+durable response checks. The cache policy is unchanged; resource evidence retains
+cache/ServiceWorker flags rather than claiming every Script used a new wire
+transfer. All 397 unit/frontend checks and typecheck pass. The longer owned
+protected SQLite/immutable production/headful Chrome flow passes both new
+ItemBuilder resource markers and the following Aspect, original sample package,
+Booklet policy and optional Original Player navigation/surface sections. It then
+stops at `completeOriginalControllerUnit` (`smoke-ui.mjs:18767`): the actual
+`TestController-radio1-Aufg1` check reports that the click did not change state.
+That separately retained failure is not diagnosed or weakened here; full group
+deletion is not reached. The run explicitly skips only offline app-shell
+acceptance, which remains covered independently. The entire longer flow, fresh
+complete remote CI, eight complete Original-UI rows, visual
+ItemBuilder supplied-state restoration and broader production acceptance remain
+independent gates. The sandboxed vendor `localStorage` error is still recorded,
+not suppressed. Evidence is retained in ignored
+`.data/ib-resource-acceptance-20261007.*`.
+
 ### Trusted ItemBuilder input with exact native frame binding (2026-10-07)
 
 The focused headful ItemBuilder failure is now isolated from the application:

@@ -88,11 +88,17 @@ fixtures and is part of quick CI. Its public Chromium DOM reader binds the exact
 selected Session's pinned runtime, rejects replaced contexts and covered inputs,
 and keeps mouse/keyboard input on the real browser path. Visible controls,
 trusted input events, interaction-derived scores and byte-exact durable reload
-remain mandatory. Neither the Player sandbox nor the test library is patched.
+remain mandatory. An additional genuine runtime reload proves completed browser
+HTML and Script responses, exact HTTP status/content types and no frame-blocking
+headers, all bound to one new load of the authorized frame. A fresh native binding
+then verifies the visible controls. No backend fetch substitutes for that browser
+proof; existing cache policy and the opaque sandbox remain unchanged. Neither
+the Player sandbox nor the test library is patched.
 With operator authentication enabled only fixture setup uses the real operator
 sign-in; participant browser requests never receive that credential. Screenshots,
-traces and redacted frame diagnostics are retained. The separate full-sequence
-browser resource-response wait and fresh complete CI remain open; see
+traces and redacted frame diagnostics are retained. The full sequence uses this
+same browser resource proof instead of missing initial opaque-frame events.
+Its complete acceptance and fresh complete CI remain separate; see
 `docs/PARITY.md` for exact proof boundaries.
 
 Group-result deletion tests distinguish backend inventory removal from UI card

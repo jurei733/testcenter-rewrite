@@ -84,7 +84,7 @@ function runtimeFixture({ replaceLoader = false, attachDelay = 0 } = {}) {
   const context = { newCDPSession: async () => {
     if (attachDelay) await new Promise(resolve => setTimeout(resolve, attachDelay)); return session;
   } };
-  return { page, context, host, element, detached: () => detached };
+  return { page, context, host, element, session, detached: () => detached };
 }
 
 test("native runtime rejection detaches and cannot invoke the verification callback", async () => {
@@ -117,4 +117,42 @@ test("late native attachment is detached after a bounded timeout", async () => {
     async () => { verified = true; }, 50), /deadline expired/u);
   await new Promise(resolve => setTimeout(resolve, 120));
   assert.equal(verified, false); assert.equal(fixture.detached(), 1);
+});
+
+test("a genuine resource reload invalidates the old native driver before further DOM reads", async () => {
+  const fixture = runtimeFixture(); let reloaded = false;
+  const originalSend = fixture.session.send;
+  fixture.session.send = async (method, params) => {
+    if (method === "Page.getFrameTree") {
+      const frameTree = tree();
+      if (reloaded) frameTree.childFrames[0].frame.loaderId = "new-load";
+      return { frameTree };
+    }
+    if (method !== "Runtime.evaluate") return originalSend(method, params);
+    if (params.expression.includes("setTimeout(() => location.reload()")) {
+      reloaded = true;
+      for (const [type, url, contentType] of [
+        ["Document", runtimeUrl, "text/html; charset=utf-8"],
+        ["Script", new URL("9.9.0/main.220e1b93.js", runtimeUrl).href, "text/javascript; charset=utf-8"]
+      ]) {
+        fixture.session.emit("Network.responseReceived", { type, requestId: type,
+          frameId: "runtime", loaderId: "new-load", response: { url, status: 200, headers: { "Content-Type": contentType } } });
+        fixture.session.emit("Network.loadingFinished", { requestId: type });
+      }
+    }
+    const value = params.expression === "globalThis.origin" ? "null" :
+      params.expression === "location.href" ? runtimeUrl : true;
+    return { result: { value } };
+  };
+  const newLoader = await withChromiumIbRuntime(fixture.context, fixture.page, "session-a", async runtime => {
+    assert.deepEqual(runtime.identity, { frameId: "runtime", loaderId: "load-a" });
+    assert.ok(Object.isFrozen(runtime.identity));
+    const resources = await runtime.reloadResources();
+    assert.equal(resources.script.loaderId, "new-load");
+    await assert.rejects(runtime.evaluate("document.title"), /stale or replaced/u);
+    return resources.script.loaderId;
+  });
+  assert.equal(newLoader, "new-load");
+  assert.equal(reloaded, true); assert.equal(fixture.detached(), 1);
+  assert.equal(fixture.session.listenerCount("Network.responseReceived"), 0);
 });

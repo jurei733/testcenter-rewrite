@@ -41,8 +41,15 @@ trusted checkbox/text input, rejection of foreign Sessions and covered controls,
 interaction-derived state and byte-exact durable reload are required. Original's
 intentionally hidden API-version diagnostic is checked for its actual handshake
 text, while the actual Player and controls must be visible. This supersedes the
-earlier focused blank-frame observation, not the separate long-sequence resource
-response wait, visual answer-restoration limitation or any full-page row below.
+earlier focused blank-frame observation, not complete long-sequence acceptance,
+the visual answer-restoration limitation or any full-page row below. The new
+additional runtime reload verifies completed native browser HTML/Script loads
+in the exact authorized frame and a new loader, before input and after participant
+re-entry, in both interfaces. A fresh native binding verifies visible controls
+after each resource probe; no API fetch or weakened sandbox replaces the browser
+proof. The separate full sequence now uses the same gate; see `PARITY.md` for its
+actual validation boundary. None of the eight complete Original-UI rows is closed
+by this shared browser-harness change.
 
 The current protected-login HTTPS notice is adapted from the actual
 `14c98284` protection service and alert layout. The shared Rewrite protection
