@@ -74,6 +74,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
               Password
               <input id="adminPassword" name="adminPassword" type="password" autocomplete="current-password" [(ngModel)]="view.ops.adminPassword" />
             </label>
+            <p *ngIf="view.adminSignInProtectionUnavailable" data-cy="login-insecure-context" role="alert">{{ view.insecureContextMessage }}</p>
             <button id="adminSignInButton" class="primary" type="submit" [disabled]="!view.canUseAdminCredentials">{{ view.proofOfWorkBusy ? "Computing Security Challenge…" : "Sign In" }}</button>
           </form>
 

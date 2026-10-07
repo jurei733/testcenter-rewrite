@@ -53,11 +53,62 @@ try {
   token = (await api("/api/v1/admin/auth/sign-in", { username: "demo-admin", password: "demo-admin-password" })).sessionToken;
   assert.ok(token);
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
-  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+    ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
+    args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
+  const protectedParticipant = String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES || "").split(/[\s,]+/u).includes("participant");
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
+    for (const mode of ["original", "rewrite"]) {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, serviceWorkers: "block" });
+      const page = await context.newPage(), credentialRequests = [];
+      page.on("request", request => {
+        if (request.method() === "POST" && ["/api/v1/participant/auth/sign-in", "/api/v1/system/proof-of-work/challenges"].includes(new URL(request.url()).pathname)) credentialRequests.push(request);
+      });
+      const insecureUrl = new URL(`/app/participant?ui=${mode}&tenantKey=demo-tenant&workspaceKey=demo-workspace`, baseUrl);
+      insecureUrl.hostname = "testcenter-proof.insecure";
+      await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
+      assert.equal(await page.evaluate(() => window.isSecureContext), false);
+      const notice = page.locator('[data-cy="login-insecure-context"]');
+      if (mode === "original") {
+        await page.getByLabel("Anmeldename", { exact: true }).fill("student-demo");
+        await page.getByRole("button", { name: "Weiter", exact: true }).click();
+      } else {
+        await page.locator("#participantLoginKey").fill("student-demo");
+      }
+      const submit = mode === "original" ? page.getByRole("button", { name: "Anmelden", exact: true }) : page.locator("#participantRouteSignInButton");
+      if (protectedParticipant) {
+        await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
+        if (mode === "original") {
+          const icon = await notice.locator(".mat-icon").boundingBox();
+          assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+        }
+        assert.equal(await submit.isDisabled(), true); assert.equal(credentialRequests.length, 0);
+        if (mode === "original") {
+          await page.locator("#originalLoginPassword").fill("owned-password");
+          await page.locator("#originalLoginPassword").press("Enter");
+          await page.locator("#originalParticipantLogin form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+          assert.equal(credentialRequests.length, 0);
+        }
+      } else {
+        assert.equal(await notice.count(), 0);
+        if (mode === "rewrite") {
+          const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.ok());
+          await submit.click(); assert.equal((await authenticated).status(), 200);
+        } else {
+          await page.locator("#originalParticipantLogin").waitFor({ state: "detached" });
+        }
+        assert.equal(credentialRequests.length, 1);
+      }
+      await page.screenshot({ path: join(root, `${theme}-${mode}-insecure-${protectedParticipant ? "blocked" : "inactive"}.png`), fullPage: true });
+      await context.close();
+      process.stdout.write(`insecure_participant_entry=${theme}/${mode}/${protectedParticipant ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
+    }
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
-      const context = await browser.newContext({ viewport: { width, height } });
+      // This geometry fixture explicitly includes the authored old-browser
+      // warning. A newer installed Chrome must not silently remove that state.
+      const context = await browser.newContext({ viewport: { width, height },
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" });
       const page = await context.newPage();
       observeProofOfWork(page);
       const errors = [];
@@ -163,6 +214,57 @@ try {
   }
   await context.close();
   process.stdout.write("Original password login: real authorized session, no persisted password.\n");
+  if (!protectedParticipant) {
+    // Second-code-only protection must not disable the preceding name login.
+    // This roster and all resulting Runs belong exclusively to this test API.
+    const protectedCode = String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES || "").split(/[\s,]+/u).includes("second_code");
+    for (const codeInputType of ["keypad-symbols-alt", "text-field"]) {
+      await api("/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster", {
+        rosterText: JSON.stringify([{ loginKey: "owned-second-code", groupKey: "owned-second-code-group",
+          booklets: [{ id: "booklet:demo", codes: "123" }],
+          viewSettings: { codeInput: { type: codeInputType, length: 3 } } }])
+      });
+      for (const mode of ["original", "rewrite"]) {
+        const context = await browser.newContext({ serviceWorkers: "block" }), page = await context.newPage();
+        const credentialRequests = [];
+        page.on("request", request => {
+          if (request.method() === "POST" && ["/api/v1/participant/auth/sign-in", "/api/v1/system/proof-of-work/challenges"].includes(new URL(request.url()).pathname)) credentialRequests.push(request);
+        });
+        const insecureUrl = new URL(`/app/participant?ui=${mode}&tenantKey=demo-tenant&workspaceKey=demo-workspace`, baseUrl);
+        insecureUrl.hostname = "testcenter-proof.insecure";
+        await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
+        assert.equal(await page.evaluate(() => window.isSecureContext), false);
+        if (mode === "original") {
+          await page.getByLabel("Anmeldename", { exact: true }).fill("owned-second-code");
+          await page.getByRole("button", { name: "Weiter", exact: true }).click();
+        } else {
+          await page.locator("#participantLoginKey").fill("owned-second-code"); await page.locator("#participantRouteSignInButton").click();
+        }
+        const control = page.locator(codeInputType === "text-field" ? "#participantCode" : "#participantCodeKeypad"); await control.waitFor();
+        assert.equal(credentialRequests.length, 1, "The preceding name entry must remain unprotected for second-code-only scopes.");
+        if (protectedCode) {
+          await page.locator('[data-cy="login-insecure-context"]').waitFor();
+          assert.equal(await page.locator("#participantRouteSignInButton").isDisabled(), true);
+          assert.equal(await page.locator("#participantRouteStartOrResumeButton").isDisabled(), true);
+          if (codeInputType === "text-field") assert.equal(await control.isDisabled(), true);
+          else assert.ok(await control.locator("button").evaluateAll(buttons => buttons.length > 0 && buttons.every(button => button.disabled)));
+          await page.keyboard.press("Enter"); assert.equal(credentialRequests.length, 1);
+        } else {
+          assert.equal(await page.locator('[data-cy="login-insecure-context"]').count(), 0);
+          const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.ok());
+          if (codeInputType === "text-field") {
+            await control.fill("123"); await page.locator("#participantRouteSignInButton").click();
+          } else {
+            for (const digit of ["1", "2", "3"]) await page.locator(`#participantCodeKeypadValue-${digit}`).click();
+          }
+          assert.equal((await authenticated).status(), 200); assert.equal(credentialRequests.length, 2);
+        }
+        await page.screenshot({ path: join(root, `${mode}-${codeInputType}-second-code-insecure-${protectedCode ? "blocked" : "inactive"}.png`), fullPage: true });
+        await context.close();
+        process.stdout.write(`insecure_second_code=${mode}/${codeInputType}/${protectedCode ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
+      }
+    }
+  }
 } finally {
   await browser?.close().catch(() => undefined);
   if (server.exitCode === null) {

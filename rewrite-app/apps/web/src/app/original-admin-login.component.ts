@@ -9,6 +9,7 @@ import { RouterLink } from "@angular/router";
 import { OpsViewFacade } from "./ops-view.facade";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { OriginalEntrySurfaceStylesComponent } from "./original-entry-surface-styles.component";
+import { OriginalLoginNoticeComponent } from "./original-login-notice.component";
 
 // Adapted from pinned IQB Testcenter 19 AdminLogin (MIT); see ORIGINAL-UI-LICENSE.txt.
 // Only presentation is local. The parent calls the same authorized operator
@@ -16,7 +17,7 @@ import { OriginalEntrySurfaceStylesComponent } from "./original-entry-surface-st
 @Component({
   selector: "app-original-admin-login", standalone: true,
   imports: [ReactiveFormsModule, MatButton, MatCardModule, MatFormField, MatLabel,
-    MatInput, RouterLink, OriginalEntrySurfaceStylesComponent],
+    MatInput, RouterLink, OriginalEntrySurfaceStylesComponent, OriginalLoginNoticeComponent],
   template: `
     <app-original-entry-surface-styles />
     <div id="originalAdminLogin" class="login-wrapper">
@@ -48,10 +49,11 @@ import { OriginalEntrySurfaceStylesComponent } from "./original-entry-surface-st
                 </span><span>{{ problem() }}</span></div>
               </div></span>
             }
+            @if (view.adminSignInProtectionUnavailable) { <app-original-login-notice /> }
           </mat-card-content>
           <mat-card-actions [style.justify-content]="'space-between'">
             <button id="adminSignInButton" matButton="filled" type="submit" data-cy="login-admin"
-              [disabled]="form.invalid || busy() || view.proofOfWorkBusy">Anmelden</button>
+              [disabled]="form.invalid || busy() || view.proofOfWorkBusy || view.adminSignInProtectionUnavailable">Anmelden</button>
           </mat-card-actions>
         </mat-card>
       </form>
@@ -88,7 +90,7 @@ export class OriginalAdminLoginComponent implements OnDestroy {
   }
 
   async submit(): Promise<void> {
-    if (this.destroyed || this.busy() || this.form.invalid || this.view.proofOfWorkBusy) return;
+    if (this.destroyed || this.busy() || this.form.invalid || this.view.proofOfWorkBusy || this.view.adminSignInProtectionUnavailable) return;
     const { name, pw } = this.form.getRawValue();
     OriginalAdminLoginComponent.oldLoginName = name;
     this.view.ops.adminUsername = name;

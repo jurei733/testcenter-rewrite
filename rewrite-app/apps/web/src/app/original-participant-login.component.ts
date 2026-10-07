@@ -9,11 +9,12 @@ import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
+import { OriginalLoginNoticeComponent } from "./original-login-notice.component";
 
 @Component({
   selector: "app-original-participant-login",
   standalone: true,
-  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatCard, MatCardContent],
+  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatCard, MatCardContent, OriginalLoginNoticeComponent],
   templateUrl: "./original-participant-login.component.html",
   styleUrls: ["./original-participant-login.component.css", "./original-login-theme.scss"]
 })
@@ -52,10 +53,22 @@ export class OriginalParticipantLoginComponent {
     this.capsLock.set(false);
   }
 
+  get canSubmit(): boolean {
+    return !this.busy() && !this.view.proofOfWorkBusy && this.view.canEnterParticipantCredentials &&
+      this.view.runtime.loginKey.trim().length >= 3 &&
+      (!this.passwordStep() || !this.view.signInProtectionUnavailable);
+  }
+
   async submit(): Promise<void> {
-    if (this.busy() || !this.view.canSignIn || this.view.runtime.loginKey.trim().length < 3) return;
+    if (!this.canSubmit) return;
     const wasPasswordStep = this.passwordStep();
     if (!wasPasswordStep) this.view.runtime.participantPassword = "";
+    // Retain the Original name/password presentation without sending even a
+    // name-first credential probe when this deployment requires HTTPS.
+    if (this.view.signInProtectionUnavailable) {
+      this.passwordStep.set(true);
+      return;
+    }
     this.busy.set(true);
     this.problem.set("");
     this.capsLock.set(false);

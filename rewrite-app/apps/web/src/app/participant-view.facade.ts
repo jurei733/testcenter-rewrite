@@ -1932,7 +1932,7 @@ export class ParticipantViewFacade {
     this.browserCompatibility.setCustomTexts(this.participantCustomTexts);
   }
 
-  get canSignIn(): boolean {
+  get canEnterParticipantCredentials(): boolean {
     return Boolean(
       !this.hasControllerError &&
       (this.workspace.workspaceKey.trim() || this.isLegacyShortLinkEntry()) &&
@@ -1940,6 +1940,19 @@ export class ParticipantViewFacade {
       (!this.participantCodeRequired || this.runtime.participantCode.trim())
     );
   }
+
+  get canSignIn(): boolean {
+    return this.canEnterParticipantCredentials && !this.proofOfWork.busy() &&
+      !this.signInProtectionUnavailable;
+  }
+
+  get signInProtectionUnavailable(): boolean {
+    return this.proofOfWork.isUnavailable("participant") ||
+      (this.participantCodeRequired || !!this.runtime.participantCode.trim()) &&
+      this.proofOfWork.isUnavailable("second_code");
+  }
+
+  readonly insecureContextMessage = ProofOfWorkService.insecureContextMessage;
 
   get proofOfWorkBusy(): boolean {
     return this.proofOfWork.busy();
@@ -2003,6 +2016,7 @@ export class ParticipantViewFacade {
   }
 
   selectParticipantCodeKeypadValue(value: string): void {
+    if (this.signInProtectionUnavailable || this.proofOfWork.busy()) return;
     if (this.runtime.participantCode.length >= this.participantCodeInputLength) {
       return;
     }

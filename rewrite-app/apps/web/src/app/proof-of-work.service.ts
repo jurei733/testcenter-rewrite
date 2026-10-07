@@ -24,6 +24,9 @@ type ProtectedParticipantCredentials = ParticipantSignInCredentials & {
 
 @Injectable({ providedIn: "root" })
 export class ProofOfWorkService {
+  static readonly insecureContextMessage =
+    "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. " +
+    "Bitte wenden Sie sich an den Betreiber dieses Servers.";
   readonly busy = signal(false);
 
   private readonly request = inject(RewriteAppShellRequestService);
@@ -33,9 +36,11 @@ export class ProofOfWorkService {
   async protectAdmin(
     credentials: AdminSignInCredentials
   ): Promise<ProtectedAdminCredentials> {
-    if (!(await this.isRequired("admin", credentials))) {
+    const config = await this.readRuntimeConfig();
+    if (!this.isRequiredWithConfig("admin", credentials, config)) {
       return credentials;
     }
+    this.assertSecureContext();
     return this.withBusy(async () => ({
       ...credentials,
       proofOfWork: {
@@ -54,6 +59,7 @@ export class ProofOfWorkService {
     if (requiredScopes.length === 0) {
       return credentials;
     }
+    this.assertSecureContext();
     return this.withBusy(async () => {
       const proofOfWork: ProofOfWorkSolutions = {};
       for (const scope of requiredScopes) {
@@ -93,15 +99,16 @@ export class ProofOfWorkService {
     return { token: challenge.token, number: solved.number };
   }
 
-  private async isRequired(
-    scope: ProofOfWorkScope,
-    credentials: AdminSignInCredentials | ParticipantSignInCredentials
-  ): Promise<boolean> {
-    return this.isRequiredWithConfig(
-      scope,
-      credentials,
-      await this.readRuntimeConfig()
+  isUnavailable(scope: ProofOfWorkScope): boolean {
+    return globalThis.isSecureContext !== true && Boolean(
+      this.readCachedRuntimeConfig()?.runtimeConfig.proofOfWork.enabledScopes.includes(scope)
     );
+  }
+
+  private assertSecureContext(): void {
+    if (globalThis.isSecureContext !== true) {
+      throw new Error(ProofOfWorkService.insecureContextMessage);
+    }
   }
 
   private isRequiredWithConfig(
@@ -122,7 +129,7 @@ export class ProofOfWorkService {
       : (participantCredentials.participantCode ?? "").trim() !== "";
   }
 
-  private async readRuntimeConfig(): Promise<GetRuntimeConfigResponse> {
+  private readCachedRuntimeConfig(): GetRuntimeConfigResponse | undefined {
     try {
       const cached = JSON.parse(
         this.uiState.ops.runtimeConfigView
@@ -133,13 +140,22 @@ export class ProofOfWorkService {
     } catch {
       // Load the public configuration below when startup diagnostics are not ready.
     }
-    return this.request.request<GetRuntimeConfigResponse>(
+    return undefined;
+  }
+
+  private async readRuntimeConfig(): Promise<GetRuntimeConfigResponse> {
+    const cached = this.readCachedRuntimeConfig();
+    if (cached) return cached;
+    const config = await this.request.request<GetRuntimeConfigResponse>(
       "Load security configuration",
       "GET",
       productionApiRoutes.system.getRuntimeConfig,
       undefined,
       { quiet: true }
     );
+    this.uiState.ops.runtimeConfigView = JSON.stringify(config);
+    this.uiState.renderVersion.update(version => version + 1);
+    return config;
   }
 
   private loadSolver(): Promise<typeof import("altcha-lib")> {

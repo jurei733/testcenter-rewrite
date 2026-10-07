@@ -469,6 +469,7 @@ export class OpsViewFacade {
   get canUseAdminCredentials(): boolean {
     return (
       !this.proofOfWork.busy() &&
+      !this.adminSignInProtectionUnavailable &&
       this.ops.adminUsername.trim() !== "" &&
       this.ops.adminPassword !== ""
     );
@@ -477,6 +478,12 @@ export class OpsViewFacade {
   get proofOfWorkBusy(): boolean {
     return this.proofOfWork.busy();
   }
+
+  get adminSignInProtectionUnavailable(): boolean {
+    return this.proofOfWork.isUnavailable("admin");
+  }
+
+  readonly insecureContextMessage = ProofOfWorkService.insecureContextMessage;
 
   get canBootstrapAdminCredentials(): boolean {
     return (

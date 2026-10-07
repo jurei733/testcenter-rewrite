@@ -1,5 +1,45 @@
 # Testcenter parity checklist
 
+### Secure-context protected entry (2026-10-07)
+
+The shared proof-of-work service now rejects a required administrator,
+participant or second-code challenge outside a browser secure context before
+sending credentials or creating a challenge. When configuration is not yet
+cached, only its public GET is permitted before this rejection. Existing scopes,
+server cryptography and session authorization remain unchanged; inactive scopes
+and secure localhost remain usable.
+
+Both interfaces display the current Original's German HTTPS/operator notice.
+Original name entry advances locally to the disabled password step without
+probing credentials. Second-code-only protection still allows the preceding
+name login, then disables text-field/keypad input, login and start actions.
+Direct form submits and Enter cannot bypass the shared gate. The adapted alert
+retains its Source 24px non-shrinking error icon, including on narrow screens.
+
+All 376 unit/frontend checks, typecheck and the unchanged 469.82kB production
+build pass. Owned SQLite/immutable production/headful Chrome verifies active
+and inactive protection in both interfaces, all three themes, administrator
+desktop/mobile states, participant name/password behavior, both code input
+types, and real secure-localhost sessions with 24 administrator and 14
+participant challenges. Browser security flags are not mocked: one explicit
+non-localhost HTTP hostname resolves only to the owned localhost test API.
+The old-browser warning layout fixture now pins its intended old user agent
+instead of assuming the installed Chrome is unsupported. Protected participant
+and second-code variants are included in mandatory quick CI. Logs/screenshots
+are retained under ignored `.data/secure-login-20261007.*`.
+
+The preceding `7d17d590` push/PR CI has actual failed UI jobs, not only pending
+checks. The shared new group-deletion assertion at `smoke-ui.mjs:25676` expects
+`pausedTestRunId` in the deleted original group, although the earlier monitor
+flow reassigns that variable to a separately created `-monitor-command` group.
+This test-scope error must be corrected against the actual selected group's
+Runs; removing the original DOM/backend assertions is not an acceptance fix.
+One separate PR review job fails while Ubuntu cannot install browser packages,
+before application tests. These failures, the ItemBuilder/headful gate, fresh
+complete publication CI, all eight full Original-UI rows, the newly audited
+Unit-short-label/toolbar-color delta and broader production acceptance remain
+open. This publication is neither 100% parity nor merge acceptance.
+
 ### Native group-result deletion acceptance (2026-10-07)
 
 The `78bfde62` publication's native PostgreSQL UI jobs pass in both the
@@ -784,7 +824,27 @@ acceptance requirements.
 
 ## Current 19.0 delta to verify
 
-GitHub `master` was reverified on 2026-10-07 at
+GitHub `master` was fetched and independently reverified on 2026-10-07 at
+`14c98284590195631750bb2352cb398ca669fe7d`. Its twelve commits after `a570587f`
+add two product requirements beyond the earlier audit:
+
+- Unit short labels are now configurable with `header_content=UNIT_LABEL_SHORT`,
+  `navbar_unit_label=LABEL_SHORT` and the new `toolbar_unit_label=LABEL_SHORT`.
+  Missing `labelshort` falls back to the full Unit label. The toolbar setting
+  also supports `LABEL` and `HIDDEN`; deprecated `toolbar_show_unit_title` and
+  older `unit_title` retain their resolved precedence. Update intake contracts,
+  runtime presentation, current fixtures and both interfaces' rendering gates
+  before counting this new requirement as complete.
+- Original Material toolbars now use `on-primary` for text and icons, including
+  Review panels; disabled icons use its 38-percent transparent mixture. Fresh
+  three-theme header, Player and side-panel comparisons are required.
+
+The new TestDAO wrong-type-array tests strengthen an existing validation
+boundary; the remaining commits are backend type/lint/test-infrastructure
+changes, not new product behavior. Historical rendered evidence remains pinned
+to `c35cff81` and does not prove these newer presentation states.
+
+The preceding audit reverified GitHub `master` on 2026-10-07 at
 `a570587f12e10989f80e91a3d559aa5f753ec3f0` (2026-10-06). Its twelve-commit
 delta from `c35cff81` adds current acceptance requirements:
 

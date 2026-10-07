@@ -58,10 +58,47 @@ try {
   }
   token = (await api("/api/v1/admin/auth/sign-in", credentials)).sessionToken;
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
-  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+    ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
+    args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
   let browserChallenges = 0;
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
+    for (const mode of ["original", "rewrite"]) {
+      for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844]]) {
+        const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
+        const page = await context.newPage(), credentialRequests = [];
+        page.on("request", request => {
+          if (request.method() === "POST" && ["/api/v1/admin/auth/sign-in", "/api/v1/system/proof-of-work/challenges"].includes(new URL(request.url()).pathname)) credentialRequests.push(request);
+        });
+        const insecureUrl = new URL(`/app/ops?ui=${mode}&returnUrl=%2Fworkspace`, baseUrl);
+        insecureUrl.hostname = "testcenter-proof.insecure";
+        await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
+        assert.equal(await page.evaluate(() => window.isSecureContext), false, "Use a real insecure origin, not a mocked security flag.");
+        await page.locator("#adminUsername").fill("demo-admin"); await page.locator("#adminPassword").fill(password);
+        const submit = page.locator("#adminSignInButton"), notice = page.locator('[data-cy="login-insecure-context"]');
+        if (proof) {
+          await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
+          if (mode === "original") {
+            const icon = await notice.locator(".mat-icon").boundingBox();
+            assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+          }
+          assert.equal(await submit.isDisabled(), true);
+          await page.locator("#adminPassword").press("Enter");
+          await page.locator("form").evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+          assert.equal(credentialRequests.length, 0, "Disabled and direct form submissions must send neither credentials nor challenges.");
+          assert.equal(await submit.isDisabled(), true);
+        } else {
+          assert.equal(await notice.count(), 0); assert.equal(await submit.isDisabled(), false);
+          const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/admin/auth/sign-in" && response.ok());
+          await submit.click(); assert.equal((await authenticated).status(), 200);
+          await page.waitForURL(url => url.pathname === "/app/workspace"); assert.equal(credentialRequests.length, 1);
+        }
+        await page.screenshot({ path: join(artifacts, `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}.png`), fullPage: true });
+        await context.close();
+        process.stdout.write(`insecure_admin_entry=${theme}/${screen}/${mode}/${proof ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
+      }
+    }
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       const context = await browser.newContext({ viewport: { width, height } });
       const page = await context.newPage(); const errors = [], signIns = [];

@@ -8,8 +8,9 @@ acceptance axis from functional parity; the historical 94% estimate in
 PARITY.md does not measure it.
 
 Current upstream target, reverified on 2026-10-07:
-`a570587f12e10989f80e91a3d559aa5f753ec3f0`. Its new protected-login busy states
-and insecure-context HTTPS notice require fresh rendering/interaction evidence.
+`14c98284590195631750bb2352cb398ca669fe7d`. The protected-login busy states,
+insecure-context HTTPS notice, short Unit labels and toolbar on-primary colors
+require current acceptance evidence, not only the historical comparisons.
 See `PARITY.md` for the source-backed delta and separate deployment boundaries.
 
 Historical rendered reference: `iqb-berlin/testcenter` commit
@@ -31,6 +32,20 @@ Compare source files from that revision, not the older local checkout.
   them into the Original participant workflow.
 
 ## Acceptance matrix
+
+The current protected-login HTTPS notice is adapted from the actual
+`14c98284` protection service and alert layout. The shared Rewrite protection
+service refuses required challenges before sending credentials in a real
+insecure browser context. Original name entry advances locally to its disabled
+password step without a credential probe; administrator and second-code entry
+are disabled directly. Inactive scopes and secure localhost remain available.
+Owned production/headful Chrome gates cover both interfaces, all three themes,
+administrator desktop/mobile layout, direct/Enter submissions, and second-code
+keypad controls. The Source's non-shrinking 24px error icon is asserted at both
+widths. Fixed old-browser geometry fixtures retain their warning even when the
+installed Chrome is newer. These gates and actual controller/service regressions
+are separate from a freshly rendered unmodified upstream page comparison:
+none of the eight full-page rows below is complete.
 
 The 2026-10-07 shared navigation correction synchronizes automatic Run-bound
 addresses with Angular Router instead of only replacing native history. Owned

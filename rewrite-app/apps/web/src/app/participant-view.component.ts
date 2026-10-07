@@ -177,6 +177,7 @@ interface ParticipantVisibleCodeNotice {
               id="participantCode"
               name="participantCode"
               autocomplete="one-time-code"
+              [disabled]="view.signInProtectionUnavailable || view.proofOfWorkBusy"
               [(ngModel)]="view.runtime.participantCode"
             />
             <section
@@ -195,6 +196,7 @@ interface ParticipantVisibleCodeNotice {
                   type="button"
                   [id]="'participantCodeKeypadValue-' + option.value"
                   [attr.aria-label]="option.label"
+                  [disabled]="view.signInProtectionUnavailable || view.proofOfWorkBusy"
                   (click)="view.selectParticipantCodeKeypadValue(option.value)"
                 >{{ option.symbol }}</button>
                 <button
@@ -202,7 +204,7 @@ interface ParticipantVisibleCodeNotice {
                   type="button"
                   class="participant-code-keypad-delete"
                   aria-label="Delete last code value"
-                  [disabled]="!view.runtime.participantCode"
+                  [disabled]="!view.runtime.participantCode || view.signInProtectionUnavailable || view.proofOfWorkBusy"
                   (click)="view.removeParticipantCodeKeypadValue()"
                 >⌫</button>
               </div>
@@ -276,6 +278,7 @@ interface ParticipantVisibleCodeNotice {
         <p id="participantCodePrompt" class="hint" *ngIf="view.participantCodeRequired">
           {{ view.customText('login_codeInputPrompt', 'This login requires the second code assigned by the test supervisor.') }}
         </p>
+        <p *ngIf="view.isParticipantLogin && view.signInProtectionUnavailable" data-cy="login-insecure-context" role="alert">{{ view.insecureContextMessage }}</p>
         <div
           #participantStarterBottomSentinel
           id="participantStarterBottomSentinel"

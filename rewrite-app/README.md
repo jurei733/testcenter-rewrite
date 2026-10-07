@@ -43,6 +43,18 @@ as is the report card with the source's three lists and send/cancel actions,
 while the remaining full-page comparisons stay open in
 [`docs/ORIGINAL-UI-PARITY.md`](./docs/ORIGINAL-UI-PARITY.md).
 
+When a configured proof-of-work scope requires HTTPS, both interfaces explain
+and disable that login in an insecure browser context. The shared protection
+service rejects before any challenge or credential request, including direct
+submits. Original name entry advances locally to the blocked password step.
+Second-code-only protection does not block the preceding name login, but does
+disable its code keypad and start action. Inactive protection and secure
+localhost remain usable; existing deployment protection is never switched off.
+`npm run smoke:ui:original-login-protected:built` verifies participant and
+second-code scopes on an owned API using a real insecure browser origin and is
+part of quick CI. Current upstream also adds short Unit labels and toolbar
+colors; those separate open requirements are tracked in `docs/PARITY.md`.
+
 Assigned Booklets and preset variants can start independently while another
 Booklet is unfinished, then return to the starter and resume their exact saved
 Run. `npm run smoke:ui:participant-variant:built` verifies the actual A/B Starter

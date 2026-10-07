@@ -41,7 +41,8 @@
       }
       @if (problem()) { <p id="originalLoginProblem" class="login-problem" role="alert">{{ problem() }}</p> }
       @if (capsLock()) { <p id="originalLoginCapsLock" role="status">Feststelltaste ist aktiviert!</p> }
-      <button matButton="filled" class="login-submit" type="submit" [disabled]="busy() || !view.canSignIn || view.runtime.loginKey.trim().length < 3">
+      @if (passwordStep() && view.signInProtectionUnavailable) { <app-original-login-notice /> }
+      <button matButton="filled" class="login-submit" type="submit" [disabled]="!canSubmit">
         @if (!passwordStep() && !busy()) {
           <span class="mat-icon" matButtonIcon aria-hidden="true"><svg width="100%" height="100%" viewBox="0 -960 960 960" focusable="false"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" /></svg></span>
         }

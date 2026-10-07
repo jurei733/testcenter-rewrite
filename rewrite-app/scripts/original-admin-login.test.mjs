@@ -26,12 +26,12 @@ const forms = moduleUrl(`
   }
 `);
 const ui = moduleUrl(`export const MatButton = {}, MatCardModule = {}, MatFormField = {}, MatLabel = {}, MatInput = {}, RouterLink = {};
-  export class OpsViewFacade {} export class RewriteAppApiService {} export class OriginalEntrySurfaceStylesComponent {}`);
+  export class OpsViewFacade {} export class RewriteAppApiService {} export class OriginalEntrySurfaceStylesComponent {} export class OriginalLoginNoticeComponent {}`);
 const file = new URL("../apps/web/src/app/original-admin-login.component.ts", import.meta.url);
 const code = ts.transpileModule(readFileSync(file,"utf8"), { compilerOptions: {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, experimentalDecorators: true
 } }).outputText.replace('"@angular/core"',JSON.stringify(angular)).replace('"@angular/forms"',JSON.stringify(forms))
-  .replace(/"(?:@angular\/material\/[^"\n]+|@angular\/router|\.\/ops-view.facade|\.\/rewrite-app-api.service|\.\/original-entry-surface-styles.component)"/gu,JSON.stringify(ui));
+  .replace(/"(?:@angular\/material\/[^"\n]+|@angular\/router|\.\/ops-view.facade|\.\/rewrite-app-api.service|\.\/original-entry-surface-styles.component|\.\/original-login-notice.component)"/gu,JSON.stringify(ui));
 const { OriginalAdminLoginComponent } = await import(moduleUrl(code));
 const deferred = () => { let resolve,reject; const promise = new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject}; };
 const withLogin = async action => {
@@ -61,6 +61,14 @@ test("a pending login cannot duplicate its authorized callback or change its Cap
     component.passwordKeyUp({getModifierState:()=>true});assert.equal(component.problem(),"");
     assert.equal(component.busy(),true);assert.equal(calls,1);assert.equal(view.ops.adminPassword,"owned-private-password");
     pending.resolve();await first;assert.equal(component.busy(),false);assert.equal(view.ops.adminPassword,"");
+  });
+});
+test("unavailable HTTPS protection rejects a direct Original admin submit before copying credentials",async()=>{
+  await withLogin(async({component,fill,view})=>{
+    let calls=0;component.authenticate=async()=>{calls++;};fill();view.adminSignInProtectionUnavailable=true;
+    await component.submit();assert.equal(calls,0);assert.equal(component.busy(),false);
+    assert.equal(view.ops.adminPassword,"");assert.equal(view.ops.adminUsername,"");
+    view.adminSignInProtectionUnavailable=false;await component.submit();assert.equal(calls,1);
   });
 });
 test("semantic credential/access/rate errors use Source copy, not the Rewrite HTTP status",async()=>{
