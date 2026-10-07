@@ -1,5 +1,36 @@
 # Testcenter parity checklist
 
+### Atomic participant-assignment reservation foundation (2026-10-07)
+
+The repository contract now reserves or reuses a Run for the exact participant
+session, release and Booklet assignment atomically. It retains existing answer
+bytes, status, locks and timers, including completed and monitor-paused Runs;
+lifecycle authorization remains the application controller's responsibility.
+Memory makes the decision without yielding, File uses its existing single-writer
+mutation queue, SQLite uses an immediate transaction, and PostgreSQL locks the
+parent session through the same transaction client. Insert-only writes prevent
+a conflicting Run ID from overwriting another session or assignment.
+
+Thirty actual Memory/File/SQLite reservation checks pass, including simultaneous
+candidates, separate preset variants, durable reopen, invalid-scope rollback,
+cross-session ID collisions and four independent SQLite workers. All 315 unit/
+frontend checks, typecheck and the full 163-test API integration suite in each
+of Memory, File and SQLite pass. Native PostgreSQL reservation checks are wired
+into its CI runner; they have not been run locally. File continues to have a
+single-writer contract, not a new cross-process locking guarantee.
+
+This is a prerequisite, not a closed multi-Booklet feature: `launch` and
+`resumeSession` still reject a different unfinished assignment. Their integration,
+completion without closing another unfinished Run, guarded Starter switching,
+stable selected-Run URLs and real browser acceptance remain required.
+
+The published `03e660ae` full protected SQLite production browser flow also
+finished successfully. Its push CI separately caught an outbox-removal timeout
+at `smoke-ui.mjs:11508` in `participant-multi-unit-background-sync`, despite the
+server already receiving the answers. The root cause is not established, and
+the assertion has not been weakened. Neither this local reservation foundation
+nor a passing full browser job makes that publication globally CI-green.
+
 ### Workspace and Content operator re-entry links (2026-10-07)
 
 The third immutable protected SQLite flow passes the generated-entry and Runtime
@@ -37,11 +68,11 @@ that test-only setup omission is retained separately. The corrected attempt uses
 the actual `Select + Load` action. Evidence is ignored under
 `.data/operator-run-links-20261007.*`.
 
-The complete protected SQLite flow is being repeated against an immutable copy
-of this production build. Fresh remote CI, PostgreSQL browser acceptance, the
-Memory/headful ItemBuilder failure, the multi-Booklet P0 and complete Original-UI
-acceptance remain separate open gates; these narrow green checks do not prove
-100% parity or merge readiness.
+The complete protected SQLite flow finished successfully against an immutable
+copy of this production build, with the offline App-Shell axis explicitly
+excluded. Fresh complete remote CI, the Memory/headful ItemBuilder failure, the
+multi-Booklet P0 and complete Original-UI acceptance remain separate open gates;
+these checks do not prove 100% parity or merge readiness.
 
 ### Generated entry and selected-run re-entry acceptance (2026-10-07)
 
@@ -216,8 +247,10 @@ An owned authorized SQLite fixture reproduced that HTTP 409 even after the
 first run returned to the starter. This is not completed multi-Booklet parity.
 The explicit run-bound selection prerequisite above is now implemented and
 tested independently of response chronology. Legacy session-only readers still
-use an `updatedAt` fallback. The launch conflict itself and atomic per-assignment
-run creation/reuse remain open; removing the conflict alone is not sufficient.
+use an `updatedAt` fallback. The launch conflict itself remains open. The atomic
+per-assignment repository reservation above is implemented and tested locally in
+Memory/File/SQLite, but still needs controller integration and native PostgreSQL
+CI evidence; removing the conflict alone is not sufficient.
 
 Next acceptance must cover starting a second assigned Booklet while the first
 is safely left/paused, re-entering each exact run with independent answers,

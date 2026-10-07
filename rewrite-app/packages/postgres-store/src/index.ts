@@ -4,6 +4,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
+  selectParticipantAssignmentRun,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -1558,6 +1559,67 @@ export const checkPostgresFirstSliceReadiness = async (
   }
 };
 
+const persistTestRun = async (connection: Pick<Pool, "query">, testRun: TestRun, updateExisting = true): Promise<boolean> => {
+  const result = await connection.query(
+    `INSERT INTO test_runs (
+      test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+    ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
+      participant_session_id = EXCLUDED.participant_session_id,
+      tenant_id = EXCLUDED.tenant_id,
+      workspace_id = EXCLUDED.workspace_id,
+      content_release_id = EXCLUDED.content_release_id,
+      booklet_key = EXCLUDED.booklet_key,
+      execution_mode = EXCLUDED.execution_mode,
+      booklet_assignment_key = EXCLUDED.booklet_assignment_key,
+      preset_booklet_states_json = EXCLUDED.preset_booklet_states_json,
+      booklet_states_json = EXCLUDED.booklet_states_json,
+      booklet_state_overrides_json = EXCLUDED.booklet_state_overrides_json,
+      status = EXCLUDED.status,
+      locked = EXCLUDED.locked,
+      current_unit_key = EXCLUDED.current_unit_key,
+      unit_responses_json = EXCLUDED.unit_responses_json,
+      shared_parameters_json = EXCLUDED.shared_parameters_json,
+      unlocked_testlet_keys_json = EXCLUDED.unlocked_testlet_keys_json,
+      monitor_navigation_unlocked = EXCLUDED.monitor_navigation_unlocked,
+      testlet_timers_json = EXCLUDED.testlet_timers_json,
+      locked_testlet_keys_json = EXCLUDED.locked_testlet_keys_json,
+      locked_unit_keys_json = EXCLUDED.locked_unit_keys_json,
+      created_at = EXCLUDED.created_at,
+      updated_at = EXCLUDED.updated_at,
+      completed_at = EXCLUDED.completed_at,
+      pause_source = EXCLUDED.pause_source` : "ON CONFLICT(test_run_id) DO NOTHING"}`,
+    [
+      testRun.testRunId,
+      testRun.participantSessionId,
+      testRun.tenantId,
+      testRun.workspaceId,
+      testRun.contentReleaseId,
+      testRun.bookletKey,
+      testRun.executionMode ?? null,
+      testRun.bookletAssignmentKey ?? testRun.bookletKey,
+      JSON.stringify(testRun.presetBookletStates ?? {}),
+      JSON.stringify(testRun.bookletStates ?? {}),
+      JSON.stringify(testRun.bookletStateOverrides ?? {}),
+      testRun.status,
+      testRun.locked === true,
+      testRun.currentUnitKey,
+      JSON.stringify(testRun.unitResponses),
+      JSON.stringify(testRun.sharedParameters ?? []),
+      JSON.stringify(testRun.unlockedTestletKeys ?? []),
+      testRun.monitorNavigationUnlocked === true,
+      JSON.stringify(testRun.testletTimers ?? {}),
+      JSON.stringify(testRun.lockedTestletKeys ?? []),
+      JSON.stringify(testRun.lockedUnitKeys ?? []),
+      testRun.createdAt,
+      testRun.updatedAt,
+      testRun.completedAt,
+      testRun.status === "paused" ? testRun.pauseSource ?? null : null
+    ]
+  );
+  return result.rowCount === 1;
+};
+
 const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   const one = async <T>(
     sql: string,
@@ -2985,64 +3047,43 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
+    async getOrCreateTestRunForAssignment(candidate) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Lock the existing parent, even when no child Run exists yet. All
+        // reservation reads/writes use this client, never a second pool slot.
+        const session = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE",
+          [candidate.participantSessionId]
+        )).rows[0]);
+        const runs = (await client.query(
+          "SELECT * FROM test_runs WHERE participant_session_id = $1 OR test_run_id = $2",
+          [candidate.participantSessionId, candidate.testRunId]
+        )).rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
+        const existing = selectParticipantAssignmentRun(candidate, session, runs);
+        if (existing) {
+          await client.query("COMMIT");
+          return { testRun: existing, created: false };
+        }
+        if (!await persistTestRun(client, candidate, false)) {
+          throw new Error("Run ID already exists outside the participant assignment reservation.");
+        }
+        const stored = mapTestRun((await client.query(
+          "SELECT * FROM test_runs WHERE test_run_id = $1", [candidate.testRunId]
+        )).rows[0]);
+        if (!stored) throw new Error("Participant assignment reservation was not persisted.");
+        await client.query("COMMIT");
+        return { testRun: stored, created: true };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async saveTestRun(testRun) {
-      await pool.query(
-        `INSERT INTO test_runs (
-          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-        ON CONFLICT(test_run_id) DO UPDATE SET
-          participant_session_id = EXCLUDED.participant_session_id,
-          tenant_id = EXCLUDED.tenant_id,
-          workspace_id = EXCLUDED.workspace_id,
-          content_release_id = EXCLUDED.content_release_id,
-          booklet_key = EXCLUDED.booklet_key,
-          execution_mode = EXCLUDED.execution_mode,
-          booklet_assignment_key = EXCLUDED.booklet_assignment_key,
-          preset_booklet_states_json = EXCLUDED.preset_booklet_states_json,
-          booklet_states_json = EXCLUDED.booklet_states_json,
-          booklet_state_overrides_json = EXCLUDED.booklet_state_overrides_json,
-          status = EXCLUDED.status,
-          locked = EXCLUDED.locked,
-          current_unit_key = EXCLUDED.current_unit_key,
-          unit_responses_json = EXCLUDED.unit_responses_json,
-          shared_parameters_json = EXCLUDED.shared_parameters_json,
-          unlocked_testlet_keys_json = EXCLUDED.unlocked_testlet_keys_json,
-          monitor_navigation_unlocked = EXCLUDED.monitor_navigation_unlocked,
-          testlet_timers_json = EXCLUDED.testlet_timers_json,
-          locked_testlet_keys_json = EXCLUDED.locked_testlet_keys_json,
-          locked_unit_keys_json = EXCLUDED.locked_unit_keys_json,
-          created_at = EXCLUDED.created_at,
-          updated_at = EXCLUDED.updated_at,
-          completed_at = EXCLUDED.completed_at,
-          pause_source = EXCLUDED.pause_source`,
-        [
-          testRun.testRunId,
-          testRun.participantSessionId,
-          testRun.tenantId,
-          testRun.workspaceId,
-          testRun.contentReleaseId,
-          testRun.bookletKey,
-          testRun.executionMode ?? null,
-          testRun.bookletAssignmentKey ?? testRun.bookletKey,
-          JSON.stringify(testRun.presetBookletStates ?? {}),
-          JSON.stringify(testRun.bookletStates ?? {}),
-          JSON.stringify(testRun.bookletStateOverrides ?? {}),
-          testRun.status,
-          testRun.locked === true,
-          testRun.currentUnitKey,
-          JSON.stringify(testRun.unitResponses),
-          JSON.stringify(testRun.sharedParameters ?? []),
-          JSON.stringify(testRun.unlockedTestletKeys ?? []),
-          testRun.monitorNavigationUnlocked === true,
-          JSON.stringify(testRun.testletTimers ?? {}),
-          JSON.stringify(testRun.lockedTestletKeys ?? []),
-          JSON.stringify(testRun.lockedUnitKeys ?? []),
-          testRun.createdAt,
-          testRun.updatedAt,
-          testRun.completedAt,
-          testRun.status === "paused" ? testRun.pauseSource ?? null : null
-        ]
-      );
+      await persistTestRun(pool, testRun);
     },
     async deleteTestRunsByIds(testRunIds) {
       if (testRunIds.length === 0) {

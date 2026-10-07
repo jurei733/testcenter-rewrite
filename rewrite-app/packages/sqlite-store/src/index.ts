@@ -6,6 +6,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
+  selectParticipantAssignmentRun,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -1647,6 +1648,68 @@ export const checkSqliteFirstSliceReadiness = async (
   }
 };
 
+const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting = true): boolean => {
+  const result = database
+    .prepare(
+      `INSERT INTO test_runs (
+        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
+        participant_session_id = excluded.participant_session_id,
+        tenant_id = excluded.tenant_id,
+        workspace_id = excluded.workspace_id,
+        content_release_id = excluded.content_release_id,
+        booklet_key = excluded.booklet_key,
+        execution_mode = excluded.execution_mode,
+        booklet_assignment_key = excluded.booklet_assignment_key,
+        preset_booklet_states_json = excluded.preset_booklet_states_json,
+        booklet_states_json = excluded.booklet_states_json,
+        booklet_state_overrides_json = excluded.booklet_state_overrides_json,
+        status = excluded.status,
+        locked = excluded.locked,
+        current_unit_key = excluded.current_unit_key,
+        unit_responses_json = excluded.unit_responses_json,
+        shared_parameters_json = excluded.shared_parameters_json,
+        unlocked_testlet_keys_json = excluded.unlocked_testlet_keys_json,
+        monitor_navigation_unlocked = excluded.monitor_navigation_unlocked,
+        testlet_timers_json = excluded.testlet_timers_json,
+        locked_testlet_keys_json = excluded.locked_testlet_keys_json,
+        locked_unit_keys_json = excluded.locked_unit_keys_json,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        completed_at = excluded.completed_at,
+        pause_source = excluded.pause_source` : "ON CONFLICT(test_run_id) DO NOTHING"}`
+    )
+    .run(
+      testRun.testRunId,
+      testRun.participantSessionId,
+      testRun.tenantId,
+      testRun.workspaceId,
+      testRun.contentReleaseId,
+      testRun.bookletKey,
+      testRun.executionMode ?? null,
+      testRun.bookletAssignmentKey ?? testRun.bookletKey,
+      JSON.stringify(testRun.presetBookletStates ?? {}),
+      JSON.stringify(testRun.bookletStates ?? {}),
+      JSON.stringify(testRun.bookletStateOverrides ?? {}),
+      testRun.status,
+      testRun.locked ? 1 : 0,
+      testRun.currentUnitKey,
+      JSON.stringify(testRun.unitResponses),
+      JSON.stringify(testRun.sharedParameters ?? []),
+      JSON.stringify(testRun.unlockedTestletKeys ?? []),
+      testRun.monitorNavigationUnlocked ? 1 : 0,
+      JSON.stringify(testRun.testletTimers ?? {}),
+      JSON.stringify(testRun.lockedTestletKeys ?? []),
+      JSON.stringify(testRun.lockedUnitKeys ?? []),
+      testRun.createdAt,
+      testRun.updatedAt,
+      testRun.completedAt,
+      testRun.status === "paused" ? testRun.pauseSource ?? null : null
+    );
+  return Number(result.changes) === 1;
+};
+
 export const createSqliteFirstSliceRepository = (
   filePath: string
 ): FirstSliceRepository => {
@@ -3146,65 +3209,37 @@ export const createSqliteFirstSliceRepository = (
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
     },
+    async getOrCreateTestRunForAssignment(candidate) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const session = mapParticipantSession(database.prepare(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = ?"
+        ).get(candidate.participantSessionId) as Record<string, unknown> | undefined);
+        const runs = (database.prepare(
+          "SELECT * FROM test_runs WHERE participant_session_id = ? OR test_run_id = ?"
+        ).all(candidate.participantSessionId, candidate.testRunId) as Record<string, unknown>[])
+          .map(mapTestRun).filter((run): run is TestRun => run !== null);
+        const existing = selectParticipantAssignmentRun(candidate, session, runs);
+        if (existing) {
+          database.exec("COMMIT");
+          return { testRun: existing, created: false };
+        }
+        if (!persistTestRun(database, candidate, false)) {
+          throw new Error("Run ID already exists outside the participant assignment reservation.");
+        }
+        const stored = mapTestRun(database.prepare(
+          "SELECT * FROM test_runs WHERE test_run_id = ?"
+        ).get(candidate.testRunId) as Record<string, unknown> | undefined);
+        if (!stored) throw new Error("Participant assignment reservation was not persisted.");
+        database.exec("COMMIT");
+        return { testRun: stored, created: true };
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async saveTestRun(testRun) {
-      database
-        .prepare(
-          `INSERT INTO test_runs (
-            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(test_run_id) DO UPDATE SET
-            participant_session_id = excluded.participant_session_id,
-            tenant_id = excluded.tenant_id,
-            workspace_id = excluded.workspace_id,
-            content_release_id = excluded.content_release_id,
-            booklet_key = excluded.booklet_key,
-            execution_mode = excluded.execution_mode,
-            booklet_assignment_key = excluded.booklet_assignment_key,
-            preset_booklet_states_json = excluded.preset_booklet_states_json,
-            booklet_states_json = excluded.booklet_states_json,
-            booklet_state_overrides_json = excluded.booklet_state_overrides_json,
-            status = excluded.status,
-            locked = excluded.locked,
-            current_unit_key = excluded.current_unit_key,
-            unit_responses_json = excluded.unit_responses_json,
-            shared_parameters_json = excluded.shared_parameters_json,
-            unlocked_testlet_keys_json = excluded.unlocked_testlet_keys_json,
-            monitor_navigation_unlocked = excluded.monitor_navigation_unlocked,
-            testlet_timers_json = excluded.testlet_timers_json,
-            locked_testlet_keys_json = excluded.locked_testlet_keys_json,
-            locked_unit_keys_json = excluded.locked_unit_keys_json,
-            created_at = excluded.created_at,
-            updated_at = excluded.updated_at,
-            completed_at = excluded.completed_at,
-            pause_source = excluded.pause_source`
-        )
-        .run(
-          testRun.testRunId,
-          testRun.participantSessionId,
-          testRun.tenantId,
-          testRun.workspaceId,
-          testRun.contentReleaseId,
-          testRun.bookletKey,
-          testRun.executionMode ?? null,
-          testRun.bookletAssignmentKey ?? testRun.bookletKey,
-          JSON.stringify(testRun.presetBookletStates ?? {}),
-          JSON.stringify(testRun.bookletStates ?? {}),
-          JSON.stringify(testRun.bookletStateOverrides ?? {}),
-          testRun.status,
-          testRun.locked ? 1 : 0,
-          testRun.currentUnitKey,
-          JSON.stringify(testRun.unitResponses),
-          JSON.stringify(testRun.sharedParameters ?? []),
-          JSON.stringify(testRun.unlockedTestletKeys ?? []),
-          testRun.monitorNavigationUnlocked ? 1 : 0,
-          JSON.stringify(testRun.testletTimers ?? {}),
-          JSON.stringify(testRun.lockedTestletKeys ?? []),
-          JSON.stringify(testRun.lockedUnitKeys ?? []),
-          testRun.createdAt,
-          testRun.updatedAt,
-          testRun.completedAt,
-          testRun.status === "paused" ? testRun.pauseSource ?? null : null
-        );
+      persistTestRun(database, testRun);
     },
     async deleteTestRunsByIds(testRunIds) {
       if (testRunIds.length === 0) {

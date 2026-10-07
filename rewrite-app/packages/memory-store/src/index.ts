@@ -2,6 +2,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
+  selectParticipantAssignmentRun,
   type ParticipantPresence,
   type FirstSliceRepository,
   type ParticipantAccessCredential
@@ -707,6 +708,15 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return Array.from(state.testRuns.values()).filter(
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
+    },
+    async getOrCreateTestRunForAssignment(candidate) {
+      const existing = selectParticipantAssignmentRun(candidate,
+        state.participantSessions.get(candidate.participantSessionId) ?? null,
+        Array.from(state.testRuns.values()));
+      if (existing) return { testRun: structuredClone(existing), created: false };
+      const testRun = structuredClone(candidate);
+      state.testRuns.set(testRun.testRunId, testRun);
+      return { testRun: structuredClone(testRun), created: true };
     },
     async saveTestRun(testRun) {
       state.testRuns.set(testRun.testRunId, testRun);
