@@ -60,6 +60,11 @@ input and exact saved-answer reload. Narrow Rewrite Player cards use smaller
 padding without changing vendor files. Toolbar colors and complete Original-UI
 comparison remain separate requirements tracked in `docs/PARITY.md`.
 
+The shared short-label browser gate waits for the actual Player after hard
+reload instead of requiring idle SSE/polling connections. Run URL identity,
+exact saved answer, native checked-state and all label assertions remain
+mandatory; navigation or missing Player errors still fail the gate.
+
 Assigned Booklets and preset variants can start independently while another
 Booklet is unfinished, then return to the starter and resume their exact saved
 Run. `npm run smoke:ui:participant-variant:built` verifies the actual A/B Starter

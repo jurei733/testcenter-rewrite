@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 
+export async function reloadParticipantUnitLabelPlayer(page, waitForPlayer) {
+  // Authorized participant SSE/polling may stay active indefinitely. A quiet
+  // network is not readiness: require the actual Player after document reload.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await waitForPlayer();
+}
+
 // Shared by the complete repository browser gate and focused owned-fixture
 // acceptance. No vendor markup, sandbox or synthetic Player input is changed.
 export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey,
@@ -130,10 +137,10 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
       await page.locator(ui === "original" ? "#participantVeronaGlobalBackwardButton" : "#participantRoutePreviousUnitButton").click();
       await assertLabels(fullA, shortA, 1);
       assert.equal((await readState()).testRun.unitResponses.a, saved);
-      await page.reload({ waitUntil: "networkidle" });
-      await waitForPlayer();
+      await reloadParticipantUnitLabelPlayer(page, waitForPlayer);
       await assertLabels(fullA, shortA, 1);
       const restored = await readState();
+      assert.equal(new URL(page.url()).searchParams.get("testRunId"), runId);
       assert.equal(restored.testRun.testRunId, runId);
       assert.equal(restored.testRun.unitResponses.a, saved);
       assert.equal(await page.frameLocator("#participantVeronaPlayerFrame").locator('[data-cy="TestController-radio1-Aufg1"]').isChecked(), true);

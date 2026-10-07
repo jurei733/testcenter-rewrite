@@ -1,5 +1,30 @@
 # Testcenter parity checklist
 
+### Explicit Player readiness after a live participant reload (2026-10-08)
+
+The published `68c883b9` Monitor Review CI job fails inside the new label matrix,
+not its review assertions: `page.reload()` times out waiting for `networkidle`
+after navigating to the correct selected Run. Participant SSE and polling can
+remain active; network quiescence is not a Player-readiness requirement.
+
+The actual shared helper now awaits document reload and then its existing Player
+readiness gate. Exact labels, full iframe title, the same selected Run, byte-exact
+saved response and native checked radio still have to pass. The browser URL's
+Run ID is also checked explicitly. No live stream is blocked, polling disabled,
+timeout increased, input forced or answer assertion relaxed. Four actual-helper
+regressions require document-before-Player sequencing and propagate navigation,
+late navigation and Player-readiness failures. They run in normal frontend tests.
+
+All 445 core/frontend checks and typecheck pass. The actual complete 28-case
+label helper passes with this reload boundary in headful Chrome 154 and Chromium
+147 on separate owned protected SQLite, strict Original-19 fixtures and the
+unchanged immutable production frontend (56 cases, both interfaces, 1280/390).
+This is a smoke-readiness change, not an application/runtime/vendor change;
+the preceding production build and 492 native API passes remain separate
+runtime evidence. Fresh publication CI, the complete flow's QR-image scanner
+timeout, the PostgreSQL snapshot/count issue, all eight complete Original-UI
+rows and broader production acceptance remain open.
+
 ### Group deletion fences concurrent presence transitions (2026-10-08)
 
 Controlled interleaving of the actual application service and native Memory,
