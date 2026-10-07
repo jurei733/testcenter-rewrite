@@ -4,6 +4,18 @@ import { reloadChromiumIbResources } from "./chromium-ib-resource-reload.mjs";
 
 const runtimeSuffix = "/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html";
 
+// In headless Chromium the opaque Player can share its parent's CDP target.
+// Select its native frame through the actual top-level iframe owner, never by
+// searching for whichever ItemBuilder URL happens to appear in the page tree.
+export function findBoundIbPlayerTree(frameTree, playerFrameId, pageUrl) {
+  assert.equal(frameTree.frame.url, pageUrl, "The parent CDP target must be the current Participant page.");
+  assert.ok(playerFrameId, "The selected Player DOM owner must identify its native frame.");
+  const matches = (frameTree.childFrames || []).filter(child => child.frame.id === playerFrameId);
+  assert.equal(matches.length, 1, "Exactly one direct, DOM-bound Player frame is required.");
+  assert.equal(matches[0].frame.parentId, frameTree.frame.id, "The selected Player must belong to the current page.");
+  return matches[0];
+}
+
 // Chrome can commit an opaque srcdoc and its nested document before Playwright
 // attaches renderer listeners. Use public CDP reads, not patched test-library
 // internals, and keep all actual input on the browser's mouse/keyboard path.
@@ -56,6 +68,8 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
   const deadline = Date.now() + timeoutMs;
   let session;
   let element;
+  let parentTarget = false;
+  let playerFrameId;
   let disposed = false;
   const bounded = async operation => {
     const remaining = deadline - Date.now();
@@ -81,7 +95,14 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
     const outer = await bounded(() => element.contentFrame());
     assert.ok(outer, "The active Player must own an actual browser frame.");
     await bounded(async () => {
-      const attached = await context.newCDPSession(outer);
+      let attached;
+      try { attached = await context.newCDPSession(outer); }
+      catch (error) {
+        if (!error?.message?.endsWith("This frame does not have a separate CDP session, it is a part of the parent frame's session")) throw error;
+        assert.ok(!disposed && Date.now() < deadline, "The native runtime deadline expired.");
+        parentTarget = true;
+        attached = await context.newCDPSession(page);
+      }
       if (disposed || Date.now() >= deadline) { await attached.detach(); return; }
       session = attached;
     });
@@ -92,9 +113,22 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
     session.on("Runtime.executionContextsCleared", () => executions.clear());
     await send("Page.enable");
     await send("Runtime.enable");
+    if (parentTarget) {
+      const { root } = await send("DOM.getDocument", { depth: 0 });
+      const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "#participantVeronaPlayerFrame" });
+      assert.ok(nodeId, "The native parent DOM must contain the selected Player owner.");
+      const { node } = await send("DOM.describeNode", { nodeId, depth: 0 });
+      assert.equal(node.localName, "iframe", "The native Player owner must be an iframe.");
+      playerFrameId = node.frameId;
+      assert.ok(playerFrameId, "The native Player owner must expose its exact frame identity.");
+    }
+    const readPlayerTree = async () => {
+      const { frameTree } = await send("Page.getFrameTree");
+      return parentTarget ? findBoundIbPlayerTree(frameTree, playerFrameId, page.url()) : frameTree;
+    };
     let runtime, execution, outerExecution;
     while (Date.now() < deadline) {
-      const { frameTree } = await send("Page.getFrameTree");
+      const frameTree = await readPlayerTree();
       runtime = findAuthorizedIbRuntime(frameTree, page.url(), participantSessionId);
       if (runtime) {
         execution = [...executions.values()].find(item => item.auxData?.isDefault && item.auxData.frameId === runtime.id);
@@ -106,13 +140,15 @@ export async function withChromiumIbRuntime(context, page, participantSessionId,
     assert.ok(runtime && execution?.uniqueId && outerExecution?.uniqueId,
       "The exact authorized runtime and both native execution contexts must load.");
     const evaluate = async (expression, selected = execution) => {
-      const { frameTree } = await send("Page.getFrameTree");
+      const frameTree = await readPlayerTree();
       const current = findAuthorizedIbRuntime(frameTree, page.url(), participantSessionId);
       assert.ok(current?.id === runtime.id && current.loaderId === runtime.loaderId,
         "A stale or replaced runtime cannot receive assertions or mouse input.");
       assert.equal(executions.get(selected.id)?.uniqueId, selected.uniqueId,
         "The original execution context must still exist.");
-      assert.equal(await bounded(() => element.evaluate(node => node.isConnected)), true,
+      assert.equal(await bounded(() => element.evaluate(node => node.isConnected &&
+        document.querySelectorAll("#participantVeronaPlayerFrame").length === 1 &&
+        document.querySelector("#participantVeronaPlayerFrame") === node)), true,
         "The originally selected Player element must still be connected.");
       const result = await send("Runtime.evaluate", { uniqueContextId: selected.uniqueId,
         returnByValue: true, expression });

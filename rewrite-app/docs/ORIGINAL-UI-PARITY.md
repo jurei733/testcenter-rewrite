@@ -33,6 +33,16 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The shared-target ItemBuilder correction retains the same exact native
+Participant/iframe/runtime binding when headless Chromium does not create a
+separate Player CDP target. The existing repository smoke passes Rewrite and
+Original in CI mode as well as headful Chrome/Chromium (six cases). It still
+requires visible controls, real trusted inputs, completed browser resource
+downloads and byte-exact durable response; no Player sandbox, vendor bytes,
+browser flag or test-library code is changed. See `PARITY.md` for the negative
+CI reproduction and exact owner/identity/deadline checks. This is browser-harness
+acceptance only: all eight complete visual comparison rows below remain open.
+
 The 2026-10-07 focused ItemBuilder acceptance now passes in both interfaces with
 headful Chrome and bundled Chromium. Exact native frame/Session binding replaces
 an independently reproduced Playwright opaque-srcdoc inventory failure; the

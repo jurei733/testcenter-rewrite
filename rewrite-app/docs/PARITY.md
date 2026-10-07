@@ -1,5 +1,44 @@
 # Testcenter parity checklist
 
+### Native shared-target ItemBuilder binding (2026-10-07)
+
+Fresh publication `fb391947` is not CI-green. Its PR monitor-review job fails at
+`chromium-ib-runtime.mjs:84`: headless Chromium reports that the actual opaque
+Player shares its parent's CDP session. An owned protected SQLite reproduction
+of the unchanged focused repository smoke fails at the same attachment boundary.
+This is separate from the long headed Original Controller radio failure.
+
+The native reader now handles only that exact shared-target response. It opens
+an independent CDP session on the current Participant page, obtains the selected
+iframe owner's native frame ID through public DOM commands, and requires that
+exact frame as one direct child of that page. It never searches the page for an
+arbitrary matching runtime URL. The retained Player element must still be the
+unique connected DOM owner on every read. The existing direct runtime parent,
+selected Session/capability, pinned resource, current origin, opaque sandbox,
+loader, unique execution contexts, parser/adapter, completed resource downloads,
+visible controls and trusted mouse/keyboard checks remain unchanged. Other
+attachment errors still fail, and an expired attachment cannot start a late
+parent-target attachment. Both independent CDP modes retain bounded cleanup.
+No application, vendor, test-library or browser-security behavior is altered.
+
+Four new regressions cover DOM-bound tree selection/rejection, shared-target
+verification with foreign-Session rejection, missing owners/unrelated attachment
+errors, and late attachment deadlines. All 402 unit/frontend checks pass. The
+same actual protected SQLite/immutable-production focused smoke now passes in
+the existing headless CI mode for Rewrite and Original and in headful Chrome
+and bundled Chromium for both interfaces (six cases), including browser resource
+proof before input and after re-entry, actual trusted interaction, covered-target
+rejection and byte-exact saved response. The vendor sandboxed `localStorage`
+error remains visible in logs. Fresh complete publication CI, the full headed
+Controller flow, ItemBuilder visual supplied-state restoration, all eight full
+Original-UI rows and broader production acceptance remain separate requirements.
+
+The actual Original Controller completeness cases 24 and 25 also pass in an
+owned isolated protected SQLite/headful Chrome sequence. Passive event evidence
+shows trusted radio input/change and a durably saved `VALUE_CHANGED` answer.
+This does not explain or close the reproduced failure in the longer sequence;
+its separately traced repetition retains the unchanged `.check()` assertion.
+
 ### Native runtime parsing boundary (2026-10-07)
 
 The final exact-rebind full-flow repetition passes the first ItemBuilder browser

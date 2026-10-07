@@ -93,7 +93,13 @@ HTML and Script responses, exact HTTP status/content types and no frame-blocking
 headers, all bound to one new load of the authorized frame. A fresh native binding
 then verifies the visible controls. No backend fetch substitutes for that browser
 proof; existing cache policy and the opaque sandbox remain unchanged. Neither
-the Player sandbox nor the test library is patched.
+the Player sandbox nor the test library is patched. If Chromium reports that
+the Player shares its parent's CDP target, the reader attaches only to the
+current Participant page and selects the iframe's native frame ID through its
+actual DOM owner. The same direct-parent, Session/capability, opaque-origin,
+loader/context, visible-control and trusted-input checks still apply; unrelated
+attachment errors are not swallowed. Both separate and shared targets are
+covered without changing browser security flags.
 With operator authentication enabled only fixture setup uses the real operator
 sign-in; participant browser requests never receive that credential. Screenshots,
 traces and redacted frame diagnostics are retained. The full sequence uses this

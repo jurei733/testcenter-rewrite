@@ -1,13 +1,35 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { findAuthorizedIbRuntime, ibPointerPoint, withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
+import { findAuthorizedIbRuntime, findBoundIbPlayerTree, ibPointerPoint, withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 
 const pageUrl = "http://127.0.0.1:4311/app/participant";
 const runtimeUrl = "http://127.0.0.1:4311/api/v1/participant/sessions/session-a/resources/.access/capability/IB_SAMPLE_2025/runtimes/ib-runtime.9.9.0.html";
 const tree = () => ({ frame: { id: "outer", url: "about:srcdoc" }, childFrames: [{ frame: {
   id: "runtime", parentId: "outer", name: "ib-runtime-host", loaderId: "load-a", url: runtimeUrl
 } }] });
+const pageTree = () => {
+  const player = tree(); player.frame.parentId = "page";
+  return { frame: { id: "page", url: pageUrl }, childFrames: [player] };
+};
+
+test("shared-target selection binds the exact native DOM owner instead of searching runtime URLs", () => {
+  const root = pageTree(); const unrelated = tree(); unrelated.frame.id = "unrelated";
+  unrelated.frame.parentId = "page"; root.childFrames.unshift(unrelated);
+  assert.equal(findBoundIbPlayerTree(root, "outer", pageUrl), root.childFrames[1]);
+  assert.equal(findAuthorizedIbRuntime(findBoundIbPlayerTree(root, "outer", pageUrl), pageUrl, "session-a").id, "runtime");
+  for (const mutate of [
+    candidate => { candidate.frame.url = `${pageUrl}?foreign=1`; },
+    candidate => { candidate.childFrames = []; },
+    candidate => { candidate.childFrames.push(candidate.childFrames[0]); },
+    candidate => { candidate.childFrames[0].frame.parentId = "other-page"; },
+    candidate => { candidate.childFrames = [{ frame: { id: "wrapper" }, childFrames: candidate.childFrames }]; }
+  ]) {
+    const candidate = pageTree(); mutate(candidate);
+    assert.throws(() => findBoundIbPlayerTree(candidate, "outer", pageUrl));
+  }
+  assert.throws(() => findBoundIbPlayerTree(pageTree(), "", pageUrl), /DOM owner/u);
+});
 
 test("native IB selection requires the exact direct, authorized pinned runtime", () => {
   assert.equal(findAuthorizedIbRuntime(tree(), pageUrl, "session-a").id, "runtime");
@@ -62,7 +84,7 @@ test("real pointer checks fail closed for covered, disabled or non-pointer contr
   }
 });
 
-function runtimeFixture({ replaceLoader = false, attachDelay = 0 } = {}) {
+function runtimeFixture({ replaceLoader = false, attachDelay = 0, parentTarget = false } = {}) {
   const session = new EventEmitter(); let detached = 0, treeReads = 0;
   session.detach = async () => { detached += 1; };
   session.send = async method => {
@@ -72,8 +94,13 @@ function runtimeFixture({ replaceLoader = false, attachDelay = 0 } = {}) {
     }
     if (method === "Page.getFrameTree") {
       const frameTree = tree(); if (replaceLoader && treeReads++ > 0) frameTree.childFrames[0].frame.loaderId = "load-b";
-      return { frameTree };
+      if (!parentTarget) return { frameTree };
+      frameTree.frame.parentId = "page";
+      return { frameTree: { frame: { id: "page", url: pageUrl }, childFrames: [frameTree] } };
     }
+    if (method === "DOM.getDocument") return { root: { nodeId: 1 } };
+    if (method === "DOM.querySelector") return { nodeId: 2 };
+    if (method === "DOM.describeNode") return { node: { localName: "iframe", frameId: "outer" } };
     if (method === "Runtime.evaluate") throw new Error("This rejected fixture must never evaluate a DOM.");
     return {};
   };
@@ -81,11 +108,58 @@ function runtimeFixture({ replaceLoader = false, attachDelay = 0 } = {}) {
   const host = { waitFor: async () => {}, count: async () => 1, scrollIntoViewIfNeeded: async () => {},
     getAttribute: async () => "allow-scripts allow-forms", elementHandle: async () => element };
   const page = { bringToFront: async () => {}, locator: () => host, url: () => pageUrl };
-  const context = { newCDPSession: async () => {
-    if (attachDelay) await new Promise(resolve => setTimeout(resolve, attachDelay)); return session;
+  const attachments = [];
+  const context = { newCDPSession: async target => {
+    attachments.push(target);
+    if (attachDelay) await new Promise(resolve => setTimeout(resolve, attachDelay));
+    if (parentTarget && target !== page) throw new Error("This frame does not have a separate CDP session, it is a part of the parent frame's session");
+    return session;
   } };
-  return { page, context, host, element, session, detached: () => detached };
+  return { page, context, host, element, session, attachments, detached: () => detached };
 }
+
+test("a shared-target runtime uses only the current page target and retains all native identity checks", async () => {
+  for (const participantSessionId of ["session-a", "session-b"]) {
+    const fixture = runtimeFixture({ parentTarget: true }); const originalSend = fixture.session.send;
+    let verified = false;
+    fixture.session.send = async (method, params) => {
+      if (method !== "Runtime.evaluate") return originalSend(method, params);
+      const value = params.expression === "globalThis.origin" ? "null" :
+        params.expression === "location.href" ? runtimeUrl :
+        params.expression === "document.readyState" ? "complete" : true;
+      return { result: { value } };
+    };
+    const verify = withChromiumIbRuntime(fixture.context, fixture.page, participantSessionId, async runtime => {
+      assert.deepEqual(runtime.identity, { frameId: "runtime", loaderId: "load-a" }); verified = true;
+    });
+    if (participantSessionId === "session-a") await verify;
+    else await assert.rejects(verify, /selected participant Session/u);
+    assert.equal(verified, participantSessionId === "session-a");
+    assert.equal(fixture.attachments.length, 2);
+    assert.equal(fixture.attachments[1], fixture.page); assert.equal(fixture.detached(), 1);
+  }
+});
+
+test("shared-target attachment rejects a missing native owner and never masks other attachment failures", async () => {
+  const missing = runtimeFixture({ parentTarget: true }); const originalSend = missing.session.send;
+  missing.session.send = async (method, params) => method === "DOM.describeNode" ?
+    { node: { localName: "iframe" } } : originalSend(method, params);
+  await assert.rejects(withChromiumIbRuntime(missing.context, missing.page, "session-a", async () => {
+    assert.fail("An unbound owner cannot be verified.");
+  }), /exact frame identity/u);
+  assert.equal(missing.detached(), 1);
+  const failed = runtimeFixture(); let attachments = 0;
+  failed.context.newCDPSession = async () => { attachments += 1; throw new Error("Target closed"); };
+  await assert.rejects(withChromiumIbRuntime(failed.context, failed.page, "session-a", async () => {}), /Target closed/u);
+  assert.equal(attachments, 1); assert.equal(failed.detached(), 0);
+});
+
+test("an expired per-frame attachment cannot start a later shared-target attachment", async () => {
+  const fixture = runtimeFixture({ parentTarget: true, attachDelay: 100 });
+  await assert.rejects(withChromiumIbRuntime(fixture.context, fixture.page, "session-a", async () => {}, 50), /deadline expired/u);
+  await new Promise(resolve => setTimeout(resolve, 120));
+  assert.equal(fixture.attachments.length, 1); assert.equal(fixture.detached(), 0);
+});
 
 test("native runtime rejection detaches and cannot invoke the verification callback", async () => {
   for (const [participantSessionId, options, message] of [
