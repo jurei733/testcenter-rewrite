@@ -41,6 +41,16 @@ The second open run in this focused fixture is repository-seeded, not started
 through the still-blocked P0 workflow. These shared functional safeguards do not
 close any full rendered-UI acceptance row or pixel-identity claim.
 
+The 2026-10-07 operator handoff check also passes in both interface modes on
+owned protected SQLite/headful Chrome: a generated entry starts the requested
+login and its exact authenticated Run, and the refreshed operator card exposes
+the same Run-bound re-entry URL. The older participant's response and Run status
+remain unchanged. Shared browser gates now check that durable identity instead
+of racing login inputs removed after success, and retain the same full-height
+Player invariant after layout settling. This closes no full UI row. The separate
+immutable Memory/headful Chrome ItemBuilder blank-frame failure remains open;
+see `PARITY.md` for the retained evidence and publication boundaries.
+
 The shared backend now permits exact preset-assignment resumption after returning
 to the starter, rather than rejecting its variant key against the source Booklet
 key. Both interfaces passed real participant login, Unicode draft preservation,

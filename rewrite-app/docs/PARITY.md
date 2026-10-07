@@ -1,5 +1,55 @@
 # Testcenter parity checklist
 
+### Generated entry and selected-run re-entry acceptance (2026-10-07)
+
+The `a88f166f` publication passes the selected-Run monitor reconnect gate, but
+its completed push CI has 21 successful and fourteen failed jobs. All fourteen
+fail at the same operator session-card assertion
+(`smoke-ui.mjs:21293`), including PostgreSQL UI. That assertion still expects
+the obsolete session-only URL, whereas the application now correctly includes
+the exact Run ID. The expected operator link now takes its Run ID from the
+authenticated filtered session response; every later detail/monitor assertion
+keeps the same exact URL, rather than dropping Run selection from production.
+
+An immutable local full-browser run also exposed a race in the generated-entry
+popup check: successful login removes the transient input fields. The browser
+gate now captures the actual launch request for the exact tenant, workspace,
+login, group and Booklet, requires its successful authenticated identity and
+Run, and matches those exact IDs against the rendered running test and its
+complete re-entry URL. No application behavior, authorization, response bytes,
+deadline or monitor guard is changed.
+
+A separate owned protected SQLite/headful browser comparison, in both
+interfaces, confirms that the published application already launches a new
+login despite preselected fields plus a cached older session/Run. The previous
+answer stays byte-exact and the older Run stays running; the hypothesized app
+selection fix was therefore discarded, not presented as a demonstrated bug.
+Exact preset assignment/resumption, hard reload, live scope acknowledgement,
+monitor pause/resume and background-answer isolation also pass in both
+interfaces. All 165 core, 12 presence and 95 frontend tests pass. The first
+immutable protected SQLite flow then fails an immediate Player geometry read;
+its retained failure screenshot already shows the full-height Original layout.
+That gate now waits for the same height/top-position invariant, with its
+existing 15-second settling deadline, before sampling and asserting it. The
+complete SQLite flow is being repeated. The separate immutable Memory/headful
+Chrome flow fails the ItemBuilder runtime-download wait at `smoke-ui.mjs:16979`
+with a blank Player frame, despite the displayed correct IB participant/Run.
+The same failure occurred earlier; it is not explained away by the previously
+overlapping build or by successful isolated IB runs. The adapter/browser cause
+and full-sequence acceptance remain open. Fresh publication CI and full
+Original-UI acceptance remain independent proof.
+The second full SQLite run passes the unchanged Player geometry invariant and
+reaches the generated popup, then fails a newly added test-only assumption that
+`ParticipantSession` exposes scope keys. Its actual contract exposes internal
+IDs; the gate now checks those IDs against the authenticated Workspace overview.
+That failed attempt is retained and is not application-regression evidence.
+A focused protected SQLite/headful check then passes the actual operator
+handoff in both interfaces: load the saved roster, generate its links, use the
+new login's link, open its real popup, compare the authenticated scope/Run and
+refresh the operator session card. Both surfaces expose the same exact
+Run-bound re-entry URL and retain the older Run's exact answer and status.
+Evidence is retained in ignored `.data/entry-link-scope-20261007.*`.
+
 ### Run-bound browser fault boundaries (2026-10-07)
 
 Publication `5e42a17d` finished with 19 successful and 16 failed push-CI jobs

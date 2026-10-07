@@ -18482,8 +18482,13 @@ try {
   assert.equal(await page.locator(".participant-meta-grid").isVisible(), false);
   const originalSurfaceFrame = await page.locator("#participantVeronaPlayerFrame").elementHandle();
   assert.ok(originalSurfaceFrame);
+  await page.waitForFunction(() => {
+    const bounds = document.querySelector("#participantVeronaPlayerFrame")?.getBoundingClientRect();
+    return bounds && bounds.height > 300 && bounds.y < 220;
+  }, undefined, { timeout: 15_000 });
   const originalSurfaceGeometry = await page.locator("#participantVeronaPlayerFrame").boundingBox();
-  assert.ok(originalSurfaceGeometry.height > 300 && originalSurfaceGeometry.y < 220);
+  assert.ok(originalSurfaceGeometry.height > 300 && originalSurfaceGeometry.y < 220,
+    `Original Player must retain its full-height layout: ${JSON.stringify(originalSurfaceGeometry)}`);
   await page.locator('[data-cy="unit-menu"]').click();
   const originalSidebar = page.locator('app-original-player-sidebar [role="dialog"]');
   await originalSidebar.waitFor();
@@ -21086,43 +21091,60 @@ try {
     exact: true
   });
   await openParticipantEntryButton.waitFor({ state: "visible" });
-  const [participantEntryPopup] = await Promise.all([
+  const directEntryLaunchResponse = context.waitForEvent("response", {
+    predicate: response => {
+      if (new URL(response.url()).pathname !== "/api/v1/participant/starter:launch" ||
+          response.request().method() !== "POST") return false;
+      const request = response.request().postDataJSON();
+      return request?.tenantKey === tenantKey && request?.workspaceKey === workspaceKey &&
+        request?.loginKey === "entry-student-direct-xml" &&
+        request?.groupKey === "group:direct-xml" && request?.bookletKey === participantRouteBookletKey;
+    },
+    timeout: 15_000
+  });
+  const [participantEntryPopup, directEntryLaunch] = await Promise.all([
     page.waitForEvent("popup", { timeout: 15_000 }),
+    directEntryLaunchResponse,
     openParticipantEntryButton.click()
   ]);
-  await participantEntryPopup.locator("#participantLoginKey").waitFor();
-  await participantEntryPopup.waitForFunction(
-    ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey, expectedGroupKey, expectedBookletKey]) => {
-      const valueOf = selector => document.querySelector(selector)?.value;
-      return (
-        valueOf("#participantTenantKey") === expectedTenantKey &&
-        valueOf("#participantWorkspaceKey") === expectedWorkspaceKey &&
-        valueOf("#participantLoginKey") === expectedLoginKey &&
-        valueOf("#participantRouteGroupKey") === expectedGroupKey &&
-        valueOf("#participantRouteBookletKey") === expectedBookletKey
-      );
-    },
-    [
-      tenantKey,
-      workspaceKey,
-      "entry-student-direct-xml",
-      "group:direct-xml",
-      participantRouteBookletKey
-    ],
-    { timeout: 15_000 }
+  assert.equal(directEntryLaunch.status(), 200);
+  const directEntryIdentity = await directEntryLaunch.json();
+  const directEntryWorkspaceResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
+    createSmokeFetchInit()
   );
+  assert.equal(directEntryWorkspaceResponse.status, 200);
+  const directEntryWorkspace = (await directEntryWorkspaceResponse.json()).workspaceOverview.workspace;
+  assert.equal(directEntryIdentity.participantSession.tenantId, directEntryWorkspace.tenantId);
+  assert.equal(directEntryIdentity.participantSession.workspaceId, directEntryWorkspace.workspaceId);
+  assert.equal(directEntryIdentity.participantSession.loginKey, "entry-student-direct-xml");
+  assert.equal(directEntryIdentity.participantSession.groupKey, "group:direct-xml");
+  assert.equal(directEntryIdentity.testRun.bookletKey, participantRouteBookletKey);
+  assert.equal(directEntryIdentity.testRun.participantSessionId, directEntryIdentity.participantSession.participantSessionId);
+  // Successful entry removes the login form. Check the durable server-backed
+  // identity and rendered run rather than racing the transient input fields.
   await participantEntryPopup.waitForFunction(
-    () => {
+    ([expectedSessionId, expectedRunId]) => {
       const status = document
         .querySelector("#participantRouteStatus")
         ?.textContent?.trim();
       const session =
         document.querySelector("#participantRouteSessionId")?.value ?? "";
-      return status === "running" && session.trim().length > 0;
+      return status === "running" && session === expectedSessionId &&
+        document.querySelector("#participantRouteRunId")?.textContent?.trim() === expectedRunId;
     },
-    undefined,
+    [directEntryIdentity.participantSession.participantSessionId, directEntryIdentity.testRun.testRunId],
     { timeout: 15_000 }
   );
+  const directEntryReentry = new URL(await participantEntryPopup.locator("#participantRouteSessionAnchor").getAttribute("href"));
+  assert.equal(directEntryReentry.origin, baseUrl);
+  assert.equal(directEntryReentry.pathname, "/participant");
+  assert.deepEqual(Object.fromEntries(directEntryReentry.searchParams), {
+    participantSessionId: directEntryIdentity.participantSession.participantSessionId,
+    testRunId: directEntryIdentity.testRun.testRunId,
+    tenantKey, workspaceKey, loginKey: "entry-student-direct-xml",
+    groupKey: "group:direct-xml", bookletKey: participantRouteBookletKey
+  });
   await participantEntryPopup.close();
   await clickAction("Refresh Sessions");
   const directLaunchStatusCard = page
@@ -21257,6 +21279,7 @@ try {
   );
   const operatorParticipantSessionLink = `${baseUrl}/participant?${new URLSearchParams({
     participantSessionId,
+    testRunId: filteredParticipantSessionsPayload.items[0].latestTestRun.testRunId,
     tenantKey,
     workspaceKey,
     loginKey: participantLoginKey,
