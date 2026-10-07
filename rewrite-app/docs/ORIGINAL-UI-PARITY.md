@@ -7,7 +7,12 @@ an optional interface identical to the Original Testcenter. This is a separate
 acceptance axis from functional parity; the historical 94% estimate in
 PARITY.md does not measure it.
 
-Reference: `iqb-berlin/testcenter` commit
+Current upstream target, reverified on 2026-10-07:
+`a570587f12e10989f80e91a3d559aa5f753ec3f0`. Its new protected-login busy states
+and insecure-context HTTPS notice require fresh rendering/interaction evidence.
+See `PARITY.md` for the source-backed delta and separate deployment boundaries.
+
+Historical rendered reference: `iqb-berlin/testcenter` commit
 `c35cff81383949b4664e0fdffa3ba1154d144d9d` (19.0), fetched on 2026-10-03.
 Compare source files from that revision, not the older local checkout.
 

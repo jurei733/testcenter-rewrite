@@ -1,5 +1,32 @@
 # Testcenter parity checklist
 
+### Run-bound browser fault boundaries (2026-10-07)
+
+Publication `5e42a17d` finished with 19 successful and 16 failed push-CI jobs
+(`37278503078`). All failures occur at two shared harness boundaries: fifteen
+jobs time out before the Verona resource because the held LAZY preload matcher
+requires the obsolete URL without `testRunId`; the monitor-live job does not abort
+the actual selected-Run stream and never observes the requested reconnect.
+These failures are not a globally green publication or proven deployment.
+
+The harness now parses query parameters without depending on their order and
+requires an owned origin, the participant endpoint and one nonempty Run ID.
+Reconnect interception additionally binds the exact session and Run. The held
+LAZY request is checked against the actually rendered session/Run before it is
+released; the real response must return that same scope. Unit regressions reject
+foreign origins/sessions/runs, ordinary state reads, missing/duplicate parameters
+and acknowledgement routes. No application algorithm, response, retry deadline,
+LAZY loading assertion or authorization guard is changed. The published monitor
+test reproduces its CI timeout locally; the corrected real-browser monitor and
+shared flow through `participant-verona-loading` pass. The monitor and exact
+variant/run-selection browser checks also pass in headless CI mode. All 165 core,
+12 presence and 95 frontend tests, typecheck and a 469.82kB production build pass.
+The first larger local run subsequently times out waiting for the IB runtime;
+that run and another navigation timeout overlap a frontend rebuild. They are
+retained as failures, not a clean full-build acceptance or an asserted cause.
+The complete flow is being repeated against an immutable frontend; publication
+CI and PostgreSQL remain independent gates until they finish.
+
 ### Run-bound state, assets, links and live updates
 
 Original `TestController::get` addresses the selected test by its explicit ID;
@@ -433,6 +460,35 @@ PostgreSQL deployment and server-side connection-loss parity remain distinct
 acceptance requirements.
 
 ## Current 19.0 delta to verify
+
+GitHub `master` was reverified on 2026-10-07 at
+`a570587f12e10989f80e91a3d559aa5f753ec3f0` (2026-10-06). Its twelve-commit
+delta from `c35cff81` adds current acceptance requirements:
+
+- Every participant, password/code and administrator login stays disabled
+  throughout challenge solving and session creation, including Enter/duplicate
+  submissions. The Original now shares this flow in one protection service.
+  Existing Rewrite duplicate/pending tests are relevant, but coverage of all
+  current protected entry paths must be proved rather than assumed.
+- When proof-of-work is configured for an entry in an insecure browser context,
+  its Original UI shows the new German HTTPS/operator notice and disables that
+  entry. Secure localhost remains supported. Verify inactive protection is not
+  incorrectly blocked, no credential/challenge request is sent by the disabled
+  entry and both interfaces retain the same server authorization.
+- New Original installations now default to inactive brute-force protection,
+  with an explicit HTTPS warning for operators enabling it. Audit deployment
+  configuration and documented differences; do not silently weaken an existing
+  installation's configured protection.
+- Declining to proceed after a failed backup or skipped migration aborts the
+  update before apply. Rewrite update/backup/migration tooling needs evidence
+  for this same non-destructive boundary; quieter archive output does not prove
+  rollback or safe updates.
+
+Other changes are release/lint/instruction cleanup and repair of historical
+backend test-data utilities, not additional runtime parity claims. The rendered
+comparisons recorded below still use the unmodified `c35cff81` frontend and do
+not automatically prove the changed current login states. The current target
+and that historical rendering reference are deliberately distinct.
 
 On 2026-10-03, the Original fetch advanced to
 `c35cff81383949b4664e0fdffa3ba1154d144d9d` (version 19.0).

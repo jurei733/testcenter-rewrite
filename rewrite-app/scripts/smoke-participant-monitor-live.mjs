@@ -7,6 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { chromium } from "playwright";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -217,7 +218,10 @@ try {
     }
   );
 
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: process.env.UI_SMOKE_HEADFUL !== "true",
+    channel: process.env.UI_SMOKE_BROWSER_CHANNEL?.trim() || undefined
+  });
   const context = await browser.newContext();
   const participantPage = await context.newPage();
   participantHttpActor.observePage(participantPage);
@@ -226,8 +230,11 @@ try {
   const participantReconnectGate = new Promise(resolvePromise => {
     releaseParticipantReconnect = resolvePromise;
   });
+  const isSelectedParticipantStream = url => matchesParticipantRunRequest(url, {
+    baseUrl, participantSessionId, testRunId, endpoint: "events"
+  });
   await participantPage.route(
-    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/events`,
+    isSelectedParticipantStream,
     async route => {
       participantStreamAttemptCount += 1;
       if (participantStreamAttemptCount === 1) {
@@ -296,9 +303,7 @@ try {
   await waitForStateBadge(operatorPage, testRunId, "CONNECTION_POLLING");
   const participantStreamResponse = participantPage.waitForResponse(
     response =>
-      response.url().endsWith(
-        `/api/v1/participant/sessions/${participantSessionId}/events`
-      ) && response.status() === 200
+      isSelectedParticipantStream(response.url()) && response.status() === 200
   );
   releaseParticipantReconnect();
   await participantStreamResponse;

@@ -12,6 +12,7 @@ import { chromium } from "playwright";
 import QRCode from "qrcode";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
+import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -9518,10 +9519,11 @@ try {
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=0-3,10-15"
   );
-  const lazyBookletPreloadPattern =
-    /\/current-state\?includeBookletAssets=true$/;
+  const lazyBookletPreloadPattern = url => matchesParticipantRunRequest(url, {
+    baseUrl, endpoint: "current-state", includeBookletAssets: true
+  });
   const lazyBookletPreloadStarted = page.waitForRequest(
-    request => lazyBookletPreloadPattern.test(request.url())
+    request => lazyBookletPreloadPattern(request.url())
   );
   let releaseLazyBookletPreload;
   const lazyBookletPreloadRelease = new Promise(resolve => {
@@ -9535,7 +9537,7 @@ try {
   let lazyBookletPreloadCompleted = false;
   const lazyBookletPreloadResponsePromise = page
     .waitForResponse(
-      response => lazyBookletPreloadPattern.test(response.url())
+      response => lazyBookletPreloadPattern(response.url())
     )
     .then(response => {
       lazyBookletPreloadCompleted = true;
@@ -9554,7 +9556,16 @@ try {
     .locator("#participantRouteTestletGateLabel")
     .filter({ hasText: "Protected Verona Block" })
     .waitFor({ timeout: 15_000 });
-  await lazyBookletPreloadStarted;
+  const heldLazyBookletPreload = await lazyBookletPreloadStarted;
+  assert.equal(heldLazyBookletPreload.method(), "GET");
+  const expectedPreloadSessionId = await page.locator("#participantRouteSessionId").inputValue();
+  const expectedPreloadRunId = (await page.locator("#participantRouteRunId").innerText()).trim();
+  assert.ok(expectedPreloadSessionId);
+  assert.ok(expectedPreloadRunId);
+  assert.equal(matchesParticipantRunRequest(heldLazyBookletPreload.url(), {
+    baseUrl, endpoint: "current-state", includeBookletAssets: true,
+    participantSessionId: expectedPreloadSessionId, testRunId: expectedPreloadRunId
+  }), true, "The held preload must address the rendered participant session and selected run.");
   await page
     .locator("#participantRouteTestletGatePrompt")
     .filter({ hasText: "Enter the project block code." })
@@ -9635,6 +9646,8 @@ try {
   const lazyBookletPreloadResponse = await lazyBookletPreloadResponsePromise;
   assert.equal(lazyBookletPreloadResponse.status(), 200);
   const lazyBookletPreloadPayload = await lazyBookletPreloadResponse.json();
+  assert.equal(lazyBookletPreloadPayload.currentRunState.testRun.testRunId, expectedPreloadRunId);
+  assert.equal(lazyBookletPreloadPayload.currentRunState.participantSession.participantSessionId, expectedPreloadSessionId);
   assert.equal(
     lazyBookletPreloadPayload.currentRunState.booklet.policy.player.loadingMode,
     "lazy"
