@@ -32,6 +32,18 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The 2026-10-07 shared navigation correction synchronizes automatic Run-bound
+addresses with Angular Router instead of only replacing native history. Owned
+protected SQLite/immutable production browsers prove prevented Back and Forward
+retain the exact selected Run, preset assignment, interface and unsaved draft;
+the visible shared fallback reload control then restores the saved answer.
+All six non-saving entry cases remain green. The longer official Verona 3 flow
+also passes its unchanged exact-URL navigation assertion. Thirty-eight actual
+entry-method regressions include awaited reload, cancellation and stale view
+boundaries. This closes the reproduced local navigation defect, not complete
+publication CI or any rendered Original-reference row. The raw-text variant
+fixture uses the shared fallback Player, not the Original Verona toolbar.
+
 Run-bound re-entry now distinguishes saving and non-saving modes in the shared
 facade. Real protected SQLite/headful Chrome verifies Demo, Review and Simulation
 login, code unlock, transient response and hard reload in both interfaces: the

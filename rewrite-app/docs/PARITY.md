@@ -1,5 +1,41 @@
 # Testcenter parity checklist
 
+### Router-synchronized participant re-entry (2026-10-07)
+
+Publication `529ca629` passes 20 jobs but fails 15 UI jobs in its completed
+push/PR CI runs. They now reach the shared prevented-Back assertion at
+`smoke-ui.mjs:11808`: native `history.replaceState` had updated the browser's
+Run-bound address without updating Angular Router's restoration URL. Cancelling
+Back restored the earlier login address without its Session ID, Run ID or exact
+assignment. An owned SQLite/immutable production browser reproduces that loss;
+it is an application defect, not a reason to relax the URL assertion.
+
+Successful launch/resume now awaits Router replacement of the canonical entry
+URL. Route reuse keeps the current Player alive, while the Router retains the
+same authorized Session/Run/assignment for cancellation. Explicit `ui=original`
+or `ui=rewrite` survives replacement; passwords and arbitrary entry parameters
+are not copied. Both reload actions wait for successful synchronization and do
+not reload a stale address when navigation is rejected. Late proof-of-work,
+launch responses and refresh completions cannot take over a departed view.
+
+All 38 actual-entry-method checks and all 353 unit/frontend checks pass, as do
+typecheck and the unchanged 469.82kB production build below its 470kB hard limit.
+The mandatory A/B variant gate proves prevented Back and Forward retain the
+exact URL, selected Run and unsaved Unicode draft, followed by an actual visible
+reload control and durable saved-answer restoration in both interface modes.
+Its raw-text extension intentionally uses the shared fallback Player; this is
+not proof of Original Verona toolbar rendering. The existing six non-saving
+Demo/Review/Simulation reload cases remain green and retain fresh code/timer
+state on the same Run.
+
+The unchanged longer protected SQLite/headful Chrome flow passes through
+Simulation reset, multi-Unit offline/background-sync queue removal and the
+previously failing exact prevented-Back assertion with the official Verona 3
+Player. That local run excludes offline app-shell startup and stops at
+`participant-verona-3-player`; complete fresh publication CI, all eight full
+Original-UI comparisons and broader production acceptance remain independent
+open gates. Evidence is retained under ignored `.data/run-navigation-20261007.*`.
+
 ### Non-saving Run-bound re-entry reset (2026-10-07)
 
 Publication `09942c4c` passes its native PostgreSQL job with 219 tests, including

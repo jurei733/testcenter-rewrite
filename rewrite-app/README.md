@@ -62,6 +62,13 @@ and timers through the existing authorized resume use case instead. Reads and
 polling do not reset them; completed/locked Runs and monitor pauses stay guarded.
 The same mandatory gate covers all three non-saving modes in both interfaces.
 
+Run-bound browser addresses are synchronized through Angular Router, not native
+history replacement. Prevented Back/Forward keeps the exact selected Run and
+current draft; explicit interface selection survives reload. Reload actions wait
+for URL synchronization rather than reopening a stale assignment. These shared
+safeguards are covered by the mandatory variant browser gate and actual facade
+regressions, not a claim of complete Original-UI identity.
+
 Workspace Study Monitor, historical activity and Content Run-specific cards
 also bind the Run they represent. Full Run records retain the exact preset
 assignment, while genuinely session-only cards keep their fallback. Actual

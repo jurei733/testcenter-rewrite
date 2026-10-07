@@ -1,4 +1,5 @@
 import { Injectable, effect, inject, signal } from "@angular/core";
+import { Router } from "@angular/router";
 
 import type {
   CompleteTestRunRequest,
@@ -273,6 +274,7 @@ export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly router = inject(Router);
   private readonly browserCompatibility = inject(BrowserCompatibilityService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly participantEvents = inject(ParticipantEventStreamService);
@@ -1294,23 +1296,39 @@ export class ParticipantViewFacade {
     if (!this.showReloadButton) {
       return;
     }
-    this.persistState();
-    this.replaceSelectedRunEntryLink();
-    globalThis.window?.location.reload();
+    this.viewState.onActionAsync(async () => {
+      this.persistState();
+      await this.replaceSelectedRunEntryLink();
+      globalThis.window?.location.reload();
+    });
   }
 
   reloadAfterControllerError(): void {
     if (!this.hasControllerError) {
       return;
     }
-    this.persistState();
-    this.replaceSelectedRunEntryLink();
-    globalThis.window?.location.reload();
+    this.viewState.onActionAsync(async () => {
+      this.persistState();
+      await this.replaceSelectedRunEntryLink();
+      globalThis.window?.location.reload();
+    });
   }
 
-  private replaceSelectedRunEntryLink(): void {
+  private async replaceSelectedRunEntryLink(): Promise<void> {
     const entryLink = this.createParticipantSessionEntryLink();
-    if (entryLink) globalThis.window?.history.replaceState(null, "", entryLink);
+    if (!entryLink || !globalThis.window) return;
+    const url = new URL(entryLink, globalThis.window.location.origin);
+    const ui = new URLSearchParams(globalThis.window.location.search).get("ui");
+    if (ui === "original" || ui === "rewrite") url.searchParams.set("ui", ui);
+    const routeUrl = this.router.serializeUrl(
+      this.router.parseUrl(`${url.pathname}${url.search}`)
+    );
+    if (this.router.url === routeUrl) return;
+    // Native history replacement leaves Router's cancellation/restoration URL
+    // stale. Route reuse keeps the Player alive while synchronizing exact scope.
+    if (!await this.router.navigateByUrl(routeUrl, { replaceUrl: true })) {
+      throw new Error("Participant entry URL update was cancelled.");
+    }
   }
 
   get fullscreenStatusText(): string {
@@ -3131,6 +3149,7 @@ export class ParticipantViewFacade {
   }
 
   private async starterLaunchInternal(): Promise<void> {
+    const lifecycleSequence = this.viewLifecycleSequence;
     let payload: ParticipantLaunchResponse;
     try {
       const credentials = await this.proofOfWork.protectParticipant({
@@ -3141,6 +3160,9 @@ export class ParticipantViewFacade {
         password: this.runtime.participantPassword || undefined,
         participantCode: this.runtime.participantCode.trim() || undefined
       });
+      if (lifecycleSequence !== this.viewLifecycleSequence) {
+        return;
+      }
       payload = await this.requestState.request<ParticipantLaunchResponse>(
         "Participant Starter Launch",
         "POST",
@@ -3151,10 +3173,17 @@ export class ParticipantViewFacade {
         } satisfies ParticipantLaunchRequest
       );
     } catch (error) {
+      if (lifecycleSequence !== this.viewLifecycleSequence) {
+        return;
+      }
       if (this.handleParticipantCodeChallenge(error)) {
         return;
       }
       throw error;
+    }
+
+    if (lifecycleSequence !== this.viewLifecycleSequence) {
+      return;
     }
 
     this.syncParticipantSessionFields(payload.participantSession);
@@ -3169,7 +3198,10 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
-    if (this.runtime.testRunId === payload.testRun.testRunId) this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence === this.viewLifecycleSequence &&
+        this.runtime.testRunId === payload.testRun.testRunId) {
+      await this.replaceSelectedRunEntryLink();
+    }
   }
 
   private async downloadParticipantReviewsInternal(): Promise<void> {
@@ -3225,7 +3257,10 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
-    if (this.runtime.testRunId === payload.testRun.testRunId) this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence === this.viewLifecycleSequence &&
+        this.runtime.testRunId === payload.testRun.testRunId) {
+      await this.replaceSelectedRunEntryLink();
+    }
   }
 
   private async saveProgressInternal(

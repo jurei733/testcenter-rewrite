@@ -53,6 +53,7 @@ try {
     const source = await api(`${workspace}/source-packages`, {
       fileName: "variant.json", mediaType: "application/json", contentStructure: { bookletEntries: [{
         bookletKey: "variant-booklet", displayLabel: "Preset variants",
+        config: { browserBehaviour: "preventNav", toolbar_show_reload_button: "TRUE" },
         stateEntries: [{ stateKey: "level", displayLabel: "Level", options: [
           { optionKey: "advanced", displayLabel: "Advanced", conditions: [{
             source: { type: "Value", variableKey: "value", unitKey: "variant-unit", defaultValue: "0" },
@@ -177,6 +178,55 @@ try {
     assert.equal(new URL(page.url()).searchParams.get("testRunId"), otherRunId);
     await leave(otherRunId);
     assert.deepEqual((await enter(assignment)).unitResponses, { "variant-unit": exactAnswer });
+    // Exercise the actual Router guard after switching between two real Runs.
+    // Native history is manipulated only to create Back/Forward destinations;
+    // the application must restore its exact selected URL without reloading.
+    const protectedUrl = page.url();
+    const protectedPath = new URL(protectedUrl);
+    assert.equal(protectedPath.searchParams.get("ui"), ui);
+    const navigationDraft = `Unsaved protected navigation draft: ä/β · ${ui}`;
+    await textarea.fill(navigationDraft);
+    await page.evaluate(async path => {
+      history.replaceState(history.state, "", "/app/runtime");
+      history.pushState(history.state, "", path);
+      await new Promise(done => {
+        addEventListener("popstate", done, { once: true });
+        history.back();
+      });
+    }, `${protectedPath.pathname}${protectedPath.search}`);
+    await page.locator("#participantRouteNavigationNoticeTitle")
+      .filter({ hasText: "Browser navigation disabled" }).waitFor();
+    await page.waitForURL(protectedUrl);
+    assert.equal(await textarea.inputValue(), navigationDraft);
+    assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
+    await page.evaluate(async () => {
+      history.pushState(history.state, "", "/app/runtime");
+      await new Promise(done => {
+        addEventListener("popstate", done, { once: true });
+        history.back();
+      });
+    });
+    await page.waitForURL(protectedUrl);
+    await page.evaluate(() => new Promise(done => {
+      addEventListener("popstate", done, { once: true });
+      history.forward();
+    }));
+    await page.waitForURL(protectedUrl);
+    assert.equal(await textarea.inputValue(), navigationDraft);
+    assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
+    await page.screenshot({ path: join(artifacts, `${ui}-protected-navigation.png`) });
+    await textarea.fill(exactAnswer);
+    await Promise.all([
+      page.waitForEvent("load"),
+      // This raw-text extension uses the shared fallback Player in both modes;
+      // Original Verona toolbar rendering has its own full browser acceptance.
+      page.locator("#participantRouteReloadButton").click()
+    ]);
+    await textarea.waitFor();
+    await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
+    assert.equal(page.url(), protectedUrl);
+    assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
+    process.stdout.write(`participant_navigation=${ui}: prevented Back/Forward preserve exact Run URL and unsaved draft; shared fallback reload preserves saved answer and interface\n`);
     const sessionPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}`;
     const participantHeaders = { authorization: `Bearer ${identity.sessionToken}` };
     const saveOther = async answer => {
