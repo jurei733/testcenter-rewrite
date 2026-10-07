@@ -137,6 +137,15 @@ still intentionally uses Memory; running it inside a PostgreSQL job alone does
 not constitute native PostgreSQL deletion evidence. See `docs/PARITY.md` for
 the owned native browser proof and the remaining concurrency/CI boundaries.
 
+Group deletion removes its selected Runs before child cleanup. The existing
+atomic parent check therefore rejects a queued presence update instead of
+leaving a new connection log behind already deleted results. Nine deterministic
+native-store interleaving regressions run with normal unit checks and the
+configured PostgreSQL integration suite; they inspect raw logs and require
+exact preservation of another group's answer/review/history. This closes the
+confirmed presence ordering race, not all concurrent-writer/transaction or
+complete browser/CI acceptance requirements.
+
 Workspace Study Monitor, historical activity and Content Run-specific cards
 also bind the Run they represent. Full Run records retain the exact preset
 assignment, while genuinely session-only cards keep their fallback. Actual

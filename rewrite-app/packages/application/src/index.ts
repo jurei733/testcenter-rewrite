@@ -26529,6 +26529,13 @@ export const createFirstSliceServices = (
     ).filter(attachmentFile =>
       deletedAttachmentIds.has(attachmentFile.attachmentId)
     );
+    // Presence transitions atomically check (and in PostgreSQL lock) their
+    // parent Run. Remove that parent before child cleanup so an already queued
+    // lease sweep cannot create an orphan CONNECTION log after logs are deleted.
+    // Capture attachment references above while the selected Runs still exist.
+    const deletedTestRunCount = await repository.deleteTestRunsByIds(
+      deletedTestRunIds
+    );
     for (const attachmentFile of deletedAttachmentFiles) {
       await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
     }
@@ -26537,9 +26544,6 @@ export const createFirstSliceServices = (
       await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
     const deletedTestLogCount =
       await repository.deleteParticipantTestLogsByTestRunIds(deletedTestRunIds);
-    const deletedTestRunCount = await repository.deleteTestRunsByIds(
-      deletedTestRunIds
-    );
     const legacyGroupKey = groupKeys[0];
 
     await recordWorkspaceActivity({

@@ -1,5 +1,43 @@
 # Testcenter parity checklist
 
+### Group deletion fences concurrent presence transitions (2026-10-08)
+
+Controlled interleaving of the actual application service and native Memory,
+File and SQLite repositories reproduces an orphan `CONNECTION: LOST` log.
+Previously child logs were removed before their Run; a lease sweep in that
+gap still found the live parent and wrote a new log which survived subsequent
+Run deletion. Ordinary result-report joins could conceal this raw storage row.
+This is a confirmed deletion-ordering defect, distinct from the earlier
+PostgreSQL 45-versus-44 snapshot assertion.
+
+The service now captures selected attachment references, removes the selected
+Runs, then cleans up their files, reviews and logs. Presence writes already
+atomically verify their parent (and lock it in PostgreSQL). A transition which
+wins before parent deletion is included in the actual cleanup/count; a queued
+transition after parent deletion is rejected. No report count assertion,
+participant authorization, lease duration or repository schema is relaxed.
+
+Nine actual-service/store regressions cover expiry before parent removal,
+after log removal and after parent removal, including a previously captured
+expiry job, a historical empty Run and raw orphan-row inspection. They require
+exact deletion counts and byte-exact preservation of another group's answer,
+Run, Session, review and log. Six cases fail against the unchanged implementation;
+all nine pass with the correction. They are included in normal unit checks and
+the configured PostgreSQL integration runner. All 441 local core/frontend checks,
+typecheck and production build pass; the initial bundle remains 469.98 kB under
+the unchanged 470-kB error budget. All 164 API integration tests pass separately
+in Memory, File and SQLite (492 total) using owned fixtures. Native PostgreSQL execution/publication CI
+and fully atomic deletion against other concurrent writers remain separate gates.
+
+The unchanged `68c883b9` complete protected SQLite/production Chrome sequence
+fails at the later saved-QR-image Attachment Capture step, before group deletion.
+An isolated actual attachment smoke repeats the same missing-target timeout;
+the rendered UI reports a scanner timeout and makes no successful target lookup.
+It is not a complete-flow pass or evidence that short Unit labels caused the
+failure. The precise QR-decoder cause, PostgreSQL snapshot/count failure,
+complete-flow CI, all eight full Original-UI rows and broader production
+acceptance remain open. This step is not a 100-percent or merge-ready claim.
+
 ### Current independent short Unit labels (2026-10-08)
 
 The upstream target remains `14c98284590195631750bb2352cb398ca669fe7d`,
