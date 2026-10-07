@@ -35495,12 +35495,26 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   assert.deepEqual(resumedVariant.body.testRun.unitResponses, { "decision-unit": exactVariantAnswer });
   assert.deepEqual(resumedVariant.body.testRun.presetBookletStates, firstVariantRun.body.testRun.presetBookletStates);
   assert.deepEqual(resumedVariant.body.testRun.bookletStates, firstVariantRun.body.testRun.bookletStates);
-  const otherVariantWhileOpen = await requestJson<{ error: string }>(
+  await requestJson(`/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} });
+  const otherVariantWhileOpen = await requestJson<{ testRun: { testRunId: string; bookletAssignmentKey: string } }>(
     `/api/v1/participant/sessions/${variantSessionId}/resume`,
     { method: "POST", body: { bookletKey: variantSignIn.body.booklets[1]!.bookletKey } }
   );
-  assert.equal(otherVariantWhileOpen.status, 409);
-  assert.equal(otherVariantWhileOpen.body.error, "participant_session_open_run_booklet_conflict");
+  assert.equal(otherVariantWhileOpen.status, 200, "A safely left unfinished variant cannot block another assigned variant.");
+  assert.notEqual(otherVariantWhileOpen.body.testRun.testRunId, firstVariantRun.body.testRun.testRunId);
+  assert.equal(otherVariantWhileOpen.body.testRun.bookletAssignmentKey, variantSignIn.body.booklets[1]!.bookletKey);
+  const exactOtherVariantAnswer = "Independent beginner bytes: 漢字/β  ";
+  await requestJson(`/api/v1/participant/test-runs/${otherVariantWhileOpen.body.testRun.testRunId}/save-progress`,
+    { method: "POST", body: { currentUnitKey: "decision-unit", unitResponse: exactOtherVariantAnswer, status: "running" } });
+  await requestJson(`/api/v1/participant/test-runs/${otherVariantWhileOpen.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} });
+  const switchedBack = await requestJson<{ testRun: { testRunId: string; unitResponses: Record<string, string> } }>(
+    `/api/v1/participant/sessions/${variantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: firstVariantAssignmentKey } });
+  assert.equal(switchedBack.status, 200);
+  assert.equal(switchedBack.body.testRun.testRunId, firstVariantRun.body.testRun.testRunId);
+  assert.deepEqual(switchedBack.body.testRun.unitResponses, { "decision-unit": exactVariantAnswer });
   await requestJson(
     `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/complete`,
     { method: "POST", body: {} }
@@ -35514,7 +35528,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   }>(`/api/v1/participant/sessions/${variantSessionId}/runtime-state`);
   assert.equal(
     variantRuntimeAfterFirst.body.runtimeState.runtimeStatus,
-    "ready_to_launch"
+    "in_progress"
   );
   assert.deepEqual(
     variantRuntimeAfterFirst.body.runtimeState.booklets.map(booklet => [
@@ -35523,7 +35537,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     ]),
     [
       [firstVariantAssignmentKey, "completed"],
-      [`${bookletKey}#level:beginner;quality:basic;numeric:low`, "available"]
+      [`${bookletKey}#level:beginner;quality:basic;numeric:low`, "in_progress"]
     ]
   );
 
@@ -35546,6 +35560,10 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   );
   assert.equal(secondVariantRun.body.testRun.presetBookletStates.level, "beginner");
   assert.equal(secondVariantRun.body.testRun.bookletStates.level, "beginner");
+  assert.equal(secondVariantRun.body.testRun.testRunId, otherVariantWhileOpen.body.testRun.testRunId);
+  const exactOtherVariantState = await requestJson<{ currentRunState: { testRun: { unitResponses: Record<string, string> } } }>(
+    `/api/v1/participant/sessions/${variantSessionId}/current-state?testRunId=${secondVariantRun.body.testRun.testRunId}`);
+  assert.deepEqual(exactOtherVariantState.body.currentRunState.testRun.unitResponses, { "decision-unit": exactOtherVariantAnswer });
   const variantOpenRuns = await requestJson<{
     items: Array<{
       testRunId: string;
@@ -46078,13 +46096,18 @@ test("participant session launch can target a specific booklet", async () => {
           {
             bookletKey: "booklet:alpha",
             displayLabel: "Alpha Booklet",
-            unitEntries: [{ unitKey: "unit-alpha-1", displayLabel: "Alpha 1" }]
+            testletEntries: [{ testletKey: "shared-block", displayLabel: "Alpha timed block", parentTestletKey: null,
+              restrictions: { timeMax: { minutes: 3, leave: "allowed" } } }],
+            unitEntries: [{ unitKey: "unit-alpha-1", displayLabel: "Alpha 1", testletPath: ["shared-block"] },
+              { unitKey: "unit-alpha-2", displayLabel: "Alpha untimed fallback" }]
           },
           {
             bookletKey: "booklet:beta",
             displayLabel: "Beta Booklet",
+            testletEntries: [{ testletKey: "shared-block", displayLabel: "Beta timed block", parentTestletKey: null,
+              restrictions: { timeMax: { minutes: 2, leave: "allowed" } } }],
             unitEntries: [
-              { unitKey: "unit-beta-1", displayLabel: "Beta 1" },
+              { unitKey: "unit-beta-1", displayLabel: "Beta 1", testletPath: ["shared-block"] },
               { unitKey: "unit-beta-2", displayLabel: "Beta 2" }
             ]
           }
@@ -46224,19 +46247,74 @@ test("participant session launch can target a specific booklet", async () => {
     1
   );
 
-  const conflictingBookletRun = await requestJson<{ error: string }>(
+  const savedBeta = await requestJson<{ testRun: { unitResponses: Record<string, string> } }>(
+    `/api/v1/participant/test-runs/${betaRun.body.testRun.testRunId}/save-progress`,
+    { method: "POST", body: { status: "running", responseUnitKey: "unit-beta-1", unitResponse: "Exact beta: ä漢字  " } });
+  assert.equal(savedBeta.status, 200);
+  assert.deepEqual(savedBeta.body.testRun.unitResponses, { "unit-beta-1": "Exact beta: ä漢字  " });
+  const returnedBeta = await requestJson<{ testRun: { status: string; testletTimers: Record<string, unknown> } }>(
+    `/api/v1/participant/test-runs/${betaRun.body.testRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} });
+  assert.equal(returnedBeta.status, 200);
+  assert.equal(returnedBeta.body.testRun.status, "paused");
+  const secondBookletAttempts = await Promise.all(Array.from({ length: 12 }, () => requestJson<{
+    testRun: { testRunId: string; bookletKey: string; status: string; testletTimers: Record<string, { durationSeconds: number }> };
+  }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     {
       method: "POST",
       body: { bookletKey: "booklet:alpha" }
     }
-  );
-
-  assert.equal(conflictingBookletRun.status, 409);
-  assert.equal(
-    conflictingBookletRun.body.error,
-    "participant_session_open_run_booklet_conflict"
-  );
+  )));
+  assert.ok(secondBookletAttempts.every(response => response.status === 200), "Another unfinished Booklet cannot block the requested assignment.");
+  const earlierAlphaRun = secondBookletAttempts[0]!.body.testRun;
+  assert.equal(new Set(secondBookletAttempts.map(response => response.body.testRun.testRunId)).size, 1,
+    "Simultaneous HTTP starts must reserve one exact assignment Run.");
+  assert.notEqual(earlierAlphaRun.testRunId, betaRun.body.testRun.testRunId);
+  assert.equal(earlierAlphaRun.testletTimers["shared-block"]?.durationSeconds, 180);
+  assert.ok(secondBookletAttempts.every(response => JSON.stringify(response.body.testRun.testletTimers) === JSON.stringify(earlierAlphaRun.testletTimers)),
+    "Losing simultaneous starts cannot reset the winner's initial timer.");
+  const initialAlphaLogs = await requestJson<{ items: Array<{ testLog: { logContent: string } }> }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${earlierAlphaRun.testRunId}&logKey=CONTROLLER&limit=20`);
+  assert.equal(initialAlphaLogs.body.items.filter(item => item.testLog.logContent === "RUNNING").length, 1,
+    "Only the reservation winner may log a newly started Run.");
+  const initialAlphaTimerLogs = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${earlierAlphaRun.testRunId}&logKey=TESTLETS_TIMELEFT&limit=20`);
+  assert.equal(initialAlphaTimerLogs.body.items.length, 1, "Only the reservation winner may log the initial timer.");
+  const savedAlpha = await requestJson(
+    `/api/v1/participant/test-runs/${earlierAlphaRun.testRunId}/save-progress`,
+    { method: "POST", body: { status: "running", responseUnitKey: "unit-alpha-1", unitResponse: "Independent alpha: β  " } });
+  assert.equal(savedAlpha.status, 200);
+  await requestJson(`/api/v1/participant/test-runs/${earlierAlphaRun.testRunId}/return-to-starter`,
+    { method: "POST", body: {} });
+  const betaAgain = await requestJson<{ testRun: { testRunId: string; unitResponses: Record<string, string>; testletTimers: Record<string, unknown> } }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet:beta" } });
+  assert.equal(betaAgain.status, 200);
+  assert.equal(betaAgain.body.testRun.testRunId, betaRun.body.testRun.testRunId);
+  assert.deepEqual(betaAgain.body.testRun.unitResponses, { "unit-beta-1": "Exact beta: ä漢字  " });
+  assert.deepEqual(betaAgain.body.testRun.testletTimers, returnedBeta.body.testRun.testletTimers,
+    "The other Booklet's same-named timed block cannot replace or restart this timer.");
+  const unassignedWhileOpen = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet:unassigned" } });
+  assert.equal(unassignedWhileOpen.status, 403);
+  assert.equal(unassignedWhileOpen.body.error, "booklet_not_assigned");
+  const alphaCommandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${earlierAlphaRun.testRunId}/commands`;
+  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "pause" } })).status, 200);
+  const monitorPausedAlpha = await requestJson<{ testRun: { status: string; pauseSource: string; unitResponses: Record<string, string> } }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet:alpha" } });
+  assert.equal(monitorPausedAlpha.status, 200);
+  assert.equal(monitorPausedAlpha.body.testRun.status, "paused");
+  assert.equal(monitorPausedAlpha.body.testRun.pauseSource, "monitor");
+  assert.deepEqual(monitorPausedAlpha.body.testRun.unitResponses, { "unit-alpha-1": "Independent alpha: β  " });
+  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "lock_test" } })).status, 200);
+  const lockedAlphaEntry = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet:alpha" } });
+  assert.equal(lockedAlphaEntry.status, 423);
+  assert.equal(lockedAlphaEntry.body.error, "test_run_locked");
 
   const completedBetaRun = await requestJson<{
     testRun: { status: string };
@@ -46245,6 +46323,14 @@ test("participant session launch can target a specific booklet", async () => {
   });
   assert.equal(completedBetaRun.status, 200);
   assert.equal(completedBetaRun.body.testRun.status, "completed");
+  const blockedSiblingState = await requestJson<{ runtimeState: { participantSession: { status: string }; runtimeStatus: string; availableAction: string } }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`);
+  assert.equal(blockedSiblingState.body.runtimeState.participantSession.status, "signed_in");
+  assert.equal(blockedSiblingState.body.runtimeState.runtimeStatus, "locked");
+  assert.equal(blockedSiblingState.body.runtimeState.availableAction, "none",
+    "Completing another Booklet cannot make a locked sibling resumable.");
+  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "unlock_test" } })).status, 200);
+  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "resume" } })).status, 200);
 
   const betweenBooklets = await requestJson<{
     runtimeState: {
@@ -46257,8 +46343,8 @@ test("participant session launch can target a specific booklet", async () => {
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`
   );
   assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "signed_in");
-  assert.equal(betweenBooklets.body.runtimeState.runtimeStatus, "ready_to_launch");
-  assert.equal(betweenBooklets.body.runtimeState.availableAction, "launch");
+  assert.equal(betweenBooklets.body.runtimeState.runtimeStatus, "in_progress");
+  assert.equal(betweenBooklets.body.runtimeState.availableAction, "resume");
   assert.deepEqual(
     betweenBooklets.body.runtimeState.booklets.map(booklet => ({
       bookletKey: booklet.bookletKey,
@@ -46266,7 +46352,7 @@ test("participant session launch can target a specific booklet", async () => {
     })),
     [
       { bookletKey: "booklet:beta", status: "completed" },
-      { bookletKey: "booklet:alpha", status: "available" }
+      { bookletKey: "booklet:alpha", status: "in_progress" }
     ]
   );
 
@@ -46281,6 +46367,12 @@ test("participant session launch can target a specific booklet", async () => {
   );
   assert.equal(alphaRun.status, 200);
   assert.equal(alphaRun.body.testRun.bookletKey, "booklet:alpha");
+  assert.equal(alphaRun.body.testRun.testRunId, earlierAlphaRun.testRunId);
+  const completedAssignmentResume = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "booklet:beta" } });
+  assert.equal(completedAssignmentResume.status, 409);
+  assert.equal(completedAssignmentResume.body.error, "booklet_already_completed");
 
   const firstSessionStatePath = `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/current-state`;
   const selectedBetaState = await requestJson<{

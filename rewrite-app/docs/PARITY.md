@@ -1,5 +1,47 @@
 # Testcenter parity checklist
 
+### Exact unfinished-Booklet launch and resume (2026-10-07)
+
+The controller now resolves and authorizes the requested assignment before
+selecting an existing Run. A different unfinished Booklet or preset variant no
+longer causes the session-wide HTTP 409. Both new and existing `resumeSession`
+entries use this same resolution; existing Run mutations re-read the selected
+Run under its mutation queue. Completed and locked assignments remain denied,
+and monitor-paused Runs are returned paused before any non-saving reset.
+
+New Runs include their initial timer in the atomic reservation candidate. Losing
+starts never persist a fresh candidate over the winner or log another initial
+controller/timer event. Starting another assignment does not implicitly pause,
+complete or cancel its sibling; the actual Starter return retains its existing
+leave/time/completeness and termination-lock behavior. Completion keeps a session
+open for other unfinished assignments, including locked ones, without presenting
+a locked-only remainder as resumable. Successful participant launch/resume also
+updates the browser address to the selected Run and exact assignment, so a hard
+reload cannot return to the previously selected Booklet.
+
+The actual HTTP suites reproduce two 409 failures before the change, then pass
+second unfinished launches, preset isolation, exact Unicode answers, twelve
+simultaneous starts with one controller/timer log, independent same-named timed
+blocks, preserved cancelled timers, unauthorized assignments, monitor pause/lock,
+locked-only remainder and completed-assignment denial. All 163 API tests pass
+in each of Memory, File and SQLite, together with all 315 unit/frontend tests,
+typecheck and the unchanged 469.82kB production build.
+
+The mandatory variant browser gate no longer seeds a second Run in storage. Real
+protected SQLite/headful Chrome passes in both interfaces: A answer/guarded
+Starter return, B launch/answer, exact A/B resume and hard reload, run-bound URLs,
+scoped live acknowledgements, other-Run background saves, monitor pause/resume,
+and completing B without closing or replacing A. Traces/screenshots use owned
+fixtures only. Evidence is ignored under `.data/multi-booklet-workflow-20261007.*`.
+
+Native PostgreSQL acceptance of this controller change and complete publication
+CI remain pending, as do the broader policy/production corpus and all eight full
+Original-UI rows. The foundation publication `3030296d` separately passed its
+native PostgreSQL job with 219 tests (including its new reservation checks), but
+its `ui-ops` job failed the pending-confirmation secret-input assertion at
+`smoke-deletion-confirmation.mjs:154`. That failure and the previous outbox timeout
+remain independent, unweakened CI issues. This is not a 100% or merge-ready claim.
+
 ### Atomic participant-assignment reservation foundation (2026-10-07)
 
 The repository contract now reserves or reuses a Run for the exact participant
@@ -19,10 +61,11 @@ of Memory, File and SQLite pass. Native PostgreSQL reservation checks are wired
 into its CI runner; they have not been run locally. File continues to have a
 single-writer contract, not a new cross-process locking guarantee.
 
-This is a prerequisite, not a closed multi-Booklet feature: `launch` and
-`resumeSession` still reject a different unfinished assignment. Their integration,
-completion without closing another unfinished Run, guarded Starter switching,
-stable selected-Run URLs and real browser acceptance remain required.
+At foundation publication `3030296d`, `launch` and `resumeSession` still rejected
+a different unfinished assignment. The subsequent controller and browser work
+above integrates that prerequisite; the foundation itself was not evidence of
+a complete multi-Booklet feature. Its native PostgreSQL CI job now passes,
+including reservation checks, without proving the subsequent controller change.
 
 The published `03e660ae` full protected SQLite production browser flow also
 finished successfully. Its push CI separately caught an outbox-removal timeout
@@ -236,23 +279,24 @@ under the unchanged 470kB limit. Evidence is retained in ignored
 The functional multi-Booklet gap below was found by this verification and is
 not covered by the mixed-state rendering seed order.
 
-### Newly reproduced multi-Booklet starter gap (P0, open)
+### Reproduced multi-Booklet starter gap (P0; implemented, CI acceptance pending)
 
 Original `c35cff81` `TestController::put` resolves/creates a test by the exact
 person and requested Booklet name; `TestDAO::getTestByPerson` does not reject
-it merely because another Booklet remains unfinished. The Rewrite instead
-selects any open session run in both `launch` and `resumeSession` and rejects
+it merely because another Booklet remains unfinished. The earlier Rewrite
+selected any open session run in both `launch` and `resumeSession` and rejected
 a different Booklet with `participant_session_open_run_booklet_conflict`.
 An owned authorized SQLite fixture reproduced that HTTP 409 even after the
-first run returned to the starter. This is not completed multi-Booklet parity.
+first run returned to the starter. The same upstream lookup behavior was
+reverified at current `a570587f` on 2026-10-07.
 The explicit run-bound selection prerequisite above is now implemented and
 tested independently of response chronology. Legacy session-only readers still
-use an `updatedAt` fallback. The launch conflict itself remains open. The atomic
-per-assignment repository reservation above is implemented and tested locally in
-Memory/File/SQLite, but still needs controller integration and native PostgreSQL
-CI evidence; removing the conflict alone is not sufficient.
+use an `updatedAt` fallback. The exact controller workflow above now passes
+locally without the launch conflict, with atomic reservation, independent
+answers/timers and real Starter launches; native PostgreSQL and complete
+publication CI acceptance of that controller change remain pending.
 
-Next acceptance must cover starting a second assigned Booklet while the first
+The required acceptance covers starting a second assigned Booklet while the first
 is safely left/paused, re-entering each exact run with independent answers,
 timers and restrictions, correct active-run selection after background saves,
 assignment variants, monitor pauses/locks and concurrent same-assignment

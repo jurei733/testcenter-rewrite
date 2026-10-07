@@ -5960,13 +5960,13 @@ const resolveParticipantSessionStatusAfterCompletion = async (
       participantSession.participantSessionId
     )
   ]);
-  const hasAvailableBooklet = buildParticipantRuntimeBooklets({
+  const hasUnfinishedBooklet = buildParticipantRuntimeBooklets({
     contentRelease,
     participantRosterEntry,
     participantCode: participantSession.participantCode,
     testRuns: testRuns.map(normalizeTestRun)
-  }).some(booklet => booklet.status === "available");
-  return hasAvailableBooklet ? "signed_in" : "closed";
+  }).some(booklet => booklet.status !== "completed");
+  return hasUnfinishedBooklet ? "signed_in" : "closed";
 };
 
 const buildParticipantRosterReadItems = (
@@ -25129,6 +25129,24 @@ export const createFirstSliceServices = (
     );
   };
 
+  const recordStartedTestletTimer = async (testRun: TestRun, testletKey: string): Promise<void> => {
+    const timer = testRun.testletTimers?.[testletKey];
+    await recordWorkspaceActivity({
+      tenantId: testRun.tenantId,
+      workspaceId: testRun.workspaceId,
+      eventType: "testlet_timer_started",
+      subjectType: "test_run",
+      subjectId: testRun.testRunId,
+      summary: `Timed block '${testletKey}' started for run '${testRun.testRunId}'.`,
+      details: {
+        testletKey,
+        durationSeconds: timer?.durationSeconds ?? null,
+        expiresAt: timer?.expiresAt ?? null,
+        currentUnitKey: testRun.currentUnitKey
+      }
+    });
+  };
+
   const persistEffectiveTestletTimerState = async (input: {
     contentRelease: ContentRelease;
     testRun: TestRun;
@@ -25183,21 +25201,7 @@ export const createFirstSliceServices = (
       );
     }
     if (activated.startedTestletKey) {
-      const timer = effectiveRun.testletTimers?.[activated.startedTestletKey];
-      await recordWorkspaceActivity({
-        tenantId: effectiveRun.tenantId,
-        workspaceId: effectiveRun.workspaceId,
-        eventType: "testlet_timer_started",
-        subjectType: "test_run",
-        subjectId: effectiveRun.testRunId,
-        summary: `Timed block '${activated.startedTestletKey}' started for run '${effectiveRun.testRunId}'.`,
-        details: {
-          testletKey: activated.startedTestletKey,
-          durationSeconds: timer?.durationSeconds ?? null,
-          expiresAt: timer?.expiresAt ?? null,
-          currentUnitKey: effectiveRun.currentUnitKey
-        }
-      });
+      await recordStartedTestletTimer(effectiveRun, activated.startedTestletKey);
     }
     for (const testletKey of reconciled.expiredTestletKeys) {
       await recordWorkspaceActivity({
@@ -31878,6 +31882,8 @@ export const createFirstSliceServices = (
         const hasAvailableBooklet = booklets.some(
           booklet => booklet.status === "available"
         );
+        const hasInProgressBooklet = booklets.some(booklet => booklet.status === "in_progress");
+        const hasLockedBooklet = booklets.some(booklet => booklet.status === "locked");
         const executionMode = resolveParticipantExecutionMode(
           latestTestRun?.executionMode ??
             participantSession.executionMode ??
@@ -31905,8 +31911,8 @@ export const createFirstSliceServices = (
             executionMode,
             latestTestRun: normalizeTestRun(latestTestRun),
             booklets,
-            runtimeStatus: hasAvailableBooklet ? "ready_to_launch" : "completed",
-            availableAction: hasAvailableBooklet ? "launch" : "none"
+            runtimeStatus: hasAvailableBooklet ? "ready_to_launch" : hasInProgressBooklet ? "in_progress" : hasLockedBooklet ? "locked" : "completed",
+            availableAction: hasAvailableBooklet ? "launch" : hasInProgressBooklet ? "resume" : "none"
           };
         }
 
@@ -32542,29 +32548,6 @@ export const createFirstSliceServices = (
         const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
           input.bookletKey
         );
-        const existingRun = await repository.getOpenTestRunByParticipantSessionId(
-          participantSession.participantSessionId
-        );
-
-        if (existingRun) {
-          if (
-            requestedBookletKey &&
-            existingRun.bookletKey !== requestedBookletKey &&
-            (existingRun.bookletAssignmentKey ?? existingRun.bookletKey) !==
-              requestedBookletKey
-          ) {
-            throw new FirstSliceError(
-              409,
-              "participant_session_open_run_booklet_conflict",
-              `Participant session '${participantSessionId}' already has an open run for booklet '${existingRun.bookletKey}'.`
-            );
-          }
-
-          const normalizedExistingRun = normalizeTestRun(existingRun);
-          requireParticipantTestRunUnlocked(normalizedExistingRun);
-          return normalizedExistingRun;
-        }
-
         const rosterEntry = await findParticipantRosterEntryByLoginKey(
           repository,
           participantSession.tenantId,
@@ -32584,6 +32567,7 @@ export const createFirstSliceServices = (
             participantSession.participantSessionId
           )
         ).map(normalizeTestRun);
+        testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
         const runtimeBooklets = buildParticipantRuntimeBooklets({
           contentRelease,
           participantRosterEntry: rosterEntry,
@@ -32593,11 +32577,17 @@ export const createFirstSliceServices = (
         const selectedRuntimeBooklet = requestedBookletKey
           ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
             runtimeBooklets.find(
+              booklet => booklet.sourceBookletKey === requestedBookletKey &&
+                (booklet.status === "in_progress" || booklet.status === "locked")
+            ) ??
+            runtimeBooklets.find(
               booklet =>
                 booklet.sourceBookletKey === requestedBookletKey &&
                 booklet.status === "available"
-            )
-          : runtimeBooklets.find(booklet => booklet.status === "available");
+            ) ?? runtimeBooklets.find(booklet => booklet.sourceBookletKey === requestedBookletKey)
+          : runtimeBooklets.find(booklet => booklet.bookletKey ===
+              testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
+            runtimeBooklets.find(booklet => booklet.status === "available");
         if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
           throw new FirstSliceError(
             403,
@@ -32640,6 +32630,18 @@ export const createFirstSliceServices = (
               ? `Participant session '${participantSessionId}' is already closed.`
               : `Participant session '${participantSessionId}' has no available booklet.`
           );
+        }
+
+        const existingRun = testRuns.find(run =>
+          (run.bookletAssignmentKey ?? run.bookletKey) ===
+            (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
+        if (existingRun) {
+          requireParticipantTestRunUnlocked(existingRun);
+          if (existingRun.status === "completed") {
+            throw new FirstSliceError(409, "booklet_already_completed",
+              `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+          }
+          return existingRun;
         }
 
         const timestamp = now();
@@ -32688,12 +32690,26 @@ export const createFirstSliceServices = (
             ? null
             : firstUnit?.unitKey ?? null
         };
-        await repository.saveTestRun(testRun);
-        const effectiveTestRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun,
-          timestamp
-        });
+        // Initialize the timer inside the candidate before reservation. A loser
+        // must never overwrite the winner's timer, answer or current Unit.
+        const activated = activateCurrentTestletTimer(contentRelease, testRun, timestamp);
+        const reservation = await repository.getOrCreateTestRunForAssignment(activated.testRun);
+        const effectiveTestRun = normalizeTestRun(reservation.testRun);
+        requireParticipantTestRunUnlocked(effectiveTestRun);
+        if (effectiveTestRun.status === "completed") {
+          throw new FirstSliceError(409, "booklet_already_completed",
+            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+        }
+        if (!reservation.created) return effectiveTestRun;
+        if (activated.startedTestletKey) {
+          if (executionMode.saveResponses) {
+            await repository.saveParticipantTestLogs(buildParticipantTestLogs({
+              testRun: effectiveTestRun,
+              batches: [{ entries: [buildTestletTimeLeftTestStateEntry(effectiveTestRun, timestamp)] }]
+            }));
+          }
+          await recordStartedTestletTimer(effectiveTestRun, activated.startedTestletKey);
+        }
         if (executionMode.saveResponses) {
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
@@ -32751,24 +32767,26 @@ export const createFirstSliceServices = (
         const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
           input.bookletKey
         );
-        const existingRun = await repository.getOpenTestRunByParticipantSessionId(
+        const previousRuns = await repository.listTestRunsByParticipantSessionId(
           participantSession.participantSessionId
         );
-
-        if (existingRun) {
+        // Use launch's exact assignment resolution and authorization for both
+        // new and existing entries; never choose an arbitrary open sibling.
+        const selectedRun = await this.launch({ participantSessionId, bookletKey: requestedBookletKey });
+        if (!previousRuns.some(run => run.testRunId === selectedRun.testRunId)) return selectedRun;
+        return serializeTestRunMutation(selectedRun.testRunId, async () => {
+          const existingRun = await repository.getTestRunById(selectedRun.testRunId);
+          if (!existingRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${selectedRun.testRunId}' was not found.`);
           let normalizedExistingRun = normalizeTestRun(existingRun);
           requireParticipantTestRunUnlocked(normalizedExistingRun);
-          if (
-            requestedBookletKey &&
-            existingRun.bookletKey !== requestedBookletKey &&
-            (existingRun.bookletAssignmentKey ?? existingRun.bookletKey) !==
-              requestedBookletKey
-          ) {
-            throw new FirstSliceError(
-              409,
-              "participant_session_open_run_booklet_conflict",
-              `Participant session '${participantSessionId}' already has an open run for booklet '${existingRun.bookletKey}'.`
-            );
+          if (normalizedExistingRun.status === "completed") {
+            throw new FirstSliceError(409, "booklet_already_completed",
+              `Booklet '${normalizedExistingRun.bookletKey}' is already completed in participant session '${participantSessionId}'.`);
+          }
+          // Monitor authority wins even in non-saving modes; entry cannot
+          // reset a paused Run and thereby resume it implicitly.
+          if (normalizedExistingRun.status === "paused" && normalizedExistingRun.pauseSource === "monitor") {
+            return normalizedExistingRun;
           }
 
           const executionMode = resolveParticipantExecutionMode(
@@ -32805,13 +32823,6 @@ export const createFirstSliceServices = (
               normalizedExistingRun = resetRun;
               await repository.saveTestRun(normalizedExistingRun);
             }
-          }
-
-          if (
-            normalizedExistingRun.status === "paused" &&
-            normalizedExistingRun.pauseSource === "monitor"
-          ) {
-            return normalizedExistingRun;
           }
 
           if (normalizedExistingRun.status === "paused") {
@@ -32869,11 +32880,6 @@ export const createFirstSliceServices = (
           }
 
           return normalizedExistingRun;
-        }
-
-        return this.launch({
-          participantSessionId: participantSession.participantSessionId,
-          bookletKey: requestedBookletKey
         });
       },
       async saveProgress(input) {

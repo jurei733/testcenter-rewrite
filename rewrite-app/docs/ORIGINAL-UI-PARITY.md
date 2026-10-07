@@ -32,13 +32,25 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The updated 2026-10-07 mandatory variant smoke creates both unfinished Runs
+through the real protected Starter workflow, without repository seeding. Owned
+SQLite/headful Chrome passes A/B answer preservation, exact preset selection,
+automatic run-bound browser addresses, hard reload of each assignment,
+background-save isolation, monitor pause/resume and completing B without closing
+A, in both interfaces. Full Memory/File/SQLite API suites also pass concurrent
+assignment creation, same-named timer isolation and monitor/completed denial.
+Native PostgreSQL and complete publication CI for this controller change are
+separate pending gates. This shared functional implementation changes no full
+rendered Original-reference acceptance row or pixel-identity claim.
+
 Both interfaces now bind the selected Run ID through state, asset preload,
 live updates and actual generated re-entry links. Exact preset assignment,
 Unicode answers and Run ID survive hard reload; another run's later background
 saves cannot steal selection or bypass the selected run's monitor pause.
 Production/development protected SQLite browsers and headless production pass.
-The second open run in this focused fixture is repository-seeded, not started
-through the still-blocked P0 workflow. These shared functional safeguards do not
+At the earlier selected-Run publication, the second open Run in that focused
+fixture was repository-seeded; the updated real-launch acceptance above now
+replaces that fixture. These shared functional safeguards do not
 close any full rendered-UI acceptance row or pixel-identity claim.
 
 The 2026-10-07 operator handoff check also passes in both interface modes on
@@ -59,8 +71,8 @@ Participant, Booklet and Unit detail links, actual link opening, hard-reload
 answer restoration and Content release Run links; both participants' answers and
 statuses are preserved. Thirteen actual-getter regressions cover variant and
 historical/fallback boundaries. This shared functional fix changes no rendered
-Original-reference acceptance row and proves neither full UI identity nor the
-still-blocked second unfinished Booklet launch.
+Original-reference acceptance row and by itself proved neither full UI identity
+nor the then-blocked second unfinished Booklet launch.
 
 The shared backend now permits exact preset-assignment resumption after returning
 to the starter, rather than rejecting its variant key against the source Booklet
@@ -68,8 +80,9 @@ key. Both interfaces passed real participant login, Unicode draft preservation,
 confirmed starter return, same-run resumption and session-link/hard-reload
 restoration with owned protected SQLite in production/development; production
 also passed headlessly. The mandatory quick-CI variant smoke retains exact
-run/answer assertions. This does not close the other-unfinished-Booklet P0 gap,
-the full starter row or any pixel-identity claim.
+run/answer assertions. This earlier same-assignment check did not close the
+other-unfinished-Booklet gap; the updated real-launch check above now covers that
+workflow locally, without closing the full starter row or pixel-identity claim.
 
 Latest participant-starter comparison (2026-10-05): the optional renderer now
 matches the pinned 19.0 intrinsic 684px card/intro width, 24px gaps, 94px companion,

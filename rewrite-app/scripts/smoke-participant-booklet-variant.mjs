@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { access, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -24,6 +23,8 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" },
   stdio: ["ignore", "ignore", "inherit", "ipc"] });
 let browser;
+let activeContext;
+let activePage;
 try {
   const port = await new Promise((done, reject) => {
     const timer = setTimeout(() => reject(new Error("Owned API startup timed out.")), 20_000);
@@ -32,6 +33,7 @@ try {
     server.once("exit", () => { clearTimeout(timer); reject(new Error("Owned API exited before ready.")); });
   });
   const baseUrl = `http://127.0.0.1:${port}`;
+  process.stdout.write(`owned_base_url=${baseUrl}\n`);
   let operatorToken;
   const api = async (path, body) => {
     const response = await fetch(`${baseUrl}${path}`, { method: "POST",
@@ -42,7 +44,8 @@ try {
   };
   operatorToken = (await api("/api/v1/admin/auth/sign-in", { username: "demo-admin", password: "demo-admin-password" })).sessionToken;
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
-  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
+    channel: process.env.UI_SMOKE_BROWSER_CHANNEL || undefined });
   for (const ui of ["rewrite", "original"]) {
     const workspaceKey = `variant-${ui}`;
     await api("/api/v1/tenants/demo-tenant/workspaces", { workspaceKey, displayName: `Owned variant ${ui}` });
@@ -68,7 +71,10 @@ try {
         '</Login></Group></Testtakers>'
     });
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    activeContext = context;
+    await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     const page = await context.newPage();
+    activePage = page;
     const errors = [];
     page.on("pageerror", error => errors.push(String(error)));
     await page.goto(`${baseUrl}/app/participant?ui=${ui}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
@@ -86,10 +92,10 @@ try {
     const identity = await signedIn.json();
     assert.notEqual(identity.sessionToken, operatorToken);
     const assignment = "variant-booklet#level:advanced";
-    const select = async () => {
-      if (ui === "original") await page.locator(`[data-booklet-key="${assignment}"] button`).click();
+    const select = async (selectedAssignment = assignment) => {
+      if (ui === "original") await page.locator(`[data-booklet-key="${selectedAssignment}"] button`).click();
       else {
-        await page.locator("#participantRouteBookletKey").selectOption(assignment);
+        await page.locator("#participantRouteBookletKey").selectOption(selectedAssignment);
         await page.locator("#participantRouteStartOrResumeButton").click();
       }
     };
@@ -130,28 +136,58 @@ try {
     assert.equal(reentryLink.searchParams.get("testRunId"), initial.testRunId);
     assert.equal(reentryLink.searchParams.get("bookletKey"), assignment);
     reentryLink.searchParams.set("ui", ui);
-    // Seed another open assignment only in this owned repository. The general
-    // second-starter-launch P0 is still blocked; this is selection proof, not
-    // proof of that separate workflow. The writer process closes its own DB.
-    const otherRunId = randomUUID();
-    const otherRun = { ...run, testRunId: otherRunId,
-      bookletAssignmentKey: "variant-booklet#level:beginner",
-      presetBookletStates: { level: "beginner" }, bookletStates: { level: "beginner" },
-      unitResponses: { "variant-unit": "Owned independent beginner answer" },
-      updatedAt: new Date(Date.now() + 1).toISOString() };
-    const writer = spawn(process.execPath, ["--input-type=module", "-e", `
-      import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
-      let input = ""; for await (const chunk of process.stdin) input += chunk;
-      await createSqliteFirstSliceRepository(${JSON.stringify(join(artifacts, "store.sqlite"))}).saveTestRun(JSON.parse(input));
-    `], { cwd: process.cwd(), stdio: ["pipe", "ignore", "inherit"] });
-    const written = new Promise((done, reject) => {
-      writer.once("error", reject);
-      writer.once("exit", code => code === 0 ? done() : reject(new Error(`Owned fixture writer exited ${code}.`)));
-    });
-    writer.stdin.end(JSON.stringify(otherRun));
-    await written;
+    const leave = async id => {
+      await page.locator("#participantRouteReturnToStarterButton").click();
+      await page.locator("#participantConfirmationContinueButton").waitFor();
+      const response = page.waitForResponse(value => new URL(value.url()).pathname === `/api/v1/participant/test-runs/${id}/return-to-starter`);
+      await page.locator("#participantConfirmationContinueButton").click();
+      const result = await response;
+      assert.equal(result.status(), 200);
+      const payload = (await result.json()).testRun;
+      assert.equal(payload.status, "paused");
+      await page.locator(ui === "original" ? "#originalParticipantStarter" : "#participantRouteEntry").waitFor();
+      return payload;
+    };
+    const enter = async selectedAssignment => {
+      const response = page.waitForResponse(value => /\/sessions\/[^/]+\/resume$/u.test(new URL(value.url()).pathname));
+      await select(selectedAssignment);
+      const result = await response;
+      assert.equal(result.status(), 200);
+      const payload = (await result.json()).testRun;
+      await textarea.waitFor();
+      await page.waitForFunction(id => new URL(location.href).searchParams.get("testRunId") === id, payload.testRunId);
+      assert.equal(new URL(page.url()).searchParams.get("bookletKey"), selectedAssignment);
+      return payload;
+    };
+    await leave(initial.testRunId);
+    // Both Runs are created through the actual guarded Starter workflow. No
+    // repository seeding may stand in for starting the second unfinished test.
+    const secondAssignment = "variant-booklet#level:beginner";
+    const otherRun = await enter(secondAssignment);
+    const otherRunId = otherRun.testRunId;
+    assert.notEqual(otherRunId, initial.testRunId);
+    assert.deepEqual(otherRun.presetBookletStates, { level: "beginner" });
+    const secondAnswer = `Independent beginner bytes: 漢字/β · ${ui}`;
+    await textarea.fill(secondAnswer);
+    assert.deepEqual((await leave(otherRunId)).unitResponses, { "variant-unit": secondAnswer });
+    assert.deepEqual((await enter(secondAssignment)).unitResponses, { "variant-unit": secondAnswer });
+    await page.reload({ waitUntil: "networkidle" });
+    await textarea.waitFor();
+    await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, secondAnswer);
+    assert.equal(new URL(page.url()).searchParams.get("testRunId"), otherRunId);
+    await leave(otherRunId);
+    assert.deepEqual((await enter(assignment)).unitResponses, { "variant-unit": exactAnswer });
     const sessionPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}`;
     const participantHeaders = { authorization: `Bearer ${identity.sessionToken}` };
+    const saveOther = async answer => {
+      const response = await fetch(`${baseUrl}/api/v1/participant/test-runs/${otherRunId}/save-progress`, {
+        method: "POST", headers: { ...participantHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ responseUnitKey: "variant-unit", unitResponse: answer, status: "running" })
+      });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).testRun.unitResponses["variant-unit"], answer);
+    };
+    await saveOther(secondAnswer);
     const legacy = await fetch(`${baseUrl}${sessionPath}/current-state`, { headers: participantHeaders });
     assert.equal(legacy.status, 200);
     assert.equal((await legacy.json()).currentRunState.testRun.testRunId, otherRunId,
@@ -173,14 +209,6 @@ try {
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await textarea.inputValue(), exactAnswer);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId);
-    const saveOther = async answer => {
-      const response = await fetch(`${baseUrl}/api/v1/participant/test-runs/${otherRunId}/save-progress`, {
-        method: "POST", headers: { ...participantHeaders, "content-type": "application/json" },
-        body: JSON.stringify({ responseUnitKey: "variant-unit", unitResponse: answer, status: "running" })
-      });
-      assert.equal(response.status, 200);
-      assert.equal((await response.json()).testRun.unitResponses["variant-unit"], answer);
-    };
     const monitorPath = `${workspace}/monitor/open-runs/${initial.testRunId}/commands`;
     await api(monitorPath, { commandType: "pause", actorId: "owned-selection-smoke" });
     await saveOther("Owned background beginner update after advanced pause");
@@ -195,12 +223,32 @@ try {
     const latestOther = await fetch(`${baseUrl}${sessionPath}/current-state`, { headers: participantHeaders });
     assert.equal(latestOther.status, 200);
     assert.equal((await latestOther.json()).currentRunState.testRun.testRunId, otherRunId);
+    const completedOther = await fetch(`${baseUrl}/api/v1/participant/test-runs/${otherRunId}/complete`, {
+      method: "POST", headers: { ...participantHeaders, "content-type": "application/json" }, body: "{}"
+    });
+    assert.equal(completedOther.status, 200);
+    const completedEntry = await fetch(`${baseUrl}${sessionPath}/resume`, {
+      method: "POST", headers: { ...participantHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ bookletKey: secondAssignment })
+    });
+    assert.equal(completedEntry.status, 409);
+    assert.equal((await completedEntry.json()).error, "booklet_already_completed");
+    await page.reload({ waitUntil: "networkidle" });
+    await textarea.waitFor();
+    await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
+    assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId,
+      "Completing the other assignment must not close the unfinished selected Run.");
     await page.screenshot({ path: join(artifacts, `${ui}-resumed.png`) });
     assert.deepEqual(errors, []);
+    await context.tracing.stop({ path: join(artifacts, `${ui}-trace.zip`) });
     await context.close();
     process.stdout.write(`participant_variant=${ui}: same assignment/run/answer after real starter return and hard reload\n`);
-    process.stdout.write(`participant_selection=${ui}: owned two-run fixture, scoped live acknowledgement, pause/resume and background-save isolation\n`);
+    process.stdout.write(`participant_selection=${ui}: two real unfinished Starter launches, exact URLs and hard reloads, scoped live acknowledgement, pause/resume, completion and background-save isolation\n`);
   }
+} catch (error) {
+  await activePage?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => undefined);
+  await activeContext?.tracing.stop({ path: join(artifacts, "failure-trace.zip") }).catch(() => undefined);
+  throw error;
 } finally {
   await browser?.close().catch(() => undefined);
   if (server.exitCode === null) {

@@ -1295,10 +1295,7 @@ export class ParticipantViewFacade {
       return;
     }
     this.persistState();
-    const entryLink = this.createParticipantSessionEntryLink();
-    if (entryLink) {
-      globalThis.window?.history.replaceState(null, "", entryLink);
-    }
+    this.replaceSelectedRunEntryLink();
     globalThis.window?.location.reload();
   }
 
@@ -1307,11 +1304,13 @@ export class ParticipantViewFacade {
       return;
     }
     this.persistState();
-    const entryLink = this.createParticipantSessionEntryLink();
-    if (entryLink) {
-      globalThis.window?.history.replaceState(null, "", entryLink);
-    }
+    this.replaceSelectedRunEntryLink();
     globalThis.window?.location.reload();
+  }
+
+  private replaceSelectedRunEntryLink(): void {
+    const entryLink = this.createParticipantSessionEntryLink();
+    if (entryLink) globalThis.window?.history.replaceState(null, "", entryLink);
   }
 
   get fullscreenStatusText(): string {
@@ -3160,6 +3159,7 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+    if (this.runtime.testRunId === payload.testRun.testRunId) this.replaceSelectedRunEntryLink();
   }
 
   private async downloadParticipantReviewsInternal(): Promise<void> {
@@ -3215,6 +3215,7 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+    if (this.runtime.testRunId === payload.testRun.testRunId) this.replaceSelectedRunEntryLink();
   }
 
   private async saveProgressInternal(
