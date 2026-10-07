@@ -10637,6 +10637,28 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(groupResultsAfterDeletion.status, 200);
     assert.deepEqual(groupResultsAfterDeletion.body.items, []);
 
+    const lateDeletedRunProgress = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          status: "running",
+          currentUnitKey: "unit-intro",
+          unitResponse: "A stale participant must not recreate deleted results."
+        }
+      }
+    );
+    assert.equal(lateDeletedRunProgress.status, 401);
+    assert.equal(lateDeletedRunProgress.body.error, "participant_session_invalid");
+    const groupResultsAfterLateProgress = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups",
+      { headers: { authorization: `Bearer ${signIn.body.sessionToken}` } }
+    );
+    assert.equal(groupResultsAfterLateProgress.status, 200);
+    assert.deepEqual(groupResultsAfterLateProgress.body.items, []);
+
     const groupMonitorAfterDeletion = await requestJsonAt<{
       studyMonitorGroup: {
         participantSessionCount: number;
@@ -10822,6 +10844,113 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
   } finally {
     await closeServer(isolated.server);
   }
+});
+
+test("group result deletion retains other groups on the configured integration store", async () => {
+  // The broad demo-bootstrap scenario above intentionally uses Memory. This
+  // independent scenario uses the suite's actual configured durable adapter.
+  let signedIn = await requestJson<{ sessionToken: string }>(productionApiRoutes.admin.signIn, {
+    method: "POST", body: { username: "integration.admin", password: "integration-secret" }
+  });
+  if (signedIn.status === 401) {
+    assert.equal((await requestJson(productionApiRoutes.admin.bootstrap, {
+      method: "POST", body: { username: "integration.admin", displayName: "Integration Admin", password: "integration-secret" }
+    })).status, 201);
+    signedIn = await requestJson<{ sessionToken: string }>(productionApiRoutes.admin.signIn, {
+      method: "POST", body: { username: "integration.admin", password: "integration-secret" }
+    });
+  }
+  assert.equal(signedIn.status, 200);
+  const headers = { authorization: `Bearer ${signedIn.body.sessionToken}` };
+  const fixture = randomUUID();
+  const tenantKey = `group-delete-${fixture}`;
+  const workspaceKey = `group-delete-${fixture}`;
+  const path = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  assert.equal((await requestJson("/api/v1/platform/tenants", {
+    method: "POST", headers, body: { tenantKey, displayName: "Owned group deletion" }
+  })).status, 201);
+  assert.equal((await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST", headers, body: { workspaceKey, displayName: "Owned group deletion" }
+  })).status, 201);
+  const source = await requestJson<{ sourcePackage: { sourcePackageId: string } }>(`${path}/source-packages`, {
+    method: "POST", headers, body: { fileName: "owned.json", mediaType: "application/json", contentStructure: {
+      bookletEntries: [{ bookletKey: "owned-booklet", displayLabel: "Owned result fixture",
+        unitEntries: [{ unitKey: "owned-unit", displayLabel: "Owned unit", content: "Owned result fixture" }] }]
+    } }
+  });
+  assert.equal(source.status, 201);
+  const imported = await requestJson<{ stagedContentRelease: { contentReleaseId: string } }>(`${path}/import-jobs`, {
+    method: "POST", headers, body: { sourcePackageId: source.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(imported.status, 201);
+  assert.equal((await requestJson(`${path}/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, {
+    method: "POST", headers, body: { activatedByActorId: "owned-group-deletion" }
+  })).status, 200);
+  assert.equal((await requestJson(`${path}/participant-roster`, {
+    method: "POST", headers, body: { rosterText: '<Testtakers>' +
+      '<Group id="deleted-group"><Login name="deleted-student" mode="run-hot-return"><Booklet>owned-booklet</Booklet></Login></Group>' +
+      '<Group id="retained-group"><Login name="retained-student" mode="run-hot-return"><Booklet>owned-booklet</Booklet></Login></Group>' +
+      '</Testtakers>' }
+  })).status, 201);
+  const runs: Array<{ loginKey: string; participantSessionId: string; testRunId: string; answer: string }> = [];
+  for (const loginKey of ["deleted-student", "retained-student"]) {
+    const identity = await requestJson<{ participantSession: { participantSessionId: string } }>(productionApiRoutes.participant.signIn, {
+      method: "POST", body: { tenantKey, workspaceKey, loginKey }
+    });
+    assert.equal(identity.status, 200);
+    const participantSessionId = identity.body.participantSession.participantSessionId;
+    const launched = await requestJson<{ testRun: { testRunId: string } }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+      method: "POST", body: {}
+    });
+    assert.equal(launched.status, 200);
+    const testRunId = launched.body.testRun.testRunId;
+    const answer = `Exact saved answer Ä/β · ${loginKey}`;
+    const saved = await requestJson<{ testRun: { unitResponses: Record<string, string> } }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+      method: "POST", body: { status: "running", currentUnitKey: "owned-unit", unitResponse: answer }
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.body.testRun.unitResponses, { "owned-unit": answer });
+    assert.equal((await requestJson(`${path}/reviews`, { method: "POST", headers,
+      body: { participantSessionId, testRunId, unitKey: "owned-unit", reviewerId: "owned-reviewer", category: "owned", comment: `Owned ${loginKey} review` }
+    })).status, 201);
+    runs.push({ loginKey, participantSessionId, testRunId, answer });
+  }
+  const [deleted, retained] = runs;
+  assert.ok(deleted && retained);
+  const before = await requestJson<{ items: Array<{ groupKey: string; responseCount: number; reviewCount: number; testLogCount: number }> }>(`${path}/results/groups`, { headers });
+  assert.equal(before.status, 200);
+  assert.deepEqual(before.body.items.map(item => item.groupKey).sort(), ["deleted-group", "retained-group"]);
+  assert.ok(before.body.items.every(item => item.responseCount === 1 && item.reviewCount === 1 && item.testLogCount > 0));
+  const removal = await requestJson<{ deletion: { deletedTestRunIds: string[]; deletedTestRunCount: number; deletedResponseCount: number; deletedReviewCount: number; deletedTestLogCount: number } }>(`${path}/results/groups`, {
+    method: "DELETE", headers, body: { groupKeys: ["deleted-group"], confirmation: workspaceKey }
+  });
+  assert.equal(removal.status, 200);
+  assert.deepEqual(removal.body.deletion.deletedTestRunIds, [deleted.testRunId]);
+  assert.equal(removal.body.deletion.deletedTestRunCount, 1);
+  assert.equal(removal.body.deletion.deletedResponseCount, 1);
+  assert.equal(removal.body.deletion.deletedReviewCount, 1);
+  assert.ok(removal.body.deletion.deletedTestLogCount > 0);
+  const staleSave = await requestJson<{ error: string }>(`/api/v1/participant/test-runs/${deleted.testRunId}/save-progress`, {
+    method: "POST", body: { status: "running", currentUnitKey: "owned-unit", unitResponse: "Must not recreate deleted results." }
+  });
+  assert.equal(staleSave.status, 401);
+  assert.equal(staleSave.body.error, "participant_session_invalid");
+  for (const report of ["responses/detailed", "reviews", "test-logs"]) {
+    const deletedReport = await requestJson<{ items: unknown[] }>(`${path}/${report}?groupKey=deleted-group`, { headers });
+    assert.equal(deletedReport.status, 200, report);
+    assert.deepEqual(deletedReport.body.items, [], report);
+  }
+  const remaining = await requestJson<typeof before.body>(`${path}/results/groups`, { headers });
+  assert.equal(remaining.status, 200);
+  assert.deepEqual(remaining.body.items.map(item => item.groupKey), ["retained-group"]);
+  assert.equal(remaining.body.items[0]?.responseCount, 1);
+  assert.equal(remaining.body.items[0]?.reviewCount, 1);
+  const retainedState = await requestJson<{ currentRunState: { testRun: { testRunId: string; unitResponses: Record<string, string> } } }>(
+    `/api/v1/participant/sessions/${retained.participantSessionId}/current-state?testRunId=${retained.testRunId}`
+  );
+  assert.equal(retainedState.status, 200);
+  assert.equal(retainedState.body.currentRunState.testRun.testRunId, retained.testRunId);
+  assert.deepEqual(retainedState.body.currentRunState.testRun.unitResponses, { "owned-unit": retained.answer });
 });
 
 test("local demo bootstrap preserves customized roster state across durable restart", async () => {

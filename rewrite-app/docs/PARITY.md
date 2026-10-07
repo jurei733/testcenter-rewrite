@@ -1,5 +1,50 @@
 # Testcenter parity checklist
 
+### Native group-result deletion acceptance (2026-10-07)
+
+The `78bfde62` publication's native PostgreSQL UI jobs pass in both the
+[push run](https://github.com/jurei733/testcenter-rewrite/actions/runs/37668275135/job/112953699202)
+and the [PR run](https://github.com/jurei733/testcenter-rewrite/actions/runs/37668279717/job/112953541622).
+The PR's complete UI sequence also passes, while other jobs are still live at
+this observation. These results supersede the preceding failure observation,
+but do not explain its intermittent group-card timeout or establish globally
+green CI. No application deletion, authorization or Player implementation was
+changed to obtain them.
+
+An owned native PostgreSQL/immutable production/headful Chrome workflow now
+independently verifies both interfaces: an exact saved Unicode answer appears
+in the group inventory, real confirmed deletion reports its removed Run and
+response, the backend inventory becomes empty, and the actual group card is
+removed. A later participant save on that deleted Run returns the existing
+HTTP 401 `participant_session_invalid` authorization denial without recreating
+results. The test uses an ephemeral, localhost-only PostgreSQL container and
+never touches the private MaP database.
+
+The API regression now has a separate scenario on the suite's actual configured
+Memory/File/SQLite/PostgreSQL store. The older comprehensive demo-bootstrap
+scenario intentionally forces Memory even within a native PostgreSQL test job;
+its result must not be counted as native deletion proof. The new scenario
+creates two groups with real answers, reviews and logs, deletes only one,
+checks all three deleted-group reports plus the group inventory, rejects a
+late save, and verifies the other group's exact answer and review survive.
+
+All 164 API tests pass on each of Memory, File and SQLite, along with all 220
+native PostgreSQL API/presence/assignment tests and all 358 unit/frontend checks.
+The first full native run exhausted
+the deliberately bounded 256 MiB disposable database filesystem and terminated
+with `pg_wal` ENOSPC; this was not an application assertion fix. A fresh owned
+2 GiB database completes the unchanged full suite. Browser screenshots/traces,
+test logs and that initial capacity failure are retained under ignored
+`.data/group-results-native-20261007.*`.
+
+The full browser gate now checks the actual DELETE counts and exact removed
+Run, then the backend inventory independently of its unchanged mandatory DOM
+removal assertion. This distinguishes incomplete backend deletion from stale
+rendering if the earlier timeout recurs; it is not a substitute assertion.
+Sequential denial does not prove an in-flight read/write versus deletion race
+or multi-process atomicity. The ItemBuilder/headful failure, complete fresh
+publication CI, all eight Original-UI rows and production acceptance stay open.
+
 ### Protected ItemBuilder failure evidence (2026-10-07)
 
 Publication `428f1a68` has advanced to 32 successful push-CI jobs, but its native

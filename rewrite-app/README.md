@@ -79,6 +79,15 @@ observations are diagnostic evidence, not a substitute for passing interactive
 Player tests. The unresolved ItemBuilder/headful gate and full CI remain tracked
 separately in `docs/PARITY.md`.
 
+Group-result deletion tests distinguish backend inventory removal from UI card
+removal and require the actual DELETE's counts and selected Run ID. A separate
+API scenario runs on the configured Memory/File/SQLite/PostgreSQL adapter,
+verifies answer/review/log cleanup, rejects a stale save after deletion, and
+preserves another group's exact saved answer. The broad demo-bootstrap scenario
+still intentionally uses Memory; running it inside a PostgreSQL job alone does
+not constitute native PostgreSQL deletion evidence. See `docs/PARITY.md` for
+the owned native browser proof and the remaining concurrency/CI boundaries.
+
 Workspace Study Monitor, historical activity and Content Run-specific cards
 also bind the Run they represent. Full Run records retain the exact preset
 assignment, while genuinely session-only cards keep their fallback. Actual

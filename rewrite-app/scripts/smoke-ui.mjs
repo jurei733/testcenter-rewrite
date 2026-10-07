@@ -25651,13 +25651,40 @@ try {
     ]);
     assert.match(download.suggestedFilename(), filenamePattern);
   }
+  const deleteGroupResultsResponse = page.waitForResponse(response =>
+    response.request().method() === "DELETE" &&
+    new URL(response.url()).pathname ===
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/results/groups`
+  );
   const deleteGroupResultsDialog = acceptVerifiedAppConfirmation(
     /Delete selected group results\?/,
     /Delete all responses, reviews, and logs for 1 selected group\(s\)\? This cannot be undone\./,
     workspaceKey
   );
   await page.locator("#deleteSelectedGroupResultsButton").click();
-  await deleteGroupResultsDialog;
+  const [groupDeletionResponse] = await Promise.all([
+    deleteGroupResultsResponse,
+    deleteGroupResultsDialog
+  ]);
+  assert.equal(groupDeletionResponse.status(), 200);
+  const groupDeletion = (await groupDeletionResponse.json()).deletion;
+  assert.deepEqual(groupDeletion.groupKeys, [participantGroupKey]);
+  assert.ok(groupDeletion.deletedTestRunCount > 0);
+  assert.ok(groupDeletion.deletedResponseCount > 0);
+  assert.ok(groupDeletion.deletedReviewCount > 0);
+  assert.ok(groupDeletion.deletedTestLogCount > 0);
+  assert.ok(groupDeletion.deletedTestRunIds.includes(pausedTestRunId));
+  // Prove the backend inventory separately from the mandatory DOM removal.
+  // A successful DELETE/filtered response read alone cannot establish that
+  // every selected group's Run was removed or distinguish stale UI state.
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/results/groups`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      !payload.items.some(item => item?.groupKey === participantGroupKey)
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
     payload =>
