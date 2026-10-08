@@ -25482,6 +25482,15 @@ try {
         .locator("#attachmentCaptureStatus")
         .filter({ hasText: "Camera active" })
         .waitFor({ timeout: 15_000 });
+      const activeCameraLabel = await page.locator("#attachmentCaptureVideo").evaluate(async video => {
+        const track = video.srcObject?.getVideoTracks()[0];
+        if (!track) throw new Error("The active camera must have a real owned video track.");
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices.find(device => device.kind === "videoinput" &&
+          device.deviceId === track.getSettings().deviceId)?.label || "Default camera";
+      });
+      await page.waitForFunction(expected => document.querySelector("#attachmentActiveCameraLabel")?.textContent?.trim() ===
+        `Active camera: ${expected}`, activeCameraLabel);
     } catch (error) {
       const cameraState = await page.evaluate(() => {
         const video = document.querySelector("#attachmentCaptureVideo");

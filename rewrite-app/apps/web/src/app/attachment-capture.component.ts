@@ -106,9 +106,11 @@ type AttachmentScope = {
             <label *ngIf="cameras.length > 1">
               Camera
               <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId" (change)="selectCamera()">
+                <option *ngIf="!selectedCameraIsListed" [value]="selectedCameraId">{{ selectedCameraId ? 'Selected camera' : 'Default camera (rear preferred)' }}</option>
                 <option *ngFor="let camera of cameras" [value]="camera.id">{{ camera.label || camera.id }}</option>
               </select>
             </label>
+            <p *ngIf="cameraActive" id="attachmentActiveCameraLabel" class="scope-line">Active camera: {{ selectedCameraLabel }}</p>
           </section>
 
           <section class="capture-controls">
@@ -188,6 +190,7 @@ export class AttachmentCaptureComponent
   private imageDecoder: AttachmentQrDecoder | null = null;
   private scanInProgress = false;
   private cameraSelectionVersion = 0;
+  private cameraDetailsVersion = 0;
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;
@@ -204,6 +207,14 @@ export class AttachmentCaptureComponent
   busy = false;
   status = "Scan a QR code or enter an attachment code to begin.";
   statusIsError = false;
+
+  get selectedCameraIsListed(): boolean {
+    return this.cameras.some(camera => camera.id === this.selectedCameraId);
+  }
+
+  get selectedCameraLabel(): string {
+    return this.cameras.find(camera => camera.id === this.selectedCameraId)?.label || "Default camera";
+  }
 
   get tenantKey(): string {
     return this.uiState.workspace.tenantKey.trim();
@@ -529,11 +540,18 @@ export class AttachmentCaptureComponent
   }
 
   private async updateCameraDetails(scanner: AttachmentCameraScanner): Promise<void> {
+    const version = ++this.cameraDetailsVersion;
+    const selectionVersion = this.cameraSelectionVersion;
+    const cameraId = scanner.getActiveCameraId();
     const cameras = await QrScanner.listCameras(true).catch(() => []);
     const hasFlash = await scanner.hasFlash().catch(() => false);
-    if (this.destroyRef.destroyed || this.scanner !== scanner || !scanner.isActive()) return;
+    if (this.destroyRef.destroyed || this.scanner !== scanner || !scanner.isActive() ||
+        version !== this.cameraDetailsVersion || selectionVersion !== this.cameraSelectionVersion ||
+        cameraId !== scanner.getActiveCameraId()) return;
     this.cameras = cameras;
-    if (!this.selectedCameraId && cameras[0]) this.selectedCameraId = cameras[0].id;
+    // Enumeration order does not identify getUserMedia's environment camera.
+    // Preserve an explicit preference when settings omit the actual device ID.
+    if (cameraId) this.selectedCameraId = cameraId;
     this.hasFlash = hasFlash;
     this.refreshView();
   }

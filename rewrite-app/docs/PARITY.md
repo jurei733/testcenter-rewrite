@@ -1,5 +1,29 @@
 # Testcenter parity checklist
 
+### Active camera identity and cloud handoff (2026-10-08)
+
+Camera selection now reflects the active owned video's actual track device ID,
+not the first enumerated camera. Missing IDs preserve the default or explicit
+preference; failed enumeration does not invent a label. Asynchronous device and
+flash metadata cannot overwrite a newer selection, track or resume update.
+Eight additional production-method regressions cover these boundaries.
+
+All 497 core/frontend checks, typecheck and production build pass locally.
+Fresh owned production/headful Chrome image and live-camera attachment flows
+pass, including QR lookup, upload, native preview/delete and worker closure.
+The image smoke also checks its camera label against the actual media track.
+New Chromium repetitions and the complete unmodified browser sequence were
+interrupted at the urgent publication boundary after an owned server reported
+`ENOSPC`. They are not claimed green and need fresh cloud/CI validation.
+
+The preceding worker publication `3ad20a7a` is independently all-72-check
+CI-green. Its owned complete Chrome/SQLite repetition also passes with only a
+passive native-input observer. This does not explain or erase the retained
+intermittent Demo-radio failure. New publication CI is a separate requirement.
+Physical visibility, current Original printed-page/QR-region framing and all
+eight complete Original-UI comparison rows remain open. See `CLOUD-HANDOFF.md`
+for the laptop-independent continuation and explicit proof boundaries.
+
 ### Owned QR workers: image recovery and live capture (2026-10-08)
 
 The production capture route now supplies the unchanged `qr-scanner` 1.4.1

@@ -170,6 +170,26 @@ test("actual camera owns the media stream and decodes video through the worker w
   assert.equal(f.events.filter(value => value === "decoder-dispose").length, 1);
 });
 
+test("camera identity comes from the active track and disappears on Stop", async () => {
+  const f = cameraFixture({ settings: { deviceId: "actual-rear-device" } });
+  assert.equal(f.scanner.getActiveCameraId(), null);
+  await f.scanner.start();
+  assert.equal(f.scanner.getActiveCameraId(), "actual-rear-device");
+  f.scanner.stop();
+  assert.equal(f.scanner.getActiveCameraId(), null);
+  f.scanner.destroy();
+});
+
+test("an unreported camera identity does not infer a device from the preference", async () => {
+  const f = cameraFixture();
+  await f.scanner.start();
+  assert.equal(f.scanner.getActiveCameraId(), null);
+  await f.scanner.setCamera("explicit-device");
+  assert.deepEqual(f.constraints.at(-1).video.deviceId, { exact: "explicit-device" });
+  assert.equal(f.scanner.getActiveCameraId(), null);
+  f.scanner.destroy();
+});
+
 test("ordinary frames without a QR code keep scanning without an error or stale target", async () => {
   const f = cameraFixture({ decode: () => { throw QrScanner.NO_QR_CODE_FOUND; } });
   await f.scanner.start(); await f.tick(); await f.tick();
@@ -425,5 +445,95 @@ test("late selection failure after Stop cannot overwrite the stopped-camera stat
     pending.reject(new Error("late device failure")); await changing;
     assert.equal(component.status, stoppedStatus); assert.equal(component.statusIsError, false);
     assert.equal(component.cameraActive, false);
+  });
+});
+
+const cameraDetailsScanner = (deviceId = "rear-device") => ({
+  getActiveCameraId: () => deviceId, isActive: () => true,
+  hasFlash: async () => false, destroy() {}
+});
+
+test("camera details select the actual rear track, not the first enumerated front device", async t => {
+  t.mock.method(QrScanner, "listCameras", async () => [
+    { id: "front-device", label: "Front camera" }, { id: "rear-device", label: "Rear camera" }
+  ]);
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = cameraDetailsScanner();
+    await component.updateCameraDetails(scanner);
+    assert.equal(component.selectedCameraId, "rear-device");
+    assert.equal(component.selectedCameraLabel, "Rear camera");
+    assert.equal(component.selectedCameraIsListed, true);
+  });
+});
+
+test("omitted track identity preserves the default preference without choosing the first device", async t => {
+  t.mock.method(QrScanner, "listCameras", async () => [{ id: "front-device", label: "Front camera" }]);
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = cameraDetailsScanner(null);
+    await component.updateCameraDetails(scanner);
+    assert.equal(component.selectedCameraId, "");
+    assert.equal(component.selectedCameraIsListed, false);
+    assert.equal(component.selectedCameraLabel, "Default camera");
+    component.selectedCameraId = "explicit-device";
+    await component.updateCameraDetails(scanner);
+    assert.equal(component.selectedCameraId, "explicit-device");
+  });
+});
+
+test("enumeration failure retains the reported active device without inventing a label", async t => {
+  t.mock.method(QrScanner, "listCameras", async () => { throw new Error("device list unavailable"); });
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = cameraDetailsScanner();
+    await component.updateCameraDetails(scanner);
+    assert.equal(component.selectedCameraId, "rear-device");
+    assert.deepEqual(component.cameras, []);
+    assert.equal(component.selectedCameraIsListed, false);
+    assert.equal(component.selectedCameraLabel, "Default camera");
+  });
+});
+
+test("pending device details cannot replace a newer explicit camera selection", async t => {
+  const cameras = deferred();
+  t.mock.method(QrScanner, "listCameras", () => cameras.promise);
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = cameraDetailsScanner();
+    const updating = component.updateCameraDetails(scanner);
+    component.cameraSelectionVersion++;
+    component.selectedCameraId = "new-device";
+    cameras.resolve([{ id: "rear-device", label: "Old rear camera" }]);
+    await updating;
+    assert.equal(component.selectedCameraId, "new-device");
+    assert.deepEqual(component.cameras, []);
+  });
+});
+
+test("newer details win even when a visibility restart uses the same camera ID", async t => {
+  const old = deferred(); let calls = 0;
+  t.mock.method(QrScanner, "listCameras", () => calls++ ? Promise.resolve([
+    { id: "rear-device", label: "Current rear camera" }
+  ]) : old.promise);
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = cameraDetailsScanner();
+    const first = component.updateCameraDetails(scanner);
+    await component.updateCameraDetails(scanner);
+    old.resolve([{ id: "rear-device", label: "Stale rear camera" }]);
+    await first;
+    assert.equal(component.selectedCameraLabel, "Current rear camera");
+  });
+});
+
+test("a changed track identity invalidates pending device details before they render", async t => {
+  const cameras = deferred(); let deviceId = "rear-device";
+  t.mock.method(QrScanner, "listCameras", () => cameras.promise);
+  await withCapture(async ({ component }) => {
+    const scanner = component.scanner = {
+      ...cameraDetailsScanner(), getActiveCameraId: () => deviceId
+    };
+    const updating = component.updateCameraDetails(scanner);
+    deviceId = "new-device";
+    cameras.resolve([{ id: "rear-device", label: "Old camera" }]);
+    await updating;
+    assert.equal(component.selectedCameraId, "");
+    assert.deepEqual(component.cameras, []);
   });
 });

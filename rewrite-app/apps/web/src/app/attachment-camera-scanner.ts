@@ -143,6 +143,11 @@ export class AttachmentCameraScanner {
 
   isActive(): boolean { return this.active; }
 
+  getActiveCameraId(): string | null {
+    if (!this.active) return null;
+    return this.stream?.getVideoTracks()[0]?.getSettings().deviceId || null;
+  }
+
   async setCamera(cameraId: string): Promise<void> {
     this.preferredCamera = cameraId;
     await this.start();
