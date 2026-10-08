@@ -34,6 +34,14 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+The 2026-10-08 PDF continuation adds nine actual TCPDF label-placement/wrapping
+references and four actual Source bookmark references. Short/long generated
+PDF pages decode correctly, and native protected single/batch exports retain
+their scope. This does not close any full-page UI row: Source QR drawing/pixel
+details, extended cases, the normal Source capture page and physical camera/
+window visibility still require separate evidence. See `PARITY.md` for exact
+whole-flow versus focused-run and publication boundaries.
+
 ### Current Review drawer comparison (2026-10-08)
 
 The optional participant Review pane now adapts the actual `14c98284` toolbar,

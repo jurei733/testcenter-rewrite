@@ -182,6 +182,24 @@ The preceding head's full Push-CI verification is still required before publishi
 Complete Original-UI, physical visibility, deployment and production acceptance
 remain separate open gates.
 
+The next local PDF step adds actual Source-style bookmark navigation, with one
+ordered bold blue title per authorized attachment and an internal XYZ target on
+its first page, including overflow pages. Four decoded real Source references
+are retained independently from the implementation. Fresh typecheck/build
+(469.98 kB), 522 normal tests, 61 compatibility checks, scoped Attachment API
+checks on Memory/File/SQLite and the protected native SQLite Attachment slice
+pass. The slice retains all four downloads, actual saved bytes, upload/preview/
+delete, five worker closures and clean shutdown. Twelve actual page-content
+comparisons against the exact `2c7d0516` source tree are byte-identical in both
+layouts; Rewrite's default viewer mode is retained. The preceding full-browser
+and 24-state Review proofs belong to the label step, not a new complete run of
+this bookmark step. Retained negative type/import helper logs and their exact
+corrections are described in `PARITY.md`. No authorization/TLS/input/gate policy
+was relaxed. Source label substitutions, QR drawing and extended cases remain
+open, alongside all full UI, physical and production gates. These local commits
+remain unpublished under the current Push-CI boundary; Entire Cloud trace
+capture remains unsupported and no new checkpoint is fabricated.
+
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
 `docs/testcenter-thread-migration-process.pptx` remain untouched and unuploaded;

@@ -1,0 +1,152 @@
+{
+  "sourceCommit": "14c98284590195631750bb2352cb398ca669fe7d",
+  "tcpdfVersion": "6.10.0",
+  "tcpdfCommit": "ca5b6de294512145db96bcbc94e61696599c391d",
+  "provenance": "Decoded from actual unmodified Source AttachmentTemplate output with two owned synthetic attachments in PHP 8.3. Outlines link to each attachment's first page, including when its label spans two pages. Titles, flags, colors, destinations and default viewer mode are actual Source dictionary values.",
+  "cases": [
+    {
+      "name": "batch",
+      "labelTemplate": null,
+      "pageCount": 2,
+      "pageMode": "/UseOutlines",
+      "items": [
+        {
+          "title": "Own Group/own-login/own-code | Own Booklet | Own Unit | own-image",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 0,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        },
+        {
+          "title": "Own Group/own-second-login/own-second-code | Own Second Booklet | Own Second Unit | own-second-image",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 1,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        }
+      ]
+    },
+    {
+      "name": "overflow-batch",
+      "labelTemplate": "R01\nR02\nR03\nR04\nR05\nR06\nR07\nR08\nR09\nR10\nR11\nR12\nR13\nR14\nR15\nR16\nR17\nR18\nR19\nR20\nR21\nR22\nR23\nR24\nR25\nR26\nR27\nR28\nR29\nR30\nR31\nR32\nR33\nR34\nR35\nR36\nR37\nR38\nR39\nR40\nR41\nR42\nR43\nR44\nR45\nR46\nR47\nR48\nR49\nR50\nR51\nR52\nR53\nR54\nR55",
+      "pageCount": 4,
+      "pageMode": "/UseOutlines",
+      "items": [
+        {
+          "title": "R01\nR02\nR03\nR04\nR05\nR06\nR07\nR08\nR09\nR10\nR11\nR12\nR13\nR14\nR15\nR16\nR17\nR18\nR19\nR20\nR21\nR22\nR23\nR24\nR25\nR26\nR27\nR28\nR29\nR30\nR31\nR32\nR33\nR34\nR35\nR36\nR37\nR38\nR39\nR40\nR41\nR42\nR43\nR44\nR45\nR46\nR47\nR48\nR49\nR50\nR51\nR52\nR53\nR54\nR55",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 0,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        },
+        {
+          "title": "R01\nR02\nR03\nR04\nR05\nR06\nR07\nR08\nR09\nR10\nR11\nR12\nR13\nR14\nR15\nR16\nR17\nR18\nR19\nR20\nR21\nR22\nR23\nR24\nR25\nR26\nR27\nR28\nR29\nR30\nR31\nR32\nR33\nR34\nR35\nR36\nR37\nR38\nR39\nR40\nR41\nR42\nR43\nR44\nR45\nR46\nR47\nR48\nR49\nR50\nR51\nR52\nR53\nR54\nR55",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 2,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        }
+      ]
+    },
+    {
+      "name": "markup",
+      "labelTemplate": "  <b>Own bold label</b><br />Own next line</div>Own end\n\nOwn last  ",
+      "pageCount": 2,
+      "pageMode": "/UseOutlines",
+      "items": [
+        {
+          "title": "Own bold label\nOwn next line\nOwn end\nOwn last",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 0,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        },
+        {
+          "title": "Own bold label\nOwn next line\nOwn end\nOwn last",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 1,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        }
+      ]
+    },
+    {
+      "name": "math",
+      "labelTemplate": "Own comparison 1 < 2 and 3 > 2",
+      "pageCount": 2,
+      "pageMode": "/UseOutlines",
+      "items": [
+        {
+          "title": "Own comparison 1 < 2 and 3 > 2",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 0,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        },
+        {
+          "title": "Own comparison 1 < 2 and 3 > 2",
+          "flags": 2,
+          "color": [
+            0,
+            0.25098,
+            0.501961
+          ],
+          "page": 1,
+          "view": "/XYZ",
+          "x": 28.35,
+          "y": 841.89,
+          "zoom": null
+        }
+      ]
+    }
+  ]
+}

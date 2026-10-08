@@ -9,7 +9,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
-import { PDFDocument } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName } from "pdf-lib";
 import { CodingSchemeFactory } from "@iqb/responses";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
 import type { Response as IqbResponse } from "@iqbspecs/response/response.interface.js";
@@ -5130,6 +5130,7 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
     await allPagesResponse.arrayBuffer()
   );
   assert.equal(allPagesPdf.getPageCount(), 2);
+  assert.equal(allPagesPdf.catalog.get(PDFName.of("Outlines")), undefined);
 
   const scopedPagesResponse = await fetch(
     `${baseUrl}${attachmentPagesPath}?labelTemplate=${encodeURIComponent("%GROUP% | %LOGIN% | %VAR%")}`,
@@ -5222,6 +5223,11 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
     assert.equal(originalResponse.headers.get("cache-control"), "private, no-store");
     const originalPdf = await PDFDocument.load(await originalResponse.arrayBuffer());
     assert.equal(originalPdf.getPageCount(), 1);
+    assert.equal(originalPdf.catalog.get(PDFName.of("PageMode"))?.toString(), "/UseOutlines");
+    const outlines = originalPdf.catalog.lookup(PDFName.of("Outlines"), PDFDict);
+    const firstBookmark = originalPdf.context.lookup(outlines.get(PDFName.of("First")), PDFDict);
+    assert.equal(firstBookmark.lookup(PDFName.of("Dest"), PDFArray).get(0)?.toString(), originalPdf.getPages()[0]!.ref.toString());
+    assert.equal(firstBookmark.get(PDFName.of("A")), undefined);
     const multilineLabel = Array.from({ length: 55 }, (_, index) =>
       `R${String(index + 1).padStart(2, "0")}`).join("\n");
     const overflowResponse = await fetch(
@@ -5233,6 +5239,9 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
     const overflowPdf = await PDFDocument.load(await overflowResponse.arrayBuffer());
     assert.equal(overflowPdf.getPageCount(), 2);
     assert.equal(overflowPdf.getTitle(), multilineLabel);
+    const overflowOutlines = overflowPdf.catalog.lookup(PDFName.of("Outlines"), PDFDict);
+    const overflowBookmark = overflowPdf.context.lookup(overflowOutlines.get(PDFName.of("First")), PDFDict);
+    assert.equal(overflowBookmark.lookup(PDFName.of("Dest"), PDFArray).get(0)?.toString(), overflowPdf.getPages()[0]!.ref.toString());
     const emptyLabelResponse = await fetch(`${baseUrl}${path}?layout=original&labelTemplate=`, {
       headers: { authorization: groupAuthorization }
     });
@@ -5240,6 +5249,9 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
     const emptyLabelPdf = await PDFDocument.load(await emptyLabelResponse.arrayBuffer());
     assert.equal(emptyLabelPdf.getTitle(), "");
     assert.equal(emptyLabelPdf.getPageCount(), 1);
+    const emptyOutlines = emptyLabelPdf.catalog.lookup(PDFName.of("Outlines"), PDFDict);
+    const emptyBookmark = emptyLabelPdf.context.lookup(emptyOutlines.get(PDFName.of("First")), PDFDict);
+    assert.equal(emptyBookmark.lookup(PDFName.of("Title"), PDFHexString).decodeText(), "");
     const denied = await requestJson<{ error: string }>(`${path}?layout=original`);
     assert.equal(denied.status, 401);
   }

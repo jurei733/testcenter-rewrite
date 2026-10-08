@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
-import { PDFArray, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
+import { PDFArray, PDFDocument, PDFName, PDFNull, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
 // Inspect the PDF actually produced by the production renderer, including its
 // image transforms. Fixtures contain only owned synthetic attachment metadata.
@@ -114,4 +114,49 @@ test("Original PDF matches rendered Source regular Helvetica 12 and excludes han
   assert.equal([...content.matchAll(/<[a-f\d]+> Tj/gi)].length,1);
   const encodedLabel = Buffer.from("Own label","ascii").toString("hex");
   assert.match(content,new RegExp(`<${encodedLabel}> Tj`,"i"));
+});
+
+const bookmarkReference = JSON.parse(await readFile(
+  new URL("./fixtures/original-attachment-pdf-bookmarks.json",import.meta.url),"utf8"));
+for(const reference of bookmarkReference.cases) {
+  test(`Original PDF bookmark navigation matches actual Source: ${reference.name}`,async()=>{
+    const pdf = await PDFDocument.load(await createAttachmentPagesPdf({layout:"original",
+      labelTemplate:reference.labelTemplate,attachments:[
+        {...attachment,attachmentId:"1:Own Unit:own-image",personLabel:"Own Group/own-login/own-code",bookletKey:"Own Booklet",unitKey:"Own Unit"},
+        {...attachment,attachmentId:"2:Own Second Unit:own-second-image",personLabel:"Own Group/own-second-login/own-second-code",bookletKey:"Own Second Booklet",unitKey:"Own Second Unit",variableId:"own-second-image"}
+      ]}));
+    assert.equal(pdf.getPageCount(),reference.pageCount);
+    assert.equal(pdf.catalog.get(PDFName.of("PageMode")).toString(),reference.pageMode);
+    const rootRef=pdf.catalog.get(PDFName.of("Outlines"));
+    const root=pdf.context.lookup(rootRef);
+    assert.equal(root.get(PDFName.of("Type")).toString(),"/Outlines");
+    let ref=root.get(PDFName.of("First"));
+    let previous;
+    for(const expected of reference.items) {
+      assert.ok(ref,"Every scoped attachment has its Source bookmark");
+      const item=pdf.context.lookup(ref);
+      assert.equal(item.get(PDFName.of("Title")).decodeText(),expected.title);
+      assert.equal(item.get(PDFName.of("Parent")).toString(),rootRef.toString());
+      assert.equal(item.get(PDFName.of("Prev"))?.toString(),previous?.toString());
+      assert.equal(item.get(PDFName.of("F")).asNumber(),expected.flags);
+      assert.deepEqual(item.lookup(PDFName.of("C"),PDFArray).asArray().map(value=>value.asNumber()),expected.color);
+      assert.equal(item.get(PDFName.of("A")),undefined,"Bookmarks never add script/external actions");
+      const destination=item.lookup(PDFName.of("Dest"),PDFArray);
+      assert.equal(destination.get(0).toString(),pdf.getPages()[expected.page].ref.toString());
+      assert.equal(destination.get(1).toString(),expected.view);
+      near(destination.get(2).asNumber(),expected.x); near(destination.get(3).asNumber(),expected.y);
+      assert.equal(destination.get(4),PDFNull);
+      previous=ref;ref=item.get(PDFName.of("Next"));
+    }
+    assert.equal(ref,undefined,"No foreign or duplicate attachment bookmark is appended");
+    assert.equal(root.get(PDFName.of("Last")).toString(),previous.toString());
+  });
+}
+
+test("default and explicit Rewrite retain their existing viewer mode without Original bookmarks",async()=>{
+  for(const layout of [undefined,"rewrite"]) {
+    const pdf=await PDFDocument.load(await createAttachmentPagesPdf({attachments:[attachment],layout}));
+    assert.equal(pdf.catalog.get(PDFName.of("Outlines")),undefined);
+    assert.equal(pdf.catalog.get(PDFName.of("PageMode")),undefined);
+  }
 });

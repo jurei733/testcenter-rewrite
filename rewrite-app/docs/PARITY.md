@@ -1,5 +1,43 @@
 # Testcenter parity checklist
 
+### Source PDF bookmark navigation — development evidence (2026-10-08)
+
+The optional Original PDF now opens its outline pane and creates one ordered
+bold blue bookmark per authorized attachment. Its label normalization, color,
+XYZ destination and first-page target match actual unmodified Source output.
+Overflow labels link to their first page while their QR remains on the final
+page. The default Rewrite PDF retains its existing viewer mode and no outlines.
+Four independently decoded Source references cover a two-attachment batch,
+four-page overflow, markup/newline normalization and mathematical angle brackets.
+They are retained in `scripts/fixtures/original-attachment-pdf-bookmarks.json`.
+Tests verify sibling/parent links, no appended foreign/duplicate bookmark and no
+script/external action, as well as the Source title/style/target values.
+
+Fresh typecheck, production build (469.98 kB), all 522 normal tests and 61
+compatibility checks pass. Scoped single/batch API checks pass on Memory, File
+and SQLite, including empty and overflow labels, first-page destinations,
+unauthenticated 401, foreign-group 403 and private/no-store headers. The protected
+SQLite Attachment browser slice passes four native Original/Rewrite single/batch
+downloads, actual saved PDF bytes, upload/preview/delete and five worker closures,
+then shuts down cleanly. Twelve single/batch default/long/overflow cases have
+byte-identical page content streams against the exact preceding `2c7d0516` tree
+in both layouts; only Original navigation metadata changes. The preceding label
+step passed the full unchanged browser suite and fresh 24-state Review matrix.
+Those whole-flow checks are not relabelled as a new full bookmark-tree run.
+
+Retained negative development logs distinguish a new test's unchecked optional
+PDF title lookup (`TS2532`) from a production defect: the test now decodes its
+typed title. A separate comparison helper initially used unsupported absolute
+imports from a data URL (`ERR_UNSUPPORTED_RESOLVE_REQUEST`); regular file URLs
+corrected that helper, and its unchanged byte-equality assertions pass. No gate,
+assertion, timeout or security control was weakened.
+Label substitutions, QR drawing/pixel details and wider character/markup cases
+remain open. All eight complete Original-UI rows, physical camera/window proof,
+deployment and production acceptance remain open. This is unpublished local/
+Cloud evidence; the preceding published head's complete Push-CI result remains
+unverified by the first-page connector. Real Entire Cloud capture is unavailable,
+so these commits receive no invented/reused checkpoint.
+
 ### Source PDF label placement and wrapping — development evidence (2026-10-08)
 
 The optional Original PDF now uses the actual Source's top label baseline,

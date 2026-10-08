@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFHexString, PDFName, type PDFRef, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
 
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
@@ -15,6 +15,13 @@ const ORIGINAL_CELL_PADDING = 2.835;
 const ORIGINAL_LINE_HEIGHT = 15;
 const ORIGINAL_BASELINE_FROM_TOP = 40.086;
 const ORIGINAL_LINES_PER_PAGE = 50;
+
+const originalBookmarkTitle = (label: string): string => label
+  .replace(/<br\s?\/>|<\/(?:blockquote|dd|dl|div|dt|h[1-6]|hr|li|ol|p|pre|ul|tcpdf|table|tr|td)>/gi, "\n")
+  .replaceAll("\r", "")
+  .replace(/\n+/g, "\n")
+  .replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/?[A-Za-z][^>]*>/g, "")
+  .trim();
 
 const toPdfSafeText = (value: string): string =>
   value
@@ -159,11 +166,15 @@ export const createAttachmentPagesPdf = async (input: {
   pdf.setSubject("Printable QR handoff pages for participant attachments");
   const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const bookmarks: Array<{ title: string; page: PDFRef; height: number }> = [];
 
   for (const [index, attachment] of input.attachments.entries()) {
     const mm = 72 / 25.4;
     let page = pdf.addPage([originalLayout ? ORIGINAL_PAGE_WIDTH : A4_WIDTH, A4_HEIGHT]);
     const authoredLabel = applyAttachmentLabelTemplate(attachment, input.labelTemplate, originalLayout);
+    if (originalLayout) bookmarks.push({
+      title: originalBookmarkTitle(authoredLabel), page: page.ref, height: page.getHeight()
+    });
     const label = originalLayout
       ? authoredLabel.replaceAll("\r", "").split("\n").map(toPdfSafeText).join("\n")
       : toPdfSafeText(authoredLabel);
@@ -276,6 +287,27 @@ export const createAttachmentPagesPdf = async (input: {
         color: rgb(0.4, 0.45, 0.54)
       }
     );
+  }
+
+  if (originalLayout) {
+    const root = pdf.context.obj({ Type: "Outlines" });
+    const rootRef = pdf.context.register(root);
+    const entries = bookmarks.map(bookmark => pdf.context.obj({
+      Title: PDFHexString.fromText(bookmark.title),
+      Parent: rootRef,
+      Dest: [bookmark.page, "XYZ", ORIGINAL_CELL_MARGIN, bookmark.height, null],
+      F: 2,
+      C: [0, 0.25098, 0.501961]
+    }));
+    const refs = entries.map(entry => pdf.context.register(entry));
+    entries.forEach((entry, index) => {
+      if (index > 0) entry.set(PDFName.of("Prev"), refs[index - 1]!);
+      if (index < refs.length - 1) entry.set(PDFName.of("Next"), refs[index + 1]!);
+    });
+    root.set(PDFName.of("First"), refs[0]!);
+    root.set(PDFName.of("Last"), refs[refs.length - 1]!);
+    pdf.catalog.set(PDFName.of("Outlines"), rootRef);
+    pdf.catalog.set(PDFName.of("PageMode"), PDFName.of("UseOutlines"));
   }
 
   return Buffer.from(await pdf.save());
