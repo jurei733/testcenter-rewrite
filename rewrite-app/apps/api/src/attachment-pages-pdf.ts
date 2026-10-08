@@ -7,6 +7,14 @@ const DEFAULT_LABEL_TEMPLATE = "%TESTTAKER% | %BOOKLET% | %UNIT% | %VAR%";
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 const PAGE_MARGIN = 56.69;
+// TCPDF's serialized A4 width and default cell metrics, independently checked
+// against unmodified Source AttachmentTemplate output (TCPDF 6.10.0).
+const ORIGINAL_PAGE_WIDTH = 595.276;
+const ORIGINAL_CELL_MARGIN = 28.35;
+const ORIGINAL_CELL_PADDING = 2.835;
+const ORIGINAL_LINE_HEIGHT = 15;
+const ORIGINAL_BASELINE_FROM_TOP = 40.086;
+const ORIGINAL_LINES_PER_PAGE = 50;
 
 const toPdfSafeText = (value: string): string =>
   value
@@ -17,7 +25,8 @@ const toPdfSafeText = (value: string): string =>
 
 const applyAttachmentLabelTemplate = (
   attachment: WorkspaceAttachment,
-  labelTemplate?: string | null
+  labelTemplate?: string | null,
+  originalLayout = false
 ): string => {
   const replacements: Record<string, string> = {
     "%GROUP%": attachment.groupKey,
@@ -30,8 +39,54 @@ const applyAttachmentLabelTemplate = (
   };
   return Object.entries(replacements).reduce(
     (label, [placeholder, value]) => label.replaceAll(placeholder, value),
-    labelTemplate?.trim() || DEFAULT_LABEL_TEMPLATE
+    originalLayout ? labelTemplate ?? DEFAULT_LABEL_TEMPLATE
+      : labelTemplate?.trim() || DEFAULT_LABEL_TEMPLATE
   );
+};
+
+const wrapOriginalPdfText = (
+  text: string,
+  measureCharacter: (value: string) => number
+): string[] => {
+  // Source preserves authored spaces/newlines and does not apply AFM kerning
+  // or the Rewrite's four-line ellipsis. Its empty MultiCell prints a space.
+  const value = text.replaceAll("\r", "") || " ";
+  const pageWidth = ORIGINAL_PAGE_WIDTH - ORIGINAL_CELL_MARGIN * 2;
+  const maxWidth = pageWidth - ORIGINAL_CELL_PADDING * 2;
+  const lines: string[] = [];
+  let start = 0;
+  let separator = -1;
+  let width = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    if (character === "\n") {
+      lines.push(value.slice(start, index));
+      start = index + 1;
+      separator = -1;
+      width = 0;
+      continue;
+    }
+    const hyphen = character === "-" && /[A-Za-z]/.test(value[index - 1] ?? "")
+      && /[A-Za-z]/.test(value[index + 1] ?? "");
+    if (character === " " || hyphen) separator = index;
+    width += measureCharacter(character);
+    if (width <= maxWidth || index === start) continue;
+
+    const nextWord = separator < start ? "" : value.slice(separator + 1).split(/\s/, 1)[0]!;
+    const nextWordWidth = Array.from(nextWord).reduce((sum, part) => sum + measureCharacter(part), 0);
+    if (separator >= start && nextWordWidth <= pageWidth) {
+      lines.push(value.slice(start, separator + (value[separator] === "-" ? 1 : 0)));
+      start = separator + 1;
+    } else {
+      lines.push(value.slice(start, index));
+      start = index;
+    }
+    index = start - 1;
+    separator = -1;
+    width = 0;
+  }
+  if (start < value.length) lines.push(value.slice(start));
+  return lines;
 };
 
 const wrapPdfText = (
@@ -89,13 +144,15 @@ export const createAttachmentPagesPdf = async (input: {
   }
 
   const pdf = await PDFDocument.create();
-  pdf.setCreator(input.layout === "original" ? "IQB-Testcenter" : "IQB Testcenter Rewrite");
+  const originalLayout = input.layout === "original";
+  pdf.setCreator(originalLayout ? "IQB-Testcenter" : "IQB Testcenter Rewrite");
   pdf.setProducer("IQB Testcenter Rewrite");
   pdf.setTitle(
     input.attachments.length === 1
       ? applyAttachmentLabelTemplate(
           input.attachments[0]!,
-          input.labelTemplate
+          input.labelTemplate,
+          originalLayout
         )
       : `Attachment QR pages - ${input.attachments.length} requests`
   );
@@ -104,20 +161,28 @@ export const createAttachmentPagesPdf = async (input: {
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   for (const [index, attachment] of input.attachments.entries()) {
-    const originalLayout = input.layout === "original";
     const mm = 72 / 25.4;
-    const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);
-    const label = toPdfSafeText(
-      applyAttachmentLabelTemplate(attachment, input.labelTemplate)
-    );
+    let page = pdf.addPage([originalLayout ? ORIGINAL_PAGE_WIDTH : A4_WIDTH, A4_HEIGHT]);
+    const authoredLabel = applyAttachmentLabelTemplate(attachment, input.labelTemplate, originalLayout);
+    const label = originalLayout
+      ? authoredLabel.replaceAll("\r", "").split("\n").map(toPdfSafeText).join("\n")
+      : toPdfSafeText(authoredLabel);
     // Unmodified Source AttachmentTemplate uses TCPDF's regular Helvetica 12.
     const labelSize = originalLayout ? 12 : 16;
     const labelFont = originalLayout ? regularFont : boldFont;
-    const labelLines = wrapPdfText(
-      label,
-      A4_WIDTH - PAGE_MARGIN * 2,
-      value => labelFont.widthOfTextAtSize(value, labelSize)
-    );
+    const characterWidths = new Map<string, number>();
+    const measureOriginalCharacter = (character: string): number => {
+      const cached = characterWidths.get(character);
+      if (cached !== undefined) return cached;
+      const width = regularFont.widthOfTextAtSize(character, labelSize);
+      characterWidths.set(character, width);
+      return width;
+    };
+    const measureLine = (value: string): number => originalLayout
+      ? Array.from(value).reduce((width, character) => width + measureOriginalCharacter(character), 0)
+      : labelFont.widthOfTextAtSize(value, labelSize);
+    const labelLines = originalLayout ? wrapOriginalPdfText(label, measureOriginalCharacter)
+      : wrapPdfText(label, A4_WIDTH - PAGE_MARGIN * 2, measureLine);
 
     if (!originalLayout) page.drawText("Attachment capture page", {
       x: PAGE_MARGIN,
@@ -127,10 +192,16 @@ export const createAttachmentPagesPdf = async (input: {
       color: rgb(0.28, 0.34, 0.44)
     });
     labelLines.forEach((line, lineIndex) => {
-      const lineWidth = labelFont.widthOfTextAtSize(line, labelSize);
+      if (originalLayout && lineIndex > 0 && lineIndex % ORIGINAL_LINES_PER_PAGE === 0) {
+        page = pdf.addPage([ORIGINAL_PAGE_WIDTH, A4_HEIGHT]);
+      }
+      if (originalLayout && !line) return;
+      const lineWidth = measureLine(line);
       page.drawText(line, {
-        x: (A4_WIDTH - lineWidth) / 2,
-        y: (originalLayout ? A4_HEIGHT - 75 * mm : A4_HEIGHT - PAGE_MARGIN - 38) - lineIndex * 22,
+        x: (page.getWidth() - lineWidth) / 2,
+        y: originalLayout
+          ? A4_HEIGHT - ORIGINAL_BASELINE_FROM_TOP - (lineIndex % ORIGINAL_LINES_PER_PAGE) * ORIGINAL_LINE_HEIGHT
+          : A4_HEIGHT - PAGE_MARGIN - 38 - lineIndex * 22,
         size: labelSize,
         font: labelFont,
         color: originalLayout ? rgb(0, 0, 0) : rgb(0.06, 0.09, 0.15)

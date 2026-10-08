@@ -24,45 +24,86 @@ async function rendered(input) {
     const streams = pdf.context.lookup(page.node.Contents(), PDFArray);
     const content = Array.from({length:streams.size()},(_,i)=>Buffer.from(decodePDFRawStream(
       pdf.context.lookup(streams.get(i),PDFRawStream)).decode()).toString("ascii")).join("\n");
-    const image = content.split("q\n").find(block=>/\/Image[^\s]* Do/.test(block));
-    assert.ok(image,"A real QR image must be embedded");
-    const transforms = [...image.matchAll(/([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) cm/g)].map(match=>match.slice(1).map(Number));
-    let matrix = [1,0,0,1,0,0];
+    const images = content.split("q\n").filter(block=>/\/Image[^\s]* Do/.test(block));
+    const image = images[0];
+    // Source can overflow the authored label onto another page; only its final
+    // label page contains that attachment's QR. Each case asserts the expected
+    // presence and page count explicitly below.
+    const transforms = image ? [...image.matchAll(/([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) cm/g)].map(match=>match.slice(1).map(Number)) : [];
+    let matrix = image ? [1,0,0,1,0,0] : null;
     for(const [a,b,c,d,e,f] of transforms) {
       const [aa,bb,cc,dd,ee,ff]=matrix;
       matrix=[aa*a+cc*b,bb*a+dd*b,aa*c+cc*d,bb*c+dd*d,aa*e+cc*f+ee,bb*e+dd*f+ff];
     }
     const fonts = page.node.Resources().lookup(PDFName.of("Font"));
-    return {page,content,matrix,fonts,pdf};
+    return {page,content,matrix,fonts,pdf,imageCount:images.length};
   });
 }
 
-test("Original printed QR occupies the current Source 20/20/40/40 mm region on every A4 page",async()=>{
+test("Original printed QR occupies the Source 20/20/40/40 mm region on each attachment's final label page",async()=>{
   const rows = await rendered({attachments:[attachment,{...attachment,attachmentId:"second-owned-qr"}],layout:"original",labelTemplate:"Own long label ".repeat(30)});
   assert.equal(rows.length,2);
-  for(const {page,matrix,content} of rows) {
-    near(page.getWidth(),595.28); near(page.getHeight(),841.89);
+  for(const {page,matrix,imageCount} of rows) {
+    assert.ok(matrix,"Each five-line attachment page must contain its real QR");
+    assert.equal(imageCount,1);
+    near(page.getWidth(),595.276); near(page.getHeight(),841.89);
     near(matrix[0],40*mm); near(matrix[3],40*mm);
     near(matrix[4],20*mm); near(page.getHeight()-matrix[5]-matrix[3],20*mm);
     near(matrix[1],0); near(matrix[2],0);
-    // Label wrapping and code captions cannot obscure the scanning region.
-    for(const match of content.matchAll(/1 0 0 1 [-\d.]+ ([-\d.]+) Tm/g))
-      assert.ok(Number(match[1])+16 < matrix[5],"Text remains below the QR region");
   }
 });
+
+const originalReference = JSON.parse(await readFile(
+  new URL("./fixtures/original-attachment-pdf-labels.json",import.meta.url),"utf8"));
+for(const reference of originalReference.cases) {
+  test(`Original PDF matches actual unmodified TCPDF label text, positions and pages: ${reference.name}`,async()=>{
+    const rows = await rendered({attachments:[{...attachment,attachmentId:"1:Own Unit:own-image",
+      personLabel:"Own Group/own-login/own-code",bookletKey:"Own Booklet",unitKey:"Own Unit"}],
+      layout:"original",labelTemplate:reference.labelTemplate});
+    assert.equal(rows.length,reference.pages.length,"All Source pages must be retained");
+    for(const [index,{page,content,matrix,fonts,pdf,imageCount}] of rows.entries()) {
+      const expected = reference.pages[index];
+      near(page.getWidth(),expected.width); near(page.getHeight(),expected.height);
+      assert.equal(Boolean(matrix),expected.qr,"The QR belongs on the same Source page");
+      assert.equal(imageCount,Number(expected.qr),"Exactly one QR per attachment, with none on earlier overflow pages");
+      if(matrix) {
+        near(matrix[0],40*mm); near(matrix[3],40*mm); near(matrix[4],20*mm);
+        near(page.getHeight()-matrix[5]-matrix[3],20*mm);
+      }
+      const text = [...content.matchAll(/BT\n([\s\S]*?)ET/g)].map(match=>{
+        const position = match[1].match(/1 0 0 1 ([-\d.]+) ([-\d.]+) Tm/);
+        const label = match[1].match(/<([a-f\d]*)> Tj/i);
+        const font = match[1].match(/\/([^\s]+) ([\d.]+) Tf/);
+        assert.equal(Number(font[2]),12);
+        assert.equal(pdf.context.lookup(fonts.get(PDFName.of(font[1]))).get(PDFName.of("BaseFont")).toString(),"/Helvetica");
+        assert.match(match[1],/0 0 0 rg/);
+        return {x:Number(position[1]),y:Number(position[2]),text:Buffer.from(label[1],"hex").toString("latin1")};
+      });
+      assert.deepEqual(text.map(line=>line.text),expected.text.map(line=>line.text),"No text, spaces or lines may be lost or truncated");
+      for(const [lineIndex,line] of text.entries()) {
+        // Source's independently serialized coordinates, not renderer-derived
+        // expectations or a below-QR constraint that Source does not satisfy.
+        assert.ok(Math.abs(line.x-expected.text[lineIndex].x)<0.001);
+        assert.ok(Math.abs(line.y-expected.text[lineIndex].y)<0.001);
+      }
+    }
+  });
+}
 
 test("default and explicit Rewrite PDFs retain the existing centered 80 mm QR geometry",async()=>{
   const input={attachments:[attachment],labelTemplate:"Own label"};
   const [defaultPage] = await rendered(input);
   const [explicitPage] = await rendered({...input,layout:"rewrite"});
   assert.equal(defaultPage.content,explicitPage.content);
+  assert.equal(defaultPage.imageCount,1); assert.equal(explicitPage.imageCount,1);
   near(defaultPage.matrix[0],226.77); near(defaultPage.matrix[3],226.77);
   near(defaultPage.matrix[4],(595.28-226.77)/2);
   near(defaultPage.matrix[5],841.89-56.69-38-22-226.77-40);
 });
 
 test("Original PDF matches rendered Source regular Helvetica 12 and excludes handoff captions/footer",async()=>{
-  const [{content,fonts,pdf}] = await rendered({attachments:[attachment],layout:"original",labelTemplate:"Own label"});
+  const [{content,fonts,pdf,imageCount}] = await rendered({attachments:[attachment],layout:"original",labelTemplate:"Own label"});
+  assert.equal(imageCount,1);
   assert.equal(pdf.getCreator(),"IQB-Testcenter");
   const text = [...content.matchAll(/\/([^\s]+) ([\d.]+) Tf/g)];
   assert.equal(text.length,1,"Only the authored label is visible text");

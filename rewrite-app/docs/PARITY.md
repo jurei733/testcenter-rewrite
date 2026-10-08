@@ -1,5 +1,44 @@
 # Testcenter parity checklist
 
+### Source PDF label placement and wrapping — development evidence (2026-10-08)
+
+The optional Original PDF now uses the actual Source's top label baseline,
+serialized A4 width, 15-point line advance, unkerned Helvetica widths and cell
+padding. It preserves spaces, explicit/empty lines and empty authored templates,
+wraps unbreakable words and hyphens, and retains overflow pages rather than
+truncating at four lines. A 55-line Source reference breaks after 50 lines and
+puts the attachment QR on its final page; the Rewrite projection does likewise.
+Default Rewrite content streams remain byte-identical in four single/batch and
+short/long cases against the isolated `b835bc78` renderer.
+
+Nine fixtures contain measured text/positions/pages from actual unmodified
+Source `14c98284` AttachmentTemplate/Attachment classes with pinned TCPDF 6.10.0
+in PHP 8.3, using only owned synthetic metadata. Regression expectations are
+stored in `scripts/fixtures/original-attachment-pdf-labels.json`, independently
+of the new implementation. The previous below-QR assertion described the
+temporary Rewrite adaptation and fails the actual Source's five-line output;
+it is replaced by exact text, position, page and QR-presence assertions, not a
+weaker visual or scanning requirement. The actual Source's short and long PDFs
+decode to their exact owned IDs. Both new PDF projections separately pass short
+and long image and generated-video acquisition through native inputs, production
+scanner/decoder and the unchanged worker, including Stop and worker closure.
+
+Fresh typecheck/build pass (469.98 kB, unchanged 470-kB gate), as do all 517
+normal tests and 61 compatibility checks. Scoped Attachment API checks on
+Memory/File/SQLite pass, including fresh compiled empty/multiline single/batch
+cases with exact titles/page counts and private/no-store responses. The full
+unchanged protected SQLite browser suite has passed on fixed
+production assets, including four native Original/Rewrite single/batch downloads,
+attachment upload/preview/delete, result deletion and clean SIGTERM shutdown.
+A fresh unmodified Source comparison and protected Review gate pass all 24 states
+across three themes at 1280/390px, with Run/Session isolation, exact UTF-8,
+save/edit/delete/retry, deletion focus and Tab containment. These are local/Cloud
+development checks, not pushed CI,
+deployment or physical camera acceptance. Label substitutions, PDF bookmarks,
+QR drawing/pixel details and wider character/wrapping cases remain open. All
+eight complete Original-UI matrix rows remain open. The published head is still
+`a89d64c7`; complete Push-CI verification remains required before another push.
+
 ### Original PDF typography — development evidence (2026-10-08)
 
 The actual unmodified Source/TCPDF output uses regular Helvetica 12, black
@@ -20,8 +59,8 @@ production scanner/unchanged worker, including native Stop and worker closure.
 The existing scoped Attachment API sequence passes separately on Memory, File
 and SQLite, retaining unauthenticated 401, foreign-group 403 and private/no-store
 Original downloads.
-No existing assertion or timeout was relaxed. Labels remain below the protected
-QR region; the Source's above-QR placement, exact wrapping/substitutions, PDF
+No existing assertion or timeout was relaxed in that step. Labels then remained
+below the QR region; the Source's above-QR placement, exact wrapping/substitutions, PDF
 bookmarks and complete pixel identity remain open. No Original-UI matrix row is
 closed by these PDF properties. This is local/Cloud development evidence,
 pending the preceding published head's complete Push-CI verification.

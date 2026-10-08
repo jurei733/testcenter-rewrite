@@ -72,7 +72,7 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 ## Data, evidence and agent traces
 
 The private Cloud environment is published and repository access is verified.
-The restored checkout is on `testcenter-rewrite-parity` at `5b3b44a2`; activation
+Restoration started on `testcenter-rewrite-parity` at `5b3b44a2`; activation
 of `/workspace/.setup-tools/activate.sh` provides Node 22.23.3 and the prepared
 Playwright Chromium. The GitHub connector and Git push dry-run work. The former
 `environment_repo_access_failed` report is historical, not a current blocker.
@@ -157,6 +157,30 @@ decoding pass. Regular network permission was granted for this continuation
 turn, with the same enforced VM domain rules and filesystem scope. Label
 placement/wrapping/substitutions, PDF bookmarks and full identity remain open.
 This is an additional local commit, not pushed CI or production acceptance.
+
+The subsequent local PDF step adopts the Source label baseline, cell width,
+unkerned text measurement and wrapping, including authored spaces/empty lines,
+empty labels and 50-line page overflow with QR on the final page. Nine independently
+measured actual TCPDF cases are preserved as owned regression fixtures. The former
+below-QR assertion was a temporary adaptation, contradicted by actual Source
+output; exact text/position/page/QR assertions now replace it. Short and long
+Source PDFs still decode; short and long Rewrite/Original PDFs pass native image
+and generated-video decoding, Stop and worker release. Four default Rewrite
+content streams remain unchanged. Typecheck/build (469.98 kB), 517 normal tests,
+61 compatibility checks and the existing scoped API sequence on all three local
+stores pass, including fresh compiled empty/multiline single/batch API cases
+with exact titles/page counts and retained private/no-store responses.
+The full unchanged protected SQLite browser suite passes on fixed production
+assets, including four native PDF downloads, attachment upload/preview/delete,
+result deletion and clean SIGTERM shutdown. Fresh actual Source and protected
+Review runs pass all 24 three-theme/1280/390px states, including exact UTF-8,
+Run/Session isolation, retry and deletion-focus/Tab gates. This turn's
+regular network permission was freshly granted and socket/loopback/child-pipe
+probes passed; VM domains and filesystem rights remain unchanged. Real Entire
+Cloud capture/CLI/export support is still unavailable; no checkpoint is invented.
+The preceding head's full Push-CI verification is still required before publishing.
+Complete Original-UI, physical visibility, deployment and production acceptance
+remain separate open gates.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked

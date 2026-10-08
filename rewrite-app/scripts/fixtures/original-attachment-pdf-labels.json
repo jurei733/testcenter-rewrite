@@ -1,0 +1,552 @@
+{
+  "sourceCommit": "14c98284590195631750bb2352cb398ca669fe7d",
+  "tcpdfVersion": "6.10.0",
+  "tcpdfCommit": "ca5b6de294512145db96bcbc94e61696599c391d",
+  "provenance": "Measured from actual unmodified AttachmentTemplate/Attachment classes with owned synthetic inputs in PHP 8.3. Font Helvetica 12; TCPDF coordinates serialize at 0.001 pt. Empty authored labels render one space. Font widths include no AFM kerning.",
+  "cases": [
+    {
+      "name": "default",
+      "labelTemplate": null,
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 109.226,
+              "y": 801.804,
+              "text": "Own Group/own-login/own-code | Own Booklet | Own Unit | own-image"
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "long",
+      "labelTemplate": "Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label Own long label ",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 37.19,
+              "y": 801.804,
+              "text": "Own long label Own long label Own long label Own long label Own long label Own long label Own"
+            },
+            {
+              "x": 38.186,
+              "y": 786.803999,
+              "text": "long label Own long label Own long label Own long label Own long label Own long label Own long"
+            },
+            {
+              "x": 36.854,
+              "y": 771.803998,
+              "text": "label Own long label Own long label Own long label Own long label Own long label Own long label"
+            },
+            {
+              "x": 37.19,
+              "y": 756.803997,
+              "text": "Own long label Own long label Own long label Own long label Own long label Own long label Own"
+            },
+            {
+              "x": 104.882,
+              "y": 741.803996,
+              "text": "long label Own long label Own long label Own long label Own long label "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "kerning",
+      "labelTemplate": "AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE ",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 50.234,
+              "y": 801.804,
+              "text": "AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To"
+            },
+            {
+              "x": 39.566,
+              "y": 786.803999,
+              "text": "WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR"
+            },
+            {
+              "x": 56.57,
+              "y": 771.803998,
+              "text": "To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE"
+            },
+            {
+              "x": 50.234,
+              "y": 756.803997,
+              "text": "AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To"
+            },
+            {
+              "x": 39.566,
+              "y": 741.803996,
+              "text": "WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR"
+            },
+            {
+              "x": 56.57,
+              "y": 726.803995,
+              "text": "To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE AVATAR To WAVE"
+            },
+            {
+              "x": 190.274,
+              "y": 711.803994,
+              "text": "AVATAR To WAVE AVATAR To WAVE "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "newlines",
+      "labelTemplate": "Own first line\n\nOwn second line\r\nOwn last line  ",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 262.964,
+              "y": 801.804,
+              "text": "Own first line"
+            },
+            {
+              "x": 253.286,
+              "y": 771.803998,
+              "text": "Own second line"
+            },
+            {
+              "x": 259.958,
+              "y": 756.803997,
+              "text": "Own last line  "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "spaces",
+      "labelTemplate": "  Own  spaced   label  ",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 238.274,
+              "y": 801.804,
+              "text": "  Own  spaced   label  "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "word",
+      "labelTemplate": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 31.43,
+              "y": 801.804,
+              "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+            },
+            {
+              "x": 31.43,
+              "y": 786.803999,
+              "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+            },
+            {
+              "x": 31.43,
+              "y": 771.803998,
+              "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+            },
+            {
+              "x": 246.662,
+              "y": 756.803997,
+              "text": "WWWWWWWWW"
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "hyphens",
+      "labelTemplate": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens ",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 40.562,
+              "y": 801.804,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 40.562,
+              "y": 786.803999,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 40.562,
+              "y": 771.803998,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 40.562,
+              "y": 756.803997,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 40.562,
+              "y": 741.803996,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 40.562,
+              "y": 726.803995,
+              "text": "own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens own-label-with-hyphens"
+            },
+            {
+              "x": 232.952,
+              "y": 711.803994,
+              "text": "own-label-with-hyphens "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "labelTemplate": "",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 295.97,
+              "y": 801.804,
+              "text": " "
+            }
+          ],
+          "qr": true
+        }
+      ]
+    },
+    {
+      "name": "pages",
+      "labelTemplate": "R01\nR02\nR03\nR04\nR05\nR06\nR07\nR08\nR09\nR10\nR11\nR12\nR13\nR14\nR15\nR16\nR17\nR18\nR19\nR20\nR21\nR22\nR23\nR24\nR25\nR26\nR27\nR28\nR29\nR30\nR31\nR32\nR33\nR34\nR35\nR36\nR37\nR38\nR39\nR40\nR41\nR42\nR43\nR44\nR45\nR46\nR47\nR48\nR49\nR50\nR51\nR52\nR53\nR54\nR55",
+      "pages": [
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 286.634,
+              "y": 801.804,
+              "text": "R01"
+            },
+            {
+              "x": 286.634,
+              "y": 786.803999,
+              "text": "R02"
+            },
+            {
+              "x": 286.634,
+              "y": 771.803998,
+              "text": "R03"
+            },
+            {
+              "x": 286.634,
+              "y": 756.803997,
+              "text": "R04"
+            },
+            {
+              "x": 286.634,
+              "y": 741.803996,
+              "text": "R05"
+            },
+            {
+              "x": 286.634,
+              "y": 726.803995,
+              "text": "R06"
+            },
+            {
+              "x": 286.634,
+              "y": 711.803994,
+              "text": "R07"
+            },
+            {
+              "x": 286.634,
+              "y": 696.803993,
+              "text": "R08"
+            },
+            {
+              "x": 286.634,
+              "y": 681.803992,
+              "text": "R09"
+            },
+            {
+              "x": 286.634,
+              "y": 666.803991,
+              "text": "R10"
+            },
+            {
+              "x": 286.634,
+              "y": 651.80399,
+              "text": "R11"
+            },
+            {
+              "x": 286.634,
+              "y": 636.803989,
+              "text": "R12"
+            },
+            {
+              "x": 286.634,
+              "y": 621.803988,
+              "text": "R13"
+            },
+            {
+              "x": 286.634,
+              "y": 606.803987,
+              "text": "R14"
+            },
+            {
+              "x": 286.634,
+              "y": 591.803986,
+              "text": "R15"
+            },
+            {
+              "x": 286.634,
+              "y": 576.803985,
+              "text": "R16"
+            },
+            {
+              "x": 286.634,
+              "y": 561.803984,
+              "text": "R17"
+            },
+            {
+              "x": 286.634,
+              "y": 546.803983,
+              "text": "R18"
+            },
+            {
+              "x": 286.634,
+              "y": 531.803983,
+              "text": "R19"
+            },
+            {
+              "x": 286.634,
+              "y": 516.803982,
+              "text": "R20"
+            },
+            {
+              "x": 286.634,
+              "y": 501.803981,
+              "text": "R21"
+            },
+            {
+              "x": 286.634,
+              "y": 486.80398,
+              "text": "R22"
+            },
+            {
+              "x": 286.634,
+              "y": 471.803979,
+              "text": "R23"
+            },
+            {
+              "x": 286.634,
+              "y": 456.803978,
+              "text": "R24"
+            },
+            {
+              "x": 286.634,
+              "y": 441.803977,
+              "text": "R25"
+            },
+            {
+              "x": 286.634,
+              "y": 426.803976,
+              "text": "R26"
+            },
+            {
+              "x": 286.634,
+              "y": 411.803975,
+              "text": "R27"
+            },
+            {
+              "x": 286.634,
+              "y": 396.803974,
+              "text": "R28"
+            },
+            {
+              "x": 286.634,
+              "y": 381.803973,
+              "text": "R29"
+            },
+            {
+              "x": 286.634,
+              "y": 366.803972,
+              "text": "R30"
+            },
+            {
+              "x": 286.634,
+              "y": 351.803971,
+              "text": "R31"
+            },
+            {
+              "x": 286.634,
+              "y": 336.80397,
+              "text": "R32"
+            },
+            {
+              "x": 286.634,
+              "y": 321.803969,
+              "text": "R33"
+            },
+            {
+              "x": 286.634,
+              "y": 306.803968,
+              "text": "R34"
+            },
+            {
+              "x": 286.634,
+              "y": 291.803967,
+              "text": "R35"
+            },
+            {
+              "x": 286.634,
+              "y": 276.803966,
+              "text": "R36"
+            },
+            {
+              "x": 286.634,
+              "y": 261.803966,
+              "text": "R37"
+            },
+            {
+              "x": 286.634,
+              "y": 246.803965,
+              "text": "R38"
+            },
+            {
+              "x": 286.634,
+              "y": 231.803964,
+              "text": "R39"
+            },
+            {
+              "x": 286.634,
+              "y": 216.803963,
+              "text": "R40"
+            },
+            {
+              "x": 286.634,
+              "y": 201.803962,
+              "text": "R41"
+            },
+            {
+              "x": 286.634,
+              "y": 186.803961,
+              "text": "R42"
+            },
+            {
+              "x": 286.634,
+              "y": 171.80396,
+              "text": "R43"
+            },
+            {
+              "x": 286.634,
+              "y": 156.803959,
+              "text": "R44"
+            },
+            {
+              "x": 286.634,
+              "y": 141.803958,
+              "text": "R45"
+            },
+            {
+              "x": 286.634,
+              "y": 126.803957,
+              "text": "R46"
+            },
+            {
+              "x": 286.634,
+              "y": 111.803956,
+              "text": "R47"
+            },
+            {
+              "x": 286.634,
+              "y": 96.803955,
+              "text": "R48"
+            },
+            {
+              "x": 286.634,
+              "y": 81.803954,
+              "text": "R49"
+            },
+            {
+              "x": 286.634,
+              "y": 66.803953,
+              "text": "R50"
+            }
+          ],
+          "qr": false
+        },
+        {
+          "width": 595.276,
+          "height": 841.89,
+          "text": [
+            {
+              "x": 286.634,
+              "y": 801.804,
+              "text": "R51"
+            },
+            {
+              "x": 286.634,
+              "y": 786.803999,
+              "text": "R52"
+            },
+            {
+              "x": 286.634,
+              "y": 771.803998,
+              "text": "R53"
+            },
+            {
+              "x": 286.634,
+              "y": 756.803997,
+              "text": "R54"
+            },
+            {
+              "x": 286.634,
+              "y": 741.803996,
+              "text": "R55"
+            }
+          ],
+          "qr": true
+        }
+      ]
+    }
+  ]
+}

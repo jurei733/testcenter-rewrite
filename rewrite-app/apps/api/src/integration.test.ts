@@ -5222,6 +5222,24 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
     assert.equal(originalResponse.headers.get("cache-control"), "private, no-store");
     const originalPdf = await PDFDocument.load(await originalResponse.arrayBuffer());
     assert.equal(originalPdf.getPageCount(), 1);
+    const multilineLabel = Array.from({ length: 55 }, (_, index) =>
+      `R${String(index + 1).padStart(2, "0")}`).join("\n");
+    const overflowResponse = await fetch(
+      `${baseUrl}${path}?layout=original&labelTemplate=${encodeURIComponent(multilineLabel)}`,
+      { headers: { authorization: groupAuthorization } }
+    );
+    assert.equal(overflowResponse.status, 200);
+    assert.equal(overflowResponse.headers.get("cache-control"), "private, no-store");
+    const overflowPdf = await PDFDocument.load(await overflowResponse.arrayBuffer());
+    assert.equal(overflowPdf.getPageCount(), 2);
+    assert.equal(overflowPdf.getTitle(), multilineLabel);
+    const emptyLabelResponse = await fetch(`${baseUrl}${path}?layout=original&labelTemplate=`, {
+      headers: { authorization: groupAuthorization }
+    });
+    assert.equal(emptyLabelResponse.status, 200);
+    const emptyLabelPdf = await PDFDocument.load(await emptyLabelResponse.arrayBuffer());
+    assert.equal(emptyLabelPdf.getTitle(), "");
+    assert.equal(emptyLabelPdf.getPageCount(), 1);
     const denied = await requestJson<{ error: string }>(`${path}?layout=original`);
     assert.equal(denied.status, 401);
   }
