@@ -53,11 +53,15 @@ capture; no DOM scroll setter or forced input establishes the comparison.
 All 24 empty/filled/list/edit
 pairs pass in Primar, Sekundar and Erwachsene at 1280 and 390 pixels: panel,
 drawer, toolbar and form-control rectangles match exactly, as do measured
-toolbar/action-button colors, button geometry/shape/font, list typography and
+toolbar/action-button colors, button geometry/shape/font, all form-label colors
+and fonts, list typography and
 scrim. Earlier empty/incorrect review-list
 fixture captures are not evidence. Source-frontend fixtures do not prove the
-Source backend. Raw screenshots still differ, including the remaining plain-label
-tint and history-dependent native scrolling; this is not full pixel identity.
+Source backend. A fresh 24-state comparison also verifies the corrected plain
+form-label tint and inherited drawer theme without a duplicated Material theme.
+The production initial bundle remains 469.98 kB under the unchanged 470 kB gate.
+Raw screenshots still differ and history-dependent native scrolling remains a
+separate comparison requirement; this is not full pixel identity.
 
 Native protected browser flows also pass new/edit/save/delete/cancel, add/back,
 test/unit/task targets, simultaneous categories, exact Unicode/newline content,

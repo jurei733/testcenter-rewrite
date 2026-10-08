@@ -128,6 +128,8 @@ try {
         assert.equal(metrics[id].drawer.width,Math.min(700,width*.9));
         assert.equal(metrics[id].toolbar.height,width<600?56:64);
         assert.equal(metrics[id].toolbarColor,"rgb(255, 255, 255)");
+        for(const label of [metrics[id].labels[0],metrics[id].labels[5],metrics[id].labels[9]])
+          assert.equal(label.color,"rgb(64, 72, 76)");
         assert.equal(metrics[id].backdropColor,"color(srgb 0.160784 0.196078 0.207843 / 0.4)");
         assert.equal(metrics[id].toolbarBackground,{Primar:"rgb(25, 97, 117)",Sekundar:"rgb(11, 45, 132)",Erwachsene:"rgb(107, 54, 154)"}[theme]);
       };
@@ -268,7 +270,7 @@ try {
     assert.deepEqual(Object.keys(metrics).sort(),Object.keys(reference.metrics).sort());
     for(const [key,actual] of Object.entries(metrics)) {
       const expected = reference.metrics[key];
-      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","controls","buttons"])
+      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","controls","buttons","labels"])
         assert.deepEqual(actual[field],expected[field],`${key}: rendered ${field}`);
       if(key.endsWith("-list")) {
         assert.deepEqual(actual.headings,expected.headings,`${key}: list typography`);

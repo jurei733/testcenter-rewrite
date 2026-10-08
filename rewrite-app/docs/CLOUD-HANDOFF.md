@@ -102,7 +102,11 @@ suite on its own fixed assets, plus a fresh synthetic live-camera attachment
 gate. The new pane's save-on-reopen defect was fixed and a new immediate Edit
 read was changed to await the same exact NgModel value, preserving its assertion
 and default timeout. The retained negative logs are not passing results.
-Publication CI must still be checked for the new commit.
+The Review implementation was committed and pushed as `bdbc5b47` on the existing
+parity branch. Its publication CI is still in progress and is separate from the
+passing Cloud gates. A subsequent fixed-assets native comparison passes all 24
+Review states, including every form-label font/color against the current rendered
+Original; the initial production bundle remains 469.98 kB under the 470 kB gate.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
@@ -118,8 +122,9 @@ If cloud capture is unsupported, report the limitation without obscuring the
 GitHub code history. Keep acceptance evidence and negative results honest;
 never commit credentials, private response data or unrelated user artifacts.
 
-Actual Entire Cloud capture is currently unavailable: the runtime has neither
-the Entire CLI/hooks nor an exposed Cloud session-trace exporter. Existing
+Actual Entire Cloud capture is currently unavailable: the runtime has no runnable
+Entire CLI, active trace-capture hooks or exposed Cloud session-trace exporter.
+Repository hook configuration is present but does not establish active capture. Existing
 settings and historical checkpoint refs do not constitute a new trace. New
 commits therefore must not receive invented checkpoint trailers or reuse old
 local sessions; GitHub code history remains authoritative. Physical camera and
