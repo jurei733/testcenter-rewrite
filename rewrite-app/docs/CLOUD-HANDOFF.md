@@ -9,11 +9,15 @@ Rewrite interface. Read the repository README, `rewrite-app/README.md`,
 and the last 15 commits before changing code. Paths below are relative to
 `rewrite-app` unless stated otherwise.
 
-GitHub `jurei733/testcenter-rewrite` remains the source of truth. Start from the
-published `testcenter-rewrite-parity` branch and use existing PR #1. Commit and
-push bounded verified steps; do not merge, force-push or rewrite published
-history. Preserve the existing main branch, including its Entire metadata.
-Do not use assistant-specific branch prefixes or names in publication prose.
+GitHub `jurei733/testcenter-rewrite` remains the source of truth. On 2026-10-08
+the owner explicitly authorized integrating every open PR and remaining branch
+into main. The complete inventory contains PR #1 and `testcenter-rewrite-parity`;
+the only other remote branch is main, and the local `work` branch already equals
+the previous main head. Integrate through an ordinary merge after fresh CI,
+preserving the existing commits and main's Entire metadata. Never force-push or
+rewrite published history. Continue later development on the parity branch and
+open a follow-up PR once PR #1 has merged. Do not use assistant-specific branch
+prefixes or names in publication prose.
 
 Current Original target was independently verified on 2026-10-08 as
 `iqb-berlin/testcenter` commit `14c98284590195631750bb2352cb398ca669fe7d`.
@@ -81,6 +85,46 @@ or OS cause is unknown. Do not weaken/drop the gate or label a headless cloud
 run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
+
+### Current integration gate (2026-10-08)
+
+Seven further commits are published through `e9885ae5`, not merely local.
+Its complete isolated Git archive passed typecheck, production build, all 522
+core/frontend and 61 compatibility checks, and the full unchanged protected
+SQLite browser suite, including Attachments, result deletion and clean shutdown.
+Its Push workflow `37848841718` subsequently completed successfully with all
+37 jobs verified, including the full PostgreSQL browser gate. The separate PR
+failure below remains a real negative observation, not erased by that pass.
+The current read-only public GitHub resource tool also supports workflow-run
+GETs and `jobs?per_page=100`, so both complete 37-job listings can be checked;
+the older first-page-only limitation below is historical. No VM domain or
+filesystem permission was expanded.
+
+PR workflow `37848848880` has a retained failing PostgreSQL browser job
+`113556452054`: `assertGroupDeletionMatchesSnapshot` compares 45 removed logs
+with a pre-preparation inventory of 44. The complete actual log is retained
+outside the checkout. It shows monitor reads finishing after the snapshot;
+it does not include the extra log row's body. A deterministic service regression
+on Memory, File, SQLite and PostgreSQL proves that a real monitor read can start
+a timed block and append `TESTLETS_TIMELEFT`, making that earlier snapshot stale
+without a participant answer write. The corrected smoke captures both groups
+after native preparation/exports and the existing not-busy condition. Every
+exact deletion count, Run ID, retained answer/review/log comparison and separate
+removal check remains mandatory; no timeout or assertion is relaxed.
+
+The correction has passing typecheck/build, 525 normal checks, 61 compatibility
+checks, nine targeted snapshot checks including PostgreSQL, and twelve existing
+presence/deletion boundary checks across all four stores. Its full protected
+PostgreSQL browser run also passed on separate fixed assets and a new owned
+database, through Attachments, native result deletion and clean shutdown. That
+run's initial and deletion snapshots both contained 44 logs: it is a passing
+corrected whole flow, not a replay that proves the CI's extra log was a timer
+log. The deterministic regressions prove the stale-snapshot class separately.
+Fresh publication CI is still pending for the correction.
+The initial bundle remains 469.98 kB under the unchanged 470 kB error limit.
+The Source camera blocker and all eight complete Original-UI rows remain open.
+Entire runtime capture remains unavailable; do not invent a checkpoint trailer
+for the correction or the later merge, or reuse an old local session trace.
 
 The private Cloud environment is published and repository access is verified.
 Restoration started on `testcenter-rewrite-parity` at `5b3b44a2`; activation

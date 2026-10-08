@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createFirstSliceServices } from "@testcenter-rewrite-app/application";
+import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
+import { createFileFirstSliceRepository } from "@testcenter-rewrite-app/file-store";
+import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
+import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 
@@ -83,3 +92,92 @@ test("unselected group retains its exact Unicode answer and historical Run", asy
     await assert.rejects(assertResultGroupRetained(fixture(options).readJson, snapshot));
   await assert.rejects(assertResultGroupRetained(fixture({ removed: true }).readJson, snapshot));
 });
+
+const snapshotStores = ["memory", "file", "sqlite"];
+if (process.env.FIRST_SLICE_STORE === "postgres") {
+  assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);
+  snapshotStores.push("postgres");
+}
+for (const kind of snapshotStores) {
+  test(`${kind}: deletion snapshot follows monitor timer initialization`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "testcenter-deletion-snapshot-"));
+    let storage;
+    const repository = kind === "memory" ? createInMemoryFirstSliceRepository()
+      : kind === "file" ? createFileFirstSliceRepository(join(directory, "own.json"))
+      : kind === "sqlite" ? createSqliteFirstSliceRepository(join(directory, "own.sqlite"))
+      : (storage = await createPostgresFirstSliceStorage(process.env.FIRST_SLICE_POSTGRES_URL)).repository;
+    const createdAt = "2026-10-08T00:00:00.000Z";
+    const services = createFirstSliceServices({ repository, now: () => createdAt });
+    const scope = { tenantKey: `snapshot-${randomUUID()}`, workspaceKey: "own-snapshot" };
+    const ownUrl = `http://127.0.0.1:4312/api/v1/tenants/${scope.tenantKey}/workspaces/${scope.workspaceKey}`;
+    const runIds = [];
+    try {
+      const tenant = await services.platform.createTenant({ tenantKey: scope.tenantKey, displayName: "Own snapshot" });
+      const workspace = await services.platform.createWorkspace({ ...scope, displayName: "Own snapshot" });
+      const base = { tenantId: tenant.tenantId, workspaceId: workspace.workspaceId, createdAt };
+      const contentReleaseId = randomUUID();
+      await repository.saveContentRelease({ ...base, contentReleaseId, importJobId: randomUUID(),
+        releaseLabel: "Own timer snapshot", status: "active", activatedAt: createdAt,
+        runtimeSnapshot: { bookletEntries: [{ bookletKey: "own-booklet", displayLabel: "Own booklet",
+          testletEntries: [{ testletKey: "own-timer", displayLabel: "Own timer",
+            restrictions: { timeMax: { minutes: 2, leave: "allowed" } } }],
+          unitEntries: [{ unitKey: "unit", displayLabel: "Own Unit", testletPath: ["own-timer"] }] }] } });
+      for (const groupKey of ["selected", "retained"]) {
+        const participantSessionId = randomUUID();
+        const testRunId = randomUUID();
+        runIds.push(testRunId);
+        await repository.saveParticipantSession({ ...base, contentReleaseId, participantSessionId,
+          loginKey: groupKey, groupKey, status: "launched" });
+        await repository.saveTestRun({ ...base, contentReleaseId, participantSessionId, testRunId,
+          bookletKey: "own-booklet", executionMode: "run-hot-return",
+          status: groupKey === "selected" ? "running" : "paused", currentUnitKey: "unit",
+          testletTimers: {}, unitResponses: { unit: `Exact ${groupKey} answer: Ä/β 🧪\n\";` },
+          updatedAt: createdAt, completedAt: null });
+        await repository.saveParticipantTestLogs([{ ...base, participantSessionId, testRunId,
+          participantTestLogId: randomUUID(), unitKey: "unit", originalUnitId: "unit",
+          logKey: "CURRENT_UNIT", logContent: "unit", timestamp: Date.parse(createdAt), recordedAt: createdAt }]);
+      }
+      const readJson = async url => {
+        const parsed = new URL(url);
+        const path = parsed.pathname.slice(new URL(ownUrl).pathname.length);
+        const input = { ...scope, groupKey: parsed.searchParams.get("groupKey") ?? undefined,
+          limit: Number(parsed.searchParams.get("limit") ?? 100) };
+        if (path === "/results/groups") return { items: await services.workspaceAdminRead.listGroupResults(scope) };
+        if (path === "/participant-sessions") return { items: await services.workspaceAdminRead.listParticipantSessions(input) };
+        if (path.startsWith("/participant-sessions/")) return { participantSessionDetail:
+          await services.workspaceAdminRead.getParticipantSessionDetail({ ...scope,
+            participantSessionId: decodeURIComponent(path.slice("/participant-sessions/".length)) }) };
+        if (path === "/test-logs") return { items: await services.workspaceAdminRead.listParticipantTestLogs(input) };
+        if (path === "/responses/detailed") return { items: await services.workspaceAdminRead.listDetailedResponses(input) };
+        if (path === "/reviews") return { items: await services.workspaceReview.listReviews(input) };
+        throw new Error(`Unexpected own snapshot URL ${url}`);
+      };
+      const before = await captureResultGroupSnapshot(readJson, ownUrl, "selected");
+      const retained = await captureResultGroupSnapshot(readJson, ownUrl, "retained");
+      assert.equal(before.logs.length, 1);
+      // A real monitor read starts this Run's timed block and appends its log.
+      // The earlier snapshot is stale even though no participant wrote an answer.
+      await services.monitorRead.listOpenRuns(scope);
+      const ready = await captureResultGroupSnapshot(readJson, ownUrl, "selected");
+      assert.equal(ready.logs.length, 2);
+      const added = ready.logs.filter(row => !before.logs.some(old =>
+        old.testLog.participantTestLogId === row.testLog.participantTestLogId));
+      assert.equal(added.length, 1);
+      assert.equal(added[0].testLog.logKey, "TESTLETS_TIMELEFT");
+      assert.equal(ready.testRuns[0].unitResponses.unit, before.testRuns[0].unitResponses.unit);
+      const removed = await services.workspaceResults.deleteGroupResultsBulk({ ...scope,
+        groupKeys: ["selected"], confirmation: scope.workspaceKey });
+      assert.throws(() => assertGroupDeletionMatchesSnapshot(removed, before), assert.AssertionError);
+      assertGroupDeletionMatchesSnapshot(removed, ready);
+      await assertResultGroupRemoved(readJson, ready);
+      await assertResultGroupRetained(readJson, retained);
+      assert.deepEqual((await repository.listParticipantTestLogsByWorkspace(tenant.tenantId, workspace.workspaceId))
+        .filter(log => log.testRunId === runIds[0]), [], "Selected raw logs must all be removed.");
+    } finally {
+      await repository.deleteTestRunsByIds(runIds);
+      await repository.deleteParticipantTestLogsByTestRunIds(runIds);
+      await storage?.shutdown();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}

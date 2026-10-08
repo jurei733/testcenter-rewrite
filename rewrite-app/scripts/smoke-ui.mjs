@@ -25727,7 +25727,7 @@ try {
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
   logStep("delete-group-results");
-  await pollJsonWithPredicate(
+  const initialGroupInventory = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/results/groups`,
     payload =>
       typeof payload === "object" &&
@@ -25738,16 +25738,6 @@ try {
   const resultWorkspaceUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
   const readGroupResultJson = async url =>
     (await sendSmokeJson(url, { method: "GET" })).json();
-  const selectedGroupSnapshot = await captureResultGroupSnapshot(
-    readGroupResultJson, resultWorkspaceUrl, participantGroupKey
-  );
-  const retainedGroupSnapshot = await captureResultGroupSnapshot(
-    readGroupResultJson, resultWorkspaceUrl, monitorCommandGroupKey
-  );
-  assert.ok(retainedGroupSnapshot.testRunIds.includes(pausedTestRunId));
-  assert.ok(!selectedGroupSnapshot.testRunIds.includes(pausedTestRunId));
-  assert.equal(retainedGroupSnapshot.testRuns.find(run => run.testRunId === pausedTestRunId)
-    .unitResponses["unit-paused"], "Filtered response smoke");
   await clickAction("Load Result Groups");
   const resultGroups = page
     .locator("app-record-collection")
@@ -25831,6 +25821,26 @@ try {
     ]);
     assert.match(download.suggestedFilename(), filenamePattern);
   }
+  // Route initialization and monitor reads can legitimately append timer logs.
+  // Compare deletion with the inventory after those prerequisite actions and
+  // exports have finished, retaining every exact count and foreign-group check.
+  await waitForNotBusy("delete-group-results-snapshot");
+  const selectedGroupSnapshot = await captureResultGroupSnapshot(
+    readGroupResultJson, resultWorkspaceUrl, participantGroupKey
+  );
+  const retainedGroupSnapshot = await captureResultGroupSnapshot(
+    readGroupResultJson, resultWorkspaceUrl, monitorCommandGroupKey
+  );
+  assert.ok(retainedGroupSnapshot.testRunIds.includes(pausedTestRunId));
+  assert.ok(!selectedGroupSnapshot.testRunIds.includes(pausedTestRunId));
+  assert.equal(retainedGroupSnapshot.testRuns.find(run => run.testRunId === pausedTestRunId)
+    .unitResponses["unit-paused"], "Filtered response smoke");
+  process.stdout.write(`group_results_snapshot=${JSON.stringify({
+    groupKey: participantGroupKey,
+    initialLogCount: initialGroupInventory.items.find(item => item.groupKey === participantGroupKey).testLogCount,
+    deletionLogCount: selectedGroupSnapshot.summary.testLogCount,
+    testRunIds: selectedGroupSnapshot.testRunIds
+  })}\n`);
   const deleteGroupResultsResponse = page.waitForResponse(response =>
     response.request().method() === "DELETE" &&
     new URL(response.url()).pathname ===

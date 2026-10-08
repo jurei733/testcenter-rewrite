@@ -1,5 +1,33 @@
 # Testcenter parity checklist
 
+### Integration acceptance and snapshot timing (2026-10-08)
+
+Integration of PR #1 and the parity branch into main is explicitly authorized.
+The current published `e9885ae5` passes an independent exact-tree protected
+SQLite full browser run, but PR CI has a PostgreSQL result-deletion failure:
+job `113556452054` in workflow `37848848880` compares 45 deleted logs against a
+snapshot of 44. The full actual log is retained; monitor initialization reads
+finish after the snapshot. The additional log's body is not present in that log.
+
+A new service-level regression on all four stores reproduces the stale-snapshot
+class through a real monitor timer initialization: the old exact count fails,
+the post-preparation snapshot passes, and the retained group's exact data and
+the selected group's raw removal remain verified. The smoke now takes its
+snapshots after native preparation/exports and the existing not-busy condition.
+All original equality, Run-isolation, byte-exact answer and removal assertions
+remain intact. No production behavior, timeout, native input or bundle limit is
+changed. The normal 525 and compatibility 61 checks pass, as do nine targeted
+snapshot checks and twelve presence/deletion boundary checks across all stores.
+The full corrected protected PostgreSQL browser flow passed on isolated fixed
+assets and a new owned database, including Attachments, result deletion and
+shutdown; both its initial and deletion inventories held 44 logs. This is
+whole-flow evidence, not proof of the extra row's type in the failed CI attempt.
+Fresh publication CI remains pending for the correction. The original
+`e9885ae5` Push workflow `37848841718` separately completed all 37 jobs
+successfully; its PR's negative PostgreSQL result remains recorded.
+Earlier passing or invalid attempts are separate evidence. A merge does not
+close Original-UI, physical camera/window, deployment or production gates.
+
 ### Current Source camera reference blocker — reproduced (2026-10-08)
 
 Current public upstream and the unmodified local reference remain exactly
