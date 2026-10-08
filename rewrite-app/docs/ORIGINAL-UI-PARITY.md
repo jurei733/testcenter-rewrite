@@ -87,6 +87,18 @@ restoration, duplicate actions, destroyed views and late results across Run/Unit
 boundaries. The new browser gate is mandatory CI. No full-page row below is
 closed by this component-level comparison.
 
+A subsequent native keyboard gate reproduced focus leaving the open drawer
+after confirmed Review deletion (the unchanged 30-second focus assertion failed).
+The old fallback targeted the generic sidebar close button, which the Original
+Review pane no longer renders. It now targets the visible Review list/form close
+action and retains the generic target for the Unit sidebar. The fixed-assets
+protected comparison passes all 24 states plus visible in-drawer focus and
+native Tab containment after deletion in all six theme/viewport combinations.
+Fresh typecheck, production build (469.98 kB) and all 505 core/frontend checks
+also pass. The retained failing log/screenshot establish the original defect;
+these Cloud gates are separate from publication CI and full cross-cutting UI
+acceptance.
+
 To reproduce against separately built unmodified upstream assets:
 
 ```sh

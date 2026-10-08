@@ -27,7 +27,12 @@ timeouts and exact assertions. Sporadic clipped header raster captures occur in
 both renderers despite matching rectangles and remain an open visual-proof issue.
 Protected native SQLite flows verify target/category/priority semantics, exact
 comment bytes, same-Run reload, foreign-Session denial, unchanged foreign reviews,
-retry and draft/list restoration. Rewrite remains available. Raw screenshots
+retry and draft/list restoration. A new native keyboard gate reproduced lost
+focus after confirmed deletion: the generic close-button fallback did not exist
+in the new Review pane. The fallback now targets its visible list/form close
+button. All six theme/viewport deletion-focus and native Tab-containment cases
+pass with the 24-state comparison, fresh typecheck/build and all 505 core/frontend
+checks; the negative reproduction is retained. Rewrite remains available. Raw screenshots
 are not pixel-identical and all eight full-page UI rows remain open; see
 `ORIGINAL-UI-PARITY.md` for the reproducible scope and negative fixture evidence.
 

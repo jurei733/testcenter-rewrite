@@ -57,7 +57,10 @@ export class OriginalPlayerSidebarComponent implements AfterViewChecked {
     queueMicrotask(() => {
       if (!this.destroyRef.destroyed && this.document.activeElement === this.document.body &&
           !this.hasForegroundDialog()) {
-        this.element.nativeElement.querySelector<HTMLButtonElement>("#originalPlayerSidebarCloseButton")?.focus();
+        const closeSelector = this.review
+          ? ".review-list:not([hidden]) .close-button, form:not([hidden]) [data-cy='comment-diag-close']"
+          : "#originalPlayerSidebarCloseButton";
+        this.element.nativeElement.querySelector<HTMLButtonElement>(closeSelector)?.focus();
       }
     });
   }

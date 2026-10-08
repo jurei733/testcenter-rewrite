@@ -228,6 +228,12 @@ try {
       await page.locator("#participantConfirmationContinueButton").click();
       await page.getByRole("heading",{name:"Kommentarübersicht",exact:true}).waitFor();
       assert.equal(await page.locator('[data-cy="comment-list-unit-comments"]').filter({hasText:comment}).count(),0);
+      await page.waitForFunction(()=>{
+        const active=document.activeElement;
+        return !!active?.closest('app-original-player-sidebar [role="dialog"]') && active.getBoundingClientRect().height>0;
+      });
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(()=>!!document.activeElement?.closest('app-original-player-sidebar [role="dialog"]')),true);
       for (const scope of ["test","task"]) {
         await page.locator('[data-cy="comment-toolbar-new-comment"]').click();
         const text = `Eigener ${scope}-Kommentar: Ω\n  exakt erhalten`;

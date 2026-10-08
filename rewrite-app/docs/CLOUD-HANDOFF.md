@@ -107,6 +107,13 @@ parity branch. Its publication CI is still in progress and is separate from the
 passing Cloud gates. A subsequent fixed-assets native comparison passes all 24
 Review states, including every form-label font/color against the current rendered
 Original; the initial production bundle remains 469.98 kB under the 470 kB gate.
+Further completed publications `38f28cb9` and `8bc69303` correct label/theme and
+action-button presentation. A fresh native deletion-focus gate then reproduced
+the absent generic close-button fallback in the Original Review pane. The fix
+targets its visible close action; the complete protected 24-state comparison,
+six theme/viewport focus/Tab cases, typecheck/build and normal 505 tests pass
+on separate fixed assets. Publication CI remains unconfirmed for these changes;
+do not infer its status from Cloud passes or the old 72-check baseline.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
