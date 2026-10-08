@@ -112,8 +112,22 @@ action-button presentation. A fresh native deletion-focus gate then reproduced
 the absent generic close-button fallback in the Original Review pane. The fix
 targets its visible close action; the complete protected 24-state comparison,
 six theme/viewport focus/Tab cases, typecheck/build and normal 505 tests pass
-on separate fixed assets. Publication CI remains unconfirmed for these changes;
-do not infer its status from Cloud passes or the old 72-check baseline.
+on separate fixed assets. Their predecessor workflow attempts were cancelled by
+subsequent pushes; the final Review head's fresh acceptance is recorded below.
+Do not infer publication status from Cloud passes or the old 72-check baseline.
+The published Review head `a89d64c7` subsequently passed the full unchanged
+protected SQLite browser suite from a complete isolated Git archive of
+`a89d64c7dddea7147d1e73fcca376c025f60736b`, including attachments and clean
+shutdown. Its separate compiler, assets, database and port were used throughout.
+An initial attempt incorrectly enabled demo bootstrap and failed 409/401 during
+the suite's own admin bootstrap; that retained negative attempt is not a pass.
+The corrected invocation used a new empty owned database and no demo bootstrap.
+PR workflow `37753348696` is freshly completed/success. All 30 visible jobs in
+Push workflow `37753342686` have completed successfully. The first-page connector
+exposes only 30 of its 37 jobs and has no Push-run summary or pagination method;
+the remaining seven and aggregate Push result are still unverified. Do not infer
+complete Push acceptance from this partial job listing.
+New work remains unpublished until this head's required CI boundary is complete.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked

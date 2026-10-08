@@ -82,6 +82,7 @@ const wrapPdfText = (
 export const createAttachmentPagesPdf = async (input: {
   attachments: WorkspaceAttachment[];
   labelTemplate?: string | null;
+  layout?: "rewrite" | "original";
 }): Promise<Buffer> => {
   if (input.attachments.length === 0) {
     throw new Error("At least one attachment is required for a QR page PDF.");
@@ -103,6 +104,8 @@ export const createAttachmentPagesPdf = async (input: {
   const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   for (const [index, attachment] of input.attachments.entries()) {
+    const originalLayout = input.layout === "original";
+    const mm = 72 / 25.4;
     const page = pdf.addPage([A4_WIDTH, A4_HEIGHT]);
     const label = toPdfSafeText(
       applyAttachmentLabelTemplate(attachment, input.labelTemplate)
@@ -114,7 +117,7 @@ export const createAttachmentPagesPdf = async (input: {
       value => boldFont.widthOfTextAtSize(value, labelSize)
     );
 
-    page.drawText("Attachment capture page", {
+    if (!originalLayout) page.drawText("Attachment capture page", {
       x: PAGE_MARGIN,
       y: A4_HEIGHT - PAGE_MARGIN,
       size: 10,
@@ -125,7 +128,7 @@ export const createAttachmentPagesPdf = async (input: {
       const lineWidth = boldFont.widthOfTextAtSize(line, labelSize);
       page.drawText(line, {
         x: (A4_WIDTH - lineWidth) / 2,
-        y: A4_HEIGHT - PAGE_MARGIN - 38 - lineIndex * 22,
+        y: (originalLayout ? A4_HEIGHT - 75 * mm : A4_HEIGHT - PAGE_MARGIN - 38) - lineIndex * 22,
         size: labelSize,
         font: boldFont,
         color: rgb(0.06, 0.09, 0.15)
@@ -134,15 +137,18 @@ export const createAttachmentPagesPdf = async (input: {
 
     const qrPng = await QRCode.toBuffer(attachment.attachmentId, {
       errorCorrectionLevel: "L",
-      margin: 2,
+      margin: originalLayout ? 0 : 2,
       type: "png",
       width: 640
     });
     const qrImage = await pdf.embedPng(qrPng);
-    const qrSize = 226.77;
-    const qrX = (A4_WIDTH - qrSize) / 2;
-    const qrY = A4_HEIGHT - PAGE_MARGIN - 38 - labelLines.length * 22 - qrSize - 40;
-    page.drawRectangle({
+    // Current Original AttachmentTemplate: A4, QRCODE,L, 20/20/40/40 mm.
+    // PDF coordinates start at the bottom; retain the Rewrite layout by default.
+    const qrSize = originalLayout ? 40 * mm : 226.77;
+    const qrX = originalLayout ? 20 * mm : (A4_WIDTH - qrSize) / 2;
+    const qrY = originalLayout ? A4_HEIGHT - 60 * mm
+      : A4_HEIGHT - PAGE_MARGIN - 38 - labelLines.length * 22 - qrSize - 40;
+    if (!originalLayout) page.drawRectangle({
       x: qrX - 8,
       y: qrY - 8,
       width: qrSize + 16,
@@ -159,6 +165,9 @@ export const createAttachmentPagesPdf = async (input: {
     });
 
     const codeSize = 7.5;
+    const codeLabelY = originalLayout
+      ? A4_HEIGHT - 75 * mm - labelLines.length * 22 - 24
+      : qrY - 52;
     const codeLines = wrapPdfText(
       attachment.attachmentId,
       A4_WIDTH - PAGE_MARGIN * 2,
@@ -166,7 +175,7 @@ export const createAttachmentPagesPdf = async (input: {
     );
     page.drawText("Attachment code", {
       x: PAGE_MARGIN,
-      y: qrY - 52,
+      y: codeLabelY,
       size: 9,
       font: boldFont,
       color: rgb(0.28, 0.34, 0.44)
@@ -174,7 +183,7 @@ export const createAttachmentPagesPdf = async (input: {
     codeLines.forEach((line, lineIndex) => {
       page.drawText(line, {
         x: PAGE_MARGIN,
-        y: qrY - 67 - lineIndex * 11,
+        y: codeLabelY - 15 - lineIndex * 11,
         size: codeSize,
         font: regularFont,
         color: rgb(0.12, 0.16, 0.23)

@@ -1,5 +1,56 @@
 # Testcenter parity checklist
 
+### Optional printed QR region — development evidence (2026-10-08)
+
+Current Source `14c98284` `AttachmentTemplate.class.php` prints its A4 QR at
+20 mm left/top with 40 mm width/height and no barcode padding. The new optional
+`layout=original` PDF projection uses that geometry; the existing centered
+80 mm Rewrite PDF remains the default. Single/batch manager exports select the
+current interface's projection through the same authorized endpoints. Original
+projection labels/captions stay below the QR region so long wrapped text cannot
+obscure it. Their typography/placement is not claimed identical to TCPDF output.
+
+Development checks pass typecheck/build (469.98 kB), 507 normal tests including
+two actual generated-PDF geometry regressions, and the scoped Attachment API
+sequence separately on Memory, File and SQLite. Original single/batch downloads
+retain 401 without credentials, 403 for a foreign group, scoped page counts and
+private/no-store responses. Both actual PDF projections were rasterized with
+Poppler and decoded through the production decoder and unchanged shipped worker
+to the exact owned synthetic attachment ID using native file input and a native
+button click. This does not prove manager layout, TCPDF pixel identity, camera
+framing or physical visibility. The current Source's label substitutions and
+camera-facing crop/scan-region behavior still require their own acceptance.
+The protected SQLite Attachment browser slice additionally passes four native
+single/batch download-button cases after selecting Original and Rewrite through
+the real interface controls. It requires the selected layout query, HTTP 200,
+private/no-store headers and actual downloaded PDF bytes, then completes image
+upload/preview/delete and releases five owned workers. Two retained negative
+test-helper attempts respectively omitted the required native Load Attachments
+step after navigation and read an empty browser response body instead of the
+actual downloaded file. The corrected helper loads normally and checks the same
+exact PDF signature in the real download, with unchanged timeouts/assertions.
+This work follows the published Review head `a89d64c7`. Its full unchanged
+protected SQLite browser suite has passed from a complete isolated Git archive,
+including attachments and clean shutdown; PR CI `37753348696` is successful.
+All 30 connector-visible Push jobs are successful, but the remaining seven and
+aggregate Push result are not yet exposed by the available connector. Complete
+Push acceptance must be verified before another push.
+
+An independent reference attempt on the unmodified current Source frontend,
+using owned monitor claims and generated camera pixels, reached the actual hash
+route `/#/am/own-group/capture-image` and rendered the intended Own Group capture
+page. It then displayed `Programmfehler: TypeError`. Native expansion of
+`Fehlerdetails` exposed `Cannot read properties of undefined (reading
+'nativeElement')` at `runCamera` from `ngOnInit`. Source `CaptureImageComponent`
+calls `runCamera()` in `ngOnInit` although its video/canvas ViewChild queries are
+dynamic. The production Source build and source tree remain unmodified at
+`14c98284`; the negative log and actual error screenshot are retained. This is
+one Primar/1280 reference failure, not six successful capture states or Source
+backend authentication evidence. Earlier raw-path attempts landed on the
+Starter page and are invalid camera references. No vendor patch, forced click
+or hidden-state substitution repairs this reference. Normal Source capture
+rendering, camera-facing framing and physical acceptance remain open.
+
 ### Restored Cloud and optional Review pane (2026-10-08)
 
 GitHub access and the published private Cloud environment are verified. Regular

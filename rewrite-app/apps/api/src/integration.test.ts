@@ -5214,6 +5214,23 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   );
   assert.equal(singlePagePdf.getPageCount(), 1);
   assert.match(singlePagePdf.getTitle() ?? "", /^Attachment Alpha \| att-/);
+  for (const path of [attachmentPagesPath, `${attachmentPath}/page.pdf`]) {
+    const originalResponse = await fetch(`${baseUrl}${path}?layout=original`, {
+      headers: { authorization: groupAuthorization }
+    });
+    assert.equal(originalResponse.status, 200);
+    assert.equal(originalResponse.headers.get("cache-control"), "private, no-store");
+    const originalPdf = await PDFDocument.load(await originalResponse.arrayBuffer());
+    assert.equal(originalPdf.getPageCount(), 1);
+    const denied = await requestJson<{ error: string }>(`${path}?layout=original`);
+    assert.equal(denied.status, 401);
+  }
+  const forbiddenOriginalPages = await requestJson<{ error: string }>(
+    `${attachmentPagesPath}?layout=original&groupKey=group-b`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(forbiddenOriginalPages.status, 403);
+  assert.equal(forbiddenOriginalPages.body.error, "attachment_group_scope_forbidden");
   const invalidImage = await requestJson<{ error: string }>(
     `${attachmentPath}/files`,
     {

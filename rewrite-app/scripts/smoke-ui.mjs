@@ -25467,6 +25467,39 @@ try {
     "attachment-smoke-participant-participant-photo-attachment-page.pdf"
   );
 
+  logStep("attachment-printed-page-interface-projection");
+  for (const layout of ["original", "rewrite"]) {
+    await page.goto(`${baseUrl}/app/home`);
+    await page.locator(`input[name="interfaceMode"][value="${layout}"]`).check();
+    await page.goto(`${baseUrl}/app/runtime`);
+    await attachmentManager.waitFor();
+    assert.equal(await page.locator("html").getAttribute("data-interface-mode"), layout);
+    await attachmentManager.locator("#loadAttachmentsButton").click();
+    await attachmentManager.locator("#attachmentManagerStatus")
+      .filter({ hasText: "requested attachment(s) loaded" }).waitFor();
+    await clickVisibleAttachmentRow(captureImageAttachmentRow);
+    await attachmentManager.locator("#selectedAttachmentCode")
+      .filter({ hasText: selectedAttachmentCode }).waitFor();
+    for (const selector of ["#downloadAttachmentPagesButton", "#downloadSelectedAttachmentPageButton"]) {
+      const [response, download] = await Promise.all([
+        page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return url.pathname.includes("/attachments/") &&
+            url.searchParams.get("layout") === layout &&
+            response.request().method() === "GET" &&
+            response.headers()["content-type"]?.includes("application/pdf");
+        }),
+        page.waitForEvent("download"),
+        attachmentManager.locator(selector).click()
+      ]);
+      assert.equal(response.status(), 200);
+      assert.match(response.headers()["cache-control"], /private.*no-store/);
+      const downloadedPagePath = await download.path();
+      assert.ok(downloadedPagePath);
+      assert.equal((await readFile(downloadedPagePath)).subarray(0, 5).toString("ascii"), "%PDF-");
+    }
+  }
+
   await attachmentManager.locator("#openAttachmentCaptureButton").click();
   await page.waitForURL(/\/app\/attachment-capture$/);
   const attachmentCapture = page.locator("#attachmentCaptureCard");

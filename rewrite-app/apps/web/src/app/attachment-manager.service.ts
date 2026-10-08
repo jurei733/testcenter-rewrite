@@ -67,7 +67,7 @@ export class AttachmentManagerService {
 
   downloadPages(
     scope: AttachmentScope,
-    options: { labelTemplate?: string; groupKey?: string } = {}
+    options: { labelTemplate?: string; groupKey?: string; layout?: "rewrite" | "original" } = {}
   ): Promise<ApiDownload> {
     const route = resolveRoutePath(
       productionApiRoutes.workspace.downloadAttachmentPagesPdf,
@@ -82,14 +82,15 @@ export class AttachmentManagerService {
   downloadPage(
     scope: AttachmentScope,
     attachmentId: string,
-    labelTemplate?: string
+    labelTemplate?: string,
+    layout?: "rewrite" | "original"
   ): Promise<ApiDownload> {
     const route = resolveRoutePath(
       productionApiRoutes.workspace.downloadAttachmentPagePdf,
       { ...scope, attachmentId }
     );
     return this.api.download(
-      this.withQuery(route, { labelTemplate }),
+      this.withQuery(route, { labelTemplate, layout }),
       this.authorization(scope.sessionToken)
     );
   }

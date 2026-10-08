@@ -6239,7 +6239,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const pdf = await createAttachmentPagesPdf({
           attachments,
-          labelTemplate
+          labelTemplate,
+          layout: url.searchParams.get("layout") === "original" ? "original" : "rewrite"
         });
         sendAsset(response, 200, "application/pdf", pdf, {
           "content-disposition": buildAttachmentContentDisposition(
@@ -6298,7 +6299,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const pdf = await createAttachmentPagesPdf({
           attachments: [attachment],
-          labelTemplate
+          labelTemplate,
+          layout: url.searchParams.get("layout") === "original" ? "original" : "rewrite"
         });
         sendAsset(response, 200, "application/pdf", pdf, {
           "content-disposition": buildAttachmentContentDisposition(

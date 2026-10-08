@@ -7,6 +7,7 @@ import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 
 import { AttachmentManagerService } from "./attachment-manager.service";
 import { downloadBlobFile } from "./download-text-file";
+import { InterfaceModeService } from "./interface-mode.service";
 
 @Component({
   selector: "app-attachment-manager",
@@ -121,6 +122,7 @@ import { downloadBlobFile } from "./download-text-file";
 })
 export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   private readonly manager = inject(AttachmentManagerService);
+  private readonly interfaceMode = inject(InterfaceModeService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   @Input({ required: true }) sessionToken = "";
@@ -244,7 +246,8 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     if (!this.hasScope || this.captureCount === 0) return;
     await this.run(async () => {
       const download = await this.manager.downloadPages(this.scope(), {
-        labelTemplate: this.labelTemplate
+        labelTemplate: this.labelTemplate,
+        layout: this.interfaceMode.mode()
       });
       downloadBlobFile({
         filename:
@@ -262,7 +265,8 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
       const download = await this.manager.downloadPage(
         this.scope(),
         attachment.attachmentId,
-        this.labelTemplate
+        this.labelTemplate,
+        this.interfaceMode.mode()
       );
       downloadBlobFile({
         filename:

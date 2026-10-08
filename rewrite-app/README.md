@@ -83,6 +83,13 @@ recovery, upload/preview/deletion and desktop/mobile card layout:
 `npm run smoke:ui:attachments-live:built`. Both are mandatory CI checks.
 They use historical XML fixtures, independently of strict Original-19 intake.
 
+Attachment single/batch PDF exports follow the selected interface. Rewrite
+retains its centered QR; Original uses the current Source's 20 mm left/top,
+40 mm square A4 scanning region through the same protected endpoints. The API
+also accepts `layout=original`; omission retains Rewrite. This reproduces the
+QR region, while complete TCPDF typography, label substitutions and camera
+framing remain tracked acceptance requirements in `docs/PARITY.md`.
+
 The separate `npm run smoke:ui:attachments-visibility:built` requires a real
 headful hidden-window transition and stream pause/resume. It currently fails
 its prerequisite locally: even independent no-app/no-camera probes keep the
