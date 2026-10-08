@@ -15,6 +15,8 @@ import QrScanner from "qr-scanner";
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 
 import { AttachmentManagerService } from "./attachment-manager.service";
+import { AttachmentCameraScanner } from "./attachment-camera-scanner";
+import { AttachmentQrDecoder } from "./attachment-qr-decoder";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
@@ -31,6 +33,9 @@ type AttachmentScope = {
   styles: [`
     :host { display: block; }
     .capture-card { overflow: hidden; }
+    .section-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .section-heading h2 { margin: .4rem 0 0; }
+    .status-pill { display: inline-block; padding: .4rem .7rem; vertical-align: middle; }
     .capture-intro { max-width: 70ch; color: var(--muted); }
     .capture-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); gap: 1rem; }
     .camera-shell { position: relative; min-height: 24rem; display: grid; place-items: center; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
@@ -94,7 +99,7 @@ type AttachmentScope = {
             </div>
             <canvas #captureCanvas hidden></canvas>
             <div class="actions">
-              <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive" (click)="startCamera()">Start camera</button>
+              <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting" (click)="startCamera()">Start camera</button>
               <button id="stopAttachmentCameraButton" class="ghost" type="button" [disabled]="!cameraActive" (click)="stopCamera()">Stop camera</button>
               <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" (click)="toggleFlash()">{{ flashOn ? 'Turn flash off' : 'Turn flash on' }}</button>
             </div>
@@ -179,8 +184,10 @@ export class AttachmentCaptureComponent
   private readonly route = inject(ActivatedRoute);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
-  private scanner: QrScanner | null = null;
+  private scanner: AttachmentCameraScanner | null = null;
+  private imageDecoder: AttachmentQrDecoder | null = null;
   private scanInProgress = false;
+  private cameraSelectionVersion = 0;
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;
@@ -190,6 +197,7 @@ export class AttachmentCaptureComponent
   cameras: QrScanner.Camera[] = [];
   selectedCameraId = "";
   cameraActive = false;
+  cameraStarting = false;
   cameraMessage = "";
   hasFlash = false;
   flashOn = false;
@@ -235,46 +243,65 @@ export class AttachmentCaptureComponent
 
   ngOnDestroy(): void {
     this.destroyScanner();
+    this.imageDecoder?.dispose();
+    this.imageDecoder = null;
     this.clearCapture();
   }
 
   async startCamera(): Promise<void> {
-    if (this.busy || this.cameraActive || !this.hasSessionScope) return;
+    if (this.busy || this.cameraActive || this.cameraStarting || !this.hasSessionScope) return;
+    this.cameraStarting = true;
     this.cameraMessage = "Requesting camera access…";
     this.statusIsError = false;
     try {
       this.destroyScanner();
-      this.scanner = new QrScanner(
+      const scanner = this.scanner = new AttachmentCameraScanner(
         this.cameraVideo.nativeElement,
-        result => void this.handleScannedCode(result.data),
-        {
-          preferredCamera: this.selectedCameraId || "environment",
-          highlightScanRegion: false,
-          highlightCodeOutline: true,
-          maxScansPerSecond: 8,
-          returnDetailedScanResult: true
+        result => this.handleScannedCode(result.data),
+        error => {
+          if (this.destroyRef.destroyed || this.scanner !== scanner) return;
+          this.cameraActive = false;
+          this.hasFlash = false;
+          this.flashOn = false;
+          this.status = this.describeCameraError(error);
+          this.statusIsError = true;
+          this.refreshView();
+        },
+        this.selectedCameraId || "environment",
+        undefined,
+        active => {
+          if (this.destroyRef.destroyed || this.scanner !== scanner) return;
+          this.cameraActive = active;
+          this.hasFlash = false;
+          this.flashOn = false;
+          if (active) {
+            this.cameraMessage = "";
+            this.status = "Camera active. Align the printed QR code inside the frame.";
+            this.statusIsError = false;
+            void this.updateCameraDetails(scanner);
+          } else if (document.hidden) {
+            this.status = "Camera paused while this tab is hidden.";
+          }
+          this.refreshView();
         }
       );
-      await this.scanner.start();
-      this.cameraActive = true;
-      this.cameraMessage = "";
-      this.status = "Camera active. Align the printed QR code inside the frame.";
-      this.cameras = await QrScanner.listCameras(true).catch(() => []);
-      if (!this.selectedCameraId && this.cameras[0]) {
-        this.selectedCameraId = this.cameras[0].id;
-      }
-      this.hasFlash = await this.scanner.hasFlash().catch(() => false);
+      await scanner.start();
+      if (this.destroyRef.destroyed || this.scanner !== scanner) { scanner.destroy(); return; }
+      this.cameraActive = scanner.isActive();
+      if (!this.cameraActive) this.status = "Camera paused while this tab is hidden.";
     } catch (error) {
       this.destroyScanner();
       this.cameraMessage = this.describeCameraError(error);
       this.status = "Camera unavailable. Use a saved QR image or the manual code fallback.";
       this.statusIsError = true;
     } finally {
+      this.cameraStarting = false;
       this.refreshView();
     }
   }
 
   stopCamera(): void {
+    this.cameraSelectionVersion++;
     this.scanner?.stop();
     this.cameraActive = false;
     this.flashOn = false;
@@ -284,16 +311,27 @@ export class AttachmentCaptureComponent
   }
 
   async selectCamera(): Promise<void> {
-    if (!this.scanner || !this.selectedCameraId) return;
+    // Choosing a device while stopped only sets the preference for Start.
+    if (!this.scanner || !this.selectedCameraId || !this.cameraActive) return;
+    const scanner = this.scanner;
+    const version = ++this.cameraSelectionVersion;
+    const current = () => !this.destroyRef.destroyed && this.scanner === scanner &&
+      version === this.cameraSelectionVersion;
     try {
-      await this.scanner.setCamera(this.selectedCameraId);
-      this.hasFlash = await this.scanner.hasFlash().catch(() => false);
-      this.flashOn = this.scanner.isFlashOn();
+      await scanner.setCamera(this.selectedCameraId);
+      const hasFlash = await scanner.hasFlash().catch(() => false);
+      if (!current()) return;
+      this.hasFlash = hasFlash;
+      this.flashOn = scanner.isFlashOn();
     } catch (error) {
+      if (!current()) return;
+      this.cameraActive = false;
+      this.hasFlash = false;
+      this.flashOn = false;
       this.status = this.describeCameraError(error);
       this.statusIsError = true;
     } finally {
-      this.refreshView();
+      if (current()) this.refreshView();
     }
   }
 
@@ -317,11 +355,10 @@ export class AttachmentCaptureComponent
     if (!file || this.busy) return;
     this.busy = true;
     this.statusIsError = false;
+    const decoder = this.imageDecoder = new AttachmentQrDecoder();
     try {
-      const result = await QrScanner.scanImage(file, {
-        alsoTryWithoutScanRegion: true,
-        returnDetailedScanResult: true
-      });
+      const result = await decoder.decode(file);
+      if (this.destroyRef.destroyed) return;
       this.attachmentCode = result.data.trim();
       await this.resolveCodeInternal();
     } catch (error) {
@@ -331,6 +368,8 @@ export class AttachmentCaptureComponent
           : this.describeCameraError(error);
       this.statusIsError = true;
     } finally {
+      decoder.dispose();
+      if (this.imageDecoder === decoder) this.imageDecoder = null;
       this.busy = false;
       this.refreshView();
     }
@@ -356,6 +395,7 @@ export class AttachmentCaptureComponent
       return;
     }
     const canvas = this.captureCanvas.nativeElement;
+    const stream = video.srcObject;
     const pageRatio = 210 / 297;
     let sourceWidth = video.videoWidth;
     let sourceHeight = sourceWidth / pageRatio;
@@ -388,6 +428,7 @@ export class AttachmentCaptureComponent
     const blob = await new Promise<Blob | null>(resolve =>
       canvas.toBlob(resolve, "image/png")
     );
+    if (this.destroyRef.destroyed || !this.cameraActive || video.srcObject !== stream) return;
     if (!blob) {
       this.status = "The browser could not encode the captured image.";
       this.statusIsError = true;
@@ -469,6 +510,7 @@ export class AttachmentCaptureComponent
     this.scanInProgress = true;
     try {
       await this.captureCurrentFrame();
+      if (this.destroyRef.destroyed || !this.cameraActive) return;
       this.stopCamera();
       this.attachmentCode = code.trim();
       await this.resolveCode();
@@ -484,6 +526,16 @@ export class AttachmentCaptureComponent
     if (!this.destroyRef.destroyed) {
       this.changeDetectorRef.markForCheck();
     }
+  }
+
+  private async updateCameraDetails(scanner: AttachmentCameraScanner): Promise<void> {
+    const cameras = await QrScanner.listCameras(true).catch(() => []);
+    const hasFlash = await scanner.hasFlash().catch(() => false);
+    if (this.destroyRef.destroyed || this.scanner !== scanner || !scanner.isActive()) return;
+    this.cameras = cameras;
+    if (!this.selectedCameraId && cameras[0]) this.selectedCameraId = cameras[0].id;
+    this.hasFlash = hasFlash;
+    this.refreshView();
   }
 
   private async resolveCodeInternal(): Promise<void> {
@@ -527,6 +579,7 @@ export class AttachmentCaptureComponent
   }
 
   private destroyScanner(): void {
+    this.cameraSelectionVersion++;
     this.scanner?.destroy();
     this.scanner = null;
     this.cameraActive = false;

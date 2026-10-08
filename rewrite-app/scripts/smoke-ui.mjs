@@ -18,6 +18,7 @@ import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
+import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -29,6 +30,10 @@ const headful = ["1", "true", "yes", "on"].includes(
 );
 const artifactDirectory = process.env.UI_SMOKE_ARTIFACT_DIR?.trim();
 const frontendRoot = process.env.UI_SMOKE_FRONTEND_ROOT?.trim();
+const attachmentQrCameraFile = process.env.UI_SMOKE_ATTACHMENT_QR_CAMERA_FILE?.trim();
+const verifyAttachmentVisibility = process.env.UI_SMOKE_VERIFY_ATTACHMENT_VISIBILITY === "true";
+if (verifyAttachmentVisibility && !headful) throw new Error("Native camera visibility verification requires a headful browser.");
+if (verifyAttachmentVisibility && attachmentQrCameraFile) throw new Error("Native visibility verification requires the image-mode camera fixture before QR auto-capture.");
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
@@ -403,7 +408,8 @@ try {
     headless: !headful,
     args: [
       "--use-fake-device-for-media-stream",
-      "--use-fake-ui-for-media-stream"
+      "--use-fake-ui-for-media-stream",
+      ...(attachmentQrCameraFile ? [`--use-file-for-fake-video-capture=${resolve(attachmentQrCameraFile)}`] : [])
     ]
   });
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -25417,6 +25423,9 @@ try {
     await attachmentManager.locator("#selectedAttachmentCode").textContent()
   )?.trim();
   assert.match(selectedAttachmentCode ?? "", /^att-/);
+  if (attachmentQrCameraFile) {
+    await writeFile(resolve(attachmentQrCameraFile), createAttachmentQrCameraVideo(selectedAttachmentCode), { flag: "wx" });
+  }
   await fillAndCommit(
     "#attachmentLabelTemplate",
     "%TESTTAKER% | %GROUP% | %VAR%"
@@ -25460,59 +25469,149 @@ try {
     .filter({ hasText: "not found" })
     .waitFor();
   assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
+  const captureWorkers = [];
+  const observeCaptureWorker = worker => {
+    const closed = new Promise(resolve => worker.once("close", resolve));
+    captureWorkers.push({ worker, closed });
+  };
+  page.on("worker", observeCaptureWorker);
   await attachmentCapture.locator("#startAttachmentCameraButton").click();
-  try {
-    await attachmentCapture
-      .locator("#attachmentCaptureStatus")
-      .filter({ hasText: "Camera active" })
-      .waitFor({ timeout: 15_000 });
-  } catch (error) {
-    const cameraState = await page.evaluate(() => {
+  if (!attachmentQrCameraFile) {
+    try {
+      await attachmentCapture
+        .locator("#attachmentCaptureStatus")
+        .filter({ hasText: "Camera active" })
+        .waitFor({ timeout: 15_000 });
+    } catch (error) {
+      const cameraState = await page.evaluate(() => {
+        const video = document.querySelector("#attachmentCaptureVideo");
+        return {
+          status: document.querySelector("#attachmentCaptureStatus")?.textContent,
+          placeholder: document.querySelector(".camera-placeholder")?.textContent,
+          video:
+            video instanceof HTMLVideoElement
+              ? {
+                  paused: video.paused,
+                  readyState: video.readyState,
+                  videoWidth: video.videoWidth,
+                  videoHeight: video.videoHeight,
+                  hasStream: video.srcObject instanceof MediaStream
+                }
+              : null
+        };
+      });
+      throw new Error(
+        `Attachment camera did not become active: ${JSON.stringify(cameraState)}`,
+        { cause: error }
+      );
+    }
+    await page.waitForFunction(() => {
       const video = document.querySelector("#attachmentCaptureVideo");
-      return {
-        status: document.querySelector("#attachmentCaptureStatus")?.textContent,
-        placeholder: document.querySelector(".camera-placeholder")?.textContent,
-        video:
-          video instanceof HTMLVideoElement
-            ? {
-                paused: video.paused,
-                readyState: video.readyState,
-                videoWidth: video.videoWidth,
-                videoHeight: video.videoHeight,
-                hasStream: video.srcObject instanceof MediaStream
-              }
-            : null
-      };
+      return (
+        video instanceof HTMLVideoElement &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+      );
     });
-    throw new Error(
-      `Attachment camera did not become active: ${JSON.stringify(cameraState)}`,
-      { cause: error }
-    );
+    if (verifyAttachmentVisibility) {
+      const stream = await attachmentCapture.locator("#attachmentCaptureVideo").evaluateHandle(video => video.srcObject);
+      const nativeWindow = await context.newCDPSession(page);
+      const { windowId, bounds } = await nativeWindow.send("Browser.getWindowForTarget");
+      try {
+        // Playwright normally emulates every page as focused/visible. Disable
+        // only that automation override so real window visibility is observable.
+        await nativeWindow.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+        // Activate actual OS window visibility; another automated page can be
+        // visible concurrently. Do not override document.hidden or dispatch events.
+        await nativeWindow.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "minimized" } });
+        logStep("attachment-camera-await-hidden");
+        try {
+          await page.waitForFunction(() => document.hidden && document.querySelector("#attachmentCaptureVideo")?.srcObject === null,
+            undefined, { polling: 100 });
+        } catch (error) {
+          const state = await page.evaluate(() => ({ hidden: document.hidden,
+            hasStream: document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream,
+            status: document.querySelector("#attachmentCaptureStatus")?.textContent }));
+          throw new Error(`Camera hidden-state check failed: ${JSON.stringify(state)}`, { cause: error });
+        }
+        assert.equal(await stream.evaluate(value => value.getTracks().every(track => track.readyState === "ended")), true);
+        await nativeWindow.send("Browser.setWindowBounds", { windowId, bounds: { windowState: bounds.windowState || "normal" } });
+        await page.bringToFront();
+        logStep("attachment-camera-await-visible-resume");
+        await page.waitForFunction(() => !document.hidden && document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream);
+        await attachmentCapture.locator("#attachmentCaptureStatus").filter({ hasText: "Camera active" }).waitFor();
+        logStep("attachment-camera-hidden-window-stream-released-and-resumed");
+      } finally {
+        await nativeWindow.send("Browser.setWindowBounds", { windowId, bounds: { windowState: bounds.windowState || "normal" } });
+        await nativeWindow.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+        await nativeWindow.detach();
+        await stream.dispose();
+      }
+    }
+    const qrInput = attachmentCapture.locator("#attachmentQrImageInput");
+    await qrInput.setInputFiles({ name: "blank.png", mimeType: "image/png",
+      buffer: await QRCode.toBuffer(selectedAttachmentCode, {
+        width: 512, color: { dark: "#ffffffff", light: "#ffffffff" }
+      }) });
+    await attachmentCapture.locator("#attachmentCaptureStatus")
+      .filter({ hasText: "No QR code was found in that image." }).waitFor();
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
+    await qrInput.setInputFiles({ name: "invalid.png", mimeType: "image/png", buffer: Buffer.from("not an image") });
+    await page.waitForFunction(() => {
+      const status = document.querySelector("#attachmentCaptureStatus");
+      return status?.classList.contains("is-error") && status.textContent.trim() &&
+        status.textContent.trim() !== "No QR code was found in that image.";
+    });
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
+    const scanKnownImage = async (name, color) => {
+      const lookup = page.waitForResponse(response => response.request().method() === "GET" &&
+        response.url().endsWith(`/attachments/${selectedAttachmentCode}`));
+      await qrInput.setInputFiles({ name, mimeType: "image/png",
+        buffer: await QRCode.toBuffer(selectedAttachmentCode, { type: "png", margin: 4, width: 512, ...(color ? { color } : {}) }) });
+      assert.equal((await lookup).status(), 200);
+      await page.waitForFunction(() => document.querySelector("#attachmentQrImageInput")?.disabled === false);
+    };
+    await scanKnownImage("attachment-code-inverted.png", { dark: "#ffffffff", light: "#000000ff" });
+    await scanKnownImage("attachment-code.png");
+    logStep("attachment-image-qr-errors-and-inversion-recovered");
   }
-  await page.waitForFunction(() => {
-    const video = document.querySelector("#attachmentCaptureVideo");
-    return (
-      video instanceof HTMLVideoElement &&
-      video.videoWidth > 0 &&
-      video.videoHeight > 0
-    );
-  });
-  await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
-    name: "attachment-code.png",
-    mimeType: "image/png",
-    buffer: await QRCode.toBuffer(selectedAttachmentCode, {
-      type: "png",
-      margin: 4,
-      width: 512
-    })
-  });
   await attachmentCapture
     .locator("#attachmentCaptureTarget")
     .filter({ hasText: "Attachment Smoke Participant" })
     .filter({ hasText: "participant-photo" })
     .waitFor();
-  await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+  if (!attachmentQrCameraFile) {
+    await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+  }
   await attachmentCapture.locator("#attachmentCapturePreview").waitFor();
+  await page.waitForFunction(() => document.querySelector("#attachmentCapturePreview")?.naturalHeight > 0);
+  if (attachmentQrCameraFile) {
+    logStep("attachment-live-camera-decoded-and-captured");
+    await page.waitForFunction(() => document.querySelector("#attachmentCaptureVideo")?.srcObject === null);
+    const dimensions = await attachmentCapture.locator("#attachmentCapturePreview")
+      .evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight }));
+    assert.ok(dimensions.height > 0);
+    assert.ok(Math.abs(dimensions.width - dimensions.height * 210 / 297) <= 1,
+      "Automatic QR capture must retain the actual camera's A4 crop.");
+  }
+  const captureViewport = page.viewportSize();
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await attachmentCapture.screenshot({ path: artifactDirectory
+      ? resolve(artifactDirectory, `attachment-${attachmentQrCameraFile ? "live" : "image"}-camera-preview-${width}.png`)
+      : undefined });
+    const geometry = await attachmentCapture.evaluate(card => {
+      const heading = card.querySelector(".section-heading").getBoundingClientRect();
+      const introduction = card.querySelector(".capture-intro").getBoundingClientRect();
+      return { headingBottom: heading.bottom, introductionTop: introduction.top,
+        scrollWidth: card.scrollWidth, clientWidth: card.clientWidth };
+    });
+    assert.ok(geometry.introductionTop >= geometry.headingBottom,
+      `Capture status badge must not overlap the introduction at ${width}px.`);
+    assert.ok(geometry.scrollWidth <= geometry.clientWidth,
+      `Capture controls must fit their card at ${width}px.`);
+  }
+  if (captureViewport) await page.setViewportSize(captureViewport);
   await attachmentCapture.locator("#uploadCapturedAttachmentButton").click();
   await attachmentCapture
     .locator("#attachmentCaptureStatus")
@@ -25522,6 +25621,13 @@ try {
     .getByRole("link", { name: "Back to Attachment Manager" })
     .click();
   await page.waitForURL(/\/app\/runtime$/);
+  page.off("worker", observeCaptureWorker);
+  assert.ok(captureWorkers.length >= (attachmentQrCameraFile ? 1 : 4), "Actual camera/image decoding must use the bundled workers.");
+  await Promise.race([
+    Promise.all(captureWorkers.map(({ closed }) => closed)),
+    delay(5_000, undefined, { ref: false }).then(() => { throw new Error("Capture workers survived route destruction."); })
+  ]);
+  logStep(`attachment-workers-released-${captureWorkers.length}`);
   const refreshedAttachmentManager = page.locator("#attachmentManagerCard");
   await refreshedAttachmentManager.locator("#loadAttachmentsButton").click();
   await refreshedAttachmentManager
@@ -25532,9 +25638,9 @@ try {
     .locator(".attachment-row")
     .filter({ hasText: "participant-photo" });
   await clickVisibleAttachmentRow(refreshedCaptureImageAttachmentRow);
-  await refreshedAttachmentManager
-    .getByRole("button", { name: "Preview" })
-    .click({ force: true });
+  const previewButton = refreshedAttachmentManager.getByRole("button", { name: "Preview" });
+  await previewButton.scrollIntoViewIfNeeded();
+  await previewButton.click();
   await refreshedAttachmentManager.locator("#attachmentPreview").waitFor();
   await refreshedAttachmentManager.getByRole("button", { name: "Delete" }).click();
   await refreshedAttachmentManager

@@ -110,6 +110,9 @@ jobs:
           - check: ui-full
             command: npm run smoke:ui
             playwright: true
+          - check: ui-attachments
+            command: npm run build && npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built
+            playwright: true
           - check: ui-verona-development
             command: npm run smoke:ui:verona-development
             playwright: true

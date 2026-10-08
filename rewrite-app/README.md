@@ -72,6 +72,25 @@ fail without retry or forced clicks. `UI_SMOKE_STOP_AFTER_STEP=attachment-auto-r
 selects this focused checkpoint; complete runs continue through capture and
 result deletion. This smoke readiness check does not close Original-UI parity.
 
+Attachment image and live-camera decoding now use the unchanged shipped QR
+worker through the SDK's public engine option, avoiding native-detector startup
+stalls. Camera selection, flash, A4 preview and protected lookup/upload remain
+available; Stop and route departure release owned streams/workers. Late results
+cannot retain a destroyed view's image or begin a QR lookup after destruction.
+Actual image/camera gates include normal and inverted images, invalid-image
+recovery, upload/preview/deletion and desktop/mobile card layout:
+`npm run smoke:ui:attachments:built` and
+`npm run smoke:ui:attachments-live:built`. Both are mandatory CI checks.
+They use historical XML fixtures, independently of strict Original-19 intake.
+
+The separate `npm run smoke:ui:attachments-visibility:built` requires a real
+headful hidden-window transition and stream pause/resume. It currently fails
+its prerequisite locally: even independent no-app/no-camera probes keep the
+document visible after native minimize. It is not included in, or proven by,
+the passing image/live-camera runs. Conditional visibility lifecycle tests pass;
+physical acceptance, Original printed-page framing and full UI identity remain
+open in `docs/PARITY.md`.
+
 Assigned Booklets and preset variants can start independently while another
 Booklet is unfinished, then return to the starter and resume their exact saved
 Run. `npm run smoke:ui:participant-variant:built` verifies the actual A/B Starter
