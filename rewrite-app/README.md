@@ -65,6 +65,13 @@ reload instead of requiring idle SSE/polling connections. Run URL identity,
 exact saved answer, native checked-state and all label assertions remain
 mandatory; navigation or missing Player errors still fail the gate.
 
+At the attachment boundary, the shared smoke waits for the rendered workspace
+checkbox's native state to agree with its saved auto-refresh preference before
+native input, then verifies both again. Input or persistence failures still
+fail without retry or forced clicks. `UI_SMOKE_STOP_AFTER_STEP=attachment-auto-refresh`
+selects this focused checkpoint; complete runs continue through capture and
+result deletion. This smoke readiness check does not close Original-UI parity.
+
 Assigned Booklets and preset variants can start independently while another
 Booklet is unfinished, then return to the starter and resume their exact saved
 Run. `npm run smoke:ui:participant-variant:built` verifies the actual A/B Starter

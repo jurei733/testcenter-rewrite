@@ -17,6 +17,7 @@ import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
+import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -2390,7 +2391,7 @@ try {
     .filter({ hasText: workspaceKey })
     .waitFor();
 
-  if (stopAfterStep === "attachment-manager") {
+  if (["attachment-manager", "attachment-auto-refresh"].includes(stopAfterStep)) {
     await runAttachmentManagerSmoke();
   }
 
@@ -25305,7 +25306,7 @@ try {
     };
   });
   try {
-    await page.locator("#autoRefreshEnabled").check();
+    await setWorkspaceAutoRefreshEnabled(page, true);
   } catch (error) {
     console.error("workspace_refresh_checkbox_diagnostic=" + JSON.stringify(
       await page.evaluate(() => window.workspaceRefreshSmokeDiagnostic())
@@ -25316,13 +25317,8 @@ try {
     window.workspaceRefreshSmokeDiagnostic();
     delete window.workspaceRefreshSmokeDiagnostic;
   });
-  await page.waitForFunction(() =>
-    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
-      .autoRefreshEnabled === true);
-  await page.locator("#autoRefreshEnabled").uncheck();
-  await page.waitForFunction(() =>
-    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
-      .autoRefreshEnabled === false);
+  await setWorkspaceAutoRefreshEnabled(page, false);
+  stopAfter("attachment-auto-refresh");
   await fillAndCommitUntilValue("#workspaceKey", attachmentWorkspaceKey);
   await page.waitForFunction(expectedWorkspaceKey =>
     JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
