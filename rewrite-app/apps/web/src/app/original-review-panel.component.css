@@ -11,6 +11,8 @@ mat-radio-group { display: flex; flex-direction: column; }
 .prio-and-category-box ul { list-style-type: none; margin: 0; padding-inline-start: 0; }
 .scrollable-area { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 30px; }
 .action-buttons { margin-top: auto; display: flex; flex-direction: row; gap: 20px; }
+/* Source button presentation must not inherit Rewrite opacity/hover transforms. */
+.action-buttons button { opacity: 1; cursor: default; transform: none; }
 .review-list .scrollable-area { display: block; flex: initial; }
 mat-list-item { margin-bottom: 1rem; cursor: pointer; }
 mat-list-item:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: -2px; }

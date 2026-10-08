@@ -98,6 +98,12 @@ try {
       await page.evaluate(()=>document.fonts.ready);
       const capture = async state => {
         const id = `${theme}-${width}-${state}`;
+        if (state === "list") await page.locator('[data-cy="comment-list-unit-comments"]').filter({hasText:"Eigener synthetischer Kommentar"}).waitFor();
+        if (state === "edit") {
+          await panel.locator('[data-cy="comment-diag-comment"]').waitFor({state:"visible"});
+          await page.waitForFunction(()=>document.querySelector('[data-cy="comment-diag-comment"]').value==="Eigener synthetischer Kommentar" &&
+            document.querySelector('[data-cy="comment-diag-title"]').textContent==="Kommentar bearbeiten");
+        }
         await page.evaluate(() => document.fonts.ready);
         const drawerRect=await drawer.boundingBox();
         const scrollArea=panel.locator('.scrollable-area').filter({visible:true});
@@ -108,6 +114,8 @@ try {
         await page.waitForFunction(()=>document.querySelector('app-original-player-sidebar [role="dialog"]').scrollLeft===0 &&
           [...document.querySelectorAll('app-original-review-panel .scrollable-area')].filter(n=>n.getBoundingClientRect().height>0).every(n=>n.scrollTop===0));
         await page.mouse.move(0, 0);
+        // Let native wheel/focus updates reach a completed browser paint.
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         if (state === "list") assert.equal(await page.locator('[data-cy="comment-list-unit-comments"]').filter({hasText:"Eigener synthetischer Kommentar"}).isVisible(), true);
         if (state === "edit") {
           assert.equal(await panel.locator('[data-cy="comment-diag-comment"]').inputValue(), "Eigener synthetischer Kommentar");
@@ -117,10 +125,11 @@ try {
         metrics[id] = await panel.evaluate(el=>{
           const rect=n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
           const toolbar=el.querySelector("mat-toolbar");return{panel:rect(el),drawer:rect(el.closest('[role="dialog"]')),
+            header:{box:rect(document.querySelector('#participantApplicationHeader')),title:rect(document.querySelector('#participantApplicationHeader h1')),logo:rect(document.querySelector('#applicationLogo'))},
             backdropColor:getComputedStyle(document.querySelector('app-original-player-sidebar .backdrop')).backgroundColor,
             toolbar:rect(toolbar),toolbarBackground:getComputedStyle(toolbar).backgroundColor,toolbarColor:getComputedStyle(toolbar).color,
             headings:[...el.querySelectorAll("h3")].map(n=>({text:n.textContent,font:getComputedStyle(n).font,color:getComputedStyle(n).color,margin:getComputedStyle(n).margin,height:n.getBoundingClientRect().height})),
-            buttons:[...el.querySelectorAll('.action-buttons button')].map(n=>({text:n.textContent.trim(),rect:rect(n),font:getComputedStyle(n).font,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius})),
+            buttons:[...el.querySelectorAll('.action-buttons button')].map(n=>({text:n.textContent.trim(),rect:rect(n),font:getComputedStyle(n).font,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius,opacity:getComputedStyle(n).opacity,cursor:getComputedStyle(n).cursor,transform:getComputedStyle(n).transform})),
             labels:[...el.querySelectorAll('label')].map(n=>({font:getComputedStyle(n).font,color:getComputedStyle(n).color})),
             controls:[...el.querySelectorAll("mat-form-field,mat-radio-group,.action-buttons,mat-toolbar button")].map(n=>({tag:n.tagName,rect:rect(n)}))};
         });
@@ -128,6 +137,11 @@ try {
         assert.equal(metrics[id].drawer.width,Math.min(700,width*.9));
         assert.equal(metrics[id].toolbar.height,width<600?56:64);
         assert.equal(metrics[id].toolbarColor,"rgb(255, 255, 255)");
+        for(const button of metrics[id].buttons) {
+          assert.equal(button.opacity,"1");
+          assert.equal(button.cursor,"default");
+          assert.equal(button.transform,"none");
+        }
         for(const label of [metrics[id].labels[0],metrics[id].labels[5],metrics[id].labels[9]])
           assert.equal(label.color,"rgb(64, 72, 76)");
         assert.equal(metrics[id].backdropColor,"color(srgb 0.160784 0.196078 0.207843 / 0.4)");
@@ -153,6 +167,8 @@ try {
       await panel.locator('[data-cy="comment-diag-priority1"] input').check();
       await panel.locator('[data-cy="comment-diag-cat-tech"] input').check();
       assert.equal(await panel.locator('[data-cy="comment-diag-submit"]').isEnabled(),true);
+      await panel.locator('[data-cy="comment-diag-submit"]').hover();
+      assert.equal(await panel.locator('[data-cy="comment-diag-submit"]').evaluate(n=>getComputedStyle(n).transform),"none");
       await capture("filled");
       await panel.locator('[data-cy="comment-diag-close"]').click();
       await drawer.waitFor({state:"detached"});
@@ -270,7 +286,7 @@ try {
     assert.deepEqual(Object.keys(metrics).sort(),Object.keys(reference.metrics).sort());
     for(const [key,actual] of Object.entries(metrics)) {
       const expected = reference.metrics[key];
-      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","controls","buttons","labels"])
+      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","controls","buttons","labels","header"])
         assert.deepEqual(actual[field],expected[field],`${key}: rendered ${field}`);
       if(key.endsWith("-list")) {
         assert.deepEqual(actual.headings,expected.headings,`${key}: list typography`);

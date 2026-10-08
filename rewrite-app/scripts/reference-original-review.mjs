@@ -103,13 +103,16 @@ try {
                 await page.waitForFunction(()=>document.querySelector('.mat-drawer-inner-container').scrollLeft===0 &&
                     [...document.querySelectorAll('tc-review-panel .scrollable-area')].filter(n=>n.getBoundingClientRect().height>0).every(n=>n.scrollTop===0));
                 await page.mouse.move(0,0);
+                // Let native wheel/focus updates reach a completed browser paint.
+                await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
                 await page.screenshot({path:`${artifacts}/${id}-${state}.png`});
                 metrics[id+'-'+state]=await page.locator('tc-review-panel').evaluate(el=>{
                     const rect=n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
                     return {textarea:{height:el.querySelector('textarea').getBoundingClientRect().height,font:getComputedStyle(el.querySelector('textarea')).font,lineHeight:getComputedStyle(el.querySelector('textarea')).lineHeight,inline:el.querySelector('textarea').getAttribute('style')},
+                        header:{box:rect(document.querySelector('[data-cy="header"]')),title:rect(document.querySelector('[data-cy="header"] h1')),logo:rect(document.querySelector('[data-cy="logo"]'))},
                         panel:rect(el),drawer:rect(el.closest('mat-sidenav')),toolbar:rect(el.querySelector('mat-toolbar')),
                         toolbarBackground:getComputedStyle(el.querySelector('mat-toolbar')).backgroundColor,toolbarColor:getComputedStyle(el.querySelector('mat-toolbar')).color,
-                        buttons:[...el.querySelectorAll('.action-buttons button')].map(n=>({text:n.textContent.trim(),rect:rect(n),font:getComputedStyle(n).font,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius})),
+                        buttons:[...el.querySelectorAll('.action-buttons button')].map(n=>({text:n.textContent.trim(),rect:rect(n),font:getComputedStyle(n).font,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius,opacity:getComputedStyle(n).opacity,cursor:getComputedStyle(n).cursor,transform:getComputedStyle(n).transform})),
                         labels:[...el.querySelectorAll('label')].map(n=>({font:getComputedStyle(n).font,color:getComputedStyle(n).color})),
                         controls:[...el.querySelectorAll('mat-form-field,mat-radio-group,.action-buttons,mat-toolbar button')].map(n=>({tag:n.tagName,rect:rect(n)}))};
                 });

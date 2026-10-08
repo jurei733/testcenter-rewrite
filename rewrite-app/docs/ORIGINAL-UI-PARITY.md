@@ -63,6 +63,20 @@ The production initial bundle remains 469.98 kB under the unchanged 470 kB gate.
 Raw screenshots still differ and history-dependent native scrolling remains a
 separate comparison requirement; this is not full pixel identity.
 
+The next rendered comparison extends the gate to header/title/logo rectangles
+and action-button opacity, cursor and transform. It exposed a real global
+Rewrite-style leak: disabled Material buttons were additionally dimmed to 65%,
+and enabled actions inherited a pointer cursor and hover translation. Only the
+Original Review action buttons now use the current Source presentation (opacity
+1, default cursor, no translation). Review edit captures await the intended
+visible editor before measuring its scroll region; an independently retained
+negative attempt had measured a disappearing list region during that transition.
+Capture helpers also wait two native animation frames after wheel input.
+Header/title/logo rectangles match in all 24 states. Some raw captures still
+clip header raster content despite identical post-capture rectangles in both
+unmodified Source and Rewrite; this observation is not a proven product layout
+regression or resolved full screenshot acceptance.
+
 Native protected browser flows also pass new/edit/save/delete/cancel, add/back,
 test/unit/task targets, simultaneous categories, exact Unicode/newline content,
 same-Run reload, restored editable drafts after closing/reopening, list reopening,

@@ -15,8 +15,16 @@ Current upstream is still `14c98284590195631750bb2352cb398ca669fe7d`.
 The optional Original Review pane now has the Source toolbar/form/lists,
 add/edit/back actions and theme colors instead of the generic 420px Rewrite
 pane. Twenty-four actual rendered reference/Rewrite states at the same native
-scroll endpoint match measured geometry, action-button styles, list typography
-and toolbar/scrim colors across all three themes at 1280/390px.
+scroll endpoint match measured geometry, action-button styles, all form-label
+fonts/colors, list typography and toolbar/scrim colors across all three themes
+at 1280/390px. A subsequent fresh gate also matches header/title/logo rectangles
+and button opacity/cursor/transform; native hover retains the Source's unshifted
+action geometry. The Original-only action styles prevent global Rewrite dimming
+and hover translation from leaking into this pane. A retained negative capture
+attempt measured a disappearing list during Edit rendering; the helper now
+requires the exact visible editor before scroll geometry, with unchanged default
+timeouts and exact assertions. Sporadic clipped header raster captures occur in
+both renderers despite matching rectangles and remain an open visual-proof issue.
 Protected native SQLite flows verify target/category/priority semantics, exact
 comment bytes, same-Run reload, foreign-Session denial, unchanged foreign reviews,
 retry and draft/list restoration. Rewrite remains available. Raw screenshots
