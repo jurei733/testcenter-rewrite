@@ -17,9 +17,28 @@ retain 401 without credentials, 403 for a foreign group, scoped page counts and
 private/no-store responses. Both actual PDF projections were rasterized with
 Poppler and decoded through the production decoder and unchanged shipped worker
 to the exact owned synthetic attachment ID using native file input and a native
-button click. This does not prove manager layout, TCPDF pixel identity, camera
+button click. A further generated-video camera gate passes both complete rendered
+PDF pages through native media acquisition, the production camera scanner and
+unchanged worker at 1280/720. Native Stop releases the owned stream and worker.
+This does not prove manager layout, TCPDF pixel identity, camera
 framing or physical visibility. The current Source's label substitutions and
 camera-facing crop/scan-region behavior still require their own acceptance.
+
+Actual Source PDF rendering is now independently available, beyond reading its
+geometry constants. Unmodified `AttachmentTemplate` and `Attachment` classes
+from `14c98284` execute with the exact `composer.lock` TCPDF 6.10.0 revision
+`ca5b6de294512145db96bcbc94e61696599c391d` in an official PHP 8.3 container.
+Only owned synthetic metadata is supplied; source/dependency mounts are read-only
+and the rendering container has no network, dropped capabilities and a read-only
+root. The existing enforced package-manager policy allowed image/dependency
+retrieval without domain or filesystem permission changes. Default and long-label
+Source PDFs contain actual vector QR bounds at 20/20/40/40 mm. Its rasterized QR
+also decodes to the exact owned Source-format ID with the production worker.
+Matching-content Rewrite PDFs were generated for comparison; full PDF typography,
+label placement, substitutions and extra captions/footer remain different and open.
+This is rendering/decoder evidence, not Source backend authorization or normal
+Source camera-page acceptance. The upstream tree remains unmodified.
+
 The protected SQLite Attachment browser slice additionally passes four native
 single/batch download-button cases after selecting Original and Rewrite through
 the real interface controls. It requires the selected layout query, HTTP 200,
@@ -29,6 +48,15 @@ test-helper attempts respectively omitted the required native Load Attachments
 step after navigation and read an empty browser response body instead of the
 actual downloaded file. The corrected helper loads normally and checks the same
 exact PDF signature in the real download, with unchanged timeouts/assertions.
+The local implementation commit `b835bc78ebd7c38a058b2f23c9fb46f2ab96c018`
+also passes its complete protected SQLite browser suite from a full isolated
+Git archive, with its own compiler, fixed production assets, database and port.
+All existing steps remain present, including the four new native PDF downloads,
+attachment upload/preview/delete, result deletion and clean SIGTERM shutdown.
+The archive's production build stays at 469.98 kB; its normal 507 tests and 61
+compatibility checks pass freshly. These are Cloud checks, not published CI,
+deployment or production acceptance. The commit remains local pending the
+preceding published head's complete Push-CI verification.
 This work follows the published Review head `a89d64c7`. Its full unchanged
 protected SQLite browser suite has passed from a complete isolated Git archive,
 including attachments and clean shutdown; PR CI `37753348696` is successful.

@@ -129,6 +129,23 @@ the remaining seven and aggregate Push result are still unverified. Do not infer
 complete Push acceptance from this partial job listing.
 New work remains unpublished until this head's required CI boundary is complete.
 
+The next local commit `b835bc78` adds the optional Source-sized printed QR region
+through existing protected single/batch PDF routes while retaining Rewrite's
+default layout. Its complete isolated Git-archive production build, normal 507
+tests, 61 compatibility checks and full protected SQLite browser suite pass.
+The full run includes both interface projections through native download
+buttons, attachment upload/preview/delete, result deletion and clean shutdown.
+Owned actual PDF images also pass image and generated-video decoding through
+the production scanner/unchanged worker. Independent unmodified Source PHP 8.3
+and pinned TCPDF 6.10.0 rendering now verifies actual QR bounds for default and
+long labels. Rendering runs in a netzless, read-only container using owned data;
+dependency retrieval used the existing enforced package-manager preset. No VM
+domain, filesystem policy, VPN or TLS rule changed. Source camera-page startup
+still fails with its recorded `nativeElement` error; complete PDF typography,
+Original UI rows and physical visibility remain open. See `PARITY.md` for scope
+and retained negative helper attempts. This local commit has not been pushed;
+do not label it CI-green or deployed.
+
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
 `docs/testcenter-thread-migration-process.pptx` remain untouched and unuploaded;
