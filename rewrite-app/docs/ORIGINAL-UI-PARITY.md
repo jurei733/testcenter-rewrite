@@ -42,6 +42,15 @@ details, extended cases, the normal Source capture page and physical camera/
 window visibility still require separate evidence. See `PARITY.md` for exact
 whole-flow versus focused-run and publication boundaries.
 
+Normal Source capture reference is currently blocked at `14c98284`:
+`runCamera` reads `video.nativeElement` before dynamic ViewChild initialization.
+Twelve actual initial/re-entry states across all three themes and both widths
+reproduce the failure without a video stream or metadata lookup. Native reload
+returns to the Starter and capture URL re-entry fails again. The standalone
+`diagnose-original-camera-reference.mjs` exits 2 and retains actual error states;
+these cannot count as successful capture comparisons or close any matrix row.
+The reference remains unmodified, and real camera/window acceptance is separate.
+
 ### Current Review drawer comparison (2026-10-08)
 
 The optional participant Review pane now adapts the actual `14c98284` toolbar,

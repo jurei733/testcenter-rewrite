@@ -1,5 +1,55 @@
 # Testcenter parity checklist
 
+### Current Source camera reference blocker — reproduced (2026-10-08)
+
+Current public upstream and the unmodified local reference remain exactly
+`14c98284590195631750bb2352cb398ca669fe7d`, freshly reverified. Actual Source
+camera startup fails in all three themes at 1280/390px, both on initial entry
+and on ordinary route re-entry after the native `Schließen und neu laden`
+action: twelve negative observations, zero successful camera states. The
+rendered page identifies Own Group and the intended capture instructions.
+Native expansion of `Fehlerdetails` shows `Cannot read properties of undefined
+(reading 'nativeElement')` at `runCamera` from `ngOnInit`. Each owned video has
+0/0 dimensions and no stream; canvas/New Capture remain hidden. No Attachment
+metadata request occurs, and the strict fixture records no unknown API calls.
+This localizes the failure before QR lookup or backend authorization. It is
+Source frontend evidence, not proof of Source backend authentication.
+
+Source `CaptureImageComponent` queries video/canvas dynamically but calls
+`runCamera()` in `ngOnInit`; its first scanner-construction argument reads the
+unavailable `video.nativeElement`. Its visible recovery action returns to
+`/#/r/starter`; ordinary authorized URL re-entry repeats the same failure.
+The hidden reset cannot be used as a native recovery action. Source assets and
+vendor files remain unmodified. The functioning Rewrite scanner/PDF checks do
+not substitute for the missing normal Original capture reference.
+
+Reproduce with Node 22 and prepared Chromium:
+
+```sh
+ORIGINAL_CAMERA_REFERENCE_ROOT=/path/to/unmodified/original/browser \
+UI_SMOKE_ARTIFACT_DIR=/path/to/new/owned/evidence \
+node scripts/diagnose-original-camera-reference.mjs
+```
+
+The diagnostic writes twelve actual screenshots/text states and structured
+evidence; it deliberately exits **2** when the Source blocker is reproduced.
+It is not added as a passing CI or capture gate. All data and generated camera
+pixels are synthetic and owned. Login uses the visible Material label, verified
+native focus and actual keyboard input. A prior helper incorrectly expected
+reload to stay on the capture route, while another native input-center click
+was intercepted by the mobile label; their logs remain separate from the
+corrected twelve-state reproduction. No forced click, hidden-state mutation,
+private scanner call, vendor patch or relaxed timeout repairs this reference.
+
+Normal Original camera/crop comparison requires a functioning unmodified current
+Original reference. Repairing the upstream lifecycle is outside this repository
+and conflicts with the prohibition on patching the reference; this acceptance
+blocker cannot be resolved within the current authorized scope. Physical camera/
+OS visibility and deployment are additional real acceptance gates. The separate
+publication boundary remains: PR `37753348696` is successful; all 30 exposed
+Push `37753342686` jobs are successful, but seven and its aggregate remain
+unverified by the connector. No extra access is requested or bypass used.
+
 ### Source PDF bookmark navigation — development evidence (2026-10-08)
 
 The optional Original PDF now opens its outline pane and creates one ordered

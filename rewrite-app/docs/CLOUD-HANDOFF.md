@@ -46,6 +46,17 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 ## Prioritized remaining work
 
+Current reference blocker: unmodified Source `14c98284` camera startup fails
+in all three themes at 1280/390px, including re-entry after native reload.
+Twelve negative observations show the same `nativeElement` lifecycle error,
+zero video/stream and zero metadata/unknown API requests. The checked-in
+`scripts/diagnose-original-camera-reference.mjs` reproduces the failure and
+exits 2; it is not a passing camera gate. A working unmodified current Source
+reference is required to complete normal capture/crop comparison. Do not patch
+Source/vendor files or expose hidden controls to claim that comparison passes.
+The Rewrite's owned image/live tests continue to pass independently. See the
+exact reproduction and narrower earlier fixture failures in `PARITY.md`.
+
 1. Confirm current publication checks and complete browser acceptance. Diagnose
    any reproduced failures from real logs before changing production code.
 2. Validate the new optional Original Review side pane and complete remaining
@@ -199,6 +210,15 @@ was relaxed. Source label substitutions, QR drawing and extended cases remain
 open, alongside all full UI, physical and production gates. These local commits
 remain unpublished under the current Push-CI boundary; Entire Cloud trace
 capture remains unsupported and no new checkpoint is fabricated.
+
+Latest local development commits are `2c7d0516` (Source label placement/wrapping)
+and `d6304a59` (Source bookmarks). Working tree is preserved; the remote parity
+head remains `a89d64c7`. Fresh PR aggregate status is successful and all 30
+exposed Push jobs succeed, while the seven missing jobs/Push aggregate remain
+unverified. The final camera diagnostic records twelve Source failures on
+strict owned fixtures; none is a normal capture pass. The minimum missing
+reference is a functioning unmodified current Original camera page, not an
+extra browser-download domain, socket grant or general repository-access fix.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
