@@ -2210,15 +2210,18 @@ export class ParticipantViewFacade {
     this.reviewFeedback = "Comment changes discarded.";
   }
 
-  saveReview(): void {
+  saveReview(onSaved?: () => void, onSettled?: () => void): void {
     if (!this.canSubmitReview) {
+      onSettled?.();
       return;
     }
-    this.viewState.onActionAsync(() => this.saveReviewInternal());
+    this.viewState.onActionAsync(() => this.saveReviewInternal()
+      .then(() => onSaved?.()).finally(() => onSettled?.()));
   }
 
-  async deleteReview(review: WorkspaceReview): Promise<void> {
+  async deleteReview(review: WorkspaceReview, onDeleted?: () => void, onSettled?: () => void): Promise<void> {
     if (!this.player.canReview) {
+      onSettled?.();
       return;
     }
     const accepted = await this.requestConfirmation({
@@ -2228,10 +2231,11 @@ export class ParticipantViewFacade {
       confirmLabel: "Delete comment"
     });
     if (!accepted || !this.player.canReview) {
+      onSettled?.();
       return;
     }
     this.viewState.onActionAsync(() =>
-      this.deleteReviewInternal(review.reviewId)
+      this.deleteReviewInternal(review.reviewId).then(() => onDeleted?.()).finally(() => onSettled?.())
     );
   }
 

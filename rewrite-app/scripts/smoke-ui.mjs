@@ -18513,9 +18513,19 @@ try {
   await page.locator('[data-cy="send-comments"]').click();
   assert.equal(await page.locator("#participantRouteReviewComment").inputValue(), originalSurfaceComment);
   await page.locator("#participantRouteReviewSaveButton").click();
-  const originalSavedReview = page.locator(".participant-review-item").filter({ hasText: originalSurfaceComment });
+  await originalSidebar.waitFor({ state: "detached" });
+  assert.equal(await page.locator('[data-cy="send-comments"]').evaluate(element => element === document.activeElement), true);
+  await page.locator('[data-cy="send-comments"]').click();
+  await page.locator('[data-cy="comment-toolbar-show-list"]').click();
+  const originalSavedReview = page.locator('[data-cy="comment-list-unit-comments"]').filter({ hasText: originalSurfaceComment });
   await originalSavedReview.waitFor();
-  await originalSavedReview.getByRole("button", { name: "Delete", exact: true }).click();
+  assert.equal(await originalSavedReview.textContent(), originalSurfaceComment);
+  await originalSavedReview.click();
+  await page.waitForFunction(comment =>
+    document.querySelector("#participantRouteReviewComment")?.value === comment,
+  originalSurfaceComment);
+  assert.equal(await page.locator("#participantRouteReviewComment").inputValue(), originalSurfaceComment);
+  await page.locator('[data-cy="comment-diag-delete"]').click();
   await page.locator("#participantConfirmationContinueButton").click();
   await originalSavedReview.waitFor({ state: "detached" });
   await page.waitForFunction(() => !!document.activeElement?.closest("app-original-player-sidebar"));

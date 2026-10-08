@@ -17,6 +17,7 @@ import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
+import { OriginalReviewPanelComponent } from "./original-review-panel.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -29,7 +30,7 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, ParticipantStatusStylesComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, ParticipantStatusStylesComponent],
   template: `
     <app-participant-status-styles />
     <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
@@ -669,7 +670,8 @@ interface ParticipantVisibleCodeNotice {
                   @if (interfaceMode.mode() === 'original' && originalPanel(); as panel) {
                     <app-original-player-sidebar
                       [title]="panel === 'review' ? 'Kommentare' : view.customText('booklet_tasklisttitle', 'Bearbeitungsstand')"
-                      [content]="panel === 'review' ? participantReviewPanel : participantUnitMenu"
+                      [review]="panel === 'review'"
+                      [content]="panel === 'review' ? originalReviewPanel : participantUnitMenu"
                       (close)="originalPanel.set(null)" />
                   }
                 }
@@ -715,6 +717,11 @@ interface ParticipantVisibleCodeNotice {
             </section>
           </ng-template>
           <ng-container *ngIf="interfaceMode.mode() !== 'original'" [ngTemplateOutlet]="participantReviewPanel" />
+          <ng-template #originalReviewPanel>
+            @defer (when originalPanel() === 'review') {
+              <app-original-review-panel (close)="originalPanel.set(null)" />
+            }
+          </ng-template>
           <ng-template #participantReviewPanel>
           <section
             *ngIf="view.player.canReview"

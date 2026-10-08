@@ -68,6 +68,9 @@ jobs:
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness
             playwright: true
+          - check: ui-original-review
+            command: npm run smoke:ui:original-review
+            playwright: true
           - check: ui-monitor-review
             command: npm run smoke:ui:monitor-review
             playwright: true

@@ -48,11 +48,13 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 1. Confirm current publication checks and complete browser acceptance. Diagnose
    any reproduced failures from real logs before changing production code.
-2. Bring the optional Original Review side pane into line with current upstream
-   toolbar, form, list, buttons, edit/back/add states and primary/on-primary
-   colors. The current generic 420px Rewrite pane is not visual parity. Compare
-   actual rendered current Original pages in all three themes and both widths;
-   source or isolated CSS checks alone do not close a full-page acceptance row.
+2. Validate the new optional Original Review side pane and complete remaining
+   visual differences. Its Source toolbar/form/lists/actions, 700px geometry
+   and primary/on-primary colors have 24 actual rendered comparisons across
+   all three themes and both widths, plus protected native SQLite flows.
+   The generic Rewrite pane remains available. The restored draft/list state
+   now has eight additional regressions (505 core/frontend checks total).
+   Raw screenshots still differ; no full-page acceptance row is closed.
 3. Close the eight open rows in `docs/ORIGINAL-UI-PARITY.md`, retaining both
    interfaces, authored texts, keyboard access, mobile behavior and same data.
 4. Complete current Original printed-page/QR-region/camera-facing framing and
@@ -69,15 +71,44 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
-The local cloud CLI currently reports `environment_repo_access_failed` for this
-repository and shows no configured environment. Cloud execution requires granting
-the connected cloud account GitHub access to this repository and publishing an
-appropriate environment; a local desktop task is not a substitute for that.
+The private Cloud environment is published and repository access is verified.
+The restored checkout is on `testcenter-rewrite-parity` at `5b3b44a2`; activation
+of `/workspace/.setup-tools/activate.sh` provides Node 22.23.3 and the prepared
+Playwright Chromium. The GitHub connector and Git push dry-run work. The former
+`environment_repo_access_failed` report is historical, not a current blocker.
+
+This Cloud turn received the regular product network permission, without added
+filesystem rights. It is a per-turn grant, not a persisted full-access setting.
+The enforced VM domain policy still permits package managers and exactly
+`cdn.playwright.dev`, `playwright.download.prss.microsoft.com`, and
+`storage.googleapis.com`. Future turns must verify their effective runtime
+permissions separately. The initial restricted shell reported
+`PermissionError: [Errno 1] Operation not permitted` for IPv4 socket creation;
+the authorized profile subsequently passed IPv4, owned loopback listen/connect,
+child-process pipes, and protected owned SQLite startup/preflight/shutdown.
+
+Fresh Cloud checks passed the normal 497 core/frontend and 61 compatibility
+tests. The protected owned SQLite browser sequence used native text input and
+proved the same Session/Run and byte-exact response after API restart. The full
+unmodified browser suite also passed from a complete `git archive` of exact
+`5b3b44a2c411e80e8842f833b45d80480cbcfcb3`, with its own compiler, assets,
+SQLite file, port and artifact paths. This is baseline evidence; new Review
+changes need their own acceptance. The earlier mutable-build race is invalid
+evidence. An additional assets-only baseline attempt failed at result-group
+deletion's log count (`45 !== 44`); its retained negative log is separate from
+the passing complete-tree attempt and does not establish a resolved race.
+The final Review build subsequently passed the complete protected SQLite browser
+suite on its own fixed assets, plus a fresh synthetic live-camera attachment
+gate. The new pane's save-on-reopen defect was fixed and a new immediate Edit
+read was changed to await the same exact NgModel value, preserving its assertion
+and default timeout. The retained negative logs are not passing results.
+Publication CI must still be checked for the new commit.
 
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
 `docs/testcenter-thread-migration-process.pptx` remain untouched and unuploaded;
-they are not prerequisites or available cloud fixtures. Avoid copying unrelated
+the user independently rechecked their unchanged hashes. They are not
+prerequisites or available cloud fixtures. Avoid copying unrelated
 local services or claiming they remain available after the laptop is closed.
 
 Record fresh Entire checkpoints for real commits when the cloud runtime supports
@@ -86,3 +117,15 @@ ref. Never fabricate traces or attach an old local session as cloud evidence.
 If cloud capture is unsupported, report the limitation without obscuring the
 GitHub code history. Keep acceptance evidence and negative results honest;
 never commit credentials, private response data or unrelated user artifacts.
+
+Actual Entire Cloud capture is currently unavailable: the runtime has neither
+the Entire CLI/hooks nor an exposed Cloud session-trace exporter. Existing
+settings and historical checkpoint refs do not constitute a new trace. New
+commits therefore must not receive invented checkpoint trailers or reuse old
+local sessions; GitHub code history remains authoritative. Physical camera and
+OS-window visibility acceptance, deployment and production acceptance remain
+separate from these headless Cloud checks.
+The historical `5b3b44a2` trailer was verified against remote
+`refs/entire/checkpoints/60/01M4D17VRMWJ3E43Z32G5RBA60`
+(`fbd52e6fc67a5b9285bc1a5de1c488bf512fec38`). It is baseline metadata,
+not a Cloud trace for the new Review work.

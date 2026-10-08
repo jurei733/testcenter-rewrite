@@ -195,6 +195,18 @@ Original-reference comparison. For isolated frontend browser checks,
 `UI_SMOKE_FRONTEND_ROOT` can point to an owned directory containing
 `dist/apps/web/browser/index.html`; invalid roots fail before runtime startup.
 
+The optional participant Original Review drawer has a dedicated protected
+SQLite/browser gate: `npm run smoke:ui:original-review:built`. It checks all
+three themes at 1280/390px, native test/unit/task comments, save/edit/delete,
+draft/list reopening, failed-save retry and exact Run/Session isolation.
+`npm run reference:ui:original-review:built` renders separately built current
+Original assets against owned synthetic API fixtures. Set
+`ORIGINAL_REVIEW_REFERENCE_ROOT` to that build, then pass its `metrics.json` as
+`ORIGINAL_REVIEW_REFERENCE_METRICS` to the Rewrite gate for exact measured
+geometry/style comparisons. See `docs/ORIGINAL-UI-PARITY.md` for commands and
+remaining pixel/full-page acceptance boundaries. Build cleanup must not run
+against assets still used by an active fixture.
+
 The optional Original Systemcheck report reuses the same required answers,
 environment, network measurements and report submission controller. Additional
 Rewrite diagnostics stay in the stored payload without appearing in the

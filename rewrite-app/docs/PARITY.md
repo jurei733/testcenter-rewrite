@@ -1,5 +1,41 @@
 # Testcenter parity checklist
 
+### Restored Cloud and optional Review pane (2026-10-08)
+
+GitHub access and the published private Cloud environment are verified. Regular
+per-turn network permission now allows owned loopback/SQLite execution; VM
+domain rules and filesystem rights are unchanged. Fresh normal core/frontend
+tests pass (505, including eight new Review state/boundary checks), as do 61
+compatibility checks, typecheck and production build. Initial output remains
+469.98 kB below the unchanged 470-kB error limit. The exact `5b3b44a2` complete
+Git-archive baseline passed its full unmodified browser suite with isolated
+compiler/assets/database/ports. The new Review build has separate fixed assets.
+
+Current upstream is still `14c98284590195631750bb2352cb398ca669fe7d`.
+The optional Original Review pane now has the Source toolbar/form/lists,
+add/edit/back actions and theme colors instead of the generic 420px Rewrite
+pane. Twenty-four actual rendered reference/Rewrite states at the same native
+scroll endpoint match measured geometry, action-button styles, list typography
+and toolbar/scrim colors across all three themes at 1280/390px.
+Protected native SQLite flows verify target/category/priority semantics, exact
+comment bytes, same-Run reload, foreign-Session denial, unchanged foreign reviews,
+retry and draft/list restoration. Rewrite remains available. Raw screenshots
+are not pixel-identical and all eight full-page UI rows remain open; see
+`ORIGINAL-UI-PARITY.md` for the reproducible scope and negative fixture evidence.
+
+The complete new-tree browser run reproduced the disabled-save-on-reopen defect;
+its log/screenshot are retained and the focused regression passes after restoring
+the actual form state. The subsequent complete protected SQLite browser suite
+passes on fixed final production assets. Its adapted Edit assertion waits for
+the exact expected NgModel value: the earlier immediate read failed before
+rendering, while the retained failure screenshot already showed that exact text.
+No assertion or timeout was weakened. New publication CI remains a separate
+gate. Synthetic live-camera attachment acceptance passes in headless
+Cloud; physical camera/OS-window visibility, deployment and production acceptance
+remain unproven. Real Entire Cloud trace export/CLI/hooks are unavailable, so no
+old local session or invented checkpoint is attached to new work. The historical
+`5b3b44a2` trailer's remote checkpoint ref was independently verified.
+
 ### Active camera identity and cloud handoff (2026-10-08)
 
 Camera selection now reflects the active owned video's actual track device ID,

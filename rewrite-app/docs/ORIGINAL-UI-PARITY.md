@@ -34,6 +34,63 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+### Current Review drawer comparison (2026-10-08)
+
+The optional participant Review pane now adapts the actual `14c98284` toolbar,
+700px inner panel/90%-viewport drawer, Material form, current-Unit and whole-Test
+lists, add/edit/back actions, priorities/categories, primary/on-primary colors
+and scrim. The existing Rewrite pane remains available. Both use the same
+authorized facade and SQLite review routes; there is no second persistence or
+credential path. Pane/list/draft state is scoped to the exact Run and Unit.
+
+`reference:ui:original-review:built` renders unmodified current upstream assets
+with owned API fixtures; `smoke:ui:original-review:built` uses a protected owned
+SQLite API. They share the same synthetic Player, labels and exact comment.
+Before every list/edit capture they require the intended visible entry or exact
+editor text, completed fonts and settled drawer geometry. Trusted native wheel
+input puts both panes at the same natural top/left scroll endpoint before each
+capture; no DOM scroll setter or forced input establishes the comparison.
+All 24 empty/filled/list/edit
+pairs pass in Primar, Sekundar and Erwachsene at 1280 and 390 pixels: panel,
+drawer, toolbar and form-control rectangles match exactly, as do measured
+toolbar/action-button colors, button geometry/shape/font, list typography and
+scrim. Earlier empty/incorrect review-list
+fixture captures are not evidence. Source-frontend fixtures do not prove the
+Source backend. Raw screenshots still differ, including the remaining plain-label
+tint and history-dependent native scrolling; this is not full pixel identity.
+
+Native protected browser flows also pass new/edit/save/delete/cancel, add/back,
+test/unit/task targets, simultaneous categories, exact Unicode/newline content,
+same-Run reload, restored editable drafts after closing/reopening, list reopening,
+failed-save retry and switching to Rewrite. Own credentials authenticate their
+own Run (`200`) and fail for another Session's Run (`401`); its review inventory
+remains byte-for-byte unchanged. Eight actual production-class regressions cover
+restoration, duplicate actions, destroyed views and late results across Run/Unit
+boundaries. The new browser gate is mandatory CI. No full-page row below is
+closed by this component-level comparison.
+
+To reproduce against separately built unmodified upstream assets:
+
+```sh
+ORIGINAL_REVIEW_REFERENCE_ROOT=/path/to/original/frontend/dist/testcenter-frontend/browser \
+UI_SMOKE_ARTIFACT_DIR=/tmp/owned-original-reference \
+npm run reference:ui:original-review:built
+ORIGINAL_REVIEW_REFERENCE_METRICS=/tmp/owned-original-reference/metrics.json \
+UI_SMOKE_ARTIFACT_DIR=/tmp/owned-rewrite-review \
+npm run smoke:ui:original-review:built
+```
+
+Verify the upstream source SHA and build first. Use fixed production assets and
+separate owned databases/ports; do not run build/typecheck cleanup against assets
+still used by a browser fixture. A protected full new-tree run reproduced a
+disabled save button after drawer recreation despite a retained draft. Its
+negative log/screenshot were retained; the implementation now restores real
+form changes and the new native close/reopen regressions pass. The complete
+protected SQLite suite then passed on fixed final production assets. An immediate
+new Edit-value read was corrected to await that exact rendered value, retaining
+the assertion and default timeout; its failure screenshot showed the expected
+text already rendered. Publication CI remains separate from these Cloud gates.
+
 The current independent header/navigation/toolbar short-label keys now compile
 and render in both interfaces, including missing-short-label fallback, modern
 toolbar-key precedence and read-only projection of older stored source keys.

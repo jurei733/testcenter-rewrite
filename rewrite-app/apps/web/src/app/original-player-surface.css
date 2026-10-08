@@ -13,6 +13,7 @@
 :root[data-interface-mode="original"] app-participant-view:has(.is-original-player) {
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 .is-original-player {
