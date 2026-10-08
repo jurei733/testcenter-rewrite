@@ -1,5 +1,31 @@
 # Testcenter parity checklist
 
+### Original PDF typography — development evidence (2026-10-08)
+
+The actual unmodified Source/TCPDF output uses regular Helvetica 12, black
+authored-label text and creator `IQB-Testcenter`. The optional Original PDF
+projection now matches those properties and omits the Rewrite handoff caption,
+repeated code and page footer. The existing default Rewrite layout is retained.
+Four matching-content default Rewrite single/batch/long-label cases have
+byte-identical content streams against the isolated `b835bc78` implementation.
+An independent check reads font/size/creator and matching text from the actual
+Source PDF, rather than deriving expected values from the new renderer.
+
+Fresh typecheck, production build (469.98 kB), all 508 normal tests and the
+protected SQLite Attachment browser slice pass. It still requires four native
+single/batch downloads across both interface modes, HTTP 200/private-no-store,
+actual saved PDF bytes, upload/preview/delete and worker release. The current
+PDFs also pass owned image and generated-video camera decoding with the
+production scanner/unchanged worker, including native Stop and worker closure.
+The existing scoped Attachment API sequence passes separately on Memory, File
+and SQLite, retaining unauthenticated 401, foreign-group 403 and private/no-store
+Original downloads.
+No existing assertion or timeout was relaxed. Labels remain below the protected
+QR region; the Source's above-QR placement, exact wrapping/substitutions, PDF
+bookmarks and complete pixel identity remain open. No Original-UI matrix row is
+closed by these PDF properties. This is local/Cloud development evidence,
+pending the preceding published head's complete Push-CI verification.
+
 ### Optional printed QR region — development evidence (2026-10-08)
 
 Current Source `14c98284` `AttachmentTemplate.class.php` prints its A4 QR at
@@ -7,8 +33,9 @@ Current Source `14c98284` `AttachmentTemplate.class.php` prints its A4 QR at
 `layout=original` PDF projection uses that geometry; the existing centered
 80 mm Rewrite PDF remains the default. Single/batch manager exports select the
 current interface's projection through the same authorized endpoints. Original
-projection labels/captions stay below the QR region so long wrapped text cannot
-obscure it. Their typography/placement is not claimed identical to TCPDF output.
+projection initially placed labels/captions below the QR region so long wrapped
+text could not obscure it. Subsequent font/caption corrections are recorded
+above; complete typography/placement is not claimed identical to TCPDF output.
 
 Development checks pass typecheck/build (469.98 kB), 507 normal tests including
 two actual generated-PDF geometry regressions, and the scoped Attachment API

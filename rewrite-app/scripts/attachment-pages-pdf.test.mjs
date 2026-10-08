@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
-import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
+import { PDFArray, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
 // Inspect the PDF actually produced by the production renderer, including its
 // image transforms. Fixtures contain only owned synthetic attachment metadata.
@@ -32,7 +32,8 @@ async function rendered(input) {
       const [aa,bb,cc,dd,ee,ff]=matrix;
       matrix=[aa*a+cc*b,bb*a+dd*b,aa*c+cc*d,bb*c+dd*d,aa*e+cc*f+ee,bb*e+dd*f+ff];
     }
-    return {page,content,matrix};
+    const fonts = page.node.Resources().lookup(PDFName.of("Font"));
+    return {page,content,matrix,fonts,pdf};
   });
 }
 
@@ -58,4 +59,18 @@ test("default and explicit Rewrite PDFs retain the existing centered 80 mm QR ge
   near(defaultPage.matrix[0],226.77); near(defaultPage.matrix[3],226.77);
   near(defaultPage.matrix[4],(595.28-226.77)/2);
   near(defaultPage.matrix[5],841.89-56.69-38-22-226.77-40);
+});
+
+test("Original PDF matches rendered Source regular Helvetica 12 and excludes handoff captions/footer",async()=>{
+  const [{content,fonts,pdf}] = await rendered({attachments:[attachment],layout:"original",labelTemplate:"Own label"});
+  assert.equal(pdf.getCreator(),"IQB-Testcenter");
+  const text = [...content.matchAll(/\/([^\s]+) ([\d.]+) Tf/g)];
+  assert.equal(text.length,1,"Only the authored label is visible text");
+  assert.equal(Number(text[0][2]),12);
+  const font = pdf.context.lookup(fonts.get(PDFName.of(text[0][1])));
+  assert.equal(font.get(PDFName.of("BaseFont")).toString(),"/Helvetica");
+  assert.match(content,/0 0 0 rg/);
+  assert.equal([...content.matchAll(/<[a-f\d]+> Tj/gi)].length,1);
+  const encodedLabel = Buffer.from("Own label","ascii").toString("hex");
+  assert.match(content,new RegExp(`<${encodedLabel}> Tj`,"i"));
 });

@@ -89,6 +89,9 @@ retains its centered QR; Original uses the current Source's 20 mm left/top,
 also accepts `layout=original`; omission retains Rewrite. This reproduces the
 QR region, while complete TCPDF typography, label substitutions and camera
 framing remain tracked acceptance requirements in `docs/PARITY.md`.
+Original also uses the rendered Source's regular Helvetica 12 in black and
+omits the additional Rewrite handoff caption and page footer. Exact Source label
+placement/wrapping and full PDF identity remain open.
 
 The separate `npm run smoke:ui:attachments-visibility:built` requires a real
 headful hidden-window transition and stream pause/resume. It currently fails

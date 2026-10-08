@@ -147,6 +147,17 @@ Original UI rows and physical visibility remain open. See `PARITY.md` for scope
 and retained negative helper attempts. This local commit has not been pushed;
 do not label it CI-green or deployed.
 
+A further local PDF step matches the actual Source's regular Helvetica 12,
+black label text and creator, and omits additional Rewrite captions/footer in
+Original mode. Four default Rewrite content-stream comparisons against the
+isolated `b835bc78` renderer are byte-identical. Fresh typecheck/build (469.98 kB),
+508 normal tests, scoped Attachment API checks on Memory/File/SQLite, protected
+native SQLite Attachment UI downloads/capture and owned PDF image/live-camera
+decoding pass. Regular network permission was granted for this continuation
+turn, with the same enforced VM domain rules and filesystem scope. Label
+placement/wrapping/substitutions, PDF bookmarks and full identity remain open.
+This is an additional local commit, not pushed CI or production acceptance.
+
 Use fresh owned synthetic SQLite/PostgreSQL fixtures and repository scripts.
 The local private tryout database and untracked
 `docs/testcenter-thread-migration-process.pptx` remain untouched and unuploaded;

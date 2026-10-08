@@ -89,7 +89,7 @@ export const createAttachmentPagesPdf = async (input: {
   }
 
   const pdf = await PDFDocument.create();
-  pdf.setCreator("IQB Testcenter Rewrite");
+  pdf.setCreator(input.layout === "original" ? "IQB-Testcenter" : "IQB Testcenter Rewrite");
   pdf.setProducer("IQB Testcenter Rewrite");
   pdf.setTitle(
     input.attachments.length === 1
@@ -110,11 +110,13 @@ export const createAttachmentPagesPdf = async (input: {
     const label = toPdfSafeText(
       applyAttachmentLabelTemplate(attachment, input.labelTemplate)
     );
-    const labelSize = 16;
+    // Unmodified Source AttachmentTemplate uses TCPDF's regular Helvetica 12.
+    const labelSize = originalLayout ? 12 : 16;
+    const labelFont = originalLayout ? regularFont : boldFont;
     const labelLines = wrapPdfText(
       label,
       A4_WIDTH - PAGE_MARGIN * 2,
-      value => boldFont.widthOfTextAtSize(value, labelSize)
+      value => labelFont.widthOfTextAtSize(value, labelSize)
     );
 
     if (!originalLayout) page.drawText("Attachment capture page", {
@@ -125,13 +127,13 @@ export const createAttachmentPagesPdf = async (input: {
       color: rgb(0.28, 0.34, 0.44)
     });
     labelLines.forEach((line, lineIndex) => {
-      const lineWidth = boldFont.widthOfTextAtSize(line, labelSize);
+      const lineWidth = labelFont.widthOfTextAtSize(line, labelSize);
       page.drawText(line, {
         x: (A4_WIDTH - lineWidth) / 2,
         y: (originalLayout ? A4_HEIGHT - 75 * mm : A4_HEIGHT - PAGE_MARGIN - 38) - lineIndex * 22,
         size: labelSize,
-        font: boldFont,
-        color: rgb(0.06, 0.09, 0.15)
+        font: labelFont,
+        color: originalLayout ? rgb(0, 0, 0) : rgb(0.06, 0.09, 0.15)
       });
     });
 
@@ -164,10 +166,12 @@ export const createAttachmentPagesPdf = async (input: {
       height: qrSize
     });
 
+    // Source prints the authored label and QR, without the Rewrite handoff
+    // caption, repeated attachment code or page footer.
+    if (originalLayout) continue;
+
     const codeSize = 7.5;
-    const codeLabelY = originalLayout
-      ? A4_HEIGHT - 75 * mm - labelLines.length * 22 - 24
-      : qrY - 52;
+    const codeLabelY = qrY - 52;
     const codeLines = wrapPdfText(
       attachment.attachmentId,
       A4_WIDTH - PAGE_MARGIN * 2,
