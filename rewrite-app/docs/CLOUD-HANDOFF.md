@@ -138,7 +138,8 @@ buttons, attachment upload/preview/delete, result deletion and clean shutdown.
 Owned actual PDF images also pass image and generated-video decoding through
 the production scanner/unchanged worker. Independent unmodified Source PHP 8.3
 and pinned TCPDF 6.10.0 rendering now verifies actual QR bounds for default and
-long labels. Rendering runs in a netzless, read-only container using owned data;
+long labels. Rendering runs in a container without network access, with a
+read-only root/source/dependencies and only its owned evidence output writable;
 dependency retrieval used the existing enforced package-manager preset. No VM
 domain, filesystem policy, VPN or TLS rule changed. Source camera-page startup
 still fails with its recorded `nativeElement` error; complete PDF typography,
