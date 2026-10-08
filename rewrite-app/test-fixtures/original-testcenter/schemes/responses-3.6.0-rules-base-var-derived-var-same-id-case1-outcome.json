@@ -1,0 +1,30 @@
+[
+  {
+    "id": "b1",
+    "status": "CODING_COMPLETE",
+    "value": "111",
+    "code": 1,
+    "score": 0
+  },
+  {
+    "id": "b2",
+    "status": "CODING_COMPLETE",
+    "value": "333",
+    "code": 1,
+    "score": 0
+  },
+  {
+    "id": "b3",
+    "status": "CODING_COMPLETE",
+    "value": "666",
+    "code": 2,
+    "score": 1
+  },
+  {
+    "id": "d1",
+    "value": 4,
+    "status": "CODING_COMPLETE",
+    "code": 1,
+    "score": 1
+  }
+]

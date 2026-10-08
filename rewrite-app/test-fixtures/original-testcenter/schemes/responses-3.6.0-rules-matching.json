@@ -1,0 +1,137 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "sourceType": "BASE",
+      "processing": ["IGNORE_ALL_SPACES"],
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "111"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "22 2 "
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "score": 1,
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "processing": [
+          "TAKE_DISPLAYED_AS_VALUE_CHANGED"
+        ]
+      },
+      "codes": [
+        {
+          "id": 1,
+          "score": 100,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": [
+                    "333\n555\n777"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 5,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "444"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "score": 1,
+      "sourceType": "BASE",
+      "processing": ["IGNORE_CASE"],
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "Counterpart\nFrickelbude\nWackel Schwanz"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH_REGEX",
+                  "parameters": [
+                    "KO+B\r\nFZ*M"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+
+      ]
+    }
+  ]
+}

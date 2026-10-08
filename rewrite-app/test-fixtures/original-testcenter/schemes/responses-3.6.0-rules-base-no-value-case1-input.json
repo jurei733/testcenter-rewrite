@@ -1,0 +1,12 @@
+[
+  {
+    "id": "text_1",
+    "status": "DISPLAYED",
+    "value": []
+  },
+  {
+    "id": "text-field_1",
+    "status": "VALUE_CHANGED",
+    "value": "5"
+  }
+]

@@ -1,0 +1,98 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": [
+          "TAKE_DISPLAYED_AS_VALUE_CHANGED",
+          "TAKE_EMPTY_AS_VALID"
+        ]
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "<p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">@Martin: Bei jedem Feld muss bei Leere ein 34-Code kommen.</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\"></p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Mögliche Reihenfolge:</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\"></p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Sina, Hedi, Tanja</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Sina, Tanja, Hedi</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Hedi, Tanja, Sina</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Hedi, Sina, Tanja</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Tanja, Sina, Hedi</p><p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">Tanja, Hedi, Sina</p>",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 31,
+          "type": "TO_CHECK",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_1"] }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 32,
+          "type": "TO_CHECK",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_2"] }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 33,
+          "type": "TO_CHECK",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                { "method": "MATCH", "parameters": ["01_3"] }
+              ]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 34,
+          "type": "TO_CHECK",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [{ "method": "IS_EMPTY" }]
+            }
+          ],
+          "manualInstruction": ""
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    }
+
+  ],
+  "version": "3.0"
+}

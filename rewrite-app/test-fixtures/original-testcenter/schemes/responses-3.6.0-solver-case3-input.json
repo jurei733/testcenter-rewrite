@@ -1,0 +1,17 @@
+[
+  {
+    "id": "t1",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  },
+  {
+    "id": "t2",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  },
+  {
+    "id": "t3",
+    "status": "VALUE_CHANGED",
+    "value": "2"
+  }
+]

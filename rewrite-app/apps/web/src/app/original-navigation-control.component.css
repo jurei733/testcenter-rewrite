@@ -1,0 +1,17 @@
+/* Adapted from IQB Testcenter 19; see assets/ORIGINAL-UI-LICENSE.txt. */
+:host { display: flex; }
+.nav-button { background: var(--mat-sys-primary); color: var(--mat-sys-on-primary); }
+.nav-button:disabled {
+  background: var(--mat-sys-state-on-surface-opacity-10, rgba(39, 26, 43, .10));
+  color: var(--mat-sys-state-on-surface-opacity-10);
+}
+.previous-button { border-radius: 8px 0 0 8px; }
+.next-button { border-radius: 0 6px 6px 0; }
+svg { width: 24px; height: 24px; fill: currentColor; display: inline-flex; }
+.label-container { display: flex; align-items: center; box-sizing: border-box; height: 40px; border: 1px solid var(--theme-gray-80, #ccc); }
+.label-container .label { padding: 0 8px; white-space: nowrap; }
+.label-container.readonly { border-radius: 100px; }
+.label-container.list { border-radius: 0; }
+.label-container.list.readonly { border-radius: 8px; }
+.list-item { border-left: 1px solid var(--mat-sys-primary); width: 37px; height: 40px; display: flex; justify-content: center; align-items: center; }
+.list-item.selected { background: var(--mat-sys-primary); color: white; }

@@ -39,15 +39,19 @@ export async function activateContentReleaseAction(
       }
     );
 
+    const supersededOpenRunCount = payload.activation.supersededOpenRunCount;
     host.rememberActivity(
       "Release Activated",
-      `${payload.contentRelease.contentReleaseId} is now ${payload.contentRelease.status}. Force activation: ${host.getForceActivation() ? "on" : "off"}.`
+      supersededOpenRunCount === 0
+        ? `${payload.contentRelease.contentReleaseId} is now ${payload.contentRelease.status}. Force activation: ${payload.activation.forced ? "on" : "off"}.`
+        : `${payload.contentRelease.contentReleaseId} is now ${payload.contentRelease.status}. Force activation superseded ${supersededOpenRunCount} open run(s).`
     );
 
     applyActivationSuccessView(
       host.createActivationGuardHost(),
       payload.contentRelease.contentReleaseId,
-      host.getForceActivation()
+      payload.activation.forced,
+      payload.activation
     );
     await host.refreshContentReads();
     await host.loadContentReleaseActivationReadiness();

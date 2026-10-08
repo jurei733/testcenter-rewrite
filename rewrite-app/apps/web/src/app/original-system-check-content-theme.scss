@@ -1,0 +1,8 @@
+@use './original-material-theme' as theme;
+@use '@angular/material' as mat;
+
+// Pinned 19.0 raised cards; scope to the Original Systemcheck content only.
+:host {
+  @include theme.apply();
+  @include mat.card-overrides((elevated-container-color: var(--mat-sys-surface)));
+}

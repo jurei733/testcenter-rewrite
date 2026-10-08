@@ -1,14 +1,29 @@
 import type {
+  CreateReviewRequest,
+  DeleteReviewResponse,
+  ReviewResponse,
+  DeleteGroupResultsResponse,
+  ImportParticipantRosterRequest,
+  ImportParticipantRosterResponse,
+  IssueMonitorRunCommandRequest,
+  IssueMonitorRunCommandResponse,
+  IssueMonitorRunCommandsRequest,
+  IssueMonitorRunCommandsResponse,
+  ParticipantLaunchRequest,
+  ParticipantLaunchResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
+  ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
-  SaveTestRunProgressResponse
+  SaveTestRunProgressResponse,
+  UpdateReviewRequest
 } from "@testcenter-rewrite-app/contracts";
 
 import {
   applyCompleteRunResult,
+  applyParticipantLaunchResult,
   applyParticipantSignInResult,
   applyResumeParticipantSessionResult,
   applyResumeRunResult,
@@ -21,18 +36,119 @@ export interface ShellRuntimeActionsHost {
     label: string,
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    onSuccess?: (payload: T) => void
   ): Promise<T>;
   getParticipantSignInPath(): string;
+  getParticipantLaunchPath(): string;
   getResumeParticipantSessionPath(): string;
   getSaveProgressPath(): string;
   getResumeRunPath(): string;
   getCompleteRunPath(): string;
+  getMonitorRunCommandPath(): string;
+  getMonitorRunCommandsPath(): string;
+  getDeleteGroupResultsPath(): string;
+  getCreateReviewPath(): string;
+  getUpdateReviewPath(): string;
+  getDeleteReviewPath(): string;
+  getImportParticipantRosterPath(): string;
+  getTenantKey(): string;
   getWorkspaceKey(): string;
+  getEntryRosterText(): string;
+  setParticipantRosterView(nextValue: string): void;
   getLoginKey(): string;
+  getParticipantPassword(): string;
+  getParticipantCode(): string;
+  getGroupKey(): string;
+  getBookletKey(): string;
+  getParticipantSessionId(): string;
+  getTestRunId(): string;
   getCurrentUnitKey(): string;
+  getMonitorTargetUnitKey(): string;
+  getMonitorTimeSeconds(): string;
+  getCurrentUnitResponse(): string;
+  getReviewerId(): string;
+  getReviewCategory(): string;
+  getReviewComment(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
+}
+
+export async function importParticipantRosterAction(
+  host: ShellRuntimeActionsHost
+): Promise<ImportParticipantRosterResponse> {
+  const payload = await host.request<ImportParticipantRosterResponse>(
+    "Import Participant Roster",
+    "POST",
+    host.getImportParticipantRosterPath(),
+    {
+      rosterText: host.getEntryRosterText()
+    } satisfies ImportParticipantRosterRequest
+  );
+  host.setParticipantRosterView(JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+export async function createReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<ReviewResponse> {
+  const payload = await host.request<ReviewResponse>(
+    "Create Review",
+    "POST",
+    host.getCreateReviewPath(),
+    {
+      participantSessionId: host.getParticipantSessionId().trim(),
+      testRunId: host.getTestRunId().trim(),
+      unitKey: host.getCurrentUnitKey().trim() || null,
+      reviewerId: host.getReviewerId().trim(),
+      category: host.getReviewCategory().trim(),
+      comment: host.getReviewComment().trim()
+    } satisfies CreateReviewRequest
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function updateReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<ReviewResponse> {
+  const payload = await host.request<ReviewResponse>(
+    "Update Review",
+    "PATCH",
+    host.getUpdateReviewPath(),
+    {
+      unitKey: host.getCurrentUnitKey().trim() || null,
+      reviewerId: host.getReviewerId().trim(),
+      category: host.getReviewCategory().trim(),
+      comment: host.getReviewComment().trim()
+    } satisfies UpdateReviewRequest
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function deleteReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<DeleteReviewResponse> {
+  const payload = await host.request<DeleteReviewResponse>(
+    "Delete Review",
+    "DELETE",
+    host.getDeleteReviewPath()
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function deleteGroupResultsAction(
+  host: ShellRuntimeActionsHost
+): Promise<DeleteGroupResultsResponse> {
+  const payload = await host.request<DeleteGroupResultsResponse>(
+    "Delete Group Results",
+    "DELETE",
+    host.getDeleteGroupResultsPath()
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }
 
 export async function participantSignInAction(
@@ -43,8 +159,12 @@ export async function participantSignInAction(
     "POST",
     host.getParticipantSignInPath(),
     {
+      tenantKey: host.getTenantKey().trim() || undefined,
       workspaceKey: host.getWorkspaceKey().trim(),
-      loginKey: host.getLoginKey().trim()
+      loginKey: host.getLoginKey().trim(),
+      groupKey: host.getGroupKey().trim() || undefined,
+      password: host.getParticipantPassword() || undefined,
+      participantCode: host.getParticipantCode().trim() || undefined
     } satisfies ParticipantSignInRequest
   );
   applyParticipantSignInResult(host.createRuntimePresentationHost(), payload);
@@ -57,7 +177,10 @@ export async function resumeParticipantSessionAction(
   const payload = await host.request<ResumeParticipantSessionResponse>(
     "Resume Session",
     "POST",
-    host.getResumeParticipantSessionPath()
+    host.getResumeParticipantSessionPath(),
+    {
+      bookletKey: host.getBookletKey().trim() || undefined
+    } satisfies ResumeParticipantSessionRequest
   );
   applyResumeParticipantSessionResult(
     host.createRuntimePresentationHost(),
@@ -66,17 +189,40 @@ export async function resumeParticipantSessionAction(
   await host.refreshCrossViewStateAfterRuntimeChange();
 }
 
+export async function participantLaunchAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<ParticipantLaunchResponse>(
+    "Participant Starter Launch",
+    "POST",
+    host.getParticipantLaunchPath(),
+    {
+      tenantKey: host.getTenantKey().trim() || undefined,
+      workspaceKey: host.getWorkspaceKey().trim(),
+      loginKey: host.getLoginKey().trim(),
+      groupKey: host.getGroupKey().trim() || undefined,
+      bookletKey: host.getBookletKey().trim() || undefined,
+      password: host.getParticipantPassword() || undefined,
+      participantCode: host.getParticipantCode().trim() || undefined
+    } satisfies ParticipantLaunchRequest
+  );
+  applyParticipantLaunchResult(host.createRuntimePresentationHost(), payload);
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
 export async function saveProgressAction(
   host: ShellRuntimeActionsHost,
   status: "paused" | "running"
 ): Promise<void> {
+  const currentUnitKey = host.getCurrentUnitKey().trim();
   const payload = await host.request<SaveTestRunProgressResponse>(
     status === "paused" ? "Save Progress Paused" : "Save Progress Running",
     "POST",
     host.getSaveProgressPath(),
     {
-      currentUnitKey: host.getCurrentUnitKey().trim() || null,
-      status
+      currentUnitKey: currentUnitKey || undefined,
+      status,
+      unitResponse: host.getCurrentUnitResponse()
     } satisfies SaveTestRunProgressRequest
   );
   applySaveProgressResult(host.createRuntimePresentationHost(), payload, status);
@@ -103,4 +249,164 @@ export async function completeRunAction(
   }>("Complete Run", "POST", host.getCompleteRunPath());
   applyCompleteRunResult(host.createRuntimePresentationHost(), payload);
   await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function issueMonitorRunCommandAction(
+  host: ShellRuntimeActionsHost,
+  commandType:
+    | "pause"
+    | "resume"
+    | "complete"
+    | "complete_and_lock"
+    | "goto"
+    | "lock_test"
+    | "unlock_test"
+    | "unlock_navigation"
+    | "lock_navigation"
+    | "set_testlet_time",
+  options?: { remainingSeconds?: number },
+  onAccepted?: (result: IssueMonitorRunCommandResponse) => void
+): Promise<IssueMonitorRunCommandResponse> {
+  const requestLabel = {
+    pause: "Monitor Pause Run",
+    resume: "Monitor Resume Run",
+    complete: "Monitor Complete Run",
+    complete_and_lock: "Monitor Complete And Lock Run",
+    goto: "Monitor Go To Unit",
+    lock_test: "Monitor Lock Test",
+    unlock_test: "Monitor Unlock Test",
+    unlock_navigation: "Monitor Unlock Navigation",
+    lock_navigation: "Monitor Lock Navigation",
+    set_testlet_time: "Monitor Set Testlet Time"
+  }[commandType];
+  const payload = await host.request<IssueMonitorRunCommandResponse>(
+    requestLabel,
+    "POST",
+    host.getMonitorRunCommandPath(),
+    {
+      commandType,
+      actorId: host.getReviewerId().trim() || undefined,
+      ...(commandType === "goto"
+        ? {
+            targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+            ...(options?.remainingSeconds != null
+              ? { remainingSeconds: options.remainingSeconds }
+              : {})
+          }
+        : commandType === "set_testlet_time"
+          ? {
+              targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+              remainingSeconds: Number(host.getMonitorTimeSeconds())
+            }
+          : {})
+    } satisfies IssueMonitorRunCommandRequest,
+    onAccepted
+  );
+
+  if (commandType === "pause") {
+    applySaveProgressResult(
+      host.createRuntimePresentationHost(),
+      { testRun: payload.command.testRun },
+      "paused"
+    );
+  } else if (
+    commandType === "resume" ||
+    commandType === "goto" ||
+    commandType === "lock_test" ||
+    commandType === "unlock_test" ||
+    (commandType === "unlock_navigation" &&
+      payload.command.testRun.status === "running") ||
+    (commandType === "lock_navigation" &&
+      payload.command.testRun.status === "running") ||
+    (commandType === "set_testlet_time" &&
+      payload.command.testRun.status === "running")
+  ) {
+    applyResumeRunResult(host.createRuntimePresentationHost(), {
+      testRun: payload.command.testRun
+    });
+  } else if (
+    commandType === "complete" ||
+    commandType === "complete_and_lock"
+  ) {
+    applyCompleteRunResult(host.createRuntimePresentationHost(), {
+      testRun: payload.command.testRun
+    });
+  } else {
+    applySaveProgressResult(
+      host.createRuntimePresentationHost(),
+      { testRun: payload.command.testRun },
+      "paused"
+    );
+  }
+
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function issueMonitorRunCommandsAction(
+  host: ShellRuntimeActionsHost,
+  testRunIds: string[],
+  commandType:
+    | "pause"
+    | "resume"
+    | "complete"
+    | "complete_and_lock"
+    | "goto"
+    | "lock_test"
+    | "unlock_test"
+    | "unlock_navigation"
+    | "lock_navigation"
+    | "set_testlet_time",
+  options?: { remainingSeconds?: number; targetUnitKey?: string },
+  onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
+): Promise<IssueMonitorRunCommandsResponse> {
+  const payload = await host.request<IssueMonitorRunCommandsResponse>(
+    `Monitor ${commandType} ${testRunIds.length} Runs`,
+    "POST",
+    host.getMonitorRunCommandsPath(),
+    {
+      testRunIds,
+      commandType,
+      actorId: host.getReviewerId().trim() || undefined,
+      ...(commandType === "goto"
+        ? {
+            targetUnitKey:
+              options?.targetUnitKey?.trim() ||
+              host.getMonitorTargetUnitKey().trim(),
+            ...(options?.remainingSeconds != null
+              ? { remainingSeconds: options.remainingSeconds }
+              : {})
+          }
+        : commandType === "set_testlet_time"
+          ? {
+              targetUnitKey:
+                options?.targetUnitKey?.trim() ||
+                host.getMonitorTargetUnitKey().trim(),
+              remainingSeconds: Number(host.getMonitorTimeSeconds())
+            }
+          : {})
+    } satisfies IssueMonitorRunCommandsRequest,
+    onAccepted
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function finishAllMonitorRunsAction(
+  host: ShellRuntimeActionsHost,
+  onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
+): Promise<IssueMonitorRunCommandsResponse> {
+  const payload = await host.request<IssueMonitorRunCommandsResponse>(
+    "Finish All Monitor Runs",
+    "POST",
+    host.getMonitorRunCommandsPath(),
+    {
+      scope: "all_unlocked_open_runs",
+      commandType: "complete_and_lock",
+      actorId: host.getReviewerId().trim() || undefined
+    } satisfies IssueMonitorRunCommandsRequest,
+    onAccepted
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }

@@ -8,7 +8,8 @@ import {
   prettyPrintJson,
   readNumberValue,
   readScalarValue,
-  readStringValue
+  readStringValue,
+  readUnknownValue
 } from "./rewrite-app-shell.readers";
 
 export interface ShellOpsHost {
@@ -31,9 +32,47 @@ export interface ShellOpsHost {
   setStorageSchemaVersion(nextValue: string | number): void;
   getReadinessBadge(): string;
   setReadinessBadge(nextValue: string): void;
+  setRouteCount(nextValue: string | number): void;
+  setRuntimePort(nextValue: string | number): void;
+  setOperatorAuthMode(nextValue: string): void;
+  setBuildRef(nextValue: string): void;
   setDiagnosticsLoaded(nextValue: boolean): void;
   rememberActivity(title: string, detail: string): void;
 }
+
+const countRouteLeaves = (value: unknown): number => {
+  if (typeof value === "string") {
+    return 1;
+  }
+
+  if (!value || typeof value !== "object") {
+    return 0;
+  }
+
+  return Object.values(value).reduce(
+    (total, child) => total + countRouteLeaves(child),
+    0
+  );
+};
+
+const readBooleanValue = (value: unknown, path: string[]): boolean | null => {
+  const scalar = readUnknownValue(value, path);
+  return typeof scalar === "boolean" ? scalar : null;
+};
+
+const formatBuildRef = (manifest: unknown, runtimeConfig: unknown): string => {
+  const commitSha =
+    readStringValue(manifest, ["build", "commitSha"]) ??
+    readStringValue(runtimeConfig, ["build", "commitSha"]);
+  if (commitSha) {
+    return commitSha.slice(0, 12);
+  }
+
+  const builtAt =
+    readStringValue(manifest, ["build", "builtAt"]) ??
+    readStringValue(runtimeConfig, ["build", "builtAt"]);
+  return builtAt ? "timestamped" : "local";
+};
 
 export async function refreshOperationalDiagnosticsAction(
   host: ShellOpsHost,
@@ -86,6 +125,22 @@ export async function refreshOperationalDiagnosticsAction(
   host.setReadinessBadge(
     readStringValue(readiness, ["status"]) ?? host.getReadinessBadge()
   );
+  host.setRouteCount(countRouteLeaves(readUnknownValue(manifest, ["routes"])));
+  host.setRuntimePort(
+    readNumberValue(runtimeConfig, ["runtimeConfig", "port"]) ?? "n/a"
+  );
+  const operatorAuthRequired = readBooleanValue(runtimeConfig, [
+    "runtimeConfig",
+    "operatorAuthRequired"
+  ]);
+  host.setOperatorAuthMode(
+    operatorAuthRequired == null
+      ? "unknown"
+      : operatorAuthRequired
+        ? "required"
+        : "open"
+  );
+  host.setBuildRef(formatBuildRef(manifest, runtimeConfig));
   host.setDiagnosticsLoaded(true);
 
   if (!quiet) {

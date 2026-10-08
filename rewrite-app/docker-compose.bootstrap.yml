@@ -1,0 +1,20 @@
+services:
+  rewrite-app-api:
+    environment:
+      FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: ${FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME:-superadmin}
+      FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME:-Superadmin}
+      FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/rewrite_app_bootstrap_admin_password
+    secrets:
+      - rewrite_app_bootstrap_admin_password
+
+  rewrite-app-preflight:
+    environment:
+      FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: ${FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME:-superadmin}
+      FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME:-Superadmin}
+      FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/rewrite_app_bootstrap_admin_password
+    secrets:
+      - rewrite_app_bootstrap_admin_password
+
+secrets:
+  rewrite_app_bootstrap_admin_password:
+    file: ${FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_SOURCE_FILE:?Set FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_SOURCE_FILE to a secret file path}

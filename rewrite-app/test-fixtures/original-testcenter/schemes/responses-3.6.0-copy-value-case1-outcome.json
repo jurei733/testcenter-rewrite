@@ -1,0 +1,41 @@
+[
+  {
+    "id": "b1",
+    "status": "CODING_COMPLETE",
+    "value": "111",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "b2",
+    "status": "CODING_INCOMPLETE",
+    "value": [
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  {
+    "id": "b3",
+    "status": "CODING_COMPLETE",
+    "value": "555",
+    "code": 1,
+    "score": 7
+  },
+  {
+    "id": "d1",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d2",
+    "value": 8,
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d3",
+    "value": [true,false,true,true],
+    "status": "NO_CODING"
+  }
+]

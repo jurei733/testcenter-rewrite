@@ -1,0 +1,46 @@
+[
+  {
+    "id": "b1_alias",
+    "status": "CODING_COMPLETE",
+    "value": "111",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "b2_alias",
+    "status": "CODING_INCOMPLETE",
+    "value": "10"
+  },
+  {
+    "id": "b3_alias",
+    "status": "CODING_COMPLETE",
+    "value": "555",
+    "code": 1,
+    "score": 7
+  },
+  {
+    "id": "d1",
+    "value": 1124,
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d2",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d3",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  },
+  {
+    "id": "d4",
+    "value": 111.01801801801801,
+    "status": "NO_CODING"
+  },
+  {
+    "id": "d5",
+    "value": null,
+    "status": "DERIVE_ERROR"
+  }
+]

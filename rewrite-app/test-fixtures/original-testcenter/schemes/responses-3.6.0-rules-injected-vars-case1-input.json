@@ -1,0 +1,12 @@
+[
+  { "id": "b1", "value": "100+304", "status": "VALUE_CHANGED" },
+  { "id": "b2", "value": "300+104", "status": "VALUE_CHANGED" },
+  { "id": "b3", "value": "200+200+4", "status": "VALUE_CHANGED" },
+  {
+    "id": "d1",
+    "value": "",
+    "status": "CODING_COMPLETE",
+    "code": 0,
+    "score": 0
+  }
+]

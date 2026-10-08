@@ -1,0 +1,32 @@
+/* Layout adapted from IQB Testcenter (MIT), c35cff813 (19.0); see docs/ORIGINAL-UI-PARITY.md. */
+:host { display: block; min-width: 0; font-family: 'Nunito Sans', sans-serif; }
+.login-page { display: flex; flex-direction: row; gap: 64px; height: 100%; color: var(--mat-sys-on-surface); }
+.welcome-section { display: flex; flex-direction: column; align-items: center; width: 25%; gap: 48px; max-height: 100%; overflow: auto; box-sizing: border-box; padding: 64px 24px 20px; background: var(--secondary-soft); }
+.welcome-section img { width: 100%; }
+.welcome-section .heading { font-size: 30px; }
+.login-section { display: flex; flex-direction: column; align-items: start; width: 75%; gap: 60px; }
+form { margin-top: 64px; display: flex; flex-direction: column; width: 80%; gap: 24px; }
+h2 { margin: .83em 0; font-size: 30px; font-weight: 400; line-height: normal; letter-spacing: normal; }
+label { font: inherit; color: inherit; }
+input.mat-mdc-input-element { font: inherit; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+mat-form-field { display: block; }
+.login-submit { width: 15%; min-width: 120px; }
+.login-submit:disabled { opacity: 1; }
+/* Source MatIcon has an overflowing inline-SVG line box. A direct SVG flex
+   item changes its vertical baseline; retain that host without loading an
+   icon registry/remote resources into the shared initial bundle. */
+.login-submit .mat-icon { overflow: hidden; fill: currentColor; }
+button.mat-mdc-icon-button { font-family: revert; font-weight: revert; line-height: normal; }
+:host ::ng-deep .mdc-floating-label { gap: normal; }
+.password-headline { display: flex; align-items: center; gap: 24px; }
+.password-headline > button { color: var(--secondary); border: 1px solid var(--secondary); border-radius: 12px; }
+svg.mat-icon { display: block; width: 24px; height: 24px; fill: currentColor; flex-shrink: 0; }
+.password-field { display: flex; align-items: center; gap: 8px; }
+.password-field input { min-width: 0; flex: 1; }
+.button-section { align-self: end; display: flex; gap: 9px; margin-top: auto; padding-bottom: 12px; margin-right: 24px; }
+.button-section a { border: 1px solid var(--secondary); }
+.login-problem { color: #a12020; }
+.help-box { display: flex; flex-direction: row; align-items: center; justify-content: start;
+  padding: 10px 10px 10px 24px; border: 1px solid var(--secondary); border-radius: 10px;
+  width: 80%; box-sizing: border-box; --mat-card-elevated-container-color: var(--mat-sys-surface); }
+.help-box svg.warning-icon { width: 5%; height: 100%; color: var(--secondary); flex-shrink: 0; }

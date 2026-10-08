@@ -1,0 +1,6 @@
+@use './original-material-theme' as theme;
+
+// Scoped to this lazy Original view; never restyles the Rewrite interface.
+:host {
+  @include theme.apply();
+}

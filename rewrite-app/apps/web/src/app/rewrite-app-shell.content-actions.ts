@@ -11,6 +11,13 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 
+const describeParticipantRosterImport = (
+  summary: CreateImportJobResponse["participantRosterImport"]
+): string =>
+  summary
+    ? ` Roster: ${summary.importedCount} imported, ${summary.updatedCount} updated, ${summary.operationalLoginCandidateCount} operational candidate(s) from ${summary.sourceFileNames.length} file(s).`
+    : "";
+
 export interface ContentActionsHost {
   request<T>(
     label: string,
@@ -57,6 +64,8 @@ export async function createSourcePackageAction(
   );
 
   host.setSourcePackageId(payload.sourcePackage.sourcePackageId);
+  host.setImportJobId("");
+  host.setContentReleaseId("");
   host.persistShellState();
   host.rememberActivity(
     "Source Package Created",
@@ -65,7 +74,12 @@ export async function createSourcePackageAction(
   await host.loadSourcePackageDetail();
 }
 
-export async function createImportJobAction(host: ContentActionsHost): Promise<void> {
+export async function createImportJobAction(
+  host: ContentActionsHost,
+  dependencySourcePackageIds: string[] = [],
+  dependencySelectionRevision?: string
+): Promise<void> {
+  const requestedSourcePackageId = host.getSourcePackageId();
   const payload = await host.request<CreateImportJobResponse>(
     "Create Import Job",
     "POST",
@@ -74,21 +88,34 @@ export async function createImportJobAction(host: ContentActionsHost): Promise<v
       workspaceKey: host.getWorkspaceKey()
     }),
     {
-      sourcePackageId: host.getSourcePackageId()
+      sourcePackageId: host.getSourcePackageId(),
+      ...(dependencySourcePackageIds.length > 0
+        ? { dependencySourcePackageIds, dependencySelectionRevision }
+        : {})
     } satisfies CreateImportJobRequest
   );
 
+  const resolvedWorkspaceDependencies =
+    payload.importJob.sourcePackageId !== requestedSourcePackageId;
+  if (resolvedWorkspaceDependencies) {
+    host.setSourcePackageId(payload.importJob.sourcePackageId);
+  }
   host.setImportJobId(payload.importJob.importJobId);
   host.setContentReleaseId(
     payload.stagedContentRelease?.contentReleaseId ?? host.getContentReleaseId()
   );
   host.persistShellState();
   host.rememberActivity(
-    "Import Started",
-    `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.`
+    resolvedWorkspaceDependencies
+      ? "Workspace Dependencies Resolved"
+      : "Import Started",
+    resolvedWorkspaceDependencies
+      ? `Import ${payload.importJob.importJobId} captured matching workspace files in immutable package ${payload.importJob.sourcePackageId}.${describeParticipantRosterImport(payload.participantRosterImport)}`
+      : `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.${describeParticipantRosterImport(payload.participantRosterImport)}`
   );
 
   await host.refreshContentReads();
+  await host.loadSourcePackageDetail();
   await host.loadImportJobDetail();
   if (host.getContentReleaseId()) {
     await host.loadContentReleaseActivationReadiness();
@@ -121,7 +148,7 @@ export async function retrySourcePackageImportAction(
   host.persistShellState();
   host.rememberActivity(
     "Import Retried",
-    `Package ${host.getSourcePackageId()} produced import ${payload.importJob?.importJobId ?? "n/a"} with status ${payload.importJob?.status ?? "unknown"}.`
+    `Package ${host.getSourcePackageId()} produced import ${payload.importJob?.importJobId ?? "n/a"} with status ${payload.importJob?.status ?? "unknown"}.${describeParticipantRosterImport(payload.participantRosterImport)}`
   );
 
   await host.refreshContentReads();

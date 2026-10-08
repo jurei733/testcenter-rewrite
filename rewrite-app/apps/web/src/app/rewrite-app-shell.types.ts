@@ -1,4 +1,18 @@
-export type AppView = "workspace" | "content" | "runtime" | "ops";
+import type {
+  AdminRole,
+  AdminRoleAccessMode,
+  AdminSessionStatus,
+  AdminUserStatus
+} from "@testcenter-rewrite-app/domain";
+
+export type AppView =
+  | "home"
+  | "workspace"
+  | "content"
+  | "runtime"
+  | "participant"
+  | "system-check"
+  | "ops";
 
 export type SummaryCard = {
   label: string;
@@ -20,19 +34,136 @@ export type PersistedShellState = {
   sourcePackageId: string;
   importJobId: string;
   contentReleaseId: string;
+  sourcePackageStatusFilter: string;
+  sourcePackageFileTypeFilter: string;
+  sourcePackageMediaTypeFilter: string;
+  sourcePackageFileNameFilter: string;
+  sourcePackageLatestImportStatusFilter: string;
+  sourcePackageSortBy: string;
+  sourcePackageSortDirection: string;
+  sourcePackageLimit: string;
+  importJobStatusFilter: string;
+  importJobSourcePackageFilter: string;
+  importJobLimit: string;
+  contentReleaseStatusFilter: string;
+  contentReleaseImportJobFilter: string;
+  contentReleaseSourcePackageFilter: string;
+  contentReleaseLimit: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  monitorTargetUnitKey: string;
+  monitorTimeSeconds: string;
   loginKey: string;
+  groupKey: string;
+  bookletKey: string;
+  participantSessionStatusFilter: string;
+  participantSessionGroupFilter: string;
+  participantSessionLoginFilter: string;
+  participantSessionBookletFilter: string;
+  participantSessionReleaseFilter: string;
+  participantSessionLimit: string;
+  detailedResponseLoginFilter: string;
+  detailedResponseGroupFilter: string;
+  detailedResponseBookletFilter: string;
+  detailedResponseSessionFilter: string;
+  detailedResponseRunFilter: string;
+  detailedResponseUnitFilter: string;
+  detailedResponseStatusFilter: string;
+  detailedResponseLimit: string;
+  reviewLoginFilter: string;
+  reviewGroupFilter: string;
+  reviewBookletFilter: string;
+  reviewSessionFilter: string;
+  reviewRunFilter: string;
+  reviewUnitFilter: string;
+  reviewReviewerFilter: string;
+  reviewCategoryFilter: string;
+  reviewLimit: string;
+  openRunLoginFilter: string;
+  openRunGroupFilter: string;
+  openRunBookletFilter: string;
+  openRunSpeciesFilter: string;
+  openRunSessionFilter: string;
+  openRunRunFilter: string;
+  openRunUnitFilter: string;
+  openRunStatusFilter: string;
+  openRunLimit: string;
+  monitorProfileId: string;
+  monitorCommandHistoryRunFilter: string;
+  monitorCommandHistoryLimit: string;
+  entryRosterText: string;
+  entryLinksView: string;
+  participantRosterView: string;
+  operationalLoginCandidatesView: string;
+  participantRosterExportView: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
+  workspaceActivityEventType: string;
+  workspaceActivitySubjectType: string;
+  workspaceActivitySubjectId: string;
+  workspaceActivityLimit: string;
+  studyMonitorMatrixLoginFilter: string;
+  studyMonitorMatrixGroupFilter: string;
+  studyMonitorMatrixBookletFilter: string;
+  studyMonitorMatrixUnitFilter: string;
+  studyMonitorMatrixStatusFilter: string;
+  studyMonitorMatrixAnswerFilter: string;
+  studyMonitorMatrixLimit: string;
   forceActivation: boolean;
+  adminUsername: string;
+  adminDisplayName: string;
+  adminSessionToken: string;
+  adminSessionView: string;
+  adminSessionUserFilter: string;
+  adminSessionStatusFilter: "" | AdminSessionStatus;
+  adminSessionLimit: string;
+  adminSessionRevokeTargetId: string;
+  adminUserUsernameFilter: string;
+  adminUserStatusFilter: string;
+  adminUserAccessStatusFilter: string;
+  adminUserPasswordChangeFilter: string;
+  adminUserRoleFilter: string;
+  adminUserTenantFilter: string;
+  adminUserWorkspaceFilter: string;
+  adminUserLimit: string;
+  adminAuditEventTypeFilter: string;
+  adminAuditActorFilter: string;
+  adminAuditSubjectFilter: string;
+  adminAuditLimit: string;
+  adminCreateUsername: string;
+  adminCreateDisplayName: string;
+  adminCreateRole: AdminRole;
+  adminCreateAccessMode: AdminRoleAccessMode;
+  adminCreateTenantKey: string;
+  adminCreateWorkspaceKey: string;
+  adminCreateGroupKey: string;
+  adminCreateMonitorProfilesJson: string;
+  adminCreateMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
+  adminCreateCustomTextsJson: string;
+  adminCreateValidFrom: string;
+  adminCreateValidTo: string;
+  adminCreateValidForMinutes: string;
+  adminRoleTargetUserId: string;
+  adminRoleRole: AdminRole;
+  adminRoleAccessMode: AdminRoleAccessMode;
+  adminRoleTenantKey: string;
+  adminRoleWorkspaceKey: string;
+  adminRoleGroupKey: string;
+  adminRoleMonitorProfilesJson: string;
+  adminRoleMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
+  adminRevokeTargetUserId: string;
+  adminRevokeRoleAssignmentId: string;
+  adminStatusTargetUserId: string;
+  adminStatusValue: AdminUserStatus;
+  adminResetTargetUserId: string;
+  showRawDebug: boolean;
   activeView: AppView;
 };
 
 export const SHELL_STORAGE_KEY = "testcenter-rewrite-app-shell";
 export const DEFAULT_SOURCE_DOCUMENT =
-  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /></booklet></assessment>';
+  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route" /><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 
 export const createInitialSummaryCards = (): SummaryCard[] => [
   {

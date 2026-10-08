@@ -1,0 +1,2 @@
+# Preserve byte-exact upstream fixture whitespace.
+booklets/system-test/CY_Bklt_Stars.xml whitespace=-blank-at-eof

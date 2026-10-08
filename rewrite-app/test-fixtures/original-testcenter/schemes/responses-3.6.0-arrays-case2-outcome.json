@@ -1,0 +1,27 @@
+[
+  {
+    "id": "b4",
+    "status": "CODING_COMPLETE",
+    "value": [
+      "10",
+      "9"
+    ],
+    "code": 1,
+    "score": 2
+  },
+  {
+    "id": "b1",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "b2",
+    "value": null,
+    "status": "UNSET"
+  },
+  {
+    "id": "b3",
+    "value": null,
+    "status": "UNSET"
+  }
+]

@@ -1,0 +1,5 @@
+[
+  { "id": "text-field_1", "status": "VALUE_CHANGED", "value": 3 },
+  { "id": "text-area_1", "status": "VALUE_CHANGED", "value": 3 },
+  { "id": "text-field_2", "status": "VALUE_CHANGED", "value": 3 }
+]

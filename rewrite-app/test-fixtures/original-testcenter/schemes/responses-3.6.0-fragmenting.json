@@ -1,0 +1,122 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "sourceType": "BASE",
+      "fragmenting": "(\\d+)\\s*(\\w+)",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment":  0,
+                  "method": "MATCH",
+                  "parameters": ["2"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment":  0,
+                  "method": "MATCH",
+                  "parameters": ["3"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "score": 1,
+      "sourceType": "BASE",
+      "fragmenting": "(\\d+)\\s*(\\w+)",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment": 1,
+                  "method": "MATCH",
+                  "parameters": [
+                    "kg"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment": 1,
+                  "method": "MATCH",
+                  "parameters": [
+                    "322"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "score": 1,
+      "sourceType": "BASE",
+      "processing": ["IGNORE_CASE"],
+      "fragmenting": "(\\d+)\\s*(\\w+)",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment": 1,
+                  "method": "MATCH",
+                  "parameters": ["KG"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "fragment": 1,
+                  "method": "MATCH",
+                  "parameters": ["20"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

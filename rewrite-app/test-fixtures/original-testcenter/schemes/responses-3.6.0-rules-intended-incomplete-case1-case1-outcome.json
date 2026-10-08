@@ -1,0 +1,23 @@
+[
+  {
+    "id": "text-field_1",
+    "status": "INVALID",
+    "value": 3,
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "text-area_1",
+    "status": "CODING_COMPLETE",
+    "value": 3,
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "text-field_2",
+    "status": "INTENDED_INCOMPLETE",
+    "value": 3,
+    "code": 0,
+    "score": 0
+  }
+]

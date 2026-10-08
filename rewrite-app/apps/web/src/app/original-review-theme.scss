@@ -1,0 +1,9 @@
+@use '@angular/material' as mat;
+:host {
+  // Base Material tokens are inherited from the Original drawer. Override only
+  // the Review toolbar; duplicating the complete theme adds no presentation.
+  @include mat.toolbar-overrides((container-background-color: var(--mat-sys-primary), container-text-color: var(--mat-sys-on-primary)));
+  .mat-toolbar {
+    @include mat.icon-button-overrides((icon-color: var(--mat-sys-on-primary), disabled-icon-color: color-mix(in srgb, var(--mat-sys-on-primary) 38%, transparent)));
+  }
+}

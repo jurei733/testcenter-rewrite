@@ -1,0 +1,27 @@
+/* Pinned Original AdminLogin layout (MIT); isolated from Native Rewrite. */
+:host { flex: 1; display: flex; flex-direction: column; height: 95%; margin-bottom: 14px; min-width: 0;
+  font-family: 'Nunito Sans', sans-serif; color: var(--mat-sys-on-surface); }
+.mat-mdc-form-field { display: block; }
+.mat-mdc-card { width: 400px; border: 3px solid var(--mat-sys-secondary);
+  --mat-card-elevated-container-color: var(--mat-sys-surface); }
+mat-card-title { padding-bottom: 20px; }
+mat-card-actions { padding: 16px; }
+.login-wrapper { display: flex; justify-content: space-around; align-items: center;
+  flex-direction: column; flex-grow: 1; width: 98%; }
+.login-wrapper form { margin: auto; }
+.button-box { align-self: end; display: flex; gap: 9px; }
+.button-box a { border: 1px solid var(--secondary); }
+:host, .login-wrapper, form, mat-card-header, mat-card-title, mat-card-content,
+mat-form-field, .button-box, .alert, .vertical-align-middle, .mat-icon,
+.vertical-align-middle span { box-sizing: content-box; }
+input.mat-mdc-input-element { font: inherit; border: 0; border-radius: 0; padding: 0;
+  background: transparent; box-shadow: none; box-sizing: content-box; }
+button:disabled { opacity: 1; }
+button:hover, a:hover { transform: none; }
+:host ::ng-deep .mdc-floating-label { gap: normal; box-sizing: content-box; }
+.alert { margin-bottom: 2px; }
+.vertical-align-middle { display: inline-flex; vertical-align: middle; align-items: center; }
+.alert-error { color: #821324; }
+.alert-warning { color: goldenrod; }
+.mat-icon { display: inline-block; width: 24px; height: 24px; fill: currentColor;
+  margin-right: .2em; overflow: visible !important; }

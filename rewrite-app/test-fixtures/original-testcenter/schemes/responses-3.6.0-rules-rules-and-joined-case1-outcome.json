@@ -1,0 +1,16 @@
+[
+  {
+    "id": "b1",
+    "status": "CODING_COMPLETE",
+    "value": "2",
+    "code": 1,
+    "score": 1
+  },
+  {
+    "id": "b2",
+    "status": "CODING_COMPLETE",
+    "value": "3",
+    "code": 0,
+    "score": 0
+  }
+]

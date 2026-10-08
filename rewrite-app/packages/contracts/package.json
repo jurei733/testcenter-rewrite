@@ -5,7 +5,22 @@
   "type": "module",
   "main": "dist/packages/contracts/src/index.js",
   "types": "dist/packages/contracts/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/packages/contracts/src/index.d.ts",
+      "default": "./dist/packages/contracts/src/index.js"
+    },
+    "./participant-roster": {
+      "types": "./dist/packages/contracts/src/participant-roster.d.ts",
+      "default": "./dist/packages/contracts/src/participant-roster.js"
+    }
+  },
   "dependencies": {
     "@testcenter-rewrite-app/domain": "0.0.0"
+  },
+  "devDependencies": {
+    "@iqb/responses": "5.2.2",
+    "@iqbspecs/coding-scheme": "3.4.1",
+    "@iqbspecs/response": "2.0.0"
   }
 }

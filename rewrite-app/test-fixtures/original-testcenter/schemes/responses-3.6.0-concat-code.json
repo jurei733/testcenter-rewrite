@@ -1,0 +1,243 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1alias",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "111"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "222"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 100,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "333"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 5,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "444"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "555"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "666"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "555"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 0,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "333"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d1",
+      "sourceType": "CONCAT_CODE",
+      "deriveSources": [
+        "b1","d2"
+      ]
+    },
+    {
+      "id": "d2",
+      "sourceType": "CONCAT_CODE",
+      "deriveSources": [
+        "b1",
+        "d3"
+      ]
+    },
+    {
+      "id": "d3",
+      "sourceType": "CONCAT_CODE",
+      "deriveSources": [
+        "b1", "b2", "b3"
+      ],
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "1_2_1"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "1_1_1"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d4",
+      "sourceType": "CONCAT_CODE",
+      "deriveSources": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "SORT"
+        ]
+      }
+    },
+    {
+      "id": "d5",
+      "sourceType": "CONCAT_CODE",
+      "deriveSources": [
+        "b4",
+        "b3"
+      ],
+      "sourceParameters": {
+        "processing": [
+          "SORT"
+        ]
+      }
+    }
+  ]
+}

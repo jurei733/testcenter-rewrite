@@ -1,0 +1,87 @@
+{
+  "variableCodings": [
+    {
+      "id": "text-field_1739196678829_1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": [
+        {
+          "id": "INTENDED_INCOMPLETE",
+          "type": "INTENDED_INCOMPLETE",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "text-field_1739196679082_1",
+      "alias": "b2",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "codes": [
+        {
+          "id": "INTENDED_INCOMPLETE",
+          "type": "INTENDED_INCOMPLETE",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": ""
+        }
+      ]
+    },
+    {
+      "id": "d_1739196783180",
+      "alias": "d1",
+      "label": "",
+      "sourceType": "MANUAL",
+      "sourceParameters": {
+        "solverExpression": "",
+        "processing": []
+      },
+      "deriveSources": [
+        "text-field_1739196678829_1",
+        "text-field_1739196679082_1"
+      ],
+      "processing": [],
+      "codeModel": "NONE",
+      "manualInstruction": "",
+      "codes": [
+        {
+          "id": 0,
+          "type": "RESIDUAL",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": "<p style=\"padding-left: 0; text-indent: 0; margin-bottom: 0; margin-top: 0\">Alle anderen Antworten</p>"
+        }
+      ],
+      "page": "",
+      "fragmenting": ""
+    }
+  ],
+  "version": "3.0"
+}
