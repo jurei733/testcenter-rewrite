@@ -131,11 +131,16 @@ No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
 fresh corrected-head CI independently before normal integration into main.
 
 An independent read-only Review capture probe also passed 24 protected states
-on `4ba6bc37` while retaining the visible header clipping. Before/after screenshot
-measurements show zero document/header scroll and normal title/logo rectangles;
-that narrows the observation but does not establish its paint/layout cause.
-Actual evidence is `goal-review-header-probe.log` and `goal-review-header-probe/`.
-No CSS/vendor/browser patch is substituted for a root-cause finding.
+on `4ba6bc37`. Before/after screenshot measurements show zero document/header
+scroll and normal title/logo rectangles. Direct decoding of all 24 actual PNGs
+against the settled `source-label-review-reference/` captures finds identical
+header content pixels; differences occupy only its last two shadow rows. This
+probe does not reproduce the earlier sporadic raster clipping. Retain those
+earlier observations separately; neither geometry nor a displayed thumbnail
+proves a paint defect. Actual evidence is `goal-review-header-probe.log`,
+`goal-review-header-probe/` and `goal-review-header-pixels.json`. Full-page
+differences and all eight acceptance rows remain open. No image, CSS, Source,
+vendor or browser patch was made for this read-only comparison.
 
 ### Latest runtime lifetime validation (2026-10-09)
 

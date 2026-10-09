@@ -98,6 +98,16 @@ The reference remains unmodified, and real camera/window acceptance is separate.
 
 ### Current Review drawer comparison (2026-10-08)
 
+An additional read-only comparison on 2026-10-09 decodes the actual PNGs from
+`goal-review-header-probe/` and the settled `source-label-review-reference/`
+captures in all 24 states. Header content pixels match exactly in all three
+themes and both widths; differing pixels occupy only the last two header shadow
+rows. Its zero-scroll before/after measurements and decoded pixels do not
+reproduce the earlier sporadic clipping described below. The retained result
+is `goal-review-header-pixels.json`. This narrower header observation does not
+establish full-page identity or close a matrix row; no image or runtime was
+modified for the comparison.
+
 Freshly rebuilt unmodified `ee2ab9ab` references and the protected owned SQLite
 Rewrite gate repeat all 24 comparisons on 2026-10-09. They retain identical own
 content, exact rendered list/editor checks, font/drawer readiness, native input,
