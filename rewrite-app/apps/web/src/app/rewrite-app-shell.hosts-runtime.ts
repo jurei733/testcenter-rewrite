@@ -17,7 +17,21 @@ export function createRuntimeActionsStateHost(args: {
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
 }): ShellRuntimeActionsHost {
+  const selectedContext = () => [args.workspaceState.tenantKey.trim(),
+    args.workspaceState.workspaceKey.trim(), args.runtimeState.participantSessionId.trim(),
+    args.runtimeState.testRunId.trim()];
+  const [tenantKey, workspaceKey, participantSessionId, testRunId] = selectedContext();
+  const capturedContext = JSON.stringify([tenantKey, workspaceKey, participantSessionId, testRunId]);
   return {
+    clearDeletedRunSelection: deletion => {
+      if (!testRunId || capturedContext !== JSON.stringify(selectedContext()) ||
+          deletion.tenantKey !== tenantKey || deletion.workspaceKey !== workspaceKey ||
+          !deletion.deletedTestRunIds.includes(testRunId) ||
+          !deletion.affectedParticipantSessionIds.includes(participantSessionId)) return;
+      args.runtimeState.testRunId = "";
+      args.runtimeState.currentUnitKey = "";
+      args.runtimeState.currentUnitResponse = "";
+    },
     request: args.request,
     getParticipantSignInPath: () => productionApiRoutes.participant.signIn,
     getParticipantLaunchPath: () => productionApiRoutes.participant.launch,
@@ -114,6 +128,7 @@ export function createRuntimeReadsStateHost(args: {
   isParticipantSessionMissingError(error: unknown): boolean;
   workspaceState: ShellWorkspaceState;
   runtimeState: ShellRuntimeState;
+  getAuthorizationContext(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
 }): ShellRuntimeReadsHost {
   const readQueryValue = (value: unknown): string =>
@@ -244,7 +259,18 @@ export function createRuntimeReadsStateHost(args: {
     return withQuery(path, query);
   };
 
+  const contextKey = () => JSON.stringify([
+    args.workspaceState.tenantKey, args.workspaceState.workspaceKey,
+    args.runtimeState.participantSessionId, args.runtimeState.testRunId,
+    args.runtimeState.loginKey, args.runtimeState.groupKey,
+    args.runtimeState.bookletKey, args.runtimeState.currentUnitKey,
+    args.getAuthorizationContext()
+  ]);
   return {
+    captureRuntimeReadContext: () => {
+      const captured = contextKey();
+      return () => contextKey() === captured;
+    },
     request: args.request,
     isCurrentRunMissingError: args.isCurrentRunMissingError,
     isParticipantSessionMissingError: args.isParticipantSessionMissingError,
@@ -333,10 +359,14 @@ export function createRuntimeReadsStateHost(args: {
     setReviewExportView: nextValue => {
       args.runtimeState.reviewExportView = nextValue;
     },
-    getCurrentRunStatePath: () =>
-      resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
+    getCurrentRunStatePath: () => {
+      const path = resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
         participantSessionId: args.runtimeState.participantSessionId.trim()
-      }),
+      });
+      const query = new URLSearchParams();
+      appendQueryValue(query, "testRunId", args.runtimeState.testRunId);
+      return withQuery(path, query);
+    },
     createRuntimePresentationHost: args.createRuntimePresentationHost
   };
 }

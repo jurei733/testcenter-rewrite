@@ -10,22 +10,27 @@ and the last 15 commits before changing code. Paths below are relative to
 `rewrite-app` unless stated otherwise.
 
 GitHub `jurei733/testcenter-rewrite` remains the source of truth. On 2026-10-08
-the owner explicitly authorized integrating every open PR and remaining branch
-into main. The complete inventory contains PR #1 and `testcenter-rewrite-parity`;
-the only other remote branch is main, and the local `work` branch already equals
-the previous main head. Integrate through an ordinary merge after fresh CI,
-preserving the existing commits and main's Entire metadata. Never force-push or
-rewrite published history. Continue later development on the parity branch and
-open a follow-up PR once PR #1 has merged. Do not use assistant-specific branch
-prefixes or names in publication prose.
+the owner explicitly authorized integrating every then-open PR and remaining
+branch into main. PR #1 was ordinarily merged as
+`2b22dbfe3d4fa54c52c6343d7b4997fe4282eb93`, preserving both parents and all
+published commits. The complete inventory had only remote main and
+`testcenter-rewrite-parity`; the local `work` branch was already contained.
+No branch was deleted or history rewritten. Continue development on the existing
+parity branch, now fast-forwarded to that merge, and open a follow-up PR.
+The owner's latest integration instruction also covers the remaining open PR
+and parity branch. At this dated checkpoint PR #2 is the only open PR; main and the parity
+branch are the only remote branches. Complete the new tree's required checks
+before a normal merge, verify the expected head, and recheck the live inventory.
+Never force-push or rewrite published history. Do not use assistant-specific
+branch prefixes or names in publication prose.
 
-Current Original target was independently verified on 2026-10-08 as
-`iqb-berlin/testcenter` commit `14c98284590195631750bb2352cb398ca669fe7d`.
+Current Original target was independently verified on 2026-10-09 as
+`iqb-berlin/testcenter` commit `ee2ab9ab64bd91209ef8534bbe6005838024e46d`.
 Refresh that target before comparing requirements. Fetch/read upstream without
 modifying unrelated working-tree changes. Distinguish local checks, published
 CI, merged work, deployed work and production acceptance.
 
-## Current camera step
+## Historical camera step at restoration
 
 The latest camera-device correction has 497 passing core/frontend checks,
 passing typecheck and production build, and passing owned immutable-production
@@ -50,7 +55,20 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 ## Prioritized remaining work
 
-Current reference blocker: unmodified Source `14c98284` camera startup fails
+An additional read-only dependency audit on 2026-10-09 records 183 findings
+in the complete installed tree (68 low, 26 moderate, 82 high, seven critical).
+The separate server `--omit=dev` audit records one high package,
+`@xmldom/xmldom`; registry metadata confirms 0.9.12 is available. All seven
+critical nodes are marked development-only in the lockfile, which does not
+certify the compiled browser bundle or establish production exploitability.
+Angular advisories need separate browser triage. Actual JSONs are
+`goal-production-dependency-audit.json` and `goal-production-server-audit.json`.
+No package, lockfile or vendor file was changed during active fixed-asset
+fixtures. After verified PR integration, perform narrow ordinary updates with
+XML/parser, compatibility, API and relevant browser/CI validation; retain the
+470-kB limit. This audit is an open production-readiness item, not acceptance.
+
+Current reference blocker: unmodified Source `ee2ab9ab` camera startup fails
 in all three themes at 1280/390px, including re-entry after native reload.
 Twelve negative observations show the same `nativeElement` lifecycle error,
 zero video/stream and zero metadata/unknown API requests. The checked-in
@@ -68,7 +86,8 @@ exact reproduction and narrower earlier fixture failures in `PARITY.md`.
    and primary/on-primary colors have 24 actual rendered comparisons across
    all three themes and both widths, plus protected native SQLite flows.
    The generic Rewrite pane remains available. The restored draft/list state
-   now has eight additional regressions (505 core/frontend checks total).
+   has eight additional restoration/lifecycle regressions. Current aggregate
+   checks and publication status are recorded below.
    Raw screenshots still differ; no full-page acceptance row is closed.
 3. Close the eight open rows in `docs/ORIGINAL-UI-PARITY.md`, retaining both
    interfaces, authored texts, keyboard access, mobile behavior and same data.
@@ -86,7 +105,289 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
-### Current integration gate (2026-10-08)
+### Latest selected-Run deletion correction (2026-10-09)
+
+`4ba6bc37908e7fab485ccfe4c1cbffb347be601a` is committed and pushed on the
+existing parity branch, with PR #2 updated for its final implementation.
+Push workflow `37913363611` and PR workflow `37913369219` both have an actual
+`local-demo` failure: jobs `113763554445` and `113763573499` time out at the
+unchanged 15-second `Group Results Deleted` assertion after successful DELETE.
+Full actual logs are retained outside the checkout as
+`ci-4ba6-local-demo-113763554445.log` and
+`ci-4ba6-local-demo-pr-113763573499.log`. The unchanged own SQLite reproduction
+also fails in `goal-4ba6-local-demo.log`; this is a product regression, not an
+invalid helper or a passing repetition. Both workflows subsequently finish all
+37 jobs: 36 succeed and this one fails in each. Their complete results remain
+negative baseline evidence. Main has not been changed by PR #2 at this checkpoint.
+
+The new exact selected-Run read correctly rejects the deleted Run with 404,
+but the deletion action had left that obsolete selection in place. Single and
+bulk deletion now clear its Run ID, current Unit and draft only when confirmed
+deleted Run/affected Session IDs and the original Workspace/Session/Run context
+all match. Other selections retain their byte-exact answers. Session, Booklet
+and group context remain available. The normal unknown/foreign-Run 404 boundary
+and explicit older-Run reads remain unchanged; no fallback to another Run or
+relaxed error classification is added.
+
+The actual-code regression fails before the fix in
+`goal-deleted-selection-before.log`. All 32 runtime checks pass afterwards,
+including eleven deletion/retention/bulk cases. Typecheck, production build,
+582 regular checks and 61 compatibility checks pass under the unchanged
+470-kB limit (469.98 kB actual initial bundle). The complete unchanged owned
+`local-demo` gate passes in `goal-deleted-selection-local-demo.log` with its
+original assertion and timeout. Fresh full protected PostgreSQL and SQLite
+browser suites both pass on separate owned databases and the same fixed assets,
+through Attachments, exact 47/47 deletion logs and complete CLI shutdown. Their
+logs are `goal-deleted-selection-full-pg.log` and
+`goal-deleted-selection-full-sqlite.log`; all four scoped monitor probes in
+each suite return HTTP 200 on their first trusted native activation. These
+are new corrected-tree Cloud results, distinct from the previous publication.
+The same corrected fixed assets also pass a fresh protected Original Starter
+suite (48 geometry/state fixtures, 18 exact current-Source toast comparisons,
+authorized empty export and saved-answer retention) and all 24 protected
+Original Review states against the current rendered Source metrics. Native
+CRUD/back/retry, same-Run reload, exact UTF-8, foreign-Session rejection and
+the Rewrite switch remain checked. Actual logs are
+`goal-deleted-selection-starter.log` and `goal-deleted-selection-review.log`.
+The follow-up publication waits until both `4ba6bc37` workflows finish, preserving
+every job result instead of cancelling them. Verify fresh corrected-head CI
+independently before normal integration into main.
+
+A supplementary unchanged `ci:browser:quick` run uses a complete archived
+`6153568e` tree with its own dependencies, build, databases and ports. It fails
+in `smoke-original-participant-login.mjs:74` at the unchanged 30-second native
+`Anmeldename` fill. The actual log is `goal-6153568e-quick.log`. An independent
+owned-server/browser diagnosis retains HTTP 200 and the rendered login through
+`127.0.0.1`, versus HTTP 403 with body `Domain forbidden` through the fixture's
+`testcenter-proof.insecure` hostname, despite its loopback resolver mapping.
+Actual evidence is `goal-insecure-loopback-reference.log` and its owned PNGs.
+This is a precise VM-domain restriction, distinct from the granted per-turn
+socket permission and from an application regression. No domain, proxy, TLS,
+authorization or assertion bypass was added. The suite remains unchanged and
+the fresh corrected-head GitHub `ui-quick` job remains mandatory; the older
+Push `ui-quick` already passed. This Cloud repetition is a failure, not a pass.
+
+An independent read-only Review capture probe also passed 24 protected states
+on `4ba6bc37`. Before/after screenshot measurements show zero document/header
+scroll and normal title/logo rectangles. Direct decoding of all 24 actual PNGs
+against the settled `source-label-review-reference/` captures finds identical
+header content pixels; differences occupy only its last two shadow rows. This
+probe does not reproduce the earlier sporadic raster clipping. Retain those
+earlier observations separately; neither geometry nor a displayed thumbnail
+proves a paint defect. Actual evidence is `goal-review-header-probe.log`,
+`goal-review-header-probe/` and `goal-review-header-pixels.json`. Full-page
+differences and all eight acceptance rows remain open. No image, CSS, Source,
+vendor or browser patch was made for this read-only comparison.
+
+### Latest runtime lifetime validation (2026-10-09)
+
+The owned pass-through whole-flow PostgreSQL run
+`goal-starter-routes-fixed.log` failed at
+`study-monitor-booklet-detail-prepare-runtime`: a late old-Session response
+overwrote the newly prepared group. Its separate SQLite counterpart passed
+Attachments, exact 47/47 deletion logs and shutdown in
+`goal-starter-routes-fixed-sqlite.log`. Both used the pre-correction tree;
+neither is relabelled as proof of the new production runtime changes.
+
+Twenty-one actual runtime-host/read/presentation regressions fail before and
+pass after the new context guard, captured paths and explicit selected-Run
+query/presentation. They cover changed workspace, authorization, Session, Run
+and form context, late missing-state failures and an older Run with distinct
+byte-exact synthetic answers. The guard compares context in memory without
+logging or persisting credentials or answers. Actual retained logs are
+`goal-runtime-context-before-corrected.log` and `goal-runtime-context-after.log`.
+An initial test-loader extraction error executed no valid behavioral proof
+and remains separately retained as `goal-runtime-context-before.log`.
+
+A native owned HTTP disconnect executes the production shutdown closure and
+reproduces repository shutdown before its asynchronous handler finishes in
+`goal-aborted-handler-before.log`. The API now drains tracked HTTP handlers
+before closing storage. All three regressions pass in
+`goal-aborted-handler-after.log`, including rejection and newly registered work
+during draining. CLI shutdown deadlines and security boundaries are unchanged.
+Independent SSE/background lifetimes are not claimed as separately proven.
+
+The combined tree passes typecheck, production build, 571 regular checks and
+61 compatibility checks. The 469.98-kB initial bundle remains under the
+unchanged 470-kB limit. Actual logs use the `goal-runtime-lifetime-` prefix.
+Fresh complete protected PostgreSQL and SQLite suites both pass using the same
+fixed assets and separate owned databases, through Attachments, exact 47/47
+deletion logs and clean CLI shutdown. Both pass the previously failing runtime
+preparation; all four scoped monitor probes observe HTTP 200 on their first
+trusted native activation without recorded browser errors. Memory, File and
+SQLite API integration each pass all 164 checks without skips. The 120 native error-list/
+restore cycles completed with 240 successful HTTP-200 actions, API exit 0 and
+no recurrence of the earlier pool-after-end error. Logs are
+`goal-runtime-lifetime-final-pg.log`,
+`goal-runtime-lifetime-final-sqlite.log`, `goal-runtime-lifetime-native-120.log`.
+Do not rebuild or clean assets while any of these fixtures still uses them.
+No new commit, push, CI result, full Original-UI row or production acceptance
+is inferred from these local/Cloud checks.
+
+A fresh supplemental Starter invocation omitted the documented CI headless
+profile and attempted a headed browser without an X server. It failed before
+any page rendering; `goal-runtime-lifetime-starter.log` retains the actual
+`Missing X server or $DISPLAY` diagnostic. This invocation error is not an
+application regression or physical-browser evidence. With `CI=true`, the
+completed gate passes all 48 geometry/state cases and 18 exact current Source
+toast comparisons in `goal-runtime-lifetime-starter-corrected.log`. The same
+fixed-asset protected Review gate passes all 24 states, native CRUD/back/retry,
+same-Run reload, exact UTF-8 and foreign-Session denial in
+`goal-runtime-lifetime-review.log`. These are Headless Cloud checks; all eight
+complete Original-UI rows and real hardware/production acceptance remain open.
+
+### Latest deletion-fixture validation (2026-10-09)
+
+`07fcbf6f` is published on the existing parity branch with follow-up PR #2.
+Its Push PostgreSQL job `113705893956` failed `45 !== 44` despite snapshots
+being taken after preparation. Full actual evidence is retained as
+`/workspace/work/testcenter-continuation/ci-07fcb-postgres-ui-113705893956.log`.
+All four scope probes observe trusted native activation and HTTP 200. A later
+monitor read completes between snapshot and deletion; the extra row's body is
+not in the log. Do not claim its exact key is established from this CI record.
+
+Seventeen new/existing targeted service checks pass across all four stores.
+They separately prove that expiry after completed preparation adds exactly one
+`TESTLETS_TIMELEFT` entry and invalidates that exact snapshot; pausing the owned
+Run keeps all snapshot data unchanged across a later read beyond the deadline.
+The existing active-Run deletion case is retained. The browser fixture issues
+its hold through the visible native authorized Pause action after timing/monitor
+acceptance, leaving the foreign retained group untouched. No production timer,
+monitor schedule, assertion or timeout is changed.
+
+The first new-helper whole run returned HTTP 200 from Pause, then failed at an
+incorrect `response.testRun` lookup. The contract is `response.command.testRun`;
+the same exact Session/Run/status assertions now read that wrapper. Its retained
+negative log is `goal-starter-held-postgres-browser.log`, not a passing result.
+The corrected complete run on a new empty owned PostgreSQL database failed
+earlier at `group-monitor-booklet-error-copy-restore`, before reaching the hold.
+Its retained log is `goal-starter-held-postgres-browser-corrected.log`; two
+trusted native clicks reached an enabled button, but no matching request was
+observed. This reproduces the earlier main failure and is not a passing result.
+A focused owned PostgreSQL fixture passed twelve native error-list/restore
+cycles after real creation, required password change and sign-in of a fresh
+monitor. Its log is `goal-monitor-restore-diagnostic-fresh-run.log`; these
+cycles do not establish the whole-flow failure's cause. A further full run
+with passive browser-error reporting uses its own empty `goal_starter_restore_probe`
+database and unchanged fixed assets; its log is `goal-starter-restore-probe.log`.
+It passed through Attachments, the native authorized hold, exact 47/47 deletion
+logs and shutdown, with the original interception removal still present.
+
+Extended native probes reproduced an unanswered read at interception removal
+after 25 and 29 cycles (`goal-monitor-restore-diagnostic-120.log` and
+`goal-monitor-restore-diagnostic-route-lifecycle.log`). The public
+`unrouteAll({ behavior: "wait" })` alternative also failed after 29 cycles in
+`goal-monitor-restore-diagnostic-unroute-wait.log`. Tracking records the next
+read between removal entry and return, after mock fulfillment. Later refreshes
+wait behind it. The fixture now retains its owned interception and forwards
+all post-presentation requests unchanged to the protected API until browser
+teardown. This variant passed 120 native cycles in
+`goal-monitor-restore-diagnostic-passthrough.log`. The earlier CI logs do not
+contain callback-lifetime detail, so do not claim that their exact internal race
+was observed. Assertions, native inputs and deadlines remain unchanged.
+
+The pre-correction 120-cycle probe's API teardown also logged an aborted read
+failing with `Cannot use a pool after calling end on the pool`; exit code 0
+does not make that clean-shutdown evidence. The separate handler/storage
+correction is recorded above, alongside the subsequent whole-flow PostgreSQL
+context failure and passing SQLite run.
+The unrelated first unit wrapper used
+an absent `npm test` alias and executed no tests. The actual documented
+`test:unit:built` and `test:compatibility:built` commands subsequently passed;
+that invocation error is neither a product regression nor acceptance evidence.
+
+Earlier dated evidence below remains valid for its exact tree. New changes
+require their own publication CI; do not erase failed attempts with a repetition.
+
+### Current continuation and integration evidence (2026-10-09)
+
+The merged main head is `2b22dbfe`. Its tree
+`ec23c8c480d34d04eb56096161a8845341ef48c4` equals the verified `d6f5c570`
+parity tree exactly. The preceding PR/Push workflows each passed all 37 jobs.
+Main workflow `37862248931` initially passed 36 jobs and failed PostgreSQL
+browser job `113600470480` at
+`group-monitor-booklet-error-copy-restore did not request the scoped monitor runs.`
+This is a different observation from the earlier 45/44 deletion snapshot.
+The complete actual failing log is retained outside the checkout as
+`/workspace/work/testcenter-continuation/ci-main-2b22-postgres-ui-113600470480.log`.
+No screenshot artifact was published by that failed job.
+
+A complete `git archive` of exact `2b22dbfe` was independently compiled and
+passed the unchanged protected PostgreSQL browser suite, including Attachments,
+44/44 result-deletion logs and clean shutdown. The run used its own database,
+compiler and fixed assets under `goal-main-2b22-tree`; its passing log is
+`/workspace/work/testcenter-continuation/goal-main-2b22-postgres-browser-corrected.log`.
+An initial invocation incorrectly pointed the frontend-root option at the
+browser directory and failed before application startup; that retained attempt
+is invalid acceptance evidence, not a product regression. Nothing was reset or
+copied back into the implementation checkout.
+
+One targeted retry of the failed main job completed successfully as
+`113697307205` on 2026-10-09. Workflow `37862248931`, attempt 2, is now
+completed/success with all 37 jobs. Neither that retry nor the passing local
+baseline proves the intermittent first failure's cause or a fix. The next
+browser harness adds passive native-click and request-readiness diagnostics to
+the existing monitor scope helper. It retains the same native activation, two
+attempts, 30-second response deadline, status assertion and exact failure.
+Diagnostics contain owned scope values, never credentials or answer bodies.
+
+Upstream `ee2ab9ab` adds one e2e fallback case and its sample setup; it changes
+no application frontend source. The frontend Git tree is unchanged at
+`64032f00186dc287c9de3ffd63cc235fe1c9a5da`. An eighth owned XML case covers
+an initially selected Unit without a short label when only `UNIT_LABEL_SHORT`
+is configured. The real facade retains the full header/toolbar label, default
+index navigation and exact saved state. Fresh typecheck, production build,
+526 normal checks and 61 compatibility checks pass. The bundle remains
+469.98 kB under the unchanged 470-kB limit. All 32 native label cases in both
+interfaces at 1280/390px pass in the complete new protected PostgreSQL browser
+run, through Attachments, exact 44/44 deletion snapshots and clean shutdown.
+All four instrumented monitor phases observed trusted native activation and
+HTTP 200 on the first attempt; the restore phase retained the intended owned
+workspace and `all` profile. Its actual log is
+`/workspace/work/testcenter-continuation/goal-ee2-postgres-browser.log`.
+This passing instrumented run does not explain the earlier intermittent failure.
+
+Fresh current Source Review references and the protected owned SQLite Rewrite
+comparison also pass all 24 form/filled/list/edit states across the three themes
+and 1280/390px. Each list/edit capture first verifies the intended exact comment.
+The same labels/comment, completed fonts and settled drawers are required.
+Toolbar, form, list, buttons, primary/on-primary colors and header geometry match;
+native add/edit/save/delete/back, failed-save retry, exact UTF-8 persistence and
+foreign Session rejection remain checked. Actual screenshots under
+`goal-source-ee2-review` and `goal-ee2-review` still show raster differences,
+including header clipping despite equal measured rectangles. These component
+checks do not establish full pixel identity or close a complete Original-UI row.
+New work is locally/Cloud verified at this checkpoint; publication and fresh CI
+for its forthcoming commit must be checked separately.
+
+The clean current Source checkout was independently rebuilt. Its unmodified
+camera diagnostic reproduces the same twelve initial/re-entry failures in all
+three themes and both widths: `nativeElement` is unavailable, no video stream
+starts, and no attachment metadata or unknown API request occurs. The diagnostic
+exits 2, writes actual negative evidence under `goal-source-ee2-camera`, and is
+not a passing capture gate. All eight full-page Original-UI rows, physical
+camera/OS visibility, deployment and production acceptance remain open.
+
+The private published environment and GitHub access remain available. This new
+turn initially restored restricted sockets; the already authorized regular
+product network grant was requested and granted for this turn only, with no
+additional filesystem rights. Owned IPv4 listen/connect and child-process pipes
+then passed. A fresh protected owned SQLite API passed readiness/configuration,
+unauthenticated workspace rejection (401) and clean shutdown. VM package-manager
+rules and exactly the three previously approved browser-download domains remain
+unchanged; a runtime grant does not persist permissions into future turns.
+
+Real Entire Cloud trace capture remains unavailable. The CLI/runtime is absent;
+no new checkpoint or fabricated trailer is created. The historic remote
+`refs/entire/checkpoints/60/01M4D17VRMWJ3E43Z32G5RBA60` remains
+`fbd52e6fc67a5b9285bc1a5de1c488bf512fec38`. An old local trace is not a Cloud
+trace. Private tryout data and the local migration PPTX are neither inspected,
+changed nor uploaded in this continuation.
+
+The dated sections below retain earlier evidence and failures. Their pending CI
+or publication statements describe those earlier checkpoints, not current main.
+
+### Historical integration gate (2026-10-08)
 
 Seven further commits are published through `e9885ae5`, not merely local.
 Its complete isolated Git archive passed typecheck, production build, all 522

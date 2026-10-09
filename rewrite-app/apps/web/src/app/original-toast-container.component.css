@@ -1,0 +1,5 @@
+:host { font: 16px "Nunito Sans", sans-serif; color: var(--mat-sys-on-surface); }
+.toast-stack, .toast, .toast-text { box-sizing: content-box; }
+.toast-stack { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 900; pointer-events: none; }
+.toast { display: flex; gap: 24px; padding: 14px 16px; border-radius: 4px; background: var(--mat-sys-inverse-surface); color: var(--mat-sys-inverse-on-surface); pointer-events: auto; }
+.toast-action { all: revert; background: none; border: none; color: var(--mat-sys-inverse-primary); cursor: pointer; }

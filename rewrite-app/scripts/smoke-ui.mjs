@@ -22171,27 +22171,109 @@ try {
   const monitorOpenRunsRoute = new RegExp(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
   );
-  const applyMonitorScopeAndWaitForOpenRuns = async step => {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await waitForNotBusy(`${step}-before-${attempt + 1}`);
-      const responsePromise = page
-        .waitForResponse(
-          response =>
-            response.request().method() === "GET" &&
-            monitorOpenRunsRoute.test(response.url()),
-          { timeout: 30_000 }
-        )
-        .catch(() => null);
-      await page.locator("#monitorApplyScopeButton").click();
-      const response = await responsePromise;
-      if (response) {
-        assert.equal(response.status(), 200);
-        await waitForNotBusy(step);
-        return;
-      }
-      await waitForNotBusy(`${step}-retry-${attempt + 1}`);
+  const pendingMonitorReads = new Map();
+  const observePendingMonitorRead = request => {
+    if (request.method() === "GET" && monitorOpenRunsRoute.test(request.url())) {
+      pendingMonitorReads.set(request, { startedAt: Date.now(), responseStatus: null });
     }
-    throw new Error(`${step} did not request the scoped monitor runs.`);
+  };
+  const observeMonitorReadResponse = response => {
+    const pending = pendingMonitorReads.get(response.request());
+    if (pending) pending.responseStatus = response.status();
+  };
+  const observeMonitorReadFinished = request => pendingMonitorReads.delete(request);
+  page.on("request", observePendingMonitorRead);
+  page.on("response", observeMonitorReadResponse);
+  page.on("requestfinished", observeMonitorReadFinished);
+  page.on("requestfailed", observeMonitorReadFinished);
+  const applyMonitorScopeAndWaitForOpenRuns = async step => {
+    const requestedRuns = new Set();
+    const failedRequests = [];
+    const browserErrors = [];
+    const observePageError = error => browserErrors.push(error.message);
+    const observeConsole = message => {
+      if (message.type() === "error") browserErrors.push(message.text());
+    };
+    const observeRequest = request => {
+      if (request.method() === "GET" && monitorOpenRunsRoute.test(request.url())) {
+        requestedRuns.add(request);
+      }
+    };
+    const observeFailure = request => {
+      if (requestedRuns.has(request)) {
+        failedRequests.push(request.failure()?.errorText ?? "unknown");
+      }
+    };
+    page.on("request", observeRequest);
+    page.on("requestfailed", observeFailure);
+    page.on("pageerror", observePageError);
+    page.on("console", observeConsole);
+    await page.evaluate(() => {
+      const activations = [];
+      const observe = event => {
+        if (event.target instanceof Element &&
+            event.target.closest("#monitorApplyScopeButton")) {
+          activations.push({ trusted: event.isTrusted, detail: event.detail });
+        }
+      };
+      document.addEventListener("click", observe, true);
+      window.__ownedMonitorScopeProbe = {
+        activations,
+        dispose: () => document.removeEventListener("click", observe, true)
+      };
+    });
+    const recordReadiness = async (attempt, responseStatus) => {
+      const rendered = await page.evaluate(() => ({
+        activations: window.__ownedMonitorScopeProbe?.activations ?? [],
+        busy: document.querySelector(".page")?.classList.contains("is-busy"),
+        buttonDisabled: document.querySelector("#monitorApplyScopeButton")?.disabled,
+        tenant: document.querySelector("#monitorTenantKey")?.value,
+        workspace: document.querySelector("#monitorWorkspaceKey")?.value,
+        profile: document.querySelector("#monitorProfile")?.value,
+        path: location.pathname
+      }));
+      process.stdout.write(`monitor_scope_readiness=${JSON.stringify({
+        step, attempt, responseStatus, requestCount: requestedRuns.size,
+        failedRequests, browserErrors,
+        pendingReads: [...pendingMonitorReads.values()].map(pending => ({
+          elapsedMs: Date.now() - pending.startedAt,
+          responseStatus: pending.responseStatus
+        })), ...rendered
+      })}\n`);
+    };
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await waitForNotBusy(`${step}-before-${attempt + 1}`);
+        const responsePromise = page
+          .waitForResponse(
+            response =>
+              response.request().method() === "GET" &&
+              monitorOpenRunsRoute.test(response.url()),
+            { timeout: 30_000 }
+          )
+          .catch(() => null);
+        await page.locator("#monitorApplyScopeButton").click();
+        const response = await responsePromise;
+        if (response) {
+          assert.equal(response.status(), 200);
+          await waitForNotBusy(step);
+          await recordReadiness(attempt + 1, response.status());
+          return;
+        }
+        await recordReadiness(attempt + 1, null);
+        await waitForNotBusy(`${step}-retry-${attempt + 1}`);
+      }
+      throw new Error(`${step} did not request the scoped monitor runs.`);
+    } finally {
+      page.off("request", observeRequest);
+      page.off("requestfailed", observeFailure);
+      page.off("pageerror", observePageError);
+      page.off("console", observeConsole);
+      await page.evaluate(() => {
+        window.__ownedMonitorScopeProbe?.dispose();
+        delete window.__ownedMonitorScopeProbe;
+      }).catch(() => {});
+    }
   };
   await clickAction("Clear Open Run Filters");
   await applyMonitorScopeAndWaitForOpenRuns("group-monitor-initial-scope");
@@ -23092,7 +23174,13 @@ try {
     ["general", "UI Booklet Access Error"]
   ];
   const monitorBookletErrorRouteOperations = new Set();
+  let monitorBookletErrorPresentationActive = true;
   await page.route(monitorOpenRunsRoute, route => {
+    // SSE can enqueue the next serialized read just as a fulfilled mock is
+    // released. Disabling interception in that window can strand the read.
+    // Keep this owned fixture registered until browser teardown; after the
+    // presentation phase every request continues unchanged to the real API.
+    if (!monitorBookletErrorPresentationActive) return route.continue();
     const operation = (async () => {
       const response = await route.fetch();
       const payload = await response.json();
@@ -23143,7 +23231,7 @@ try {
   while (monitorBookletErrorRouteOperations.size > 0) {
     await Promise.all([...monitorBookletErrorRouteOperations]);
   }
-  await page.unroute(monitorOpenRunsRoute);
+  monitorBookletErrorPresentationActive = false;
   await selectAndCommit("#monitorProfile", "all");
   await clickAction("Clear Open Run Filters");
   await applyMonitorScopeAndWaitForOpenRuns(
@@ -23158,6 +23246,11 @@ try {
     { timeout: 10_000 }
   );
   stopAfter("group-monitor-console");
+
+  page.off("request", observePendingMonitorRead);
+  page.off("response", observeMonitorReadResponse);
+  page.off("requestfinished", observeMonitorReadFinished);
+  page.off("requestfailed", observeMonitorReadFinished);
 
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
@@ -25006,6 +25099,28 @@ try {
   logStep("nav-runtime-before-complete");
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
+  // All timing/monitor interactions on this owned Run are complete. Hold it
+  // through the real authorized UI before the later attachment and deletion
+  // phases: an active timer can expire during the confirmation and append a
+  // log after even a post-preparation snapshot. Keep exact deletion counts.
+  logStep("hold-owned-result-run-before-deletion");
+  for (const [selector, value] of [["#participantSessionId", participantSessionId], ["#testRunId", pausedTestRunId]]) {
+    await page.locator(selector).fill(value);
+    await page.locator(selector).press("Tab");
+    await expectInputValue(selector,value);
+  }
+  const holdOwnedRunResponse = page.waitForResponse(response =>
+    response.request().method() === "POST" && new URL(response.url()).pathname ===
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`
+  );
+  await page.getByRole("button",{name:"Monitor Pause",exact:true}).click();
+  const heldOwnedRun = await holdOwnedRunResponse;
+  assert.equal(heldOwnedRun.status(),200);
+  const heldOwnedRunPayload = await heldOwnedRun.json();
+  assert.equal(heldOwnedRunPayload.command.testRun.testRunId,pausedTestRunId);
+  assert.equal(heldOwnedRunPayload.command.testRun.participantSessionId,participantSessionId);
+  assert.equal(heldOwnedRunPayload.command.testRun.status,"paused");
+  await waitForNotBusy("hold-owned-result-run-before-deletion");
   logStep("refresh-monitor-command-target");
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
   const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;

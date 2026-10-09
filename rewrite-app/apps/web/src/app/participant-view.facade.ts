@@ -2097,11 +2097,15 @@ export class ParticipantViewFacade {
     );
   }
 
-  downloadParticipantReviews(): void {
+  async downloadParticipantReviews(): Promise<"empty" | "downloaded" | undefined> {
     if (!this.canDownloadParticipantReviews) {
       return;
     }
-    this.viewState.onActionAsync(() => this.downloadParticipantReviewsInternal());
+    let result: "empty" | "downloaded" | undefined;
+    await this.viewState.runActionAsync(async () => {
+      result = await this.downloadParticipantReviewsInternal();
+    });
+    return result;
   }
 
   get adaptiveStates(): ParticipantCurrentRunStateResponse["currentRunState"]["adaptiveStates"] {
@@ -3236,7 +3240,8 @@ export class ParticipantViewFacade {
     }
   }
 
-  private async downloadParticipantReviewsInternal(): Promise<void> {
+  private async downloadParticipantReviewsInternal(): Promise<"empty" | "downloaded" | undefined> {
+    const lifecycleSequence = this.viewLifecycleSequence;
     const participantSessionId = this.runtime.participantSessionId.trim();
     if (!participantSessionId) {
       return;
@@ -3247,13 +3252,18 @@ export class ParticipantViewFacade {
         participantSessionId
       })
     );
+    if (lifecycleSequence !== this.viewLifecycleSequence ||
+        participantSessionId !== this.runtime.participantSessionId.trim()) {
+      return;
+    }
     if (download.statusCode === 204 || download.blob.size === 0) {
       this.reviewDownloadFeedback = "Keine Kommentare verfügbar.";
-      return;
+      return "empty";
     }
     const filename = download.filename ?? "testcenter-reviews.csv";
     downloadBlobFile({ filename, blob: download.blob });
     this.reviewDownloadFeedback = `Reviews downloaded as ${filename}.`;
+    return "downloaded";
   }
 
   private async resumeSessionInternal(options: { quiet?: boolean } = {}): Promise<void> {

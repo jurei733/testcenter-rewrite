@@ -63,6 +63,8 @@ export interface ShellRuntimeActionsHost {
   getBookletKey(): string;
   getParticipantSessionId(): string;
   getTestRunId(): string;
+  clearDeletedRunSelection(deletion: Pick<DeleteGroupResultsResponse["deletion"],
+    "tenantKey" | "workspaceKey" | "deletedTestRunIds" | "affectedParticipantSessionIds">): void;
   getCurrentUnitKey(): string;
   getMonitorTargetUnitKey(): string;
   getMonitorTimeSeconds(): string;
@@ -147,6 +149,7 @@ export async function deleteGroupResultsAction(
     "DELETE",
     host.getDeleteGroupResultsPath()
   );
+  host.clearDeletedRunSelection(payload.deletion);
   await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;
 }

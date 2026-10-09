@@ -1,5 +1,5 @@
 {
-  "referenceRevision": "14c98284590195631750bb2352cb398ca669fe7d",
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
   "cases": [
     { "key": "short", "config": { "header_content": "UNIT_LABEL_SHORT", "navbar_unit_label": "LABEL_SHORT", "toolbar_unit_label": "LABEL_SHORT" }, "header": "short", "nav": "short", "toolbar": "short" },
     { "key": "full", "config": { "header_content": "UNIT_LABEL", "navbar_unit_label": "LABEL", "toolbar_unit_label": "LABEL" }, "header": "full", "nav": "full", "toolbar": "full" },
@@ -7,6 +7,7 @@
     { "key": "hidden-nav", "config": { "header_content": "UNIT_LABEL_SHORT", "navbar_unit_label": "HIDDEN", "toolbar_unit_label": "LABEL" }, "header": "short", "nav": "hidden", "toolbar": "full" },
     { "key": "modern-wins", "config": { "header_content": "UNIT_LABEL_SHORT", "navbar_unit_label": "LABEL_SHORT", "toolbar_unit_label": "LABEL_SHORT", "toolbar_show_unit_title": "FALSE", "unit_title": "OFF" }, "header": "short", "nav": "short", "toolbar": "short" },
     { "key": "legacy-newer", "config": { "header_content": "UNIT_LABEL", "toolbar_show_unit_title": "TRUE", "unit_title": "OFF" }, "header": "full", "nav": "index", "toolbar": "full" },
-    { "key": "defaults", "config": {}, "header": "booklet", "nav": "index", "toolbar": "full" }
+    { "key": "defaults", "config": {}, "header": "booklet", "nav": "index", "toolbar": "full" },
+    { "key": "initial-short-fallback", "config": { "header_content": "UNIT_LABEL_SHORT" }, "firstUnitWithoutShortLabel": true, "header": "short", "nav": "index", "toolbar": "full" }
   ]
 }

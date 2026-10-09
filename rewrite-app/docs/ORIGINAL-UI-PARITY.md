@@ -7,8 +7,14 @@ an optional interface identical to the Original Testcenter. This is a separate
 acceptance axis from functional parity; the historical 94% estimate in
 PARITY.md does not measure it.
 
-Current upstream target, reverified on 2026-10-08:
-`14c98284590195631750bb2352cb398ca669fe7d`. The protected-login busy states,
+Current upstream target, reverified on 2026-10-09:
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Its only new commit since
+`14c98284` adds an initial short-header fallback e2e case and sample setup;
+frontend tree `64032f00186dc287c9de3ffd63cc235fe1c9a5da` is unchanged.
+The owned native label corpus now covers eight configurations, both interfaces
+and both widths (32 cases), including this initial missing-short-label fallback,
+exact Run/Session identity and byte-exact saved-response reload. These functional
+checks do not close a full-page comparison row. The protected-login busy states,
 insecure-context HTTPS notice and independent short Unit labels have current
 functional browser evidence. Toolbar on-primary colors and full-page visual
 identity require fresh comparison, not only the historical comparisons.
@@ -34,6 +40,45 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+### Current Starter and Review-download messages (2026-10-09)
+
+Unmodified current Source `ee2ab9ab` renders 24 owned fresh/mixed/long-title/
+Review Starter states in all three themes at 1280/390px. Their 2,928 measured
+Starter geometry/style values match the protected Rewrite renderer exactly.
+These are frontend fixtures, not Source backend authentication evidence.
+
+The empty Review export exposed a concrete presentation difference: Source
+shows a bottom-centered, independently dismissible toast; the Original-mode
+Rewrite had inserted an inline status paragraph. The optional Original interface
+now uses Source's stack, five-second per-message lifetime, close action,
+inverse-surface colors, native button font and narrow-width text wrapping.
+The existing Rewrite feedback remains available. Populated exports download
+their exact CSV without an empty-message toast. Late replies across Session/
+view changes are discarded before feedback/downloads; a destroyed Starter
+suppresses its pending empty-message toast.
+
+The existing protected SQLite Starter gate passes all 48 geometry/state cases,
+exact saved-answer resume, duplicate pending-start prevention and authorized
+empty exports. It additionally requires 18 exact single/stacked/first-dismissed
+toast comparisons against actual Source in the six theme/viewport combinations,
+native click/Enter/close, polite live announcements and independent expiry.
+Fifteen production-method regressions cover download results, failed/stale
+responses, destroyed views and independent timers. The new Source reference
+helper is reproducible without changing Source or vendor assets:
+
+```sh
+ORIGINAL_STARTER_REFERENCE_ROOT=/path/to/original/frontend/dist/testcenter-frontend/browser \
+UI_SMOKE_ARTIFACT_DIR=/path/to/new/owned/source-evidence \
+npm run reference:ui:original-starter:built
+npm run smoke:ui:original-starter:built
+```
+
+Verify current Source SHA and build before running the reference. The measured
+toast fixtures are in `scripts/fixtures/original-starter-review-toasts.json`.
+These checks close this component's empty-export presentation gap. Whole-page
+pixel identity, all start/resume/error combinations, broader export feedback and
+the complete cross-cutting requirements remain open; no full-page row is closed.
+
 The 2026-10-08 PDF continuation adds nine actual TCPDF label-placement/wrapping
 references and four actual Source bookmark references. Short/long generated
 PDF pages decode correctly, and native protected single/batch exports retain
@@ -42,9 +87,9 @@ details, extended cases, the normal Source capture page and physical camera/
 window visibility still require separate evidence. See `PARITY.md` for exact
 whole-flow versus focused-run and publication boundaries.
 
-Normal Source capture reference is currently blocked at `14c98284`:
+Normal Source capture reference is currently blocked at `ee2ab9ab`:
 `runCamera` reads `video.nativeElement` before dynamic ViewChild initialization.
-Twelve actual initial/re-entry states across all three themes and both widths
+Twelve fresh actual initial/re-entry states across all three themes and both widths
 reproduce the failure without a video stream or metadata lookup. Native reload
 returns to the Starter and capture URL re-entry fails again. The standalone
 `diagnose-original-camera-reference.mjs` exits 2 and retains actual error states;
@@ -52,6 +97,25 @@ these cannot count as successful capture comparisons or close any matrix row.
 The reference remains unmodified, and real camera/window acceptance is separate.
 
 ### Current Review drawer comparison (2026-10-08)
+
+An additional read-only comparison on 2026-10-09 decodes the actual PNGs from
+`goal-review-header-probe/` and the settled `source-label-review-reference/`
+captures in all 24 states. Header content pixels match exactly in all three
+themes and both widths; differing pixels occupy only the last two header shadow
+rows. Its zero-scroll before/after measurements and decoded pixels do not
+reproduce the earlier sporadic clipping described below. The retained result
+is `goal-review-header-pixels.json`. This narrower header observation does not
+establish full-page identity or close a matrix row; no image or runtime was
+modified for the comparison.
+
+Freshly rebuilt unmodified `ee2ab9ab` references and the protected owned SQLite
+Rewrite gate repeat all 24 comparisons on 2026-10-09. They retain identical own
+content, exact rendered list/editor checks, font/drawer readiness, native input,
+same-Run persistence and foreign-Session rejection. All measured panel, toolbar,
+form, button, label, list and header comparisons pass. Actual raw screenshots
+still differ, including header raster clipping despite identical rectangles;
+this is current component evidence, not full pixel identity or closure of any
+complete acceptance row. The frontend source tree is unchanged from `14c98284`.
 
 The optional participant Review pane now adapts the actual `14c98284` toolbar,
 700px inner panel/90%-viewport drawer, Material form, current-Unit and whole-Test

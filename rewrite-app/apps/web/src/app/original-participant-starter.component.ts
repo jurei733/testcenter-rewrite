@@ -6,6 +6,7 @@ import { MatCard, MatCardActions, MatCardHeader } from "@angular/material/card";
 import type { ParticipantRuntimeBooklet } from "@testcenter-rewrite-app/domain";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
+import { OriginalToastService } from "./original-toast.service";
 
 // Layout adapted from IQB Testcenter; see assets/ORIGINAL-UI-LICENSE.txt.
 @Component({
@@ -22,6 +23,8 @@ export class OriginalParticipantStarterComponent implements OnDestroy {
   readonly problem = signal("");
   readonly showScrollButton = signal(false);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly messages = inject(OriginalToastService);
+  private destroyed = false;
   private bottomElement: HTMLElement | null = null;
   private readonly observer = typeof IntersectionObserver === "undefined" ? null :
     new IntersectionObserver(([entry]) => this.showScrollButton.set(Boolean(entry && !entry.isIntersecting)));
@@ -65,7 +68,15 @@ export class OriginalParticipantStarterComponent implements OnDestroy {
       ?.scrollBy({ top: 300, behavior: "smooth" });
   }
 
+  async downloadReviews(): Promise<void> {
+    const result = await this.view.downloadParticipantReviews();
+    if (!this.destroyed && result === "empty") {
+      this.messages.show("Keine Kommentare verfügbar.");
+    }
+  }
+
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.observer?.disconnect();
   }
 }

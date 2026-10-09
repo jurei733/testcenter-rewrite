@@ -54,9 +54,11 @@ localhost remain usable; existing deployment protection is never switched off.
 second-code scopes on an owned API using a real insecure browser origin and is
 part of quick CI. Current upstream's independent short Unit labels are supported
 in the header, navigation and toolbar, including full-label fallback and legacy
-toolbar-key precedence. The complete browser smoke tests seven native XML
+toolbar-key precedence. The complete browser smoke tests eight native XML
 configurations in both interfaces at desktop and mobile widths, with real Player
-input and exact saved-answer reload. Narrow Rewrite Player cards use smaller
+input and exact saved-answer reload. This includes the current upstream's initial
+full-label fallback when `UNIT_LABEL_SHORT` is configured without a first-Unit
+short label. Narrow Rewrite Player cards use smaller
 padding without changing vendor files. Toolbar colors and complete Original-UI
 comparison remain separate requirements tracked in `docs/PARITY.md`.
 
@@ -64,6 +66,18 @@ The shared short-label browser gate waits for the actual Player after hard
 reload instead of requiring idle SSE/polling connections. Run URL identity,
 exact saved answer, native checked-state and all label assertions remain
 mandatory; navigation or missing Player errors still fail the gate.
+
+The optional Original Starter shows the current Source's stacked Review-download
+messages, including native close actions, independent five-second expiry and
+mobile wrapping. Rewrite feedback remains available. Empty/populated results
+are explicit. Replies across Session/view changes are discarded before feedback
+or downloads, and a destroyed Starter suppresses its pending empty-message
+toast. The protected
+Starter smoke retains its 48 geometry/state checks and compares 18 actual Source
+toast states across all three themes and both widths. Build unmodified current
+Source first and use `reference:ui:original-starter:built` for owned frontend
+references; see `docs/ORIGINAL-UI-PARITY.md` for evidence and remaining full-page
+acceptance boundaries.
 
 At the attachment boundary, the shared smoke waits for the rendered workspace
 checkbox's native state to agree with its saved auto-refresh preference before

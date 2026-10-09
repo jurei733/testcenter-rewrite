@@ -1,0 +1,1890 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "description": "Measured unmodified current Source empty-review toast states; own content, three themes, 1280/390px, native close and independent expiry",
+  "states": {
+    "Primar-review-desktop-single": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Primar-review-desktop-stacked": {
+      "box": {
+        "x": 468.359375,
+        "y": 588,
+        "width": 343.28125,
+        "height": 108
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 588,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 602,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 602,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Primar-review-desktop-dismissed-first": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Primar-review-mobile-single": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Primar-review-mobile-stacked": {
+      "box": {
+        "x": 84.359375,
+        "y": 624,
+        "width": 221.28125,
+        "height": 196
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 624,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 638,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 638,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Primar-review-mobile-dismissed-first": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-desktop-single": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-desktop-stacked": {
+      "box": {
+        "x": 468.359375,
+        "y": 588,
+        "width": 343.28125,
+        "height": 108
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 588,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 602,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 602,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-desktop-dismissed-first": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-mobile-single": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-mobile-stacked": {
+      "box": {
+        "x": 84.359375,
+        "y": 624,
+        "width": 221.28125,
+        "height": 196
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 624,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 638,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 638,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Sekundar-review-mobile-dismissed-first": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-desktop-single": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-desktop-stacked": {
+      "box": {
+        "x": 468.359375,
+        "y": 588,
+        "width": 343.28125,
+        "height": 108
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 588,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 602,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 602,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-desktop-dismissed-first": {
+      "box": {
+        "x": 468.359375,
+        "y": 646,
+        "width": 343.28125,
+        "height": 50
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -171.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 468.359375,
+            "y": 646,
+            "width": 343.28125,
+            "height": 50
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 484.359375,
+              "y": 660,
+              "width": 216,
+              "height": 22
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 724.359375,
+              "y": 660,
+              "width": 71.28125,
+              "height": 22
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-mobile-single": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-mobile-stacked": {
+      "box": {
+        "x": 84.359375,
+        "y": 624,
+        "width": 221.28125,
+        "height": 196
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 624,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 638,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 638,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        },
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    },
+    "Erwachsene-review-mobile-dismissed-first": {
+      "box": {
+        "x": 84.359375,
+        "y": 726,
+        "width": 221.28125,
+        "height": 94
+      },
+      "style": {
+        "font": "16px \"Nunito Sans\", sans-serif",
+        "color": "rgb(25, 28, 29)",
+        "background": "rgba(0, 0, 0, 0)",
+        "padding": "0px",
+        "gap": "8px",
+        "border": "0px none rgb(25, 28, 29)",
+        "radius": "0px",
+        "cursor": "auto",
+        "transform": "matrix(1, 0, 0, 1, -110.641, 0)",
+        "boxSizing": "content-box"
+      },
+      "items": [
+        {
+          "box": {
+            "x": 84.359375,
+            "y": 726,
+            "width": 221.28125,
+            "height": 94
+          },
+          "style": {
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(239, 241, 242)",
+            "background": "rgb(46, 49, 50)",
+            "padding": "14px 16px",
+            "gap": "24px",
+            "border": "0px none rgb(239, 241, 242)",
+            "radius": "4px",
+            "cursor": "auto",
+            "transform": "none",
+            "boxSizing": "content-box"
+          },
+          "text": {
+            "value": "Keine Kommentare verfügbar.",
+            "box": {
+              "x": 100.359375,
+              "y": 740,
+              "width": 94,
+              "height": 66
+            },
+            "style": {
+              "font": "16px \"Nunito Sans\", sans-serif",
+              "color": "rgb(239, 241, 242)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "0px",
+              "gap": "normal",
+              "border": "0px none rgb(239, 241, 242)",
+              "radius": "0px",
+              "cursor": "auto",
+              "transform": "none",
+              "boxSizing": "content-box"
+            }
+          },
+          "action": {
+            "value": "Schließen",
+            "box": {
+              "x": 218.359375,
+              "y": 740,
+              "width": 71.28125,
+              "height": 66
+            },
+            "style": {
+              "font": "13.3333px Arial",
+              "color": "rgb(145, 208, 231)",
+              "background": "rgba(0, 0, 0, 0)",
+              "padding": "1px 6px",
+              "gap": "normal",
+              "border": "0px none rgb(145, 208, 231)",
+              "radius": "0px",
+              "cursor": "pointer",
+              "transform": "none",
+              "boxSizing": "border-box"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

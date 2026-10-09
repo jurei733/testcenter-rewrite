@@ -98,8 +98,11 @@ if (process.env.FIRST_SLICE_STORE === "postgres") {
   assert.ok(process.env.FIRST_SLICE_POSTGRES_URL);
   snapshotStores.push("postgres");
 }
-for (const kind of snapshotStores) {
-  test(`${kind}: deletion snapshot follows monitor timer initialization`, async () => {
+for (const {kind,timing} of snapshotStores.flatMap(kind =>
+  ["initialized","expired","paused"].map(timing => ({kind,timing})))) {
+  const description = {initialized:"follows monitor timer initialization",
+    expired:"detects expiry after completed preparation",paused:"holds the owned Run across later timer reads"}[timing];
+  test(`${kind}: deletion snapshot ${description}`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "testcenter-deletion-snapshot-"));
     let storage;
     const repository = kind === "memory" ? createInMemoryFirstSliceRepository()
@@ -107,7 +110,8 @@ for (const kind of snapshotStores) {
       : kind === "sqlite" ? createSqliteFirstSliceRepository(join(directory, "own.sqlite"))
       : (storage = await createPostgresFirstSliceStorage(process.env.FIRST_SLICE_POSTGRES_URL)).repository;
     const createdAt = "2026-10-08T00:00:00.000Z";
-    const services = createFirstSliceServices({ repository, now: () => createdAt });
+    let currentTime = createdAt;
+    const services = createFirstSliceServices({ repository, now: () => currentTime });
     const scope = { tenantKey: `snapshot-${randomUUID()}`, workspaceKey: "own-snapshot" };
     const ownUrl = `http://127.0.0.1:4312/api/v1/tenants/${scope.tenantKey}/workspaces/${scope.workspaceKey}`;
     const runIds = [];
@@ -158,16 +162,43 @@ for (const kind of snapshotStores) {
       // A real monitor read starts this Run's timed block and appends its log.
       // The earlier snapshot is stale even though no participant wrote an answer.
       await services.monitorRead.listOpenRuns(scope);
-      const ready = await captureResultGroupSnapshot(readJson, ownUrl, "selected");
+      let ready = await captureResultGroupSnapshot(readJson, ownUrl, "selected");
       assert.equal(ready.logs.length, 2);
       const added = ready.logs.filter(row => !before.logs.some(old =>
         old.testLog.participantTestLogId === row.testLog.participantTestLogId));
       assert.equal(added.length, 1);
       assert.equal(added[0].testLog.logKey, "TESTLETS_TIMELEFT");
       assert.equal(ready.testRuns[0].unitResponses.unit, before.testRuns[0].unitResponses.unit);
+      const prepared = ready;
+      if (timing === "expired") {
+        currentTime = "2026-10-08T00:10:00.000Z";
+        await services.monitorRead.listOpenRuns(scope);
+        ready = await captureResultGroupSnapshot(readJson,ownUrl,"selected");
+        assert.equal(ready.logs.length,3,"Later timer expiry adds one real log after preparation.");
+        const late = ready.logs.filter(row=>!prepared.logs.some(old=>
+          old.testLog.participantTestLogId===row.testLog.participantTestLogId));
+        assert.equal(late.length,1);
+        assert.equal(late[0].testLog.logKey,"TESTLETS_TIMELEFT");
+      }
+      if (timing === "paused") {
+        const held = await services.monitorControl.issueRunCommand({ ...scope,
+          testRunId:runIds[0],commandType:"pause",actorId:"owned-snapshot-operator" });
+        assert.equal(held.testRun.testRunId,runIds[0]);
+        assert.equal(held.testRun.status,"paused");
+        ready = await captureResultGroupSnapshot(readJson,ownUrl,"selected");
+        assert.equal(ready.testRuns[0].testletTimers["own-timer"].status,"paused");
+        // Advance beyond the original active deadline. A real later monitor
+        // read must leave every held log, timer and byte-exact answer intact.
+        currentTime = "2026-10-08T00:10:00.000Z";
+        await services.monitorRead.listOpenRuns(scope);
+        assert.deepEqual(await captureResultGroupSnapshot(readJson,ownUrl,"selected"),ready);
+      }
       const removed = await services.workspaceResults.deleteGroupResultsBulk({ ...scope,
         groupKeys: ["selected"], confirmation: scope.workspaceKey });
       assert.throws(() => assertGroupDeletionMatchesSnapshot(removed, before), assert.AssertionError);
+      if (timing === "expired") {
+        assert.throws(() => assertGroupDeletionMatchesSnapshot(removed,prepared),assert.AssertionError);
+      }
       assertGroupDeletionMatchesSnapshot(removed, ready);
       await assertResultGroupRemoved(readJson, ready);
       await assertResultGroupRetained(readJson, retained);
