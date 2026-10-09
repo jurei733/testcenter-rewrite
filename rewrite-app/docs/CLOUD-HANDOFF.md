@@ -33,6 +33,14 @@ and `d2807ed0` and their exact verified tree. All 74 head Push/PR jobs pass;
 fresh main workflow `37939303283` separately passes all 37 jobs. The live
 inventory has zero open PRs and all published branch changes are contained in
 main. The existing local parity branch is fast-forwarded before the next step.
+PR #4 is normally merged as `641f6f9096b7d9052f7bf3e8c07b270a8c3aedc6`,
+preserving parents `fe9ec21f` and `f161e897` and the verified head's exact tree.
+The PR workflow passes all 37 jobs. The Push workflow ultimately passes all
+37 jobs after bounded unchanged Compose and Quick retries; its first failures
+remain separate evidence, and the first Quick assertion is still unavailable.
+Fresh main workflow `37962778150` independently passes all 37 jobs on its first
+attempt. All published branch commits are contained in main and no PR remains
+open at that checkpoint. Continue on the existing parity branch from this merge.
 Never force-push or rewrite published history. Do not use assistant-specific
 branch prefixes or names in publication prose.
 
@@ -67,7 +75,12 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 ## Prioritized remaining work
 
-An additional read-only dependency audit on 2026-10-09 records 183 findings
+The dependency step below now has zero findings in both fresh audits. Keep
+the following earlier audit as history, rather than treating it as the current
+installed state. Production acceptance and the remaining capability/UI gates
+are still open.
+
+An earlier read-only dependency audit on 2026-10-09 recorded 183 findings
 in the complete installed tree (68 low, 26 moderate, 82 high, seven critical).
 The separate server `--omit=dev` audit records one high package,
 `@xmldom/xmldom`; registry metadata confirms 0.9.12 is available. All seven
@@ -116,6 +129,60 @@ or OS cause is unknown. Do not weaken/drop the gate or label a headless cloud
 run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
+
+### Compatible dependency lock and restored runtime (2026-10-09)
+
+The next continuation restores the clean existing parity checkout at `641f6f90`
+with Node 22.23.3 after activation. The previous product network grant expired:
+the initial own IPv4 listener fails with
+`listen EPERM: operation not permitted 127.0.0.1`. After the regular product
+network request, the effective execution profile has `network: enabled` and
+the fresh IPv4 listener and exact `own-pipe-ok` child output succeed. An own
+new SQLite database starts with operator authentication enabled, returns 401
+for the unauthenticated workspace request and shuts down cleanly. This is a
+fresh restoration pass. It does not expand filesystem rights, VM domains, VPN,
+proxy exceptions or sandbox/policy configuration. Permissions remain turn-scoped.
+
+An isolated complete `git archive` of `641f6f90` uses its own dependency install,
+build assets, databases and ports. Targeted ordinary transitive updates remain
+inside the parents' existing declared ranges; the manifest, Angular, Material,
+TypeScript, Playwright and browser versions are unchanged. The MCP SDK explicitly
+allows both `@hono/node-server` 1.x and 2.x. Vite allows esbuild 0.28.1; the same
+version is already the Angular builder's exact dependency. Updating Vite's
+older separate esbuild removes the last finding and deduplicates its binaries.
+There is no override, force install, vendor modification or new direct dependency.
+The fresh full audit moves from 17 findings to zero, and the separate server
+`--omit=dev` audit remains zero. This closes those installed-lock findings, not
+production acceptance or a claim that audits prove every security property.
+
+Typecheck and the unchanged production budget pass at 469.46 kB. All 145 actual
+browser files are byte-identical to the freshly built `641f6f90` baseline.
+The 596 regular tests, 61 compatibility tests and 24 fresh Source/Rewrite
+Review states pass, including the visibly verified own list/edit entry, native
+CRUD/back/retry, exact UTF-8, same Run reload and foreign-Session denial.
+Memory/File/SQLite each pass all 165 API cases. The unchanged Verona gate also
+passes all eight native completion-navigation cases in both interfaces and
+both widths with exact same-Run answers and unchanged foreign own state.
+The complete protected SQLite browser repetition is still running at this
+commit checkpoint; do not label it passed before its actual clean completion.
+Current publication CI remains a separate gate before normal integration.
+Builds finish before browser fixtures start; their assets are not cleaned or
+rebuilt while in use. Logs and generated audit JSONs use the
+`goal-next-compatible-tooling-*` names outside the repository.
+
+Two fresh negative prerequisites remain separate. The existing real insecure
+fixture hostname `testcenter-proof.insecure` still receives HTTP 403
+`Domain forbidden`, while the same own protected API on 127.0.0.1 returns 200
+and renders its login field. A supported loopback-only fixture exception or
+equivalent actual insecure-context product fixture is still missing; no proxy
+or domain bypass is made. Unmodified current Source `ee2ab9ab` also fails all
+12 initial/native-reload camera states with the same `nativeElement` error,
+zero stream and zero metadata/unknown requests. Its diagnostic exits 2 and
+does not establish camera acceptance. The functioning current Original camera
+reference and physical camera/OS-window acceptance remain external prerequisites.
+None of the eight complete Original-UI rows is closed by this dependency step.
+Entire CLI/Cloud trace export remains unavailable; no new checkpoint or trailer
+is invented, and no private PPTX/tryout data is read or transferred.
 
 ### Maintained dependencies and completed toolbar references (2026-10-09)
 

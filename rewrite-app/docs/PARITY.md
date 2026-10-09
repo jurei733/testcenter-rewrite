@@ -1,5 +1,45 @@
 # Testcenter parity checklist
 
+### Compatible lock updates and current external prerequisites (2026-10-09)
+
+PR #4 is normally merged as `641f6f9096b7d9052f7bf3e8c07b270a8c3aedc6`,
+with both parents and the verified `f161e897` tree preserved. Its PR passes
+37/37 jobs. The Push completes 37/37 after bounded unchanged Compose/Quick
+retries; the first negative results and unavailable Quick assertion remain
+recorded separately. Fresh main `37962778150` passes all 37 jobs on its first
+attempt. At that live checkpoint no PR remains open and all remote branch
+changes are contained in main. These are merged/CI facts, not deployment.
+
+From an isolated complete archive of this main tree, targeted ordinary lock
+updates close the remaining 17 installed-package audit findings. Both the
+fresh full audit and server `--omit=dev` audit have zero findings. Parent ranges
+already allow the selected official versions, including MCP's Hono adapter
+2.x and Vite's esbuild 0.28.1; Angular's builder already requires the latter.
+There is no override, force installation, vendor patch or manifest change.
+Angular, Material, TypeScript, Playwright and Chromium remain unchanged.
+Typecheck, production build (469.46 kB under the unchanged 470-kB limit),
+596 regular checks, 61 compatibility checks and 165 API cases on each of
+Memory/File/SQLite pass. All 145 actual production browser files are byte-identical
+to the freshly built main baseline. A fresh unmodified Source reference and
+protected SQLite Review gate pass all 24 visible form/filled/list/edit states,
+three themes, 1280/390px, native CRUD/retry/back, exact UTF-8, same Run reload
+and foreign-Session denial. Audit results and byte equality are not substitutes
+for complete browser/publication CI or production security acceptance.
+
+Fresh negative prerequisites are retained: the existing actual insecure-context
+fixture hostname receives HTTP 403 `Domain forbidden`, while the same own
+protected loopback API returns 200 and its login field. The minimum missing
+product support is a loopback-only exception for that existing fixture or an
+equivalent real insecure-context fixture within the enforced policy. No domain,
+proxy or authorization exception is introduced. Unmodified current Source
+`ee2ab9ab` again fails all 12 initial/native-reload camera states with
+`Cannot read properties of undefined (reading 'nativeElement')`, zero stream
+and zero metadata/unknown requests; the diagnostic exits 2, not a passing
+reference. A functioning current Source camera reference and real physical
+camera/OS-window evidence remain external prerequisites. All eight complete
+Original-UI rows, broader partial corpus requirements, deployment and production
+acceptance remain open. Real Entire Cloud trace support is still unavailable.
+
 ### Maintained parser, frontend and Original toolbar controls (2026-10-09)
 
 PR #3 is normally merged as `fe9ec21fd744fc769b7d0af49d44e27f466a4d1d`
