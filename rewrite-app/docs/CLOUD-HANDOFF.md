@@ -121,9 +121,12 @@ including eleven deletion/retention/bulk cases. Typecheck, production build,
 470-kB limit (469.98 kB actual initial bundle). The complete unchanged owned
 `local-demo` gate passes in `goal-deleted-selection-local-demo.log` with its
 original assertion and timeout. Fresh full protected PostgreSQL and SQLite
-browser suites are in progress on separate owned databases and fixed assets,
-with logs `goal-deleted-selection-full-pg.log` and
-`goal-deleted-selection-full-sqlite.log`; these are not yet passing evidence.
+browser suites both pass on separate owned databases and the same fixed assets,
+through Attachments, exact 47/47 deletion logs and complete CLI shutdown. Their
+logs are `goal-deleted-selection-full-pg.log` and
+`goal-deleted-selection-full-sqlite.log`; all four scoped monitor probes in
+each suite return HTTP 200 on their first trusted native activation. These
+are new corrected-tree Cloud results, distinct from the previous publication.
 No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
 fresh corrected-head CI independently before normal integration into main.
 

@@ -27,8 +27,10 @@ its original success-message assertion and 15-second deadline.
 
 Fresh full protected PostgreSQL and SQLite suites use separate owned databases
 and the same fixed new assets; their logs are `goal-deleted-selection-full-pg.log`
-and `goal-deleted-selection-full-sqlite.log`. They are currently in progress,
-not passing evidence. No new publication will cancel the still-running
+and `goal-deleted-selection-full-sqlite.log`. Both now pass through Attachments,
+exact 47/47 deletion logs and complete CLI shutdown. Each suite's four scoped
+monitor probes return HTTP 200 on their first trusted native activation. These
+are new corrected-tree Cloud results. No new publication will cancel the still-running
 `4ba6bc37` workflows. The correction requires fresh publication CI and does not
 close any full Original-UI, physical camera/window or production gate.
 
