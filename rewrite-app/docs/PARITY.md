@@ -1,5 +1,19 @@
 # Testcenter parity checklist
 
+### Dependency audit and production-readiness boundary (2026-10-09)
+
+The actual read-only full dependency audit records 183 findings: 68 low,
+26 moderate, 82 high and seven critical. A separate server `--omit=dev` audit
+reports one high package, `@xmldom/xmldom`, with registry version 0.9.12 available.
+The seven critical dependency nodes are development-only in the current
+lockfile. That alone certifies neither production exploitability nor safety;
+the compiled Angular frontend requires separate advisory/reachability triage.
+Retained evidence is `goal-production-dependency-audit.json` and
+`goal-production-server-audit.json`. These are negative audit results, not
+successful security acceptance. No package or live asset was modified. Narrow
+ordinary dependency updates and parser/compatibility/API/browser/CI validation
+remain required before production acceptance, with the unchanged bundle limit.
+
 ### Confirmed deletion and selected Runtime context (2026-10-09)
 
 Published `4ba6bc37` passed the recorded Cloud browser suites, but its fresh
@@ -30,7 +44,15 @@ and the same fixed new assets; their logs are `goal-deleted-selection-full-pg.lo
 and `goal-deleted-selection-full-sqlite.log`. Both now pass through Attachments,
 exact 47/47 deletion logs and complete CLI shutdown. Each suite's four scoped
 monitor probes return HTTP 200 on their first trusted native activation. These
-are new corrected-tree Cloud results. No new publication will cancel the still-running
+are new corrected-tree Cloud results.
+
+The corrected fixed assets additionally pass fresh protected Starter 48-state/
+18-Source-toast checks and Review 24-state comparisons with current rendered
+Source metrics, including native CRUD/back/retry, exact answers, same-Run reload,
+foreign-Session denial and the Rewrite switch. Logs are
+`goal-deleted-selection-starter.log` and `goal-deleted-selection-review.log`.
+
+No new publication will cancel the still-running
 `4ba6bc37` workflows. The correction requires fresh publication CI and does not
 close any full Original-UI, physical camera/window or production gate.
 

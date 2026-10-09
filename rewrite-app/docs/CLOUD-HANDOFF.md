@@ -55,6 +55,19 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 ## Prioritized remaining work
 
+An additional read-only dependency audit on 2026-10-09 records 183 findings
+in the complete installed tree (68 low, 26 moderate, 82 high, seven critical).
+The separate server `--omit=dev` audit records one high package,
+`@xmldom/xmldom`; registry metadata confirms 0.9.12 is available. All seven
+critical nodes are marked development-only in the lockfile, which does not
+certify the compiled browser bundle or establish production exploitability.
+Angular advisories need separate browser triage. Actual JSONs are
+`goal-production-dependency-audit.json` and `goal-production-server-audit.json`.
+No package, lockfile or vendor file was changed during active fixed-asset
+fixtures. After verified PR integration, perform narrow ordinary updates with
+XML/parser, compatibility, API and relevant browser/CI validation; retain the
+470-kB limit. This audit is an open production-readiness item, not acceptance.
+
 Current reference blocker: unmodified Source `ee2ab9ab` camera startup fails
 in all three themes at 1280/390px, including re-entry after native reload.
 Twelve negative observations show the same `nativeElement` lifecycle error,
@@ -127,6 +140,13 @@ logs are `goal-deleted-selection-full-pg.log` and
 `goal-deleted-selection-full-sqlite.log`; all four scoped monitor probes in
 each suite return HTTP 200 on their first trusted native activation. These
 are new corrected-tree Cloud results, distinct from the previous publication.
+The same corrected fixed assets also pass a fresh protected Original Starter
+suite (48 geometry/state fixtures, 18 exact current-Source toast comparisons,
+authorized empty export and saved-answer retention) and all 24 protected
+Original Review states against the current rendered Source metrics. Native
+CRUD/back/retry, same-Run reload, exact UTF-8, foreign-Session rejection and
+the Rewrite switch remain checked. Actual logs are
+`goal-deleted-selection-starter.log` and `goal-deleted-selection-review.log`.
 No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
 fresh corrected-head CI independently before normal integration into main.
 
