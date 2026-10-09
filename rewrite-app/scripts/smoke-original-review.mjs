@@ -114,6 +114,10 @@ try {
         await page.waitForFunction(()=>document.querySelector('app-original-player-sidebar [role="dialog"]').scrollLeft===0 &&
           [...document.querySelectorAll('app-original-review-panel .scrollable-area')].filter(n=>n.getBoundingClientRect().height>0).every(n=>n.scrollTop===0));
         await page.mouse.move(0, 0);
+        // Observe settled native ripples/transitions; never disable animation.
+        await page.waitForFunction(() => document.getAnimations()
+          .filter(animation => animation.effect?.getTiming().iterations !== Infinity)
+          .every(animation => !animation.pending && animation.playState !== 'running'));
         // Let native wheel/focus updates reach a completed browser paint.
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         if (state === "list") assert.equal(await page.locator('[data-cy="comment-list-unit-comments"]').filter({hasText:"Eigener synthetischer Kommentar"}).isVisible(), true);
@@ -126,8 +130,14 @@ try {
           const rect=n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
           const toolbar=el.querySelector("mat-toolbar");return{panel:rect(el),drawer:rect(el.closest('[role="dialog"]')),
             header:{box:rect(document.querySelector('#participantApplicationHeader')),title:rect(document.querySelector('#participantApplicationHeader h1')),logo:rect(document.querySelector('#applicationLogo'))},
+            playerToolbarButtons:[...document.querySelectorAll('[data-cy="toolbar-right"] button')].map(n=>({
+              cursor:getComputedStyle(n).cursor,opacity:getComputedStyle(n).opacity,transform:getComputedStyle(n).transform,
+              icon:rect(n.querySelector('svg')),host:rect(n.querySelector('.mat-icon'))})),
             backdropColor:getComputedStyle(document.querySelector('app-original-player-sidebar .backdrop')).backgroundColor,
             toolbar:rect(toolbar),toolbarBackground:getComputedStyle(toolbar).backgroundColor,toolbarColor:getComputedStyle(toolbar).color,
+            toolbarButtons:[...el.querySelectorAll('mat-toolbar button')].map(n=>({
+              disabled:n.disabled,cursor:getComputedStyle(n).cursor,opacity:getComputedStyle(n).opacity,transform:getComputedStyle(n).transform,
+              icon:rect(n.querySelector('svg')),host:rect(n.querySelector('.mat-icon'))})),
             headings:[...el.querySelectorAll("h3")].map(n=>({text:n.textContent,font:getComputedStyle(n).font,color:getComputedStyle(n).color,margin:getComputedStyle(n).margin,height:n.getBoundingClientRect().height})),
             buttons:[...el.querySelectorAll('.action-buttons button')].map(n=>({text:n.textContent.trim(),rect:rect(n),font:getComputedStyle(n).font,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius,opacity:getComputedStyle(n).opacity,cursor:getComputedStyle(n).cursor,transform:getComputedStyle(n).transform})),
             labels:[...el.querySelectorAll('label')].map(n=>({font:getComputedStyle(n).font,color:getComputedStyle(n).color})),
@@ -144,6 +154,16 @@ try {
         }
         for(const label of [metrics[id].labels[0],metrics[id].labels[5],metrics[id].labels[9]])
           assert.equal(label.color,"rgb(64, 72, 76)");
+        for(const button of metrics[id].toolbarButtons) {
+          assert.equal(button.cursor,button.disabled ? "default" : "pointer");
+          assert.equal(button.opacity,"1");
+          assert.equal(button.transform,"none");
+          assert.equal(button.icon.y,button.host.y);
+        }
+        for(const button of metrics[id].playerToolbarButtons) {
+          assert.equal(button.cursor,"default");
+          assert.equal(button.icon.y,button.host.y);
+        }
         assert.equal(metrics[id].backdropColor,"color(srgb 0.160784 0.196078 0.207843 / 0.4)");
         assert.equal(metrics[id].toolbarBackground,{Primar:"rgb(25, 97, 117)",Sekundar:"rgb(11, 45, 132)",Erwachsene:"rgb(107, 54, 154)"}[theme]);
       };
@@ -292,7 +312,7 @@ try {
     assert.deepEqual(Object.keys(metrics).sort(),Object.keys(reference.metrics).sort());
     for(const [key,actual] of Object.entries(metrics)) {
       const expected = reference.metrics[key];
-      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","controls","buttons","labels","header"])
+      for(const field of ["panel","drawer","toolbar","toolbarBackground","toolbarColor","toolbarButtons","playerToolbarButtons","controls","buttons","labels","header"])
         assert.deepEqual(actual[field],expected[field],`${key}: rendered ${field}`);
       if(key.endsWith("-list")) {
         assert.deepEqual(actual.headings,expected.headings,`${key}: list typography`);

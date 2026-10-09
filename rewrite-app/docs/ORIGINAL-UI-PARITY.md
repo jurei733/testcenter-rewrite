@@ -40,6 +40,29 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+### Separate Player and Review toolbar references (2026-10-09)
+
+The current unmodified Source has two different icon hosts: the main Player
+toolbar uses 18px SVGs in 18x24px MatIcon hosts; the Review pane uses 24px SVGs
+in 24x30px hosts. The optional Original renderer now preserves both geometries.
+Its main toolbar keeps Source's default cursor; the pane retains pointer for
+enabled controls and default for disabled controls. The disabled list button
+keeps full opacity instead of inheriting the Rewrite's 0.65 opacity.
+
+Both reference helpers wait for real finite drawer/ripple transitions and fonts
+before capture. They independently compare both toolbar hosts/SVGs and cursors
+in all 24 form/filled/list/edit states across three themes at 1280/390px.
+Every list/edit capture first proves the same intended own comment is visibly
+rendered. Protected SQLite native CRUD/back/new/retry, exact UTF-8 answers,
+same Run reload, foreign-Session denial and the existing Rewrite switch pass.
+The earlier diagnostic that selected `toolbar-right` measured the main Player
+toolbar; it was not a measurement of the pane's `mat-toolbar`.
+
+These are component comparisons, not full-page identity. Small image differences
+remain and none of the eight complete acceptance rows is closed here. Source
+fixtures prove rendered frontend behavior; they do not prove Source backend
+authorization or physical camera/window acceptance.
+
 ### Current Starter and Review-download messages (2026-10-09)
 
 Unmodified current Source `ee2ab9ab` renders 24 owned fresh/mixed/long-title/

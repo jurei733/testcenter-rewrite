@@ -3,6 +3,9 @@ mat-toolbar { flex-shrink: 0; }
 mat-toolbar h2 { margin: 0; font-size: inherit; font-weight: inherit; line-height: inherit; color: inherit; }
 .spacer { flex: 1 1 auto; }
 svg { width: 24px; height: 24px; fill: currentColor; }
+/* The rendered Original Review MatIcon has a 24px glyph in a 30px host. */
+.toolbar-icon { display: inline-block; width: 24px; height: 30px; flex-shrink: 0; }
+.toolbar-icon svg { display: block; width: 24px; height: 24px; }
 form, .review-list { min-height: 0; flex: 1; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; }
 [hidden] { display: none !important; }
 .username { width: 400px; }
@@ -13,6 +16,7 @@ mat-radio-group { display: flex; flex-direction: column; }
 .action-buttons { margin-top: auto; display: flex; flex-direction: row; gap: 20px; }
 /* Source button presentation must not inherit Rewrite opacity/hover transforms. */
 .action-buttons button { opacity: 1; cursor: default; transform: none; }
+mat-toolbar button { opacity: 1; transform: none; }
 .review-list .scrollable-area { display: block; flex: initial; }
 mat-list-item { margin-bottom: 1rem; cursor: pointer; }
 mat-list-item:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: -2px; }
