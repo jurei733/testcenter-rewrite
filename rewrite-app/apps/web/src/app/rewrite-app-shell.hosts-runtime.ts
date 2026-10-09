@@ -17,7 +17,21 @@ export function createRuntimeActionsStateHost(args: {
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
 }): ShellRuntimeActionsHost {
+  const selectedContext = () => [args.workspaceState.tenantKey.trim(),
+    args.workspaceState.workspaceKey.trim(), args.runtimeState.participantSessionId.trim(),
+    args.runtimeState.testRunId.trim()];
+  const [tenantKey, workspaceKey, participantSessionId, testRunId] = selectedContext();
+  const capturedContext = JSON.stringify([tenantKey, workspaceKey, participantSessionId, testRunId]);
   return {
+    clearDeletedRunSelection: deletion => {
+      if (!testRunId || capturedContext !== JSON.stringify(selectedContext()) ||
+          deletion.tenantKey !== tenantKey || deletion.workspaceKey !== workspaceKey ||
+          !deletion.deletedTestRunIds.includes(testRunId) ||
+          !deletion.affectedParticipantSessionIds.includes(participantSessionId)) return;
+      args.runtimeState.testRunId = "";
+      args.runtimeState.currentUnitKey = "";
+      args.runtimeState.currentUnitResponse = "";
+    },
     request: args.request,
     getParticipantSignInPath: () => productionApiRoutes.participant.signIn,
     getParticipantLaunchPath: () => productionApiRoutes.participant.launch,

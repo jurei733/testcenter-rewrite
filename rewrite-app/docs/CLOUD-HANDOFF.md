@@ -92,6 +92,48 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
+### Latest selected-Run deletion correction (2026-10-09)
+
+`4ba6bc37908e7fab485ccfe4c1cbffb347be601a` is committed and pushed on the
+existing parity branch, with PR #2 updated for its final implementation.
+Push workflow `37913363611` and PR workflow `37913369219` both have an actual
+`local-demo` failure: jobs `113763554445` and `113763573499` time out at the
+unchanged 15-second `Group Results Deleted` assertion after successful DELETE.
+Full actual logs are retained outside the checkout as
+`ci-4ba6-local-demo-113763554445.log` and
+`ci-4ba6-local-demo-pr-113763573499.log`. The unchanged own SQLite reproduction
+also fails in `goal-4ba6-local-demo.log`; this is a product regression, not an
+invalid helper or a passing repetition. Main has not been changed by PR #2.
+
+The new exact selected-Run read correctly rejects the deleted Run with 404,
+but the deletion action had left that obsolete selection in place. Single and
+bulk deletion now clear its Run ID, current Unit and draft only when confirmed
+deleted Run/affected Session IDs and the original Workspace/Session/Run context
+all match. Other selections retain their byte-exact answers. Session, Booklet
+and group context remain available. The normal unknown/foreign-Run 404 boundary
+and explicit older-Run reads remain unchanged; no fallback to another Run or
+relaxed error classification is added.
+
+The actual-code regression fails before the fix in
+`goal-deleted-selection-before.log`. All 32 runtime checks pass afterwards,
+including eleven deletion/retention/bulk cases. Typecheck, production build,
+582 regular checks and 61 compatibility checks pass under the unchanged
+470-kB limit (469.98 kB actual initial bundle). The complete unchanged owned
+`local-demo` gate passes in `goal-deleted-selection-local-demo.log` with its
+original assertion and timeout. Fresh full protected PostgreSQL and SQLite
+browser suites are in progress on separate owned databases and fixed assets,
+with logs `goal-deleted-selection-full-pg.log` and
+`goal-deleted-selection-full-sqlite.log`; these are not yet passing evidence.
+No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
+fresh corrected-head CI independently before normal integration into main.
+
+An independent read-only Review capture probe also passed 24 protected states
+on `4ba6bc37` while retaining the visible header clipping. Before/after screenshot
+measurements show zero document/header scroll and normal title/logo rectangles;
+that narrows the observation but does not establish its paint/layout cause.
+Actual evidence is `goal-review-header-probe.log` and `goal-review-header-probe/`.
+No CSS/vendor/browser patch is substituted for a root-cause finding.
+
 ### Latest runtime lifetime validation (2026-10-09)
 
 The owned pass-through whole-flow PostgreSQL run

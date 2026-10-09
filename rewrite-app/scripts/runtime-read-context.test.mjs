@@ -22,8 +22,17 @@ const pretty = functions("../apps/web/src/app/rewrite-app-shell.readers.ts", ["p
 const presentation = functions("../apps/web/src/app/rewrite-app-shell.runtime.ts", ["applyRuntimeReadsWithoutSession", "applyRuntimeReadsWithSession", "applyRuntimeReadsCurrentRunMissing"]);
 const action = functions("../apps/web/src/app/rewrite-app-shell.runtime-reads.ts", ["refreshRuntimeReadsAction"]);
 const factory = functions("../apps/web/src/app/rewrite-app-shell.hosts-runtime.ts", ["createRuntimeReadsStateHost"]);
+const actionsFactory = functions("../apps/web/src/app/rewrite-app-shell.hosts-runtime.ts", ["createRuntimeActionsStateHost"]);
+const deletionAction = functions("../apps/web/src/app/rewrite-app-shell.runtime-actions.ts", ["deleteGroupResultsAction"]);
 const { create } = await load(`export const create = (productionApiRoutes, resolveRoutePath) => { ${pretty}\n${presentation}\n${action}\n${factory}\nreturn { refreshRuntimeReadsAction, createRuntimeReadsStateHost }; };`);
 const { refreshRuntimeReadsAction, createRuntimeReadsStateHost } = create(productionApiRoutes, resolveRoutePath);
+const { deletion } = await load(`export const deletion = (productionApiRoutes, resolveRoutePath) => { ${actionsFactory}\n${deletionAction}\nreturn { createRuntimeActionsStateHost, deleteGroupResultsAction }; };`);
+const { createRuntimeActionsStateHost, deleteGroupResultsAction } = deletion(productionApiRoutes, resolveRoutePath);
+const serviceAst = ts.createSourceFile("runtime-service.ts", readFileSync(new URL("../apps/web/src/app/rewrite-app-runtime.service.ts", import.meta.url), "utf8"), ts.ScriptTarget.ES2022, true);
+const serviceClass = serviceAst.statements.find(n=>ts.isClassDeclaration(n)&&n.name?.text==="RewriteAppRuntimeService");
+const bulkMethod = serviceClass.members.find(n=>n.name?.getText(serviceAst)==="deleteSelectedGroupResults");
+assert.ok(bulkMethod,"Execute the actual production bulk-deletion method.");
+const { createBulkService } = await load(`export const createBulkService = (productionApiRoutes, loadGroupResultsAction, loadDetailedResponsesAction, loadReviewsAction) => class { ${bulkMethod.getText(serviceAst)} };`);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((ok,fail) => {resolve=ok;reject=fail;});
@@ -125,4 +134,68 @@ for(const olderRun of [false,true]) test(`stable refresh preserves the exact ${o
   assert.equal(f.runtime.testRunId,selected);
   assert.equal(new URL(f.reads.find(path=>path.includes("/current-state")),"http://127.0.0.1").searchParams.get("testRunId"),selected);
   assert.equal(f.views.selectedRun.unitResponses["owned-unit"],olderRun?"Owned older answer: Ä/β 🧪\n":"Owned newest answer: Ä/β 🧪\n");
+});
+
+function deletionFixture() {
+  const workspace = {tenantKey:"owned-tenant",workspaceKey:"owned-workspace"};
+  const runtime = {participantSessionId:"owned-session",testRunId:"owned-run",
+    currentUnitKey:"owned-unit",currentUnitResponse:"Owned selected answer: Ä/β 🧪\n",
+    groupKey:"owned-group",bookletKey:"owned-booklet"};
+  const gate = deferred(), started = deferred(), refreshed = [];
+  const host = createRuntimeActionsStateHost({workspaceState:workspace,runtimeState:runtime,
+    request:async()=>{started.resolve();return gate.promise;},
+    createRuntimePresentationHost:()=>{throw Error("No unrelated presentation mutation");},
+    refreshCrossViewStateAfterRuntimeChange:async()=>{refreshed.push(structuredClone(runtime));}});
+  const payload = {deletion:{...workspace,groupKey:"owned-group",deletedTestRunIds:["owned-run"],
+    affectedParticipantSessionIds:["owned-session"],deletedTestRunCount:1}};
+  return {workspace,runtime,host,gate,started,refreshed,payload};
+}
+
+test("confirmed group deletion clears only its selected Run before the next exact runtime read",async()=>{
+  const f=deletionFixture(),pending=deleteGroupResultsAction(f.host);await f.started.promise;
+  f.gate.resolve(f.payload);assert.equal(await pending,f.payload);
+  assert.deepEqual(f.runtime,{participantSessionId:"owned-session",testRunId:"",currentUnitKey:"",
+    currentUnitResponse:"",groupKey:"owned-group",bookletKey:"owned-booklet"});
+  assert.deepEqual(f.refreshed,[f.runtime]);
+});
+
+for(const boundary of ["tenant","workspace","Session","Run","foreign payload scope","foreign payload Run","foreign payload Session"]) {
+  test(`confirmed deletion cannot clear a changed or unrelated ${boundary}`,async()=>{
+    const f=deletionFixture(),pending=deleteGroupResultsAction(f.host);await f.started.promise;
+    if(boundary==="tenant")f.workspace.tenantKey="another-owned-tenant";
+    else if(boundary==="workspace")f.workspace.workspaceKey="another-owned-workspace";
+    else if(boundary==="Session")f.runtime.participantSessionId="another-owned-session";
+    else if(boundary==="Run")f.runtime.testRunId="another-owned-run";
+    else if(boundary==="foreign payload scope")f.payload.deletion.workspaceKey="another-owned-workspace";
+    else if(boundary==="foreign payload Run")f.payload.deletion.deletedTestRunIds=["another-owned-run"];
+    else f.payload.deletion.affectedParticipantSessionIds=["another-owned-session"];
+    const expected=structuredClone(f.runtime);f.gate.resolve(f.payload);await pending;
+    assert.deepEqual(f.runtime,expected);assert.deepEqual(f.refreshed,[expected]);
+  });
+}
+
+test("failed group deletion retains the selected Run and exact answer without refreshing",async()=>{
+  const f=deletionFixture(),expected=structuredClone(f.runtime);
+  const pending=deleteGroupResultsAction(f.host);await f.started.promise;
+  const failure=new Error("Owned forbidden deletion");f.gate.reject(failure);
+  await assert.rejects(pending,error=>error===failure);
+  assert.deepEqual(f.runtime,expected);assert.deepEqual(f.refreshed,[]);
+});
+
+for(const foreign of [false,true]) test(`bulk deletion ${foreign?"retains an unrelated":"clears its confirmed"} selected Run before filtered reads`,async()=>{
+  const f=deletionFixture(),reads=[],activities=[];
+  const read=async()=>{reads.push(structuredClone(f.runtime));};
+  const service=Object.assign(new (createBulkService(productionApiRoutes,read,read,read))(),{
+    normalizeSelectedGroupKeys:keys=>keys,selectedGroupPath:()=>"/owned-delete",
+    hosts:{createRuntimeActionsHost:()=>f.host,createRuntimeReadsHost:()=>({})},
+    requestState:{request:f.host.request},feedback:{rememberActivity:(...args)=>activities.push(args)},
+    refreshCrossViewStateAfterRuntimeChange:async()=>{throw Error("No unrelated workflow");}});
+  const payload={deletion:{...f.payload.deletion,groupKeys:["owned-group"]}};
+  delete payload.deletion.groupKey;
+  if(foreign)payload.deletion.deletedTestRunIds=["other-owned-run"];
+  const expected=structuredClone(f.runtime),pending=service.deleteSelectedGroupResults(["owned-group"],"owned-workspace");
+  await f.started.promise;f.gate.resolve(payload);assert.equal(await pending,payload);
+  if(!foreign)Object.assign(expected,{testRunId:"",currentUnitKey:"",currentUnitResponse:""});
+  assert.deepEqual(f.runtime,expected);assert.deepEqual(reads,[expected,expected,expected]);
+  assert.equal(activities[0][0],"Selected Group Results Deleted");
 });

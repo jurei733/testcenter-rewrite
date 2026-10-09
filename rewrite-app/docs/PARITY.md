@@ -1,5 +1,37 @@
 # Testcenter parity checklist
 
+### Confirmed deletion and selected Runtime context (2026-10-09)
+
+Published `4ba6bc37` passed the recorded Cloud browser suites, but its fresh
+Push and PR `local-demo` jobs independently failed waiting 15 seconds for
+`Group Results Deleted` after a successful group DELETE. Actual job logs
+`113763554445` and `113763573499` are retained. The unchanged owned local
+reproduction also fails in `goal-4ba6-local-demo.log`: the explicit selected
+Run no longer exists, so the post-deletion current-state read returns
+`404 test_run_not_found` and prevents the completion feedback. These real
+negative gates prevent merge; the earlier whole-flow passes do not erase them.
+
+Single and bulk deletion now clear only a selection confirmed by the server's
+deleted Run IDs and affected Session IDs, while the original Workspace, Session
+and Run context still matches. Run ID, current Unit and its answer draft are
+cleared before subsequent reads. Session, Booklet and group selection remain;
+an unrelated or changed selection retains its exact answer. Unknown/foreign Run
+404s remain errors, and reads never silently substitute another Run.
+
+The actual-code regression fails before this correction. All 32 runtime checks
+now pass, including eleven deletion/retention/bulk cases. Typecheck, production
+build, all 582 regular tests and 61 compatibility tests pass. The initial bundle
+remains 469.98 kB under the unchanged 470-kB limit. The complete unchanged own
+`local-demo` gate now passes in `goal-deleted-selection-local-demo.log`, including
+its original success-message assertion and 15-second deadline.
+
+Fresh full protected PostgreSQL and SQLite suites use separate owned databases
+and the same fixed new assets; their logs are `goal-deleted-selection-full-pg.log`
+and `goal-deleted-selection-full-sqlite.log`. They are currently in progress,
+not passing evidence. No new publication will cancel the still-running
+`4ba6bc37` workflows. The correction requires fresh publication CI and does not
+close any full Original-UI, physical camera/window or production gate.
+
 ### Runtime read context and HTTP handler lifetime (2026-10-09)
 
 The pass-through monitor-fixture PostgreSQL run failed later at

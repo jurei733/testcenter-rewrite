@@ -460,6 +460,9 @@ export class RewriteAppRuntimeService {
     confirmation: string
   ): Promise<DeleteGroupResultsBulkResponse> {
     const normalizedGroupKeys = this.normalizeSelectedGroupKeys(groupKeys);
+    const deletionHost = this.hosts.createRuntimeActionsHost(() =>
+      this.refreshCrossViewStateAfterRuntimeChange()
+    );
     const payload = await this.requestState.request<DeleteGroupResultsBulkResponse>(
       "Delete Selected Group Results",
       "DELETE",
@@ -469,6 +472,7 @@ export class RewriteAppRuntimeService {
       ),
       { groupKeys: normalizedGroupKeys, confirmation }
     );
+    deletionHost.clearDeletedRunSelection(payload.deletion);
     await Promise.all([
       loadGroupResultsAction(this.hosts.createRuntimeReadsHost()),
       loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost()),
