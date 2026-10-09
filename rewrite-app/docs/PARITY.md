@@ -1,5 +1,152 @@
 # Testcenter parity checklist
 
+### Preserve the actual Quick failure evidence (2026-10-09)
+
+Published `6221bbdd` Push workflow `37986888156` completes 36/37 jobs and
+fails Quick job `114010993886`. GitHub confirms the failed `Run ui-quick`
+step, but two decoded-log reads return `Transport closed`; no workflow
+artifact exists. Annotation access is rejected by the connector's endpoint
+allowlist. The local CLI reports an invalid token, while its concrete job-log
+request returns `Forbidden` before downloading any log bytes. The exact
+application assertion is unavailable and is not inferred. This is not a general
+GitHub access blocker. The separate PR workflow `37986892883` completes 37/37
+on its first attempt; both workflows finish before the next publication.
+That independent pass does not explain the Push failure. Both complete UI gates and
+both activation/native-retry gates already pass. Actual complete Push and
+activation logs are retained outside Git, including exact 47/47 deletion logs,
+five released Attachment workers and the four native same-delivery cases.
+
+Only Quick now records the unchanged command's merged output to an owned runner
+log and uploads it after failure. Its original command, exit status, assertions,
+timeout and the 470-kB bundle gate remain unchanged; every other matrix command
+keeps its original step. Three controls execute the actual extracted shell and
+verify exact success/failure statuses 0/37/29, first-failure stopping and exact
+stdout/stderr bytes in the captured file. Workflow YAML and all thirty existing
+matrix cases remain valid. Real IPv4 loopback and child-process pipes pass after
+the regular turn-scoped network grant, with no new filesystem/domain rights.
+This is diagnostic retention, not a fix for an unknown application failure or
+passing acceptance for the new publication. All eight complete Original-UI,
+physical hardware, deployment and production-acceptance gates remain separate.
+
+A separate protected ItemBuilder repetition initially fails before browser
+launch with `401 admin_credentials_invalid`: its invocation enabled protection
+without a synthetic administrator bootstrap. That invalid invocation, log and
+own database are retained, not treated as a product or Quick-CI reproduction.
+The unchanged helper subsequently passes Rewrite and Original on fresh owned
+SQLite paths with the real secret-file bootstrap, trusted input, foreign/covered
+target rejection and byte-exact reload; the command completes with exit 0.
+Logs are `goal-6221-protected-ib-rewrite.log` and
+`goal-6221-protected-ib-original.log`. These passes do not explain the missing
+Quick assertion or certify the whole Quick sequence.
+
+### Retained in-flight retries and selected-Run isolation (2026-10-09)
+
+Published `ce46b960` finishes both workflows before another publication: Push
+`37971006346` passes 37/37; PR `37971066257` passes 36/37 and fails
+`ui-activation-blocking-runtime`, job `113957509582`. Its complete actual log
+is retained outside Git. The unchanged 90-second mid-drain response predicate
+fails after route recovery. An isolated complete archive of that exact head
+independently passes the unchanged gate; this repetition does not explain or
+fix the CI failure. No CI job is retried or assertion/deadline relaxed.
+
+A separately reproduced production race loses an online/manual retry requested
+while an older save is in flight: its later failure stops the existing drain
+with the same durable packet still queued. The drain now retains one fresh retry
+for the same selected Run. A second failure stops without another retry intent;
+changing the selected Run expires the old intent. Delivery IDs, exact response
+bytes, durable packets and foreign-Run isolation remain unchanged. Fourteen
+actual-method tests pass, including five new regression/control cases; the new
+retry and Run-switch regressions fail before their respective corrections.
+
+An own protected SQLite browser fixture reproduces the lost same-delivery retry
+against the exact old assets after trusted native input and offline/online
+events. Corrected fixed assets pass Original/Rewrite at 1280/390px, asserting
+the same delivery ID, Session/Run, two byte-exact answers, reload restoration,
+foreign-Session 401 and unchanged foreign Run. This fixture specifically covers
+the supported foreground fallback when the own Worker script is unavailable;
+it is added after the existing activation CI gate. Full Worker and
+complete browser gates remain intact. Earlier fixture attempts with a newly
+generated delivery ID are invalid for this race and remain separate evidence.
+The mid-drain gate also records precise mismatched Unit IDs and answer hashes
+on failure without printing answers or changing its acceptance condition.
+
+An intermediate complete SQLite invocation omits the operator-auth flag and
+is not protected acceptance evidence. It actually fails the late Monitor Pause
+assertion, 409 versus 200. Read-only examination of its own database proves the
+same Run already completed with its 120-second timer expired. The fixture's
+existing native authorized pause now runs immediately after the final running
+status and CSV assertions, before unrelated detail/import/attachment work. All original
+timing/status assertions remain strict; duration and timeouts are unchanged.
+The later boundary additionally asserts exact Session/Run and the full identical
+paused timer before retaining the exact deletion snapshot/counts. The failure,
+own database and screenshot are preserved. A separate complete fixed-assets
+snapshot validates this fixture correction with operator authentication enabled.
+The first relocation ran before a later CSV `running` assertion and therefore
+fails that unchanged predicate. Its log, screenshot and exact patch are retained
+as invalid fixture-placement evidence. The pause is moved after those final
+export assertions, preserving them; no expected CSV state is weakened.
+That relocation passes the CSV and pause assertions, but a new state-read helper
+incorrectly defaults to POST and receives the correct 404. Its full log and
+screenshot remain negative evidence. The helper explicitly uses GET; endpoint,
+authorization, exact identity and full timer assertions remain unchanged.
+
+The final complete isolated archive plus this correction passes typecheck,
+production build at 469.46 kB under the unchanged 470-kB limit, 601 regular
+checks, 61 compatibility cases, all four new native browser cases and 24 fresh
+Review states against the current rendered Source reference. Memory/File/SQLite
+each pass 165 API cases. The production correction's complete protected SQLite
+browser repetition passes through Attachments, five released workers, exact
+47/47 deletion logs and clean shutdown. The later fixture-timing snapshot also
+passes typecheck/build, 601/61 checks and four native cases; all 145 compiled
+browser files are byte-identical to that fully tested production snapshot.
+Its corrected complete fixture-timing repetition passes with operator auth
+enabled: native pause after the unchanged running CSV, identical full paused
+timer at the later boundary, Attachments, five released workers, exact 47/47
+deletion logs and clean shutdown with exit 0 in
+`goal-save-retry-get-hold-complete-ui.log`. Publication CI remains a separate gate
+until its actual completion. This correction closes no complete Original-UI,
+physical camera/window, deployment or production-acceptance row.
+
+### Compatible lock updates and current external prerequisites (2026-10-09)
+
+PR #4 is normally merged as `641f6f9096b7d9052f7bf3e8c07b270a8c3aedc6`,
+with both parents and the verified `f161e897` tree preserved. Its PR passes
+37/37 jobs. The Push completes 37/37 after bounded unchanged Compose/Quick
+retries; the first negative results and unavailable Quick assertion remain
+recorded separately. Fresh main `37962778150` passes all 37 jobs on its first
+attempt. At that live checkpoint no PR remains open and all remote branch
+changes are contained in main. These are merged/CI facts, not deployment.
+
+From an isolated complete archive of this main tree, targeted ordinary lock
+updates close the remaining 17 installed-package audit findings. Both the
+fresh full audit and server `--omit=dev` audit have zero findings. Parent ranges
+already allow the selected official versions, including MCP's Hono adapter
+2.x and Vite's esbuild 0.28.1; Angular's builder already requires the latter.
+There is no override, force installation, vendor patch or manifest change.
+Angular, Material, TypeScript, Playwright and Chromium remain unchanged.
+Typecheck, production build (469.46 kB under the unchanged 470-kB limit),
+596 regular checks, 61 compatibility checks and 165 API cases on each of
+Memory/File/SQLite pass. All 145 actual production browser files are byte-identical
+to the freshly built main baseline. A fresh unmodified Source reference and
+protected SQLite Review gate pass all 24 visible form/filled/list/edit states,
+three themes, 1280/390px, native CRUD/retry/back, exact UTF-8, same Run reload
+and foreign-Session denial. Audit results and byte equality are not substitutes
+for complete browser/publication CI or production security acceptance.
+
+Fresh negative prerequisites are retained: the existing actual insecure-context
+fixture hostname receives HTTP 403 `Domain forbidden`, while the same own
+protected loopback API returns 200 and its login field. The minimum missing
+product support is a loopback-only exception for that existing fixture or an
+equivalent real insecure-context fixture within the enforced policy. No domain,
+proxy or authorization exception is introduced. Unmodified current Source
+`ee2ab9ab` again fails all 12 initial/native-reload camera states with
+`Cannot read properties of undefined (reading 'nativeElement')`, zero stream
+and zero metadata/unknown requests; the diagnostic exits 2, not a passing
+reference. A functioning current Source camera reference and real physical
+camera/OS-window evidence remain external prerequisites. All eight complete
+Original-UI rows, broader partial corpus requirements, deployment and production
+acceptance remain open. Real Entire Cloud trace support is still unavailable.
+
 ### Maintained parser, frontend and Original toolbar controls (2026-10-09)
 
 PR #3 is normally merged as `fe9ec21fd744fc769b7d0af49d44e27f466a4d1d`

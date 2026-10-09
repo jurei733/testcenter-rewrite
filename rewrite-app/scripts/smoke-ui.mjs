@@ -14642,18 +14642,41 @@ try {
   );
   await context.unroute(starsSaveProgressUrl, starsMidDrainRoute);
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
-    payload =>
-      starsUnitKeys.every(unitKey =>
-        matchesStarsMidDrainResponse(
-          unitKey,
-          payload?.currentRunState?.testRun?.unitResponses?.[unitKey]
-        )
-      ),
-    90_000,
-    2_000
-  );
+  let lastStarsMidDrainRun;
+  try {
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+      payload => {
+        lastStarsMidDrainRun = payload?.currentRunState?.testRun;
+        return starsUnitKeys.every(unitKey =>
+          matchesStarsMidDrainResponse(
+            unitKey,
+            lastStarsMidDrainRun?.unitResponses?.[unitKey]
+          )
+        );
+      },
+      90_000,
+      2_000
+    );
+  } catch (error) {
+    // Identify the precise retained or changed Units without printing answers.
+    // Keep the original matcher, deadline and failed assertion unchanged.
+    const fingerprint = response => typeof response === "string"
+      ? { bytes: Buffer.byteLength(response), sha256: createHash("sha256").update(response).digest("hex") }
+      : null;
+    const queue = await page.evaluate(storageKey => {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+      return stored?.entries?.map(({ testRunId, unitKey, deliveryId }) => ({ testRunId, unitKey, deliveryId })) ?? [];
+    }, "testcenter-rewrite:participant-save-outbox:v1").catch(diagnosticError => ({ unavailable: String(diagnosticError) }));
+    process.stdout.write(`ui_smoke_mid_drain_delivery=${JSON.stringify({
+      expectedRunId: starsTestRunId, actualRunId: lastStarsMidDrainRun?.testRunId ?? null,
+      mismatches: starsUnitKeys.filter(unitKey => !matchesStarsMidDrainResponse(
+        unitKey, lastStarsMidDrainRun?.unitResponses?.[unitKey]
+      )).map(unitKey => ({ unitKey, expected: fingerprint(starsMidDrainResponses[unitKey]),
+        actual: fingerprint(lastStarsMidDrainRun?.unitResponses?.[unitKey]) })), queue
+    })}\n`);
+    throw error;
+  }
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
     "testcenter-rewrite:participant-save-outbox:v1",
@@ -24155,6 +24178,35 @@ try {
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "running" })
     .waitFor();
+  // Timed-monitor, running-status and running CSV assertions are complete.
+  // Pause this own Run before unrelated detail/import/attachment checks can
+  // consume its real 120-second timer. Preserve the exact deletion gate.
+  logStep("hold-owned-result-run-after-running-export-checks");
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  for (const [selector, value] of [["#participantSessionId", participantSessionId], ["#testRunId", pausedTestRunId]]) {
+    await page.locator(selector).fill(value);
+    await page.locator(selector).press("Tab");
+    await expectInputValue(selector,value);
+  }
+  const holdOwnedRunResponse = page.waitForResponse(response =>
+    response.request().method() === "POST" && new URL(response.url()).pathname ===
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`
+  );
+  await page.getByRole("button",{name:"Monitor Pause",exact:true}).click();
+  const heldOwnedRun = await holdOwnedRunResponse;
+  assert.equal(heldOwnedRun.status(),200);
+  const heldOwnedRunPayload = await heldOwnedRun.json();
+  assert.equal(heldOwnedRunPayload.command.testRun.testRunId,pausedTestRunId);
+  assert.equal(heldOwnedRunPayload.command.testRun.participantSessionId,participantSessionId);
+  assert.equal(heldOwnedRunPayload.command.testRun.status,"paused");
+  const heldOwnedRunTimer = heldOwnedRunPayload.command.testRun.testletTimers["testlet:timed-paused"];
+  assert.equal(heldOwnedRunTimer.status,"paused");
+  assert.equal(heldOwnedRunTimer.durationSeconds,120);
+  assert.ok(heldOwnedRunTimer.remainingSeconds>0);
+  await waitForNotBusy("hold-owned-result-run-after-running-export-checks");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
@@ -25099,27 +25151,25 @@ try {
   logStep("nav-runtime-before-complete");
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
-  // All timing/monitor interactions on this owned Run are complete. Hold it
-  // through the real authorized UI before the later attachment and deletion
-  // phases: an active timer can expire during the confirmation and append a
-  // log after even a post-preparation snapshot. Keep exact deletion counts.
+  // The earlier real authorized pause must survive all intervening checks.
+  // Keep the same Run/Session and timer; do not replace an already expired Run
+  // or relax the exact later deletion counts.
   logStep("hold-owned-result-run-before-deletion");
   for (const [selector, value] of [["#participantSessionId", participantSessionId], ["#testRunId", pausedTestRunId]]) {
     await page.locator(selector).fill(value);
     await page.locator(selector).press("Tab");
     await expectInputValue(selector,value);
   }
-  const holdOwnedRunResponse = page.waitForResponse(response =>
-    response.request().method() === "POST" && new URL(response.url()).pathname ===
-      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`
+  const heldOwnedRunStateResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state?testRunId=${pausedTestRunId}`,
+    { method: "GET" }
   );
-  await page.getByRole("button",{name:"Monitor Pause",exact:true}).click();
-  const heldOwnedRun = await holdOwnedRunResponse;
-  assert.equal(heldOwnedRun.status(),200);
-  const heldOwnedRunPayload = await heldOwnedRun.json();
-  assert.equal(heldOwnedRunPayload.command.testRun.testRunId,pausedTestRunId);
-  assert.equal(heldOwnedRunPayload.command.testRun.participantSessionId,participantSessionId);
-  assert.equal(heldOwnedRunPayload.command.testRun.status,"paused");
+  assert.equal(heldOwnedRunStateResponse.status,200);
+  const heldOwnedRunState = (await heldOwnedRunStateResponse.json()).currentRunState;
+  assert.equal(heldOwnedRunState.testRun.testRunId,pausedTestRunId);
+  assert.equal(heldOwnedRunState.participantSession.participantSessionId,participantSessionId);
+  assert.equal(heldOwnedRunState.testRun.status,"paused");
+  assert.deepEqual(heldOwnedRunState.testRun.testletTimers["testlet:timed-paused"],heldOwnedRunTimer);
   await waitForNotBusy("hold-owned-result-run-before-deletion");
   logStep("refresh-monitor-command-target");
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
