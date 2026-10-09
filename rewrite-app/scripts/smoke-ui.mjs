@@ -22172,26 +22172,80 @@ try {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
   );
   const applyMonitorScopeAndWaitForOpenRuns = async step => {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await waitForNotBusy(`${step}-before-${attempt + 1}`);
-      const responsePromise = page
-        .waitForResponse(
-          response =>
-            response.request().method() === "GET" &&
-            monitorOpenRunsRoute.test(response.url()),
-          { timeout: 30_000 }
-        )
-        .catch(() => null);
-      await page.locator("#monitorApplyScopeButton").click();
-      const response = await responsePromise;
-      if (response) {
-        assert.equal(response.status(), 200);
-        await waitForNotBusy(step);
-        return;
+    const requestedRuns = new Set();
+    const failedRequests = [];
+    const observeRequest = request => {
+      if (request.method() === "GET" && monitorOpenRunsRoute.test(request.url())) {
+        requestedRuns.add(request);
       }
-      await waitForNotBusy(`${step}-retry-${attempt + 1}`);
+    };
+    const observeFailure = request => {
+      if (requestedRuns.has(request)) {
+        failedRequests.push(request.failure()?.errorText ?? "unknown");
+      }
+    };
+    page.on("request", observeRequest);
+    page.on("requestfailed", observeFailure);
+    await page.evaluate(() => {
+      const activations = [];
+      const observe = event => {
+        if (event.target instanceof Element &&
+            event.target.closest("#monitorApplyScopeButton")) {
+          activations.push({ trusted: event.isTrusted, detail: event.detail });
+        }
+      };
+      document.addEventListener("click", observe, true);
+      window.__ownedMonitorScopeProbe = {
+        activations,
+        dispose: () => document.removeEventListener("click", observe, true)
+      };
+    });
+    const recordReadiness = async (attempt, responseStatus) => {
+      const rendered = await page.evaluate(() => ({
+        activations: window.__ownedMonitorScopeProbe?.activations ?? [],
+        busy: document.querySelector(".page")?.classList.contains("is-busy"),
+        buttonDisabled: document.querySelector("#monitorApplyScopeButton")?.disabled,
+        tenant: document.querySelector("#monitorTenantKey")?.value,
+        workspace: document.querySelector("#monitorWorkspaceKey")?.value,
+        profile: document.querySelector("#monitorProfile")?.value,
+        path: location.pathname
+      }));
+      process.stdout.write(`monitor_scope_readiness=${JSON.stringify({
+        step, attempt, responseStatus, requestCount: requestedRuns.size,
+        failedRequests, ...rendered
+      })}\n`);
+    };
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await waitForNotBusy(`${step}-before-${attempt + 1}`);
+        const responsePromise = page
+          .waitForResponse(
+            response =>
+              response.request().method() === "GET" &&
+              monitorOpenRunsRoute.test(response.url()),
+            { timeout: 30_000 }
+          )
+          .catch(() => null);
+        await page.locator("#monitorApplyScopeButton").click();
+        const response = await responsePromise;
+        if (response) {
+          assert.equal(response.status(), 200);
+          await waitForNotBusy(step);
+          await recordReadiness(attempt + 1, response.status());
+          return;
+        }
+        await recordReadiness(attempt + 1, null);
+        await waitForNotBusy(`${step}-retry-${attempt + 1}`);
+      }
+      throw new Error(`${step} did not request the scoped monitor runs.`);
+    } finally {
+      page.off("request", observeRequest);
+      page.off("requestfailed", observeFailure);
+      await page.evaluate(() => {
+        window.__ownedMonitorScopeProbe?.dispose();
+        delete window.__ownedMonitorScopeProbe;
+      }).catch(() => {});
     }
-    throw new Error(`${step} did not request the scoped monitor runs.`);
   };
   await clickAction("Clear Open Run Filters");
   await applyMonitorScopeAndWaitForOpenRuns("group-monitor-initial-scope");

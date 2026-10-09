@@ -35,7 +35,7 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
       unit_responses_buffer_time: "0", ...item.config }).map(([key, value]) =>
       `<Config key="${key}">${escapeXml(value)}</Config>`).join("") +
     '</BookletConfig><Units><Testlet id="owned-block" label="Owned block">' +
-    `<Unit id="CY-Unit.Sample-101" alias="a" label="${fullA}" labelshort="${shortA}"/>` +
+    `<Unit id="CY-Unit.Sample-101" alias="a" label="${fullA}"${item.firstUnitWithoutShortLabel ? "" : ` labelshort="${shortA}"`}/>` +
     `<Unit id="CY-Unit.Sample-101" alias="b" label="${fullB}"/></Testlet></Units></Booklet>` }));
   const archive = createZip([...booklets, { fileName: "units/CY_Unit101.xml", content: unitDocument },
     { fileName: "players/verona-player-simple-6.0.html", content: playerDocument }]);
@@ -59,6 +59,7 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
   } });
   let passed = 0;
   for (const ui of interfaces) for (const width of widths) for (const item of cases) {
+    const initialShortLabel = item.firstUnitWithoutShortLabel ? undefined : shortA;
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     try {
       const page = await context.newPage();
@@ -117,9 +118,9 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
         assert.equal(await playerOwner.getAttribute("title"), full, "Short labels must not replace Verona metadata.");
       };
       await waitForPlayer();
-      await assertLabels(fullA, shortA, 1);
+      await assertLabels(fullA, initialShortLabel, 1);
       const initial = await readState();
-      assert.equal(initial.bookletUnits[0].shortLabel, shortA);
+      assert.equal(initial.bookletUnits[0].shortLabel, initialShortLabel);
       assert.equal(initial.bookletUnits[1].shortLabel, undefined);
       await playerOwner.scrollIntoViewIfNeeded();
       await playerOwner.screenshot();
@@ -135,10 +136,10 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
       await page.locator(ui === "original" ? "#participantVeronaGlobalForwardButton" : "#participantRouteNextUnitButton").click();
       await assertLabels(fullB, undefined, 2);
       await page.locator(ui === "original" ? "#participantVeronaGlobalBackwardButton" : "#participantRoutePreviousUnitButton").click();
-      await assertLabels(fullA, shortA, 1);
+      await assertLabels(fullA, initialShortLabel, 1);
       assert.equal((await readState()).testRun.unitResponses.a, saved);
       await reloadParticipantUnitLabelPlayer(page, waitForPlayer);
-      await assertLabels(fullA, shortA, 1);
+      await assertLabels(fullA, initialShortLabel, 1);
       const restored = await readState();
       assert.equal(new URL(page.url()).searchParams.get("testRunId"), runId);
       assert.equal(restored.testRun.testRunId, runId);

@@ -10,17 +10,18 @@ and the last 15 commits before changing code. Paths below are relative to
 `rewrite-app` unless stated otherwise.
 
 GitHub `jurei733/testcenter-rewrite` remains the source of truth. On 2026-10-08
-the owner explicitly authorized integrating every open PR and remaining branch
-into main. The complete inventory contains PR #1 and `testcenter-rewrite-parity`;
-the only other remote branch is main, and the local `work` branch already equals
-the previous main head. Integrate through an ordinary merge after fresh CI,
-preserving the existing commits and main's Entire metadata. Never force-push or
-rewrite published history. Continue later development on the parity branch and
-open a follow-up PR once PR #1 has merged. Do not use assistant-specific branch
-prefixes or names in publication prose.
+the owner explicitly authorized integrating every then-open PR and remaining
+branch into main. PR #1 was ordinarily merged as
+`2b22dbfe3d4fa54c52c6343d7b4997fe4282eb93`, preserving both parents and all
+published commits. The complete inventory had only remote main and
+`testcenter-rewrite-parity`; the local `work` branch was already contained.
+No branch was deleted or history rewritten. Continue development on the existing
+parity branch, now fast-forwarded to that merge, and open a follow-up PR.
+Never force-push or rewrite published history. Do not use assistant-specific
+branch prefixes or names in publication prose.
 
-Current Original target was independently verified on 2026-10-08 as
-`iqb-berlin/testcenter` commit `14c98284590195631750bb2352cb398ca669fe7d`.
+Current Original target was independently verified on 2026-10-09 as
+`iqb-berlin/testcenter` commit `ee2ab9ab64bd91209ef8534bbe6005838024e46d`.
 Refresh that target before comparing requirements. Fetch/read upstream without
 modifying unrelated working-tree changes. Distinguish local checks, published
 CI, merged work, deployed work and production acceptance.
@@ -50,7 +51,7 @@ security bypasses or relaxed timeouts/assertions as substitutes for a fix.
 
 ## Prioritized remaining work
 
-Current reference blocker: unmodified Source `14c98284` camera startup fails
+Current reference blocker: unmodified Source `ee2ab9ab` camera startup fails
 in all three themes at 1280/390px, including re-entry after native reload.
 Twelve negative observations show the same `nativeElement` lifecycle error,
 zero video/stream and zero metadata/unknown API requests. The checked-in
@@ -86,7 +87,95 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
-### Current integration gate (2026-10-08)
+### Current continuation and integration evidence (2026-10-09)
+
+The merged main head is `2b22dbfe`. Its tree
+`ec23c8c480d34d04eb56096161a8845341ef48c4` equals the verified `d6f5c570`
+parity tree exactly. The preceding PR/Push workflows each passed all 37 jobs.
+Main workflow `37862248931` initially passed 36 jobs and failed PostgreSQL
+browser job `113600470480` at
+`group-monitor-booklet-error-copy-restore did not request the scoped monitor runs.`
+This is a different observation from the earlier 45/44 deletion snapshot.
+The complete actual failing log is retained outside the checkout as
+`/workspace/work/testcenter-continuation/ci-main-2b22-postgres-ui-113600470480.log`.
+No screenshot artifact was published by that failed job.
+
+A complete `git archive` of exact `2b22dbfe` was independently compiled and
+passed the unchanged protected PostgreSQL browser suite, including Attachments,
+44/44 result-deletion logs and clean shutdown. The run used its own database,
+compiler and fixed assets under `goal-main-2b22-tree`; its passing log is
+`/workspace/work/testcenter-continuation/goal-main-2b22-postgres-browser-corrected.log`.
+An initial invocation incorrectly pointed the frontend-root option at the
+browser directory and failed before application startup; that retained attempt
+is invalid acceptance evidence, not a product regression. Nothing was reset or
+copied back into the implementation checkout.
+
+One targeted retry of the failed main job completed successfully as
+`113697307205` on 2026-10-09. Workflow `37862248931`, attempt 2, is now
+completed/success with all 37 jobs. Neither that retry nor the passing local
+baseline proves the intermittent first failure's cause or a fix. The next
+browser harness adds passive native-click and request-readiness diagnostics to
+the existing monitor scope helper. It retains the same native activation, two
+attempts, 30-second response deadline, status assertion and exact failure.
+Diagnostics contain owned scope values, never credentials or answer bodies.
+
+Upstream `ee2ab9ab` adds one e2e fallback case and its sample setup; it changes
+no application frontend source. The frontend Git tree is unchanged at
+`64032f00186dc287c9de3ffd63cc235fe1c9a5da`. An eighth owned XML case covers
+an initially selected Unit without a short label when only `UNIT_LABEL_SHORT`
+is configured. The real facade retains the full header/toolbar label, default
+index navigation and exact saved state. Fresh typecheck, production build,
+526 normal checks and 61 compatibility checks pass. The bundle remains
+469.98 kB under the unchanged 470-kB limit. All 32 native label cases in both
+interfaces at 1280/390px pass in the complete new protected PostgreSQL browser
+run, through Attachments, exact 44/44 deletion snapshots and clean shutdown.
+All four instrumented monitor phases observed trusted native activation and
+HTTP 200 on the first attempt; the restore phase retained the intended owned
+workspace and `all` profile. Its actual log is
+`/workspace/work/testcenter-continuation/goal-ee2-postgres-browser.log`.
+This passing instrumented run does not explain the earlier intermittent failure.
+
+Fresh current Source Review references and the protected owned SQLite Rewrite
+comparison also pass all 24 form/filled/list/edit states across the three themes
+and 1280/390px. Each list/edit capture first verifies the intended exact comment.
+The same labels/comment, completed fonts and settled drawers are required.
+Toolbar, form, list, buttons, primary/on-primary colors and header geometry match;
+native add/edit/save/delete/back, failed-save retry, exact UTF-8 persistence and
+foreign Session rejection remain checked. Actual screenshots under
+`goal-source-ee2-review` and `goal-ee2-review` still show raster differences,
+including header clipping despite equal measured rectangles. These component
+checks do not establish full pixel identity or close a complete Original-UI row.
+New work is locally/Cloud verified at this checkpoint; publication and fresh CI
+for its forthcoming commit must be checked separately.
+
+The clean current Source checkout was independently rebuilt. Its unmodified
+camera diagnostic reproduces the same twelve initial/re-entry failures in all
+three themes and both widths: `nativeElement` is unavailable, no video stream
+starts, and no attachment metadata or unknown API request occurs. The diagnostic
+exits 2, writes actual negative evidence under `goal-source-ee2-camera`, and is
+not a passing capture gate. All eight full-page Original-UI rows, physical
+camera/OS visibility, deployment and production acceptance remain open.
+
+The private published environment and GitHub access remain available. This new
+turn initially restored restricted sockets; the already authorized regular
+product network grant was requested and granted for this turn only, with no
+additional filesystem rights. Owned IPv4 listen/connect and child-process pipes
+then passed. A fresh protected owned SQLite API passed readiness/configuration,
+unauthenticated workspace rejection (401) and clean shutdown. VM package-manager
+rules and exactly the three previously approved browser-download domains remain
+unchanged; a runtime grant does not persist permissions into future turns.
+
+Real Entire Cloud trace capture remains unavailable. The CLI/runtime is absent;
+no new checkpoint or fabricated trailer is created. The historic remote
+`refs/entire/checkpoints/60/01M4D17VRMWJ3E43Z32G5RBA60` remains
+`fbd52e6fc67a5b9285bc1a5de1c488bf512fec38`. An old local trace is not a Cloud
+trace. Private tryout data and the local migration PPTX are neither inspected,
+changed nor uploaded in this continuation.
+
+The dated sections below retain earlier evidence and failures. Their pending CI
+or publication statements describe those earlier checkpoints, not current main.
+
+### Historical integration gate (2026-10-08)
 
 Seven further commits are published through `e9885ae5`, not merely local.
 Its complete isolated Git archive passed typecheck, production build, all 522

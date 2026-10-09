@@ -1,5 +1,55 @@
 # Testcenter parity checklist
 
+### Current upstream and integration evidence (2026-10-09)
+
+PR #1 was normally merged as `2b22dbfe3d4fa54c52c6343d7b4997fe4282eb93`.
+Its tree equals the verified `d6f5c570` parity tree; history and branches were
+preserved. Main CI `37862248931` is now successful with all 37 jobs after one
+targeted retry. The first PostgreSQL job `113600470480` failed at
+`group-monitor-booklet-error-copy-restore did not request the scoped monitor runs.`
+Its actual complete log remains retained. The unchanged complete exact-main Git
+archive independently passed the protected PostgreSQL browser suite, Attachments,
+44/44 result-deletion logs and shutdown before that retry. These positive results
+do not establish the intermittent failure's cause. Passive native-click/request
+diagnostics retain the helper's existing inputs, assertions, retries and deadlines;
+no production scheduling change is claimed as a fix.
+
+Current public Original is `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Compared
+with `14c98284`, its only new commit adds an e2e test and sample setup for an
+initial Unit with no short label under `UNIT_LABEL_SHORT`. Application frontend
+tree `64032f00186dc287c9de3ffd63cc235fe1c9a5da` is unchanged. The owned corpus
+now has eight XML configurations and 32 native browser cases across both
+interfaces and 1280/390px. All 32 pass, including exact Session/Run identity,
+real Controller input and byte-exact response restoration. An actual facade
+regression also verifies the initial full-label fallback, default navigation and
+unchanged saved state. Fresh typecheck/build, 526 normal tests and 61 compatibility
+tests pass; the bundle is 469.98 kB under the unchanged 470-kB limit. The complete
+new-tree protected PostgreSQL browser acceptance passes through Attachments,
+exact 44/44 deletion snapshots and clean shutdown. Four monitor phases record
+trusted native activation and HTTP 200 on their first attempt, including the
+previously failing restore phase. Its earlier intermittent cause remains unknown.
+
+Fresh rendered Review references from current `ee2ab9ab` and the owned protected
+SQLite Rewrite comparison pass all 24 states in three themes and both widths.
+The intended comment/editor value is visible before every list/edit capture.
+Panel, toolbar, form, buttons, colors, list typography and header rectangles
+match; native review behavior, byte-exact Unicode persistence and foreign-Session
+rejection remain mandatory. Raw screenshots still differ, including clipped
+header raster content despite equal geometry, so this does not establish full
+pixel identity. These new-tree checks are local/Cloud evidence; a new commit's
+publication and complete CI must be verified independently.
+
+The freshly built unmodified `ee2ab9ab` Source camera again fails in all twelve
+theme/viewport initial/re-entry states with the same unavailable `nativeElement`.
+No stream, attachment metadata or unknown request is observed. This negative
+reference is reproduced evidence, not capture acceptance. All eight complete
+Original-UI rows, physical camera/window, deployment and production gates remain
+open. The regular network grant is per-turn; private data and PPTX are unchanged
+and not uploaded. Entire Cloud trace capture is unsupported; no old session or
+invented checkpoint is substituted. `CLOUD-HANDOFF.md` records the exact current
+CI, isolated assets, log paths, restoration and historical checkpoint boundary.
+Earlier dated pending-publication statements below remain historical evidence.
+
 ### Integration acceptance and snapshot timing (2026-10-08)
 
 Integration of PR #1 and the parity branch into main is explicitly authorized.

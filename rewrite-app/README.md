@@ -54,9 +54,11 @@ localhost remain usable; existing deployment protection is never switched off.
 second-code scopes on an owned API using a real insecure browser origin and is
 part of quick CI. Current upstream's independent short Unit labels are supported
 in the header, navigation and toolbar, including full-label fallback and legacy
-toolbar-key precedence. The complete browser smoke tests seven native XML
+toolbar-key precedence. The complete browser smoke tests eight native XML
 configurations in both interfaces at desktop and mobile widths, with real Player
-input and exact saved-answer reload. Narrow Rewrite Player cards use smaller
+input and exact saved-answer reload. This includes the current upstream's initial
+full-label fallback when `UNIT_LABEL_SHORT` is configured without a first-Unit
+short label. Narrow Rewrite Player cards use smaller
 padding without changing vendor files. Toolbar colors and complete Original-UI
 comparison remain separate requirements tracked in `docs/PARITY.md`.
 

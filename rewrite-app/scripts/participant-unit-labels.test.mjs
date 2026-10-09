@@ -52,8 +52,8 @@ test("the persistent native browser corpus covers current independent config and
   const { referenceRevision, cases } = JSON.parse(readFileSync(new URL(
     "../test-fixtures/original-testcenter/current-unit-label-cases.json", import.meta.url
   ), "utf8"));
-  assert.equal(referenceRevision, "14c98284590195631750bb2352cb398ca669fe7d");
-  assert.equal(new Set(cases.map(item => item.key)).size, 7);
+  assert.equal(referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
+  assert.equal(new Set(cases.map(item => item.key)).size, 8);
   const headers = { short: "unit_short", full: "unit", booklet: "booklet" };
   const labels = { short: "label_short", full: "label", hidden: "hidden", index: "index" };
   for (const item of cases) {
@@ -62,6 +62,21 @@ test("the persistent native browser corpus covers current independent config and
     assert.equal(policy.navigation.unitLabel, labels[item.nav], item.key);
     assert.equal(policy.display.toolbarUnitLabel, labels[item.toolbar], item.key);
   }
+});
+
+test("current upstream initial short-header fallback keeps default navigation and saved responses", () => {
+  const { cases } = JSON.parse(readFileSync(new URL(
+    "../test-fixtures/original-testcenter/current-unit-label-cases.json", import.meta.url
+  ), "utf8"));
+  const entry = cases.find(item => item.key === "initial-short-fallback");
+  assert.equal(entry.firstUnitWithoutShortLabel, true);
+  const { state, facade } = fixture(entry.config);
+  delete state.bookletUnits[0].shortLabel;
+  const before = structuredClone(state);
+  assert.equal(facade.screenHeaderLabel, "Full Unit title ä/β");
+  assert.equal(facade.unitToolbarLabel, "Full Unit title ä/β");
+  assert.equal(facade.unitNavigationLabel, "Unit 1 / 2");
+  assert.deepEqual(state, before);
 });
 
 test("all three short-label surfaces use only the selected Unit and preserve saved state", () => {
