@@ -1,5 +1,46 @@
 # Testcenter parity checklist
 
+### Maintained parser, frontend and Original toolbar controls (2026-10-09)
+
+PR #3 is normally merged as `fe9ec21fd744fc769b7d0af49d44e27f466a4d1d`
+after all 74 `d2807ed0` Push/PR jobs pass. Fresh main `37939303283` independently
+passes all 37 jobs. Both parents, the exact verified tree and published history
+remain intact. All published branch changes are contained and no PR is open
+at that inventory checkpoint; this is merged code, not deployment.
+
+An own malformed SysCheck XML end tag was accepted by parser 0.9.10. Official
+0.9.12 correctly rejects it with `source_document_xml_malformed`, while valid
+own XML remains accepted. Protected API coverage asserts 401 and persisted
+accepted/rejected status. Memory/File/SQLite each pass 165 cases and PostgreSQL
+233, using separate own databases. Unchanged complete own PostgreSQL and
+SQLite browser gates pass through Attachments, exact 47/47 deletion logs and
+clean shutdown. Earlier invalid invocations are retained in CLOUD-HANDOFF.md.
+
+Official Angular security patches (core 21.2.25, CLI/build 21.2.26) retain the
+pinned Material/CDK theme versions. The already-used modern builder becomes a
+direct dependency and removes 397 unnecessary legacy packages. Compatible
+tooling updates remove all critical audit findings; full audit is still
+negative at 17 findings (two low, five moderate, ten high). Server omit-dev
+audit has zero findings. Remaining development/browser reachability still
+requires triage; no production security acceptance is claimed.
+
+The initial update's 473.81-kB build fails the unchanged 470-kB limit. Loading
+operator-only presentation components/styles with their view produces 469.46 kB
+without dropping controls. Four protected native before/after captures match
+Live Context content, geometry and computed styles exactly, including both
+sides of the 1080px breakpoint. Typecheck, 596 regular and 61 compatibility
+checks pass. Later tooling updates produce byte-identical browser assets;
+fresh complete repetitions/publication CI remain independently required.
+
+The main Player and Review pane's different MatIcon host geometries now match
+their independently rendered current Source references. All 24 completed
+form/filled/list/edit states compare across three themes and 1280/390px,
+including native CRUD/back/new/retry, visible intended text, exact UTF-8,
+same Run reload and foreign-Session denial. Eight trusted completion-navigation
+cases pass on the final snapshot. Raw images still differ. All eight complete
+Original-UI rows, current Source camera-reference recovery, real camera/window
+visibility, deployment and production acceptance remain open.
+
 ### Verified integration and consistent host completion navigation (2026-10-09)
 
 PR #2 is normally merged as `537bd0cb4c579cf303313b2742056eacd92ef034`, with

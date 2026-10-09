@@ -381,8 +381,8 @@
     </section>
 
     <nav *ngIf="!isOriginalAdminLogin" class="view-nav" aria-label="Application Views">
+      @for (view of app.views; track view) {
       <a
-        *ngFor="let view of app.views"
         [routerLink]="view.link"
         routerLinkActive="is-active"
         class="nav-link"
@@ -390,6 +390,7 @@
       >
         {{ view.label }}
       </a>
+      }
       <details
         id="operatorAccountMenu"
         class="operator-account-menu"
@@ -415,14 +416,13 @@
               <dt>Access</dt>
               <dd id="operatorAccountAccessLabel">{{ app.operatorAccessLabel }}</dd>
             </div>
-            <div
-              class="operator-account-permission"
-              *ngFor="let access of app.operatorAccountAccessItems; trackBy: trackOperatorAccountAccess"
-            >
+            @for (access of app.operatorAccountAccessItems; track trackOperatorAccountAccess($index, access)) {
+            <div class="operator-account-permission">
               <dt>Permission</dt>
               <dd class="operator-account-role">{{ access.role }}</dd>
               <dd class="operator-account-scope">{{ access.scope }}</dd>
             </div>
+            }
             <div>
               <dt>Session expires</dt>
               <dd id="operatorAccountSessionExpiresAt">{{ app.operatorAccountSessionExpiresAt }}</dd>
@@ -459,7 +459,9 @@
     <ng-template #operationalWorkspace>
       <section class="workspace app-layout">
         <div class="stack">
-          <app-live-context [sections]="app.liveContextSections"></app-live-context>
+          @defer (when true) {
+            <app-live-context [sections]="app.liveContextSections"></app-live-context>
+          }
 
           <router-outlet></router-outlet>
         </div>
@@ -477,8 +479,10 @@
           </article>
 
           <article class="card view-grid">
-            <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
-            <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
+            @defer (when true) {
+              <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
+              <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
+            }
           </article>
         </div>
       </section>
