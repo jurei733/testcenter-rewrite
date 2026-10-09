@@ -130,6 +130,20 @@ are new corrected-tree Cloud results, distinct from the previous publication.
 No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
 fresh corrected-head CI independently before normal integration into main.
 
+A supplementary unchanged `ci:browser:quick` run uses a complete archived
+`6153568e` tree with its own dependencies, build, databases and ports. It fails
+in `smoke-original-participant-login.mjs:74` at the unchanged 30-second native
+`Anmeldename` fill. The actual log is `goal-6153568e-quick.log`. An independent
+owned-server/browser diagnosis retains HTTP 200 and the rendered login through
+`127.0.0.1`, versus HTTP 403 with body `Domain forbidden` through the fixture's
+`testcenter-proof.insecure` hostname, despite its loopback resolver mapping.
+Actual evidence is `goal-insecure-loopback-reference.log` and its owned PNGs.
+This is a precise VM-domain restriction, distinct from the granted per-turn
+socket permission and from an application regression. No domain, proxy, TLS,
+authorization or assertion bypass was added. The suite remains unchanged and
+the fresh corrected-head GitHub `ui-quick` job remains mandatory; the older
+Push `ui-quick` already passed. This Cloud repetition is a failure, not a pass.
+
 An independent read-only Review capture probe also passed 24 protected states
 on `4ba6bc37`. Before/after screenshot measurements show zero document/header
 scroll and normal title/logo rectangles. Direct decoding of all 24 actual PNGs

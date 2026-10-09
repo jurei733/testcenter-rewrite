@@ -34,6 +34,16 @@ are new corrected-tree Cloud results. No new publication will cancel the still-r
 `4ba6bc37` workflows. The correction requires fresh publication CI and does not
 close any full Original-UI, physical camera/window or production gate.
 
+The additional unchanged Quick suite in an archived `6153568e` snapshot fails
+the Original login's 30-second native-input wait because the Cloud VM returns
+`403 Domain forbidden` for the fixture's `testcenter-proof.insecure` alias.
+An independent owned-server Chromium diagnosis shows the real login at
+`127.0.0.1` with HTTP 200 and no page error, and the alias's actual 403/body.
+Logs `goal-6153568e-quick.log` and `goal-insecure-loopback-reference.log` retain
+both observations. This Cloud run is not a pass or proof of a product defect.
+No VM-domain/security change or gate relaxation was made. The same unchanged
+Quick gate passed in the older Push CI and must pass in fresh publication CI.
+
 ### Runtime read context and HTTP handler lifetime (2026-10-09)
 
 The pass-through monitor-fixture PostgreSQL run failed later at
