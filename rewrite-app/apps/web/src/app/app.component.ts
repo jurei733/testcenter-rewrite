@@ -1,4 +1,4 @@
-import { CommonModule } from "@angular/common";
+import { NgIf, NgTemplateOutlet } from "@angular/common";
 import {
   ChangeDetectorRef,
   Component,
@@ -44,7 +44,8 @@ const routeViews: AppView[] = [
   selector: "app-root",
   standalone: true,
   imports: [
-    CommonModule,
+    NgIf,
+    NgTemplateOutlet,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,

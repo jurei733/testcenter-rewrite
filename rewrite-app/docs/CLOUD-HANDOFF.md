@@ -27,6 +27,12 @@ main. Local main and the existing parity checkout are fast-forwarded to this
 merge. Fresh main CI is a separate requirement: its real navigation failure
 and the next correction are recorded below. Complete each new tree's checks
 before normal integration and recheck the live inventory.
+PR #3 is subsequently normally merged as
+`fe9ec21fd744fc769b7d0af49d44e27f466a4d1d`, preserving parents `537bd0cb`
+and `d2807ed0` and their exact verified tree. All 74 head Push/PR jobs pass;
+fresh main workflow `37939303283` separately passes all 37 jobs. The live
+inventory has zero open PRs and all published branch changes are contained in
+main. The existing local parity branch is fast-forwarded before the next step.
 Never force-push or rewrite published history. Do not use assistant-specific
 branch prefixes or names in publication prose.
 
@@ -110,6 +116,72 @@ or OS cause is unknown. Do not weaken/drop the gate or label a headless cloud
 run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
+
+### Maintained dependencies and completed toolbar references (2026-10-09)
+
+The next step is validated in isolated own snapshots, with no shared build,
+database or port paths and no build cleanup while a fixture uses its assets.
+The official XML parser 0.9.12 rejects an own malformed SysCheck end tag that
+0.9.10 imported successfully. Valid own XML remains accepted. A new protected
+API regression asserts unauthenticated 401, successful valid import, precise
+malformed-XML rejection and accepted/rejected persisted source status.
+Memory/File/SQLite each pass 165 cases; PostgreSQL passes 233 cases, with own
+fresh databases. The complete unchanged own PostgreSQL and SQLite browser
+gates pass through Attachments, exact 47/47 deletion logs and clean shutdown.
+
+Angular core packages are updated to 21.2.25 and CLI/build to 21.2.26, while
+the pinned Material/CDK presentation versions remain unchanged. The project
+already uses `@angular/build`; declaring it directly removes 397 unnecessary
+legacy Devkit/webpack packages. Ordinary compatible updates also remove the
+remaining critical development-package findings. The full audit drops from
+183 findings/seven critical to 17 findings/zero critical (two low, five
+moderate, ten high); the separate server `--omit=dev` audit has zero findings.
+The remaining full-tree findings still require triage; neither a zero server
+audit nor dependency flags certify the compiled browser or production safety.
+Actual final JSONs are `goal-build-package-audit.json` and
+`goal-build-package-server-audit.json`.
+
+The initial 473.81-kB dependency-update build genuinely fails the unchanged
+470-kB gate. Operator-only Live Context, Summary and Activity components now
+load when their existing view opens; Live Context's unchanged styles load with
+that component. The root imports only the Common directives it uses and keeps
+the existing identity/permission tracking keys in built-in control flow.
+The resulting build passes at 469.46 kB; typecheck, all 596 regular checks and
+61 compatibility checks pass. Protected native before/after Live Context
+captures have exactly matching content, rectangles and computed styles at
+390, 1080, 1081 and 1280px. Later tooling updates emit byte-identical complete
+browser assets, independently compared; their fresh browser repetition remains
+a separate result and is not inferred from that comparison.
+
+Current unmodified Source and protected own Rewrite compare 24 completed
+form/filled/list/edit states in three themes at 1280/390px. Main Player and
+Review-pane icons have different Source hosts and are measured independently.
+The pane's disabled list button retains Source opacity. Native CRUD/back/new/
+retry, exact UTF-8, same Run reload and foreign-Session isolation pass; all
+eight trusted native completion-navigation cases pass on the final snapshot.
+Every intended list/edit entry is visibly verified before capture. Small raw
+image differences remain; no full Original-UI row is closed.
+
+Invalid invocations remain separate: the first parser schema smoke omitted
+CI=true and attempted headed Chromium without an X server; its normal CI=true
+repetition passes. The first PostgreSQL browser invocation reused an own
+integration database retaining a system_check role and therefore offered the
+correct protected entry instead of the expected anonymous entry. A distinct
+empty own database passes the unchanged complete gate. The nonexistent Memory
+NPM alias is an invocation error; direct execution of the unchanged built test
+passes. The first toolbar assumption measured the main Player icons as though
+they were the pane icons; direct Source comparison rejects it before correction.
+None of those records is a product regression or passing acceptance evidence.
+
+GitHub main/PR/branch access, the published private environment and own protected
+Cloud testing are established. Product network permission is still turn-scoped;
+no filesystem/domain rights, VPN or sandbox/policy settings are expanded.
+Entire CLI and real Cloud trace capture/export remain unavailable. No new
+checkpoint/trailer is invented or attached from an old local session; the
+historical remote checkpoint remains separate. Private PPTX/tryout data are
+not transferred. Fresh complete publication CI is required before normal
+integration; deployment, physical camera/window and the eight complete UI rows
+remain distinct open requirements.
 
 ### PR #2 integration and host navigation correction (2026-10-09)
 

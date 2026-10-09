@@ -768,6 +768,50 @@ after(async () => {
   await closeServer(server);
 });
 
+test("protected compatibility intake rejects malformed SysCheck end tags without rejecting valid XML", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true"
+  });
+  try {
+    assert.equal((await requestJsonAt(isolated.baseUrl, "/api/v1/admin/users")).status, 401);
+    const signedIn = await requestJsonAt<AdminSignInResponse>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST", body: { username: "demo-admin", password: "demo-admin-password" }
+    });
+    assert.equal(signedIn.status, 200);
+    const headers = { authorization: `Bearer ${signedIn.body.sessionToken}` };
+    const post = (path: string, body: unknown) => requestJsonAt<any>(isolated.baseUrl, path, { method: "POST", headers, body });
+    for (const malformed of [false, true]) {
+      const workspaceKey = `own-syscheck-${randomUUID()}`;
+      assert.equal((await post("/api/v1/tenants/demo-tenant/workspaces", {
+        workspaceKey, displayName: "Own SysCheck XML"
+      })).status, 201);
+      const path = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
+      const validXml = '<SysCheck><Metadata><Id>OWN.SYSCHECK</Id><Label>Own ä🙂</Label></Metadata>' +
+        '<Config skipnetwork="true"><Q id="own-question" type="string" prompt="Own question"/></Config></SysCheck>';
+      const uploaded = await post(`${path}/source-packages`, {
+        fileName: "OWN.SYSCHECK.xml", mediaType: "application/xml",
+        sourceDocument: malformed ? validXml.replace("</SysCheck>", "</SysCheck\n injected>") : validXml
+      });
+      assert.equal(uploaded.status, 201);
+      const imported = await post(`${path}/import-jobs`, { sourcePackageId: uploaded.body.sourcePackage.sourcePackageId });
+      assert.equal(imported.status, 201);
+      assert.equal(imported.body.importJob.status, malformed ? "failed" : "completed");
+      assert.equal(imported.body.stagedContentRelease, null);
+      if (malformed) {
+        assert.deepEqual(imported.body.importJob.diagnostics.map((item: { code: string }) => item.code), ["source_document_xml_malformed"]);
+      } else {
+        assert.deepEqual(imported.body.importJob.diagnostics, []);
+      }
+      const stored = await requestJsonAt<GetSourcePackageResponse>(isolated.baseUrl,
+        `${path}/source-packages/${uploaded.body.sourcePackage.sourcePackageId}`, { headers });
+      assert.equal(stored.status, 200);
+      assert.equal(stored.body.sourcePackageDetail.sourcePackage.status, malformed ? "rejected" : "accepted");
+    }
+  } finally { await closeServer(isolated.server); }
+});
+
 test("Original 19 strict XSD intake validates imports and cannot be bypassed by contentStructure", async () => {
   const directory = mkdtempSync(join(tmpdir(), "testcenter-strict-xsd-api-"));
   const isolated = await createIsolatedServer({

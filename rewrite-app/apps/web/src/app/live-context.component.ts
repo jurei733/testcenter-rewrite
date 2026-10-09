@@ -44,7 +44,8 @@ export type LiveContextSection = {
         </a>
       </div>
     </article>
-  `
+  `,
+  styleUrl: "./live-context.component.css"
 })
 export class LiveContextComponent {
   @Input({ required: true }) sections: LiveContextSection[] = [];
