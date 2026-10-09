@@ -24,6 +24,8 @@ reproduction also fails in `goal-4ba6-local-demo.log`: the explicit selected
 Run no longer exists, so the post-deletion current-state read returns
 `404 test_run_not_found` and prevents the completion feedback. These real
 negative gates prevent merge; the earlier whole-flow passes do not erase them.
+Both old workflows finish all 37 jobs, with 36 successes and this one failure
+in each; none is cancelled by the follow-up publication.
 
 Single and bulk deletion now clear only a selection confirmed by the server's
 deleted Run IDs and affected Session IDs, while the original Workspace, Session
@@ -52,8 +54,8 @@ Source metrics, including native CRUD/back/retry, exact answers, same-Run reload
 foreign-Session denial and the Rewrite switch. Logs are
 `goal-deleted-selection-starter.log` and `goal-deleted-selection-review.log`.
 
-No new publication will cancel the still-running
-`4ba6bc37` workflows. The correction requires fresh publication CI and does not
+The follow-up publication waits for both `4ba6bc37` workflows to finish.
+The correction requires fresh publication CI and does not
 close any full Original-UI, physical camera/window or production gate.
 
 The additional unchanged Quick suite in an archived `6153568e` snapshot fails

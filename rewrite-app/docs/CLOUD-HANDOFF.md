@@ -18,7 +18,7 @@ published commits. The complete inventory had only remote main and
 No branch was deleted or history rewritten. Continue development on the existing
 parity branch, now fast-forwarded to that merge, and open a follow-up PR.
 The owner's latest integration instruction also covers the remaining open PR
-and parity branch. PR #2 is currently the only open PR; main and the parity
+and parity branch. At this dated checkpoint PR #2 is the only open PR; main and the parity
 branch are the only remote branches. Complete the new tree's required checks
 before a normal merge, verify the expected head, and recheck the live inventory.
 Never force-push or rewrite published history. Do not use assistant-specific
@@ -116,7 +116,9 @@ Full actual logs are retained outside the checkout as
 `ci-4ba6-local-demo-113763554445.log` and
 `ci-4ba6-local-demo-pr-113763573499.log`. The unchanged own SQLite reproduction
 also fails in `goal-4ba6-local-demo.log`; this is a product regression, not an
-invalid helper or a passing repetition. Main has not been changed by PR #2.
+invalid helper or a passing repetition. Both workflows subsequently finish all
+37 jobs: 36 succeed and this one fails in each. Their complete results remain
+negative baseline evidence. Main has not been changed by PR #2 at this checkpoint.
 
 The new exact selected-Run read correctly rejects the deleted Run with 404,
 but the deletion action had left that obsolete selection in place. Single and
@@ -147,8 +149,9 @@ Original Review states against the current rendered Source metrics. Native
 CRUD/back/retry, same-Run reload, exact UTF-8, foreign-Session rejection and
 the Rewrite switch remain checked. Actual logs are
 `goal-deleted-selection-starter.log` and `goal-deleted-selection-review.log`.
-No follow-up push may cancel the still-running `4ba6bc37` workflows. Verify
-fresh corrected-head CI independently before normal integration into main.
+The follow-up publication waits until both `4ba6bc37` workflows finish, preserving
+every job result instead of cancelling them. Verify fresh corrected-head CI
+independently before normal integration into main.
 
 A supplementary unchanged `ci:browser:quick` run uses a complete archived
 `6153568e` tree with its own dependencies, build, databases and ports. It fails
