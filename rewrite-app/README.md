@@ -67,6 +67,18 @@ reload instead of requiring idle SSE/polling connections. Run URL identity,
 exact saved answer, native checked-state and all label assertions remain
 mandatory; navigation or missing Player errors still fail the gate.
 
+The optional Original Starter shows the current Source's stacked Review-download
+messages, including native close actions, independent five-second expiry and
+mobile wrapping. Rewrite feedback remains available. Empty/populated results
+are explicit. Replies across Session/view changes are discarded before feedback
+or downloads, and a destroyed Starter suppresses its pending empty-message
+toast. The protected
+Starter smoke retains its 48 geometry/state checks and compares 18 actual Source
+toast states across all three themes and both widths. Build unmodified current
+Source first and use `reference:ui:original-starter:built` for owned frontend
+references; see `docs/ORIGINAL-UI-PARITY.md` for evidence and remaining full-page
+acceptance boundaries.
+
 At the attachment boundary, the shared smoke waits for the rendered workspace
 checkbox's native state to agree with its saved auto-refresh preference before
 native input, then verifies both again. Input or persistence failures still

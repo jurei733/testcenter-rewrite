@@ -18,6 +18,7 @@ import { OriginalParticipantEntryComponent } from "./original-participant-entry.
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { OriginalReviewPanelComponent } from "./original-review-panel.component";
+import { OriginalToastContainerComponent } from "./original-toast-container.component";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -30,9 +31,14 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, ParticipantStatusStylesComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent],
   template: `
     <app-participant-status-styles />
+    @defer (when interfaceMode.mode() === 'original') {
+      @if (interfaceMode.mode() === 'original') {
+        <app-original-toast-container />
+      }
+    }
     <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
       @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
         @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {

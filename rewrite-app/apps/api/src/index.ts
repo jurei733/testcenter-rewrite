@@ -8,6 +8,7 @@ import { fileURLToPath, URL } from "node:url";
 
 import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
 import { ProofOfWorkManager } from "./proof-of-work.js";
+import { createRequestLifecycle } from "./request-lifecycle.js";
 
 import {
   createFirstSliceServices,
@@ -603,6 +604,7 @@ const createRepositoryFromEnvironment = async () => {
 };
 
 const createApiRuntime = async () => {
+  const requestLifecycle = createRequestLifecycle();
   const store = resolveStoreKind();
   const configuredPort = parsePortEnvironmentValue("PORT", 4310);
   const shutdownDrainDelayMs = parseIntegerEnvironmentValue(
@@ -969,6 +971,7 @@ const createApiRuntime = async () => {
     },
     repositoryConfig,
     repository,
+    requestLifecycle,
     proofOfWork,
     services,
     metrics: createRuntimeMetrics(),
@@ -984,6 +987,7 @@ const createApiRuntime = async () => {
     shutdown: async () => {
       clearInterval(presenceSweepHandle);
       await presenceSweep;
+      await requestLifecycle.drain();
       await repositoryConfig.shutdown();
     }
   };
@@ -4485,7 +4489,7 @@ const streamMonitorEvents = async (input: {
 };
 
 const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
-  async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+  runtime.requestLifecycle.wrap(async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
     const requestId = randomUUID();
     const requestStartedAt = process.hrtime.bigint();
@@ -9471,7 +9475,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         { requestId }
       );
     }
-  };
+  });
 
 const applyHttpServerTimeouts = (
   server: ReturnType<typeof createServer>,

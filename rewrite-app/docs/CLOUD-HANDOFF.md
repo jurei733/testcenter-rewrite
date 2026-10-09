@@ -17,6 +17,10 @@ published commits. The complete inventory had only remote main and
 `testcenter-rewrite-parity`; the local `work` branch was already contained.
 No branch was deleted or history rewritten. Continue development on the existing
 parity branch, now fast-forwarded to that merge, and open a follow-up PR.
+The owner's latest integration instruction also covers the remaining open PR
+and parity branch. PR #2 is currently the only open PR; main and the parity
+branch are the only remote branches. Complete the new tree's required checks
+before a normal merge, verify the expected head, and recheck the live inventory.
 Never force-push or rewrite published history. Do not use assistant-specific
 branch prefixes or names in publication prose.
 
@@ -26,7 +30,7 @@ Refresh that target before comparing requirements. Fetch/read upstream without
 modifying unrelated working-tree changes. Distinguish local checks, published
 CI, merged work, deployed work and production acceptance.
 
-## Current camera step
+## Historical camera step at restoration
 
 The latest camera-device correction has 497 passing core/frontend checks,
 passing typecheck and production build, and passing owned immutable-production
@@ -69,7 +73,8 @@ exact reproduction and narrower earlier fixture failures in `PARITY.md`.
    and primary/on-primary colors have 24 actual rendered comparisons across
    all three themes and both widths, plus protected native SQLite flows.
    The generic Rewrite pane remains available. The restored draft/list state
-   now has eight additional regressions (505 core/frontend checks total).
+   has eight additional restoration/lifecycle regressions. Current aggregate
+   checks and publication status are recorded below.
    Raw screenshots still differ; no full-page acceptance row is closed.
 3. Close the eight open rows in `docs/ORIGINAL-UI-PARITY.md`, retaining both
    interfaces, authored texts, keyboard access, mobile behavior and same data.
@@ -86,6 +91,126 @@ or OS cause is unknown. Do not weaken/drop the gate or label a headless cloud
 run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
+
+### Latest runtime lifetime validation (2026-10-09)
+
+The owned pass-through whole-flow PostgreSQL run
+`goal-starter-routes-fixed.log` failed at
+`study-monitor-booklet-detail-prepare-runtime`: a late old-Session response
+overwrote the newly prepared group. Its separate SQLite counterpart passed
+Attachments, exact 47/47 deletion logs and shutdown in
+`goal-starter-routes-fixed-sqlite.log`. Both used the pre-correction tree;
+neither is relabelled as proof of the new production runtime changes.
+
+Twenty-one actual runtime-host/read/presentation regressions fail before and
+pass after the new context guard, captured paths and explicit selected-Run
+query/presentation. They cover changed workspace, authorization, Session, Run
+and form context, late missing-state failures and an older Run with distinct
+byte-exact synthetic answers. The guard compares context in memory without
+logging or persisting credentials or answers. Actual retained logs are
+`goal-runtime-context-before-corrected.log` and `goal-runtime-context-after.log`.
+An initial test-loader extraction error executed no valid behavioral proof
+and remains separately retained as `goal-runtime-context-before.log`.
+
+A native owned HTTP disconnect executes the production shutdown closure and
+reproduces repository shutdown before its asynchronous handler finishes in
+`goal-aborted-handler-before.log`. The API now drains tracked HTTP handlers
+before closing storage. All three regressions pass in
+`goal-aborted-handler-after.log`, including rejection and newly registered work
+during draining. CLI shutdown deadlines and security boundaries are unchanged.
+Independent SSE/background lifetimes are not claimed as separately proven.
+
+The combined tree passes typecheck, production build, 571 regular checks and
+61 compatibility checks. The 469.98-kB initial bundle remains under the
+unchanged 470-kB limit. Actual logs use the `goal-runtime-lifetime-` prefix.
+Fresh complete protected PostgreSQL and SQLite suites both pass using the same
+fixed assets and separate owned databases, through Attachments, exact 47/47
+deletion logs and clean CLI shutdown. Both pass the previously failing runtime
+preparation; all four scoped monitor probes observe HTTP 200 on their first
+trusted native activation without recorded browser errors. Memory, File and
+SQLite API integration each pass all 164 checks without skips. The 120 native error-list/
+restore cycles completed with 240 successful HTTP-200 actions, API exit 0 and
+no recurrence of the earlier pool-after-end error. Logs are
+`goal-runtime-lifetime-final-pg.log`,
+`goal-runtime-lifetime-final-sqlite.log`, `goal-runtime-lifetime-native-120.log`.
+Do not rebuild or clean assets while any of these fixtures still uses them.
+No new commit, push, CI result, full Original-UI row or production acceptance
+is inferred from these local/Cloud checks.
+
+A fresh supplemental Starter invocation omitted the documented CI headless
+profile and attempted a headed browser without an X server. It failed before
+any page rendering; `goal-runtime-lifetime-starter.log` retains the actual
+`Missing X server or $DISPLAY` diagnostic. This invocation error is not an
+application regression or physical-browser evidence. With `CI=true`, the
+completed gate passes all 48 geometry/state cases and 18 exact current Source
+toast comparisons in `goal-runtime-lifetime-starter-corrected.log`. The same
+fixed-asset protected Review gate passes all 24 states, native CRUD/back/retry,
+same-Run reload, exact UTF-8 and foreign-Session denial in
+`goal-runtime-lifetime-review.log`. These are Headless Cloud checks; all eight
+complete Original-UI rows and real hardware/production acceptance remain open.
+
+### Latest deletion-fixture validation (2026-10-09)
+
+`07fcbf6f` is published on the existing parity branch with follow-up PR #2.
+Its Push PostgreSQL job `113705893956` failed `45 !== 44` despite snapshots
+being taken after preparation. Full actual evidence is retained as
+`/workspace/work/testcenter-continuation/ci-07fcb-postgres-ui-113705893956.log`.
+All four scope probes observe trusted native activation and HTTP 200. A later
+monitor read completes between snapshot and deletion; the extra row's body is
+not in the log. Do not claim its exact key is established from this CI record.
+
+Seventeen new/existing targeted service checks pass across all four stores.
+They separately prove that expiry after completed preparation adds exactly one
+`TESTLETS_TIMELEFT` entry and invalidates that exact snapshot; pausing the owned
+Run keeps all snapshot data unchanged across a later read beyond the deadline.
+The existing active-Run deletion case is retained. The browser fixture issues
+its hold through the visible native authorized Pause action after timing/monitor
+acceptance, leaving the foreign retained group untouched. No production timer,
+monitor schedule, assertion or timeout is changed.
+
+The first new-helper whole run returned HTTP 200 from Pause, then failed at an
+incorrect `response.testRun` lookup. The contract is `response.command.testRun`;
+the same exact Session/Run/status assertions now read that wrapper. Its retained
+negative log is `goal-starter-held-postgres-browser.log`, not a passing result.
+The corrected complete run on a new empty owned PostgreSQL database failed
+earlier at `group-monitor-booklet-error-copy-restore`, before reaching the hold.
+Its retained log is `goal-starter-held-postgres-browser-corrected.log`; two
+trusted native clicks reached an enabled button, but no matching request was
+observed. This reproduces the earlier main failure and is not a passing result.
+A focused owned PostgreSQL fixture passed twelve native error-list/restore
+cycles after real creation, required password change and sign-in of a fresh
+monitor. Its log is `goal-monitor-restore-diagnostic-fresh-run.log`; these
+cycles do not establish the whole-flow failure's cause. A further full run
+with passive browser-error reporting uses its own empty `goal_starter_restore_probe`
+database and unchanged fixed assets; its log is `goal-starter-restore-probe.log`.
+It passed through Attachments, the native authorized hold, exact 47/47 deletion
+logs and shutdown, with the original interception removal still present.
+
+Extended native probes reproduced an unanswered read at interception removal
+after 25 and 29 cycles (`goal-monitor-restore-diagnostic-120.log` and
+`goal-monitor-restore-diagnostic-route-lifecycle.log`). The public
+`unrouteAll({ behavior: "wait" })` alternative also failed after 29 cycles in
+`goal-monitor-restore-diagnostic-unroute-wait.log`. Tracking records the next
+read between removal entry and return, after mock fulfillment. Later refreshes
+wait behind it. The fixture now retains its owned interception and forwards
+all post-presentation requests unchanged to the protected API until browser
+teardown. This variant passed 120 native cycles in
+`goal-monitor-restore-diagnostic-passthrough.log`. The earlier CI logs do not
+contain callback-lifetime detail, so do not claim that their exact internal race
+was observed. Assertions, native inputs and deadlines remain unchanged.
+
+The pre-correction 120-cycle probe's API teardown also logged an aborted read
+failing with `Cannot use a pool after calling end on the pool`; exit code 0
+does not make that clean-shutdown evidence. The separate handler/storage
+correction is recorded above, alongside the subsequent whole-flow PostgreSQL
+context failure and passing SQLite run.
+The unrelated first unit wrapper used
+an absent `npm test` alias and executed no tests. The actual documented
+`test:unit:built` and `test:compatibility:built` commands subsequently passed;
+that invocation error is neither a product regression nor acceptance evidence.
+
+Earlier dated evidence below remains valid for its exact tree. New changes
+require their own publication CI; do not erase failed attempts with a repetition.
 
 ### Current continuation and integration evidence (2026-10-09)
 

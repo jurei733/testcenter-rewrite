@@ -1,5 +1,113 @@
 # Testcenter parity checklist
 
+### Runtime read context and HTTP handler lifetime (2026-10-09)
+
+The pass-through monitor-fixture PostgreSQL run failed later at
+`study-monitor-booklet-detail-prepare-runtime`: an earlier Session read restored
+`group:student-ui` after native preparation selected `group:entry-smoke`.
+Its actual retained log is `goal-starter-routes-fixed.log`. The same fixed-asset
+SQLite run passed through Attachments, exact 47/47 deletion logs and shutdown
+in `goal-starter-routes-fixed-sqlite.log`. That positive SQLite result does not
+erase the PostgreSQL context race or validate the subsequent production fixes.
+
+Twenty-one regressions execute the actual runtime host, read action and
+presentation functions. Before the correction all 21 fail; after it all pass.
+Pending reads capture their authorization, workspace, Session, Run and form
+context and immutable paths. Changed-context replies and missing-state failures
+cannot restore old selections, clear new selections or issue empty-Session
+requests. A selected older Run is queried explicitly and presented from its own
+current state, preserving its distinct byte-exact synthetic answers rather than
+switching to the Session's latest Run. Context comparison stays in memory;
+credentials and answers are not logged or persisted by the guard.
+
+A native owned HTTP abort reproduction independently proves that socket close
+can precede completion of an asynchronous handler. The actual runtime shutdown
+closure previously closed its repository too early; the failing assertion is
+retained in `goal-aborted-handler-before.log`. The API now drains tracked HTTP
+handlers before repository shutdown. Three actual-code regressions pass,
+including rejection propagation and work registered during draining. Existing
+CLI shutdown deadlines and authorization remain unchanged. This does not claim
+that every independent background task has been separately lifetime-tested.
+
+The combined new tree passes typecheck, production build, 571 regular checks
+and 61 compatibility checks. The initial bundle remains 469.98 kB under the
+unchanged 470-kB limit. Fresh complete protected PostgreSQL and SQLite browser
+runs both pass against these same fixed production assets, through Attachments,
+exact 47/47 deletion logs and clean CLI shutdown. Both pass the previously
+failing runtime-preparation phase; all four scoped monitor probes return HTTP
+200 on the first trusted native activation with no recorded browser error.
+The 120-cycle
+native monitor probe completed with API exit 0 and no recurrence of the prior
+pool-after-end error; its 240 error/restore actions reached actual HTTP 200.
+Their logs are
+`goal-runtime-lifetime-final-pg.log`, `goal-runtime-lifetime-final-sqlite.log`
+and `goal-runtime-lifetime-native-120.log`. Memory, File and SQLite API
+integration each pass all 164 checks without skips. Publication and CI remain separate
+gates; no complete Original-UI row or production acceptance is closed here.
+The same fixed-asset Starter gate passes 48 geometry/state cases and 18 exact
+Source toast comparisons; the protected Review gate passes all 24 states,
+native CRUD/back/retry, same-Run reload, exact UTF-8 and foreign-Session denial.
+The initial supplemental Starter command omitted `CI=true` and failed before
+rendering without an X server. That retained invocation error is separate from
+the corrected Headless gate and is not a product failure or hardware evidence.
+
+### Later monitor reads and deletion snapshots (2026-10-09)
+
+Published `07fcbf6f` has a retained failing Push PostgreSQL job `113705893956`
+in workflow `37895524479`: the post-preparation snapshot contains 44 logs,
+but deletion removes 45. All four passive scope diagnostics show trusted
+activation and HTTP 200; this is not the earlier missing-scope-response failure.
+A later monitor read completes between the snapshot and deletion. The log does
+not contain the additional row's body, so its exact type in CI is unknown.
+
+New deterministic service cases on Memory, File, SQLite and PostgreSQL reproduce
+the remaining race class: a timer starts during preparation, then a later read
+past its deadline adds exactly one `TESTLETS_TIMELEFT` entry. The earlier exact
+snapshot assertion correctly fails even though preparation already finished.
+The paused variant advances beyond that same deadline and verifies an unchanged
+complete snapshot, including exact answers, timers, reviews and logs. All 17
+targeted checks pass; the existing running-Run deletion case remains mandatory.
+
+The whole browser fixture now pauses only its own selected Run through the real
+authorized native operator action after all monitor/timing checks, before the
+attachment and deletion phases. It verifies HTTP 200 and the exact Session/Run
+and paused status. The retained group is not modified. Every existing exact
+deletion count, Run-removal, answer/review/log retention assertion and deadline
+is preserved. Production timer, monitor and deletion behavior is unchanged.
+The first corrected protected PostgreSQL browser run failed earlier at the
+separate `group-monitor-booklet-error-copy-restore` phase, before reaching the
+new hold. Both attempts recorded trusted native clicks on the enabled scope
+button, with zero matching requests and no request failure. This is a fresh
+reproduction of the intermittent main observation.
+A focused owned PostgreSQL fixture with a fresh authorized monitor, its real
+required password change and native input passed twelve error-list/restore
+cycles. That positive probe does not replace whole-flow acceptance. A fresh
+empty-database full run with additional passive browser-error reporting is
+passed Attachments, exact 47/47 deletion logs and shutdown; it still used the old
+interception teardown, so this positive repetition alone is not a correction.
+No assertion, input requirement or deadline has been relaxed.
+Its initial new-helper run received HTTP 200, then failed because the assertion
+omitted the response contract's `command` wrapper. That retained helper failure
+is separate from the CI race; reading the documented wrapper preserves the same
+identity/status assertions and requires a fresh empty owned database run.
+
+Native repeated error-list/restore probes then reproduced an unanswered read
+during interception removal after 25 and 29 completed cycles. Callback tracking
+shows the new read arriving between `unroute` entry and return after the prior
+mock was fulfilled; later serialized refreshes cannot pass that read. The public
+`unrouteAll({ behavior: "wait" })` variant also failed after 29 cycles. The
+fixture now keeps its owned route registered and forwards every post-presentation
+request unchanged to the protected real API, through normal browser teardown.
+That variant passes 120 native cycles. Its whole-flow SQLite run subsequently
+passes; PostgreSQL exposes the separate runtime-context race recorded above.
+Historical CI logs do not contain the same
+callback detail, so their exact internal race is not retrospectively asserted.
+
+The 120-cycle probe also logged `Cannot use a pool after calling end on the pool`
+for an aborted read during its API teardown, despite exit code 0. Its cycle proof
+is valid; that teardown is not clean-shutdown evidence. The separate
+request-lifecycle correction and its new-tree validation are recorded above.
+
 ### Current upstream and integration evidence (2026-10-09)
 
 PR #1 was normally merged as `2b22dbfe3d4fa54c52c6343d7b4997fe4282eb93`.

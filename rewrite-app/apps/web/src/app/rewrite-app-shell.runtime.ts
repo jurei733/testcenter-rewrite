@@ -320,7 +320,8 @@ export function applyRuntimeReadsWithSession(
   host.setGroupKey(
     sessionDetailPayload.participantSessionDetail.participantSession.groupKey
   );
-  host.syncRuntimeStateFromRun(runtimeStatePayload.runtimeState.latestTestRun);
+  host.syncRuntimeStateFromRun(currentRunStatePayload?.currentRunState.testRun ??
+    runtimeStatePayload.runtimeState.latestTestRun);
   host.updateRuntimeSummary(
     runtimeStatePayload.runtimeState.availableAction ??
       runtimeStatePayload.runtimeState.runtimeStatus,

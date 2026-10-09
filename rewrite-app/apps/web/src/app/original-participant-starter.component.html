@@ -48,8 +48,7 @@
   }
   <div class="button-box">
     @if (view.canDownloadParticipantReviews) {
-      <button matButton="tonal" id="originalDownloadReviews" type="button" (click)="view.downloadParticipantReviews()">Reviews downloaden</button>
+      <button matButton="tonal" id="originalDownloadReviews" type="button" (click)="downloadReviews()">Reviews downloaden</button>
     }
-    @if (view.reviewDownloadFeedback) { <p role="status">{{ view.reviewDownloadFeedback }}</p> }
   </div>
 </section>

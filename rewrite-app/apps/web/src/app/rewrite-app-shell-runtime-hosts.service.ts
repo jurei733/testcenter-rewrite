@@ -50,6 +50,7 @@ export class RewriteAppShellRuntimeHostsService {
       isParticipantSessionMissingError: (error: unknown) =>
         this.requestState.isApiError(error) &&
         error.error === "participant_session_not_found",
+      getAuthorizationContext: () => this.uiState.ops.adminSessionToken,
       workspaceState: this.workspaceState,
       runtimeState: this.runtimeState,
       createRuntimePresentationHost: () =>

@@ -19,6 +19,7 @@ import {
 } from "./rewrite-app-shell.runtime";
 
 export interface ShellRuntimeReadsHost {
+  captureRuntimeReadContext(): () => boolean;
   request<T>(
     label: string,
     method: string,
@@ -102,6 +103,12 @@ export async function refreshRuntimeReadsAction(
   quiet = false,
   options: { monitorOnly?: boolean } = {}
 ): Promise<void> {
+  const isCurrent = host.captureRuntimeReadContext();
+  const historyPath = options.monitorOnly ? null : host.getMonitorCommandHistoryPath();
+  const participantPaths = !options.monitorOnly && participantSessionId.trim()
+    ? { runtime: host.getRuntimeStatePath(), detail: host.getParticipantSessionDetailPath(),
+        current: host.getCurrentRunStatePath() }
+    : null;
   const openRunsRequest = host.request<MonitorOpenRunsResponse>(
     "Monitor Open Runs",
     "GET",
@@ -112,6 +119,7 @@ export async function refreshRuntimeReadsAction(
 
   if (options.monitorOnly) {
     const openRuns = await openRunsRequest;
+    if (!isCurrent()) return;
     host.setMonitorCommandHistoryView(
       JSON.stringify(
         {
@@ -137,14 +145,15 @@ export async function refreshRuntimeReadsAction(
     host.request<ListWorkspaceActivityEventsResponse>(
       "Monitor Command History",
       "GET",
-      host.getMonitorCommandHistoryPath(),
+      historyPath!,
       undefined,
       { quiet }
     )
   ]);
+  if (!isCurrent()) return;
   host.setMonitorCommandHistoryView(JSON.stringify(monitorCommandHistory, null, 2));
 
-  if (!participantSessionId.trim()) {
+  if (!participantPaths) {
     applyRuntimeReadsWithoutSession(
       host.createRuntimePresentationHost(),
       openRuns,
@@ -160,19 +169,20 @@ export async function refreshRuntimeReadsAction(
       host.request<ParticipantRuntimeStateResponse>(
         "Runtime State",
         "GET",
-        host.getRuntimeStatePath(),
+        participantPaths.runtime,
         undefined,
         { quiet }
       ),
       host.request<GetParticipantSessionResponse>(
         "Participant Session Detail",
         "GET",
-        host.getParticipantSessionDetailPath(),
+        participantPaths.detail,
         undefined,
         { quiet }
       )
     ]);
   } catch (error) {
+    if (!isCurrent()) return;
     if (!host.isParticipantSessionMissingError(error)) {
       throw error;
     }
@@ -182,17 +192,19 @@ export async function refreshRuntimeReadsAction(
     applyRuntimeReadsWithoutSession(presentationHost, openRuns, quiet);
     return;
   }
+  if (!isCurrent()) return;
 
   let currentRunStatePayload: ParticipantCurrentRunStateResponse | null = null;
   try {
     currentRunStatePayload = await host.request<ParticipantCurrentRunStateResponse>(
       "Current State",
       "GET",
-      host.getCurrentRunStatePath(),
+      participantPaths.current,
       undefined,
       { quiet }
     );
   } catch (error) {
+    if (!isCurrent()) return;
     if (host.isCurrentRunMissingError(error)) {
       applyRuntimeReadsCurrentRunMissing(
         host.createRuntimePresentationHost(),
@@ -202,6 +214,7 @@ export async function refreshRuntimeReadsAction(
       throw error;
     }
   }
+  if (!isCurrent()) return;
 
   applyRuntimeReadsWithSession(
     host.createRuntimePresentationHost(),

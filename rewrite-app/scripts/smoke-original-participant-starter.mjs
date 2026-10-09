@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -30,6 +30,10 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 let browser;
 const errors = [];
 const metrics = {};
+const toastMetrics = {};
+const toastReference = JSON.parse(await readFile(new URL("./fixtures/original-starter-review-toasts.json", import.meta.url),"utf8"));
+assert.equal(toastReference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
+assert.equal(Object.keys(toastReference.states).length,18);
 const closeEnough = (actual, expected, name) =>
   assert.ok(Math.abs(actual - expected) <= 1 / 32, `${name}: ${actual} != ${expected}`);
 const labels = ["Alpha Booklet", "Beta Booklet", "Gamma Booklet"];
@@ -304,16 +308,49 @@ try {
           await root.waitFor({ state: "detached" });
           await context.unroute(`**${path}`);
         }
-        if (theme === "Primar" && screen === "desktop" && state === "review") {
+        if (["desktop","mobile"].includes(screen) && state === "review") {
           const path = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/exports/reviews.csv`;
-          const downloaded = page.waitForResponse(response => new URL(response.url()).pathname === path);
-          await root.getByRole("button", { name: "Reviews downloaden", exact: true }).click();
-          const response = await downloaded;
-          assert.equal(response.status(), 204);
-          assert.equal((await response.request().allHeaders()).authorization, `Bearer ${identity.sessionToken}`);
-          await root.getByRole("status").filter({ hasText: "Keine Kommentare verfügbar." }).waitFor();
-          // This exercises shared export authorization, not the still-open
-          // Source snackbar/feedback rendering acceptance.
+          const download = root.getByRole("button", { name: "Reviews downloaden", exact: true });
+          const stack = page.locator('[data-cy="toast-container"]');
+          const toast = stack.locator(".toast");
+          const expectDownload = async activate => {
+            const downloaded = page.waitForResponse(response => new URL(response.url()).pathname === path);
+            await activate();
+            const response = await downloaded;
+            assert.equal(response.status(),204);
+            assert.equal((await response.request().allHeaders()).authorization,`Bearer ${identity.sessionToken}`);
+          };
+          const captureToast = async phase => {
+            await page.evaluate(() => document.fonts.ready);
+            const value = await stack.evaluate(element => {
+              const rect = node => {const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
+              const style = node => {const s=getComputedStyle(node);return {font:s.font,color:s.color,
+                background:s.backgroundColor,padding:s.padding,gap:s.gap,border:s.border,radius:s.borderRadius,
+                cursor:s.cursor,transform:s.transform,boxSizing:s.boxSizing};};
+              return {box:rect(element),style:style(element),items:[...element.querySelectorAll(".toast")].map(item => ({
+                box:rect(item),style:style(item),text:{value:item.querySelector(".toast-text").textContent.trim(),
+                  box:rect(item.querySelector(".toast-text")),style:style(item.querySelector(".toast-text"))},
+                action:{value:item.querySelector("button").textContent.trim(),box:rect(item.querySelector("button")),
+                  style:style(item.querySelector("button"))}}))};
+            });
+            toastMetrics[`${id}-${phase}`] = value;
+            await writeFile(join(artifacts,"toast-metrics.json"),JSON.stringify(toastMetrics,null,2));
+            await page.screenshot({path:join(artifacts,`${id}-toast-${phase}.png`)});
+            assert.deepEqual(value,toastReference.states[`${id}-${phase}`],`${id}: actual Source ${phase} toast`);
+          };
+          await expectDownload(() => download.click());
+          await toast.filter({hasText:"Keine Kommentare verfügbar."}).waitFor();
+          assert.equal(await stack.getAttribute("aria-live"),"polite");
+          assert.equal(await toast.count(),1);
+          await captureToast("single");
+          assert.equal(await download.evaluate(button=>button===document.activeElement),true);
+          await expectDownload(() => page.keyboard.press("Enter"));
+          await toast.nth(1).waitFor();
+          await captureToast("stacked");
+          await stack.locator('[data-cy="toast-action-0"]').click();
+          await page.waitForFunction(()=>document.querySelectorAll('[data-cy="toast-container"] .toast').length===1);
+          await captureToast("dismissed-first");
+          await toast.waitFor({state:"detached"});
         }
         assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key =>
           localStorage.getItem(key)?.includes("demo-admin-password"))), false);
@@ -324,7 +361,8 @@ try {
   }
   await writeFile(join(artifacts, "metrics.json"), JSON.stringify(metrics, null, 2));
   assert.deepEqual(errors, []);
-  process.stdout.write("Original starter: 48 geometry/state fixtures, exact saved answer, pending guard, authorized empty review export.\n");
+  assert.equal(Object.keys(toastMetrics).length,18);
+  process.stdout.write("Original starter: 48 geometry/state fixtures, exact saved answer, pending guard, 18 current Source toast comparisons and authorized empty review exports.\n");
 } finally {
   await browser?.close().catch(() => undefined);
   if (server.exitCode === null) {

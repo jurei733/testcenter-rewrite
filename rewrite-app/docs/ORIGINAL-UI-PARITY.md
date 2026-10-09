@@ -40,6 +40,45 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+### Current Starter and Review-download messages (2026-10-09)
+
+Unmodified current Source `ee2ab9ab` renders 24 owned fresh/mixed/long-title/
+Review Starter states in all three themes at 1280/390px. Their 2,928 measured
+Starter geometry/style values match the protected Rewrite renderer exactly.
+These are frontend fixtures, not Source backend authentication evidence.
+
+The empty Review export exposed a concrete presentation difference: Source
+shows a bottom-centered, independently dismissible toast; the Original-mode
+Rewrite had inserted an inline status paragraph. The optional Original interface
+now uses Source's stack, five-second per-message lifetime, close action,
+inverse-surface colors, native button font and narrow-width text wrapping.
+The existing Rewrite feedback remains available. Populated exports download
+their exact CSV without an empty-message toast. Late replies across Session/
+view changes are discarded before feedback/downloads; a destroyed Starter
+suppresses its pending empty-message toast.
+
+The existing protected SQLite Starter gate passes all 48 geometry/state cases,
+exact saved-answer resume, duplicate pending-start prevention and authorized
+empty exports. It additionally requires 18 exact single/stacked/first-dismissed
+toast comparisons against actual Source in the six theme/viewport combinations,
+native click/Enter/close, polite live announcements and independent expiry.
+Fifteen production-method regressions cover download results, failed/stale
+responses, destroyed views and independent timers. The new Source reference
+helper is reproducible without changing Source or vendor assets:
+
+```sh
+ORIGINAL_STARTER_REFERENCE_ROOT=/path/to/original/frontend/dist/testcenter-frontend/browser \
+UI_SMOKE_ARTIFACT_DIR=/path/to/new/owned/source-evidence \
+npm run reference:ui:original-starter:built
+npm run smoke:ui:original-starter:built
+```
+
+Verify current Source SHA and build before running the reference. The measured
+toast fixtures are in `scripts/fixtures/original-starter-review-toasts.json`.
+These checks close this component's empty-export presentation gap. Whole-page
+pixel identity, all start/resume/error combinations, broader export feedback and
+the complete cross-cutting requirements remain open; no full-page row is closed.
+
 The 2026-10-08 PDF continuation adds nine actual TCPDF label-placement/wrapping
 references and four actual Source bookmark references. Short/long generated
 PDF pages decode correctly, and native protected single/batch exports retain
