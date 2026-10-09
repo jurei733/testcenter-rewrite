@@ -17,10 +17,16 @@ published commits. The complete inventory had only remote main and
 `testcenter-rewrite-parity`; the local `work` branch was already contained.
 No branch was deleted or history rewritten. Continue development on the existing
 parity branch, now fast-forwarded to that merge, and open a follow-up PR.
-The owner's latest integration instruction also covers the remaining open PR
-and parity branch. At this dated checkpoint PR #2 is the only open PR; main and the parity
-branch are the only remote branches. Complete the new tree's required checks
-before a normal merge, verify the expected head, and recheck the live inventory.
+The owner repeated that integration instruction on 2026-10-09. PR #2 was
+normally merged as `537bd0cb4c579cf303313b2742056eacd92ef034` after all 74
+Push/PR jobs passed on `eccdf8fc0d9fdf03e8396889d8c3f31451195ef1`. The merge
+tree is exactly that verified tree; both parents and all published history are
+preserved. The live inventory then has no open PRs and only main and the parity
+branch. All remote branch changes and the local `work` branch are contained in
+main. Local main and the existing parity checkout are fast-forwarded to this
+merge. Fresh main CI is a separate requirement: its real navigation failure
+and the next correction are recorded below. Complete each new tree's checks
+before normal integration and recheck the live inventory.
 Never force-push or rewrite published history. Do not use assistant-specific
 branch prefixes or names in publication prose.
 
@@ -105,6 +111,64 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
+### PR #2 integration and host navigation correction (2026-10-09)
+
+Push `37920261273` and PR `37920266922` both complete all 37 jobs successfully
+on exact head `eccdf8fc`. PR #2 is ordinarily merged as `537bd0cb`; there is
+no force-push, history rewrite or branch deletion. Fresh main workflow
+`37926836911` has a real failure in job `113807688442`, `ui-open-run-sync`:
+the unchanged 15-second assertion does not observe `CY-Unit.Sample-102` after
+the native Original host-forward click. Its full actual 2.48-MB log is retained
+as `ci-main-open-run-sync-113807688442.log`. This is not replaced by the earlier
+green PR evidence. A complete isolated `git archive` of exact `537bd0cb`, with
+its own modules, assets, database and ports, independently passes the unchanged
+full `smoke:ui:open-run-sync:built` gate in `goal-537bd0cb-open-sync.log`.
+That repetition alone does not fix or explain the intermittent failure.
+This main workflow then completes all 37 jobs: 36 succeed and this navigation
+job fails. Complete run/jobs metadata is retained as
+`ci-main-537bd0cb-completed.json` before the next publication; no job is cancelled.
+
+The actual host action nevertheless has a deterministic contradictory decision:
+the Player's `canGoNextUnit`/`canGoPreviousUnit` uses the completed local response,
+but the host action independently rejects the older raw completeness reasons.
+Six actual-code regressions fail before correction. Both host actions now share
+the Player's existing effective decision; the existing foreground save still
+settles the answer before the real API enforces all booklet restrictions.
+Fourteen new checks cover complete, incomplete, timed-block and unavailable
+actions in both directions. Typecheck, production build and 596 regular checks
+pass; all 61 compatibility checks pass. Initial bundle remains 469.98 kB under
+the unchanged 470-kB limit. No existing browser assertion or deadline changes.
+
+The new `smoke-participant-navigation-completeness.mjs` uses only own synthetic
+content and protected SQLite. A real current-state read can be held without
+changing its payload or credentials. The exact old main assets reproduce the
+missing navigation after completed native input with trusted observers in
+`goal-navigation-native-trusted-baseline.log`.
+The corrected assets pass all eight forward/backward cases across both interfaces
+and 1280/390px in `goal-navigation-native-ready.log`. Passive input/click observers
+prove `isTrusted=true`; exact Session/Run and response bytes, reload restoration,
+401 denial for a foreign own Session/Run and its unchanged state are asserted.
+This fixture is added after the existing unchanged Verona smoke in the Quick CI
+gate. Its earlier helper mistakes (reading an omitted snapshot field, an
+unauthored hidden navigation control, removing an active route, and reading a
+Player before its start-command status) are retained separately as invalid
+fixture evidence, not application regressions or passing gates. The final helper
+keeps its route alive, waits for the real answered status and retains all exact
+answer assertions and deadlines. The complete unchanged protected SQLite
+operator browser gate also passes in `goal-navigation-full-sqlite.log`, through
+Attachments, exact 47/47 deletion logs and clean CLI shutdown. This is a fresh
+corrected-tree Cloud pass. Publication CI remains a separate requirement before
+integration. The next head's complete Push/PR workflows must finish before
+another publication; the old main workflow has already completed with its
+negative result preserved.
+
+The already granted product network permission remains turn-scoped, with no
+additional filesystem/domain rights or policy changes. Entire Cloud trace
+capture/export and a working Entire CLI remain unavailable. No new checkpoint
+or trailer is invented; the historical remote checkpoint ref remains separate
+from these real GitHub commits. No full Original-UI row, physical camera/window,
+deployment or production gate is closed by this correction.
+
 ### Latest selected-Run deletion correction (2026-10-09)
 
 `4ba6bc37908e7fab485ccfe4c1cbffb347be601a` is committed and pushed on the
@@ -118,7 +182,8 @@ Full actual logs are retained outside the checkout as
 also fails in `goal-4ba6-local-demo.log`; this is a product regression, not an
 invalid helper or a passing repetition. Both workflows subsequently finish all
 37 jobs: 36 succeed and this one fails in each. Their complete results remain
-negative baseline evidence. Main has not been changed by PR #2 at this checkpoint.
+negative baseline evidence. At that earlier checkpoint main had not yet been
+changed by PR #2; the later verified integration is recorded above.
 
 The new exact selected-Run read correctly rejects the deleted Run with 404,
 but the deletion action had left that obsolete selection in place. Single and

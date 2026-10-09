@@ -2563,15 +2563,8 @@ export class ParticipantViewFacade {
     if (!this.player.canRequestPreviousUnit) {
       return;
     }
-    const deniedReasons =
-      this.readCurrentRunState()?.navigation.backwardDeniedReasons ?? [];
-    if (
-      deniedReasons.length > 0 &&
-      this.canRequestUnitNavigation(deniedReasons)
-    ) {
-      this.presentNavigationDenial("backward");
-      return;
-    }
+    // Share the Player's effective completion decision. The navigation action
+    // settles the current answer before the API enforces the booklet policy.
     if (!this.player.canGoPreviousUnit) {
       this.presentNavigationDenial("backward");
       return;
@@ -2583,15 +2576,6 @@ export class ParticipantViewFacade {
 
   goToNextUnit(): void {
     if (!this.player.canRequestNextUnit) {
-      return;
-    }
-    const deniedReasons =
-      this.readCurrentRunState()?.navigation.forwardDeniedReasons ?? [];
-    if (
-      deniedReasons.length > 0 &&
-      this.canRequestUnitNavigation(deniedReasons)
-    ) {
-      this.presentNavigationDenial("forward");
       return;
     }
     if (!this.player.canGoNextUnit) {

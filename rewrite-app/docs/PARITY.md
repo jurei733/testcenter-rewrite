@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Verified integration and consistent host completion navigation (2026-10-09)
+
+PR #2 is normally merged as `537bd0cb4c579cf303313b2742056eacd92ef034`, with
+both parents and the exact verified `eccdf8fc` tree preserved. Its Push and PR
+workflows `37920261273`/`37920266922` each pass all 37 jobs. The live inventory
+has zero open PRs; all remaining remote branch changes and local `work` are
+contained in main. This is merged code, not deployment or production acceptance.
+
+Fresh main workflow `37926836911` independently fails `ui-open-run-sync` job
+`113807688442` at the original 15-second `CY-Unit.Sample-102` navigation
+assertion. Its full log remains retained. The fresh main workflow completes
+with 36 successful jobs and this one failure, without any
+cancellation. The complete metadata remains retained. The unchanged exact-main
+Git archive passes independently in `goal-537bd0cb-open-sync.log`; that does
+not erase the CI failure. Six deterministic actual-code failures and the own
+native protected-SQLite fixture then reproduce the stale completion decision:
+the enabled Player target and the host action use different response states.
+The host now uses the same effective decision as the Player. Foreground answer
+settlement and authoritative server policy checks remain unchanged.
+
+Fourteen new regressions and all 596 regular/61 compatibility checks pass;
+typecheck/build pass under the unchanged 470-kB limit (469.98 kB actual).
+The new browser gate passes eight trusted native forward/backward cases in
+Original and Rewrite modes at 1280/390px, exact answer packets and reload,
+same Session/Run, foreign-Run 401 and unchanged foreign own data. Its old-main
+reproduction is negative; corrected result is `goal-navigation-native-ready.log`.
+Earlier invalid helper recordings are separated in `CLOUD-HANDOFF.md`.
+The existing full browser script's inputs, assertions and deadlines are unchanged.
+Fresh full protected SQLite browser acceptance passes through Attachments,
+exact 47/47 deletion snapshots and clean shutdown in
+`goal-navigation-full-sqlite.log`. Fresh publication CI is required before the
+correction is integrated. No full UI, physical camera/window or production
+requirement is closed by these component and lifecycle results.
+
 ### Dependency audit and production-readiness boundary (2026-10-09)
 
 The actual read-only full dependency audit records 183 findings: 68 low,
