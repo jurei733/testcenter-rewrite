@@ -430,6 +430,8 @@ export class ParticipantViewFacade {
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private veronaSaveRetrySequence = 0;
+  private veronaSaveRetryRunId: string | null = null;
   private veronaForegroundSaveSettlement = false;
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
@@ -2486,8 +2488,11 @@ export class ParticipantViewFacade {
   }
 
   retryVeronaSave(): void {
+    const currentState = this.readCurrentRunState();
+    this.veronaSaveRetryRunId = currentState?.testRun.testRunId ?? null;
+    this.veronaSaveRetrySequence++;
     if (!this.pendingVeronaSave) {
-      this.restorePersistentVeronaSave(this.readCurrentRunState());
+      this.restorePersistentVeronaSave(currentState);
     }
     if (this.pendingVeronaSave) {
       this.scheduleVeronaSaveDrain(0);
@@ -3445,6 +3450,7 @@ export class ParticipantViewFacade {
         !this.veronaForegroundSaveSettlement)
     ) {
       const save = this.pendingVeronaSave;
+      const retrySequence = this.veronaSaveRetrySequence;
       this.pendingVeronaSave = null;
       try {
         const payload = await this.requestState.request<SaveTestRunProgressResponse>(
@@ -3486,12 +3492,17 @@ export class ParticipantViewFacade {
         this.persistState();
         if (
           retrySave.testRunId !== save.testRunId ||
-          retrySave.deliveryId !== save.deliveryId
+          retrySave.deliveryId !== save.deliveryId ||
+          (this.veronaSaveRetrySequence !== retrySequence &&
+            this.veronaSaveRetryRunId === save.testRunId &&
+            this.readCurrentRunState()?.testRun.testRunId === save.testRunId)
         ) {
           // A Player answer queued during the failed request has not had its
           // own attempt yet. Keep the failed packet durable, but do not strand
           // this newer one behind the old drain's offline status. The loop
-          // still stops on failure when no distinct packet arrived meanwhile.
+          // also retains one retry requested while this failed request was
+          // still in flight, scoped to the same selected Run. A second failure
+          // stops again unless another packet or retry intent actually arrives.
           continue;
         }
         return;

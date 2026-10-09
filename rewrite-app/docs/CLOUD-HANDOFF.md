@@ -130,6 +130,104 @@ run physical-camera/window acceptance. Unit lifecycle tests are not that proof.
 
 ## Data, evidence and agent traces
 
+### In-flight retry correction and retained negative CI evidence (2026-10-09)
+
+Both `ce46b960` workflows complete before the next publication: Push
+`37971006346` is 37/37 successful, while PR `37971066257` is 36/37 successful
+and has the real failed activation job `113957509582`. Its full 1.76-MB decoded
+log is saved as `ci-ce46-activation-runtime-113957509582.log` outside Git.
+The existing strict 90-second mid-drain predicate fails; later reads continue
+without the expected remaining save requests. An exact complete `git archive`
+of that head, with its own install/assets/DB/ports, passes the unchanged gate
+in `goal-ce46-activation-exact.log`. That pass is independent evidence, not a
+fix or proof of the precise intermittent CI cause. The failure is not retried.
+
+Actual production methods separately reproduce a lost online/manual retry while
+an old request is in flight. Two new retry regressions fail before correction.
+Retaining one fresh intent per attempt fixes them without changing packet IDs
+or answer bytes or starting an unconditional retry loop. A further regression
+fails when the selected Run changes after requesting the retry; checking the
+still-selected Run expires that intent. All 14 actual-method cases then pass.
+The final complete isolated archive plus the correction passes typecheck,
+build (469.46 kB; unchanged 470-kB limit), 601 regular checks, 61 compatibility
+cases and four new native Original/Rewrite 1280/390px cases against a protected
+own SQLite API. A fresh comparison also passes all 24 completed Review states
+against the current rendered Source reference in `goal-save-retry-final-review.log`.
+Memory/File/SQLite each pass 165 API cases. The complete protected SQLite
+production-correction repetition passes in `goal-save-retry-final-complete-ui.log`
+through Attachments, five released workers, exact 47/47 deletion logs and clean
+shutdown, with actual exit 0. Its unchanged full activation gate independently
+passes in `goal-save-retry-final-activation.log` with actual exit 0.
+
+`smoke-participant-save-retry.mjs` uses only own synthetic content and trusted
+native input/connectivity, retaining the same delivery ID, Session/Run, both
+byte-exact answers and reload restoration, and asserting foreign-Session denial
+and an unchanged foreign Run. It isolates the supported foreground fallback
+with an unavailable own Worker script and is appended after the existing
+activation CI gate. Existing Worker/full gates remain enabled. The exact old
+assets fail waiting for that same delivery's retry in
+`goal-native-retry-ce46-baseline-v3.log`; the corrected final assets pass all
+four cases in `goal-save-retry-final-native.log`. Earlier helper attempts with
+a different newer delivery ID are invalid fixture evidence, not regressions.
+The existing mid-drain predicate/deadline remains unchanged; failure-only
+diagnostics now identify mismatched Units, hashes and queue IDs without answers.
+The corrected complete fixture-timing repetition subsequently passes as recorded
+below. Publication CI remains separate until its actual completion.
+
+The first intermediate complete SQLite invocation omits
+`FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, so it is not protected acceptance
+evidence. Its actual full log `goal-save-retry-complete-ui.log` fails at the
+late real Monitor Pause: 409 versus 200. Read-only inspection of that own
+database proves Run `09c60c33` is already completed, with its authored
+120-second timer expired at `2026-10-09T19:23:19.230Z`. The screenshot and
+`goal-save-retry-fixture-timer-failure.json` are retained outside Git.
+Production correctly rejects pausing a completed Run. The existing fixture
+pause is moved immediately after the final running-status and CSV checks, before
+unrelated detail/import/attachment phases. Its native click, authorized 200,
+same Session/Run and paused status assertions remain; the real timer's duration
+and all deadlines are unchanged. Before deletion the helper additionally
+requires the entire same paused timer to be unchanged, alongside exact Run,
+Session and deletion counts. No completed Run is substituted or result relaxed.
+The new complete archive `goal-save-retry-hold-final` has its own install,
+compiler/assets/DB/ports and verifies this correction with operator auth enabled.
+It independently passes typecheck/build at 469.46 kB, 601 regular/61 compatibility
+checks and all four native retry cases. All 145 actual browser files are byte-
+identical to the already fully tested production correction; this does not
+substitute for the new fixture's complete browser run, independently checked below.
+The first placement at the earlier status-filter boundary pauses before a
+later CSV still requires `running`. The unchanged predicate catches that
+fixture error in `goal-save-retry-hold-complete-ui.log`, with screenshot
+`/tmp/testcenter-ui-failure-Cv79HJ/failure.png`. Its exact baseline-to-fixture
+patch is retained as `goal-save-retry-hold-first-placement.patch`. The pause
+is relocated after the final running CSV assertion, without altering it.
+`goal-save-retry-export-hold-complete-ui.log` proves the unchanged running CSV
+and correctly placed native pause, but then fails the new state-read helper:
+its POST default receives the correct 404 `route_not_found`. This invocation
+is not a pass. The helper now explicitly uses GET without changing the endpoint,
+authorization or its identity/timer assertions. Its actual log and screenshot
+`/tmp/testcenter-ui-failure-vLBtby/failure.png` remain retained; the corrected
+fresh protected repetition is `goal-save-retry-get-hold-complete-ui.log`.
+That complete repetition passes with actual exit 0: all unchanged running CSV
+assertions, native authorized pause with 120-second duration and positive time,
+same Session/Run and identical full paused timer at the later boundary,
+Attachments, five released workers, exact 47/47 deletion logs and clean shutdown.
+The 361 frontend checks independently pass after the corrected fixture placement.
+No active fixture's assets are cleaned or rebuilt.
+
+The product network permission is turn-scoped. A later fresh install runs under
+`network: restricted` and fails `spawnSync .../esbuild/bin/esbuild EPERM`;
+that failed invocation is preserved in `goal-save-retry-final-install.log`.
+The regular authorized product request grants only `network.enabled=true` for
+the current turn. Fresh Node 22.23.3 IPv4 loopback and exact `own-pipe-ok` child
+output succeed; a protected new SQLite database returns unauthenticated 401
+and shuts down cleanly in `goal-save-retry-restoration-renewed.log`. No file,
+domain, VPN, proxy or policy rights are expanded. GitHub access remains proven.
+Entire CLI/hooks/real Cloud trace export remain unavailable; no checkpoint or
+trailer is invented. The historical remote checkpoint ref still resolves to
+`fbd52e6f`. Private PPTX/tryout data are not read or transferred. All eight full
+Original-UI rows, physical camera/window, deployment and production acceptance
+remain open; the current unmodified Source camera reference still fails.
+
 ### Compatible dependency lock and restored runtime (2026-10-09)
 
 The next continuation restores the clean existing parity checkout at `641f6f90`
@@ -163,9 +261,11 @@ CRUD/back/retry, exact UTF-8, same Run reload and foreign-Session denial.
 Memory/File/SQLite each pass all 165 API cases. The unchanged Verona gate also
 passes all eight native completion-navigation cases in both interfaces and
 both widths with exact same-Run answers and unchanged foreign own state.
-The complete protected SQLite browser repetition is still running at this
-commit checkpoint; do not label it passed before its actual clean completion.
-Current publication CI remains a separate gate before normal integration.
+The complete protected SQLite browser repetition subsequently passes through
+Attachments, five released workers, exact 47/47 deletion logs and clean shutdown
+in `goal-next-compatible-tooling-full-sqlite.log`. At the earlier `ce46b960` commit
+checkpoint it was still running. Publication CI remains independently required;
+the later real activation failure and its correction are recorded above.
 Builds finish before browser fixtures start; their assets are not cleaned or
 rebuilt while in use. Logs and generated audit JSONs use the
 `goal-next-compatible-tooling-*` names outside the repository.

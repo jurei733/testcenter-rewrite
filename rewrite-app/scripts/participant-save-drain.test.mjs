@@ -23,7 +23,7 @@ const facadeSource = readFileSync(new URL("../apps/web/src/app/participant-view.
 const ast = ts.createSourceFile("participant-view.facade.ts", facadeSource, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
 const methods = ["saveVeronaResponse", "scheduleVeronaSaveDrain", "clearVeronaSaveBuffer", "drainVeronaSaveQueue",
-  "nextPersistentVeronaSave", "restorePersistentVeronaSave"].map(name => {
+  "nextPersistentVeronaSave", "restorePersistentVeronaSave", "retryVeronaSave"].map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
@@ -75,6 +75,8 @@ const withHost = async action => {
   host.optimisticVeronaResponse = null;
   host.queuedVeronaLogs = [];
   host.veronaSaveDrainPromise = null;
+  host.veronaSaveRetrySequence = 0;
+  host.veronaSaveRetryRunId = null;
   host.veronaForegroundSaveSettlement = false;
   host.veronaSaveBufferTimeout = null;
   host.veronaSaveBufferDueAtMs = null;
@@ -297,5 +299,99 @@ test("a partial 28-Unit reload keeps exactly 21 blocked packets after the visibl
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("another-run"), [sibling]);
     assert.equal(host.pendingVeronaSave.deliveryId, blocked[0].deliveryId);
     assert.equal(host.veronaSaveStatus, "queued_offline");
+  });
+});
+
+test("an online retry during a failed in-flight request drains the same Run's remaining exact packets", async () => {
+  await withHost(async ({ host, calls, currentState }) => {
+    const packets = [entry("8"), entry("9")];
+    const foreign = entry("8", { testRunId: "foreign-run", response: "foreign exact\n ä🙂\u0000 " });
+    for (const packet of [...packets, foreign]) assert.equal(outbox.persistParticipantSaveOutboxEntry(packet), true);
+    const firstRequest = deferred();
+    host.respond = body => calls.requests.length === 1 ? firstRequest.promise : {
+      testRun: { testRunId: currentState.testRun.testRunId, unitResponses: { [body.responseUnitKey]: body.unitResponse } }
+    };
+    host.restorePersistentVeronaSave(currentState);
+    const drain = host.veronaSaveDrainPromise;
+    assert.equal(calls.requests.length, 1);
+    assert.equal(host.pendingVeronaSave, null);
+    host.retryVeronaSave();
+    firstRequest.reject(new Error("the older interrupted request settles after reconnection"));
+    await drain;
+    assert.deepEqual(calls.requests.map(request => request.body.deliveryId), [packets[0].deliveryId, packets[0].deliveryId, packets[1].deliveryId]);
+    assert.deepEqual(calls.requests.map(request => request.body.unitResponse), [packets[0].response, packets[0].response, packets[1].response]);
+    assert.ok(calls.requests.every(request => request.path.includes("selected-run")));
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), []);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("foreign-run"), [foreign]);
+    assert.equal(host.veronaSaveStatus, "saved");
+  });
+});
+
+test("one in-flight retry intent is consumed once when its retry also fails", async () => {
+  await withHost(async ({ host, calls, currentState }) => {
+    const packet = entry("8");
+    assert.equal(outbox.persistParticipantSaveOutboxEntry(packet), true);
+    const firstRequest = deferred();
+    host.respond = () => calls.requests.length === 1 ? firstRequest.promise : Promise.reject(new Error("still offline"));
+    host.restorePersistentVeronaSave(currentState);
+    const drain = host.veronaSaveDrainPromise;
+    host.retryVeronaSave();
+    firstRequest.reject(new Error("original interruption"));
+    await drain;
+    assert.deepEqual(calls.requests.map(request => request.body.deliveryId), [packet.deliveryId, packet.deliveryId]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), [packet]);
+    assert.equal(host.pendingVeronaSave.deliveryId, packet.deliveryId);
+    assert.equal(host.veronaSaveStatus, "queued_offline");
+  });
+});
+
+test("a failed request without a fresh retry intent stays durable without a retry loop", async () => {
+  await withHost(async ({ host, calls, currentState }) => {
+    const packet = entry("8");
+    assert.equal(outbox.persistParticipantSaveOutboxEntry(packet), true);
+    host.respond = () => Promise.reject(new Error("offline"));
+    host.restorePersistentVeronaSave(currentState);
+    await host.veronaSaveDrainPromise;
+    assert.equal(calls.requests.length, 1);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), [packet]);
+    assert.equal(host.veronaSaveStatus, "queued_offline");
+  });
+});
+
+test("a retry requested after switching Run does not retry the old in-flight packet", async () => {
+  await withHost(async ({ host, calls, currentState }) => {
+    const packet = entry("8");
+    const foreign = entry("9", { testRunId: "foreign-run", response: "foreign unchanged\n ä🙂 " });
+    for (const value of [packet, foreign]) assert.equal(outbox.persistParticipantSaveOutboxEntry(value), true);
+    const firstRequest = deferred();
+    host.respond = () => firstRequest.promise;
+    host.restorePersistentVeronaSave(currentState);
+    const drain = host.veronaSaveDrainPromise;
+    currentState.testRun = { testRunId: "new-selected-run", status: "running", unitResponses: {} };
+    host.retryVeronaSave();
+    firstRequest.reject(new Error("the old Run's request settles after the switch"));
+    await drain;
+    assert.equal(calls.requests.length, 1);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), [packet]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("foreign-run"), [foreign]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("new-selected-run"), []);
+  });
+});
+
+test("switching Run before the old failure settles expires its earlier retry intent", async () => {
+  await withHost(async ({ host, calls, currentState }) => {
+    const packet = entry("8");
+    assert.equal(outbox.persistParticipantSaveOutboxEntry(packet), true);
+    const firstRequest = deferred();
+    host.respond = () => firstRequest.promise;
+    host.restorePersistentVeronaSave(currentState);
+    const drain = host.veronaSaveDrainPromise;
+    host.retryVeronaSave();
+    currentState.testRun = { testRunId: "new-selected-run", status: "running", unitResponses: {} };
+    firstRequest.reject(new Error("the selected Run changed after requesting the old retry"));
+    await drain;
+    assert.equal(calls.requests.length, 1);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), [packet]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("new-selected-run"), []);
   });
 });

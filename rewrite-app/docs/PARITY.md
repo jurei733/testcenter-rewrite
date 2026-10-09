@@ -1,5 +1,73 @@
 # Testcenter parity checklist
 
+### Retained in-flight retries and selected-Run isolation (2026-10-09)
+
+Published `ce46b960` finishes both workflows before another publication: Push
+`37971006346` passes 37/37; PR `37971066257` passes 36/37 and fails
+`ui-activation-blocking-runtime`, job `113957509582`. Its complete actual log
+is retained outside Git. The unchanged 90-second mid-drain response predicate
+fails after route recovery. An isolated complete archive of that exact head
+independently passes the unchanged gate; this repetition does not explain or
+fix the CI failure. No CI job is retried or assertion/deadline relaxed.
+
+A separately reproduced production race loses an online/manual retry requested
+while an older save is in flight: its later failure stops the existing drain
+with the same durable packet still queued. The drain now retains one fresh retry
+for the same selected Run. A second failure stops without another retry intent;
+changing the selected Run expires the old intent. Delivery IDs, exact response
+bytes, durable packets and foreign-Run isolation remain unchanged. Fourteen
+actual-method tests pass, including five new regression/control cases; the new
+retry and Run-switch regressions fail before their respective corrections.
+
+An own protected SQLite browser fixture reproduces the lost same-delivery retry
+against the exact old assets after trusted native input and offline/online
+events. Corrected fixed assets pass Original/Rewrite at 1280/390px, asserting
+the same delivery ID, Session/Run, two byte-exact answers, reload restoration,
+foreign-Session 401 and unchanged foreign Run. This fixture specifically covers
+the supported foreground fallback when the own Worker script is unavailable;
+it is added after the existing activation CI gate. Full Worker and
+complete browser gates remain intact. Earlier fixture attempts with a newly
+generated delivery ID are invalid for this race and remain separate evidence.
+The mid-drain gate also records precise mismatched Unit IDs and answer hashes
+on failure without printing answers or changing its acceptance condition.
+
+An intermediate complete SQLite invocation omits the operator-auth flag and
+is not protected acceptance evidence. It actually fails the late Monitor Pause
+assertion, 409 versus 200. Read-only examination of its own database proves the
+same Run already completed with its 120-second timer expired. The fixture's
+existing native authorized pause now runs immediately after the final running
+status and CSV assertions, before unrelated detail/import/attachment work. All original
+timing/status assertions remain strict; duration and timeouts are unchanged.
+The later boundary additionally asserts exact Session/Run and the full identical
+paused timer before retaining the exact deletion snapshot/counts. The failure,
+own database and screenshot are preserved. A separate complete fixed-assets
+snapshot validates this fixture correction with operator authentication enabled.
+The first relocation ran before a later CSV `running` assertion and therefore
+fails that unchanged predicate. Its log, screenshot and exact patch are retained
+as invalid fixture-placement evidence. The pause is moved after those final
+export assertions, preserving them; no expected CSV state is weakened.
+That relocation passes the CSV and pause assertions, but a new state-read helper
+incorrectly defaults to POST and receives the correct 404. Its full log and
+screenshot remain negative evidence. The helper explicitly uses GET; endpoint,
+authorization, exact identity and full timer assertions remain unchanged.
+
+The final complete isolated archive plus this correction passes typecheck,
+production build at 469.46 kB under the unchanged 470-kB limit, 601 regular
+checks, 61 compatibility cases, all four new native browser cases and 24 fresh
+Review states against the current rendered Source reference. Memory/File/SQLite
+each pass 165 API cases. The production correction's complete protected SQLite
+browser repetition passes through Attachments, five released workers, exact
+47/47 deletion logs and clean shutdown. The later fixture-timing snapshot also
+passes typecheck/build, 601/61 checks and four native cases; all 145 compiled
+browser files are byte-identical to that fully tested production snapshot.
+Its corrected complete fixture-timing repetition passes with operator auth
+enabled: native pause after the unchanged running CSV, identical full paused
+timer at the later boundary, Attachments, five released workers, exact 47/47
+deletion logs and clean shutdown with exit 0 in
+`goal-save-retry-get-hold-complete-ui.log`. Publication CI remains a separate gate
+until its actual completion. This correction closes no complete Original-UI,
+physical camera/window, deployment or production-acceptance row.
+
 ### Compatible lock updates and current external prerequisites (2026-10-09)
 
 PR #4 is normally merged as `641f6f9096b7d9052f7bf3e8c07b270a8c3aedc6`,

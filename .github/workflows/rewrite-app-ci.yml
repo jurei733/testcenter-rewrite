@@ -102,7 +102,7 @@ jobs:
             command: npm run smoke:ui:open-run-sync
             playwright: true
           - check: ui-activation-blocking-runtime
-            command: npm run smoke:ui:activation-blocking-runtime
+            command: npm run smoke:ui:activation-blocking-runtime && npm run smoke:ui:participant-save-retry:built
             playwright: true
           - check: ui-adaptive-runtime
             command: npm run smoke:ui:adaptive-runtime
