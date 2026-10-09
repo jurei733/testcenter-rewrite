@@ -1,5 +1,43 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Latest Quick CI evidence retention (2026-10-09)
+
+Head `6221bbdd` Push `37986888156` finishes with 36 successful jobs and one
+failed Quick job, `114010993886`. Its `Run ui-quick` step fails. Two actual
+decoded-log requests return `Transport closed`; GitHub reports no uploaded
+artifacts. The connector rejects the annotation endpoint; the local CLI reports
+an invalid token and its actual job-log request returns `Forbidden` with zero
+downloaded bytes. Preserve that precise access limitation and unknown assertion
+in `ci-6221-push-quick-log-access-evidence.json`; do not claim an application
+cause, general repository-access blocker or a passing head from the other jobs.
+PR `37986892883` separately finishes 37/37 on its first attempt. Both workflows
+finish before the next push; this independent pass does not explain the Push
+failure. Both complete browser and activation/native-retry gates pass;
+actual complete Push/activation logs are separately retained outside Git.
+
+The next workflow change captures only Quick's unchanged command output and
+uploads its owned log on failure. The original failing exit status still fails
+the job; no deadline, assertion, authorization, native input or bundle gate is
+relaxed. The actual extracted shell passes three controls for exact output and
+statuses 0/37/29, including first-failure stopping. YAML parses with the same
+thirty matrix entries. A fresh regular `network.enabled=true` turn-scoped grant
+has no additional filesystem rights; real IPv4 loopback and child pipes pass.
+VM package-manager rules and the three approved browser-download domains remain
+enforced. This diagnostic change requires its own fresh publication CI and is
+not a correction or inferred explanation of the unavailable Quick assertion.
+No real Entire Cloud trace support, deployment, production acceptance or complete
+Original-UI acceptance is established by it.
+
+The additional owned protected ItemBuilder check first omits administrator
+bootstrap and correctly receives `401 admin_credentials_invalid` before browser
+launch. Preserve `goal-6221-quick-ib.log`, its own database and the invalid-
+invocation JSON; this is neither a product regression nor a CI reproduction.
+The unchanged helper then passes both interfaces on new owned SQLite paths
+using the real synthetic secret-file bootstrap: trusted input, foreign/covered
+target rejection and byte-exact reload, with exit 0. Logs
+`goal-6221-protected-ib-rewrite.log` and `goal-6221-protected-ib-original.log`
+are separate positive evidence, not an explanation of the absent Quick log.
+
 ## Objective and publication boundaries
 
 Continue toward evidenced complete functional parity with the current Original

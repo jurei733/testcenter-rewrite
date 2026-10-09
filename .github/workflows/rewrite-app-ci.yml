@@ -133,7 +133,22 @@ jobs:
       - if: ${{ matrix.playwright }}
         run: npx playwright install --with-deps chromium
       - name: Run ${{ matrix.check }}
+        if: matrix.check != 'ui-quick'
         run: ${{ matrix.command }}
+      - name: Run ui-quick
+        if: matrix.check == 'ui-quick'
+        env:
+          CHECK_COMMAND: ${{ matrix.command }}
+        run: |
+          bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+      - name: Retain failed Quick browser log
+        if: failure() && matrix.check == 'ui-quick'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-quick-diagnostics
+          path: ${{ runner.temp }}/rewrite-ui-quick.log
+          if-no-files-found: error
+          retention-days: 7
 
   verify-postgres:
     runs-on: ubuntu-latest

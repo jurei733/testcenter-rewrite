@@ -1,5 +1,44 @@
 # Testcenter parity checklist
 
+### Preserve the actual Quick failure evidence (2026-10-09)
+
+Published `6221bbdd` Push workflow `37986888156` completes 36/37 jobs and
+fails Quick job `114010993886`. GitHub confirms the failed `Run ui-quick`
+step, but two decoded-log reads return `Transport closed`; no workflow
+artifact exists. Annotation access is rejected by the connector's endpoint
+allowlist. The local CLI reports an invalid token, while its concrete job-log
+request returns `Forbidden` before downloading any log bytes. The exact
+application assertion is unavailable and is not inferred. This is not a general
+GitHub access blocker. The separate PR workflow `37986892883` completes 37/37
+on its first attempt; both workflows finish before the next publication.
+That independent pass does not explain the Push failure. Both complete UI gates and
+both activation/native-retry gates already pass. Actual complete Push and
+activation logs are retained outside Git, including exact 47/47 deletion logs,
+five released Attachment workers and the four native same-delivery cases.
+
+Only Quick now records the unchanged command's merged output to an owned runner
+log and uploads it after failure. Its original command, exit status, assertions,
+timeout and the 470-kB bundle gate remain unchanged; every other matrix command
+keeps its original step. Three controls execute the actual extracted shell and
+verify exact success/failure statuses 0/37/29, first-failure stopping and exact
+stdout/stderr bytes in the captured file. Workflow YAML and all thirty existing
+matrix cases remain valid. Real IPv4 loopback and child-process pipes pass after
+the regular turn-scoped network grant, with no new filesystem/domain rights.
+This is diagnostic retention, not a fix for an unknown application failure or
+passing acceptance for the new publication. All eight complete Original-UI,
+physical hardware, deployment and production-acceptance gates remain separate.
+
+A separate protected ItemBuilder repetition initially fails before browser
+launch with `401 admin_credentials_invalid`: its invocation enabled protection
+without a synthetic administrator bootstrap. That invalid invocation, log and
+own database are retained, not treated as a product or Quick-CI reproduction.
+The unchanged helper subsequently passes Rewrite and Original on fresh owned
+SQLite paths with the real secret-file bootstrap, trusted input, foreign/covered
+target rejection and byte-exact reload; the command completes with exit 0.
+Logs are `goal-6221-protected-ib-rewrite.log` and
+`goal-6221-protected-ib-original.log`. These passes do not explain the missing
+Quick assertion or certify the whole Quick sequence.
+
 ### Retained in-flight retries and selected-Run isolation (2026-10-09)
 
 Published `ce46b960` finishes both workflows before another publication: Push
