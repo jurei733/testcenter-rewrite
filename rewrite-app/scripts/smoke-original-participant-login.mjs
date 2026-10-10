@@ -69,6 +69,11 @@ try {
       insecureUrl.hostname = "testcenter-proof.insecure";
       await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
       assert.equal(await page.evaluate(() => window.isSecureContext), false);
+      const freshName = mode === "original"
+        ? page.getByLabel("Anmeldename", { exact: true }) : page.locator("#participantLoginKey");
+      assert.equal(await freshName.inputValue(), "", "Both interfaces start without a synthetic login");
+      assert.equal(await (mode === "original" ? page.getByRole("button", { name: "Weiter", exact: true })
+        : page.locator("#participantRouteSignInButton")).isDisabled(), true);
       const notice = page.locator('[data-cy="login-insecure-context"]');
       if (mode === "original") {
         await page.getByLabel("Anmeldename", { exact: true }).fill("student-demo");
@@ -104,6 +109,28 @@ try {
       await context.close();
       process.stdout.write(`insecure_participant_entry=${theme}/${mode}/${protectedParticipant ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
     }
+    for (const mode of ["original", "rewrite"]) {
+      for (const explicit of [false, true]) {
+        const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        await context.addInitScript(() => localStorage.setItem("testcenter-rewrite-app-shell",
+          JSON.stringify({ loginKey: "own-saved-login", groupKey: "own-saved-group" })));
+        const page = await context.newPage(), credentials = [];
+        page.on("request", request => {
+          if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/participant/auth/sign-in") credentials.push(request);
+        });
+        const entry = new URL(`/app/participant?ui=${mode}&tenantKey=demo-tenant&workspaceKey=demo-workspace`, baseUrl);
+        if (explicit) { entry.searchParams.set("loginKey", "own-explicit-login"); entry.searchParams.set("groupKey", "own-explicit-group"); }
+        await page.goto(entry.href, { waitUntil: "networkidle" });
+        const name = mode === "original" ? page.getByLabel("Anmeldename", { exact: true }) : page.locator("#participantLoginKey");
+        assert.equal(await name.inputValue(), explicit ? "own-explicit-login" : "own-saved-login");
+        assert.equal(credentials.length, 0, "Restoring a name or opening an entry link must not sign in");
+        await page.reload({ waitUntil: "networkidle" });
+        assert.equal(await name.inputValue(), explicit ? "own-explicit-login" : "own-saved-login");
+        assert.equal(credentials.length, 0);
+        await context.close();
+        process.stdout.write(`participant_entry_identity=${theme}/${mode}/${explicit ? "explicit" : "saved"}:passed\n`);
+      }
+    }
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       // This geometry fixture explicitly includes the authored old-browser
       // warning. A newer installed Chrome must not silently remove that state.
@@ -115,6 +142,10 @@ try {
       page.on("pageerror", error => errors.push(String(error)));
       await page.goto(`${baseUrl}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+      assert.equal(await page.locator("#originalLoginName").inputValue(), "",
+        "Fresh participant entry must not prefill a synthetic developer login");
+      assert.equal(await page.getByRole("button", { name: "Weiter", exact: true }).isDisabled(), true,
+        "The empty Original name step must wait for the participant's input");
       await page.evaluate(() => document.fonts.ready);
       const geometry = await page.locator("#originalParticipantLogin").evaluate(element => {
         const read = selector => element.querySelector(selector).getBoundingClientRect();

@@ -1,5 +1,56 @@
 # Testcenter parity checklist
 
+### Neutral fresh participant entry and current Source comparison (2026-10-10)
+
+Fresh entry previously displayed the synthetic `student-ui` login and carried
+`group:student-ui` before any participant input. Both initial values are now
+empty. The production login gate requires blank, disabled fresh entry in both
+interfaces, checks twelve saved-name/explicit-link combinations across the
+three themes, and reloads each without sending an authentication request.
+Explicit links still override saved names. The existing password, protection,
+second-code and four-width Original geometry cases also pass. All 361 frontend
+state cases pass; typecheck and production build pass at 469.44 kB under the
+unchanged 470-kB limit.
+
+The full own protected SQLite UI run completes all browser assertions, including
+47/47 group deletion and six real attachment worker releases. Its log contains
+one test-log POST 500 with `cannot rollback - no transaction is active`.
+The original storage exception is masked by a secondary rollback failure;
+exit 0 alone does not close this runtime acceptance. The primary cause remains
+unconfirmed and is being investigated separately from the Docker failure.
+
+Current Original `ee2ab9ab64bd91209ef8534bbe6005838024e46d` is freshly built
+from an isolated complete frontend/common/definitions archive. All 398 tracked
+files, including symlink contents, match their Git blob hashes. Its generated
+untracked environment file uses the exact tracked production configuration.
+Own equal frontend fixtures and a protected Rewrite SQLite API capture both
+interfaces at 1280/390px with zero unknown requests or frontend errors. In the
+same pristine focused-name state, all three 1280x720 full-page screenshots have
+zero changed pixels. Initial focus differs, and mobile full-page image heights
+are 847px in Source versus 844px in Rewrite. These differences remain recorded;
+there is no image crop, mask or claim that the full Shell/login row is closed.
+An earlier prototype's label click touched only the already-focused Rewrite
+field and produced a different validation state. That invalid equal-state
+comparison and the subsequent incorrect Source ARIA expectation are retained
+separately from the corrected pristine-focus evidence.
+
+The same freshly built, unmodified Source again fails all twelve camera initial
+and native-reload/re-entry cases at `video.nativeElement`, with no video stream,
+metadata lookup or unknown request. The diagnostic exits 2; it is negative
+reference evidence, not a passing capture comparison.
+
+The new local Docker image builds and passes the standalone non-root SQLite
+runtime smoke with schema 58. Its metadata explicitly identifies the local
+`local-3e337dfa-neutral-entry` test tree. The separate production-overlay Compose
+gate fails in Docker's `overlay2` driver with actual `input/output error`; removal
+of its own API container also fails, and subsequent daemon requests report
+`Docker Desktop is unable to start`. Preserve `work/compose-production.log`;
+do not call this an application failure or a passing release gate. Other Docker
+images, containers and volumes are not pruned or reset. Only reproducible build
+caches inside this chat's verified Source archive are removed. Production,
+shared-environment deployment and all eight complete Original UI rows remain
+open.
+
 ### Attachment capture ownership through async transitions (2026-10-10)
 
 Fresh GitHub main is `143dc3e73ae83f379de4b2fe38edef25c7286a4a`; its actual

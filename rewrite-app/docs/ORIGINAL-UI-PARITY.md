@@ -2,6 +2,20 @@
 
 ## Acceptance baseline
 
+Fresh 2026-10-10 comparison removes the Rewrite's synthetic initial participant
+login/group values. Blank entry is disabled, while saved names and explicit
+links retain their values across reload in both interfaces. The current Source
+is built from verified byte-exact tracked frontend/common/definitions files at
+`ee2ab9ab`; equal own frontend fixtures have no unknown requests or page errors.
+The three desktop full-page pristine-focused-name images match every pixel.
+Initial focus still differs, and mobile full-page heights differ (847/844px);
+no full Shell/login or cross-cutting row is closed by this bounded comparison.
+The corrected focus comparison uses the same actual pristine input state;
+an earlier extra click had touched only the already-focused Rewrite control.
+The fresh Source camera diagnostic again exits 2 after twelve actual
+`video.nativeElement` startup/re-entry failures. These are separate negative
+reference observations, not successful camera or physical hardware acceptance.
+
 Requested on 2026-09-12: keep the existing rewrite interface available and add
 an optional interface identical to the Original Testcenter. This is a separate
 acceptance axis from functional parity; the historical 94% estimate in

@@ -1,5 +1,44 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Neutral entry, fresh Source and local container boundaries (2026-10-10)
+
+The initial runtime login/group now start empty instead of synthetic
+`student-ui`/`group:student-ui`. The protected production login gate passes fresh
+blank/disabled entry in both interfaces, twelve saved/explicit-link cases with
+native reload and zero sign-in requests, all three themes, real password login,
+second-code and existing four-width geometry checks. All 361 frontend-state
+cases, typecheck and the 469.44-kB production build pass. Defaults alone change;
+saved participant inputs and explicit entry parameters still hydrate normally.
+
+Fresh Source `ee2ab9ab` builds from frontend/common/definitions, with all 398
+tracked blobs verified byte-exact, including symlinks. Its own equal frontend
+fixtures and the own protected Rewrite SQLite API have zero page errors and
+unknown requests. The same pristine-focused-name desktop state matches all
+pixels in Primar/Sekundar/Erwachsene. Preserve the separate initial-focus and
+mobile 847/844px height differences; no full UI row is closed. Earlier prototype
+captures had unequal touched state, and its first ARIA assertion incorrectly
+expected Source's absent valid-state attribute to be the string `false`.
+Neither negative prototype is product evidence. Current unmodified Source's
+camera reference still fails twelve initial/native-reload/re-entry states with
+`video.nativeElement`, zero streams/lookups and diagnostic exit 2.
+
+Own image `testcenter-rewrite-app:production-readiness-20261010` builds and
+passes standalone non-root SQLite runtime smoke, schema 58, with local metadata
+`local-3e337dfa-neutral-entry`. The own production Compose attempt
+`testcenter-readiness-20261010-prod` uses ports 54839/54840 and fails in Docker
+`overlay2` with actual `input/output error`. Its cleanup cannot remove the own
+API container, and the daemon subsequently reports that Desktop cannot start.
+Preserve the real log, and inspect/clean only that owned project after Docker
+recovers. Do not prune unrelated images/volumes, reset Desktop or claim a
+passing Compose gate. Only the verified chat-owned Source build caches were
+removed; its source, built browser assets and evidence remain available. The
+full own protected SQLite browser run completes its assertions, including
+47/47 group deletion and six attachment workers. Its server log nevertheless
+contains one test-log POST 500 (`cannot rollback - no transaction is active`).
+Do not treat its exit 0 as clean runtime acceptance. Investigate the primary
+SQLite error, which the unconditional rollback currently masks; the original
+failure's cause is not established by the Docker failure or low disk space.
+
 ## Local attachment ownership correction (2026-10-10)
 
 Continue from current main `143dc3e73ae83f379de4b2fe38edef25c7286a4a` on the
