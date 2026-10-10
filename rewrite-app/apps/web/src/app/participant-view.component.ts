@@ -1163,7 +1163,7 @@ interface ParticipantVisibleCodeNotice {
             <section id="participantRuntimeErrorFallback" class="participant-confirmation-backdrop" role="alertdialog" aria-modal="true"
               cdkTrapFocus [cdkTrapFocusAutoCapture]="true" aria-labelledby="participantErrorFallbackTitle">
               <article class="participant-confirmation-dialog">
-                <h2 id="participantErrorFallbackTitle">Fehler beim Abspielen der Aufgabe</h2>
+                <h2 id="participantErrorFallbackTitle">{{ request.title ?? "Fehler beim Abspielen der Aufgabe" }}</h2>
                 <p>{{ view.customText('booklet_errormessage') }}</p>
                 <details><summary>Fehlerdetails</summary><p>{{ redactBugReportText(request.description || request.message) }}</p></details>
                 <button id="participantRouteControllerReloadButton" cdkFocusInitial type="button"

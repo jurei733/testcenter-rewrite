@@ -66,6 +66,7 @@ export type VeronaControllerError = {
   testRunId: string;
   unitKey: string;
   message: string;
+  title?: string;
   description?: string;
   timestamp?: number;
   details?: string;
@@ -706,12 +707,18 @@ export class VeronaPlayerHostComponent
     );
     const apiVersion = apiResolution.version;
     if (!apiVersion) {
-      this.fail("The player ready notification does not declare a Verona API version.");
+      this.fail(
+        "The player ready notification does not declare a Verona API version.",
+        "Player did not report its Verona version (apiVersion or metadata.specVersion)",
+        "Unbekannte Verona-Version"
+      );
       return;
     }
     if (!isSupportedVeronaPlayerApiVersion(apiVersion)) {
       this.fail(
-        `Player uses Verona ${apiVersion}; supported major versions are ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN}–${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}.`
+        `Player uses Verona ${apiVersion}; supported major versions are ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN}–${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}.`,
+        `Player uses Verona ${apiVersion}, but this testcenter only support \n              ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN} to ${SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX}`,
+        "Unpassende Verona-Version"
       );
       return;
     }
@@ -1105,7 +1112,7 @@ export class VeronaPlayerHostComponent
     }, 500);
   }
 
-  private fail(message: string, description = message): void {
+  private fail(message: string, description = message, title?: string): void {
     this.clearReadyTimeout();
     this.clearScheduledFrames();
     this.status = "error";
@@ -1131,6 +1138,7 @@ export class VeronaPlayerHostComponent
         testRunId: this.frameTestRunId,
         unitKey: this.frameUnitKey,
         message,
+        title,
         description,
         timestamp: Date.now(),
         details: new Error(message).stack

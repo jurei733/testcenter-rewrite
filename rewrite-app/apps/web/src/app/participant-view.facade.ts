@@ -2482,44 +2482,27 @@ export class ParticipantViewFacade {
       originalUnitId: null,
       entries
     };
-    if (
-      this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
-    ) {
-      this.queuedVeronaLogs.push(batch);
-      this.saveVeronaResponse({
-        testRunId: this.pendingVeronaSave.testRunId,
-        unitKey: this.pendingVeronaSave.unitKey,
-        response: this.pendingVeronaSave.response,
-        unitDataChanged: false,
-        unitStateChanged: false,
-        playerStateChanged: false
-      });
+    const pending = this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
+      ? this.pendingVeronaSave : null;
+    const unitKey = pending?.unitKey ?? currentState.currentUnit.unitKey;
+    if (!unitKey) {
       return;
     }
-
-    const deliveryId =
-      globalThis.crypto?.randomUUID?.() ??
-      `testlog-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    void this.requestState
-      .request<SaveParticipantTestLogsResponse>(
-        "Participant Test Logs",
-        "POST",
-        resolveRoutePath(productionApiRoutes.participant.saveTestLogs, {
-          testRunId: currentState.testRun.testRunId
-        }),
-        {
-          deliveryId,
-          logs: [{
-            unitKey: batch.unitKey,
-            originalUnitId: batch.originalUnitId,
-            entries: batch.entries
-          }]
-        } satisfies SaveParticipantTestLogsRequest,
-        { quiet: true }
-      )
-      .catch(() => {
-        this.queuedVeronaLogs.push(batch);
-      });
+    const response = pending?.response ??
+      (this.runtime.currentUnitKey === unitKey
+        ? this.runtime.currentUnitResponse
+        : this.effectiveUnitResponse(currentState, unitKey));
+    // Controller/focus logs must survive reload even after the last answer
+    // packet was delivered. Use the same durable, idempotent queue as answers.
+    this.queuedVeronaLogs.push(batch);
+    this.saveVeronaResponse({
+      testRunId: currentState.testRun.testRunId,
+      unitKey,
+      response,
+      unitDataChanged: false,
+      unitStateChanged: false,
+      playerStateChanged: false
+    });
   }
 
   retryVeronaSave(): void {
@@ -3382,7 +3365,8 @@ export class ParticipantViewFacade {
     this.removeMatchingDeliveredOutbox(
       testRunId,
       currentUnitKey,
-      unitResponse
+      unitResponse,
+      status
     );
 
     if (matchingLogBatches.length > 0) {
@@ -4703,7 +4687,7 @@ export class ParticipantViewFacade {
       | ParticipantCurrentRunStateResponse["currentRunState"]
       | null
   ): void {
-    if (!currentState || this.pendingVeronaSave) {
+    if (!currentState || this.pendingVeronaSave || this.veronaSaveDrainPromise) {
       return;
     }
     const testRunId = currentState.testRun.testRunId;
@@ -4715,7 +4699,13 @@ export class ParticipantViewFacade {
     if (!saved) {
       return;
     }
-    if (currentState.testRun.unitResponses[saved.unitKey] === saved.response) {
+    // An unchanged answer does not acknowledge the packet's new logs or status.
+    // Log-bearing packets need their own idempotent delivery acknowledgement.
+    if (
+      saved.logs.length === 0 &&
+      currentState.testRun.status === saved.status &&
+      currentState.testRun.unitResponses[saved.unitKey] === saved.response
+    ) {
       removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
       this.veronaSaveStatus = "saved";
       return;
@@ -4760,7 +4750,8 @@ export class ParticipantViewFacade {
   private removeMatchingDeliveredOutbox(
     testRunId: string,
     unitKey: string | undefined,
-    unitResponse: string | null | undefined
+    unitResponse: string | null | undefined,
+    status: "running" | "paused"
   ): void {
     if (!unitKey || unitResponse == null) {
       return;
@@ -4769,7 +4760,9 @@ export class ParticipantViewFacade {
     if (
       saved &&
       saved.unitKey === unitKey &&
-      saved.response === unitResponse
+      saved.response === unitResponse &&
+      saved.status === status &&
+      saved.logs.length === 0
     ) {
       removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
     }

@@ -22,8 +22,8 @@ const outbox = await import(moduleUrl(transpile(outboxSource).replace(
 const facadeSource = readFileSync(new URL("../apps/web/src/app/participant-view.facade.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("participant-view.facade.ts", facadeSource, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
-const methods = ["saveVeronaResponse", "scheduleVeronaSaveDrain", "clearVeronaSaveBuffer", "drainVeronaSaveQueue",
-  "nextPersistentVeronaSave", "restorePersistentVeronaSave", "retryVeronaSave"].map(name => {
+const methods = ["saveVeronaResponse", "saveVeronaTestLogs", "effectiveUnitResponse", "scheduleVeronaSaveDrain", "clearVeronaSaveBuffer", "drainVeronaSaveQueue",
+  "nextPersistentVeronaSave", "restorePersistentVeronaSave", "retryVeronaSave", "removeMatchingDeliveredOutbox"].map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
@@ -74,6 +74,7 @@ const withHost = async action => {
   host.pendingVeronaSave = null;
   host.optimisticVeronaResponse = null;
   host.queuedVeronaLogs = [];
+  host.ephemeralUnitResponses = new Map();
   host.veronaSaveDrainPromise = null;
   host.veronaSaveRetrySequence = 0;
   host.veronaSaveRetryRunId = null;
@@ -393,5 +394,119 @@ test("switching Run before the old failure settles expires its earlier retry int
     assert.equal(calls.requests.length, 1);
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"), [packet]);
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("new-selected-run"), []);
+  });
+});
+
+// Error and focus logs often leave the answer text unchanged. Equality of that
+// text cannot prove these newer side effects reached the authenticated store.
+test("an unchanged saved answer keeps new logs durable through refresh and an in-flight delivery", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("2");currentState.testRun.unitResponses["2"]=packet.response;
+    outbox.persistParticipantSaveOutboxEntry(packet);
+    const request=deferred();host.respond=()=>request.promise;
+    host.restorePersistentVeronaSave(currentState);
+    const drain=host.veronaSaveDrainPromise;assert.ok(drain);
+    assert.deepEqual(calls.requests.map(r=>r.body.deliveryId),[packet.deliveryId]);
+    host.restorePersistentVeronaSave(currentState);
+    assert.equal(host.pendingVeronaSave,null,"Do not requeue a delivery still being awaited.");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[packet]);
+    request.resolve({testRun:currentState.testRun});await drain;
+    assert.equal(calls.requests.length,1);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+test("failed logs remain durable even when their exact answer is already saved", async () => {
+  await withHost(async ({host,currentState}) => {
+    const packet=entry("2");currentState.testRun.unitResponses["2"]=packet.response;
+    outbox.persistParticipantSaveOutboxEntry(packet);host.respond=()=>{throw Error("owned logs unavailable");};
+    host.restorePersistentVeronaSave(currentState);await host.veronaSaveDrainPromise;
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[packet]);
+    assert.equal(host.pendingVeronaSave.deliveryId,packet.deliveryId);assert.equal(host.veronaSaveStatus,"queued_offline");
+  });
+});
+test("restoring an answer-only packet skips delivery only when its saved status also matches", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const matching=entry("2",{logs:[]});currentState.testRun.unitResponses["2"]=matching.response;
+    outbox.persistParticipantSaveOutboxEntry(matching);host.restorePersistentVeronaSave(currentState);
+    assert.equal(calls.requests.length,0);assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+    const pause=entry("2",{logs:[],status:"paused"});outbox.persistParticipantSaveOutboxEntry(pause);
+    const request=deferred();host.respond=()=>request.promise;host.restorePersistentVeronaSave(currentState);
+    const drain=host.veronaSaveDrainPromise;assert.ok(drain);
+    assert.equal(calls.requests[0].body.status,"paused");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[pause]);
+    request.resolve({testRun:{...currentState.testRun,status:"paused"}});await drain;
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+test("a foreground answer write cannot acknowledge queued logs or a different queued status", async () => {
+  await withHost(async ({host,currentState}) => {
+    for(const packet of [entry("2"),entry("2",{logs:[],status:"paused"})]) {
+      outbox.persistParticipantSaveOutboxEntry(packet);
+      host.removeMatchingDeliveredOutbox("selected-run","2",packet.response,"running");
+      assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[packet]);
+      outbox.removeParticipantSaveOutboxEntry(packet.testRunId,packet.deliveryId);
+    }
+    const answerOnly=entry("2",{logs:[]});outbox.persistParticipantSaveOutboxEntry(answerOnly);
+    host.removeMatchingDeliveredOutbox("selected-run","2",answerOnly.response,"running");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+
+test("controller logs after the final answer save use a durable idempotent packet rather than a detached HTTP write", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const response="already saved exact answer Ω\n  ";currentState.testRun.unitResponses["2"]=response;
+    host.runtime.currentUnitKey="2";host.runtime.currentUnitResponse=response;
+    const entries=[{key:"CONTROLLER",content:"ERROR",timeStamp:1_791_411_000_000}];
+    const request=deferred();host.respond=()=>request.promise;
+    host.saveVeronaTestLogs(entries);
+    const drain=host.veronaSaveDrainPromise;assert.ok(drain);
+    const packet=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2");assert.ok(packet);
+    assert.equal(packet.response,response);
+    assert.deepEqual(packet.logs,[{unitKey:null,originalUnitId:null,entries}]);
+    assert.equal(calls.requests[0].body.deliveryId,packet.deliveryId);
+    assert.ok(calls.requests[0].path.endsWith("/save-progress"));
+    host.restorePersistentVeronaSave(currentState);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[packet]);
+    request.reject(Error("late logs unavailable"));await drain;
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[packet]);
+    assert.equal(host.pendingVeronaSave.deliveryId,packet.deliveryId);
+    host.respond=body=>({testRun:{...currentState.testRun,unitResponses:{"2":body.unitResponse}}});
+    host.retryVeronaSave();await host.veronaSaveDrainPromise;
+    assert.equal(calls.requests[1].body.deliveryId,packet.deliveryId);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+test("late focus logs keep a pending other-Unit packet and the visible Unit's newer draft intact", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const old=entry("8");outbox.persistParticipantSaveOutboxEntry(old);host.pendingVeronaSave=old;
+    host.runtime.currentUnitKey="2";host.runtime.currentUnitResponse="new visible draft";
+    const entries=[{key:"FOCUS",content:"HAS_NOT",timeStamp:1_791_411_000_000}];
+    const request=deferred();host.respond=()=>request.promise;host.saveVeronaTestLogs(entries);
+    const drain=host.veronaSaveDrainPromise;assert.ok(drain);
+    const packet=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","8");assert.ok(packet);
+    assert.equal(packet.response,old.response);assert.equal(host.runtime.currentUnitResponse,"new visible draft");
+    assert.deepEqual(packet.logs,[...old.logs,{unitKey:null,originalUnitId:null,entries}]);
+    request.resolve({testRun:currentState.testRun});await drain;
+    assert.equal(calls.requests.length,1);
+  });
+});
+test("test logs for a saved unit use its server packet when the runtime draft belongs to a different unit", async () => {
+  await withHost(async ({host,currentState}) => {
+    const response="server selected packet";currentState.testRun.unitResponses["2"]=response;
+    host.runtime.currentUnitKey="8";host.runtime.currentUnitResponse="foreign unit draft";
+    const request=deferred();host.respond=()=>request.promise;
+    host.saveVeronaTestLogs([{key:"CONTROLLER",content:"ERROR",timeStamp:1_791_411_000_000}]);
+    const drain=host.veronaSaveDrainPromise;assert.ok(drain);
+    assert.equal(outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2").response,response);
+    request.resolve({testRun:currentState.testRun});await drain;
+  });
+});
+test("non-saving modes and runs without save authority cannot queue or send controller logs", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const entries=[{key:"CONTROLLER",content:"ERROR",timeStamp:1_791_411_000_000}];
+    currentState.executionMode.saveResponses=false;host.saveVeronaTestLogs(entries);
+    currentState.executionMode.saveResponses=true;currentState.availableActions=[];host.saveVeronaTestLogs(entries);
+    assert.deepEqual(calls.requests,[]);assert.deepEqual(host.queuedVeronaLogs,[]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
   });
 });
