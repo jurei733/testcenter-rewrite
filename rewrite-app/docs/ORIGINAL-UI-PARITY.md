@@ -1,5 +1,63 @@
 # Optional Original UI
 
+### Version-specific errors and acknowledged log delivery (2026-10-10)
+
+Application checkpoint `392692085f19` shows the pinned Original's titles and
+expanded descriptions for missing and unsupported Verona Player versions,
+including the actual failed-lazy-module fallback. Supported startup and the
+existing legacy module-version correction are retained. The production initial
+bundle remains 469.41 kB under the unchanged 470 kB error limit; the existing
+450 kB and component-style warnings remain.
+
+Twelve new unmodified Source frontend cases cover both version errors across
+Primar, Sekundar and Erwachsene on desktop/mobile. The owned Rewrite cases begin
+with a previously saved exact response/progress packet and retain it through
+rejected startup and reload, without leave locks or timer cancellation. The new
+mandatory quick-browser wrapper passes all 22 headful cases: 12 native states,
+2 failed lazy-module downloads, 2 delayed saves, 2 failed saves with recovery,
+2 delayed error-log deliveries after the answer was already saved, and 2 failed
+such log deliveries with recovery. All 1158 unit/state checks pass, including
+499 frontend-state checks. The existing nine runtime-error cases and all 44
+pause cases also pass against this checkpoint. All 43 exit cases (37 Original,
+6 Rewrite), 32 header cases, the broad Systemcheck flow and the broad Verona
+flow also pass in the completed sequential regression run.
+
+Two negative browser probes confirmed actual storage defects. Refresh could
+acknowledge a log-bearing packet merely because its answer text already matched
+the server; error logs emitted after a delivered answer could instead use a
+detached HTTP write which reload did not await. Controller/focus logs now use
+the durable answer outbox. Restoration skips an active drain and requires a
+matching saved status plus an answer-only packet before inferring delivery;
+a foreground answer write likewise cannot acknowledge queued logs or a different
+status. Eight added save-drain tests and the delayed/failed browser cases prove
+these narrow corrections.
+
+All twelve closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero whole dialog rectangles are identical; no full-viewport or expanded-report
+screenshot identity is claimed. A separate new unit probe confirms the next
+open gap: replacing a same-Unit packet during its failed in-flight delivery can
+lose the older packet's unacknowledged logs. That concurrent replacement is not
+covered by the completed version/error cases. Custom help, further error and
+command overlap cases, and all eight full Original UI acceptance rows remain open.
+
+Current-image PostgreSQL Compose passes in standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-392692085f19`, ID
+`sha256:72421ecb598f4601da35681bd81d1b0b4db62ad0bd4536805f43d29549c7493b`,
+has USER node, revision 392692085f19 and declared timestamp
+2026-10-10T18:28:20.222Z. Owned containers/volumes are removed; exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, plus the protected
+presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.1 GiB are free after these runs.
+
+API/application/store code remains unchanged from checkpoint 9d9ec5754879 and
+its recorded 165 SQLite API/701 PostgreSQL integration checks; these full suites
+were not replayed for this frontend checkpoint. Remote Original master is freshly
+verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references use
+owned API fixtures and do not prove its backend authorization/persistence.
+Nothing was pushed; remote CI, real devices, release and deployment are unverified.
+
 ### Runtime-error dialog and durable reload (2026-10-10)
 
 Application checkpoint `d026e3f7c63f` retains the running Original Player behind
