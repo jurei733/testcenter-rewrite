@@ -1,5 +1,44 @@
 # Testcenter parity checklist
 
+### Host storage recovery and container gates (2026-10-10)
+
+The user explicitly requested space for the container runs. Docker's own host
+log confirms the daemon incident: writing VM `init.log` failed with
+`no space left on device`. The Mac initially had about 1.8 GiB available.
+Writable npm content cache, verified untracked/inactive Angular and Nx cache
+directories, unused Docker build cache and unreferenced dangling images were
+removed. Root-owned or unverifiable cache directories were retained. User
+working files, the protected PPTX, all 24 unrelated containers and the 85
+existing volumes were preserved. Only the four containers from the aborted
+owned Compose project were removed; its database volume remains.
+
+The failed Docker Desktop did not complete a normal CLI restart. After normal
+quit and termination requests, its remaining verified processes were stopped
+and the application restarted. The real Docker API responds again. Host
+availability reached about 12 GiB after cleanup and remains about 10–11 GiB
+after the fresh image build. All three fresh Compose gates pass with their own
+projects and ports: standard, demo and production-secret; PostgreSQL schema 52,
+metadata-required preflight, non-root `node` runtime and the production
+authentication/bootstrap checks are verified. Their generated test volumes
+are removed by the existing smoke teardown. The freshly built same production
+image also passes the standalone SQLite Docker runtime gate at schema 58.
+The real PostgreSQL integration runner also passes 233 tests with zero
+skips/cancellations, using a separately
+labelled ephemeral container with its database on tmpfs; that container has
+been stopped. This is local runtime evidence, not remote CI, deployment or
+production acceptance. The earlier masked SQLite incident's primary cause
+remains unknown; Docker's confirmed disk-full incident does not recover it.
+
+The fresh complete protected/headful SQLite browser replay now passes the
+stricter server gate through final teardown: 12,911 completed own API requests,
+zero actual failed requests/5xx, normal Attachment capture/upload/preview/delete,
+six observed QR-worker releases and exact 47/47 group-result log deletion.
+The API port 57894 is closed and no owned test process/container remains.
+The successful database, log and screenshots are retained alongside the earlier
+failed-run evidence. Complete local browser acceptance is restored; all eight
+complete Original UI comparisons, physical-camera/window proof, remote CI for
+these unpublished commits, deployment and production acceptance remain open.
+
 ### Original login footer overflow (2026-10-10)
 
 The mobile full-page comparison against the byte-verified current Source

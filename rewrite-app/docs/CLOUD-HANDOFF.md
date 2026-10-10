@@ -1,5 +1,39 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Recovered storage and container execution (2026-10-10)
+
+The user authorized freeing space to resume container tests. Docker's actual
+host log confirms `init.log` write `ENOSPC`. Host availability increased from
+about 1.8 GiB to 12 GiB by clearing verified unused npm/Angular/Nx/Docker build
+and dangling-image caches; it remains about 10–11 GiB after rebuilding. Existing
+user data, 24 unrelated containers, 85 volumes and the protected PPTX remain.
+Only the aborted own project's four containers were removed. Its volume and
+the real failure logs remain. Root-owned/unverifiable caches were not forced.
+After its regular restart timed out, the unresponsive verified Docker processes
+were stopped and Desktop restarted; the Docker API now responds normally.
+
+Fresh own standard, demo and production-secret Compose projects pass PostgreSQL
+schema 52, build metadata, runtime preflight, non-root execution and the existing
+production bootstrap/authentication assertions. Their synthetic generated
+volumes are normally cleaned up. That freshly built production image also
+passes the standalone SQLite Docker runtime gate at schema 58.
+Separately, all 233 PostgreSQL integration tests pass without skips/cancellations
+on a labelled own tmpfs database, and
+its container is stopped. Keep the earlier masked SQLite cause unresolved;
+confirmed Docker `ENOSPC` does not establish that lost exception. The older
+failed Compose gate below is historical and now has a successful fresh replay.
+These are local checks; no new remote CI, deployment or production proof exists.
+
+The complete protected/headful SQLite browser replay now passes its strict
+server-failure gate through teardown, with 12,911 completed requests and zero
+actual failures/5xx. It passes the formerly failing IB stage, normal Attachment
+capture/upload/preview/deletion, six observed QR-worker releases and exact
+47/47 group-result log deletion. Its own API port 57894 is closed. No owned test
+container/process remains; the final inventory still has the same 24 unrelated
+containers and 85 preserved volumes. The successful own DB/log/screenshots and
+the earlier failure evidence remain. Do not replace these local proofs with a
+claim of full Original UI, physical hardware, remote CI or production acceptance.
+
 ## Original entry overflow continuation (2026-10-10)
 
 Continue on `testcenter-production-readiness`; `cb8d0066` records the SQLite
