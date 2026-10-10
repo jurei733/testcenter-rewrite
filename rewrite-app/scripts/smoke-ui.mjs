@@ -10794,6 +10794,11 @@ try {
   assert.equal(simulationCompleteResponse.status(), 200);
 
   logStep("participant-merged-return-confirmation");
+  const mergedReturnLaunchPromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/participant/starter:launch")
+  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -10805,6 +10810,24 @@ try {
   );
   const mergedReturnFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await mergedReturnFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await mergedReturnFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
+  const mergedReturnLaunch = await (await mergedReturnLaunchPromise).json();
+  const mergedReturnSessionId = mergedReturnLaunch.participantSession.participantSessionId;
+  const mergedReturnStateUrl = `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(mergedReturnSessionId)}/current-state`;
+  const mergedReturnAnswer = "Merged timer return keeps this exact answer Ω";
+  await mergedReturnFrame.locator("#playerAnswer").fill(mergedReturnAnswer);
+  const mergedReturnBefore = (
+    await pollJsonWithPredicate(mergedReturnStateUrl, payload =>
+      payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey]?.includes(
+        mergedReturnAnswer
+      )
+    )
+  ).currentRunState;
+  assert.deepEqual(mergedReturnBefore.testRun.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnBefore.testRun.lockedTestletKeys, []);
   await page
     .locator("#participantRouteTestletTimer")
     .filter({ hasText: "Merged return block" })
@@ -10837,6 +10860,22 @@ try {
     .filter({ hasText: "running" })
     .waitFor();
 
+  const mergedReturnCancelled = (
+    await pollJsonWithPredicate(
+      mergedReturnStateUrl,
+      payload =>
+        payload?.currentRunState?.testRun?.testRunId ===
+        mergedReturnBefore.testRun.testRunId
+    )
+  ).currentRunState;
+  assert.equal(mergedReturnCancelled.testRun.status, "running");
+  assert.deepEqual(
+    mergedReturnCancelled.testRun.unitResponses,
+    mergedReturnBefore.testRun.unitResponses
+  );
+  assert.deepEqual(mergedReturnCancelled.testRun.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnCancelled.testRun.lockedTestletKeys, []);
+
   await page.locator("#participantApplicationLogoButton").click();
   await page
     .locator("#participantConfirmationTitle")
@@ -10863,8 +10902,11 @@ try {
   await page.locator("#participantConfirmationContinueButton").click();
   const mergedReturnRequest = await mergedReturnRequestPromise;
   assert.deepEqual(mergedReturnRequest.postDataJSON(), {
+    currentUnitKey: veronaUnitKey,
+    expectedStatus: "running",
     confirmTestletTimeLeave: true,
-    confirmTestletLeaveLock: true
+    // The pinned Source ends its leave-check chain at the timed confirmation.
+    confirmTestletLeaveLock: false
   });
   const mergedReturnResponse = await mergedReturnResponsePromise;
   assert.equal(mergedReturnResponse.status(), 200);
@@ -10876,9 +10918,12 @@ try {
     ]?.status,
     "cancelled"
   );
-  assert.deepEqual(mergedReturnPayload.testRun?.lockedUnitKeys, [
-    veronaUnitKey
-  ]);
+  assert.deepEqual(
+    mergedReturnPayload.testRun?.unitResponses,
+    mergedReturnBefore.testRun.unitResponses
+  );
+  assert.deepEqual(mergedReturnPayload.testRun?.lockedUnitKeys, []);
+  assert.deepEqual(mergedReturnPayload.testRun?.lockedTestletKeys, []);
   await page.locator("#participantRouteEntry").waitFor({ timeout: 15_000 });
   await page.waitForTimeout(250);
   assert.equal(

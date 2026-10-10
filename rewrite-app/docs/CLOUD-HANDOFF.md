@@ -1,5 +1,61 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Runtime-error dialog and durable reload (2026-10-10)
+
+Application checkpoint `d026e3f7c63f` retains the running Original Player behind
+its native Material error dialog. It reproduces the help text, Fehlerdetails,
+focus, non-dismissible backdrop/Escape behavior and reload action. The fixed
+Source SVG and fixed en-US/local-zone date output are rendered directly, while
+the native dialog and expansion panel remain deferred. The first implementation
+failed the unchanged 470 kB initial budget; the final production build is
+469.41 kB. The 450 kB and component-style warnings remain; no limit was raised.
+
+Six unmodified Source frontend references and six owned SQLite browser cases
+cover Primar, Sekundar and Erwachsene on desktop/mobile, incomplete responses,
+and forbidden timed-block exits. A repeated error from the same callback leaves
+one dialog and one CONTROLLER=ERROR, while preserving both runtime-error logs.
+The reference and Rewrite share only an owned synthetic Player; the Source
+frontend stays unchanged. The new mandatory quick-browser gate also proves a
+failed lazy-module download, a delayed save, and failed saves followed by recovery.
+These nine headful cases pass. The 44 pause cases, 43 normal exits (37 Original,
+6 Rewrite), 32 header cases and the broad system-check browser flow also pass.
+The broad Verona flow passes after updating its stale merged-timer exit
+expectation: the timed confirmation suppresses the later leave-lock check, with
+current-unit/status guards present. Cancel and accepted return preserve the exact
+stored answer packet and leave unit/testlet locks empty. The new answer setup
+waits for vopStart's rendered unit definition before typing.
+Reload waits for the durable outbox, preserves
+exact response/progress packets and the selected authorized Run, and fences
+context changes while awaiting storage and Router navigation. All 1140 current
+unit/state checks pass, including 481 frontend-state checks.
+
+The six closed-dialog interiors are pixel-identical after a 28-pixel inset.
+Zero complete dialog rectangles or full viewports are claimed identical: the
+rounded corners expose different backgrounds (574 changed rectangle pixels on
+desktop, 362–364 on mobile; maximum channel difference 155). Expanded diagnostic
+content is functionally checked, without claiming complete screenshot identity.
+Custom help variants, other startup/error categories and overlapping commands
+remain open, as do all eight full Original UI acceptance rows.
+
+The new image passes PostgreSQL Compose in standard, demo and production-secret
+modes (schema 52), plus standalone SQLite Docker (schema 58). Image
+`testcenter-rewrite-app:completeness-d026e3f7c63f` has ID
+`sha256:fcd2cd7ed3fea049c3d9798e84ec78034a198dad0c4700baac01c3bdf1ea5da8`,
+USER node, revision d026e3f7c63f and declared timestamp
+2026-10-10T17:23:04.421Z. Owned containers/volumes are removed. Exact inventory
+comparison preserves all 24 preexisting container IDs and 85 volume names; the
+protected presentation remains SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 9.9 GiB remain free after the runs (8.7 GiB during them).
+
+The API/application/store implementation is unchanged from checkpoint
+9d9ec5754879 and its recorded 165 SQLite API/701 PostgreSQL integration checks;
+those full suites were not replayed for this frontend change. Source master is
+freshly verified at `ee2ab9ab64bd91209ef8534bbe6005838024e46d`. The Source references
+use owned API fixtures and do not prove Source backend authorization/persistence.
+Nothing was pushed. Remote CI, real-device acceptance, release and deployment
+are still unverified.
+
 ### Native pause container and startup budget (2026-10-10)
 
 Application checkpoint `85e8e9e86fe8` uses the pinned Original's native
