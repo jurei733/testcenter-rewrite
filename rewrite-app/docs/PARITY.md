@@ -1,5 +1,52 @@
 # Testcenter parity checklist
 
+### Late save receipts and accepted control state (2026-10-11)
+
+Application checkpoint `ef83639c4597` acknowledges successful durable Player saves
+without projecting their Run snapshot into an errored controller, another
+selected Run, or a state that has advanced through an applied refresh since
+the request started. Receipt processing still removes the exact delivered
+outbox entry and drains following packets. Unchanged active Runs retain their
+ordinary save-state synchronization. Backend authorization, completion and
+monitor write guards are unchanged.
+
+A real-browser negative probe on the prior build reproduces a late paused
+save receipt removing the ERROR Frame. A second probe uses only copied static
+assets from the verified owned 92e0d0eaa776 image: an old running receipt
+temporarily recreates the Player after an already accepted pause. The reference
+container was never started and was removed immediately after extraction.
+The corrected native and failed-lazy-load dialogs preserve the ERROR Frame or
+the accepted paused state, retain exactly one runtime error/controller ERROR,
+acknowledge the outbox, and preserve the exact incomplete response on reload.
+A DOM observer rejects transient Player resurrection hidden by a later pause.
+Read-only SQLite inspection confirms exact runtime-error text and one controller
+ERROR for each of the four owned native/fallback cases.
+Four new actual-method tests also cover ERROR, a newer state, Run switching
+and normal successful receipt handling.
+
+All 1192 unit/state checks pass (533 frontend). Typecheck and the subsequent
+production build pass; initial size remains 469.41 kB under the unchanged
+470 kB error budget, with existing warning budgets unchanged.
+Fresh production browser checks pass the existing 17 runtime cases, the two
+new accepted-pause/old-receipt cases with native/fallback dialogs, all 56
+runtime contracts and the complete Verona/official-player recovery flow.
+The late-save pair was additionally repeated with exact persisted error text
+and controller log checks. The other browser groups from 92e0d0eaa776 remain
+retained evidence; this checkpoint does not claim eight fresh browser groups.
+API/store code is unchanged from bceb17b4db38; 166 memory/file/SQLite and 702
+PostgreSQL integration checks remain retained evidence, not new API runs.
+
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-ef83639c4597`
+has USER node and revision ef83639c4597; ID `sha256:9a8b1aadc32f7bdda1f3b0718afb84008b3102555710c6392709d3348180a24f`.
+All owned runtime resources are removed. Exact inventory preserves 24 existing
+containers, 85 volumes and the protected presentation hash. Approximately 5.2 GiB are free.
+
+Ordered/same-status command delivery, Source termination equivalence and all
+eight complete Original UI acceptance rows remain open. Nothing was pushed;
+current-checkpoint remote CI, real devices, release, deployment and overall
+production readiness remain unverified.
+
 ### ERROR and accepted monitor pause overlap (2026-10-10)
 
 Application checkpoint `92e0d0eaa776` cuts new participant channel delivery and
