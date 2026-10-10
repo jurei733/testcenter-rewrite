@@ -16,7 +16,7 @@ const {localDemoSourcePackage}=await import('../apps/api/dist/apps/api/src/local
 const demo=JSON.parse(localDemoSourcePackage.sourceDocument);
 const contract=process.env.ORIGINAL_RUNTIME_CONTRACT==='true';
 const overlap=process.env.ORIGINAL_RUNTIME_COMMAND_OVERLAP;
-assert.ok(!overlap||['pending-pause','pending-terminate','queued-pause','queued-terminate'].includes(overlap));
+assert.ok(!overlap||['pending-pause','pending-terminate','queued-pause','queued-terminate','pending-resume','queued-resume'].includes(overlap));
 assert.ok(!(overlap&&contract));
 const xmlText=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://localhost').pathname,file=resolve(root,extname(pathname)?'.'+pathname:'index.html');if(relative(root,file).startsWith('..'))return res.writeHead(404).end();res.setHeader('content-type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404).end();}});
@@ -81,7 +81,7 @@ try{
     return page.evaluate(()=>{
       const read=n=>{if(!n)return null;const b=n.getBoundingClientRect(),s=getComputedStyle(n);return{x:b.x,y:b.y,width:b.width,height:b.height,font:s.font,color:s.color,background:s.backgroundColor,padding:s.padding,margin:s.margin,borderRadius:s.borderRadius,boxShadow:s.boxShadow};};
       const dialog=document.querySelector('mat-dialog-container');
-      return {url:location.href,activeTag:document.activeElement.tagName,activeRole:document.activeElement.getAttribute('role'),bodyText:document.body.innerText,iframeCount:document.querySelectorAll('iframe').length,cardCount:document.querySelectorAll('mat-card').length,
+      return {url:location.href,activeTag:document.activeElement.tagName,activeRole:document.activeElement.getAttribute('role'),bodyText:document.body.innerText,iframeCount:document.querySelectorAll('iframe').length,cardCount:document.querySelectorAll('mat-card').length,samePlayerFrameAsBeforeError:document.querySelector('iframe')===globalThis.__ownedPlayerFrameBeforeError,
         dialog:dialog?{role:dialog.getAttribute('role'),box:read(dialog),title:dialog.querySelector('[mat-dialog-title]').textContent.trim(),titleBox:read(dialog.querySelector('[mat-dialog-title]')),content:dialog.querySelector('mat-dialog-content,[mat-dialog-content]').textContent.trim(),contentBox:read(dialog.querySelector('mat-dialog-content,[mat-dialog-content]')),expansion:read(dialog.querySelector('mat-expansion-panel')),icon:read(dialog.querySelector('mat-icon')),actions:read(dialog.querySelector('mat-dialog-actions')),buttons:[...dialog.querySelectorAll('button')].map(n=>({text:n.textContent.trim(),box:read(n),classes:n.className}))}:null};
     });
   };
@@ -92,6 +92,7 @@ try{
     try{await Promise.race([commandStarted,new Promise((_,reject)=>{gateTimer=setTimeout(()=>reject(Error('Owned command gate did not start')),15000);})]);}
     finally{clearTimeout(gateTimer);}
   }
+  await page.evaluate(()=>{globalThis.__ownedPlayerFrameBeforeError=document.querySelector('iframe');});
   const before=requests.length;await frame.locator('#ownedRuntimeError').click();
   await page.locator('mat-dialog-container').waitFor();
   if(overlap){

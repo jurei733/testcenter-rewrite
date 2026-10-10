@@ -40,12 +40,14 @@ const replacementMode = process.env.UI_SMOKE_RUNTIME_REPLACEMENT;
 const monitorCommand = process.env.UI_SMOKE_RUNTIME_LATE_COMMAND;
 const receivedPauseOldSave = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE_OLD_SAVE === 'true';
 const receivedPause = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE === 'true' || receivedPauseOldSave;
+const receivedResume = process.env.UI_SMOKE_RUNTIME_RECEIVED_RESUME === 'true';
 const lateSavePause = process.env.UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE === 'true';
 const commandOverlap = JSON.parse(await readFile(new URL('./fixtures/original-runtime-command-overlap.json', import.meta.url), 'utf8'));
 assert.equal(commandOverlap.referenceRevision, reference.referenceRevision);
 assert.ok(!monitorCommand || ['pause','complete'].includes(monitorCommand));
 assert.ok(!(monitorCommand && receivedPause));
 assert.ok(!(lateSavePause && (monitorCommand || receivedPause || replacementMode || saveFailure)));
+assert.ok(!(receivedResume && (monitorCommand || receivedPause || lateSavePause || replacementMode || saveFailure)));
 assert.ok(!replacementMode || ["success", "reject"].includes(replacementMode));
 try {
   const port = await new Promise((done, reject) => {
@@ -119,7 +121,28 @@ try {
     });
     const runId = current.testRun.testRunId;
     let packet = current.testRun.unitResponses["unit-intro"];
-    if (monitorCommand || receivedPause || lateSavePause) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    if (monitorCommand || receivedPause || lateSavePause || receivedResume) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    let releaseReceivedResume, receivedResumeCommand;
+    if (receivedResume) {
+      let accepted, held=false, issuedUpdatedAt;
+      const started=new Promise(done=>{accepted=done;});
+      const gate=new Promise(done=>{releaseReceivedResume=done;});
+      await context.route('**/api/v1/participant/sessions/**/current-state**',async route=>{
+        const response=await route.fetch();const body=await response.json();
+        if(!held && issuedUpdatedAt && body.currentRunState?.testRun.testRunId===runId &&
+          body.currentRunState.testRun.status==='running' && body.currentRunState.testRun.updatedAt===issuedUpdatedAt){
+          held=true;accepted();await gate;
+        }
+        await route.fulfill({response});
+      });
+      const issued=await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume',actorId:'owned-received-resume'},operator);
+      assert.equal(issued.command.testRun.status,current.testRun.status);
+      assert.equal(issued.command.testRun.currentUnitKey,current.testRun.currentUnitKey);
+      receivedResumeCommand=issued.command.commandId;issuedUpdatedAt=issued.command.testRun.updatedAt;
+      let timer;
+      try{await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned same-status resume refresh did not start')),15000);})]);}
+      finally{clearTimeout(timer);}
+    }
     let releaseBeforePauseSave, releaseAfterPauseLog;
     if (receivedPauseOldSave) {
       let started,held=false;
@@ -179,6 +202,26 @@ try {
     await delay(200);
     assert.equal(await page.locator("mat-dialog-container").count(), 0);
     await frame.locator("#ownedRuntimeError").click(); await page.locator(failDialog ? "#participantRuntimeErrorFallback" : "mat-dialog-container").waitFor();
+    if(receivedResume){
+      assert.equal(await element.evaluate(el=>el.isConnected),true);
+      releaseReceivedResume();await delay(1800);
+      const actual={receivedResumeCommand,samePlayerFrameAsBeforeError:await element.evaluate(el=>el.isConnected),
+        iframeCount:await page.locator('iframe').count(),cardCount:await page.locator('mat-card').count(),
+        dialogRetained:await page.locator(failDialog?'#participantRuntimeErrorFallback':'mat-dialog-container').count()===1,
+        connectionStatus:await page.locator('#participantRouteConnectionState').count()
+          ? await page.locator('#participantRouteConnectionState').getAttribute('data-status') : 'not-rendered'};
+      states[key]=actual;
+      await page.screenshot({path:join(artifacts,`${key}-received-resume.png`),fullPage:true});
+      const sourceResume=commandOverlap.cases['queued-resume'];
+      assert.equal(actual.samePlayerFrameAsBeforeError,sourceResume.samePlayerFrameAsBeforeError,
+        'An accepted same-status resume must replace the errored Player as observed in Source queued-resume.');
+      assert.equal(actual.iframeCount,Number(sourceResume.iframePreserved));
+      assert.equal(actual.cardCount,sourceResume.cardCount);
+      assert.equal(actual.dialogRetained,sourceResume.dialogRetained);
+      assert.equal(actual.connectionStatus,'live');
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      await context.close();console.log('original_runtime_received_resume=preserved:passed');continue;
+    }
     if (lateSavePause) {
       let timer;
       try {await Promise.race([lateSaveStarted,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned runtime log save did not start')),15000);})]);}

@@ -13,7 +13,9 @@
         "ERROR"
       ],
       "acknowledgedCommandIds": [],
-      "returnedToStarter": false
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
     },
     "pending-terminate": {
       "iframePreserved": true,
@@ -26,7 +28,9 @@
         "ERROR"
       ],
       "acknowledgedCommandIds": [],
-      "returnedToStarter": false
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
     },
     "queued-pause": {
       "iframePreserved": false,
@@ -43,7 +47,9 @@
         1,
         2
       ],
-      "returnedToStarter": false
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": false
     },
     "queued-terminate": {
       "iframePreserved": false,
@@ -60,7 +66,43 @@
         1,
         2
       ],
-      "returnedToStarter": true
+      "returnedToStarter": true,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": false
+    },
+    "pending-resume": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 1,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR"
+      ],
+      "acknowledgedCommandIds": [],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": true,
+      "reloadedCurrentUnit": false
+    },
+    "queued-resume": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "dialogRetained": true,
+      "commandPollCount": 2,
+      "controllerStates": [
+        "LOADING",
+        "RUNNING",
+        "ERROR",
+        "RUNNING"
+      ],
+      "acknowledgedCommandIds": [
+        1,
+        2
+      ],
+      "returnedToStarter": false,
+      "samePlayerFrameAsBeforeError": false,
+      "reloadedCurrentUnit": true
     }
   }
 }

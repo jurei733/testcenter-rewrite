@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 
-const modes = ["pending-pause", "pending-terminate", "queued-pause", "queued-terminate"];
-assert.equal(process.argv.length, 6, "Pass the four completed Source exit.json files in pending-pause, pending-terminate, queued-pause, queued-terminate order.");
+const modes = ["pending-pause", "pending-terminate", "queued-pause", "queued-terminate", "pending-resume", "queued-resume"];
+assert.equal(process.argv.length, 8, `Pass the six completed Source exit.json files in this order: ${modes.join(', ')}.`);
 const cases = {};
 for (const [index, mode] of modes.entries()) {
   const source = JSON.parse(await readFile(process.argv[index + 2], "utf8"));
@@ -12,21 +12,26 @@ for (const [index, mode] of modes.entries()) {
   assert.deepEqual(Object.keys(source.states), [mode]);
   const state = source.states[mode];
   const pending = mode.startsWith("pending-");
+  const resumes = mode === "queued-resume";
   const controllerStates = state.requests.flatMap(request => Array.isArray(request.body) ? request.body : [])
     .filter(entry => entry.key === "CONTROLLER").map(entry => entry.content);
   const acknowledgedCommandIds = state.acknowledgements.map(request => Number(request.pathname.match(/\/command\/(\d+)\/executed$/)[1]));
   assert.equal(state.first.iframeCount, 1);
   assert.equal(state.first.cardCount, 0);
   assert.ok(state.first.dialog);
-  assert.equal(state.after.iframeCount, Number(pending));
-  assert.equal(state.after.cardCount, Number(!pending));
+  assert.equal(state.first.samePlayerFrameAsBeforeError, true);
+  assert.equal(state.after.samePlayerFrameAsBeforeError, pending);
+  assert.equal(state.after.iframeCount, Number(pending || resumes));
+  assert.equal(state.after.cardCount, Number(!pending && !resumes));
   assert.ok(state.after.dialog);
-  assert.deepEqual(controllerStates, ["LOADING", "RUNNING", "ERROR", ...(!pending ? [mode.endsWith("pause") ? "PAUSED" : "TERMINATED"] : [])]);
+  assert.deepEqual(controllerStates, ["LOADING", "RUNNING", "ERROR", ...(!pending ? [resumes ? "RUNNING" : mode.endsWith("pause") ? "PAUSED" : "TERMINATED"] : [])]);
   assert.deepEqual(acknowledgedCommandIds, pending ? [] : [1, 2]);
-  assert.equal(state.commandPollCount, mode === "queued-pause" ? 2 : 1);
+  assert.equal(state.commandPollCount, mode === "queued-pause" || resumes ? 2 : 1);
   const returnedToStarter = new URL(state.after.url).hash === "#/r/starter";
   assert.equal(returnedToStarter, mode === "queued-terminate");
   if (pending) assert.equal(state.after.url, state.first.url);
+  const reloadedCurrentUnit = /[?&]reload=\d+/.test(new URL(state.after.url).hash);
+  assert.equal(reloadedCurrentUnit, resumes);
   cases[mode] = {
     iframePreserved: state.after.iframeCount === 1,
     cardCount: state.after.cardCount,
@@ -34,7 +39,9 @@ for (const [index, mode] of modes.entries()) {
     commandPollCount: state.commandPollCount,
     controllerStates,
     acknowledgedCommandIds,
-    returnedToStarter
+    returnedToStarter,
+    samePlayerFrameAsBeforeError: state.after.samePlayerFrameAsBeforeError,
+    reloadedCurrentUnit
   };
 }
 await writeFile(new URL("./fixtures/original-runtime-command-overlap.json", import.meta.url), JSON.stringify({
@@ -42,4 +49,4 @@ await writeFile(new URL("./fixtures/original-runtime-command-overlap.json", impo
   scope: "Source frontend on owned API/player fixtures; no Source backend control-state equivalence proof",
   cases
 }, null, 2) + "\n");
-console.log("Verified Source runtime command overlap fixture: 4 cases.");
+console.log("Verified Source runtime command overlap fixture: 6 cases.");
