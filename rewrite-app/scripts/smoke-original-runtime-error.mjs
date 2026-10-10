@@ -37,6 +37,12 @@ const errors = [], states = {}; let browser;
 const failDialog = process.env.UI_SMOKE_RUNTIME_DIALOG_FAILURE === "true";
 const saveFailure = process.env.UI_SMOKE_RUNTIME_SAVE_FAILURE;
 const replacementMode = process.env.UI_SMOKE_RUNTIME_REPLACEMENT;
+const monitorCommand = process.env.UI_SMOKE_RUNTIME_LATE_COMMAND;
+const receivedPause = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE === 'true';
+const commandOverlap = JSON.parse(await readFile(new URL('./fixtures/original-runtime-command-overlap.json', import.meta.url), 'utf8'));
+assert.equal(commandOverlap.referenceRevision, reference.referenceRevision);
+assert.ok(!monitorCommand || ['pause','complete'].includes(monitorCommand));
+assert.ok(!(monitorCommand && receivedPause));
 assert.ok(!replacementMode || ["success", "reject"].includes(replacementMode));
 try {
   const port = await new Promise((done, reject) => {
@@ -109,11 +115,52 @@ try {
       return p?.unitState.presentationProgress === "some" && p.unitState.responseProgress === "none" && p.unitState.dataParts.answer === answer;
     });
     const runId = current.testRun.testRunId, packet = current.testRun.unitResponses["unit-intro"];
+    if (monitorCommand || receivedPause) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    let releaseReceivedPause;
+    if (receivedPause) {
+      let pausedRequest;
+      const started = new Promise(done=>{pausedRequest=done;});
+      const gate = new Promise(done=>{releaseReceivedPause=done;});
+      let held = false;
+      await context.route('**/api/v1/participant/sessions/**/current-state**', async route=>{
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!held && body.currentRunState?.testRun.status === 'paused') {
+          held = true;pausedRequest();await gate;
+        }
+        await route.fulfill({response});
+      });
+      await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:'pause',actorId:'owned-received-pause'}, operator);
+      let timer;
+      try {await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned accepted pause refresh did not start')),15000);})]);}
+      finally {clearTimeout(timer);}
+    }
     // An unrelated window cannot send a trusted Player error.
     await page.evaluate(() => window.postMessage({type:"vopRuntimeErrorNotification",sessionId:"wrong-session",code:"runtime-error",message:"untrusted"}, "*"));
     await delay(200);
     assert.equal(await page.locator("mat-dialog-container").count(), 0);
     await frame.locator("#ownedRuntimeError").click(); await page.locator(failDialog ? "#participantRuntimeErrorFallback" : "mat-dialog-container").waitFor();
+    if (receivedPause) {
+      assert.equal(await element.evaluate(el=>el.isConnected),true);
+      releaseReceivedPause();
+      await page.locator('iframe').waitFor({state:'detached'});
+      await page.locator('app-original-participant-paused mat-card').waitFor();
+      const sourcePause = commandOverlap.cases['queued-pause'];
+      assert.equal(await element.evaluate(el=>el.isConnected),sourcePause.iframePreserved);
+      assert.equal(await page.locator('mat-card').count(),sourcePause.cardCount);
+      assert.equal(await page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container').count(),Number(sourcePause.dialogRetained));
+      await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+      const logs = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('Runtime Error: runtime-error')}&unitKey=unit-intro`;
+      await poll(()=>api(logs,undefined,operator),p=>p.items.length===1);
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      states[key]={receivedPause:true,errorDialogRetained:true,iframeRemoved:true,serverStatus:'paused'};
+      await page.screenshot({path:join(artifacts,`${key}-received-pause.png`),fullPage:true});
+      await page.locator('#participantRouteControllerReloadButton').click();
+      await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});
+      await page.locator('app-original-participant-paused mat-card').waitFor();
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      await context.close();console.log('original_runtime_received_pause=preserved:passed');continue;
+    }
     assert.equal(await element.evaluate(el => el.isConnected), expected.iframePreserved);
     assert.equal(await page.locator("#participantRouteControllerErrorState").count(), 0);
     assert.equal(await page.locator("mat-card").count(), expected.cardCount);
@@ -181,6 +228,26 @@ try {
     const failed = await currentState();
     assert.equal(failed.testRun.status, "running"); assert.equal(failed.testRun.unitResponses["unit-intro"], packet);
     assert.deepEqual(failed.testRun.lockedUnitKeys, []); assert.deepEqual(failed.testRun.lockedTestletKeys, []);
+    if (monitorCommand) {
+      await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:monitorCommand,actorId:'owned-error-overlap'}, operator);
+      const status = monitorCommand === 'pause' ? 'paused' : 'completed';
+      await poll(currentState, state => state.testRun.status === status);
+      await delay(700);
+      states[key].lateCommand = {command:monitorCommand,serverStatus:status,
+        iframePreserved:await element.evaluate(el=>el.isConnected),
+        dialogCount:await page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container').count()};
+      await page.screenshot({path:join(artifacts,`${key}-late-${monitorCommand}.png`),fullPage:true});
+      const sourceLate = commandOverlap.cases['pending-pause'];
+      assert.equal(states[key].lateCommand.iframePreserved,sourceLate.iframePreserved,'Source ignores a command whose response arrives after ERROR; retain the errored frame until reload.');
+      assert.equal(states[key].lateCommand.dialogCount,Number(sourceLate.dialogRetained));
+      await page.locator('#participantRouteControllerReloadButton').click();
+      await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});
+      await page.locator('iframe').waitFor({state:'detached'});
+      if (monitorCommand === 'pause') await page.locator('app-original-participant-paused mat-card').waitFor();
+      else await page.locator('#participantRouteCompletedState').waitFor();
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      await context.close();console.log(`original_runtime_late_command=${monitorCommand}:passed`);continue;
+    }
     let expectedPacket = packet, expectedAnswer = answer;
     let expectedRuntimeLogCount = expected.repeatedRuntimeLogCount;
     if (replacementMode) {

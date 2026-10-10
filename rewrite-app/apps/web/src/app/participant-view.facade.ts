@@ -392,6 +392,7 @@ export class ParticipantViewFacade {
   private readonly activeControllerError = signal<VeronaControllerError | null>(
     null
   );
+  private participantErrorReceptionSuspended = false;
   private copiedSessionEntryLink = "";
   private fullscreenPromptDismissedRunId = "";
   private fullscreenStatusRunId = "";
@@ -478,7 +479,7 @@ export class ParticipantViewFacade {
     }
   };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
-    this.refreshCurrentStateInternal(true);
+    this.refreshCurrentStateInternal(true, true);
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -1466,7 +1467,8 @@ export class ParticipantViewFacade {
     return Boolean(
       currentState &&
         currentState.testRun.status !== "completed" &&
-        controllerError?.testRunId === currentState.testRun.testRunId
+        controllerError?.testRunId === currentState.testRun.testRunId &&
+        this.participantErrorReceptionSuspended
     );
   }
 
@@ -1477,7 +1479,11 @@ export class ParticipantViewFacade {
   }
 
   get controllerError(): VeronaControllerError | null {
-    return this.hasControllerError ? this.activeControllerError() : null;
+    const currentState = this.readCurrentRunState();
+    const error = this.activeControllerError();
+    return currentState && error?.testRunId === currentState.testRun.testRunId
+      ? error
+      : null;
   }
 
   get controllerErrorText(): string {
@@ -1497,6 +1503,8 @@ export class ParticipantViewFacade {
       return;
     }
     this.activeControllerError.set(controllerError);
+    this.participantErrorReceptionSuspended = true;
+    this.participantEvents.suspend();
   }
 
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
@@ -4211,8 +4219,12 @@ export class ParticipantViewFacade {
     await this.refreshParticipantReviewsInternal(currentState, true);
   }
 
-  private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {
-    if (!this.runtime.participantSessionId.trim()) {
+  private async refreshCurrentStateInternal(
+    quiet: boolean,
+    acceptedParticipantEvent = false
+  ): Promise<void> {
+    if (!this.runtime.participantSessionId.trim() ||
+      this.hasControllerError && !acceptedParticipantEvent) {
       return;
     }
 
@@ -4229,7 +4241,8 @@ export class ParticipantViewFacade {
           undefined,
           { quiet }
         );
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
       const testRunId = payload.currentRunState.testRun.testRunId;
@@ -4242,7 +4255,8 @@ export class ParticipantViewFacade {
       ) {
         payload = await this.loadBookletAssets(payload);
       }
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
       this.currentStateAppliedRefreshSequence = refreshSequence;
@@ -4264,6 +4278,13 @@ export class ParticipantViewFacade {
       );
       const preserveCurrentTextDraft =
         this.shouldPreserveCurrentTextDraft(payload.currentRunState);
+      if (acceptedParticipantEvent && this.hasControllerError &&
+        (payload.currentRunState.testRun.status !== this.readCurrentRunState()?.testRun.status ||
+          payload.currentRunState.currentUnit.unitKey !== this.readCurrentRunState()?.currentUnit.unitKey)) {
+        // An accepted channel update can move the controller out of ERROR.
+        // Its already-open error dialog remains until the user reloads.
+        this.participantErrorReceptionSuspended = false;
+      }
       this.syncCurrentRunState(payload.currentRunState);
       if (!preserveCurrentTextDraft) {
         this.syncCurrentUnitResponse(payload.currentRunState);
@@ -4280,6 +4301,8 @@ export class ParticipantViewFacade {
       }
       if (payload.currentRunState.testRun.status === "completed") {
         this.participantEvents.stop();
+      } else if (this.hasControllerError) {
+        this.participantEvents.suspend();
       } else {
         this.participantEvents.start(
           payload.currentRunState.participantSession.participantSessionId,
@@ -4290,7 +4313,8 @@ export class ParticipantViewFacade {
       }
       this.persistState();
     } catch (error) {
-      if (refreshSequence < this.currentStateAppliedRefreshSequence) {
+      if (refreshSequence < this.currentStateAppliedRefreshSequence ||
+        this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
       if (

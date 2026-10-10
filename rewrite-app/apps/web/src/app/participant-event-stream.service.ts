@@ -105,6 +105,13 @@ export class ParticipantEventStreamService {
     this.setConnectionState("idle", "Live participant updates are inactive.");
   }
 
+  suspend(): void {
+    // ERROR cuts new channel delivery. Refreshes already accepted from the
+    // channel still finish; route/session cleanup uses stop() to discard them.
+    this.stopConnection();
+    this.setConnectionState("idle", "Live participant updates are inactive.");
+  }
+
   private stopConnection(): void {
     this.generation += 1;
     this.abortController?.abort();

@@ -6,7 +6,11 @@ const variants = [
   ["pending-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"delay"}],
   ["failed-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"reject"}],
   ["replacement-old-succeeded", {UI_SMOKE_RUNTIME_REPLACEMENT:"success"}],
-  ["replacement-old-rejected", {UI_SMOKE_RUNTIME_REPLACEMENT:"reject"}]
+  ["replacement-old-rejected", {UI_SMOKE_RUNTIME_REPLACEMENT:"reject"}],
+  ["late-monitor-pause", {UI_SMOKE_RUNTIME_LATE_COMMAND:"pause"}],
+  ["late-monitor-pause-fallback", {UI_SMOKE_RUNTIME_LATE_COMMAND:"pause",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
+  ["received-monitor-pause", {UI_SMOKE_RUNTIME_RECEIVED_PAUSE:"true"}],
+  ["received-monitor-pause-fallback", {UI_SMOKE_RUNTIME_RECEIVED_PAUSE:"true",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}]
 ];
 for (const [variant, extra] of variants) {
   const code = await new Promise((done, reject) => {

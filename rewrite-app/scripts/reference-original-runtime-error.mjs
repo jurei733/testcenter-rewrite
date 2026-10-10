@@ -15,6 +15,9 @@ await access(join(root,'index.html'));await mkdir(artifacts,{recursive:true});
 const {localDemoSourcePackage}=await import('../apps/api/dist/apps/api/src/local-demo-bootstrap.js');
 const demo=JSON.parse(localDemoSourcePackage.sourceDocument);
 const contract=process.env.ORIGINAL_RUNTIME_CONTRACT==='true';
+const overlap=process.env.ORIGINAL_RUNTIME_COMMAND_OVERLAP;
+assert.ok(!overlap||['pending-pause','pending-terminate','queued-pause','queued-terminate'].includes(overlap));
+assert.ok(!(overlap&&contract));
 const xmlText=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://localhost').pathname,file=resolve(root,extname(pathname)?'.'+pathname:'index.html');if(relative(root,file).startsWith('..'))return res.writeHead(404).end();res.setHeader('content-type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404).end();}});
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${server.address().port}`;
@@ -22,16 +25,19 @@ const errors=[],unknown=[],states={};let browser;
 try{
  browser=await chromium.launch({headless:false});
  const lockOnTermination=process.env.ORIGINAL_PAUSED_LOCK_ONLY==='true';
- const cases=contract?runtimeErrorContractCases:['Primar','Sekundar','Erwachsene'].slice(0,lockOnTermination?1:3).flatMap(theme=>
+ const cases=overlap?[{theme:'Primar',screen:'desktop'}]:contract?runtimeErrorContractCases:['Primar','Sekundar','Erwachsene'].slice(0,lockOnTermination?1:3).flatMap(theme=>
   (lockOnTermination?['desktop']:['desktop','mobile']).map(screen=>({theme,screen})));
  for(const scenario of cases) {
   const {theme,screen}=scenario,mode='run-hot-return',restriction='forbidden',silent=false;
   const [width,height]=screen==='desktop'?[1280,720]:[390,844];
   const runtimePlayer=runtimeErrorPlayer(demo.playerEntries[0].html,contract?scenario:{});
   const scope='unit',lockConfirm=true,hidden=false;
-  const key=contract?scenario.key:`${mode}-${theme}-${screen}-${restriction}-${silent}${lockOnTermination?'-locked':''}`,context=await browser.newContext({viewport:{width,height},locale:'de-DE'}),page=await context.newPage(),requests=[];
+  const key=overlap?overlap:contract?scenario.key:`${mode}-${theme}-${screen}-${restriction}-${silent}${lockOnTermination?'-locked':''}`,context=await browser.newContext({viewport:{width,height},locale:'de-DE'}),page=await context.newPage(),requests=[];
   page.on('pageerror',error=>errors.push({key,error:String(error)}));
   let pauseRequested=false;
+  let releaseCommand,commandBlocked,commandPollCount=0;
+  const commandGate=new Promise(done=>{releaseCommand=done;});
+  const commandStarted=new Promise(done=>{commandBlocked=done;});
   const auth={token:'owned-player-exit',displayName:'exit-person',loginName:'exit-person',groupLabel:'Exit Group',flags:[],customTexts:scenario.loginCustomTexts??{},groupToken:'owned-exit-group',viewSettings:{theme},claims:{test:[{id:'owned-exit',label:'Logo Testheft',workspaceId:'1',description:'',type:'test',flags:{}}]}};
   const customTexts=Object.keys(scenario.bookletCustomTexts??{}).length?`<CustomTexts>${Object.entries(scenario.bookletCustomTexts).map(([key,value])=>`<CustomText key="${key}">${xmlText(value)}</CustomText>`).join('')}</CustomTexts>`:'';
   const unit='<Unit id="unit-intro" label="Logo Aufgabe"/>',testlet=restriction==='none'?unit:`<Testlet id="timed" label="Zeitblock"><Restrictions><TimeMax minutes="5" leave="${restriction}"/><LockAfterLeaving scope="${scope}" confirm="${lockConfirm}"/></Restrictions>${unit}</Testlet>`;
@@ -46,8 +52,18 @@ try{
    else if(pathname.startsWith('/api/test/1/unit/unit-intro/alias/')&&method==='GET')body={state:{},dataParts:{},unitResponseType:'owned',definition:demo.bookletEntries[0].unitEntries[0].unitDefinition,definitionType:'application/vnd.testcenter.demo+json'};
    else if(pathname==='/api/file/owned-exit-group/ws_1/owned-player.html'&&method==='GET')return route.fulfill({status:200,contentType:'text/html',body:runtimePlayer});
    else if(pathname==='/api/test/1/connection-lost'&&method==='POST')body={};
-   else if(pathname==='/api/test/1/commands'&&method==='GET')body=pauseRequested?[{id:1,timestamp:Date.now(),keyword:'pause',arguments:[]}]:[];
-   else if(pathname==='/api/test/1/command/1/executed'&&method==='PATCH')body={};
+   else if(pathname==='/api/test/1/commands'&&method==='GET'){
+    commandPollCount++;
+    if(overlap&&commandPollCount===1){
+      const command={id:2,timestamp:Date.now(),keyword:overlap.split('-')[1],arguments:[]};
+      if(overlap.startsWith('pending-')){commandBlocked();await commandGate;body=[command];}
+      else body=[{id:1,timestamp:Date.now(),keyword:'debug',arguments:['off']},command];
+    }else body=pauseRequested?[{id:1,timestamp:Date.now(),keyword:'pause',arguments:[]}]:[];
+   }
+   else if(/^\/api\/test\/1\/command\/[12]\/executed$/.test(pathname)&&method==='PATCH'){
+    if(overlap?.startsWith('queued-')){if(pathname.endsWith('/1/executed'))commandBlocked();await commandGate;}
+    body={};
+   }
    else if(pathname==='/api/test/1/state'&&method==='PATCH')body='';
    else if(pathname==='/api/test/1/lock'&&method==='PATCH')body=true;
    else if((pathname==='/api/test/1/log'||pathname==='/api/test/1/unit/unit-intro/log'||pathname==='/api/test/1/unit/unit-intro/response')&&method==='PUT')body={};
@@ -71,8 +87,25 @@ try{
   };
   const frame=page.frameLocator('iframe');await frame.locator('#demoPlayerAnswer').fill('Own incomplete Ω');
   await frame.locator('#exitPresentation').selectOption('some');await frame.locator('#exitResponse').selectOption('none');
+  if(overlap){
+    let gateTimer;
+    try{await Promise.race([commandStarted,new Promise((_,reject)=>{gateTimer=setTimeout(()=>reject(Error('Owned command gate did not start')),15000);})]);}
+    finally{clearTimeout(gateTimer);}
+  }
   const before=requests.length;await frame.locator('#ownedRuntimeError').click();
   await page.locator('mat-dialog-container').waitFor();
+  if(overlap){
+    const first=await capture('error');releaseCommand();
+    await new Promise(done=>setTimeout(done,1800));
+    const after=await capture('after-command');
+    const acknowledgements=requests.filter(q=>/\/command\/[12]\/executed$/.test(q.pathname));
+    if(overlap.startsWith('pending-')){
+      assert.equal(acknowledgements.length,0);assert.equal(after.iframeCount,1);assert.equal(after.cardCount,0);assert.equal(after.url,first.url);
+    }else assert.ok(acknowledgements.some(q=>q.pathname.endsWith('/2/executed')));
+    assert.equal(first.dialog.title,'Fehler beim Abspielen der Aufgabe');
+    states[key]={first,after,commandPollCount,acknowledgements,requests};
+    await context.close();console.log(`source_runtime_command_overlap=${key}:passed`);continue;
+  }
   if(contract)await page.mouse.move(0,0);
   states[key]={definition:scenario,collapsed:await capture('collapsed'),requests};
   const intro=await page.locator('mat-dialog-content').evaluate(content=>{
