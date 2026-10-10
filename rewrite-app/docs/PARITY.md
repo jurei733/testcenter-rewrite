@@ -1,5 +1,33 @@
 # Testcenter parity checklist
 
+### Current container execution after storage recovery (2026-10-10)
+
+The application tree at f099540e was rebuilt in Docker after the native Player
+exit changes. Its local image `testcenter-rewrite-app:readiness-f099540e` has
+revision f099540e and runs as the `node` user. Fresh, isolated standard, demo and
+production-secret Compose projects all pass their PostgreSQL migration,
+runtime-preflight, readiness, build-metadata and applicable protected bootstrap
+checks at schema 52. The same current image passes the standalone SQLite Docker
+runtime gate at schema 58. These are actual container executions, not only
+Compose configuration validation.
+
+Separately, the current host API/core build passes all 233 integration tests
+against a fresh owned PostgreSQL 16 container, with zero failures, skips or
+cancellations (125.4 seconds). That runner uses its own labeled container and
+volume; it verifies ownership and absence of remaining references before cleanup.
+After all gates, the exact before/after inventories retain the original 24
+containers and 85 volumes. The protected PPTX checksum is unchanged. A further
+439.4 MB of unused Docker build cache was removed after the builds; measured host
+headroom is 8.6 GiB. Current runtime images remain available for subsequent gates.
+
+This closes the current local container build/start/storage checkpoint. It does
+not establish complete Original UI parity, remote CI or deployment acceptance.
+The next exit-contract check is Source's completeness-before-timer/lock ordering:
+`checkAndSolveCompleteness` runs first for a logo exit, while the current
+`returnToStarterWithConfirmation` and application `returnToStarter` paths do not
+explicitly perform that check. Reproduce the restricted incomplete response with
+real API calls and an unmodified Source frontend before changing this behavior.
+
 ### Original in-player logo exit and hidden header (2026-10-10)
 
 The optional Original Player now opens the native Material confirmation used by

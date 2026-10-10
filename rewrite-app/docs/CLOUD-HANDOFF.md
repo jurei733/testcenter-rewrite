@@ -1,5 +1,18 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current container checkpoint (2026-10-10)
+
+The application tree f099540e now has a fresh local Docker image, three successful
+isolated PostgreSQL Compose runs (standard/demo/production secret), a successful
+SQLite Docker runtime gate at schema 58, and 233 passing host-API integration
+tests against an owned PostgreSQL container. Every owned test container/volume
+was removed; exact inventories preserve all pre-existing 24 containers/85 volumes
+and the protected PPTX. Further unused build-cache cleanup freed 439.4 MB; the
+last measured host availability is 8.6 GiB. See the current container section in
+PARITY.md for proof scope. Complete Original UI and deployment acceptance remain
+open. Continue with the Source completeness-before-logo-exit contract, including
+direct return-to-starter API calls and timer/lock precedence.
+
 ### Original in-player logo exit and hidden header (2026-10-10)
 
 The optional Original Player now opens the native Material confirmation used by
