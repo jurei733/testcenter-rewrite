@@ -1,5 +1,53 @@
 # Cloud continuation: Testcenter Rewrite
 
+### ERROR and accepted monitor pause overlap (2026-10-10)
+
+Application checkpoint `92e0d0eaa776` cuts new participant channel delivery and
+ordinary status refreshes on a validated ERROR from the selected running Unit.
+Already accepted channel refreshes may finish. A pre-error accepted pause moves
+the controller to PAUSED, removes the Player and reopens the channel, while
+keeping the error dialog until reload. Ordinary late status responses and API failures
+cannot replace or clear the errored Run; route/session cleanup still invalidates
+in-flight responses and discards queued refreshes.
+
+Pinned Source frontend ee2ab9ab64bd91209ef8534bbe6005838024e46d passes four
+owned Primar/desktop fixtures: pending pause/terminate are ignored after ERROR,
+queued pause executes and reopens command reception, and queued terminate
+returns to Starter. A maintained recorder validates the four complete probes.
+These are Source frontend/stub observations, not Source backend state proof.
+Pinned backend MonitorController.putCommand stores and broadcasts a command;
+TestDAO.getCommands reads unexecuted commands in timestamp order, and
+patchCommandExecuted marks the selected test/command as acknowledged.
+The current Rewrite monitor API applies canonical Run changes immediately.
+Native canonical completion is not claimed equivalent to Source terminate.
+
+The old production build reproduces the late-monitor-pause regression.
+The corrected production replay passes 15 runtime cases, including native and
+failed-lazy-load dialogs for late and already received pause. It verifies
+retained dialog, reopened channel, exact incomplete answer/progress and reload.
+All 1188 unit/state tests pass (529 frontend), including 11 new ERROR reception
+cases. Typecheck and the subsequent production build pass with unchanged
+469.41 kB initial size and 470 kB error budget; existing warnings remain.
+Fresh browser replay also passes 56 runtime contract cases, 22 Player-version
+cases, 44 pause, 43 exit, 32 header cases, Systemcheck and the complete
+Verona/official-player recovery sequence.
+
+API/store code is unchanged from bceb17b4db38. Its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not fresh API reruns.
+Fresh-image Docker passes standard/demo/production-secret PostgreSQL (schema
+52) and standalone SQLite (schema 58). Image `testcenter-rewrite-app:completeness-92e0d0eaa776`
+has USER node, revision 92e0d0eaa776 and ID `sha256:334a95f30170f76fea2d8b7b6e800c8f99f4e8a9e7ba29bebf98a90778640a9d`.
+Owned runtime resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6 GiB are free.
+
+Same-status/ordered command delivery, control-state reconciliation from late
+save responses, Source termination equivalence and all eight full Original UI
+acceptance rows remain open. Nothing was pushed.
+Published main 143dc3e73ae8 has successful GitHub Actions run 38000558022;
+that run does not validate this unpublished application checkpoint.
+Remote CI, real devices, release, deployment and overall production readiness
+remain unverified.
+
 ### Exact runtime error text and custom help (2026-10-10)
 
 Application checkpoint `0e5c90b47fb5` preserves runtime message whitespace in
