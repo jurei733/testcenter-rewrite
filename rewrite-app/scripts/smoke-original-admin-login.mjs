@@ -10,6 +10,16 @@ import { chromium } from "playwright";
 
 // These fixtures own their API/database/address; no interactive test is reset.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+const noticeReference = JSON.parse(await readFile(new URL("./fixtures/original-login-notices.json", import.meta.url), "utf8"));
+const readNotice = element => {
+  const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, color: style.color,
+      font: style.font, margin: style.margin, display: style.display }; };
+  const host = box(element), icon = box(element.querySelector(".mat-icon"));
+  icon.x -= host.x; icon.y -= host.y;
+  host.x = host.y = 0;
+  return { text: element.textContent.trim(), host, icon };
+};
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-original-admin-login-"));
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
@@ -80,8 +90,7 @@ try {
         if (proof) {
           await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
           if (mode === "original") {
-            const icon = await notice.locator(".mat-icon").boundingBox();
-            assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+            assert.deepEqual(await notice.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].httpsAdmin);
           }
           assert.equal(await submit.isDisabled(), true);
           await page.locator("#adminPassword").press("Enter");

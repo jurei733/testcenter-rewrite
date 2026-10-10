@@ -25,7 +25,6 @@ svg.mat-icon { display: block; width: 24px; height: 24px; fill: currentColor; fl
 .password-field input { min-width: 0; flex: 1; }
 .button-section { align-self: end; display: flex; gap: 9px; margin-top: auto; padding-bottom: 12px; margin-right: 24px; }
 .button-section a { border: 1px solid var(--secondary); }
-.login-problem { color: #a12020; }
 .help-box { display: flex; flex-direction: row; align-items: center; justify-content: start;
   padding: 10px 10px 10px 24px; border: 1px solid var(--secondary); border-radius: 10px;
   width: 80%; box-sizing: border-box; --mat-card-elevated-container-color: var(--mat-sys-surface); }

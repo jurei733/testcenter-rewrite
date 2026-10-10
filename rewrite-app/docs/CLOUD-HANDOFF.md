@@ -1,5 +1,41 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Participant alert and native form reset continuation (2026-10-10)
+
+On `testcenter-production-readiness`, Original participant errors/Caps Lock now
+use the current Source's alert geometry, inherited text color, error/warning
+SVGs and native icon shrinking. Rejected login resets the submitted/touched
+template form as well as clearing credentials, eliminating the premature red
+name field. Text uses interpolation and authorization/secret clearing remain
+shared. Twenty-four full-page RGBA error/warning pairs and all notice geometry
+are exact against unmodified `ee2ab9ab`; the paragraph baseline fails all 24.
+The intermediate no-form-reset images remain as negative evidence.
+
+Participant HTTPS notices have twelve exact geometry comparisons and eleven
+exact full-page pairs; retain one Primar/1280 pair with 25 differing text pixels.
+Admin HTTPS Source fixtures are separately measured. The portable Source helper
+passes twelve normal focus/alert cases plus twelve real-insecure participant
+and twelve admin cases, with no unknown requests/page errors. Add
+`ORIGINAL_LOGIN_REFERENCE_INSECURE=true` for HTTPS notices and
+`ORIGINAL_LOGIN_REFERENCE_ENTRY=admin` for the admin mode, with separate owned
+artifact directories and externally verified Source/build revision.
+
+Protected/headful SQLite participant gates pass both scope configurations, all
+24 login cases, 38 real participant proof challenges, password authorization,
+name reload and second-code blocking. The admin gate passes twelve cases, six
+Original HTTPS comparisons, 24 real browser proof challenges, access windows
+and asset/chunk recovery. Twenty-six actual method tests, typecheck and the
+469.44-kB production build pass. Keep the initial failed assumptions: fixed 24px
+icons, literal false instead of Material's unset empty-required `aria-invalid`,
+and absolute coordinates after native focus scrolling. Gates retain exact
+notice-local geometry, 24px field gap, pristine/untouched/unsubmitted state and
+strict no-request blocking. Source itself probes the fixture name once;
+Rewrite's stronger zero-request protection remains. No complete UI row, physical
+hardware, remote CI, deployment or production acceptance is claimed. Earlier
+full browser/Compose proofs belong to the preceding tree. Continue with actual
+Source logo-link/navigation semantics and remaining error/busy states; preserve
+the protected PPTX and user data. No publication occurred.
+
 ## Native participant entry focus continuation (2026-10-10)
 
 On `testcenter-production-readiness`, Original participant entry now uses

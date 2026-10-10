@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,6 +9,16 @@ import { chromium } from "playwright";
 
 // Own the API/database; never consume or reset the interactive port 4311.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
+const noticeReference = JSON.parse(await readFile(new URL("./fixtures/original-login-notices.json", import.meta.url), "utf8"));
+const readNotice = element => {
+  const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, color: style.color,
+      font: style.font, margin: style.margin, display: style.display }; };
+  const host = box(element), icon = box(element.querySelector(".mat-icon"));
+  icon.x -= host.x; icon.y -= host.y;
+  host.x = host.y = 0;
+  return { text: element.textContent.trim(), host, icon };
+};
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const root = await mkdtemp(join(tmpdir(), "testcenter-original-participant-login-"));
 process.stdout.write(`owned_artifacts=${root}\n`);
@@ -85,8 +95,7 @@ try {
       if (protectedParticipant) {
         await notice.waitFor(); assert.equal(await notice.innerText(), "Die Anmeldung ist nur über eine verschlüsselte Verbindung (HTTPS) möglich. Bitte wenden Sie sich an den Betreiber dieses Servers.");
         if (mode === "original") {
-          const icon = await notice.locator(".mat-icon").boundingBox();
-          assert.equal(icon.width, 24); assert.equal(icon.height, 24);
+          assert.deepEqual(await notice.evaluate(readNotice), noticeReference.measurements[`${theme}-desktop`].httpsParticipant);
         }
         assert.equal(await submit.isDisabled(), true); assert.equal(credentialRequests.length, 0);
         if (mode === "original") {
@@ -201,6 +210,21 @@ try {
       await page.waitForFunction(() => document.activeElement?.id === "originalLoginPassword");
       const password = page.getByLabel("Kennwort", { exact: true });
       await password.fill("owned-synthetic-password");
+      await password.evaluate(input => input.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "A", modifierCapsLock: true, bubbles: true
+      })));
+      const capsLock = page.locator("#originalLoginCapsLock");
+      await capsLock.waitFor();
+      assert.equal(await capsLock.getAttribute("role"), "status");
+      assert.deepEqual(await capsLock.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].capsLock);
+      assert.equal(await capsLock.evaluate(element => element.getBoundingClientRect().top -
+        element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
+      assert.equal(await password.getAttribute("aria-describedby"), "originalLoginCapsLock");
+      assert.equal(await page.locator('[data-cy="login-insecure-context"]').count(), 0);
+      await password.evaluate(input => input.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "a", modifierCapsLock: false, bubbles: true
+      })));
+      await capsLock.waitFor({ state: "detached" });
       assert.equal(await password.getAttribute("type"), "password");
       await page.getByRole("button", { name: "Kennwort anzeigen", exact: true }).click();
       await page.getByRole("button", { name: "Kennwort verbergen", exact: true }).waitFor();
@@ -227,6 +251,19 @@ try {
       assert.equal(await name.inputValue(), "");
       assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
         "Source returns invalid credentials to an unfocused empty name step");
+      const problem = page.locator("#originalLoginProblem");
+      await problem.waitFor();
+      assert.equal(await problem.getAttribute("role"), "alert");
+      assert.deepEqual(await problem.evaluate(readNotice), noticeReference.measurements[`${theme}-${screen}`].invalidCredentials);
+      assert.equal(await problem.evaluate(element => element.getBoundingClientRect().top -
+        element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
+      assert.equal(await name.getAttribute("aria-describedby"), "originalLoginProblem");
+      assert.notEqual(await name.getAttribute("aria-invalid"), "true",
+        "Source resets the submitted form so the empty name has no premature validation error");
+      assert.equal(await page.locator("#originalParticipantLogin form.ng-submitted").count(), 0);
+      assert.equal(await name.evaluate(input => input.classList.contains("ng-pristine") && input.classList.contains("ng-untouched")), true);
+      assert.equal(await page.locator('[data-cy="login-insecure-context"]').count(), 0);
+      await page.screenshot({ path: join(root, `${theme}-${screen}-invalid.png`), fullPage: true });
       assert.deepEqual(errors, []);
       await context.close();
       process.stdout.write(`original_login=${theme}/${screen}:passed\n`);

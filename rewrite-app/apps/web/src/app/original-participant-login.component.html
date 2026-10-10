@@ -9,7 +9,7 @@
     </div>
   </aside>
   <div class="login-section">
-    <form (ngSubmit)="submit()" [attr.aria-busy]="busy()">
+    <form #loginForm="ngForm" (ngSubmit)="submit(loginForm)" [attr.aria-busy]="busy()">
       @if (!passwordStep()) {
         <h2>Anmeldenamen eingeben</h2>
         <mat-form-field appearance="outline">
@@ -39,8 +39,13 @@
           </button>
         </mat-form-field>
       }
-      @if (problem()) { <p id="originalLoginProblem" class="login-problem" role="alert">{{ problem() }}</p> }
-      @if (capsLock()) { <p id="originalLoginCapsLock" role="status">Feststelltaste ist aktiviert!</p> }
+      @if (problem()) {
+        <app-original-login-notice id="originalLoginProblem" [message]="problem()" marker="participant-login-problem" />
+      }
+      @if (capsLock()) {
+        <app-original-login-notice id="originalLoginCapsLock" message="Feststelltaste ist aktiviert!"
+          [warning]="true" marker="participant-login-caps-lock" />
+      }
       @if (passwordStep() && view.signInProtectionUnavailable) { <app-original-login-notice /> }
       <button matButton="filled" class="login-submit" type="submit" [disabled]="!canSubmit">
         @if (!passwordStep() && !busy()) {

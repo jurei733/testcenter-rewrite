@@ -1,5 +1,5 @@
 import { Component, inject, signal } from "@angular/core";
-import { FormsModule } from "@angular/forms";
+import { FormsModule, type NgForm } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -48,7 +48,7 @@ export class OriginalParticipantLoginComponent {
       (!this.passwordStep() || !this.view.signInProtectionUnavailable);
   }
 
-  async submit(): Promise<void> {
+  async submit(form?: NgForm): Promise<void> {
     if (!this.canSubmit) return;
     const wasPasswordStep = this.passwordStep();
     if (!wasPasswordStep) this.view.runtime.participantPassword = "";
@@ -77,6 +77,7 @@ export class OriginalParticipantLoginComponent {
         this.view.runtime.loginKey = "";
         this.view.runtime.participantPassword = "";
         this.showPassword.set(false);
+        form?.resetForm({ name: "", password: "" });
       }
     } finally {
       this.busy.set(false);

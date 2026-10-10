@@ -1,5 +1,53 @@
 # Testcenter parity checklist
 
+### Original participant login alerts and form reset (2026-10-10)
+
+The current unmodified Source `ee2ab9ab` renders rejected credentials and Caps
+Lock through `tc-alert`. The Rewrite had plain paragraphs, different error
+colors, missing icons and extra margins. Its submitted template form also left
+the new empty name field visibly invalid after rejection. The optional Original
+component now uses the Source error/warning SVGs, inherited text color, two-pixel
+alert margin and native icon shrinking; failed authentication resets the form's
+submitted/touched state as well as clearing credentials. The same authorized
+sign-in path, secret clearing, HTTPS blocking and existing Rewrite interface
+remain in use. Text stays safely interpolated.
+
+All 24 complete, unmasked Caps Lock/rejected-credential RGBA pairs match Source
+byte-for-byte across three themes and four widths. Their notice geometry also
+matches exactly; the original paragraph baseline differs in all 24 cases.
+The intermediate icon-only correction retained twelve red-field differences,
+which the actual form reset resolves. The HTTPS participant notice has twelve
+exact geometry comparisons and eleven exact full-page images; one Primar/1280
+pair differs in 25 text pixels (maximum channel delta 12). Retain that negative
+observation; it does not close the entire login/Shell row. Source admin HTTPS
+notices have separately measured references in all twelve theme/width cases.
+
+The protected/headful real SQLite participant gate passes both protection
+configurations, all 24 login geometry/error cases, 38 actual participant proof
+challenges, real password login, saved/explicit-name reload and protected second
+code. The admin gate passes all twelve normal-login cases, six Original HTTPS
+notice comparisons, 24 actual browser proof challenges, unavailable/expired
+accounts and failed-asset/chunk recovery. All 26 protection/admin method tests,
+typecheck and the 469.44-kB production build pass under the unchanged limit.
+The Source-only helper passes twelve normal focus/alert cases, twelve participant
+HTTPS cases and twelve admin HTTPS cases, rejecting unknown requests/page errors.
+Its fixture coordinates are local to each notice; the gates also require the
+Source's exact 24px gap below the participant field. Whole-page captures remain
+independent evidence rather than being cropped or position-normalized.
+
+Keep the initial negative gate logs. Their 24px fixed-icon assumption contradicted
+the newly measured Source shrinking; an empty required Material input has an
+unset `aria-invalid`, not literal `false`; native focus scrolling changes absolute
+page coordinates. The corrected expectations come from the unmodified Source
+and actual Material binding. Pristine/untouched state, no submitted form, absence
+of validation error, exact local geometry and no-request protection remain gated.
+Source still probes the name once on the own insecure fixture; the Rewrite keeps
+its stronger no-credential/no-challenge rule. These are Source frontend fixtures,
+not Source backend, physical keyboard/camera, remote CI or production proof.
+No complete Original UI row is closed, and the preceding whole-browser/Compose
+proofs were run on the earlier tree. Logo-link semantics and other error/busy
+states remain separate work. This change is local and unpublished.
+
 ### Native Original participant login focus (2026-10-10)
 
 The actual current Source `ee2ab9ab` leaves initial name entry, password back

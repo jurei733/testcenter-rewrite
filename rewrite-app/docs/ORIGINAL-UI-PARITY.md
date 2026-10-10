@@ -2,6 +2,18 @@
 
 ## Acceptance baseline
 
+The latest participant alert comparison closes the plain-paragraph and stale
+submitted-form presentation gaps: 24 complete Caps Lock/rejected-credential
+RGBA pairs are exact across three themes and four widths. Rejection clears the
+credentials and resets pristine/untouched/submitted state without forcing
+focus. Source error/warning icons shrink naturally inside narrow notices.
+Participant HTTPS notice geometry matches in twelve cases; eleven full-page
+images are exact and one has 25 differing text pixels. Admin HTTPS notices have
+separate current Source measurements. Protected real participant/admin browser
+gates pass, including no-request HTTPS blocking, actual challenges and retry.
+These bounded states do not close the login/Shell or cross-cutting row; logo-link
+semantics, remaining errors/busy states and full production acceptance are open.
+
 Fresh 2026-10-10 comparison removes the Rewrite's synthetic initial participant
 login/group values. Blank entry is disabled, while saved names and explicit
 links retain their values across reload in both interfaces. The current Source
@@ -42,6 +54,12 @@ npm run reference:ui:original-login-focus:built
 The helper records the caller's revision assertion, renders the unchanged
 frontend on owned rejected-login fixtures and fails unknown requests/page
 errors. It does not verify that revision itself or establish backend behavior.
+It also checks the Source notice fixtures and native form reset. For a real
+insecure HTTP origin, run it with `ORIGINAL_LOGIN_REFERENCE_INSECURE=true` and
+a new artifact directory. Add `ORIGINAL_LOGIN_REFERENCE_ENTRY=admin` to check
+the admin notice. These three modes each pass twelve Source cases. The Source
+participant fixture makes one rejected name probe; the protected Rewrite gates
+independently require zero credential/challenge requests in that context.
 The regular protected login and bounded entry/logout browser gates verify the
 Rewrite's real authorization/session flow independently.
 
