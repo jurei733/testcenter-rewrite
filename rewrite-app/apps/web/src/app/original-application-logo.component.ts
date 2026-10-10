@@ -13,16 +13,20 @@ import { OriginalOverlayStylesComponent } from "./original-overlay-styles.compon
 @Component({
   selector: "app-original-application-logo", standalone: true,
   imports: [MatTooltipModule, OriginalOverlayStylesComponent],
-  template: `<app-original-overlay-styles /><a [id]="standalone ? 'participantStandaloneLogo' : 'participantApplicationLogoButton'"
+  template: `<app-original-overlay-styles /><div [class.standalone-logo]="standalone"><a [id]="standalone ? 'participantStandaloneLogo' : 'participantApplicationLogoButton'"
     [class.standalone]="standalone" [href]="href" aria-label="Gehe zur Startseite" (click)="activateLink($event)">
     <img id="applicationLogo" [src]="settings.assetUrl('logo', settings.settings().mainLogo)"
       alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" />
-  </a>`,
+  </a></div>`,
   styles: [`:host { display: contents; }
     app-original-overlay-styles { display: none; }
+    div { display: contents; }
     a { display: inline-flex; height: 48px; }
+    a:not(.standalone) { font: 22px / 28px 'Nunito Sans'; }
     img { display: block; height: 100%; width: auto; }
-    a.standalone { display: block; position: absolute; top: 8px; right: 8px; z-index: 2; }
+    div.standalone-logo { display: block; position: absolute; top: 8px; right: 8px; z-index: 2; height: 48px; }
+    a.standalone { display: inline; height: 100%; }
+    a.standalone img { display: inline; }
     @media (max-width: 599px) { a:not(.standalone) { height: 40px; } }`]
 })
 export class OriginalApplicationLogoComponent {

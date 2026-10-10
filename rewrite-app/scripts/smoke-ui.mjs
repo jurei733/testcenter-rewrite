@@ -7733,6 +7733,7 @@ try {
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").waitFor();
     await originalSignInPage.locator("#participantConfirmationStayButton").click();
+    await originalSignInPage.locator("#participantConfirmationBackdrop").waitFor({state:"detached"});
     assert.equal(await originalSignInPage.locator("#originalParticipantStarter").count(), 0);
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").click();

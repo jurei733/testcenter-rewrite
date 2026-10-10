@@ -262,11 +262,18 @@ type SettledVeronaResponse = Pick<
   "testRunId" | "unitKey" | "response"
 >;
 
-type ParticipantConfirmationDialog = {
+export type ParticipantConfirmationDialog = {
   title: string;
   message: string;
   cancelLabel: string;
   confirmLabel: string;
+  original?: {
+    title: string;
+    message: string;
+    cancelLabel: string;
+    confirmLabel: string;
+    confirmMeansContinue: boolean;
+  };
 };
 
 const VERONA_FOREGROUND_STATE_GRACE_MS = 200;
@@ -448,6 +455,8 @@ export class ParticipantViewFacade {
   readonly confirmationDialog = signal<ParticipantConfirmationDialog | null>(
     null
   );
+  // Each attempt has its own identity, including repeated blocked clicks.
+  readonly originalNavigationToast = signal<{ text: string } | null>(null);
   private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
@@ -1727,6 +1736,7 @@ export class ParticipantViewFacade {
   }
 
   private clearNavigationAdvisory(): void {
+    this.originalNavigationToast.set(null);
     if (this.navigationAdvisoryTimeout != null) {
       globalThis.window?.clearTimeout(this.navigationAdvisoryTimeout);
       this.navigationAdvisoryTimeout = null;
@@ -2815,12 +2825,17 @@ export class ParticipantViewFacade {
     if (!currentState) {
       return;
     }
+    const testRunId = currentState.testRun.testRunId;
+    const viewLifecycleSequence = this.viewLifecycleSequence;
     const timer = this.player.testletTimer;
     if (
       currentState.executionMode.forceTimeRestrictions &&
       timer?.leave === "forbidden"
     ) {
       this.clearNavigationAdvisory();
+      this.originalNavigationToast.set({
+        text: "Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist."
+      });
       this.navigationAdvisory.set({
         title: this.customText(
           "booklet_warningLeaveTimerBlockTitle",
@@ -2858,7 +2873,7 @@ export class ParticipantViewFacade {
         confirmLabel: "Leave anyway"
       }
         : null;
-    const confirmation = restrictionConfirmation
+    const confirmation: ParticipantConfirmationDialog | null = restrictionConfirmation
       ? {
           ...restrictionConfirmation,
           title: currentState.executionMode.saveResponses
@@ -2873,7 +2888,28 @@ export class ParticipantViewFacade {
             confirmLabel: "Return to tests"
           }
         : null;
+    if (confirmation) {
+      confirmation.original = {
+        title: currentState.executionMode.saveResponses
+          ? "Sicher, dass du den Test beenden möchtest?"
+          : confirmTestletTimeLeave
+            ? this.customText("booklet_warningLeaveTimerBlockTitle")
+            : this.customText(this.player.leaveLock?.scope === "unit" ? "booklet_warningLeaveTitle-unit" : "booklet_warningLeaveTitle-testlet"),
+        message: confirmTestletTimeLeave
+          ? this.customText("booklet_warningLeaveTimerBlockTextPrompt")
+          : confirmTestletLeaveLock
+            ? this.customText(this.player.leaveLock?.scope === "unit" ? "booklet_warningLeaveTextPrompt-unit" : "booklet_warningLeaveTextPrompt-testlet")
+            : "",
+        cancelLabel: restrictionConfirmation ? "Trotzdem weiter" : "Abbrechen",
+        confirmLabel: restrictionConfirmation ? "Hier bleiben" : "Bestätigen",
+        confirmMeansContinue: !restrictionConfirmation
+      };
+    }
     if (confirmation && !(await this.requestConfirmation(confirmation))) {
+      return;
+    }
+    if (this.viewLifecycleSequence !== viewLifecycleSequence ||
+        this.readCurrentRunState()?.testRun.testRunId !== testRunId) {
       return;
     }
 

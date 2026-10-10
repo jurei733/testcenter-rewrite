@@ -1,5 +1,72 @@
 # Testcenter parity checklist
 
+### Original in-player logo exit and hidden header (2026-10-10)
+
+The optional Original Player now opens the native Material confirmation used by
+unmodified Source ee2ab9ab. A saved exit asks "Sicher, dass du den Test beenden
+möchtest?" without an extra saved-progress paragraph. A timed-block or leave-lock
+warning is folded into that one question. Source's restriction labels reverse
+the native result: "Hier bleiben" stays, "Trotzdem weiter" continues. Primar fills
+the first native false-result button; Sekundar/Erwachsene retain outlined order.
+A forced forbidden timer reports the Source toast and never opens a dialog.
+The shared Rewrite labels/renderer and server restrictions remain in use.
+
+Source's hidden header has a 48px positioned logo wrapper and an inline native
+link, whose measured hit rectangle differs from the image. Both visible and
+hidden header geometry now follow that actual DOM. Replacing an open dialog uses
+Material-generated IDs and keeps the original live focus trigger; destruction
+unsubscribes before closing. Weak focus references do not retain detached views.
+The parent rejects old overlay results, and the exit action fences its awaited
+confirmation against a changed Run or view lifecycle.
+
+The read-only Source helper covers 36 combinations: three themes, desktop/mobile,
+visible/hidden header, and plain/confirm/forbidden exit. Its API and synthetic
+Player fixtures establish frontend behavior, not Source backend authorization.
+The actual logo/image and 24 native dialog geometry/style/copy measurements are
+pinned in scripts/fixtures/original-player-exit.json. Caller revision metadata
+must still be verified against the unmodified Source build externally. Reproduce
+with ORIGINAL_PLAYER_REFERENCE_ROOT, ORIGINAL_PLAYER_REFERENCE_COMMIT and a fresh
+absolute UI_SMOKE_ARTIFACT_DIR, then reference:ui:original-player-exit:built.
+
+The new mandatory ci:browser:quick gate owns its real SQLite API and credentials.
+Its 36 Original cases check trusted Verona answers and exact stored packets,
+modified activation, native focus trap/Escape/backdrop/stay, one confirmed exit,
+cancelled timer state, and an actual forbidden-return 409. It also checks native
+dialog replacement, a deliberately missing lazy bundle's guarded fallback, and
+six shared Rewrite cases. Only the injected missing-bundle case models no Service
+Worker in its owned top frame; the normal matrix keeps production Worker behavior
+and the opaque Verona sandbox. Actual request failures stay fatal through child/stream
+shutdown. The 24 production-method tests exercise scoped timer/lock copy, reversed
+results, destroyed/replaced overlays, live focus ownership and changed Run/view
+fences; the complete frontend suite has 396 tests. Production build/typecheck
+retain the 470-kB initial limit (469.99 kB). The existing 24-state protected Review
+workflow and native header/read-only Starter gate also pass. The final 43-case
+exit gate succeeds through owned API shutdown. The settled broader participant
+entry/leave/resume/logout slice has 1,283 requests, zero actual API failures/5xx,
+and orderly shutdown at participant-entry-start-after-sign-in. This is a bounded
+local replay; it does not replace the complete browser/Compose matrix.
+
+Keep the negative observations. The initial Source forbidden check accidentally
+read the older timer snackbar instead of the current toast stack; the final
+helper waits for the exact denial text. The first own check exposed inherited
+logo fonts/inline hit geometry. Dialog replacement exposed a real detached-focus
+regression and one comparison captured the replacement's intermediate animation;
+the final gate waits for settled animation. The shared single-booklet login
+already starts its Player; the test must not click a disappearing Starter button.
+The first bundle-failure injection was satisfied by the Worker cache and did not
+block a request. Playwright's Worker-block shim then threw in the opaque iframe;
+the final injection models absent Worker support only in the owned top frame and
+requires an actually blocked bundle. The shared fallback passes an explicit
+request context and rejects obsolete results. The broad native cancellation flow
+now waits for Material dismissal before opening its next confirmation.
+A broad smoke initially reused demo bootstrap credentials with a different first-
+admin password; repeat on a fresh owned, non-demo database. Complete PNGs retain
+Player/notification/background differences, so no complete Original UI row,
+physical hardware, remote CI, new container image, deployment or production
+acceptance is closed here. The protected PPTX and user stores are preserved.
+This checkpoint is local and unpublished; continue remaining whole Player/Shell,
+error/busy and production acceptance.
+
 ### Original native logo and authorized Starter links (2026-10-10)
 
 The optional Original header now uses the Source's native logo link, label,

@@ -1,0 +1,2095 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Unmodified Source frontend on owned API/player fixtures; no Source backend authorization proof",
+  "forbiddenToast": "Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist.",
+  "measurements": {
+    "Primar-desktop-header-none": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 117.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 468.7265625,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-desktop-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 151.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 502.6640625,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-desktop-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Primar-desktop-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 117.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 468.7265625,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-desktop-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 151.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 502.6640625,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-desktop-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Primar-mobile-header-none": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 117.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 165.609375,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-mobile-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 151.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 199.546875,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-mobile-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Primar-mobile-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 117.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 165.609375,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-mobile-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 151.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(255, 255, 255)",
+                "background": "rgb(25, 97, 117)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 199.546875,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Primar-mobile-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Sekundar-desktop-header-none": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 469.7265625,
+                "y": 373.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-desktop-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 478.7265625,
+                "y": 385.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-desktop-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Sekundar-desktop-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 469.7265625,
+                "y": 373.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-desktop-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 478.7265625,
+                "y": 385.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-desktop-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Sekundar-mobile-header-none": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 166.609375,
+                "y": 467.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-mobile-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 175.609375,
+                "y": 491.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-mobile-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Sekundar-mobile-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 166.609375,
+                "y": 467.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-mobile-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 175.609375,
+                "y": 491.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(11, 45, 132)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Sekundar-mobile-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Erwachsene-desktop-header-none": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 469.7265625,
+                "y": 373.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-desktop-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 478.7265625,
+                "y": 385.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-desktop-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1144.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Erwachsene-desktop-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 290.5,
+            "width": 641.765625,
+            "height": 139,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 343.1171875,
+                "y": 373.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 469.7265625,
+                "y": 373.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-desktop-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 319.1171875,
+            "y": 278.5,
+            "width": 641.765625,
+            "height": 163,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 343.1171875,
+                "y": 385.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 478.7265625,
+                "y": 385.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-desktop-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 1160.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 1160.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Erwachsene-mobile-header-none": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 166.609375,
+                "y": 467.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-mobile-header-confirm": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 175.609375,
+                "y": 491.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-mobile-header-forbidden": {
+      "player": {
+        "logo": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 273.1328125,
+          "y": 8,
+          "width": 92.8671875,
+          "height": 40,
+          "font": "22px / 28px \"Nunito Sans\"",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    },
+    "Erwachsene-mobile-hidden-none": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 320.5,
+            "width": 358,
+            "height": 203,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "",
+          "buttons": [
+            {
+              "text": "Bestätigen",
+              "box": {
+                "x": 40,
+                "y": 467.5,
+                "width": 118.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Abbrechen",
+              "box": {
+                "x": 166.609375,
+                "y": 467.5,
+                "width": 119.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-mobile-hidden-confirm": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      },
+      "confirmation": {
+        "dialog": {
+          "role": "dialog",
+          "box": {
+            "x": 16,
+            "y": 296.5,
+            "width": 358,
+            "height": 251,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Sicher, dass du den Test beenden möchtest?",
+          "content": "Du verlässt einen zeitbeschränkten Bereich und kannst nicht zurückkehren.",
+          "buttons": [
+            {
+              "text": "Hier bleiben",
+              "box": {
+                "x": 40,
+                "y": 491.5,
+                "width": 127.609375,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            },
+            {
+              "text": "Trotzdem weiter",
+              "box": {
+                "x": 175.609375,
+                "y": 491.5,
+                "width": 153.546875,
+                "height": 40,
+                "font": "500 14px \"Nunito Sans\"",
+                "color": "rgb(107, 54, 154)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "0px 24px",
+                "borderRadius": "10px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Erwachsene-mobile-hidden-forbidden": {
+      "player": {
+        "logo": {
+          "x": 270.5625,
+          "y": 40,
+          "width": 111.4375,
+          "height": 21.5,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        },
+        "logoImage": {
+          "x": 270.5625,
+          "y": 8,
+          "width": 111.4375,
+          "height": 48,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "borderRadius": "0px"
+        }
+      }
+    }
+  }
+}

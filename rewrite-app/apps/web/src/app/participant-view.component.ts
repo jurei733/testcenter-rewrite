@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   ViewChild,
+  effect,
   inject,
   signal
 } from "@angular/core";
@@ -12,6 +13,8 @@ import { FormsModule } from "@angular/forms";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
+import type { ParticipantConfirmationDialog } from "./participant-view.facade";
+import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
 import { ParticipantStatusStylesComponent } from "./participant-status-styles.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
@@ -19,6 +22,7 @@ import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.compon
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { OriginalReviewPanelComponent } from "./original-review-panel.component";
 import { OriginalToastContainerComponent } from "./original-toast-container.component";
+import { OriginalToastService } from "./original-toast.service";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 interface ParticipantVisibleCodeNotice {
@@ -31,7 +35,7 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent],
   template: `
     <app-participant-status-styles />
     @defer (when interfaceMode.mode() === 'original') {
@@ -1099,8 +1103,8 @@ interface ParticipantVisibleCodeNotice {
           </ng-template>
         </div>
       </article>
+      <ng-template #confirmationFallback let-confirmation>
       <section
-        *ngIf="view.confirmationDialog() as confirmation"
         id="participantConfirmationBackdrop"
         class="participant-confirmation-backdrop"
       >
@@ -1126,24 +1130,51 @@ interface ParticipantVisibleCodeNotice {
               class="secondary"
               type="button"
               autofocus
-              (click)="view.resolveConfirmation(false)"
+              (click)="resolveOriginalConfirmation(confirmation, false)"
             >{{ confirmation.cancelLabel }}</button>
             <button
               id="participantConfirmationContinueButton"
               class="ghost"
               type="button"
-              (click)="view.resolveConfirmation(true)"
+              (click)="resolveOriginalConfirmation(confirmation, true)"
             >{{ confirmation.confirmLabel }}</button>
           </div>
         </article>
       </section>
+      </ng-template>
+      @if (view.confirmationDialog(); as confirmation) {
+        @if (interfaceMode.mode() === 'original') {
+          @for (request of [confirmation]; track request) {
+            @defer (on immediate) {
+              <app-original-participant-confirmation-launcher [confirmation]="request"
+                (closed)="resolveOriginalConfirmation(request, $event)" />
+            } @error {
+              <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: request}" />
+            }
+          }
+        } @else {
+          <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: confirmation}" />
+        }
+      }
     </div>
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  resolveOriginalConfirmation(request: ParticipantConfirmationDialog, confirmed: boolean): void {
+    if (this.view.confirmationDialog() === request) this.view.resolveConfirmation(confirmed);
+  }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly originalToasts = inject(OriginalToastService);
+  private consumedNavigationToast: { text: string } | null = null;
+  private readonly presentOriginalNavigationToast = effect(() => {
+    const notice = this.view.originalNavigationToast();
+    const original = this.interfaceMode.mode() === "original";
+    if (!notice || notice === this.consumedNavigationToast) return;
+    this.consumedNavigationToast = notice;
+    if (original) this.originalToasts.show(notice.text);
+  });
   readonly originalPanel = signal<"review" | "units" | null>(null);
 
   toggleOriginalPanel(panel: "review" | "units"): void {
