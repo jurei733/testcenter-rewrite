@@ -1,5 +1,78 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Paused starter exits (2026-10-10)
+
+Application checkpoint `9d9ec5754879` matches the pinned Original pause-status
+exit. A visible pause leaves for Starter without a termination question, another
+CONTROLLER write, changed response packets, timer cancellation or leave locks.
+The interrupted timer and monitor pause remain intact. A forced silent pause
+keeps only the ordinary end-test confirmation. Staying makes no mutation;
+approval records `TERMINATED_PAUSED` and, if configured, locks the whole test.
+Source's `patchLock` writes the separate `BOOKLETLOCKEDbyTESTEE` event and locked
+flag, preserving the controller state; the Rewrite now does that for paused exits.
+
+The lazy Original pause surface uses Source's native raised card, booklet title,
+login and mode labels, custom pause text and retained unit toolbar. The paused
+toolbar has Source's natural height and hides interrupted time. In all captured
+cases card/toolbar/title/paragraph geometry agrees within 0.6 px; fonts, colors,
+spacing, borders and shadows agree exactly. The shared participant controller
+continues to own the Run and the ordinary interface keeps its existing surface.
+
+Unmodified Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` passes 42 frontend
+cases: Hot Return across three themes and desktop/mobile, Hot Restart in Primar
+at desktop, three timer leave policies, and visible/silent pause. Two more
+Source cases prove the configured termination lock. The matching 44 authenticated
+Rewrite browser cases use its real SQLite API, owned operator pause commands and
+trusted synthetic Verona input. Anonymous/foreign sessions, stale units/status,
+exact saved packets, interrupted timers and absent leave locks are checked.
+The 36 advisory, 57 completeness/visible-button and 43 normal-exit regression
+cases also pass to owned API shutdown: 180 successful browser cases in total.
+An extra PNG audit finds 44 exact card-body crops but zero exact full viewports;
+small differences remain at the header/toolbar and upper-card shadow overlap.
+Full pixel parity is therefore still open despite matching measured geometry
+and computed styles.
+Source frontend fixtures do not prove Source backend authorization; the pinned
+PHP controller/DAO and TestLog sources independently establish the lock event.
+This does not close the full Player UI row or untested navigation/custom-text
+and hidden-header combinations.
+
+Optional `expectedStatus` fences stale HTTP confirmations. Run, current unit,
+view and status are also checked after lazy loading, autosave, draft saving,
+preparation, confirmation and the response. A refresh observing this action's
+exact server result before HTTP completes is accepted; a newer remote pause
+cannot be erased by the old response. The production methods are exercised in
+frontend state tests, alongside native browser flow checks.
+
+All 1,128 unit/state tests pass (469 frontend), all 165 SQLite API tests and all
+701 PostgreSQL integration tests pass. PostgreSQL uses a fresh owned container
+and volume, removed afterwards. The new 44-case browser gate is mandatory in
+`ci:browser:quick`; the initial bundle stays at 469.99 kB under the unchanged
+470-kB limit. Existing budget warnings remain visible.
+
+Fresh standard/demo/production-secret PostgreSQL Compose checks (schema 52) and
+standalone SQLite Docker (schema 58) pass for application `9d9ec5754879`. Image
+`testcenter-rewrite-app:completeness-9d9ec5754879` is
+`sha256:c7190455bac4b65f100c8d304fd89582be76c9fe1fe6d3be4987f081c75f728d`,
+uses `node`, and declares build time `2026-10-10T15:36:01.071Z`. All owned test
+resources are removed. Exact inventories retain all 24 existing containers and
+85 volumes, and the protected PPTX checksum is unchanged. Lossless compression
+of one additional closed owned test database saves 106,082,263 bytes, with a
+verified SHA-256 round trip. After the current image build, 11 GiB remain free.
+
+Keep the negative evidence: 24 pre-correction memory-store pause cases failed
+with forced-completeness denial. The first Source probe looked for literal
+"Testpause" although Source resolves its default custom text. The first own card
+used that fallback and had the wrong width. Reusing the same paused participant
+across viewports then blocked a fixture's next Player load; each browser case now
+uses its own workspace. The old API expectation of a termination during visible
+pause caused the first SQLite/PostgreSQL replay to fail. Its replacement checks
+unchanged complete test-log lists against the observed Source behavior; corrected
+full replays pass. Failure logs and closed database evidence remain available.
+
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next establish Source's actual
+Shell/error and overlapping-action behavior, then widen Player/Review acceptance.
+
 ### Starter exit advisory order (2026-10-10)
 
 Application checkpoint `f74f3f8512a1` follows Source's order of completeness,
