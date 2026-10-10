@@ -1,5 +1,34 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Local attachment ownership correction (2026-10-10)
+
+Continue from current main `143dc3e73ae83f379de4b2fe38edef25c7286a4a` on the
+local neutral branch `testcenter-production-readiness`. Fresh main workflow
+`38000558022` completes 37/37; it is baseline evidence, not CI for this change.
+The correction binds native camera encoding, QR lookup and uploads to the
+scope, target, stream/photo and operation that started them. Reset/retake/target
+replacement expire old results; old upload bytes cannot start a request after
+scope changes, and old results cannot clear newer busy state. Manual/saved-QR
+target replacement clears the old photo; live QR capture retains its new frame.
+
+Initial 32 actual-method baseline cases reproduce 27 failures without cancelled
+tests. The unmodified production build also fails the protected native browser
+reset case with the actual encoded PNG callback delayed. Corrected production
+assets pass that full protected headful SQLite Attachment slice, six released
+workers and 1280/390px checks, plus the separate generated live-camera sequence.
+All 54 lifecycle regressions, 601 existing regular checks, 61 compatibility cases
+and 165 SQLite API cases pass. Typecheck/build pass with unchanged 469.46-kB
+initial output under the 470-kB limit; both fresh audits report zero findings.
+Evidence belongs to the owning local chat's `work/attachment-*`, `work/build.log`,
+`work/unit-all.log`, `work/compatibility.log` and `work/integration-sqlite.log`.
+
+No publication or deployment is authorized by this checkpoint. Preserve the
+untracked migration presentation (SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`).
+Continue remaining Original full-page comparisons, camera/printed-page work and
+production/recovery acceptance. Do not convert local passing focused tests or
+the historical Source camera failure into full parity or production proof.
+
 ## Latest Quick CI evidence retention (2026-10-09)
 
 Head `6221bbdd` Push `37986888156` finishes with 36 successful jobs and one

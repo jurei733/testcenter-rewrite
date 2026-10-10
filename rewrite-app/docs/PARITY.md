@@ -1,5 +1,46 @@
 # Testcenter parity checklist
 
+### Attachment capture ownership through async transitions (2026-10-10)
+
+Fresh GitHub main is `143dc3e73ae83f379de4b2fe38edef25c7286a4a`; its actual
+completed workflow `38000558022` passes 37/37 jobs. Development continues locally
+from that tree on `testcenter-production-readiness`. This baseline CI result does
+not verify the new local correction or establish deployment.
+
+The actual production component has three reproduced ownership problems:
+pending native PNG encoding restores an obsolete photo/status after reset;
+manual target lookup retains the previous target's photo; and late image/HTTP
+results can update a changed operator, tenant, workspace or target. Uploads can
+also start after scope changes while reading the old photo's bytes. Against the
+unmodified baseline, the initial 32 actual-method controls complete with 27
+failures and five passes. A protected headful SQLite browser gate independently
+fails after native reset when the real delayed canvas callback restores the old
+capture status. The retained callback contains the browser's actual PNG; no
+pixels, decoder result or application method is substituted.
+
+Encoding now belongs to a specific scope, target, stream and capture generation.
+Reset/retake/replacement expire earlier results. Manual and saved-QR target
+lookups discard the previous photo; successful automatic QR capture keeps its
+new frame. A failed encoding cannot stop the camera or start target lookup.
+Lookup/upload/QR results check their original context before changing state,
+and upload checks scope and write permission again after reading bytes. An old
+operation cannot clear a newer operation's busy state. A current failed upload
+keeps its own photo for retry.
+
+All 54 actual-method lifecycle cases and the 601 existing regular checks pass,
+as do 61 compatibility cases and 165 SQLite API cases. Typecheck and production
+build pass at 469.46 kB, below the unchanged 470-kB limit. The complete protected
+headful SQLite Attachment slice passes the native pending-encoding reset,
+saved-QR normal/inverted/error recovery, actual capture/upload/preview/deletion,
+1280/390px layout and six observed worker releases. Its separate generated live
+camera gate passes real worker decoding, A4 capture, protected upload and worker
+release. Fresh full-tree and server audits both report zero findings.
+
+This correction is local until separately published; no new remote CI, release,
+deployment or production acceptance is claimed. All eight complete Original UI
+rows, the remaining printed/camera reference work and physical-camera/window
+acceptance remain open. The protected migration presentation stays unchanged.
+
 ### Preserve the actual Quick failure evidence (2026-10-09)
 
 Published `6221bbdd` Push workflow `37986888156` completes 36/37 jobs and

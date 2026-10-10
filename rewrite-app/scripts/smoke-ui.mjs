@@ -25798,6 +25798,46 @@ try {
     .filter({ hasText: "participant-photo" })
     .waitFor();
   if (!attachmentQrCameraFile) {
+    // Delay only the callback of this canvas's actual native PNG encoding.
+    // Reset through the visible control while that real frame is pending;
+    // no pixels, decoder results or application methods are synthesized.
+    await page.evaluate(() => {
+      const canvas = document.querySelector("#attachmentCaptureCard canvas");
+      const nativeToBlob = canvas.toBlob;
+      window.ownedAttachmentEncoding = { ready: false, released: false };
+      canvas.toBlob = function (callback, ...args) {
+        nativeToBlob.call(this, blob => {
+          window.ownedAttachmentEncoding.ready = true;
+          window.ownedAttachmentEncoding.release = () => {
+            canvas.toBlob = nativeToBlob;
+            callback(blob);
+            window.ownedAttachmentEncoding.released = true;
+          };
+        }, ...args);
+      };
+    });
+    await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+    await page.waitForFunction(() => window.ownedAttachmentEncoding?.ready === true);
+    await attachmentCapture.locator("#resetAttachmentCaptureButton").click();
+    await page.evaluate(async () => {
+      window.ownedAttachmentEncoding.release();
+      await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureTarget").count(), 0);
+    assert.equal(await attachmentCapture.locator("#attachmentCapturePreview").count(), 0,
+      "The real pending camera frame must not return after native reset");
+    assert.equal(await attachmentCapture.locator("#attachmentCaptureStatus").textContent(),
+      "Scan a QR code or enter an attachment code to begin.");
+    logStep("attachment-pending-native-encoding-reset-isolated");
+    const relookup = page.waitForResponse(response => response.request().method() === "GET" &&
+      response.url().endsWith(`/attachments/${selectedAttachmentCode}`));
+    await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
+      name: "attachment-code-after-reset.png", mimeType: "image/png",
+      buffer: await QRCode.toBuffer(selectedAttachmentCode, { type: "png", margin: 4, width: 512 })
+    });
+    assert.equal((await relookup).status(), 200);
+    await page.waitForFunction(() => document.querySelector("#attachmentQrImageInput")?.disabled === false);
+    await attachmentCapture.locator("#attachmentCaptureTarget").filter({ hasText: "Attachment Smoke Participant" }).waitFor();
     await attachmentCapture.locator("#captureAttachmentFrameButton").click();
   }
   await attachmentCapture.locator("#attachmentCapturePreview").waitFor();

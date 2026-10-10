@@ -191,6 +191,11 @@ export class AttachmentCaptureComponent
   private scanInProgress = false;
   private cameraSelectionVersion = 0;
   private cameraDetailsVersion = 0;
+  // Native encoding, QR decoding and HTTP can finish after a reset or switch.
+  // Each result belongs to the scope, target and photo that started it.
+  private captureVersion = 0;
+  private targetVersion = 0;
+  private operationVersion = 0;
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;
@@ -364,15 +369,22 @@ export class AttachmentCaptureComponent
     const file = input.files?.[0];
     input.value = "";
     if (!file || this.busy) return;
+    const scope = this.scope();
+    const operation = ++this.operationVersion;
+    const current = () => this.isCurrentScope(scope) && operation === this.operationVersion;
+    this.targetVersion++;
+    this.attachment = null;
+    this.clearCapture();
     this.busy = true;
     this.statusIsError = false;
     const decoder = this.imageDecoder = new AttachmentQrDecoder();
     try {
       const result = await decoder.decode(file);
-      if (this.destroyRef.destroyed) return;
+      if (!current()) return;
       this.attachmentCode = result.data.trim();
       await this.resolveCodeInternal();
     } catch (error) {
+      if (!current()) return;
       this.status =
         error === QrScanner.NO_QR_CODE_FOUND
           ? "No QR code was found in that image."
@@ -381,30 +393,36 @@ export class AttachmentCaptureComponent
     } finally {
       decoder.dispose();
       if (this.imageDecoder === decoder) this.imageDecoder = null;
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
-  async resolveCode(): Promise<void> {
+  async resolveCode(preserveCapture = false): Promise<void> {
     if (this.busy) return;
+    const operation = ++this.operationVersion;
     this.busy = true;
     this.statusIsError = false;
     try {
-      await this.resolveCodeInternal();
+      await this.resolveCodeInternal(preserveCapture);
     } finally {
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
-  async captureCurrentFrame(): Promise<void> {
+  async captureCurrentFrame(): Promise<Blob | null> {
     const video = this.cameraVideo.nativeElement;
     if (!this.cameraActive || !video.videoWidth || !video.videoHeight) {
       this.status = "The camera does not have a frame ready yet.";
       this.statusIsError = true;
-      return;
+      return null;
     }
+    const scope = this.scope();
+    const capture = ++this.captureVersion;
+    const target = this.targetVersion;
+    const attachment = this.attachment;
+    const code = this.attachmentCode;
     const canvas = this.captureCanvas.nativeElement;
     const stream = video.srcObject;
     const pageRatio = 210 / 297;
@@ -423,7 +441,7 @@ export class AttachmentCaptureComponent
     if (!context) {
       this.status = "The browser could not prepare the captured image.";
       this.statusIsError = true;
-      return;
+      return null;
     }
     context.drawImage(
       video,
@@ -439,17 +457,20 @@ export class AttachmentCaptureComponent
     const blob = await new Promise<Blob | null>(resolve =>
       canvas.toBlob(resolve, "image/png")
     );
-    if (this.destroyRef.destroyed || !this.cameraActive || video.srcObject !== stream) return;
+    if (!this.isCurrentScope(scope) || capture !== this.captureVersion ||
+        target !== this.targetVersion || this.attachment !== attachment || this.attachmentCode !== code ||
+        !this.cameraActive || video.srcObject !== stream) return null;
     if (!blob) {
       this.status = "The browser could not encode the captured image.";
       this.statusIsError = true;
       this.refreshView();
-      return;
+      return null;
     }
     this.setCapture(blob, `attachment-capture-${Date.now()}.png`);
     this.status = "Camera frame captured. Confirm the target and upload when ready.";
     this.statusIsError = false;
     this.refreshView();
+    return blob;
   }
 
   selectCaptureFile(event: Event): void {
@@ -474,31 +495,44 @@ export class AttachmentCaptureComponent
     const attachment = this.attachment;
     const captureBlob = this.captureBlob;
     if (!attachment || !captureBlob || !this.canWrite || this.busy) return;
+    const scope = this.scope();
+    const fileName = this.captureFileName;
+    const capture = this.captureVersion;
+    const target = this.targetVersion;
+    const operation = ++this.operationVersion;
+    const current = () => this.isCurrentScope(scope) && operation === this.operationVersion &&
+      target === this.targetVersion && capture === this.captureVersion &&
+      this.attachment === attachment && this.captureBlob === captureBlob;
     this.busy = true;
     this.statusIsError = false;
     try {
+      const dataBase64 = this.arrayBufferToBase64(await captureBlob.arrayBuffer());
+      if (!current() || !this.canWrite) return;
       const updated = await this.manager.upload(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         {
-          fileName: this.captureFileName,
+          fileName,
           mediaType: captureBlob.type,
-          dataBase64: this.arrayBufferToBase64(await captureBlob.arrayBuffer())
+          dataBase64
         }
       );
+      if (!current()) return;
       this.attachment = updated;
       this.clearCapture();
       this.status = `Attachment uploaded for ${updated.personLabel}. Scan another page when ready.`;
     } catch (error) {
+      if (!current()) return;
       this.status = this.manager.describeError(error);
       this.statusIsError = true;
     } finally {
-      this.busy = false;
+      if (operation === this.operationVersion) this.busy = false;
       this.refreshView();
     }
   }
 
   clearCapture(): void {
+    this.captureVersion++;
     if (this.capturePreviewUrl) {
       URL.revokeObjectURL(this.capturePreviewUrl);
     }
@@ -508,6 +542,9 @@ export class AttachmentCaptureComponent
   }
 
   resetTarget(): void {
+    this.targetVersion++;
+    this.operationVersion++;
+    this.busy = false;
     this.attachment = null;
     this.attachmentCode = "";
     this.clearCapture();
@@ -520,11 +557,14 @@ export class AttachmentCaptureComponent
     if (this.scanInProgress || this.busy || !code.trim()) return;
     this.scanInProgress = true;
     try {
-      await this.captureCurrentFrame();
-      if (this.destroyRef.destroyed || !this.cameraActive) return;
+      const scope = this.scope();
+      const target = this.targetVersion;
+      const captured = await this.captureCurrentFrame();
+      if (!captured || this.captureBlob !== captured || !this.isCurrentScope(scope) ||
+          target !== this.targetVersion || !this.cameraActive) return;
       this.stopCamera();
       this.attachmentCode = code.trim();
-      await this.resolveCode();
+      await this.resolveCode(true);
     } finally {
       this.scanInProgress = false;
       this.refreshView();
@@ -556,15 +596,25 @@ export class AttachmentCaptureComponent
     this.refreshView();
   }
 
-  private async resolveCodeInternal(): Promise<void> {
+  private async resolveCodeInternal(preserveCapture = false): Promise<void> {
     const attachmentId = this.attachmentCode.trim();
     if (!attachmentId) {
       this.status = "Enter or scan an attachment code first.";
       this.statusIsError = true;
       return;
     }
+    const scope = this.scope();
+    const target = ++this.targetVersion;
+    const current = () => this.isCurrentScope(scope) && target === this.targetVersion &&
+      this.attachmentCode.trim() === attachmentId;
+    this.attachment = null;
+    // Only live QR capture brings a new frame associated with the scanned code.
+    // Manual/image lookups cannot reassign the previous target's photograph.
+    if (!preserveCapture) this.clearCapture();
     try {
-      this.attachment = await this.manager.get(this.scope(), attachmentId);
+      const attachment = await this.manager.get(scope, attachmentId);
+      if (!current()) return;
+      this.attachment = attachment;
       this.attachmentCode = this.attachment.attachmentId;
       if (!this.canCaptureTarget) {
         this.clearCapture();
@@ -575,6 +625,7 @@ export class AttachmentCaptureComponent
         this.statusIsError = false;
       }
     } catch (error) {
+      if (!current()) return;
       this.attachment = null;
       this.status = this.manager.describeError(error);
       this.statusIsError = true;
@@ -594,6 +645,12 @@ export class AttachmentCaptureComponent
       tenantKey: this.tenantKey,
       workspaceKey: this.workspaceKey
     };
+  }
+
+  private isCurrentScope(scope: AttachmentScope): boolean {
+    const current = this.scope();
+    return !this.destroyRef.destroyed && current.sessionToken === scope.sessionToken &&
+      current.tenantKey === scope.tenantKey && current.workspaceKey === scope.workspaceKey;
   }
 
   private destroyScanner(): void {
