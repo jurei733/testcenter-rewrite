@@ -10,6 +10,7 @@
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
 :root[data-interface-mode='original'] .original-player-menu,
 :root[data-interface-mode='original'] .original-application-logo-tooltip,
+:root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   @include theme.apply();
 }
@@ -17,6 +18,7 @@
 // Rewrite's general button hover lifts by one pixel; the pinned Material
 // dialogs do not. Keep the correction local to these Original renderers.
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-participant-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog button.mat-mdc-button-base:hover {
   transform: none;
 }
@@ -27,6 +29,7 @@
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
+:root[data-interface-mode='original'] .original-participant-error-dialog,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog {
   color: var(--mat-sys-on-surface);
   @include mat.dialog-overrides((

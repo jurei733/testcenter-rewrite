@@ -11,9 +11,9 @@ const source = readFileSync(new URL("../apps/web/src/app/participant-view.facade
 const ast = ts.createSourceFile("participant-view.facade.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
 const methodNames = ["resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
-  "starterLaunchInternal", "resumeSessionInternal", "readCurrentRunState"];
+  "starterLaunchInternal", "resumeSessionInternal", "readCurrentRunState", "hasControllerError", "controllerError"];
 const methods = methodNames.map(name => {
-  const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
+  const method = declaration?.members.find(node => (ts.isMethodDeclaration(node) || ts.isGetAccessor(node)) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
 });
@@ -170,7 +170,7 @@ const withRouter = async (ui, action) => {
   const previousWindow = globalThis.window;
   let resolveNavigation, rejectNavigation;
   const navigation = new Promise((done, fail) => { resolveNavigation = done; rejectNavigation = fail; });
-  const calls = { nativeWrites: 0, reloads: 0, persisted: 0, routed: [], actions: [] };
+  const calls = { nativeWrites: 0, reloads: 0, persisted: 0, settled: 0, routed: [], actions: [] };
   const link = "https://owned.example/participant?participantSessionId=session%2F%C3%A4&testRunId=run%2FA&bookletKey=BOOKLET%23level%3Aadvanced";
   globalThis.window = {
     location: { origin: "https://owned.example", search: `?ui=${ui ?? ""}&password=must-not-persist&unknown=ignored`, reload() { calls.reloads++; } },
@@ -183,7 +183,11 @@ const withRouter = async (ui, action) => {
   entry.viewState = { onActionAsync(fn) { calls.actions.push(fn()); } };
   entry.persistState = () => { calls.persisted++; };
   entry.showReloadButton = true;
-  entry.hasControllerError = true;
+  entry.viewLifecycleSequence = 1;
+  entry.currentRunState = {testRun:{testRunId:"run/A",status:"running"},currentUnit:{unitKey:"active-unit"}};
+  entry.activeControllerError = () => error;
+  const error = {testRunId:"run/A",unitKey:"active-unit",message:"Owned error"};
+  entry.settleVeronaAutoSaveBeforeForegroundAction = async () => { calls.settled++; };
   try { await action({ entry, calls, resolveNavigation, rejectNavigation }); }
   finally {
     resolveNavigation(true);
@@ -215,6 +219,7 @@ for (const method of ["reloadPage", "reloadAfterControllerError"]) {
   test(`${method} waits for the exact Router URL before reloading the page`, async () => {
     await withRouter("original", async ({ entry, calls, resolveNavigation }) => {
       entry[method]();
+      await Promise.resolve();
       assert.equal(calls.persisted, 1);
       assert.equal(calls.reloads, 0, "Reloading early could reopen a stale assignment.");
       assert.equal(calls.routed.length, 1);
@@ -226,7 +231,7 @@ for (const method of ["reloadPage", "reloadAfterControllerError"]) {
   test(`${method} retains its availability guard`, async () => {
     await withRouter("original", async ({ entry, calls }) => {
       entry.showReloadButton = false;
-      entry.hasControllerError = false;
+      entry.activeControllerError = () => null;
       entry[method]();
       assert.equal(calls.routed.length, 0);
       assert.equal(calls.reloads, 0);
@@ -366,4 +371,43 @@ test("a late launch code challenge cannot change the next participant view", asy
   assert.equal(calls.challenges, 0);
   assert.equal(calls.synchronized, 0);
   assert.equal(calls.routed, 0);
+});
+
+for (const phase of ["save", "router"]) {
+  for (const changed of ["view", "run", "unit", "error"]) {
+    test(`controller-error reload cannot reload after ${changed} changes during ${phase}`, async () => {
+      await withRouter("original", async ({entry, calls, resolveNavigation}) => {
+        let settle;
+        entry.settleVeronaAutoSaveBeforeForegroundAction = () => new Promise(done => { settle = done; });
+        entry.reloadAfterControllerError(entry.controllerError);
+        assert.equal(calls.persisted, 0); assert.equal(calls.routed.length, 0);
+        if (phase === "router") { settle(); await Promise.resolve(); assert.equal(calls.routed.length, 1); }
+        if (changed === "view") entry.viewLifecycleSequence++;
+        if (changed === "run") entry.currentRunState.testRun.testRunId = "other-run";
+        if (changed === "unit") entry.currentRunState.currentUnit.unitKey = "other-unit";
+        if (changed === "error") entry.activeControllerError = () => ({testRunId:"run/A",unitKey:"active-unit",message:"new error"});
+        if (phase === "save") settle();
+        resolveNavigation(true); await Promise.all(calls.actions);
+        assert.equal(calls.reloads, 0);
+        assert.equal(calls.persisted, phase === "save" ? 0 : 1);
+      });
+    });
+  }
+}
+
+test("controller-error reload retains a failed save and never reloads or changes the URL", async () => {
+  await withRouter("original", async ({entry, calls}) => {
+    const failure = Error("owned_save_failure");
+    entry.settleVeronaAutoSaveBeforeForegroundAction = async () => { throw failure; };
+    entry.reloadAfterControllerError(entry.controllerError);
+    await assert.rejects(calls.actions[0], error => error === failure);
+    assert.equal(calls.persisted, 0); assert.equal(calls.routed.length, 0); assert.equal(calls.reloads, 0);
+  });
+});
+
+test("a stale error dialog cannot reload a different active error", async () => {
+  await withRouter("original", async ({entry, calls}) => {
+    entry.reloadAfterControllerError({...entry.controllerError});
+    assert.equal(calls.actions.length, 0); assert.equal(calls.settled, 0);
+  });
 });

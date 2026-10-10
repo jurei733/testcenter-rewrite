@@ -1333,13 +1333,21 @@ export class ParticipantViewFacade {
     });
   }
 
-  reloadAfterControllerError(): void {
-    if (!this.hasControllerError) {
+  reloadAfterControllerError(expectedError?: VeronaControllerError): void {
+    const error = this.controllerError;
+    if (!error || expectedError && expectedError !== error) {
       return;
     }
+    const sequence = this.viewLifecycleSequence;
+    const unitKey = this.readCurrentRunState()?.currentUnit.unitKey;
+    const isCurrent = (): boolean => sequence === this.viewLifecycleSequence &&
+      this.controllerError === error && this.readCurrentRunState()?.currentUnit.unitKey === unitKey;
     this.viewState.onActionAsync(async () => {
+      await this.settleVeronaAutoSaveBeforeForegroundAction();
+      if (!isCurrent()) return;
       this.persistState();
       await this.replaceSelectedRunEntryLink();
+      if (!isCurrent()) return;
       globalThis.window?.location.reload();
     });
   }
@@ -1466,6 +1474,10 @@ export class ParticipantViewFacade {
       : "";
   }
 
+  get controllerError(): VeronaControllerError | null {
+    return this.hasControllerError ? this.activeControllerError() : null;
+  }
+
   get controllerErrorText(): string {
     return this.customText(
       "booklet_errormessage",
@@ -1486,6 +1498,14 @@ export class ParticipantViewFacade {
   }
 
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
+    return this.buildVeronaPlayer(false);
+  }
+
+  get originalVeronaPlayer(): ParticipantVeronaPlayerState | null {
+    return this.buildVeronaPlayer(true);
+  }
+
+  private buildVeronaPlayer(retainErroredPlayer: boolean): ParticipantVeronaPlayerState | null {
     const currentState = this.readCurrentRunState();
     const player = currentState?.currentUnit.player;
     const unitDefinition = currentState?.currentUnit.unitDefinition?.trim();
@@ -1493,7 +1513,7 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       currentState.testRun.status !== "running" ||
-      this.hasControllerError ||
+      (!retainErroredPlayer && this.hasControllerError) ||
       this.eagerBookletLoading ||
       !player?.html.trim() ||
       !unitDefinition ||

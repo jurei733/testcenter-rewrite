@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { completenessPlayer } from './exit-completeness-fixture.mjs';
+import { runtimeErrorPlayer } from './runtime-error-fixture.mjs';
 // Read-only unmodified Source frontend on owned API/player fixtures. The caller
 // must verify its revision/build. This does not prove Source backend behavior.
 assert.ok(process.env.ORIGINAL_PLAYER_REFERENCE_ROOT);
@@ -12,16 +12,8 @@ assert.ok(process.env.UI_SMOKE_ARTIFACT_DIR);
 const root=resolve(process.env.ORIGINAL_PLAYER_REFERENCE_ROOT), artifacts=resolve(process.env.UI_SMOKE_ARTIFACT_DIR);
 await access(join(root,'index.html'));await mkdir(artifacts,{recursive:true});
 const {localDemoSourcePackage}=await import('../apps/api/dist/apps/api/src/local-demo-bootstrap.js');
-const demo=JSON.parse(localDemoSourcePackage.sourceDocument),player=completenessPlayer(demo.playerEntries[0].html);
-const injectErrorButton = html => {
- const controls='<textarea id="demoPlayerAnswer"';
- const listener='answer.addEventListener("input", () => {';
- assert.equal(html.split(controls).length,2);assert.equal(html.split(listener).length,2);
- return html.replace(controls,'<button id="ownedRuntimeError">Owned runtime error</button>'+controls).replace(listener,`document.querySelector("#ownedRuntimeError").addEventListener("click", () => {
- parent.postMessage({type:"vopRuntimeErrorNotification",sessionId,code:"runtime-error",message:"Owned incomplete runtime Ω"},"*");
- });`+listener);
-};
-const runtimePlayer=injectErrorButton(player);
+const demo=JSON.parse(localDemoSourcePackage.sourceDocument);
+const runtimePlayer=runtimeErrorPlayer(demo.playerEntries[0].html);
 const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://localhost').pathname,file=resolve(root,extname(pathname)?'.'+pathname:'index.html');if(relative(root,file).startsWith('..'))return res.writeHead(404).end();res.setHeader('content-type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404).end();}});
 await new Promise(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${server.address().port}`;
 const errors=[],unknown=[],states={};let browser;
@@ -81,9 +73,18 @@ try{
   await page.locator('.cdk-overlay-backdrop').click({position:{x:5,y:5}});assert.equal(await page.locator('mat-dialog-container').count(),1);
   await page.getByRole('button',{name:'Fehlerdetails',exact:true}).click();states[key].expanded=await capture('expanded');
   assert.ok(states[key].expanded.dialog.content.includes('Owned incomplete runtime Ω'));
+  await frame.locator('#ownedRuntimeError').evaluate(button=>{button.dataset.message='Second owned runtime Ω';button.click();});
+  await new Promise(done=>setTimeout(done,700));
+  states[key].repeated=await capture('repeated');
+  states[key].repeatedDialogCount=await page.locator('mat-dialog-container').count();
+  assert.equal(states[key].repeatedDialogCount,1);
+  assert.ok(states[key].repeated.dialog.content.includes('Owned incomplete runtime Ω'));
+  assert.ok(!states[key].repeated.dialog.content.includes('Second owned runtime Ω'));
   await page.locator('[data-cy=close]').click();await page.waitForFunction(()=>!document.querySelector('mat-dialog-container'));
   await page.waitForLoadState('networkidle');states[key].reloaded=await capture('reloaded');states[key].errorRequests=requests.slice(before);
   assert.equal(states[key].errorRequests.filter(q=>q.body?.logEntries?.some(e=>e.key==='Runtime Error: runtime-error'&&e.content==='Owned incomplete runtime Ω')).length,1);
+  states[key].repeatedRuntimeLogCount=states[key].errorRequests.filter(q=>q.body?.logEntries?.some(e=>e.key==='Runtime Error: runtime-error')).length;
+  assert.equal(states[key].repeatedRuntimeLogCount,2);
   assert.equal(states[key].errorRequests.filter(q=>Array.isArray(q.body)&&q.body.some(e=>e.key==='CONTROLLER'&&e.content==='ERROR')).length,1);
   await context.close();console.log(`source_runtime_error=${key}:passed`);
  }

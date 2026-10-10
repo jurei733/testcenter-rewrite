@@ -9,6 +9,8 @@ import {
 } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { CdkTrapFocus } from "@angular/cdk/a11y";
+import { redactBugReportText } from "@testcenter-rewrite-app/contracts";
 
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
@@ -16,6 +18,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
 import type { ParticipantConfirmationDialog } from "./participant-view.facade";
 import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
 import { OriginalParticipantInformationLauncherComponent } from "./original-participant-information-dialog.component";
+import { OriginalParticipantErrorLauncherComponent } from "./original-participant-error-dialog.component";
 import { ParticipantStatusStylesComponent } from "./participant-status-styles.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
@@ -36,8 +39,8 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent],
+  imports: [CommonModule, FormsModule, CdkTrapFocus, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
+    OriginalPlayerToolbarComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent, OriginalParticipantErrorLauncherComponent],
   template: `
     <app-participant-status-styles />
     @defer (when interfaceMode.mode() === 'original') {
@@ -507,7 +510,7 @@ interface ParticipantVisibleCodeNotice {
             </section>
           </ng-container>
           <ng-template #participantActiveRun>
-          <ng-container *ngIf="view.hasControllerError; else participantRunnableState">
+          <ng-container *ngIf="view.hasControllerError && interfaceMode.mode() !== 'original'; else participantRunnableState">
             <section
               id="participantRouteControllerErrorState"
               class="participant-controller-error-state"
@@ -622,7 +625,7 @@ interface ParticipantVisibleCodeNotice {
           </section>
           <ng-container *ngIf="!view.eagerBookletLoading; else eagerBookletLoading">
             <app-verona-player-host
-              *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
+              *ngIf="(interfaceMode.mode() === 'original' ? view.originalVeronaPlayer : view.veronaPlayer) as verona; else textResponsePlayer"
               [playerHtml]="verona.playerHtml"
               [playerKey]="verona.playerKey"
               [testRunId]="verona.testRunId"
@@ -1152,6 +1155,24 @@ interface ParticipantVisibleCodeNotice {
         </article>
       </section>
       </ng-template>
+      @if (interfaceMode.mode() === 'original' && view.controllerError; as error) {
+        @for (request of [error]; track request) {
+          @defer (on immediate) {
+            <app-original-participant-error-launcher [error]="request" />
+          } @error {
+            <section id="participantRuntimeErrorFallback" class="participant-confirmation-backdrop" role="alertdialog" aria-modal="true"
+              cdkTrapFocus [cdkTrapFocusAutoCapture]="true" aria-labelledby="participantErrorFallbackTitle">
+              <article class="participant-confirmation-dialog">
+                <h2 id="participantErrorFallbackTitle">Fehler beim Abspielen der Aufgabe</h2>
+                <p>{{ view.customText('booklet_errormessage') }}</p>
+                <details><summary>Fehlerdetails</summary><p>{{ redactBugReportText(request.description || request.message) }}</p></details>
+                <button id="participantRouteControllerReloadButton" cdkFocusInitial type="button"
+                  (click)="view.reloadAfterControllerError(request)">Schließen und neu laden</button>
+              </article>
+            </section>
+          }
+        }
+      }
       @if (view.confirmationDialog(); as confirmation) {
         @if (interfaceMode.mode() === 'original') {
           @for (request of [confirmation]; track request) {
@@ -1179,6 +1200,7 @@ interface ParticipantVisibleCodeNotice {
   `
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
+  readonly redactBugReportText = redactBugReportText;
   resolveOriginalConfirmation(request: ParticipantConfirmationDialog, confirmed: boolean): void {
     if (this.view.confirmationDialog() === request) this.view.resolveConfirmation(confirmed);
   }

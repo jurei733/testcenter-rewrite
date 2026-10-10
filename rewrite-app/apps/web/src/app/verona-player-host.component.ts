@@ -66,6 +66,9 @@ export type VeronaControllerError = {
   testRunId: string;
   unitKey: string;
   message: string;
+  description?: string;
+  timestamp?: number;
+  details?: string;
 };
 
 type RetiredVeronaFrame = {
@@ -221,7 +224,7 @@ type RetiredVeronaFrame = {
         </button>
       </nav>
       <section
-        *ngIf="errorMessage"
+        *ngIf="errorMessage && !originalUi"
         class="verona-player-error"
         id="participantVeronaPlayerError"
         role="alert"
@@ -935,7 +938,8 @@ export class VeronaPlayerHostComponent
     this.persistHostLog(entry);
     this.fail(
       [code, message].filter(Boolean).join(": ") ||
-        "The player reported a runtime error."
+        "The player reported a runtime error.",
+      message
     );
   }
 
@@ -1101,7 +1105,7 @@ export class VeronaPlayerHostComponent
     }, 500);
   }
 
-  private fail(message: string): void {
+  private fail(message: string, description = message): void {
     this.clearReadyTimeout();
     this.clearScheduledFrames();
     this.status = "error";
@@ -1126,7 +1130,10 @@ export class VeronaPlayerHostComponent
       this.controllerError.emit({
         testRunId: this.frameTestRunId,
         unitKey: this.frameUnitKey,
-        message
+        message,
+        description,
+        timestamp: Date.now(),
+        details: new Error(message).stack
       });
     }
   }

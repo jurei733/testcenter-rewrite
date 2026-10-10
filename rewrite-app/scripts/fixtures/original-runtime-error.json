@@ -119,7 +119,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     },
     "run-hot-return-Primar-mobile-forbidden-false": {
       "iframePreserved": true,
@@ -238,7 +240,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     },
     "run-hot-return-Sekundar-desktop-forbidden-false": {
       "iframePreserved": true,
@@ -357,7 +361,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     },
     "run-hot-return-Sekundar-mobile-forbidden-false": {
       "iframePreserved": true,
@@ -476,7 +482,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     },
     "run-hot-return-Erwachsene-desktop-forbidden-false": {
       "iframePreserved": true,
@@ -595,7 +603,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     },
     "run-hot-return-Erwachsene-mobile-forbidden-false": {
       "iframePreserved": true,
@@ -714,7 +724,9 @@
         "LOADING",
         "RUNNING"
       ],
-      "reloadReturnsToSameParticipantRoute": true
+      "reloadReturnsToSameParticipantRoute": true,
+      "repeatedDialogCount": 1,
+      "repeatedRuntimeLogCount": 2
     }
   }
 }
