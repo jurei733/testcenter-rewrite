@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
-import type { OnDestroy, OnInit } from "@angular/core";
+import type { OnDestroy, OnInit, Type } from "@angular/core";
 import { MatButton } from "@angular/material/button";
 import { MAT_DIALOG_DATA, MatDialog, MatDialogActions, MatDialogClose, MatDialogContent, MatDialogTitle } from "@angular/material/dialog";
 import type { MatDialogRef } from "@angular/material/dialog";
@@ -41,7 +41,8 @@ export class OriginalParticipantConfirmationLauncherComponent implements OnInit,
   @Input({ required: true }) confirmation!: ParticipantConfirmationDialog;
   @Output() readonly closed = new EventEmitter<boolean>();
   private readonly dialogs = inject(MatDialog);
-  private dialog?: MatDialogRef<OriginalParticipantConfirmationDialogComponent, boolean>;
+  protected readonly dialogComponent: Type<unknown> = OriginalParticipantConfirmationDialogComponent;
+  private dialog?: MatDialogRef<unknown, boolean>;
   private subscription?: Subscription;
   ngOnInit(): void {
     const copy = this.confirmation.original ?? { ...this.confirmation, confirmMeansContinue: true };
@@ -50,7 +51,7 @@ export class OriginalParticipantConfirmationLauncherComponent implements OnInit,
       ? OriginalParticipantConfirmationLauncherComponent.focusOrigins.get(this.dialogs)?.deref()
       : activeElement;
     if (focusOrigin) OriginalParticipantConfirmationLauncherComponent.focusOrigins.set(this.dialogs, new WeakRef(focusOrigin));
-    this.dialog = this.dialogs.open(OriginalParticipantConfirmationDialogComponent, {
+    this.dialog = this.dialogs.open(this.dialogComponent, {
       // Keep Material's generated ID: a replaced dialog may still be closing.
       panelClass: "original-participant-confirmation-dialog",
       data: { ...copy, safeMode: document.documentElement.dataset["applicationTheme"] === "Primar" },

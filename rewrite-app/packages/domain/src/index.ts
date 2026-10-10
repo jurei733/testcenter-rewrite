@@ -1363,6 +1363,10 @@ export type ParticipantCurrentRunState = {
   };
   currentUnit: {
     unitKey: string | null;
+    // Resolved nearest testlet/root restrictions for decisions using a newer
+    // local Player report than the last API state. Optional for older servers.
+    completenessPolicy?: Pick<BookletRuntimePolicy["navigation"],
+      "requirePresentationComplete" | "requireResponseComplete">;
     displayLabel: string | null;
     description?: string | null;
     content?: string | null;

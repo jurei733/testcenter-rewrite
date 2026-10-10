@@ -6,6 +6,10 @@
   "main": "dist/packages/contracts/src/index.js",
   "types": "dist/packages/contracts/src/index.d.ts",
   "exports": {
+    "./booklet-completeness": {
+      "types": "./dist/packages/contracts/src/booklet-completeness.d.ts",
+      "default": "./dist/packages/contracts/src/booklet-completeness.js"
+    },
     ".": {
       "types": "./dist/packages/contracts/src/index.d.ts",
       "default": "./dist/packages/contracts/src/index.js"

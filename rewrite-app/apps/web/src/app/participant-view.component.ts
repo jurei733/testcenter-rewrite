@@ -15,6 +15,7 @@ import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import type { ParticipantConfirmationDialog } from "./participant-view.facade";
 import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
+import { OriginalParticipantInformationLauncherComponent } from "./original-participant-information-dialog.component";
 import { ParticipantStatusStylesComponent } from "./participant-status-styles.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
@@ -35,7 +36,7 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent],
   template: `
     <app-participant-status-styles />
     @defer (when interfaceMode.mode() === 'original') {
@@ -1132,12 +1133,14 @@ interface ParticipantVisibleCodeNotice {
               autofocus
               (click)="resolveOriginalConfirmation(confirmation, false)"
             >{{ confirmation.cancelLabel }}</button>
+            @if (confirmation.kind !== 'information') {
             <button
               id="participantConfirmationContinueButton"
               class="ghost"
               type="button"
               (click)="resolveOriginalConfirmation(confirmation, true)"
             >{{ confirmation.confirmLabel }}</button>
+            }
           </div>
         </article>
       </section>
@@ -1145,11 +1148,20 @@ interface ParticipantVisibleCodeNotice {
       @if (view.confirmationDialog(); as confirmation) {
         @if (interfaceMode.mode() === 'original') {
           @for (request of [confirmation]; track request) {
+            @if (request.kind === 'information') {
+              @defer (on immediate) {
+                <app-original-participant-information-launcher [confirmation]="request"
+                  (closed)="resolveOriginalConfirmation(request, false)" />
+              } @error {
+                <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: request}" />
+              }
+            } @else {
             @defer (on immediate) {
               <app-original-participant-confirmation-launcher [confirmation]="request"
                 (closed)="resolveOriginalConfirmation(request, $event)" />
             } @error {
               <ng-container [ngTemplateOutlet]="confirmationFallback" [ngTemplateOutletContext]="{$implicit: request}" />
+            }
             }
           }
         } @else {
@@ -1167,13 +1179,13 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly originalToasts = inject(OriginalToastService);
-  private consumedNavigationToast: { text: string } | null = null;
+  private consumedNavigationToast: { text: string; additionalTexts?: readonly string[] } | null = null;
   private readonly presentOriginalNavigationToast = effect(() => {
     const notice = this.view.originalNavigationToast();
     const original = this.interfaceMode.mode() === "original";
     if (!notice || notice === this.consumedNavigationToast) return;
     this.consumedNavigationToast = notice;
-    if (original) this.originalToasts.show(notice.text);
+    if (original) for (const text of [notice.text, ...(notice.additionalTexts ?? [])]) this.originalToasts.show(text);
   });
   readonly originalPanel = signal<"review" | "units" | null>(null);
 

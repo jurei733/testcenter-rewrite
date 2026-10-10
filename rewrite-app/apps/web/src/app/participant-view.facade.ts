@@ -263,6 +263,7 @@ type SettledVeronaResponse = Pick<
 >;
 
 export type ParticipantConfirmationDialog = {
+  kind?: "information";
   title: string;
   message: string;
   cancelLabel: string;
@@ -456,7 +457,7 @@ export class ParticipantViewFacade {
     null
   );
   // Each attempt has its own identity, including repeated blocked clicks.
-  readonly originalNavigationToast = signal<{ text: string } | null>(null);
+  readonly originalNavigationToast = signal<{ text: string; additionalTexts?: readonly string[] } | null>(null);
   private confirmationResolver: ((confirmed: boolean) => void) | null = null;
   private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
@@ -2821,102 +2822,34 @@ export class ParticipantViewFacade {
   }
 
   private async returnToStarterWithConfirmation(): Promise<void> {
-    const currentState = this.readCurrentRunState();
-    if (!currentState) {
-      return;
-    }
-    const testRunId = currentState.testRun.testRunId;
+    const initialState = this.readCurrentRunState();
+    if (!initialState) return;
+    const testRunId = initialState.testRun.testRunId;
     const viewLifecycleSequence = this.viewLifecycleSequence;
-    const timer = this.player.testletTimer;
-    if (
-      currentState.executionMode.forceTimeRestrictions &&
-      timer?.leave === "forbidden"
-    ) {
-      this.clearNavigationAdvisory();
-      this.originalNavigationToast.set({
-        text: "Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist."
-      });
-      this.navigationAdvisory.set({
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `The timed block "${timer.displayLabel}" cannot be left while its timer is active.`
-        )
-      });
+    const { planParticipantStarterExit } = await import("./participant-exit-policy");
+    const currentState = this.readCurrentRunState();
+    if (!currentState || currentState.testRun.testRunId !== testRunId ||
+        this.viewLifecycleSequence !== viewLifecycleSequence) return;
+    const plan = planParticipantStarterExit({ state: currentState,
+      response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
+      lock: this.player.leaveLock, customText: this.customText.bind(this) });
+    this.clearNavigationAdvisory();
+    if (plan.originalNotices.length) this.originalNavigationToast.set({
+      text: plan.originalNotices[0], additionalTexts: plan.originalNotices.slice(1)
+    });
+    if (plan.information) {
+      await this.requestConfirmation(plan.information);
       return;
     }
-    const confirmTestletTimeLeave =
-      currentState.executionMode.forceTimeRestrictions &&
-      timer?.leave === "confirm";
-    const confirmTestletLeaveLock = this.player.leaveLock?.confirm === true;
-    const restrictionConfirmation = confirmTestletTimeLeave
-      ? {
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `Leave the timed block "${timer.displayLabel}" and close it permanently?`
-        ),
-        cancelLabel: "Stay here",
-        confirmLabel: "Leave anyway"
-      }
-      : confirmTestletLeaveLock
-        ? {
-        title: this.leaveLockConfirmationTitle(this.player.leaveLock),
-        message: this.leaveLockConfirmationText(this.player.leaveLock),
-        cancelLabel: "Stay here",
-        confirmLabel: "Leave anyway"
-      }
-        : null;
-    const confirmation: ParticipantConfirmationDialog | null = restrictionConfirmation
-      ? {
-          ...restrictionConfirmation,
-          title: currentState.executionMode.saveResponses
-            ? "Return to test selection?"
-            : restrictionConfirmation.title
-        }
-      : currentState.executionMode.saveResponses
-        ? {
-            title: "Return to test selection?",
-            message: "Your saved progress will remain available.",
-            cancelLabel: "Continue working",
-            confirmLabel: "Return to tests"
-          }
-        : null;
-    if (confirmation) {
-      confirmation.original = {
-        title: currentState.executionMode.saveResponses
-          ? "Sicher, dass du den Test beenden möchtest?"
-          : confirmTestletTimeLeave
-            ? this.customText("booklet_warningLeaveTimerBlockTitle")
-            : this.customText(this.player.leaveLock?.scope === "unit" ? "booklet_warningLeaveTitle-unit" : "booklet_warningLeaveTitle-testlet"),
-        message: confirmTestletTimeLeave
-          ? this.customText("booklet_warningLeaveTimerBlockTextPrompt")
-          : confirmTestletLeaveLock
-            ? this.customText(this.player.leaveLock?.scope === "unit" ? "booklet_warningLeaveTextPrompt-unit" : "booklet_warningLeaveTextPrompt-testlet")
-            : "",
-        cancelLabel: restrictionConfirmation ? "Trotzdem weiter" : "Abbrechen",
-        confirmLabel: restrictionConfirmation ? "Hier bleiben" : "Bestätigen",
-        confirmMeansContinue: !restrictionConfirmation
-      };
-    }
-    if (confirmation && !(await this.requestConfirmation(confirmation))) {
+    if (plan.advisory) {
+      this.resolveConfirmation(false);
+      this.navigationAdvisory.set(plan.advisory);
       return;
     }
+    if (plan.confirmation && !(await this.requestConfirmation(plan.confirmation))) return;
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
-        this.readCurrentRunState()?.testRun.testRunId !== testRunId) {
-      return;
-    }
-
-    await this.returnToStarterInternal(
-      confirmTestletTimeLeave,
-      confirmTestletLeaveLock
-    );
+        this.readCurrentRunState()?.testRun.testRunId !== testRunId) return;
+    await this.returnToStarterInternal(plan.confirmTestletTimeLeave, plan.confirmTestletLeaveLock);
   }
 
   async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
@@ -3867,17 +3800,23 @@ export class ParticipantViewFacade {
     if (!currentState) {
       return;
     }
+    const testRunId = currentState.testRun.testRunId;
+    const viewLifecycleSequence = this.viewLifecycleSequence;
+    const isCurrent = (): boolean => this.viewLifecycleSequence === viewLifecycleSequence &&
+      this.readCurrentRunState()?.testRun.testRunId === testRunId && this.runtime.testRunId.trim() === testRunId;
     const saveResponses = currentState.executionMode.saveResponses;
     const settledVeronaResponse =
       await this.settleVeronaAutoSaveBeforeForegroundAction();
+    if (!isCurrent()) return;
     await this.saveCurrentDraftBeforeCompleteInternal(settledVeronaResponse);
+    if (!isCurrent()) return;
 
     const payload =
       await this.requestState.request<ReturnTestRunToStarterResponse>(
         "Participant Return To Starter",
         "POST",
         resolveRoutePath(productionApiRoutes.participant.returnToStarter, {
-          testRunId: this.runtime.testRunId.trim()
+          testRunId
         }),
         {
           responseUnitKey: saveResponses
@@ -3896,6 +3835,7 @@ export class ParticipantViewFacade {
         } satisfies ReturnTestRunToStarterRequest
       );
 
+    if (!isCurrent()) return;
     this.participantEvents.stop();
     this.invalidateCurrentStateRefreshes();
     discardParticipantSaveOutboxForRun(payload.testRun.testRunId);

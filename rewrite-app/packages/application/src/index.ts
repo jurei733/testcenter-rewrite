@@ -1,3 +1,4 @@
+import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import {
   createHash,
   randomBytes,
@@ -44,7 +45,6 @@ import type { Response as IqbResponse } from "@iqbspecs/response/response.interf
 
 import {
   adminPasswordPolicy,
-  bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
   isBookletPlayerEndAllowed,
   isSupportedVeronaPlayerApiVersion,
@@ -32092,11 +32092,16 @@ export const createFirstSliceServices = (
           executionMode,
           testRun: currentTestRun,
           booklet: participantBooklet,
-          currentUnit: resolveRuntimeUnit(
-            contentRelease,
-            currentTestRun.bookletKey,
-            currentTestRun.currentUnitKey
-          ),
+          currentUnit: {
+            ...resolveRuntimeUnit(contentRelease, currentTestRun.bookletKey, currentTestRun.currentUnitKey),
+            completenessPolicy: isUnitLeaveLocked(currentBooklet, currentTestRun, currentTestRun.currentUnitKey)
+              ? { requirePresentationComplete: "off", requireResponseComplete: "off" }
+              : (() => {
+                  const policy = resolveTestletCompletenessPolicy(currentBooklet, currentTestRun.currentUnitKey, runtimeBooklet.policy);
+                  return { requirePresentationComplete: policy.navigation.requirePresentationComplete,
+                    requireResponseComplete: policy.navigation.requireResponseComplete };
+                })()
+          },
           ...(input.includeBookletAssets
             ? {
                 bookletAssets: resolveRuntimeBookletAssets(
@@ -33659,6 +33664,26 @@ export const createFirstSliceServices = (
               }
             })
           : testRun;
+        // A logo exit leaves the current unit in the forward direction. Source
+        // checks completeness before any timer/leave-lock confirmation, and a
+        // direct API caller must not bypass that decision with confirm flags.
+        const currentResponse = returnEvaluationRun.currentUnitKey
+          ? returnEvaluationRun.unitResponses[returnEvaluationRun.currentUnitKey] : undefined;
+        const parsedResponse = currentResponse === undefined ? null : parseVeronaUnitResponse(currentResponse);
+        const completenessDeniedReasons = !returnEvaluationRun.currentUnitKey ||
+          !executionMode.forceNaviRestrictions || returnEvaluationRun.monitorNavigationUnlocked ||
+          isUnitLeaveLocked(booklet, returnEvaluationRun, returnEvaluationRun.currentUnitKey) ? []
+          : bookletStarterExitDeniedReasons({
+              policy: resolveTestletCompletenessPolicy(booklet, returnEvaluationRun.currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
+              presentationProgress: parsedResponse ? parsedResponse.unitState.presentationProgress : currentResponse === undefined ? undefined : "complete",
+              responseProgress: parsedResponse ? parsedResponse.unitState.responseProgress : currentResponse === undefined ? undefined : currentResponse.trim() ? "complete" : "none"
+            });
+        if (completenessDeniedReasons.length > 0) {
+          throw new FirstSliceError(409, "booklet_starter_return_denied",
+            `Run '${testRunId}' cannot return to the starter before completing the current unit.`, {
+              currentUnitKey: testRun.currentUnitKey, deniedReasons: completenessDeniedReasons
+            });
+        }
         const leavingTimedTestlet = resolveLeavingTimedTestlet(
           booklet,
           returnEvaluationRun,
