@@ -1,0 +1,720 @@
+{
+  "referenceRevision": "ee2ab9ab64bd91209ef8534bbe6005838024e46d",
+  "scope": "Unmodified Source frontend on owned API/player fixtures; no Source backend authorization proof",
+  "cases": {
+    "run-hot-return-Primar-desktop-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    },
+    "run-hot-return-Primar-mobile-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 751.59375,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 176.203125,
+          "width": 358,
+          "height": 548.59375,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 696.203125,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 68.203125,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 724.796875,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 741.796875,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(25, 97, 117)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    },
+    "run-hot-return-Sekundar-desktop-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    },
+    "run-hot-return-Sekundar-mobile-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 751.59375,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 176.203125,
+          "width": 358,
+          "height": 548.59375,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 696.203125,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 68.203125,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 724.796875,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 741.796875,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(11, 45, 132)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    },
+    "run-hot-return-Erwachsene-desktop-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 549,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 280,
+          "y": 85.5,
+          "width": 720,
+          "height": 65,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 280,
+          "y": 151.5,
+          "width": 720,
+          "height": 410,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 304,
+          "y": 503.5,
+          "width": 672,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 304,
+          "y": 107.5,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 280,
+          "y": 561.5,
+          "width": 720,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 537.375,
+              "y": 578.5,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    },
+    "run-hot-return-Erwachsene-mobile-forbidden-false": {
+      "iframePreserved": true,
+      "cardCount": 0,
+      "activeRole": "dialog",
+      "collapsedDialog": {
+        "role": "dialog",
+        "box": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 751.59375,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "title": "Fehler beim Abspielen der Aufgabe",
+        "titleBox": {
+          "x": 16,
+          "y": 46.203125,
+          "width": 358,
+          "height": 129,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "6px 24px 13px",
+          "margin": "0px 0px 1px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "contentBox": {
+          "x": 16,
+          "y": 176.203125,
+          "width": 358,
+          "height": 548.59375,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(64, 72, 76)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "expansion": {
+          "x": 40,
+          "y": 696.203125,
+          "width": 310,
+          "height": 48,
+          "font": "16px / 24px \"Nunito Sans\"",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgb(255, 255, 255)",
+          "padding": "0px",
+          "margin": "0px 0px 10px",
+          "borderRadius": "12px",
+          "boxShadow": "rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px"
+        },
+        "icon": {
+          "x": 40,
+          "y": 68.203125,
+          "width": 24,
+          "height": 24,
+          "font": "30px / 32px \"Nunito Sans\"",
+          "color": "rgb(169, 35, 25)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "margin": "0px 15px 0px 0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "actions": {
+          "x": 16,
+          "y": 724.796875,
+          "width": 358,
+          "height": 73,
+          "font": "16px \"Nunito Sans\", sans-serif",
+          "color": "rgb(25, 28, 29)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "16px 24px",
+          "margin": "0px",
+          "borderRadius": "0px",
+          "boxShadow": "none"
+        },
+        "buttons": [
+          {
+            "text": "Schließen und neu laden",
+            "box": {
+              "x": 92.375,
+              "y": 741.796875,
+              "width": 205.25,
+              "height": 40,
+              "font": "500 14px \"Nunito Sans\"",
+              "color": "rgb(107, 54, 154)",
+              "background": "rgb(255, 255, 255)",
+              "padding": "0px 24px",
+              "margin": "0px",
+              "borderRadius": "9999px",
+              "boxShadow": "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px"
+            },
+            "classes": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-unthemed"
+          }
+        ]
+      },
+      "introText": "Leider gab es ein technisches Problem. Versuche Folgendes:\n\n1. Lade die Seite neu. Drücke dafür die Taste F5 oder am Tablet das Neu-Laden-Symbol oben rechts neben der Internetadresse.\n\nFunktioniert nicht? Dann...\n\n2. Melde dich mit deinen Zugangsdaten in einem anderen Browser neu an (Browser: Mozilla Firefox, Google Chrome, Apple Safari).\n\nFunktioniert auch nicht? Dann...\n\n3. Melde dich mit deinen Zugangsdaten an einem anderen Gerät neu an. Spreche das aber vorher mit der Lehrkraft bzw. Testleitung ab.",
+      "errorDescription": "Owned incomplete runtime Ω",
+      "escapeKeepsDialog": true,
+      "backdropKeepsDialog": true,
+      "runtimeErrorLogCount": 1,
+      "controllerErrorWriteCount": 1,
+      "connectionLostBeaconCount": 1,
+      "reloadControllerStates": [
+        "ERROR",
+        "LOADING",
+        "RUNNING"
+      ],
+      "reloadReturnsToSameParticipantRoute": true
+    }
+  }
+}

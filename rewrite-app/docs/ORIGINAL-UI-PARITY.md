@@ -1,5 +1,57 @@
 # Optional Original UI
 
+### Native pause container and startup budget (2026-10-10)
+
+Application checkpoint `85e8e9e86fe8` uses the pinned Original's native
+Material sidenav container/content, closed end drawer and white content surface
+for the pause card. This clips the upper card shadow at the content boundary.
+The first drawer build exceeded the unchanged 470 kB startup limit by 694 bytes.
+Migrating the root template's conditional rendering to Angular control flow
+removes its static NgIf dependency and lowers the production initial bundle to
+469.02 kB. The existing 450 kB warning and component-style warnings remain;
+no budget was increased.
+
+Eight sequential headful browser suites pass against owned SQLite APIs: all 44
+pause cases, 32 header cases, participant login/second-code cases, admin login
+with and without its proof-of-work challenge, offline shell/central bug reporting,
+global warning and raw-response settings, and required/voluntary password changes.
+All 469 frontend state tests also pass. The API/application/store implementation
+is unchanged from the preceding 9d9ec5754879 checkpoint and its recorded
+1128 unit/state, 165 SQLite API and 701 PostgreSQL integration checks.
+
+The new application image passes PostgreSQL Compose in standard, demo and
+production-secret modes, plus standalone SQLite Docker. The image is
+`testcenter-rewrite-app:completeness-85e8e9e86fe8`, with ID
+`sha256:127a8503e58a17a4fd77db5b53751b81e80a47bc416cc1855f1e1c86b045299e`,
+USER node and revision 85e8e9e86fe8. Its declared build timestamp is
+2026-10-10T16:34:04.899Z. Owned test containers/volumes are removed. Exact comparison
+preserves all 24 preexisting container IDs and 85 volume names, and the protected
+presentation SHA-256 remains
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+Approximately 11 GiB remain available after the runs.
+
+A new full-PNG comparison of the 44 pause cases measures at most 0.13965% changed
+pixels. The remaining differences are the header shadow and three card-edge
+pixels; the maximum channel difference is 5. Zero full viewports are pixel-identical.
+This improves the former upper-shadow overlap but does not close full-page UI
+acceptance, remote CI, real-device, release or deployment proof.
+
+The next confirmed gap is the Original runtime-error surface. Six unmodified
+Source frontend cases (three themes, desktop/mobile, Hot Return with incomplete
+presentation/response and a forbidden timed-block exit) pass in
+`scripts/reference-original-runtime-error.mjs`. The Source retains its iframe,
+focuses a native non-dismissible dialog, shows the default custom technical-help
+text and expandable Fehlerdetails, and offers Schließen und neu laden. Escape and
+backdrop clicks retain the dialog. Each case logs one Runtime Error: runtime-error
+and one CONTROLLER=ERROR, then reloads through the same participant route and
+sends a connection-lost beacon. Portable presentation expectations are saved in
+`scripts/fixtures/original-runtime-error.json`. These are frontend references on
+owned API/player fixtures, not Source backend authorization or persistence proof.
+The Rewrite's retained-player/native-error-dialog implementation and broader
+error, custom-text and overlapping-command acceptance remain open. The pinned
+Source revision remains `ee2ab9ab64bd91209ef8534bbe6005838024e46d`, freshly verified
+against remote master. All eight full Original UI acceptance rows remain open.
+
 ### Paused starter exits (2026-10-10)
 
 Application checkpoint `9d9ec5754879` matches the pinned Original pause-status
