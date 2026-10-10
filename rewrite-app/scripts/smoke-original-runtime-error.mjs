@@ -38,11 +38,14 @@ const failDialog = process.env.UI_SMOKE_RUNTIME_DIALOG_FAILURE === "true";
 const saveFailure = process.env.UI_SMOKE_RUNTIME_SAVE_FAILURE;
 const replacementMode = process.env.UI_SMOKE_RUNTIME_REPLACEMENT;
 const monitorCommand = process.env.UI_SMOKE_RUNTIME_LATE_COMMAND;
-const receivedPause = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE === 'true';
+const receivedPauseOldSave = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE_OLD_SAVE === 'true';
+const receivedPause = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE === 'true' || receivedPauseOldSave;
+const lateSavePause = process.env.UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE === 'true';
 const commandOverlap = JSON.parse(await readFile(new URL('./fixtures/original-runtime-command-overlap.json', import.meta.url), 'utf8'));
 assert.equal(commandOverlap.referenceRevision, reference.referenceRevision);
 assert.ok(!monitorCommand || ['pause','complete'].includes(monitorCommand));
 assert.ok(!(monitorCommand && receivedPause));
+assert.ok(!(lateSavePause && (monitorCommand || receivedPause || replacementMode || saveFailure)));
 assert.ok(!replacementMode || ["success", "reject"].includes(replacementMode));
 try {
   const port = await new Promise((done, reject) => {
@@ -114,8 +117,44 @@ try {
       const p = parseVeronaUnitResponse(s.testRun.unitResponses["unit-intro"] || "");
       return p?.unitState.presentationProgress === "some" && p.unitState.responseProgress === "none" && p.unitState.dataParts.answer === answer;
     });
-    const runId = current.testRun.testRunId, packet = current.testRun.unitResponses["unit-intro"];
-    if (monitorCommand || receivedPause) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    const runId = current.testRun.testRunId;
+    let packet = current.testRun.unitResponses["unit-intro"];
+    if (monitorCommand || receivedPause || lateSavePause) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    let releaseBeforePauseSave, releaseAfterPauseLog;
+    if (receivedPauseOldSave) {
+      let started,held=false;
+      const ready=new Promise(done=>{started=done;}),gate=new Promise(done=>{releaseBeforePauseSave=done;}),logGate=new Promise(done=>{releaseAfterPauseLog=done;});
+      await context.route(`**/api/v1/participant/test-runs/${encodeURIComponent(runId)}/save-progress`,async route=>{
+        const requestPacket=parseVeronaUnitResponse(route.request().postDataJSON().unitResponse ?? '');
+        if (!held && requestPacket?.unitState.dataParts.answer===answer+' before pause') {
+          held=true;const response=await route.fetch();const body=await response.json();
+          assert.equal(body.testRun.status,'running');packet=body.testRun.unitResponses['unit-intro'];
+          started();await gate;await route.fulfill({response});
+        } else {
+          const body=route.request().postDataJSON();
+          if(body.logs?.some(batch=>batch.entries.some(entry=>entry.key==='Runtime Error: runtime-error')))await logGate;
+          await route.continue();
+        }
+      });
+      await frame.locator('#demoPlayerAnswer').fill(answer+' before pause');
+      let timer;
+      try {await Promise.race([ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned pre-pause save response did not arrive')),15000);})]);}
+      finally {clearTimeout(timer);}
+      assert.equal(parseVeronaUnitResponse(packet).unitState.dataParts.answer,answer+' before pause');
+    }
+    let releaseLateSave, lateSaveStarted;
+    if (lateSavePause) {
+      const gate = new Promise(done=>{releaseLateSave=done;});
+      let started, held=false;
+      lateSaveStarted = new Promise(done=>{started=done;});
+      await context.route(`**/api/v1/participant/test-runs/${encodeURIComponent(runId)}/save-progress`, async route=>{
+        const body=route.request().postDataJSON();
+        if (!held && body.logs?.some(batch=>batch.entries.some(entry=>entry.key==='Runtime Error: runtime-error'))) {
+          held=true;started();await gate;
+        }
+        await route.continue();
+      });
+    }
     let releaseReceivedPause;
     if (receivedPause) {
       let pausedRequest;
@@ -140,6 +179,31 @@ try {
     await delay(200);
     assert.equal(await page.locator("mat-dialog-container").count(), 0);
     await frame.locator("#ownedRuntimeError").click(); await page.locator(failDialog ? "#participantRuntimeErrorFallback" : "mat-dialog-container").waitFor();
+    if (lateSavePause) {
+      let timer;
+      try {await Promise.race([lateSaveStarted,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned runtime log save did not start')),15000);})]);}
+      finally {clearTimeout(timer);}
+      await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:'pause',actorId:'owned-late-save-pause'}, operator);
+      await poll(currentState,s=>s.testRun.status==='paused');
+      releaseLateSave();
+      const logs=workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('Runtime Error: runtime-error')}&unitKey=unit-intro`;
+      const stored=await poll(()=>api(logs,undefined,operator),p=>p.items.length===1);
+      assert.equal(stored.items[0].testLog.logContent,expected.errorDescription);
+      const controllerLogs=workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=CONTROLLER&limit=100`;
+      await poll(()=>api(controllerLogs,undefined,operator),p=>p.items.filter(i=>i.testLog.logContent==='ERROR').length===1);
+      await page.waitForFunction(()=>localStorage.getItem('testcenter-rewrite:participant-save-outbox:v1')===null);
+      await delay(700);
+      states[key]={lateSavePause:true,iframePreserved:await element.evaluate(el=>el.isConnected),dialogCount:await page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container').count()};
+      await page.screenshot({path:join(artifacts,`${key}-late-save-pause.png`),fullPage:true});
+      assert.equal(states[key].iframePreserved,commandOverlap.cases['pending-pause'].iframePreserved,'A save acknowledgement must not deliver a late monitor pause into ERROR.');
+      assert.equal(states[key].dialogCount,1);
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      await page.locator('#participantRouteControllerReloadButton').click();
+      await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});
+      await page.locator('app-original-participant-paused mat-card').waitFor();
+      assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
+      await context.close();console.log('original_runtime_late_save_pause=preserved:passed');continue;
+    }
     if (receivedPause) {
       assert.equal(await element.evaluate(el=>el.isConnected),true);
       releaseReceivedPause();
@@ -150,8 +214,24 @@ try {
       assert.equal(await page.locator('mat-card').count(),sourcePause.cardCount);
       assert.equal(await page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container').count(),Number(sourcePause.dialogRetained));
       await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+      if (receivedPauseOldSave) await page.evaluate(()=>{
+        window.ownedPauseFrameAdds=0;
+        window.ownedPauseObserver=new MutationObserver(records=>{
+          for(const record of records)for(const node of record.addedNodes)
+            if(node instanceof Element && (node.matches('iframe') || node.querySelector('iframe')))window.ownedPauseFrameAdds++;
+        });
+        window.ownedPauseObserver.observe(document.body,{childList:true,subtree:true});
+      });
+      releaseBeforePauseSave?.();
+      if (receivedPauseOldSave) {await delay(700);releaseAfterPauseLog();}
       const logs = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('Runtime Error: runtime-error')}&unitKey=unit-intro`;
       await poll(()=>api(logs,undefined,operator),p=>p.items.length===1);
+      if (receivedPauseOldSave) {
+        await page.waitForFunction(()=>localStorage.getItem('testcenter-rewrite:participant-save-outbox:v1')===null);
+        await delay(700);await page.locator('app-original-participant-paused mat-card').waitFor();
+        assert.equal(await page.locator('iframe').count(),0,'An older running save snapshot cannot undo an accepted pause.');
+        assert.equal(await page.evaluate(()=>{window.ownedPauseObserver.disconnect();return window.ownedPauseFrameAdds;}),0,'An old save cannot temporarily recreate the Player behind the retained dialog.');
+      }
       assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
       states[key]={receivedPause:true,errorDialogRetained:true,iframeRemoved:true,serverStatus:'paused'};
       await page.screenshot({path:join(artifacts,`${key}-received-pause.png`),fullPage:true});
@@ -159,7 +239,7 @@ try {
       await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});
       await page.locator('app-original-participant-paused mat-card').waitFor();
       assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
-      await context.close();console.log('original_runtime_received_pause=preserved:passed');continue;
+      await context.close();console.log(receivedPauseOldSave ? 'original_runtime_received_pause_old_save=preserved:passed' : 'original_runtime_received_pause=preserved:passed');continue;
     }
     assert.equal(await element.evaluate(el => el.isConnected), expected.iframePreserved);
     assert.equal(await page.locator("#participantRouteControllerErrorState").count(), 0);

@@ -85,6 +85,8 @@ const withHost = async action => {
   host.veronaSaveInFlight = null;
   host.veronaSaveRetrySequence = 0;
   host.veronaSaveRetryRunId = null;
+  host.currentStateAppliedRefreshSequence = 1;
+  host.hasControllerError = false;
   host.veronaForegroundSaveSettlement = false;
   host.veronaSaveBufferTimeout = null;
   host.veronaSaveBufferDueAtMs = null;
@@ -111,6 +113,56 @@ const withHost = async action => {
     else delete globalThis.window;
   }
 };
+
+test("a successful save during ERROR acknowledges exact data without applying its paused Run snapshot", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("8");outbox.persistParticipantSaveOutboxEntry(packet);
+    const response=deferred();host.respond=()=>response.promise;
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    host.hasControllerError=true;
+    response.resolve({testRun:{testRunId:"selected-run",status:"paused",unitResponses:{"8":packet.response}}});
+    await drain;
+    assert.deepEqual(calls.synchronized,[]);assert.equal(currentState.testRun.status,"running");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+    assert.equal(host.veronaSaveStatus,"saved");assert.equal(calls.requests[0].body.unitResponse,packet.response);
+  });
+});
+
+test("a response from before an accepted pause cannot overwrite the newer applied state", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("8");outbox.persistParticipantSaveOutboxEntry(packet);
+    const response=deferred();host.respond=()=>response.promise;
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    currentState.testRun.status="paused";host.currentStateAppliedRefreshSequence++;
+    response.resolve({testRun:{testRunId:"selected-run",status:"running"}});await drain;
+    assert.deepEqual(calls.synchronized,[]);assert.equal(currentState.testRun.status,"paused");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+
+test("a switched Run still acknowledges the old delivery without projecting it into the new selection", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("8"),foreign=entry("9",{testRunId:"new-selected-run"});
+    for(const value of [packet,foreign])outbox.persistParticipantSaveOutboxEntry(value);
+    const response=deferred();host.respond=()=>response.promise;
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    currentState.testRun={testRunId:"new-selected-run",status:"running",unitResponses:{}};
+    response.resolve({testRun:{testRunId:"selected-run",status:"paused"}});await drain;
+    assert.deepEqual(calls.synchronized,[]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("new-selected-run"),[foreign]);
+  });
+});
+
+test("an unchanged active Run still applies its successful auto-save receipt", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("8");outbox.persistParticipantSaveOutboxEntry(packet);
+    host.restorePersistentVeronaSave(currentState);await host.veronaSaveDrainPromise;
+    assert.equal(calls.synchronized.length,1);
+    assert.equal(calls.synchronized[0].unitResponses["8"],packet.response);
+    assert.equal(host.veronaSaveStatus,"saved");
+  });
+});
 
 test("an older failed delivery cannot strand a new visible-Unit answer behind its existing drain", async () => {
   await withHost(async ({ host, calls, currentState }) => {

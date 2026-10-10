@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
 
 const variants = [
+  ["late-save-monitor-pause", {UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE:"true"}],
+  ["late-save-monitor-pause-fallback", {UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE:"true",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
+  ["received-monitor-pause-old-save", {UI_SMOKE_RUNTIME_RECEIVED_PAUSE_OLD_SAVE:"true"}],
+  ["received-monitor-pause-old-save-fallback", {UI_SMOKE_RUNTIME_RECEIVED_PAUSE_OLD_SAVE:"true",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
   ["native", {}],
   ["lazy-load-fallback", {UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
   ["pending-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"delay"}],

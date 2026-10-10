@@ -3486,6 +3486,7 @@ export class ParticipantViewFacade {
     ) {
       const save = this.pendingVeronaSave;
       const retrySequence = this.veronaSaveRetrySequence;
+      const appliedRefreshSequence = this.currentStateAppliedRefreshSequence;
       this.pendingVeronaSave = null;
       this.veronaSaveInFlight = save;
       try {
@@ -3513,7 +3514,13 @@ export class ParticipantViewFacade {
             save.testRunId
           );
         }
-        this.syncRun(payload.testRun);
+        // A durable save receipt acknowledges data, not a new control command.
+        // ERROR keeps its local state until an accepted channel update or reload.
+        if (this.readCurrentRunState()?.testRun.testRunId === save.testRunId &&
+          !this.hasControllerError &&
+          appliedRefreshSequence === this.currentStateAppliedRefreshSequence) {
+          this.syncRun(payload.testRun);
+        }
         this.runtime.runtimeMonitorView = prettyPrintJson(
           payload,
           this.runtime.runtimeMonitorView
