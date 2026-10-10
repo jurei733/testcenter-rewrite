@@ -1,5 +1,53 @@
 # Optional Original UI
 
+### Command reception and dependency caching (2026-10-11)
+
+Packaging checkpoint `26f74a5bd6be` installs workspace dependencies from the
+root lockfile and all nine workspace manifests before copying application
+sources or applying build metadata. Runtime copies retain node ownership.
+A second image build in an owned archived checkout changes an API source file
+and the build timestamp: both development and production npm-install layers
+are CACHED, while the application rebuild and runtime preflight succeed.
+
+Six fresh read-only Source browser probes at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` cover pending and queued
+pause, terminate and resume. The recorder checks actual DOM identity:
+pending replies after ERROR retain the original iframe and receive no ACK;
+queued resume retains the dialog, replaces the iframe, records RUNNING and
+reopens polling. Queued pause/terminate retain their existing observations.
+These are unmodified Source frontend probes on owned API/player fixtures,
+not a Source backend control-state equivalence claim.
+
+An opt-in Rewrite regression (`UI_SMOKE_RUNTIME_RECEIVED_RESUME=true`)
+issues a real same-status/same-Unit monitor resume, captures its resulting
+current-state refresh before ERROR and delivers that response afterwards.
+It currently fails the specific Source-derived DOM assertion: the errored
+iframe remains connected. The failure is verified with the actual API shut
+down and no page errors. This refresh is not a durable command receipt.
+The regression is recorded, not fixed or enabled as a passing CI scenario;
+command identity, receipt handling and already-accepted command execution
+remain necessary. Clearing ERROR on an arbitrary snapshot cannot establish
+that command causality.
+
+Fresh checks pass 41 existing error-reception/save-drain tests and three
+browser cases (normal runtime error, accepted pause, accepted pause with the
+lazy-dialog fallback). Fresh-image Docker passes standard/demo/production-
+secret PostgreSQL (schema 52) and SQLite (schema 58). The image
+`testcenter-rewrite-app:completeness-26f74a5bd6be` has USER node and ID
+`sha256:a387648696fad847f7e2265ca881280958607ec2342ec25214dbdc00ee46e65f`.
+All owned runtime resources are removed; exact inventory retains 24 existing
+containers, 85 volumes and the protected presentation hash.
+
+Application/frontend sources are unchanged from `ef83639c4597`. Its 1192
+unit checks, typecheck, production build, 56 runtime contracts and complete
+Verona recovery checks below remain retained evidence, not new full-suite
+runs. The new Docker builds compile the current production application.
+Ordered command delivery, Source termination equivalence, all eight complete
+Original UI acceptance rows, current-checkpoint remote CI, real devices,
+release and deployment remain open. Nothing was pushed.
+
+
+
 ### Late save receipts and accepted control state (2026-10-11)
 
 Application checkpoint `ef83639c4597` acknowledges successful durable Player saves
