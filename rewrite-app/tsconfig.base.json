@@ -17,6 +17,9 @@
     "paths": {
       "@testcenter-rewrite-app/domain": ["packages/domain/src/index.ts"],
       "@testcenter-rewrite-app/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite-app/contracts/participant-run-command": [
+        "packages/contracts/src/participant-run-command.ts"
+      ],
       "@testcenter-rewrite-app/contracts/booklet-completeness": [
         "packages/contracts/src/booklet-completeness.ts"
       ],

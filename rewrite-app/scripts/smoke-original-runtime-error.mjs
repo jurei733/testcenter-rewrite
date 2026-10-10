@@ -122,26 +122,27 @@ try {
     const runId = current.testRun.testRunId;
     let packet = current.testRun.unitResponses["unit-intro"];
     if (monitorCommand || receivedPause || lateSavePause || receivedResume) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
-    let releaseReceivedResume, receivedResumeCommand;
+    let releaseReceivedResume, receivedResumeCommand, receivedResumeReceipt;
     if (receivedResume) {
-      let accepted, held=false, issuedUpdatedAt;
+      let accepted, held=false;
       const started=new Promise(done=>{accepted=done;});
       const gate=new Promise(done=>{releaseReceivedResume=done;});
-      await context.route('**/api/v1/participant/sessions/**/current-state**',async route=>{
+      await context.route('**/api/v1/participant/sessions/**/commands/*/acknowledgement',async route=>{
         const response=await route.fetch();const body=await response.json();
-        if(!held && issuedUpdatedAt && body.currentRunState?.testRun.testRunId===runId &&
-          body.currentRunState.testRun.status==='running' && body.currentRunState.testRun.updatedAt===issuedUpdatedAt){
-          held=true;accepted();await gate;
+        if(!held && body.command?.testRunId===runId && body.command.commandType==='resume'){
+          assert.ok(body.command.acknowledgedAt);
+          held=true;receivedResumeReceipt=body.command;accepted();await gate;
         }
         await route.fulfill({response});
       });
       const issued=await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume',actorId:'owned-received-resume'},operator);
       assert.equal(issued.command.testRun.status,current.testRun.status);
       assert.equal(issued.command.testRun.currentUnitKey,current.testRun.currentUnitKey);
-      receivedResumeCommand=issued.command.commandId;issuedUpdatedAt=issued.command.testRun.updatedAt;
+      receivedResumeCommand=issued.command.commandId;
       let timer;
-      try{await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned same-status resume refresh did not start')),15000);})]);}
+      try{await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned same-status resume acknowledgement did not start')),15000);})]);}
       finally{clearTimeout(timer);}
+      assert.equal(receivedResumeReceipt.commandId,receivedResumeCommand);
     }
     let releaseBeforePauseSave, releaseAfterPauseLog;
     if (receivedPauseOldSave) {
@@ -178,24 +179,27 @@ try {
         await route.continue();
       });
     }
-    let releaseReceivedPause;
+    let releaseReceivedPause, receivedPauseCommand, receivedPauseReceipt;
     if (receivedPause) {
       let pausedRequest;
       const started = new Promise(done=>{pausedRequest=done;});
       const gate = new Promise(done=>{releaseReceivedPause=done;});
       let held = false;
-      await context.route('**/api/v1/participant/sessions/**/current-state**', async route=>{
+      await context.route('**/api/v1/participant/sessions/**/commands/*/acknowledgement', async route=>{
         const response = await route.fetch();
         const body = await response.json();
-        if (!held && body.currentRunState?.testRun.status === 'paused') {
-          held = true;pausedRequest();await gate;
+        if (!held && body.command?.testRunId === runId && body.command.commandType === 'pause') {
+          assert.ok(body.command.acknowledgedAt);
+          held = true;receivedPauseReceipt=body.command;pausedRequest();await gate;
         }
         await route.fulfill({response});
       });
-      await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:'pause',actorId:'owned-received-pause'}, operator);
+      receivedPauseCommand=(await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:'pause',actorId:'owned-received-pause'}, operator)).command.commandId;
       let timer;
-      try {await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned accepted pause refresh did not start')),15000);})]);}
+      try {await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned pause acknowledgement did not start')),15000);})]);}
       finally {clearTimeout(timer);}
+      assert.equal(receivedPauseReceipt.commandId,receivedPauseCommand);
+      assert.equal(await element.evaluate(el=>el.isConnected),true,'The held command receipt must defer the browser pause.');
     }
     // An unrelated window cannot send a trusted Player error.
     await page.evaluate(() => window.postMessage({type:"vopRuntimeErrorNotification",sessionId:"wrong-session",code:"runtime-error",message:"untrusted"}, "*"));
@@ -205,7 +209,8 @@ try {
     if(receivedResume){
       assert.equal(await element.evaluate(el=>el.isConnected),true);
       releaseReceivedResume();await delay(1800);
-      const actual={receivedResumeCommand,samePlayerFrameAsBeforeError:await element.evaluate(el=>el.isConnected),
+      const actual={receivedResumeCommand,acknowledgedAt:receivedResumeReceipt.acknowledgedAt,
+        samePlayerFrameAsBeforeError:await element.evaluate(el=>el.isConnected),
         iframeCount:await page.locator('iframe').count(),cardCount:await page.locator('mat-card').count(),
         dialogRetained:await page.locator(failDialog?'#participantRuntimeErrorFallback':'mat-dialog-container').count()===1,
         connectionStatus:await page.locator('#participantRouteConnectionState').count()
@@ -219,6 +224,15 @@ try {
       assert.equal(actual.cardCount,sourceResume.cardCount);
       assert.equal(actual.dialogRetained,sourceResume.dialogRetained);
       assert.equal(actual.connectionStatus,'live');
+      assert.equal(await frame.locator('#demoPlayerAnswer').inputValue(),answer,'The replacement Player must receive the saved response.');
+      const logs=await poll(()=>api(workspace+`/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=CONTROLLER&limit=100`,undefined,operator),payload=>{
+        const entries=payload.items.map(item=>item.testLog).sort((a,b)=>a.timestamp-b.timestamp);
+        const error=entries.findIndex(entry=>entry.logContent==='ERROR');
+        return error>=0 && entries.slice(error+1).some(entry=>entry.logContent==='RUNNING');
+      });
+      const controllerStates=logs.items.map(item=>item.testLog).sort((a,b)=>a.timestamp-b.timestamp).map(entry=>entry.logContent);
+      actual.controllerStatesAfterError=controllerStates.slice(controllerStates.indexOf('ERROR'));
+      assert.deepEqual(actual.controllerStatesAfterError,sourceResume.controllerStates.slice(sourceResume.controllerStates.indexOf('ERROR')));
       assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
       await context.close();console.log('original_runtime_received_resume=preserved:passed');continue;
     }
@@ -276,7 +290,7 @@ try {
         assert.equal(await page.evaluate(()=>{window.ownedPauseObserver.disconnect();return window.ownedPauseFrameAdds;}),0,'An old save cannot temporarily recreate the Player behind the retained dialog.');
       }
       assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
-      states[key]={receivedPause:true,errorDialogRetained:true,iframeRemoved:true,serverStatus:'paused'};
+      states[key]={receivedPause:true,receivedPauseCommand,acknowledgedAt:receivedPauseReceipt.acknowledgedAt,errorDialogRetained:true,iframeRemoved:true,serverStatus:'paused'};
       await page.screenshot({path:join(artifacts,`${key}-received-pause.png`),fullPage:true});
       await page.locator('#participantRouteControllerReloadButton').click();
       await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});

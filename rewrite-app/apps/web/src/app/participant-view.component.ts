@@ -628,6 +628,7 @@ interface ParticipantVisibleCodeNotice {
               *ngIf="(interfaceMode.mode() === 'original' ? view.originalVeronaPlayer : view.veronaPlayer) as verona; else textResponsePlayer"
               [playerHtml]="verona.playerHtml"
               [playerKey]="verona.playerKey"
+              [commandReloadSequence]="verona.commandReloadSequence"
               [testRunId]="verona.testRunId"
               [unitKey]="verona.unitKey"
               [unitTitle]="verona.unitTitle"

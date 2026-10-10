@@ -718,6 +718,8 @@ export type WorkspaceReviewPort = {
 };
 
 export type ParticipantRuntimePort = {
+  listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
+  acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
     action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
@@ -31999,6 +32001,33 @@ export const createFirstSliceServices = (
           availableAction: "resume"
         };
       },
+      async listPendingCommands(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const run = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!run || !resolveParticipantExecutionMode(run.executionMode).receiveRemoteCommands) return [];
+        return repository.listPendingParticipantRunCommands({
+          tenantId: session.tenantId, workspaceId: session.workspaceId,
+          participantSessionId: session.participantSessionId, testRunId: run.testRunId
+        });
+      },
+      async acknowledgeCommand(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const run = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!run || !resolveParticipantExecutionMode(run.executionMode).receiveRemoteCommands) {
+          throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+        }
+        const commandId = input.commandId?.trim();
+        if (!commandId || commandId.length > 160) {
+          throw new FirstSliceError(400, "invalid_participant_command_id", "A command identifier is required.");
+        }
+        const command = await repository.acknowledgeParticipantRunCommand({
+          tenantId: session.tenantId, workspaceId: session.workspaceId,
+          participantSessionId: session.participantSessionId, testRunId: run.testRunId,
+          commandId, acknowledgedAt: now()
+        });
+        if (!command) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
+        return command;
+      },
       async getCurrentRunState(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
@@ -34706,6 +34735,14 @@ export const createFirstSliceServices = (
         }
 
         const commandId = idGenerator();
+        if (commandType !== "complete" && commandType !== "complete_and_lock") {
+          const queued = await repository.appendParticipantRunCommand({
+            tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            participantSessionId: participantSession.participantSessionId, testRunId,
+            commandId, commandType, targetUnitKey, remainingSeconds, actorId, issuedAt
+          });
+          if (!queued) throw new FirstSliceError(409, "monitor_command_delivery_unavailable", "The Run no longer accepts commands.");
+        }
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,

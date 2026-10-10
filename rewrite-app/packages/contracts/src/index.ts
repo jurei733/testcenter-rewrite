@@ -79,6 +79,11 @@ export * from "./booklet-policy.js";
 export * from "./browser-compatibility.js";
 export * from "./monitor-event-stream.js";
 export * from "./participant-event-stream.js";
+export type {
+  ListParticipantRunCommandsResponse,
+  AcknowledgeParticipantRunCommandRequest,
+  AcknowledgeParticipantRunCommandResponse
+} from "./participant-run-command.js";
 export * from "./monitor-custom-texts.js";
 export * from "./participant-custom-texts.js";
 export * from "./original-report-format.js";
@@ -295,6 +300,10 @@ export const productionApiRoutes = {
       "/api/v1/participant/sessions/:participantSessionId/events",
     acknowledgeEventStream:
       "/api/v1/participant/sessions/:participantSessionId/events/acknowledgements",
+    listPendingCommands:
+      "/api/v1/participant/sessions/:participantSessionId/commands",
+    acknowledgeCommand:
+      "/api/v1/participant/sessions/:participantSessionId/commands/:commandId/acknowledgement",
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",

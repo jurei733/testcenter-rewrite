@@ -47,6 +47,7 @@ import {
   participantExecutionModeDefinitions,
   participantCodeInputTypes,
   type ParticipantExecutionMode,
+  type ParticipantRunCommand,
   type ParticipantCodeInputType,
   type ParticipantRosterEntry,
   type ParticipantViewSettings,
@@ -188,6 +189,7 @@ type ParticipantPlayerUnitItem = {
 };
 
 export type ParticipantVeronaPlayerState = {
+  commandReloadSequence: number;
   playerKey: string;
   playerHtml: string;
   testRunId: string;
@@ -479,7 +481,35 @@ export class ParticipantViewFacade {
     }
   };
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
-    this.refreshCurrentStateInternal(true, true);
+    this.refreshCurrentStateInternal(true);
+  private readonly commandReloadSequence = signal(0);
+  private readonly receiveParticipantCommand = (command: ParticipantRunCommand): void => {
+    void this.applyReceivedParticipantCommand(command).catch(() => undefined);
+  };
+
+  private async applyReceivedParticipantCommand(command: ParticipantRunCommand): Promise<void> {
+    const state = this.readCurrentRunState();
+    if (!state || !command.acknowledgedAt || state.testRun.status === "completed" ||
+        command.participantSessionId !== state.participantSession.participantSessionId ||
+        command.testRunId !== state.testRun.testRunId || command.tenantId !== state.testRun.tenantId ||
+        command.workspaceId !== state.testRun.workspaceId) return;
+    const lifecycle = this.viewLifecycleSequence;
+    const replacesPlayer = command.commandType === "resume" || command.commandType === "goto";
+    let reloaded = false;
+    if (replacesPlayer && state.testRun.status === "running" &&
+        (command.commandType === "resume" || command.targetUnitKey === state.currentUnit.unitKey)) {
+      this.participantErrorReceptionSuspended = false;
+      this.commandReloadSequence.update(sequence => sequence + 1);
+      reloaded = true;
+    }
+    await this.refreshCurrentStateInternal(true, true);
+    const current = this.readCurrentRunState();
+    if (lifecycle !== this.viewLifecycleSequence || current?.testRun.testRunId !== command.testRunId) return;
+    if (replacesPlayer && !reloaded && current.testRun.status === "running") {
+      this.participantErrorReceptionSuspended = false;
+      this.commandReloadSequence.update(sequence => sequence + 1);
+    }
+  }
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -1540,6 +1570,7 @@ export class ParticipantViewFacade {
     );
     return {
       playerKey: player.playerKey,
+      commandReloadSequence: this.commandReloadSequence(),
       playerHtml: player.html,
       testRunId: currentState.testRun.testRunId,
       unitKey,
@@ -4315,7 +4346,8 @@ export class ParticipantViewFacade {
           payload.currentRunState.participantSession.participantSessionId,
           this.refreshFromParticipantEvents,
           null,
-          payload.currentRunState.testRun.testRunId
+          payload.currentRunState.testRun.testRunId,
+          this.receiveParticipantCommand
         );
       }
       this.persistState();

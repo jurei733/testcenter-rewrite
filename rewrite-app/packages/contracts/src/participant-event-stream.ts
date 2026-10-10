@@ -19,6 +19,8 @@ export type ParticipantEventStreamEvent = {
   revision: string;
   /** Opaque server-registered lease; only received frames may renew it. */
   connectionId?: string;
+  /** Command records are validated by the scoped command receiver before ACK. */
+  commands?: readonly unknown[];
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -55,6 +57,7 @@ export const parseParticipantEventStreamEvent = (
     return null;
   }
 
+  if (value.commands !== undefined && !Array.isArray(value.commands)) return null;
   return {
     schemaVersion: PARTICIPANT_EVENT_STREAM_SCHEMA_VERSION,
     eventType: eventType as ParticipantEventStreamEventType,
@@ -63,6 +66,7 @@ export const parseParticipantEventStreamEvent = (
     testRunId: value.testRunId,
     emittedAt: value.emittedAt,
     revision: value.revision.toLowerCase(),
-    ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : {})
+    ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : {}),
+    ...(Array.isArray(value.commands) ? { commands: value.commands } : {})
   };
 };

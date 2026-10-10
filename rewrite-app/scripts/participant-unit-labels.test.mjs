@@ -43,6 +43,7 @@ const fixture = config => {
     availableActions: ["save_progress"], navigation: { backwardDeniedReasons: [], forwardDeniedReasons: [] }
   };
   const facade = Object.assign(new LabelFacade(), {
+    commandReloadSequence: () => 0,
     readCurrentRunState: () => state, hasControllerError: false, eagerBookletLoading: false,
     effectiveUnitResponse: (value, key) => value.testRun.unitResponses[key] ?? "",
     player: { canGoPreviousUnit: false, canGoNextUnit: true, canComplete: false }

@@ -2481,6 +2481,8 @@ const participantEventStreamPattern = createRoutePattern(
 const participantEventAcknowledgementPattern = createRoutePattern(
   productionApiRoutes.participant.acknowledgeEventStream
 );
+const participantRunCommandsPattern = createRoutePattern(productionApiRoutes.participant.listPendingCommands);
+const participantRunCommandAcknowledgementPattern = createRoutePattern(productionApiRoutes.participant.acknowledgeCommand);
 const participantResourcePattern =
   /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
@@ -2526,6 +2528,7 @@ const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
   ["POST", participantEventAcknowledgementPattern],
+  ["GET", participantRunCommandsPattern], ["PATCH", participantRunCommandAcknowledgementPattern],
   ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
   ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
   ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
@@ -3742,6 +3745,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
     ["POST", participantEventAcknowledgementPattern, productionApiRoutes.participant.acknowledgeEventStream],
+    ["GET", participantRunCommandsPattern, productionApiRoutes.participant.listPendingCommands],
+    ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -4215,11 +4220,12 @@ const PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS = 1_000;
 const PARTICIPANT_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
 
 const participantCurrentStateRevision = (
-  currentRunState: ParticipantCurrentRunStateResponse["currentRunState"]
+  currentRunState: ParticipantCurrentRunStateResponse["currentRunState"],
+  commands: Awaited<ReturnType<FirstSliceServices["participantRuntime"]["listPendingCommands"]>> = []
 ): string =>
   createHash("sha256")
     .update(
-      JSON.stringify(currentRunState.testRun, (key, value) =>
+      JSON.stringify({ testRun: currentRunState.testRun, commands }, (key, value) =>
         key === "remainingSeconds" ? undefined : value
       )
     )
@@ -4248,6 +4254,9 @@ const streamParticipantEvents = async (input: {
     testRunId: input.testRunId
   });
   let testRunId = initialState.testRun.testRunId;
+  let commands = await input.participantRuntime.listPendingCommands({
+    participantSessionId: input.participantSessionId, testRunId
+  });
   const connectionId = randomUUID();
   const register = () => input.participantRuntime.updateConnection({
     participantSessionId: input.participantSessionId, testRunId, action: "open", connectionId
@@ -4257,7 +4266,7 @@ const streamParticipantEvents = async (input: {
       "A live connection is unavailable for this run. Refresh the participant state.");
     return;
   }
-  let revision = participantCurrentStateRevision(initialState);
+  let revision = participantCurrentStateRevision(initialState, commands);
   let sequence = 0;
   let lastEventAt = Date.now();
   let polling = false;
@@ -4290,7 +4299,8 @@ const streamParticipantEvents = async (input: {
       testRunId,
       emittedAt: new Date(lastEventAt).toISOString(),
       revision,
-      connectionId
+      connectionId,
+      commands
     });
   };
 
@@ -4321,7 +4331,11 @@ const streamParticipantEvents = async (input: {
         if (closed) {
           return;
         }
-        const nextRevision = participantCurrentStateRevision(currentState);
+        commands = await input.participantRuntime.listPendingCommands({
+          participantSessionId: input.participantSessionId, testRunId: currentState.testRun.testRunId
+        });
+        if (closed) return;
+        const nextRevision = participantCurrentStateRevision(currentState, commands);
         if (nextRevision !== revision) {
           if (testRunId !== currentState.testRun.testRunId) {
             await input.participantRuntime.updateConnection({
@@ -8470,6 +8484,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantRunCommandsMatch = participantRunCommandsPattern.exec(pathname);
+      const participantRunCommandAcknowledgementMatch = participantRunCommandAcknowledgementPattern.exec(pathname);
+      if (request.method === "GET" && participantRunCommandsMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandsMatch.groups.participantSessionId);
+        const testRunId = url.searchParams.get("testRunId");
+        if (!participantSessionId?.trim() || !testRunId?.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session and selected Run are required.");
+          return;
+        }
+        const commands = await services.participantRuntime.listPendingCommands({ participantSessionId, testRunId });
+        sendJson(response, 200, { commands });
+        return;
+      }
+      if (request.method === "PATCH" && participantRunCommandAcknowledgementMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandAcknowledgementMatch.groups.participantSessionId);
+        const commandId = decodeRouteGroup(participantRunCommandAcknowledgementMatch.groups.commandId);
+        const body = await readRequestJsonBody<{ testRunId?: unknown }>();
+        if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
+          return;
+        }
+        const command = await services.participantRuntime.acknowledgeCommand({ participantSessionId, commandId, testRunId: body.testRunId });
+        sendJson(response, 200, { command });
+        return;
+      }
       const currentRunStateMatch = currentRunStatePattern.exec(pathname);
       const participantEventAcknowledgementMatch = participantEventAcknowledgementPattern.exec(pathname);
       if (request.method === "POST" && participantEventAcknowledgementMatch?.groups) {

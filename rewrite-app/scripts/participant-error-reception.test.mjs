@@ -107,7 +107,7 @@ test("route cleanup still invalidates an accepted refresh in flight",async()=>{
 });
 
 const streamMethods=methods("../apps/web/src/app/participant-event-stream.service.ts","ParticipantEventStreamService",
- ["suspend","stop","stopConnection","queueRefresh","handleFrame"]);
+ ["suspend","stop","stopConnection","resetCommands","queueRefresh","handleFrame"]);
 const {makeStream}=await moduleFrom(`export const makeStream=parseParticipantEventStreamEvent=>class Stream{${streamMethods}};`);
 const Stream=makeStream(parseParticipantEventStreamEvent);
 const streamFixture=()=>{

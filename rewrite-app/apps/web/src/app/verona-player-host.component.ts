@@ -266,6 +266,7 @@ export class VeronaPlayerHostComponent
 
   @Input({ required: true }) playerHtml = "";
   @Input({ required: true }) playerKey = "";
+  @Input() commandReloadSequence = 0;
   @Input({ required: true }) testRunId = "";
   @Input({ required: true }) unitKey = "";
   @Input({ required: true }) unitTitle = "";
@@ -475,6 +476,7 @@ export class VeronaPlayerHostComponent
     if (
       changes["playerHtml"] ||
       changes["playerKey"] ||
+      changes["commandReloadSequence"] ||
       changes["testRunId"] ||
       changes["unitKey"] ||
       changes["unitDefinition"] ||
