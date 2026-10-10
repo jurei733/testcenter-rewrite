@@ -68,6 +68,7 @@ import {
   removeParticipantSaveOutboxEntry,
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
+import { carriedParticipantTestLogBatches, identifyParticipantTestLogEntries } from "./participant-test-log-identities";
 import { buildParticipantSessionEntryUrl, withSelectedParticipantRun } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
@@ -441,6 +442,7 @@ export class ParticipantViewFacade {
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private veronaSaveInFlight: ParticipantSaveOutboxEntry | null = null;
   private veronaSaveRetrySequence = 0;
   private veronaSaveRetryRunId: string | null = null;
   private veronaForegroundSaveSettlement = false;
@@ -2419,13 +2421,13 @@ export class ParticipantViewFacade {
         batch.testRunId !== currentState.testRun.testRunId ||
         (batch.unitKey !== unitKey && batch.unitKey !== null)
     );
-    const pendingLogs =
+    const carriedSave =
       this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId &&
       this.pendingVeronaSave.unitKey === unitKey
-        ? this.pendingVeronaSave.logs
-        : [];
+        ? this.pendingVeronaSave
+        : findParticipantSaveOutboxEntryForUnit(currentState.testRun.testRunId, unitKey);
     const logs = this.compactParticipantTestLogBatches([
-      ...pendingLogs,
+      ...carriedParticipantTestLogBatches(carriedSave),
       ...queuedEntries
     ]);
     const save = createParticipantSaveOutboxEntry({
@@ -2462,7 +2464,7 @@ export class ParticipantViewFacade {
       testRunId: change.testRunId,
       unitKey,
       originalUnitId: unitKey,
-      entries: change.entries
+      entries: identifyParticipantTestLogEntries(change.entries)
     });
   }
 
@@ -2480,7 +2482,7 @@ export class ParticipantViewFacade {
       testRunId: currentState.testRun.testRunId,
       unitKey: null,
       originalUnitId: null,
-      entries
+      entries: identifyParticipantTestLogEntries(entries)
     };
     const pending = this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId
       ? this.pendingVeronaSave : null;
@@ -2488,7 +2490,10 @@ export class ParticipantViewFacade {
     if (!unitKey) {
       return;
     }
-    const response = pending?.response ??
+    const durable = pending ?? findParticipantSaveOutboxEntryForUnit(
+      currentState.testRun.testRunId, unitKey
+    );
+    const response = durable?.response ??
       (this.runtime.currentUnitKey === unitKey
         ? this.runtime.currentUnitResponse
         : this.effectiveUnitResponse(currentState, unitKey));
@@ -3474,6 +3479,7 @@ export class ParticipantViewFacade {
       const save = this.pendingVeronaSave;
       const retrySequence = this.veronaSaveRetrySequence;
       this.pendingVeronaSave = null;
+      this.veronaSaveInFlight = save;
       try {
         const payload = await this.requestState.request<SaveTestRunProgressResponse>(
           "Verona Auto Save",
@@ -3528,6 +3534,10 @@ export class ParticipantViewFacade {
           continue;
         }
         return;
+      } finally {
+        if (this.veronaSaveInFlight === save) {
+          this.veronaSaveInFlight = null;
+        }
       }
     }
 
@@ -4687,7 +4697,7 @@ export class ParticipantViewFacade {
       | ParticipantCurrentRunStateResponse["currentRunState"]
       | null
   ): void {
-    if (!currentState || this.pendingVeronaSave || this.veronaSaveDrainPromise) {
+    if (!currentState || this.pendingVeronaSave) {
       return;
     }
     const testRunId = currentState.testRun.testRunId;
@@ -4697,6 +4707,14 @@ export class ParticipantViewFacade {
         ? findParticipantSaveOutboxEntryForUnit(testRunId, currentUnitKey)
         : null) ?? findParticipantSaveOutboxEntry(testRunId);
     if (!saved) {
+      return;
+    }
+    // Only the actual packet in transit is protected. The drain also awaits a
+    // final status refresh; a retry during that refresh must restore new work.
+    if (
+      this.veronaSaveInFlight?.testRunId === saved.testRunId &&
+      this.veronaSaveInFlight.deliveryId === saved.deliveryId
+    ) {
       return;
     }
     // An unchanged answer does not acknowledge the packet's new logs or status.

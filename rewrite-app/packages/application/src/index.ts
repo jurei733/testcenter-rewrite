@@ -25016,6 +25016,18 @@ export const createFirstSliceServices = (
           ? unitKey
           : String(batch.originalUnitId).trim() || unitKey;
       return batch.entries.map(entry => {
+        const clientEntryId = entry?.clientEntryId;
+        if (
+          clientEntryId !== undefined &&
+          (typeof clientEntryId !== "string" ||
+            !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,209}$/.test(clientEntryId))
+        ) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_log_entry_id_invalid",
+            "Test-log entry IDs must contain 1–210 URL-safe identifier characters."
+          );
+        }
         const logKey = typeof entry?.key === "string" ? entry.key.trim() : "";
         const logContent =
           entry?.content == null ? "" : String(entry.content);
@@ -25044,10 +25056,13 @@ export const createFirstSliceServices = (
             "Participant test-log timestamps must be valid non-negative Unix millisecond values."
           );
         }
+        const logIndex = entryIndex++;
         return {
-          participantTestLogId: input.deliveryId
-            ? `delivery:${input.testRun.testRunId}:${input.deliveryId}:log:${entryIndex++}`
-            : idGenerator(),
+          participantTestLogId: clientEntryId
+            ? `delivery:${input.testRun.testRunId}:${clientEntryId}`
+            : input.deliveryId
+              ? `delivery:${input.testRun.testRunId}:${input.deliveryId}:log:${logIndex}`
+              : idGenerator(),
           tenantId: input.testRun.tenantId,
           workspaceId: input.testRun.workspaceId,
           participantSessionId: input.testRun.participantSessionId,

@@ -1166,6 +1166,8 @@ export const selectLatestParticipantTestStateLogs = (
 };
 
 export type ParticipantTestLogEntryInput = {
+  // Stable across replacement answer packets; older callers may omit this.
+  clientEntryId?: string;
   key: string;
   content?: string;
   timeStamp: number;

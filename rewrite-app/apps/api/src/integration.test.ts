@@ -8394,6 +8394,110 @@ test("runtime port and shutdown drain settings are validated and exposed", async
   );
 });
 
+test("replacement answer deliveries retain stable logs exactly once on the configured integration store", async () => {
+  const tenantKey = "integration-log-replacement";
+  const workspaceKey = "log-replacement";
+  const scope = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  assert.equal((await requestJson("/api/v1/platform/tenants", {
+    method: "POST", body: {tenantKey, displayName: tenantKey}
+  })).status, 201);
+  assert.equal((await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST", body: {workspaceKey, displayName: workspaceKey}
+  })).status, 201);
+  await uploadMinimalOriginalUnitDependencies(tenantKey, workspaceKey, ["UNIT.LOG"]);
+  const source = await requestJson<{sourcePackage: {sourcePackageId: string}}>(`${scope}/source-packages`, {
+    method: "POST", body: {
+      fileName: "log-replacement.xml", mediaType: "application/xml",
+      sourceDocument: '<Booklet><Metadata><Id>LOG.BOOKLET</Id><Label>Log replacement</Label></Metadata><Units><Unit id="UNIT.LOG" /></Units></Booklet>'
+    }
+  });
+  assert.equal(source.status, 201);
+  const imported = await requestJson<{stagedContentRelease: {contentReleaseId: string}}>(`${scope}/import-jobs`, {
+    method: "POST", body: {sourcePackageId: source.body.sourcePackage.sourcePackageId}
+  });
+  assert.equal(imported.status, 201);
+  assert.ok(imported.body.stagedContentRelease);
+  assert.equal((await requestJson(`${scope}/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, {
+    method: "POST", body: {}
+  })).status, 200);
+  assert.equal((await requestJson(`${scope}/participant-roster`, {
+    method: "POST", body: {rosterText: "loginKey,groupKey,bookletKey,executionMode\nlog-owner,log-group,LOG.BOOKLET,run-hot-return\nlog-other,log-group,LOG.BOOKLET,run-hot-return"}
+  })).status, 201);
+  const start = async (loginKey: string) => {
+    const signedIn = await requestJson<{sessionToken: string; participantSession: {participantSessionId: string}}>(
+      "/api/v1/participant/auth/sign-in", {method: "POST", body: {tenantKey, workspaceKey, loginKey}}
+    );
+    assert.equal(signedIn.status, 200);
+    const resumed = await requestJson<{testRun: TestRun}>(
+      `/api/v1/participant/sessions/${signedIn.body.participantSession.participantSessionId}/resume`,
+      {method: "POST", body: {bookletKey: "LOG.BOOKLET"}}
+    );
+    assert.equal(resumed.status, 200);
+    return {testRunId: resumed.body.testRun.testRunId, sessionToken: signedIn.body.sessionToken};
+  };
+  const owner = await start("log-owner");
+  const path = `/api/v1/participant/test-runs/${owner.testRunId}/save-progress`;
+  const event = {key: "REPLACEMENT_EVENT", content: "same event Ω", timeStamp: 1_791_411_000_000};
+  const oldLogs = [
+    {unitKey: "UNIT.LOG", originalUnitId: "UNIT.LOG", entries: [{...event}]},
+    {unitKey: null, originalUnitId: null, entries: [{...event}]}
+  ];
+  const save = (deliveryId: string, unitResponse: string, logs: unknown) => requestJson<{testRun: TestRun; error?: string}>(path, {
+    method: "POST", body: {deliveryId, responseUnitKey: "UNIT.LOG", status: "running", unitResponse, logs}
+  });
+  assert.equal((await save("legacy-packet", "older answer", oldLogs)).status, 200);
+  // These identifiers match legacy server IDs even after batch reorder. Two
+  // distinct new events keep separate rows despite identical time/content.
+  const replacementLogs = [
+    {...oldLogs[1]!, entries: [{...event, clientEntryId: "legacy-packet:log:1"}]},
+    {...oldLogs[0]!, entries: [{...event, clientEntryId: "legacy-packet:log:0"}]},
+    {unitKey: null, originalUnitId: null, entries: [
+      {...event, clientEntryId: "new-event-a"}, {...event, clientEntryId: "new-event-b"}
+    ]}
+  ];
+  const latestResponse = "latest exact answer\n ä🙂 \u0000 ";
+  const saved = await save("new-packet", latestResponse, replacementLogs);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.testRun.unitResponses["UNIT.LOG"], latestResponse);
+  assert.equal((await save("another-retry-packet", latestResponse, replacementLogs)).status, 200);
+  const readLogs = (testRunId: string) => requestJson<{items: Array<{testLog: {
+    participantTestLogId: string; unitKey: string | null; logContent: string
+  }}>}>(`${scope}/test-logs?testRunId=${testRunId}&logKey=REPLACEMENT_EVENT&limit=100`);
+  const logs = await readLogs(owner.testRunId);
+  assert.equal(logs.status, 200);
+  assert.equal(logs.body.items.length, 4);
+  assert.deepEqual(logs.body.items.map(item => item.testLog.participantTestLogId).sort(), [
+    `delivery:${owner.testRunId}:legacy-packet:log:0`, `delivery:${owner.testRunId}:legacy-packet:log:1`,
+    `delivery:${owner.testRunId}:new-event-a`, `delivery:${owner.testRunId}:new-event-b`
+  ].sort());
+  assert.equal(logs.body.items.filter(item => item.testLog.unitKey === "UNIT.LOG").length, 1);
+  for (const clientEntryId of [null, 12, "", "has space", "x".repeat(211)]) {
+    const invalid = await save("invalid-entry-id", "must never overwrite the answer", [{
+      unitKey: null, originalUnitId: null, entries: [{...event, clientEntryId}]
+    }]);
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.error, "participant_test_log_entry_id_invalid");
+  }
+  const other = await start("log-other");
+  const otherPath = `/api/v1/participant/test-runs/${other.testRunId}/save-progress`;
+  const denied = await requestJson<{error: string}>(otherPath, {
+    method: "POST", headers: {authorization: `Bearer ${owner.sessionToken}`},
+    body: {deliveryId: "other-run-packet", responseUnitKey: "UNIT.LOG", status: "running", unitResponse: "unauthorized", logs: replacementLogs}
+  });
+  assert.equal(denied.status, 401);
+  assert.equal(denied.body.error, "participant_session_invalid");
+  assert.equal((await requestJson(otherPath, {
+    method: "POST", body: {deliveryId: "other-run-packet", responseUnitKey: "UNIT.LOG", status: "running", unitResponse: "other exact answer", logs: replacementLogs}
+  })).status, 200);
+  assert.equal((await readLogs(other.testRunId)).body.items.length, 4, "Entry identities remain scoped to the authorized Run.");
+  assert.deepEqual((await readLogs(owner.testRunId)).body.items, logs.body.items, "Rejected IDs and another Run must leave the original log rows unchanged.");
+  const preserved = await requestJson<{currentRunState: {testRun: TestRun}}>(
+    `/api/v1/participant/sessions/${saved.body.testRun.participantSessionId}/current-state`
+  );
+  assert.equal(preserved.status, 200);
+  assert.equal(preserved.body.currentRunState.testRun.unitResponses["UNIT.LOG"], latestResponse);
+});
+
 test("local demo bootstrap seeds a directly usable app state", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",

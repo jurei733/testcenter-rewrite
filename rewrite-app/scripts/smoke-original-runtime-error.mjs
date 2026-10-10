@@ -32,6 +32,8 @@ const serverClosed = new Promise(done => server.once("close", done));
 const errors = [], states = {}; let browser;
 const failDialog = process.env.UI_SMOKE_RUNTIME_DIALOG_FAILURE === "true";
 const saveFailure = process.env.UI_SMOKE_RUNTIME_SAVE_FAILURE;
+const replacementMode = process.env.UI_SMOKE_RUNTIME_REPLACEMENT;
+assert.ok(!replacementMode || ["success", "reject"].includes(replacementMode));
 try {
   const port = await new Promise((done, reject) => {
     const timer = setTimeout(() => reject(Error("Owned API did not start")), 20_000);
@@ -85,9 +87,11 @@ try {
     const page = await context.newPage(); page.on("pageerror", error => errors.push({key,error:String(error)}));
     await page.goto(`${base}/app/participant?ui=original&theme=${theme}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, {waitUntil:"networkidle"});
     await page.locator("#originalLoginName").fill("exit-person");
-    const signedIn = page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/participant/auth/sign-in" && r.request().method() === "POST");
-    await page.getByRole("button", {name:"Weiter",exact:true}).click();
-    const identity = await (await signedIn).json(), token = identity.sessionToken;
+    const [signedIn] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/participant/auth/sign-in" && r.request().method() === "POST"),
+      page.getByRole("button", {name:"Weiter",exact:true}).click()
+    ]);
+    const identity = await signedIn.json(), token = identity.sessionToken;
     const currentPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
     const currentState = async () => (await api(currentPath, undefined, token)).currentRunState;
     const frame = page.frameLocator("iframe"); await frame.locator("#ownedRuntimeError").waitFor();
@@ -166,7 +170,65 @@ try {
     assert.equal(failed.testRun.status, "running"); assert.equal(failed.testRun.unitResponses["unit-intro"], packet);
     assert.deepEqual(failed.testRun.lockedUnitKeys, []); assert.deepEqual(failed.testRun.lockedTestletKeys, []);
     let expectedPacket = packet, expectedAnswer = answer;
-    if (saveFailure) {
+    let expectedRuntimeLogCount = expected.repeatedRuntimeLogCount;
+    if (replacementMode) {
+      const lateError = "Third owned runtime log during replacement Ω";
+      const writes = [];
+      let releaseSave, saveStarted;
+      const blocked = new Promise(done => {saveStarted = done;});
+      const gate = new Promise(done => {releaseSave = done;});
+      let held = false;
+      await context.route(`**/api/v1/participant/test-runs/${encodeURIComponent(runId)}/save-progress`, async route => {
+        const body = route.request().postDataJSON();
+        writes.push(body);
+        if (!held && body.logs?.some(batch => batch.entries.some(entry => entry.content === lateError))) {
+          held = true;
+          saveStarted(body);
+          await gate;
+          if (replacementMode === "reject") {
+            await route.fulfill({status:503,contentType:"application/json",body:'{"error":"owned_old_packet_unavailable"}'});
+            return;
+          }
+        }
+        await route.continue();
+      });
+      await frame.locator("#ownedRuntimeError").evaluate((button, message) => {
+        button.dataset.message = message; button.click();
+      }, lateError);
+      const older = await Promise.race([blocked, delay(10_000).then(() => {throw Error("Owned log-bearing delivery did not start");})]);
+      expectedAnswer += " newer packet Ω";
+      await frame.locator("#demoPlayerAnswer").evaluate((input, value) => {
+        input.value = value; input.dispatchEvent(new Event("input", {bubbles:true}));
+      }, expectedAnswer);
+      const replacement = await poll(() => page.evaluate(() => {
+        const raw = localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1");
+        return raw ? JSON.parse(raw).entries : [];
+      }), entries => entries.some(entry => entry.testRunId === runId &&
+        parseVeronaUnitResponse(entry.response)?.unitState.dataParts.answer === expectedAnswer));
+      const latest = replacement.find(entry => entry.testRunId === runId && entry.unitKey === "unit-intro");
+      expectedPacket = latest.response;
+      const lateEntries = logs => logs.flatMap(batch => batch.entries).filter(entry => entry.content === lateError);
+      assert.notEqual(latest.deliveryId, older.deliveryId);
+      assert.equal(lateEntries(older.logs).length, 1);
+      assert.deepEqual(lateEntries(latest.logs), lateEntries(older.logs), "The replacement must retain the exact original log identity before the older request settles.");
+      assert.ok(lateEntries(latest.logs)[0].clientEntryId);
+      const address = page.url();
+      await page.locator("#participantRouteControllerReloadButton").click();
+      await delay(350);
+      assert.equal(page.url(), address);
+      assert.equal(await element.evaluate(el => el.isConnected), true);
+      assert.equal((await currentState()).testRun.unitResponses["unit-intro"], packet);
+      releaseSave();
+      await poll(currentState, state => state.testRun.unitResponses["unit-intro"] === expectedPacket);
+      const delivered = writes.filter(body => body.unitResponse === expectedPacket);
+      assert.ok(delivered.length > 0);
+      assert.deepEqual(lateEntries(delivered.at(-1).logs), lateEntries(older.logs));
+      expectedRuntimeLogCount++;
+      const stored = await poll(() => api(unitLogsPath, undefined, operator), result => result.items.length === expectedRuntimeLogCount);
+      assert.equal(stored.items.filter(item => item.testLog.logContent === lateError).length, 1);
+      await page.waitForFunction(() => localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1") === null);
+      states[key].replacement = {olderResult:replacementMode, exactLogIdentityPreserved:true, runtimeLogCount:stored.items.length};
+    } else if (saveFailure) {
       expectedAnswer += " late save Ω";
       let releaseSave, saveStarted;
       const blocked = new Promise(done => {saveStarted = done;});
@@ -203,7 +265,7 @@ try {
     assert.equal(link.searchParams.get("participantSessionId"), identity.participantSession.participantSessionId);
     const recovered = await poll(() => api(controllerLogsPath, undefined, operator), p => p.items.some(i => i.testLog.logContent === "RUNNING"));
     assert.equal(recovered.items.filter(i => i.testLog.logContent === "ERROR").length, expected.controllerErrorWriteCount);
-    assert.equal((await api(unitLogsPath, undefined, operator)).items.length, expected.repeatedRuntimeLogCount);
+    assert.equal((await api(unitLogsPath, undefined, operator)).items.length, expectedRuntimeLogCount);
     assert.equal((await currentState()).testRun.unitResponses["unit-intro"], expectedPacket);
     await context.close(); console.log(`original_runtime_error=${key}:passed`);
   }

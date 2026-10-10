@@ -11360,9 +11360,23 @@ try {
   const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
   const thirdUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n  `;
   const multiUnitSaveOrder = [];
+  const multiUnitPacketWrites = [];
   const observedMultiUnitResponses = new Set();
   const recordMultiUnitSaveOrder = request => {
     const requestBody = request.postDataJSON();
+    if (
+      request.method() === "POST" && request.url().endsWith(
+        `/participant/test-runs/${originalAdaptiveTestRunId}/save-progress`
+      )
+    ) {
+      multiUnitPacketWrites.push({
+        deliveryId: requestBody?.deliveryId,
+        unitKey: requestBody?.responseUnitKey ?? requestBody?.currentUnitKey,
+        responseLength: requestBody?.unitResponse?.length,
+        responseSuffix: requestBody?.unitResponse?.slice(-12),
+        logKeys: requestBody?.logs?.flatMap(batch => batch.entries?.map(entry => entry.key) ?? [])
+      });
+    }
     if (
       request.method() === "POST" &&
       request.url().endsWith(
@@ -11441,7 +11455,8 @@ try {
       thirdResponse: thirdUnitOutboxResponse
     }
   );
-  await pollJsonWithPredicate(
+  try {
+    await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
     payload =>
       payload?.currentRunState?.testRun?.unitResponses?.[
@@ -11453,7 +11468,22 @@ try {
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBonusUnitKey
       ] === thirdUnitOutboxResponse
-  );
+    );
+  } catch (error) {
+    const outboxMetadata = await page.evaluate(() => {
+      const raw = localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1");
+      return raw ? JSON.parse(raw).entries.map(entry => ({
+        testRunId: entry.testRunId,
+        unitKey: entry.unitKey,
+        deliveryId: entry.deliveryId,
+        responseLength: entry.response.length,
+        responseSuffix: entry.response.slice(-12),
+        logKeys: entry.logs.flatMap(batch => batch.entries.map(log => log.key))
+      })) : [];
+    });
+    console.log(`multi_unit_save_diagnostic=${JSON.stringify({writes:multiUnitPacketWrites,outboxMetadata})}`);
+    throw error;
+  }
   await page.waitForFunction(
     storageKey => localStorage.getItem(storageKey) === null,
     "testcenter-rewrite:participant-save-outbox:v1"

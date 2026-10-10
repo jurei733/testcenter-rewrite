@@ -284,6 +284,9 @@ function isParticipantSaveOutboxLogs(
       typeof entry === "object" &&
       entry !== null &&
       typeof entry.key === "string" &&
+      (entry.clientEntryId === undefined ||
+        (typeof entry.clientEntryId === "string" &&
+          /^[A-Za-z0-9][A-Za-z0-9._:-]{0,209}$/.test(entry.clientEntryId))) &&
       entry.key.length > 0 &&
       entry.key.length <= 200 &&
       (entry.content === undefined ||

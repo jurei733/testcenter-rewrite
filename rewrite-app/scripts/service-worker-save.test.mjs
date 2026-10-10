@@ -68,6 +68,27 @@ test("background saves retain network failures and continue independently with o
   assert.equal(pending.size, 0);
 });
 
+test("background retries preserve stable log identities when a newer answer replaces an in-flight packet", async () => {
+  const item = record();
+  item.entry.logs = [{unitKey: null, originalUnitId: null, entries: [
+    {clientEntryId: "stable-error", key: "CONTROLLERERROR", content: "ERROR Ω", timeStamp: 1_791_411_000_000}
+  ]}];
+  const {pending, sent, run} = fixture([item]);
+  await assert.rejects(run(async () => {
+    const replacement = structuredClone(pending.get(item.key));
+    replacement.entry.deliveryId = "replacement-delivery";
+    replacement.entry.response = "latest exact answer\n ä🙂 ";
+    pending.set(item.key, replacement);
+    return response(503);
+  }), /remain queued/);
+  await run(async () => response(200));
+  const bodies = sent.map(request => JSON.parse(request.init.body));
+  assert.notEqual(bodies[0].deliveryId, bodies[1].deliveryId);
+  assert.deepEqual(bodies[0].logs, bodies[1].logs);
+  assert.equal(bodies[1].unitResponse, "latest exact answer\n ä🙂 ");
+  assert.equal(pending.size, 0);
+});
+
 test("background saves retain an unauthorized Unit while delivering other valid Units", async () => {
   const { pending, run } = fixture([record("a"), record("b")]);
   await assert.rejects(run(async url => response(String(url).includes("run-a") ? 401 : 201)), /remain queued/);

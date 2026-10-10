@@ -4,7 +4,9 @@ const variants = [
   ["native", {}],
   ["lazy-load-fallback", {UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
   ["pending-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"delay"}],
-  ["failed-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"reject"}]
+  ["failed-save", {UI_SMOKE_RUNTIME_SAVE_FAILURE:"reject"}],
+  ["replacement-old-succeeded", {UI_SMOKE_RUNTIME_REPLACEMENT:"success"}],
+  ["replacement-old-rejected", {UI_SMOKE_RUNTIME_REPLACEMENT:"reject"}]
 ];
 for (const [variant, extra] of variants) {
   const code = await new Promise((done, reject) => {

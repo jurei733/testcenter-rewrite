@@ -15,6 +15,9 @@ const workerUrl = moduleUrl(`
   export function removeParticipantSaveFromBackgroundDelivery() {}
   export function discardParticipantBackgroundSavesForRun() {}
 `);
+const logIdentities = await import(moduleUrl(transpile(readFileSync(new URL(
+  "../apps/web/src/app/participant-test-log-identities.ts", import.meta.url
+), "utf8"))));
 const outboxSource = readFileSync(new URL("../apps/web/src/app/participant-save-outbox.ts", import.meta.url), "utf8");
 const outbox = await import(moduleUrl(transpile(outboxSource).replace(
   'from "./participant-save-background-sync"', `from ${JSON.stringify(workerUrl)}`
@@ -29,14 +32,15 @@ const methods = ["saveVeronaResponse", "saveVeronaTestLogs", "effectiveUnitRespo
   return method.getText(ast);
 });
 const { createSaveHost } = await import(moduleUrl(transpile(`
-  export const createSaveHost = (outbox, productionApiRoutes, resolveRoutePath, prettyPrintJson) => {
+  export const createSaveHost = (outbox, productionApiRoutes, resolveRoutePath, prettyPrintJson, logIdentities) => {
+    const { carriedParticipantTestLogBatches, identifyParticipantTestLogEntries } = logIdentities;
     const { createParticipantSaveOutboxEntry, persistParticipantSaveOutboxEntry, removeParticipantSaveOutboxEntry,
       queueParticipantSaveOutboxEntryForBackgroundDelivery, findParticipantSaveOutboxEntryForUnit,
       findParticipantSaveOutboxEntry } = outbox;
     return class SaveHost { ${methods.join("\n")} };
   };
 `)));
-const SaveHost = createSaveHost(outbox, productionApiRoutes, resolveRoutePath, value => JSON.stringify(value));
+const SaveHost = createSaveHost(outbox, productionApiRoutes, resolveRoutePath, value => JSON.stringify(value), logIdentities);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((done, fail) => { resolve = done; reject = fail; });
@@ -51,6 +55,8 @@ const entry = (unitKey, overrides = {}) => outbox.createParticipantSaveOutboxEnt
 const change = (unitKey, response, testRunId = "selected-run") => ({
   testRunId, unitKey, response, unitDataChanged: true, unitStateChanged: false, playerStateChanged: false
 });
+const withoutEntryIds = batches => batches.map(batch => ({...batch,
+  entries:batch.entries.map(({clientEntryId:_clientEntryId,...entry})=>entry)}));
 const withHost = async action => {
   const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -76,6 +82,7 @@ const withHost = async action => {
   host.queuedVeronaLogs = [];
   host.ephemeralUnitResponses = new Map();
   host.veronaSaveDrainPromise = null;
+  host.veronaSaveInFlight = null;
   host.veronaSaveRetrySequence = 0;
   host.veronaSaveRetryRunId = null;
   host.veronaForegroundSaveSettlement = false;
@@ -415,6 +422,41 @@ test("an unchanged saved answer keeps new logs durable through refresh and an in
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
   });
 });
+test("an online retry during the final state refresh restores every newly durable Unit packet", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const refresh=deferred();
+    host.refreshCurrentStateInternal=()=>refresh.promise;
+    const first=entry("2");outbox.persistParticipantSaveOutboxEntry(first);
+    host.restorePersistentVeronaSave(currentState);
+    const drain=host.veronaSaveDrainPromise;
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(host.pendingVeronaSave,null);
+    assert.equal(outbox.listParticipantSaveOutboxEntriesForRun("selected-run").length,0);
+    const packets=[entry("8"),entry("9"),entry("2",{response:"new exact visible answer\n ä🙂 "})];
+    packets.forEach(packet=>outbox.persistParticipantSaveOutboxEntry(packet));
+    host.retryVeronaSave();
+    assert.equal(host.pendingVeronaSave?.deliveryId,packets[2].deliveryId);
+    refresh.resolve();await drain;
+    await host.veronaSaveDrainPromise;
+    assert.deepEqual(calls.requests.slice(1).map(call=>call.body.deliveryId),
+      [packets[2].deliveryId,packets[0].deliveryId,packets[1].deliveryId]);
+    assert.equal(outbox.listParticipantSaveOutboxEntriesForRun("selected-run").length,0);
+  });
+});
+test("a focus log arriving during a delivery keeps the durable answer instead of a stale runtime draft", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const packet=entry("2",{response:"durable answer\n ä🙂 "});
+    outbox.persistParticipantSaveOutboxEntry(packet);
+    const request=deferred();host.respond=()=>request.promise;
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    host.runtime.currentUnitKey="2";host.runtime.currentUnitResponse="stale draft";
+    host.saveVeronaTestLogs([{key:"FOCUS",timeStamp:1_791_411_000_000,content:"focused"}]);
+    assert.equal(outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2").response,packet.response);
+    request.resolve({testRun:currentState.testRun});await drain;
+    assert.equal(calls.requests[1].body.unitResponse,packet.response);
+    assert.deepEqual(calls.requests[1].body.logs.flatMap(batch=>batch.entries.map(entry=>entry.key)),["UNIT_STATE","FOCUS"]);
+  });
+});
 test("failed logs remain durable even when their exact answer is already saved", async () => {
   await withHost(async ({host,currentState}) => {
     const packet=entry("2");currentState.testRun.unitResponses["2"]=packet.response;
@@ -462,7 +504,8 @@ test("controller logs after the final answer save use a durable idempotent packe
     const drain=host.veronaSaveDrainPromise;assert.ok(drain);
     const packet=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2");assert.ok(packet);
     assert.equal(packet.response,response);
-    assert.deepEqual(packet.logs,[{unitKey:null,originalUnitId:null,entries}]);
+    assert.deepEqual(withoutEntryIds(packet.logs),[{unitKey:null,originalUnitId:null,entries}]);
+    assert.ok(packet.logs[0].entries[0].clientEntryId);
     assert.equal(calls.requests[0].body.deliveryId,packet.deliveryId);
     assert.ok(calls.requests[0].path.endsWith("/save-progress"));
     host.restorePersistentVeronaSave(currentState);
@@ -485,7 +528,9 @@ test("late focus logs keep a pending other-Unit packet and the visible Unit's ne
     const drain=host.veronaSaveDrainPromise;assert.ok(drain);
     const packet=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","8");assert.ok(packet);
     assert.equal(packet.response,old.response);assert.equal(host.runtime.currentUnitResponse,"new visible draft");
-    assert.deepEqual(packet.logs,[...old.logs,{unitKey:null,originalUnitId:null,entries}]);
+    assert.deepEqual(withoutEntryIds(packet.logs),[...old.logs,{unitKey:null,originalUnitId:null,entries}]);
+    assert.equal(packet.logs[0].entries[0].clientEntryId,`${old.deliveryId}:log:0`);
+    assert.ok(packet.logs[1].entries[0].clientEntryId);
     request.resolve({testRun:currentState.testRun});await drain;
     assert.equal(calls.requests.length,1);
   });
@@ -507,6 +552,37 @@ test("non-saving modes and runs without save authority cannot queue or send cont
     currentState.executionMode.saveResponses=false;host.saveVeronaTestLogs(entries);
     currentState.executionMode.saveResponses=true;currentState.availableActions=[];host.saveVeronaTestLogs(entries);
     assert.deepEqual(calls.requests,[]);assert.deepEqual(host.queuedVeronaLogs,[]);
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+
+test("a replacement answer carries older in-flight logs durably before failure and keeps their original server identities",async()=>{
+  await withHost(async({host,calls,currentState})=>{
+    const older=entry("2");outbox.persistParticipantSaveOutboxEntry(older);
+    const first=deferred();host.respond=body=>calls.requests.length===1?first.promise:{testRun:{...currentState.testRun,unitResponses:{"2":body.unitResponse}}};
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    host.saveVeronaResponse(change("2","newest answer Ω"));
+    const persisted=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2");
+    assert.deepEqual(withoutEntryIds(persisted.logs),older.logs);
+    assert.equal(persisted.logs[0].entries[0].clientEntryId,`${older.deliveryId}:log:0`);
+    first.reject(Error("older log-bearing delivery failed"));await drain;
+    assert.deepEqual(calls.requests[1].body.logs,persisted.logs);
+    assert.equal(calls.requests[1].body.unitResponse,"newest answer Ω");
+    assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+  });
+});
+test("replacement packets preserve entry identities even after the older request succeeds",async()=>{
+  await withHost(async({host,calls,currentState})=>{
+    const older=entry("2",{logs:[{unitKey:null,originalUnitId:null,entries:[{clientEntryId:"stable-error-event",key:"CONTROLLER",content:"ERROR",timeStamp:1_791_411_000_000}]}]});
+    outbox.persistParticipantSaveOutboxEntry(older);
+    const first=deferred();host.respond=body=>calls.requests.length===1?first.promise:{testRun:{...currentState.testRun,unitResponses:{"2":body.unitResponse}}};
+    host.restorePersistentVeronaSave(currentState);const drain=host.veronaSaveDrainPromise;
+    host.saveVeronaResponse(change("2","newest answer Ω"));
+    const persisted=outbox.findParticipantSaveOutboxEntryForUnit("selected-run","2");
+    assert.deepEqual(persisted.logs,older.logs);
+    first.resolve({testRun:{...currentState.testRun,unitResponses:{"2":older.response}}});await drain;
+    assert.deepEqual(calls.requests.map(r=>r.body.logs),[older.logs,older.logs]);
+    assert.notEqual(calls.requests[0].body.deliveryId,calls.requests[1].body.deliveryId);
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
   });
 });
