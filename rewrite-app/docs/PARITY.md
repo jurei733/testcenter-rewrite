@@ -1,5 +1,29 @@
 # Testcenter parity checklist
 
+### Original login footer overflow (2026-10-10)
+
+The mobile full-page comparison against the byte-verified current Source
+`ee2ab9ab` exposed a three-pixel footer difference: Source captures 390x847,
+while Rewrite clipped at 390x844. Source clips the window at html/body but
+allows its footer text to extend outside the independently scrolling AppRoot.
+The participant and admin entry shells now follow that hierarchy. This does
+not make the Source's clipped mobile footer reachable by native window scroll.
+The scoped rules cease to apply when either login surface is absent; the
+participant starter has no Source footer and is unchanged.
+
+All twelve actual full-page RGBA comparisons now match byte-for-byte: participant
+and admin login, all three themes, desktop 1280x720 and mobile 390x844 viewports
+(847px full-page height on mobile), with equivalent pristine focused name fields.
+No masking, cropping or resizing is used. Initial participant autofocus still
+differs from Source; this bounded proof does not close the complete login row.
+The production browser gates measure the actual version text with a DOM Range
+and reject truncation outside the inner root. The admin baseline fails that
+assertion. Both corrected headful/protected SQLite gates pass all three themes
+and four widths, including actual login/navigation and their existing error,
+reload, entry-link and recovery cases. Production build passes at 469.44 kB
+under the unchanged 470-kB limit. Full parity, physical and deployment gates
+remain separate.
+
 ### SQLite failure causes and strict browser server gate (2026-10-10)
 
 The full browser run exposed a masked storage failure: the unconditional

@@ -115,7 +115,11 @@ try {
       const geometry = await root.evaluate(element => {
         const b = element.getBoundingClientRect(), card = element.querySelector("mat-card");
         const footer = document.querySelector("#originalApplicationFooter").getBoundingClientRect();
+        const versionText = document.createRange();
+        versionText.selectNodeContents(document.querySelector("#originalApplicationFooter .version-label"));
         return { width: b.width, height: b.height, footer: [footer.y, footer.height],
+          versionBottom: versionText.getBoundingClientRect().bottom,
+          documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           header: document.querySelector("#participantApplicationHeader").getBoundingClientRect().height,
           cardWidth: card.getBoundingClientRect().width, cardColor: getComputedStyle(card).backgroundColor,
           heading: element.querySelector("mat-card-title").textContent.trim(),
@@ -125,6 +129,8 @@ try {
       assert.equal(geometry.height, height - (width < 600 ? 56 : 64) - 56 - 14);
       assert.ok(Math.abs(geometry.width - width * .98) <= 1 / 64);
       assert.deepEqual(geometry.footer, [height - 56, 56]);
+      assert.ok(geometry.versionBottom <= geometry.documentHeight + 1,
+        "The Original footer's wrapped text overflow must survive outside the inner scroll container");
       assert.equal(geometry.header, width < 600 ? 56 : 64);
       assert.equal(geometry.cardWidth, 400); assert.equal(geometry.cardColor, "rgb(255, 255, 255)");
       assert.equal(geometry.heading, "Admin-Bereich");

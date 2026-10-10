@@ -1,5 +1,20 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Original entry overflow continuation (2026-10-10)
+
+Continue on `testcenter-production-readiness`; `cb8d0066` records the SQLite
+failure-cause and strict browser-server gate correction below. Participant and
+admin login now retain the current Source's footer overflow outside AppRoot,
+with window clipping scoped to html/body. Twelve unmasked full-page RGBA pairs
+match the byte-verified Source `ee2ab9ab`, across both surfaces, three themes
+and desktop/mobile, in equivalent pristine focused name states. Initial
+participant focus remains different. Both protected/headful production login
+gates pass their four-width matrix and actual navigation/error/recovery cases;
+the actual-text overflow assertion fails the admin baseline. Starter has no
+Source footer and is unchanged. Build remains 469.44 kB under the 470-kB limit.
+Retain the baseline screenshots and negative guard log; this is bounded entry
+proof, not full Original UI acceptance.
+
 ## SQLite failure handling continuation (2026-10-10)
 
 Local checkpoints `3e337dfa` and `894042eb` preserve capture ownership and

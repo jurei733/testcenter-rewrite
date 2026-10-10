@@ -150,12 +150,16 @@ try {
       const geometry = await page.locator("#originalParticipantLogin").evaluate(element => {
         const read = selector => element.querySelector(selector).getBoundingClientRect();
         const footer = document.querySelector("#originalApplicationFooter").getBoundingClientRect();
+        const versionText = document.createRange();
+        versionText.selectNodeContents(document.querySelector("#originalApplicationFooter .version-label"));
         const topbar = document.querySelector("#participantApplicationHeader").getBoundingClientRect();
         const h2 = element.querySelector("h2"), style = getComputedStyle(h2);
         const label = getComputedStyle(element.querySelector(".mdc-floating-label"));
         const icon = element.querySelector(".login-submit [matButtonIcon]");
         return { rootHeight: element.getBoundingClientRect().height,
           footer: [footer.y, footer.height], toolbarHeight: topbar.height,
+          versionBottom: versionText.getBoundingClientRect().bottom,
+          documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           heading: [style.fontSize, style.fontWeight, style.lineHeight],
           direction: getComputedStyle(element).flexDirection, labelGap: label.gap,
           disabledOpacity: getComputedStyle(element.querySelector(".login-submit")).opacity,
@@ -166,6 +170,8 @@ try {
       });
       assert.equal(geometry.rootHeight, height - (width < 600 ? 56 : 64) - 56);
       assert.deepEqual(geometry.footer, [height - 56, 56]);
+      assert.ok(geometry.versionBottom <= geometry.documentHeight + 1,
+        "The Original footer's wrapped text overflow must survive outside the inner scroll container");
       assert.equal(geometry.toolbarHeight, width < 600 ? 56 : 64);
       assert.deepEqual(geometry.heading, ["30px", "400", "normal"]);
       assert.equal(geometry.direction, "row");
@@ -175,7 +181,7 @@ try {
       assert.ok(geometry.iconHeight >= 18 && geometry.iconHeight < 27);
       assert.equal(geometry.warningSizing, "border-box");
       assert.ok(Math.abs(geometry.warningWidth - geometry.columnWidth * .8) <= 1 / 64);
-      await page.screenshot({ path: join(root, `${theme}-${screen}-name.png`) });
+      await page.screenshot({ path: join(root, `${theme}-${screen}-name.png`), fullPage: true });
       const name = page.getByLabel("Anmeldename", { exact: true });
       await name.fill("ab");
       assert.equal(await page.getByRole("button", { name: "Weiter", exact: true }).isDisabled(), true);

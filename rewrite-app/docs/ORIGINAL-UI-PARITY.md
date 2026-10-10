@@ -7,9 +7,16 @@ login/group values. Blank entry is disabled, while saved names and explicit
 links retain their values across reload in both interfaces. The current Source
 is built from verified byte-exact tracked frontend/common/definitions files at
 `ee2ab9ab`; equal own frontend fixtures have no unknown requests or page errors.
-The three desktop full-page pristine-focused-name images match every pixel.
-Initial focus still differs, and mobile full-page heights differ (847/844px);
-no full Shell/login or cross-cutting row is closed by this bounded comparison.
+The initial participant comparison matched desktop but exposed mobile full-page
+heights of 847/844px. The corrected participant and admin entry shells preserve
+the Source footer's overflow outside AppRoot, while html/body clip the window.
+All twelve full-page pristine-focused-name RGBA pairs now match byte-for-byte:
+both login surfaces, three themes and desktop/mobile. The two protected headful
+production gates also pass their four-width matrix and actual login/recovery
+cases; a DOM Range regression assertion rejects the clipped admin baseline.
+Initial participant focus still differs; no full Shell/login or cross-cutting
+row is closed by this bounded comparison. Source's native window clipping and
+the footer-free participant starter are retained.
 The corrected focus comparison uses the same actual pristine input state;
 an earlier extra click had touched only the already-focused Rewrite control.
 The fresh Source camera diagnostic again exits 2 after twelve actual
