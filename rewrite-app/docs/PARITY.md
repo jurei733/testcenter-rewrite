@@ -1,5 +1,49 @@
 # Testcenter parity checklist
 
+### Scoped command transport and same-status resume (2026-10-11)
+
+Application checkpoint `357eba0ffd84` connects nonterminal monitor commands
+with independent IDs to authenticated selected-Run command listing and ACK
+routes. SSE carries pending records; polling uses the same scoped collection.
+The server derives tenant/workspace ownership and the first receipt timestamp.
+An ACK changes receipt metadata without changing the Run or its saved answers.
+
+The browser validates records and receipts before dispatch, suppresses duplicate
+ACKs, spaces ACK starts by one second and dispatches in successful ACK completion
+order. ERROR cuts new delivery while preserving accepted requests and scheduled
+ACKs; route/session cleanup cancels both. Pending receipts also suppress opaque
+SSE state refreshes, including the interval after the server persists an ACK
+but before its held browser response arrives. The receiver loads lazily through
+a contract subpath; the production initial bundle is 469.85 kB under the unchanged
+470 kB error budget. Existing warning budgets remain exceeded.
+
+Fresh checks pass typecheck, the production web build, 1237 unit/state checks
+and 741 full PostgreSQL integration checks, including the new real command API
+proof in a private schema. All 21 runtime browser cases across 16 variants pass,
+including native/fallback same-status resume, accepted pause and old save replies.
+Resume replaces the actual errored iframe, restores the saved answer, retains
+the dialog and matches the pinned Source post-ERROR logs `ERROR, RUNNING`.
+Read-only storage inspection confirms the exact persisted command receipts.
+These are owned API/player fixtures, not a complete Original backend or device
+acceptance proof.
+
+All four fresh-image checks pass: PostgreSQL standard, demo and production-secret
+boundaries plus SQLite. The image `testcenter-rewrite-app:completeness-357eba0ffd84`
+has USER node and ID `sha256:6598630b62a1fe6a41507bf19c1041b016649ecf9f1449ba8a69b6773c6062f8`. Its build uses an archived tracked checkout;
+the protected presentation is excluded. Owned test resources are removed and
+exact inventory retains 24 existing containers and 85 volumes. About 8 GiB are
+free after builds; the preceding targeted cleanup reclaimed about 5 GiB.
+
+Confirmed remaining gaps: monitor issuance still changes canonical state before
+browser execution, and its Run mutation and command insertion are separate writes.
+In the held-pause test, Native persists `PAUSED` before `ERROR`; Source instead
+records `ERROR, PAUSED` at browser execution. Pause DOM/receipt checks pass while
+this log-order mismatch remains open. Integrated multi-command effects in ACK
+completion order, terminal command delivery and termination/save-drain equivalence
+still require work. All eight complete Original UI acceptance rows, real devices,
+current-checkpoint remote CI, release, deployment and production proof remain
+open. This is a local checkpoint; nothing was pushed.
+
 ### Durable command identities and receipts (2026-10-11)
 
 Application checkpoint `5f88508c12e8` persists commands with independent IDs,
