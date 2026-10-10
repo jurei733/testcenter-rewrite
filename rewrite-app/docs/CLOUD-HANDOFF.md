@@ -1,6 +1,76 @@
 # Cloud continuation: Testcenter Rewrite
 
-### Current container checkpoint (2026-10-10)
+### Completeness before starter exit (2026-10-10)
+
+A forced logo exit now checks the current unit's completeness before timed-block
+or leave-lock decisions. Direct return-to-starter requests cannot skip that check
+with confirmation flags. The API resolves the nearest testlet/root policy and
+projects it with the current unit; the frontend uses the newest local Player
+report instead of an older API packet. A denial leaves saved responses, locks,
+timer expiry and the running Run unchanged. Non-saving modes evaluate transient
+reports without persisting them. Monitor navigation overrides keep the separate
+forbidden-timer restriction.
+
+Unmodified Source ee2ab9ab confirms the ordering in 54 presentation/response/both
+cases and 18 legacy Verona 2 cases, across three themes, desktop/mobile and three
+leave policies. Two additional fresh-Player probes distinguish an absent response
+status from explicit incomplete progress. Source requires exactly `complete` for
+presentation; `complete-and-valid` is accepted for responses. The controller,
+Verona interfaces, InfoDialog and close SVG match their pinned Git blobs. These
+frontend probes use owned API/Player fixtures; they do not prove Source backend
+authorization or whole-page parity.
+
+The Original UI presents the native information dialog with one close button.
+The shared UI also offers only a close action. A malformed positive result cannot
+approve a denied exit. Run/view fences cover lazy loading, autosave settling,
+draft saving and the eventual HTTP response, so an obsolete exit cannot clear a
+replacement view or stop its event stream. The lazy policy and direct contracts
+subpath keep the unchanged 470-kB initial limit; the production build is 469.99 kB.
+
+Local checks pass all 868 unit/state tests (including 419 frontend tests and 47
+exit-method tests), 165 SQLite API integration tests and 421 PostgreSQL integration
+tests against a fresh owned container. The mandatory 57-case browser gate uses
+trusted Verona input, direct authenticated/anonymous/foreign-session HTTP calls,
+exact stored packets, timer/lock precedence, native focus/close behavior and
+Source dialog copy/geometry. Its visible close-button comparison uses real
+locator screenshots from all 72 Source cases, including fractional positions;
+off-screen transparent whole-page crops are not accepted as icon evidence.
+The final 57-case visible-button replay and the separate 43-case normal-exit
+regression both pass through owned API shutdown. The original animation timeout
+remains recorded; its precise cause is not established by the successful retry.
+
+Keep the negative evidence: the old API returned HTTP 200 for a forced incomplete
+exit; the initial implementation invented an absent response status and failed
+an existing execution-mode case. Explicit MatIconRegistry wiring and a contracts
+barrel re-export exceeded the initial bundle budget. The inline SVG first sat
+four pixels too low on desktop; Source's inline baseline/automatic icon height
+fixes it. A generic close-button hash failed for a differently sized response
+dialog; reference hashes are now captured separately for every state. A normal
+exit replay timed out while waiting for animations; its retry brings the owned
+page forward and preserves animation diagnostics on any repeated failure.
+
+### Current container and storage checkpoint (2026-10-10)
+
+Application tree ca54c32603bd passes fresh isolated standard, demo and
+production-secret PostgreSQL Compose runs at schema 52, plus the same image's
+standalone SQLite Docker runtime at schema 58. The local image is
+`testcenter-rewrite-app:completeness-ca54c32603bd`, revision ca54c32603bd, user
+`node`, image ID `sha256:09e3106f02f5f59b57718f7390c67038606b7d8374400cdb63ab2762d7407b54`.
+Its declared build timestamp is 2026-10-10T13:44:39.382Z. All owned projects have
+removed their containers and volumes after verification. The earlier a0f479d6
+image also passed these four container executions.
+
+Docker recovered from a stopped engine after a bounded Desktop restart. Two
+completed owned SQLite artifacts were losslessly compressed and checksum-verified,
+saving 212,118,099 bytes. A further 1.269 GB of unused Docker build cache was removed after the current
+builds. Exact inventories retain all 24 pre-existing containers and 85 volumes;
+the protected PPTX checksum is unchanged. The final measured host availability is 13 GiB. Complete Original UI rows, physical-device acceptance, remote CI,
+release and deployment acceptance remain open. Continue with unforced timer/lock
+advisory ordering on exit and the remaining Shell/error/busy and wider Player/
+Review matrices; the visible-button and normal-exit replays are now closed.
+
+
+### Earlier f099540e container checkpoint (2026-10-10)
 
 The application tree f099540e now has a fresh local Docker image, three successful
 isolated PostgreSQL Compose runs (standard/demo/production secret), a successful
@@ -10,8 +80,8 @@ was removed; exact inventories preserve all pre-existing 24 containers/85 volume
 and the protected PPTX. Further unused build-cache cleanup freed 439.4 MB; the
 last measured host availability is 8.6 GiB. See the current container section in
 PARITY.md for proof scope. Complete Original UI and deployment acceptance remain
-open. Continue with the Source completeness-before-logo-exit contract, including
-direct return-to-starter API calls and timer/lock precedence.
+open. That previously pending exit contract is implemented and validated in the current
+completeness checkpoint above.
 
 ### Original in-player logo exit and hidden header (2026-10-10)
 

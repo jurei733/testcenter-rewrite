@@ -94,7 +94,16 @@ try {
       let popups=0;context.on("page",()=>popups++);await logo.click({modifiers:["ControlOrMeta"]});await delay(100);
       assert.equal(popups,0);assert.deepEqual(mutations,[]);
       const capture=async(phase)=>{
-        await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).every(a=>!a.pending&&a.playState!=="running"));
+        await page.bringToFront();
+        try {
+          await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).every(a=>!a.pending&&a.playState!=="running"));
+        } catch(error) {
+          states[key]??={};
+          states[key].animationTimeout=await page.evaluate(phase=>({phase,visibility:document.visibilityState,focus:document.hasFocus(),
+            animations:document.getAnimations().map(a=>({pending:a.pending,state:a.playState,time:a.currentTime,
+              timing:a.effect?.getComputedTiming(),target:a.effect?.target?.outerHTML.slice(0,500)}))}),phase);
+          throw error;
+        }
         await page.screenshot({path:join(artifacts,`${key}-${phase}.png`),fullPage:true});
         return page.evaluate(()=>{const rect=n=>{if(!n)return null;const b=n.getBoundingClientRect(),s=getComputedStyle(n);return{x:b.x,y:b.y,width:b.width,height:b.height,font:s.font,color:s.color,background:s.backgroundColor,padding:s.padding,borderRadius:s.borderRadius};};
           const dialog=document.querySelector("mat-dialog-container");return{logo:rect(document.querySelector("#participantStandaloneLogo,#participantApplicationLogoButton")),logoImage:rect(document.querySelector("#applicationLogo")),
