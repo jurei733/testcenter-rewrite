@@ -1,5 +1,49 @@
 # Optional Original UI
 
+### Exact runtime error text and custom help (2026-10-10)
+
+Application checkpoint `0e5c90b47fb5` preserves runtime message whitespace in
+descriptions and logs, and keeps the Original log key for a missing code.
+The guarded fallback now preserves empty descriptions, renders allowed rich
+HTML through Angular sanitization, and displays multiline help with pre-wrap.
+Existing diagnostic bounds and secret redaction remain in force.
+
+The unchanged pinned Source frontend passes 28 cases: six known codes, an
+unknown code, defensive missing code, empty/rich whitespace messages, and
+application/login/booklet help across three themes and desktop/mobile.
+Missing code is defensive behavior, not a valid optional protocol field.
+A maintained recorder rejects incomplete Source probes. Source fixtures use
+owned API/player stubs; they do not prove Source backend authorization or
+persistence. Both probes neutralize the pointer before measuring dialogs.
+An initial hover-shadow mismatch is retained as test-harness evidence.
+
+All 56 Rewrite contract cases pass with native and failed-lazy-load dialogs:
+exact description HTML/text, exact stored messages and keys, first-dialog
+retention, one controller ERROR, focus trapping, and exact answer/progress/Run
+recovery. Collapsed native dialog inset pixel comparison covers 28 cases
+(maximum RMS 0.01357 on 0-255 RGB); outer shadows, underlying
+page, expanded metadata and fallback geometry are outside that pixel scope.
+The gate is included in ci:browser:quick. Negative unit/browser probes reproduce
+the whitespace loss before the fix.
+
+All 1177 unit/state checks pass (518 frontend). Typecheck and the subsequent
+production rebuild pass; initial size stays 469.41 kB below the unchanged
+470 kB error limit. Existing 450 kB/style warnings remain. Final production
+browser replay passes runtime 11, versions 22, pause 44, exits 43, headers 32,
+Systemcheck and the complete Verona/official-player recovery flow.
+API/store code is unchanged from bceb17b4db38; its 166 memory/file/SQLite
+and 702 PostgreSQL checks are retained evidence, not repeated API runs.
+
+Fresh-image Compose passes standard/demo/production-secret PostgreSQL (schema
+52), and standalone SQLite passes schema 58. Image `testcenter-rewrite-app:completeness-0e5c90b47fb5`
+has USER node, revision 0e5c90b47fb5 and ID `sha256:3dac41aeffa4c89d4fa3c8a322e9b96a978922385b7149ee0eff6b021573ec1b`.
+Owned resources are removed; exact inventory preserves 24 containers,
+85 volumes and the protected presentation hash. Approximately 6.8 GiB are free.
+
+Overlapping monitor commands and all eight full Original UI acceptance rows
+remain open. Nothing was pushed; remote CI, real devices, release, deployment
+and overall production readiness remain unverified.
+
 ### Durable replacement logs and recovered retry (2026-10-10)
 
 Application checkpoint `bceb17b4db38` resolves the previous multi-unit answer
