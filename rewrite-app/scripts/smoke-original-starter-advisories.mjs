@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,6 +17,8 @@ const artifacts = await mkdtemp(join(tmpdir(),"testcenter-starter-advisories-"))
 console.log(`owned_artifacts=${artifacts}`);
 const failureGate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
+const reference=JSON.parse(await readFile(new URL("./fixtures/original-starter-advisories.json",import.meta.url),"utf8"));
+assert.equal(reference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 const server = spawn(process.execPath,["--input-type=module","-e",`
   import { createProductionApiServer } from ${JSON.stringify(module)};
   const server=await createProductionApiServer();
@@ -29,8 +30,6 @@ const server = spawn(process.execPath,["--input-type=module","-e",`
 failureGate.observeStream(server.stdout);failureGate.observeStream(server.stderr);
 const serverClosed=new Promise(done=>server.once("close",done));
 const errors=[],states={};let browser;
-const reference=JSON.parse(await readFile(new URL("./fixtures/original-starter-advisories.json",import.meta.url),"utf8"));
-assert.equal(reference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 try {
   const port=await new Promise((done,reject)=>{
     const timer=setTimeout(()=>reject(Error("Owned API did not start")),20_000);

@@ -67,7 +67,7 @@ try{
   await page.waitForURL('**/#/r/starter');
   states[key].left={notices:await notices(),requests:requests.slice(before)};
   const stateEntries=states[key].left.requests.flatMap(r=>Array.isArray(r.body)?r.body:r.body?.newState||[]);
-  assert.equal(stateEntries.some(entry=>entry.key==='LOCKED'||entry.key==='LOCKED_UNIT'||entry.key==='LOCKED_TESTLET'),false);
+  assert.equal(stateEntries.some(entry=>entry.key==='UNITS_LOCKED_AFTER_LEAVE'||entry.key==='TESTLETS_LOCKED_AFTER_LEAVE'),false);
   await context.close();console.log(`source_player_exit=${key}:passed`);
  }
  assert.deepEqual(unknown,[]);assert.deepEqual(errors,[]);

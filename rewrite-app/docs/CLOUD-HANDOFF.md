@@ -1,5 +1,64 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Starter exit advisory order (2026-10-10)
+
+Application checkpoint `f74f3f8512a1` follows Source's order of completeness,
+timer and leave-lock checks. In Demo/Review/Trial, an allowed timer is cancelled;
+other non-enforced timers are interrupted before a later confirmation opens.
+Cancelling that confirmation keeps the Run and current unit active, without
+restarting its timer, changing saved packets or applying a leave lock. A repeated
+attempt repeats the completeness notice but not the timer notice. Non-confirmed
+lock notices appear immediately; confirmed lock notices appear only after consent.
+A forced timed confirmation short-circuits the later leave-lock check.
+
+The preparation endpoint authorizes the participant's selected Run and current
+unit. Its effects come from stored execution policy; it cannot bypass forced
+completeness/time rules or persist preview packets. Saving modes use stored
+responses for completeness. Old foreground actions are fenced by Run, unit and
+view at lazy loading, autosave, draft save, preparation, confirmation and response.
+The optional current-unit guard on the final return request also rejects stale
+HTTP confirmations while retaining compatibility for existing API callers.
+
+Unmodified Source `ee2ab9ab` passes 36 owned frontend cases: three preview modes,
+three timer leave policies, unit/testlet locks and both confirmation settings.
+Their captured copy and notice order match all 36 authenticated Rewrite browser
+cases with the real SQLite API and trusted synthetic Verona input. The browser
+also checks anonymous/foreign-session rejection, stale units, unchanged packets
+and no implicit locks after staying. A separate forced-time Source probe records
+zero remaining time and termination without an additional unit leave-lock write.
+These fixtures do not prove Source backend authorization or full Player UI parity.
+
+All 1,031 local unit/state tests pass, including 444 frontend tests. All 165
+SQLite API and 605 PostgreSQL integration tests pass; PostgreSQL used a fresh
+owned container and volume, both removed after verification. The production
+initial bundle remains 469.99 kB under the unchanged 470-kB limit. The new browser
+gate is mandatory in `ci:browser:quick`.
+
+Keep the negative evidence: the first preparation implementation let status
+reads automatically resume an interrupted timer. A persisted interruption bound
+to the loaded unit fixes that; status/save, repetition and explicit resume are
+tested across all four stores. Native lifecycle copy initially used a UI timer
+projection without its identity/duration fields; the compiler caught it and the
+implementation now retains the actual current-state timer.
+
+Fresh isolated PostgreSQL Compose checks (standard/demo/production-secret,
+schema 52) and standalone SQLite Docker (schema 58) pass for application commit
+`f74f3f8512a1`. Image `testcenter-rewrite-app:completeness-f74f3f8512a1` has ID
+`sha256:c0304bf4c57342bafb8c69c8db21e54f273f14be2b0f8b35fbe1613d06033274`,
+revision `f74f3f8512a1`, user `node` and declared timestamp
+`2026-10-10T14:31:03.202Z`. All owned resources have been removed. Exact inventory
+checks retain all 24 pre-existing containers and 85 volumes; the protected PPTX
+checksum is unchanged. After the new image build, host availability is 12 GiB.
+The 57-case completeness/visible-button and separate 43-case normal-exit
+regressions both pass through owned API shutdown. Together with the new 36-case
+advisory matrix, this checkpoint has 136 successful browser cases. The later
+test-only refinement loads the pinned fixture before spawning its API and checks
+Source's actual `UNITS_LOCKED_AFTER_LEAVE` / `TESTLETS_LOCKED_AFTER_LEAVE` keys;
+all 36 captured advisory traces plus the forced-time trace have neither key.
+All eight full Original UI rows, physical-device acceptance, current remote CI,
+release and deployment acceptance remain open. Next compare paused exits and
+Shell/error/busy races, then widen Player and Review acceptance.
+
 ### Completeness before starter exit (2026-10-10)
 
 A forced logo exit now checks the current unit's completeness before timed-block
