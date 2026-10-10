@@ -12,7 +12,12 @@ assert.ok(process.env.UI_SMOKE_ARTIFACT_DIR);
 const root = resolve(process.env.ORIGINAL_LOGIN_REFERENCE_ROOT);
 const artifacts = resolve(process.env.UI_SMOKE_ARTIFACT_DIR);
 const insecureReference = process.env.ORIGINAL_LOGIN_REFERENCE_INSECURE === "true";
-const adminReference = insecureReference && process.env.ORIGINAL_LOGIN_REFERENCE_ENTRY === "admin";
+const headerReference = process.env.ORIGINAL_LOGIN_REFERENCE_HEADER === "true";
+const starterReference = headerReference && process.env.ORIGINAL_LOGIN_REFERENCE_STARTER === "true";
+const adminReference = (insecureReference || headerReference) && process.env.ORIGINAL_LOGIN_REFERENCE_ENTRY === "admin";
+assert.ok(!starterReference || (!adminReference && !insecureReference), "Starter reference requires the secure participant header mode.");
+const headerFixture = headerReference ? JSON.parse(await readFile(new URL("./fixtures/original-header-logo.json", import.meta.url), "utf8")) : null;
+if (headerFixture) assert.equal(process.env.ORIGINAL_LOGIN_REFERENCE_COMMIT, headerFixture.referenceRevision);
 const noticeReference = JSON.parse(await readFile(new URL("./fixtures/original-login-notices.json", import.meta.url), "utf8"));
 const readNotice = element => {
   const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
@@ -52,8 +57,11 @@ try {
       const context = await browser.newContext({ viewport: { width, height }, locale: "de-DE" });
       const page = await context.newPage(), requests = [];
       const key = `${theme}-${screen}`;
+      const starterAuth = { token: "owned-header", displayName: "Header Person", loginName: "header-person",
+        groupLabel: "Header Group", flags: [], customTexts: {}, viewSettings: { theme },
+        claims: { test: ["first", "second"].map(id => ({ id, label: id, workspaceId: "1", description: "", type: "test", flags: {} })) } };
       page.on("pageerror", error => errors.push({ key, error: String(error) }));
-      await page.route(`${browserBase}/api/**`, async route => {
+      await context.route(`${browserBase}/api/**`, async route => {
         const request = route.request(), pathname = new URL(request.url()).pathname;
         let body;
         if (pathname === "/api/system/config") body = {
@@ -66,9 +74,14 @@ try {
         else if (pathname === "/api/sys-check-mode") body = false;
         else if (pathname === "/api/asset-assignments") body = {};
         else if (pathname === "/api/assets") body = [];
+        else if (starterReference && pathname === "/api/session" && request.method() === "GET") body = starterAuth;
+        else if (headerReference && pathname === "/api/session" && request.method() === "DELETE") {
+          return route.fulfill({ status: 204, body: "" });
+        }
         else if (pathname === "/api/session/login") {
           assert.equal(request.method(), "PUT");
           requests.push(request.postDataJSON());
+          if (starterReference) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(starterAuth) });
           return route.fulfill({ status: 400, contentType: "application/json",
             body: JSON.stringify({ message: "Owned invalid credentials" }) });
         } else {
@@ -101,6 +114,67 @@ try {
         await page.screenshot({ path: join(artifacts, `${key}-${phase}.png`), fullPage: true });
         return states[`${key}-${phase}`];
       };
+      if (headerReference) {
+        if (starterReference) {
+          await name.fill("owned-header-person");
+          await page.getByRole("button", { name: "Weiter", exact: true }).click();
+          await page.waitForURL("**/#/r/starter");
+        }
+        const logo = page.locator("tc-header .logo a");
+        await logo.waitFor();
+        assert.equal(await logo.evaluate(element => element.tagName), headerFixture.nativeLink.tag);
+        assert.equal(await logo.getAttribute("aria-label"), headerFixture.nativeLink.label);
+        assert.equal(await logo.getAttribute("href"), starterReference ? headerFixture.nativeLink.starterHref : headerFixture.nativeLink.loginHref);
+        assert.equal(await logo.locator("img").getAttribute("alt"), headerFixture.nativeLink.alt);
+        await logo.hover();
+        const tooltip = page.locator(".mat-mdc-tooltip-surface");
+        await tooltip.waitFor();
+        await capture("header-tooltip");
+        const measured = await tooltip.evaluate(element => {
+          const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+          return { text: element.textContent.trim(), x: box.x, y: box.y, width: box.width, height: box.height,
+            color: style.color, background: style.backgroundColor, font: style.font, lineHeight: style.lineHeight,
+            padding: style.padding, borderRadius: style.borderRadius };
+        });
+        assert.deepEqual(measured, headerFixture.measurements[key]);
+        states[`${key}-header-tooltip`].tooltip = measured;
+        await page.mouse.move(0, height / 2);
+        await tooltip.waitFor({ state: "detached" });
+        if (starterReference) {
+          let popups = 0; context.on("page", () => popups++);
+          await logo.evaluate(element => element.addEventListener("click", event => setTimeout(() => {
+            window.headerLogoObservation = { defaultPrevented: event.defaultPrevented, isTrusted: event.isTrusted };
+          }, 0), { once: true }));
+          await logo.click({ modifiers: ["ControlOrMeta"] });
+          await page.waitForFunction(() => window.headerLogoObservation !== undefined);
+          assert.deepEqual(await page.evaluate(() => window.headerLogoObservation), { defaultPrevented: true, isTrusted: true });
+          assert.equal(popups, 0);
+          assert.deepEqual(requests, [{ name: "owned-header-person", password: "" }]);
+          await context.close(); process.stdout.write(`source_header=starter/${key}:passed\n`);
+          continue;
+        }
+        await name.fill("owned-header-name");
+        if (!adminReference) {
+          await page.getByRole("button", { name: "Weiter", exact: true }).click();
+          await password.waitFor();
+        }
+        await password.fill("owned-header-password");
+        const deleted = page.waitForResponse(response => new URL(response.url()).pathname === "/api/session" && response.request().method() === "DELETE");
+        await logo.focus(); await page.keyboard.press("Enter"); await deleted;
+        await page.waitForLoadState("networkidle"); await name.waitFor();
+        assert.equal(await name.inputValue(), "");
+        assert.equal((await capture("header-primary")).tag, "BODY");
+        await name.fill("owned-modified-header");
+        const [popup] = await Promise.all([context.waitForEvent("page"), logo.click({ modifiers: ["ControlOrMeta"] })]);
+        popup.on("pageerror", error => errors.push({ key, error: String(error) }));
+        await popup.waitForLoadState("networkidle"); await page.waitForLoadState("networkidle");
+        await name.waitFor(); await popup.locator("input[formcontrolname=name]").waitFor();
+        assert.equal(await name.inputValue(), "");
+        assert.equal(await popup.locator("input[formcontrolname=name]").inputValue(), "");
+        await popup.close(); await context.close();
+        process.stdout.write(`source_header=${adminReference ? "admin" : "participant"}/${key}:passed\n`);
+        continue;
+      }
       if (insecureReference) {
         assert.equal(await page.evaluate(() => window.isSecureContext), false);
         if (!adminReference) {
@@ -179,8 +253,8 @@ try {
 } finally {
   await writeFile(join(artifacts, "focus.json"), JSON.stringify({ states, errors, unknown,
     callerVerifiedReferenceCommit: process.env.ORIGINAL_LOGIN_REFERENCE_COMMIT,
-    insecureReference, entry: adminReference ? "admin" : "participant",
-    scope: "Unmodified Source frontend on owned rejected-login fixtures; no Source backend or full UI proof" }, null, 2));
+    insecureReference, headerReference, entry: starterReference ? "starter" : adminReference ? "admin" : "participant",
+    scope: "Unmodified Source frontend on owned UI fixtures; no Source backend or full UI proof" }, null, 2));
   await browser?.close();
   await new Promise(done => server.close(done));
 }

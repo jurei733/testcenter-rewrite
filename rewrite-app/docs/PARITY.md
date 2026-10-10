@@ -1,5 +1,56 @@
 # Testcenter parity checklist
 
+### Original native logo and authorized Starter links (2026-10-10)
+
+The optional Original header now uses the Source's native logo link, label,
+image alt text and settled Material tooltip. Primary/Enter activation on login
+clears the form and returns to blank entry; Ctrl/Meta activation clears both
+the originating and newly opened login tab, as independently observed on Source.
+On the authenticated Starter, Source cancels modified activation; the Rewrite
+preserves that behavior. Copy/open-link destinations retain only UI, workspace
+scope and session ID, never credentials or a selected Run. The normal in-player
+logo still uses the existing leave confirmation and server restrictions.
+
+A separately opened Starter uses the authorized runtime-state GET. It never
+loads player state, resumes/resets a Run, drains another tab's pending save
+outbox or emits player-load logs. The view clears its cached player presentation
+only after authorization and the lifecycle fence; existing non-saving re-entry
+semantics stay separate. Both fresh and running sessions are covered in
+run-hot-return, run-demo, run-review and run-simulation. Anonymous and foreign
+session links remain denied. Pending own authentication also prevents a logo
+reset from clearing its credentials. The default Rewrite button remains shared
+with the lazy Original failure fallback.
+
+All 48 complete initial/native-focus/Caps-Lock/rejection RGBA pairs and all
+12 complete settled-tooltip pairs match unmodified Source ee2ab9ab byte-for-byte
+across three themes and four widths. The Source helper separately passes twelve
+participant-login, twelve admin-login and twelve Starter header cases; API
+fixtures establish frontend behavior only. The own real SQLite header gate
+covers 24 participant/admin entry cases and eight authorized Starter cases,
+including native modified activation, no Run mutation, unchanged stored answers
+and pending save outbox, and anonymous/foreign-session rejection. It is part of
+ci:browser:quick and observes actual API failures through child/stream shutdown.
+The protected admin gate additionally passes its 24 real challenges, HTTPS,
+access-window and failed-asset/chunk cases. The 372-test frontend suite (including
+66 entry/protection cases), typecheck and unchanged 470-kB production limit pass;
+the initial bundle is 469.99 kB. The bounded normal entry/leave/resume/logout
+flow has 1,201 requests with zero actual API failures/5xx and orderly shutdown.
+
+Keep the negative observations: native href is #/r/login, tooltip surfaces do
+not have the assumed named role, and intermediate animation geometry differs
+from settled geometry. Loading an empty style host as a flex child initially
+moved the logo; the final hidden style host restores all full-page comparisons.
+An overlapping rebuild invalidated a previously loaded chunk in one broad
+browser run; the repeat used stable assets and passed. The first fresh-session
+snapshot incorrectly expected current-state GET success; a fresh session has
+no Run. The final Starter reads runtime-state directly, also avoiding player
+save/log side effects. No complete Original UI row, physical camera/keyboard,
+remote CI, new Docker image, deployment or production acceptance is claimed.
+Earlier complete Compose/full-browser evidence belongs to the preceding tree.
+The protected PPTX and user data are preserved. This checkpoint is local and
+unpublished; continue with remaining Shell/error/busy, hidden-header/timer and
+whole-flow Original acceptance.
+
 ### Original participant login alerts and form reset (2026-10-10)
 
 The current unmodified Source `ee2ab9ab` renders rejected credentials and Caps

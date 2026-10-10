@@ -233,6 +233,7 @@ type ParticipantEntryParameters = {
   currentUnitKey?: string | null;
   unitResponse?: string | null;
   legacyShortLink?: boolean;
+  openStarter?: boolean;
 };
 
 type NormalizedParticipantEntryParameters = {
@@ -247,6 +248,7 @@ type NormalizedParticipantEntryParameters = {
   unitResponse: string;
   hasUnitResponse: boolean;
   legacyShortLink: boolean;
+  openStarter: boolean;
 };
 
 type ParticipantTestLogBatch = {
@@ -596,7 +598,8 @@ export class ParticipantViewFacade {
       currentUnitKey: parameters.currentUnitKey?.trim() ?? "",
       unitResponse: parameters.unitResponse ?? "",
       hasUnitResponse: parameters.unitResponse != null,
-      legacyShortLink: parameters.legacyShortLink === true
+      legacyShortLink: parameters.legacyShortLink === true,
+      openStarter: parameters.openStarter === true
     };
     const previousTenantKey = this.workspace.tenantKey.trim();
     const previousWorkspaceKey = this.workspace.workspaceKey.trim();
@@ -2938,6 +2941,36 @@ export class ParticipantViewFacade {
     // Do not let a booklet from a previously persisted browser session
     // constrain which assigned booklet the server starts when no run exists.
     this.runtime.bookletKey = normalized.bookletKey;
+    if (normalized.openStarter) {
+      // Read only the authorized roster. Loading player state would restore a
+      // pending save outbox, emit logs and start the Run's event stream.
+      const payload = await this.requestState.request<ParticipantRuntimeStateResponse>(
+        "Participant Starter", "GET",
+        resolveRoutePath(productionApiRoutes.participant.getRuntimeState, {
+          participantSessionId: this.runtime.participantSessionId.trim()
+        }), undefined, { quiet: true }
+      );
+      if (lifecycleSequence !== this.viewLifecycleSequence) return;
+      this.participantEvents.stop();
+      this.invalidateCurrentStateRefreshes();
+      this.currentRunState = null;
+      this.activeControllerError.set(null);
+      this.loadedBookletAssets.set(null);
+      this.runtime.testRunId = "";
+      this.runtime.currentUnitKey = "";
+      this.runtime.currentUnitResponse = "";
+      this.workspace.tenantKey = payload.runtimeState.scope.tenantKey;
+      this.workspace.workspaceKey = payload.runtimeState.scope.workspaceKey;
+      this.syncParticipantSessionFields(payload.runtimeState.participantSession);
+      this.syncParticipantRosterEntry(payload.runtimeState.participantRosterEntry);
+      this.syncRuntimeBooklets(payload.runtimeState.booklets);
+      this.runtime.currentRunStateView = prettyPrintJson({
+        status: "participant_starter_entry", runtimeState: payload.runtimeState
+      }, this.runtime.currentRunStateView);
+      this.syncParticipantHeaderVisibility();
+      this.persistState();
+      return;
+    }
     try {
       await this.refreshCurrentStateInternal(true);
       if (lifecycleSequence !== this.viewLifecycleSequence) {

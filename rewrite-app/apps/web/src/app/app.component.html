@@ -175,6 +175,27 @@
       </div>
     </form>
   </section>
+  <ng-template #participantLogo let-standalone="standalone">
+    @defer (when interfaceMode.mode() === 'original') {
+      @if (interfaceMode.mode() === 'original') {
+        <app-original-application-logo />
+      }
+    } @error {
+      <ng-container [ngTemplateOutlet]="rewriteParticipantLogo" />
+    }
+    @if (interfaceMode.mode() === 'rewrite') {
+      <ng-container [ngTemplateOutlet]="rewriteParticipantLogo" />
+    }
+    <ng-template #rewriteParticipantLogo>
+    <button [id]="standalone ? 'participantStandaloneLogo' : 'participantApplicationLogoButton'"
+      [class]="standalone ? 'participant-standalone-logo' : 'application-logo-button'"
+      type="button" aria-label="Return to test selection" (click)="leaveParticipantSession()">
+      <img id="applicationLogo" class="application-logo"
+        [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
+        [alt]="applicationSettings.settings().appTitle + ' logo'" />
+    </button>
+    </ng-template>
+  </ng-template>
   <ng-template #entryHeader>
     <header
       *ngIf="!isParticipantHeaderHidden; else standaloneParticipantLogo"
@@ -188,20 +209,7 @@
         }
       }
       <div class="application-brand">
-        <button
-          id="participantApplicationLogoButton"
-          class="application-logo-button"
-          type="button"
-          aria-label="Return to test selection"
-          (click)="leaveParticipantSession()"
-        >
-          <img
-            id="applicationLogo"
-            class="application-logo"
-            [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
-            [alt]="applicationSettings.settings().appTitle + ' logo'"
-          />
-        </button>
+        <ng-container [ngTemplateOutlet]="participantLogo" [ngTemplateOutletContext]="{standalone: false}" />
         <div>
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
           <h1 *ngIf="participantPageTitle">{{ participantPageTitle }}</h1>
@@ -210,20 +218,7 @@
       <span id="readinessBadge" *ngIf="interfaceMode.mode() === 'rewrite'">{{ app.ops.readinessBadge }}</span>
     </header>
     <ng-template #standaloneParticipantLogo>
-      <button
-        id="participantStandaloneLogo"
-        class="participant-standalone-logo"
-        type="button"
-        aria-label="Return to test selection"
-        (click)="leaveParticipantSession()"
-      >
-        <img
-          id="applicationLogo"
-          class="application-logo"
-          [src]="applicationSettings.assetUrl('logo', applicationSettings.settings().mainLogo)"
-          [alt]="applicationSettings.settings().appTitle + ' logo'"
-        />
-      </button>
+      <ng-container [ngTemplateOutlet]="participantLogo" [ngTemplateOutletContext]="{standalone: true}" />
     </ng-template>
   </ng-template>
   <ng-container *ngIf="isParticipantView; else operatorShell">

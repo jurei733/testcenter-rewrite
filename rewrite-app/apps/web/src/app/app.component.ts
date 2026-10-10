@@ -26,6 +26,7 @@ import { LiveContextComponent } from "./live-context.component";
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalFooterComponent } from "./original-footer.component";
 import { OriginalParticipantAccountComponent } from "./original-participant-account.component";
+import { OriginalApplicationLogoComponent } from "./original-application-logo.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -55,7 +56,8 @@ const routeViews: AppView[] = [
     ConfirmationDialogComponent,
     LiveContextComponent,
     OriginalFooterComponent,
-    OriginalParticipantAccountComponent
+    OriginalParticipantAccountComponent,
+    OriginalApplicationLogoComponent
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css"

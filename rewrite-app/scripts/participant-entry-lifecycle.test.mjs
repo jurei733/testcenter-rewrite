@@ -11,7 +11,7 @@ const source = readFileSync(new URL("../apps/web/src/app/participant-view.facade
 const ast = ts.createSourceFile("participant-view.facade.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
 const methodNames = ["resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
-  "starterLaunchInternal", "resumeSessionInternal"];
+  "starterLaunchInternal", "resumeSessionInternal", "readCurrentRunState"];
 const methods = methodNames.map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
@@ -79,6 +79,57 @@ for (const status of ["running", "paused", "completed"]) {
     assert.equal(entry.runtime.bookletKey, currentState.testRun.bookletAssignmentKey);
   });
 }
+
+for (const mode of ["run-hot-return", "run-demo", "run-review", "run-simulation"]) {
+  for (const hasRun of [false, true]) {
+    test(`${mode}: native Starter entry reads its authorized roster without starting or resetting a Run (${hasRun ? "existing" : "none"})`, async () => {
+      const { entry, calls } = host(hasRun ? state(mode) : null);
+      const presentation = { stopped: 0, invalidated: 0, synchronized: 0, persisted: 0, assets: "old" };
+      const roster = { participantSession: { participantSessionId: "own-session" }, participantRosterEntry: { displayName: "Own person" },
+        scope: {tenantKey:"own-tenant",workspaceKey:"own-workspace"}, booklets:[{bookletKey:"own-assignment"}] };
+      const requests = [];
+      entry.runtime.participantSessionId = "own-session"; entry.workspace = {};
+      entry.requestState = { request: async (...args) => { requests.push(args); return { runtimeState: roster }; } };
+      entry.syncParticipantSessionFields = value => assert.equal(value, roster.participantSession);
+      entry.syncParticipantRosterEntry = value => assert.equal(value, roster.participantRosterEntry);
+      entry.syncRuntimeBooklets = value => assert.equal(value, roster.booklets);
+      entry.participantEvents = { stop() { presentation.stopped++; } };
+      entry.invalidateCurrentStateRefreshes = () => { presentation.invalidated++; };
+      entry.loadedBookletAssets = { set(value) { presentation.assets = value; } };
+      entry.activeControllerError = { set(value) { assert.equal(value, null); } };
+      entry.syncParticipantHeaderVisibility = () => { presentation.synchronized++; };
+      entry.persistState = () => { presentation.persisted++; };
+      entry.runtime.currentUnitKey = "previous-unit";
+      entry.runtime.currentUnitResponse = "previous-view";
+      entry.runtime.currentRunStateView = JSON.stringify({ currentRunState: state(mode) });
+      await entry.resumeEntrySessionInternal({ ...parameters(""), openStarter: true });
+      assert.deepEqual(calls, { resumed: 0, applied: 0, refreshed: 0 });
+      assert.deepEqual(requests, [["Participant Starter", "GET", "/api/v1/participant/sessions/own-session/runtime-state", undefined, {quiet:true}]]);
+      assert.deepEqual(entry.workspace, roster.scope);
+      assert.equal(entry.currentRunState, null);
+      assert.equal(entry.runtime.testRunId, ""); assert.equal(entry.runtime.currentUnitKey, ""); assert.equal(entry.runtime.currentUnitResponse, "");
+      assert.deepEqual(presentation, { stopped: 1, invalidated: 1, synchronized: 1, persisted: 1, assets: null });
+      assert.equal(entry.readCurrentRunState(), null, "The render cache must not resurrect the Run in Starter presentation.");
+    });
+  }
+}
+
+test("a denied or stale native Starter read cannot clear another view or start a sibling Run", async () => {
+  for (const stale of [false, true]) {
+    const { entry, calls } = host(state("run-hot-return"));
+    entry.runtime.participantSessionId = "own-session";
+    const denied = new Error("participant_session_access_required");
+    entry.requestState = { request: async () => {
+      if (stale) { entry.viewLifecycleSequence++; return {}; }
+      throw denied;
+    } };
+    const action = entry.resumeEntrySessionInternal({ ...parameters(""), openStarter: true });
+    if (stale) await action;
+    else await assert.rejects(action, error => error === denied);
+    assert.deepEqual(calls, { resumed: 0, applied: 0, refreshed: 0 });
+    assert.equal(entry.runtime.testRunId, "selected/A");
+  }
+});
 
 for (const protectedState of [{ status: "completed" }, { locked: true }, { status: "paused", pauseSource: "monitor" }]) {
   test(`non-saving re-entry respects ${JSON.stringify(protectedState)} instead of resetting it`, async () => {

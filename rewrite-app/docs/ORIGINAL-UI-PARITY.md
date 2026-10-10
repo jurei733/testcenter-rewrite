@@ -2,6 +2,26 @@
 
 ## Acceptance baseline
 
+The current native-logo correction makes 48 complete initial/focus/alert RGBA
+pairs and twelve complete settled-tooltip pairs byte-identical to unmodified
+Source ee2ab9ab. Native login activation resets the form; modified activation
+clears both tabs. Source cancels modified Starter activation, while copied links
+open an independently authorized read-only Starter. The own real SQLite gate
+covers 24 participant/admin cases, eight fresh/running Starter cases across four
+modes, unchanged server Run/answers and pending save outbox, and anonymous/foreign
+session denial. It is mandatory in ci:browser:quick. The normal leave confirmation
+and pending-authentication protection remain in use. This is a bounded header
+proof; hidden-header/timer and remaining Shell/error/busy states, whole flows and
+production acceptance are still open. No complete row is closed.
+
+To reproduce current Source header evidence, use the same externally verified
+production build/revision and a fresh owned artifact directory as below, then
+run reference:ui:original-header:built. Add ORIGINAL_LOGIN_REFERENCE_ENTRY=admin
+for admin login or ORIGINAL_LOGIN_REFERENCE_STARTER=true for Starter. These
+three modes pass twelve cases each. The helper's revision metadata is a caller
+assertion, not Source/backend/production verification. Tooltip comparisons wait
+for animation completion; intermediate scaled rectangles are not the fixture.
+
 The latest participant alert comparison closes the plain-paragraph and stale
 submitted-form presentation gaps: 24 complete Caps Lock/rejected-credential
 RGBA pairs are exact across three themes and four widths. Rejection clears the
@@ -11,8 +31,9 @@ Participant HTTPS notice geometry matches in twelve cases; eleven full-page
 images are exact and one has 25 differing text pixels. Admin HTTPS notices have
 separate current Source measurements. Protected real participant/admin browser
 gates pass, including no-request HTTPS blocking, actual challenges and retry.
-These bounded states do not close the login/Shell or cross-cutting row; logo-link
-semantics, remaining errors/busy states and full production acceptance are open.
+These bounded states do not close the login/Shell or cross-cutting row;
+remaining hidden-header/timer, errors/busy states and full production acceptance
+are open.
 
 Fresh 2026-10-10 comparison removes the Rewrite's synthetic initial participant
 login/group values. Blank entry is disabled, while saved names and explicit
@@ -31,7 +52,7 @@ desktop/mobile RGBA pairs byte-identical without first focusing the name fields.
 All 72 initial/password/visibility/back/repeated-password/invalid-return focus
 states match Source across three themes and four widths. The independently
 observed native Tab sequence is logo, welcome scroll container, name; Source's
-logo is still a link while Rewrite uses a button. One wider Primar/600px image
+logo was still a link while Rewrite used a button at that checkpoint; the correction above now resolves that bounded difference. One wider Primar/600px image
 has 113 differing text pixels, while its fresh single-case replay is exact.
 Both are retained; no complete Shell/login or cross-cutting row is closed.
 Source's native window clipping and the footer-free starter are retained.

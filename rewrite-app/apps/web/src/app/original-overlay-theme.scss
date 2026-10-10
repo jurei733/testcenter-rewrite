@@ -8,7 +8,8 @@
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,
-:root[data-interface-mode='original'] .original-player-menu {
+:root[data-interface-mode='original'] .original-player-menu,
+:root[data-interface-mode='original'] .original-application-logo-tooltip {
   @include theme.apply();
 }
 

@@ -1257,7 +1257,8 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
       testRunId: query.get("testRunId"),
       currentUnitKey: query.get("currentUnitKey"),
       unitResponse: query.get("unitResponse"),
-      legacyShortLink: query.get("legacyShortLink") === "true"
+      legacyShortLink: query.get("legacyShortLink") === "true",
+      openStarter: query.get("view") === "starter"
     });
   }
 
