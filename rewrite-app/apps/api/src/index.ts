@@ -1,3 +1,4 @@
+import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
@@ -2512,6 +2513,7 @@ const resumeSessionPattern = createRoutePattern(
 const resumeRunPattern = createRoutePattern(
   productionApiRoutes.participant.resumeRun
 );
+const prepareStarterExitPattern = createRoutePattern(participantStarterExitPreparationRoute);
 const returnToStarterPattern = createRoutePattern(
   productionApiRoutes.participant.returnToStarter
 );
@@ -2531,7 +2533,7 @@ const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantReviewListPattern], ["POST", participantReviewListPattern],
   ["PATCH", participantReviewDetailPattern], ["DELETE", participantReviewDetailPattern],
   ["POST", unlockTestletPattern], ["POST", resumeRunPattern],
-  ["POST", returnToStarterPattern], ["POST", completeRunPattern]
+  ["POST", prepareStarterExitPattern], ["POST", returnToStarterPattern], ["POST", completeRunPattern]
 ];
 
 const authorizeParticipantRoute = async (
@@ -3768,6 +3770,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       returnToStarterPattern,
       productionApiRoutes.participant.returnToStarter
     ],
+    ["POST", prepareStarterExitPattern, participantStarterExitPreparationRoute],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
     ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
     ["GET", monitorEventStreamPattern, productionApiRoutes.monitor.eventStream],
@@ -9026,6 +9029,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const preparationMatch = prepareStarterExitPattern.exec(pathname);
+      if (request.method === "POST" && preparationMatch?.groups) {
+        const testRunId = decodeRouteGroup(preparationMatch.groups.testRunId);
+        if (!testRunId) { sendError(response, 400, "invalid_test_run_id", "testRunId is required."); return; }
+        const body = await readOptionalRequestJsonBody<PrepareParticipantStarterExitRequest>();
+        const prepared = await services.participantRuntime.prepareStarterExit({
+          testRunId, currentUnitKey: body?.currentUnitKey ?? "",
+          responseUnitKey: body?.responseUnitKey, unitResponse: body?.unitResponse,
+          transientUnitResponses: body?.transientUnitResponses
+        });
+        sendJson<PrepareParticipantStarterExitResponse>(response, 200, prepared);
+        return;
+      }
+
       const returnToStarterMatch = returnToStarterPattern.exec(pathname);
       if (request.method === "POST" && returnToStarterMatch?.groups) {
         const testRunId = decodeRouteGroup(
@@ -9040,6 +9057,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<ReturnTestRunToStarterRequest>();
         const testRun = await services.participantRuntime.returnToStarter({
           testRunId,
+          currentUnitKey: body?.currentUnitKey,
           responseUnitKey: body?.responseUnitKey,
           unitResponse: body?.unitResponse,
           transientUnitResponses: body?.transientUnitResponses,

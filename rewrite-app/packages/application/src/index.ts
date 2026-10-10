@@ -1,4 +1,5 @@
 import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
+import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import {
   createHash,
   randomBytes,
@@ -814,8 +815,12 @@ export type ParticipantRuntimePort = {
     code: string;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
+  prepareStarterExit(input: PrepareParticipantStarterExitRequest & {
+    testRunId: string;
+  }): Promise<PrepareParticipantStarterExitResponse>;
   returnToStarter(input: {
     testRunId: string;
+    currentUnitKey?: string | null;
     responseUnitKey?: string | null;
     unitResponse?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -6928,7 +6933,9 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
             startedAt: timer.startedAt || testRun.createdAt,
             expiresAt: timer.expiresAt ?? null,
             updatedAt: timer.updatedAt || testRun.updatedAt,
-            endedAt: timer.endedAt ?? null
+            endedAt: timer.endedAt ?? null,
+            ...(status === "paused" && timer.interruptedAtUnitKey
+              ? {interruptedAtUnitKey: timer.interruptedAtUnitKey} : {})
           }
         ]
       ];
@@ -21496,6 +21503,10 @@ const activateCurrentTestletTimer = (
   if (existingTimer?.status === "expired" || existingTimer?.status === "cancelled") {
     return { testRun, startedTestletKey: null };
   }
+  if (existingTimer?.status === "paused" &&
+      existingTimer.interruptedAtUnitKey === testRun.currentUnitKey) {
+    return {testRun, startedTestletKey: null};
+  }
   const timestampMs = Date.parse(timestamp);
   const durationSeconds = existingTimer
     ? Math.max(1, existingTimer.durationSeconds)
@@ -21563,6 +21574,7 @@ const transitionTestletTimersForRunStatus = (
           {
             ...timer,
             status: "running",
+            interruptedAtUnitKey: undefined,
             remainingSeconds,
             expiresAt: Number.isFinite(timestampMs)
               ? new Date(timestampMs + remainingSeconds * 1_000).toISOString()
@@ -33579,6 +33591,69 @@ export const createFirstSliceServices = (
         });
         return effectiveRun;
       },
+      async prepareStarterExit(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedRun = await repository.getTestRunById(testRunId);
+        if (!storedRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${testRunId}' was not found.`);
+        await requireAccessibleParticipantSession(storedRun.participantSessionId);
+        const contentRelease = await requireContentRelease(repository, storedRun.contentReleaseId);
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({contentRelease, testRun: normalizeTestRun(storedRun), timestamp});
+        requireParticipantTestRunUnlocked(testRun);
+        if (testRun.status !== "running") throw new FirstSliceError(409, "test_run_not_running", "Only a running Run can prepare a starter exit.");
+        const currentUnitKey = normalizeOptionalResponseUnitKey(input.currentUnitKey);
+        if (!currentUnitKey || currentUnitKey !== testRun.currentUnitKey) {
+          throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit preparation.");
+        }
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
+        const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
+        const responseUnitKey = input.responseUnitKey === undefined ? currentUnitKey : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        if (responseUnitKey) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, responseUnitKey);
+        const transient = normalizeTransientUnitResponses(input.transientUnitResponses);
+        if (executionMode.saveResponses && Object.keys(transient).length) {
+          throw new FirstSliceError(400, "transient_unit_responses_not_allowed", "transientUnitResponses are only accepted for non-saving execution modes.");
+        }
+        for (const unitKey of Object.keys(transient)) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, unitKey);
+        const evaluationRun = executionMode.saveResponses ? testRun : withEvaluatedBookletStates(booklet, {
+          ...testRun, unitResponses: {...testRun.unitResponses, ...transient,
+            ...(responseUnitKey && unitResponse != null ? {[responseUnitKey]: unitResponse} : {})}
+        });
+        const response = evaluationRun.unitResponses[currentUnitKey];
+        const parsed = response === undefined ? null : parseVeronaUnitResponse(response);
+        if (executionMode.forceNaviRestrictions && !testRun.monitorNavigationUnlocked && !isUnitLeaveLocked(booklet, evaluationRun, currentUnitKey)) {
+          const reasons = bookletStarterExitDeniedReasons({
+            policy: resolveTestletCompletenessPolicy(booklet, currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
+            presentationProgress: parsed ? parsed.unitState.presentationProgress : response === undefined ? undefined : "complete",
+            responseProgress: parsed ? parsed.unitState.responseProgress : response === undefined ? undefined : response.trim() ? "complete" : "none"
+          });
+          if (reasons.length) throw new FirstSliceError(409, "booklet_starter_return_denied", "The current unit is incomplete.", {currentUnitKey, deniedReasons: reasons});
+        }
+        const timed = resolveLeavingTimedTestlet(booklet, evaluationRun, null);
+        const timer = timed ? testRun.testletTimers?.[timed.testletKey] : null;
+        if (!timed || timer?.status !== "running") return {testRun, timerEffect: null};
+        const leave = timed.restrictions?.timeMax?.leave;
+        const timerEffect = leave === "allowed" ? "cancelled" : !executionMode.forceTimeRestrictions ? "interrupted" : null;
+        if (!timerEffect) return {testRun, timerEffect: null};
+        let prepared = timerEffect === "cancelled" ? cancelTestletTimerAfterLeave(testRun, timed.testletKey, timestamp)
+          : interruptTestletTimerAfterLeave(testRun, timed.testletKey, timestamp);
+        if (timerEffect === "interrupted") {
+          prepared = normalizeTestRun({...prepared, testletTimers: {
+            ...prepared.testletTimers,
+            [timed.testletKey]: {...prepared.testletTimers![timed.testletKey]!, interruptedAtUnitKey: currentUnitKey}
+          }});
+        }
+        await repository.saveTestRun(prepared);
+        if (executionMode.saveResponses && timerEffect === "cancelled") {
+          await repository.saveParticipantTestLogs(buildParticipantTestLogs({
+            testRun: prepared,
+            batches: [{entries: [buildTestletTimeLeftTestStateEntry(prepared, timestamp)]}]
+          }));
+        }
+        // Neither preparation nor cancelled confirmation may apply a leave lock,
+        // stop the Run, or persist a non-saving Player packet.
+        return {testRun: prepared, timerEffect};
+      },
       async returnToStarter(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
         const storedTestRun = await repository.getTestRunById(testRunId);
@@ -33610,6 +33685,10 @@ export const createFirstSliceServices = (
           return testRun;
         }
 
+        if (input.currentUnitKey !== undefined &&
+            normalizeOptionalResponseUnitKey(input.currentUnitKey) !== testRun.currentUnitKey) {
+          throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit confirmation.");
+        }
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
@@ -33720,7 +33799,8 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const leavingLock = executionMode.forceNaviRestrictions
+        const leavingLock = executionMode.forceNaviRestrictions &&
+          !(executionMode.forceTimeRestrictions && leavePolicy === "confirm")
           ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
           : null;
         if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {

@@ -1032,7 +1032,9 @@ export type CompleteTestRunRequest = {
   confirmTestletLeaveLock?: boolean;
 };
 
-export type ReturnTestRunToStarterRequest = CompleteTestRunRequest;
+export type ReturnTestRunToStarterRequest = CompleteTestRunRequest & {
+  currentUnitKey?: string | null;
+};
 
 export type CreateTenantResponse = {
   tenant: Tenant;

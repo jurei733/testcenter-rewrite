@@ -1,3 +1,4 @@
+export { participantStarterExitPreparationRoute } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import type { ParticipantCustomTextKey } from "@testcenter-rewrite-app/contracts";
@@ -11,6 +12,9 @@ type ExitPlan = {
   confirmation?: ParticipantConfirmationDialog;
   advisory?: { title: string; message: string };
   originalNotices: string[];
+  afterTimerNotices: string[];
+  confirmedNotices: string[];
+  prepareTimer: boolean;
 };
 
 // Lazy with the foreground exit action: keep dialog copy and completeness
@@ -22,8 +26,9 @@ export function planParticipantStarterExit(input: {
   lock: ParticipantViewFacade["player"]["leaveLock"];
   customText: (key: ParticipantCustomTextKey, fallback?: string) => string;
 }): ExitPlan {
-  const { state, timer, lock, customText } = input;
-  const plan: ExitPlan = { confirmTestletTimeLeave: false, confirmTestletLeaveLock: false, originalNotices: [] };
+  const { state, lock, customText } = input;
+  const timer = input.timer && !["paused", "cancelled", "expired"].includes(input.timer.status) ? input.timer : null;
+  const plan: ExitPlan = { confirmTestletTimeLeave: false, confirmTestletLeaveLock: false, originalNotices: [], afterTimerNotices: [], confirmedNotices: [], prepareTimer: false };
   const policy = state.booklet.policy;
   const parsed = parseVeronaUnitResponse(input.response);
   const hasResponse = input.response.length > 0 || state.currentUnit.unitKey != null &&
@@ -53,8 +58,19 @@ export function planParticipantStarterExit(input: {
     };
     return plan;
   }
+  plan.prepareTimer = !!timer && (timer.leave === "allowed" || !state.executionMode.forceTimeRestrictions);
+  if (timer && !state.executionMode.forceTimeRestrictions && timer.leave !== "allowed") {
+    plan.afterTimerNotices.push(timer.leave === "forbidden"
+      ? "Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich."
+      : "Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.");
+  }
   plan.confirmTestletTimeLeave = state.executionMode.forceTimeRestrictions && timer?.leave === "confirm";
-  plan.confirmTestletLeaveLock = lock?.confirm === true;
+  // A timed confirmation stops Source's leave-check chain before leave locks.
+  plan.confirmTestletLeaveLock = !plan.confirmTestletTimeLeave && lock?.confirm === true;
+  if (lock && !plan.confirmTestletTimeLeave && !state.executionMode.forceNaviRestrictions) {
+    const notice = `${lock.scope} würde im Testmodus nun gesperrt werden.`;
+    (lock.confirm ? plan.confirmedNotices : plan.afterTimerNotices).push(notice);
+  }
   const restriction = plan.confirmTestletTimeLeave ? {
     title: customText("booklet_warningLeaveTimerBlockTitle", "Leave timed block?"),
     message: customText("booklet_warningLeaveTimerBlockTextPrompt", `Leave the timed block "${timer?.displayLabel}" and close it permanently?`),
