@@ -5,7 +5,7 @@ import { OriginalOverlayStylesComponent } from "./original-overlay-styles.compon
 import { OriginalParticipantConfirmationLauncherComponent } from "./original-participant-confirmation-dialog.component";
 import type { ParticipantConfirmationDialog } from "./participant-view.facade";
 
-// Adapted from the pinned Original InfoDialog and its MIT icon set. The shared
+// Adapted from the pinned Original InfoDialog and its close SVG. The shared
 // controller owns denial; closing this surface cannot approve a navigation.
 @Component({
   selector: "app-original-participant-information-dialog", standalone: true,
