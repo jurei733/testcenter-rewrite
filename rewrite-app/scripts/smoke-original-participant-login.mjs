@@ -141,7 +141,16 @@ try {
       const errors = [];
       page.on("pageerror", error => errors.push(String(error)));
       await page.goto(`${baseUrl}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=demo-workspace`, { waitUntil: "networkidle" });
-      await page.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+      await page.locator("#originalLoginName").waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source leaves the fresh name step unfocused");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "participantApplicationLogoButton");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.classList.contains("welcome-section")), true,
+        "Source's welcome scroll container is the next native keyboard focus stop");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "originalLoginName");
       assert.equal(await page.locator("#originalLoginName").inputValue(), "",
         "Fresh participant entry must not prefill a synthetic developer login");
       assert.equal(await page.getByRole("button", { name: "Weiter", exact: true }).isDisabled(), true,
@@ -201,8 +210,23 @@ try {
       assert.equal(await password.getAttribute("type"), "password");
       await page.screenshot({ path: join(root, `${theme}-${screen}-password.png`) });
       await page.getByRole("button", { name: "Zurück zum Anmeldenamen", exact: true }).click();
-      await page.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+      await name.waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source does not force name focus after the password back action");
       assert.equal(await name.inputValue(), `unknown-${theme}-${screen}`);
+      await page.getByRole("button", { name: "Weiter", exact: true }).click();
+      await password.waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source uses native autofocus, which does not repeatedly steal focus in the same document");
+      await password.fill("owned-invalid-password");
+      const invalidPassword = page.waitForResponse(response => new URL(response.url()).pathname ===
+        "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+      assert.equal((await invalidPassword).status(), 401);
+      await name.waitFor();
+      assert.equal(await name.inputValue(), "");
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), "BODY",
+        "Source returns invalid credentials to an unfocused empty name step");
       assert.deepEqual(errors, []);
       await context.close();
       process.stdout.write(`original_login=${theme}/${screen}:passed\n`);

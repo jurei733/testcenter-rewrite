@@ -14,14 +14,36 @@ All twelve full-page pristine-focused-name RGBA pairs now match byte-for-byte:
 both login surfaces, three themes and desktop/mobile. The two protected headful
 production gates also pass their four-width matrix and actual login/recovery
 cases; a DOM Range regression assertion rejects the clipped admin baseline.
-Initial participant focus still differs; no full Shell/login or cross-cutting
-row is closed by this bounded comparison. Source's native window clipping and
-the footer-free participant starter are retained.
+The subsequent native-focus correction also makes the six initial participant
+desktop/mobile RGBA pairs byte-identical without first focusing the name fields.
+All 72 initial/password/visibility/back/repeated-password/invalid-return focus
+states match Source across three themes and four widths. The independently
+observed native Tab sequence is logo, welcome scroll container, name; Source's
+logo is still a link while Rewrite uses a button. One wider Primar/600px image
+has 113 differing text pixels, while its fresh single-case replay is exact.
+Both are retained; no complete Shell/login or cross-cutting row is closed.
+Source's native window clipping and the footer-free starter are retained.
 The corrected focus comparison uses the same actual pristine input state;
 an earlier extra click had touched only the already-focused Rewrite control.
 The fresh Source camera diagnostic again exits 2 after twelve actual
 `video.nativeElement` startup/re-entry failures. These are separate negative
 reference observations, not successful camera or physical hardware acceptance.
+
+To reproduce the Source focus observation, first verify the unmodified current
+Source revision and its production build, then run:
+
+```sh
+ORIGINAL_LOGIN_REFERENCE_ROOT=/path/to/original/frontend/dist/testcenter-frontend/browser \
+ORIGINAL_LOGIN_REFERENCE_COMMIT=ee2ab9ab64bd91209ef8534bbe6005838024e46d \
+UI_SMOKE_ARTIFACT_DIR=/path/to/new/owned/source-evidence \
+npm run reference:ui:original-login-focus:built
+```
+
+The helper records the caller's revision assertion, renders the unchanged
+frontend on owned rejected-login fixtures and fails unknown requests/page
+errors. It does not verify that revision itself or establish backend behavior.
+The regular protected login and bounded entry/logout browser gates verify the
+Rewrite's real authorization/session flow independently.
 
 Requested on 2026-09-12: keep the existing rewrite interface available and add
 an optional interface identical to the Original Testcenter. This is a separate

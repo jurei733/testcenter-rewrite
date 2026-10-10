@@ -7711,7 +7711,9 @@ try {
     await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
       ui: "original", tenantKey, workspaceKey
     })}`, { waitUntil: "networkidle" });
-    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator("#originalLoginName").waitFor();
+    assert.equal(await originalSignInPage.evaluate(() => document.activeElement.tagName), "BODY",
+      "Original fresh entry must preserve Source's unfocused name step");
     await originalSignInPage.locator("#originalApplicationFooter").waitFor();
     assert.deepEqual(await originalSignInPage.locator("#originalApplicationFooter nav a").allTextContents(),
       ["Barrierefreiheit", "Datenschutz", "Impressum"]);
@@ -7786,7 +7788,9 @@ try {
     await originalSignInPage.locator("#originalParticipantLogoutConfirmButton").click();
     await logoutCompleted;
     await originalSignInPage.locator("#originalParticipantLogin").waitFor();
-    await originalSignInPage.waitForFunction(() => document.activeElement?.id === "originalLoginName");
+    await originalSignInPage.locator("#originalLoginName").waitFor();
+    assert.notEqual(await originalSignInPage.evaluate(() => document.activeElement.id), "originalLoginName",
+      "Original logout must not force focus onto the name step");
     assert.equal(new URL(originalSignInPage.url()).searchParams.has("participantSessionId"), false);
     assert.equal((await fetch(`${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
       { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } })).status, 401);

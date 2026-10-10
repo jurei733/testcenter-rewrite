@@ -1,4 +1,4 @@
-import { Component, ElementRef, afterRenderEffect, inject, signal, viewChild } from "@angular/core";
+import { Component, inject, signal } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -28,17 +28,6 @@ export class OriginalParticipantLoginComponent {
   readonly problem = signal("");
   readonly showPassword = signal(false);
   readonly capsLock = signal(false);
-  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>("nameInput");
-  private readonly passwordInput = viewChild<ElementRef<HTMLInputElement>>("passwordInput");
-
-  constructor() {
-    afterRenderEffect(() => {
-      if (this.busy()) return;
-      const input = this.passwordStep() ? this.passwordInput() : this.nameInput();
-      input?.nativeElement.focus();
-    });
-  }
-
   passwordKeyUp(event: KeyboardEvent): void {
     this.capsLock.set(typeof event.getModifierState === "function" && event.getModifierState("CapsLock"));
     this.problem.set("");

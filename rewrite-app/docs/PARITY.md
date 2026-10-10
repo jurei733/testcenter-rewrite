@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Native Original participant login focus (2026-10-10)
+
+The actual current Source `ee2ab9ab` leaves initial name entry, password back
+and invalid-credential return unfocused. Only its first password insertion uses
+native `autofocus`; another password insertion in the same document does not
+force focus again. The Rewrite's render effect had instead repeatedly focused
+the name/password controls. Against unmodified Source, 24 of 36 baseline focus
+states differ. The Original component now uses the same native password
+attribute and has no imperative name-focus effect. Credential values, the
+retained name after Back, secret clearing and shared authorization are intact.
+
+All 72 native focus states match Source across three themes and four widths;
+the 24 independently observed keyboard sequences reach logo, welcome scroll
+container and name in that order. Six actual initial full-page desktop/mobile
+RGBA pairs now also match byte-for-byte, without artificially focusing either
+name field. The wider 12-pair capture has 11 exact images and one 113-pixel
+text-rendering difference at Primar/600px; its fresh single-case replay is exact.
+Both observations remain, and no deterministic whole-page row is closed.
+The logo remains a Source link versus a Rewrite button; wider interaction,
+error/busy rendering and all complete Original UI rows remain separate work.
+
+The production protected/headful login gate passes all twelve theme/width
+cases, 38 actual proof-of-work challenges, inaccessible-context no-request
+checks, saved/explicit-name reload, second code and real authorized password
+login with no persisted password. Seventeen actual protection-method tests
+pass. The bounded main protected/headful SQLite entry/logout/re-entry gate
+also passes with the same Run and intact answers, old-token rejection, 1,161
+completed API requests and zero actual failed requests/5xx through shutdown.
+Its owned port 60107 is closed. Typecheck and production build pass at 469.44 kB
+under the unchanged 470-kB limit. The preceding complete browser/Compose proofs
+belong to the earlier tree; this focus step has these fresh bounded checks.
+
+The portable read-only Source helper passes all twelve cases on the unchanged,
+byte-verified Source build and records its owned rejected-login fixtures,
+native focus, keyboard path, screenshots and unknown-request/page-error lists.
+It requires the caller to verify the supplied Source revision/build; its
+`callerVerifiedReferenceCommit` field does not perform that verification.
+Source frontend fixtures do not prove its backend authentication. The initial
+new gate's too-short synthetic proof secret and incorrect second-Tab assumption
+failed; the secret was corrected to meet the unchanged 32-character policy,
+and the current Source's native welcome scroll stop was measured directly.
+No gate, authentication or bundle policy was relaxed.
+
 ### Host storage recovery and container gates (2026-10-10)
 
 The user explicitly requested space for the container runs. Docker's own host

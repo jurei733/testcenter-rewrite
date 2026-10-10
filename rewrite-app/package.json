@@ -69,6 +69,7 @@
     "smoke:ui:original-login-protected:built": "FIRST_SLICE_PROOF_OF_WORK_SCOPES=participant,second_code FIRST_SLICE_PROOF_OF_WORK_SECRET=owned-original-login-challenge-secret-not-production FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=128 node scripts/smoke-original-participant-login.mjs && FIRST_SLICE_PROOF_OF_WORK_SCOPES=second_code FIRST_SLICE_PROOF_OF_WORK_SECRET=owned-original-login-challenge-secret-not-production FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=128 node scripts/smoke-original-participant-login.mjs",
     "smoke:ui:original-starter:built": "node ./scripts/smoke-original-participant-starter.mjs",
     "reference:ui:original-starter:built": "node ./scripts/reference-original-starter.mjs",
+    "reference:ui:original-login-focus:built": "node ./scripts/reference-original-participant-login-focus.mjs",
     "smoke:ui:original-review": "npm run build && npm run smoke:ui:original-review:built",
     "smoke:ui:original-review:built": "node ./scripts/smoke-original-review.mjs",
     "reference:ui:original-review:built": "node ./scripts/reference-original-review.mjs",

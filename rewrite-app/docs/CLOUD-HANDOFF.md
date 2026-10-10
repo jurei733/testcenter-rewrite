@@ -1,5 +1,32 @@
 # Cloud continuation: Testcenter Rewrite
 
+## Native participant entry focus continuation (2026-10-10)
+
+On `testcenter-production-readiness`, Original participant entry now uses
+Source's native first-password autofocus and no repeated name-focus effect.
+The baseline differs in 24/36 actual focus states; the corrected tree matches
+all 72 states across three themes and four widths. Back retains the name;
+invalid credentials clear it without forcing focus. Native keyboard order is
+logo/welcome scroll/name, observed independently on unmodified Source. Source
+logo remains a link versus Rewrite's button; do not call the entire entry row
+closed. Six desktop/mobile initial full-page RGBA pairs match without manual
+focus normalization. Retain the wider matrix's 113-pixel Primar/600px difference
+and exact fresh repeat; they do not establish deterministic full-page identity.
+
+The portable `reference:ui:original-login-focus:built` passes twelve current
+Source cases with owned rejected-login fixtures, no unknown API paths and no
+page errors. Its revision field is a caller assertion; verify Source/build
+externally before running. Protected real Rewrite login passes twelve cases,
+38 real proof challenges, saved/explicit names, HTTPS blocking and second code.
+The main bounded entry/logout/re-entry flow passes same Run/answers, revoked
+old token and strict API/shutdown checks: 1,161 requests, zero actual failures,
+owned port 60107 closed. Seventeen protection-method tests, typecheck and
+469.44-kB production build pass. The preceding complete browser/Compose results
+belong to the earlier tree, not a new whole-tree replay. Preserve the negative
+short-secret startup and initially wrong Tab-assumption logs; both were fixed
+without weakening the 32-character secret or any gate. No publication, remote
+CI, full Original UI, physical hardware or production acceptance is claimed.
+
 ## Recovered storage and container execution (2026-10-10)
 
 The user authorized freeing space to resume container tests. Docker's actual

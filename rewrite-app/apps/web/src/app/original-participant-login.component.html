@@ -14,7 +14,7 @@
         <h2>Anmeldenamen eingeben</h2>
         <mat-form-field appearance="outline">
         <mat-label>Anmeldename</mat-label>
-        <input matInput #nameInput id="originalLoginName" name="name" autocomplete="username" autocapitalize="off"
+        <input matInput id="originalLoginName" name="name" autocomplete="username" autocapitalize="off"
           [attr.aria-describedby]="problem() ? 'originalLoginProblem' : null"
           required minlength="3" [disabled]="busy()" [(ngModel)]="view.runtime.loginKey" />
         </mat-form-field>
@@ -27,7 +27,7 @@
         </div>
         <mat-form-field appearance="outline">
           <mat-label>Kennwort</mat-label>
-          <input matInput #passwordInput id="originalLoginPassword" name="password" autocomplete="current-password"
+          <input matInput id="originalLoginPassword" name="password" autocomplete="current-password" autofocus
             [attr.aria-describedby]="capsLock() ? 'originalLoginCapsLock' : problem() ? 'originalLoginProblem' : null"
             (keyup)="passwordKeyUp($event)"
             [type]="showPassword() ? 'text' : 'password'" [disabled]="busy()"
