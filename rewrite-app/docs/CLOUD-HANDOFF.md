@@ -1,5 +1,36 @@
 # Cloud continuation: Testcenter Rewrite
 
+## SQLite failure handling continuation (2026-10-10)
+
+Local checkpoints `3e337dfa` and `894042eb` preserve capture ownership and
+neutral participant entry. Continue on `testcenter-production-readiness`.
+The subsequent store correction preserves the primary failure in all ten
+transaction catch paths when SQLite has already rolled back; unexpected
+rollback errors retain both causes. Seven real-store cases include bounded
+`SQLITE_FULL`, true SQL rollback, atomic retry, migration, challenge consumption
+and busy COMMIT. Baseline: four failures out of five, no cancellations. Current:
+668 unit/frontend and 165 SQLite API cases pass. The protected real HTTP
+negative check confirms generic 500, original private cause in logs, no rejected
+data and one exact log after idempotent retry.
+
+The full UI harness now checks its own structured API output for failed
+requests/5xx at full/early completion and after shutdown, with streams drained
+before the success message. Its six helper cases pass. The former browser log
+correctly fails this stricter gate. Keep the original incident's primary storage
+cause unresolved; do not infer disk-full or Docker causation from its masked
+error. The complete stricter headful/protected SQLite UI run fails at the
+IB-family stage with a test-log POST 500 (`unable to open database file`), then
+actual log-output `ENOSPC`. Its owned API port 54778 is closed and no matching
+API/browser processes remain. Keep the failure database/log; this is no clean
+complete browser run. Three completed own synthetic DBs now have byte-exact
+SHA-256-verified gzip archives in chat work, recovering about 261 MiB without
+removing the diagnostics. The separate bounded protected/headful SQLite
+attachment flow passes normal capture/upload/preview/deletion, releases six
+workers and completes the strict early-exit/shutdown gate with zero API failed
+requests/5xx. Docker production Compose remains open at the actual overlay2
+I/O failure. Avoid another full corpus/container replay until stable host
+storage headroom is established; do not reset/prune unrelated resources.
+
 ## Neutral entry, fresh Source and local container boundaries (2026-10-10)
 
 The initial runtime login/group now start empty instead of synthetic

@@ -19,6 +19,7 @@ import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
+import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 
 const participantHttpActor = createParticipantHttpTestActor();
 const fetch = participantHttpActor.fetch;
@@ -386,7 +387,7 @@ const port = process.env.FIRST_SLICE_UI_PORT
 
 const child = spawn(process.execPath, [serverEntry], {
   cwd: frontendRoot ? resolve(frontendRoot) : undefined,
-  stdio: "inherit",
+  stdio: ["inherit", "pipe", "pipe"],
   env: {
     ...process.env,
     PORT: String(port),
@@ -397,8 +398,16 @@ const child = spawn(process.execPath, [serverEntry], {
   }
 });
 
+const serverFailureGate = createServerRequestFailureGate();
+const childClosed = new Promise(resolveClosed => child.once("close", resolveClosed));
+for (const [input, output] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+  serverFailureGate.observeStream(input);
+  input.pipe(output, { end: false });
+}
+
 let browser;
 let page;
+let successMessage = "";
 
 try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
@@ -446,10 +455,8 @@ try {
     }
     assert.equal(participantOperatorCredentialLeakCount, 0,
       "Participant browser requests must not carry the signed-in operator credential.");
-
-    process.stdout.write(
-      `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`
-    );
+    serverFailureGate.assertHealthy();
+    successMessage = `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`;
     throw new UiSmokeEarlyExit(step);
   };
   const observePageRequests = observedPage => {
@@ -26113,9 +26120,8 @@ try {
 
   assert.equal(participantOperatorCredentialLeakCount, 0,
     "Participant browser requests must not carry the signed-in operator credential.");
-  process.stdout.write(
-    `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
-  );
+  serverFailureGate.assertHealthy();
+  successMessage = `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`;
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
     if (page && !page.isClosed()) {
@@ -26144,5 +26150,8 @@ try {
   await browser?.close().catch(() => undefined);
   process.stdout.write("ui_smoke_step=teardown-server\n");
   await stopChild(child);
+  await childClosed;
+  if (successMessage) serverFailureGate.assertHealthy();
   process.stdout.write("ui_smoke_step=teardown-complete\n");
 }
+process.stdout.write(successMessage);

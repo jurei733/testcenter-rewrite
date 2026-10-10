@@ -1554,6 +1554,24 @@ const getCurrentSchemaVersion = (database: DatabaseSync): number => {
   return row ? Number(row.version) : 0;
 };
 
+function rollbackAfterFailure(database: DatabaseSync, error: unknown): never {
+  try {
+    database.exec("ROLLBACK");
+  } catch (rollbackError) {
+    // SQLite can already have rolled back the entire transaction after FULL,
+    // IOERR or a ROLLBACK conflict. Retain the primary failure for diagnostics
+    // and retry instead of replacing it with "no transaction is active".
+    if (!(rollbackError instanceof Error &&
+      rollbackError.message === "cannot rollback - no transaction is active")) {
+      const message = (failure: unknown) => failure instanceof Error ? failure.message : String(failure);
+      throw new AggregateError([error, rollbackError],
+        `SQLite transaction failed (${message(error)}); rollback failed (${message(rollbackError)}).`,
+        { cause: error });
+    }
+  }
+  throw error;
+}
+
 const applyMigrations = (database: DatabaseSync): void => {
   database.exec("PRAGMA foreign_keys = ON;");
 
@@ -1575,8 +1593,7 @@ const applyMigrations = (database: DatabaseSync): void => {
         .run(migration.version, migration.name, new Date().toISOString());
       database.exec("COMMIT");
     } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
+      rollbackAfterFailure(database, error);
     }
   }
 };
@@ -1986,8 +2003,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return Number(insertion.changes) === 1;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async saveAdminUser(adminUser) {
@@ -2045,8 +2061,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return { deletedRoleAssignmentCount, deletedSessionCount };
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
@@ -2382,8 +2397,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return counts;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
@@ -2578,8 +2592,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return true;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async reserveSourcePackageReplacement(input) {
@@ -2684,8 +2697,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return true;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async deleteSourcePackageAggregate(input) {
@@ -2821,8 +2833,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return Number(deletion.changes) === 1;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async getImportJobById(importJobId) {
@@ -3234,8 +3245,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return { testRun: stored, created: true };
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async saveTestRun(testRun) {
@@ -3336,8 +3346,7 @@ export const createSqliteFirstSliceRepository = (
         }
         database.exec("COMMIT");
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async updateParticipantPresence(input) {
@@ -3375,8 +3384,7 @@ export const createSqliteFirstSliceRepository = (
         database.exec("COMMIT");
         return result;
       } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
+        rollbackAfterFailure(database, error);
       }
     },
     async listExpiredParticipantPresence(timestamp, limit) {

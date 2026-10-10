@@ -1,5 +1,45 @@
 # Testcenter parity checklist
 
+### SQLite failure causes and strict browser server gate (2026-10-10)
+
+The full browser run exposed a masked storage failure: the unconditional
+`ROLLBACK` in a catch block replaced the primary error when SQLite had already
+aborted its transaction. A bounded real `SQLITE_FULL` and real `RAISE(ROLLBACK)`
+triggers reproduce this on the unchanged store. Four of five baseline cases
+fail; the regular `ABORT` case already passes. The actual original browser
+incident's primary cause remains unknown; low host capacity and Docker I/O
+errors do not establish it.
+
+All ten SQLite transaction failure paths now retain the primary error after an
+automatic rollback. An unexpected rollback failure reports both causes rather
+than silently discarding either. Seven real-store tests pass: ordinary and
+automatic rollback, bounded capacity, exact batch rollback/retry, challenge
+consumption, schema migration/retry, busy COMMIT and unexpected rollback failure.
+The protected real HTTP negative check returns a generic 500 without the private
+storage cause, logs that original cause, persists no rejected log and accepts
+an exact, idempotent retry after recovery.
+
+The main browser gate now observes its own API's structured output and rejects
+actual failed requests/5xx at normal completion, requested early exit and after
+shutdown. Both output streams remain visible; the final success message follows
+stream drain. Six helper cases cover expected 4xx, original-cause deduplication,
+500/502/503 and split UTF-8 output. Browser-injected recovery responses do not
+become exemptions for actual API failures. Replaying the earlier real server
+log fails this gate, as required. All 668 unit/frontend cases and all 165 SQLite
+API integration cases pass. The subsequent complete protected/headful SQLite
+browser run fails at the IB-family stage: a real test-log POST returns 500 with
+the now-visible primary `unable to open database file`, followed by an actual
+`ENOSPC` while writing its own log. Its owned API port 54778 is no longer open;
+no clean complete browser acceptance is claimed. This second incident does not
+recover the primary cause of the earlier masked failure. Three completed own
+synthetic databases are archived with byte-exact decompression SHA-256 checks,
+recovering about 261 MiB; the failed-run database, diagnostics and screenshots
+remain. No unrelated Docker resources or user data are removed. A fresh bounded
+protected/headful SQLite attachment flow passes the stricter early-exit and
+shutdown checks with no own API failed requests/5xx. It completes capture,
+upload, preview and deletion and releases six actual QR workers. This does not
+replace the complete browser, Compose, deployment or full-parity gates.
+
 ### Neutral fresh participant entry and current Source comparison (2026-10-10)
 
 Fresh entry previously displayed the synthetic `student-ui` login and carried
