@@ -9,12 +9,16 @@ import { chromium } from "playwright";
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { runtimeErrorPlayer } from "./runtime-error-fixture.mjs";
+import { runtimeErrorContractCases } from "./runtime-error-contract-fixture.mjs";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
-const reference = JSON.parse(await readFile(new URL("./fixtures/original-runtime-error.json", import.meta.url), "utf8"));
+const contract = process.env.UI_SMOKE_RUNTIME_CONTRACT === "true";
+const reference = JSON.parse(await readFile(new URL(contract ? "./fixtures/original-runtime-error-contract.json" : "./fixtures/original-runtime-error.json", import.meta.url), "utf8"));
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
+if (contract) assert.deepEqual(Object.keys(reference.cases), runtimeErrorContractCases.map(s => s.key));
+if (process.env.UI_SMOKE_ONLY_CASE) assert.ok(Object.hasOwn(reference.cases, process.env.UI_SMOKE_ONLY_CASE), "The requested runtime case must exist.");
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-runtime-error-"));
 console.log(`owned_artifacts=${artifacts}`);
 const failureGate = createServerRequestFailureGate();
@@ -58,12 +62,13 @@ try {
   browser = await chromium.launch({headless:process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true"});
   for (const [key, expected] of Object.entries(reference.cases)) {
     if (process.env.UI_SMOKE_ONLY_CASE && key !== process.env.UI_SMOKE_ONLY_CASE) continue;
-    const [, theme, screen] = key.match(/^run-hot-return-(Primar|Sekundar|Erwachsene)-(desktop|mobile)-forbidden-false$/);
+    const scenario = expected.definition;
+    const [, theme, screen] = contract ? [null, scenario.theme, scenario.screen] : key.match(/^run-hot-return-(Primar|Sekundar|Erwachsene)-(desktop|mobile)-forbidden-false$/);
     const workspaceKey = `runtime-${key.toLowerCase()}`, workspace = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
     await api("/api/v1/tenants/demo-tenant/workspaces", {workspaceKey,displayName:workspaceKey}, operator);
     const content = JSON.parse(localDemoSourcePackage.sourceDocument);
-    content.playerEntries[0].html = runtimeErrorPlayer(content.playerEntries[0].html);
-    content.bookletEntries = [{bookletKey:"owned-exit",displayLabel:"Logo Testheft",config:{silent_mode:"FALSE",
+    content.playerEntries[0].html = runtimeErrorPlayer(content.playerEntries[0].html, contract ? {...scenario, code:scenario.code} : {});
+    content.bookletEntries = [{bookletKey:"owned-exit",displayLabel:"Logo Testheft",...(contract ? {customTexts:scenario.bookletCustomTexts} : {}),config:{silent_mode:"FALSE",
       force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS",toolbar_show_unit_list:"FALSE",
       toolbar_show_fullscreen_button:"FALSE",toolbar_show_reload_button:"FALSE",navbar_unit_label:"HIDDEN",navbar_page_label:"HIDDEN"},
       testletEntries:[{testletKey:"timed",displayLabel:"Zeitblock",parentTestletKey:null,
@@ -72,8 +77,8 @@ try {
     const source = await api(workspace + "/source-packages", {fileName:"runtime.json",mediaType:"application/json",contentStructure:content}, operator);
     const imported = await api(workspace + "/import-jobs", {sourcePackageId:source.sourcePackage.sourcePackageId}, operator);
     await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, {activatedByActorId:"runtime-proof"}, operator);
-    await api(workspace + "/participant-roster", {rosterText:'<Testtakers><Group id="owned" label="Exit Group"><Login mode="run-hot-return" name="exit-person"><Booklet>owned-exit</Booklet></Login></Group></Testtakers>'}, operator);
-    await api("/api/v1/admin/application-settings", {themeName:theme}, operator, "PATCH");
+    await api(workspace + "/participant-roster", {rosterText:contract ? JSON.stringify([{loginKey:"exit-person",groupKey:"owned",groupLabel:"Exit Group",displayName:"exit-person",executionMode:"run-hot-return",booklets:[{id:"owned-exit"}],customTexts:scenario.loginCustomTexts}]) : '<Testtakers><Group id="owned" label="Exit Group"><Login mode="run-hot-return" name="exit-person"><Booklet>owned-exit</Booklet></Login></Group></Testtakers>'}, operator);
+    await api("/api/v1/admin/application-settings", {themeName:theme, ...(contract ? {customTexts:scenario.applicationCustomTexts} : {})}, operator, "PATCH");
     const context = await browser.newContext({viewport:screen === "desktop" ? {width:1280,height:720} : {width:390,height:844},locale:"de-DE"});
     if (failDialog) {
       const assets = await readdir(join(root, "dist/apps/web/browser"));
@@ -113,6 +118,7 @@ try {
     assert.equal(await page.locator("#participantRouteControllerErrorState").count(), 0);
     assert.equal(await page.locator("mat-card").count(), expected.cardCount);
     const capture = async phase => {
+      if (contract) await page.mouse.move(0,0);
       await page.evaluate(() => document.fonts.ready);
       await page.waitForFunction(() => document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).every(a => !a.pending && a.playState !== "running"));
       await page.screenshot({path:join(artifacts, `${key}-${phase}.png`),fullPage:true});
@@ -120,7 +126,7 @@ try {
         const read = n => { const b = n.getBoundingClientRect(), s = getComputedStyle(n); return {x:b.x,y:b.y,width:b.width,height:b.height,font:s.font,color:s.color,background:s.backgroundColor,padding:s.padding,margin:s.margin,borderRadius:s.borderRadius,boxShadow:s.boxShadow}; };
         return {role:dialog.getAttribute("role"),box:read(dialog),title:dialog.querySelector("[mat-dialog-title]").textContent.trim(),
           titleBox:read(dialog.querySelector("[mat-dialog-title]")),contentBox:read(dialog.querySelector("mat-dialog-content")),
-          introText:dialog.querySelector("mat-dialog-content > p").textContent.trim(),expansion:read(dialog.querySelector("mat-expansion-panel")),
+          introText:dialog.querySelector("mat-dialog-content > p").textContent.trim(),introWhiteSpace:getComputedStyle(dialog.querySelector("mat-dialog-content > p")).whiteSpace,expansion:read(dialog.querySelector("mat-expansion-panel")),
           icon:read(dialog.querySelector(".mat-icon")),actions:read(dialog.querySelector("mat-dialog-actions")),
           buttons:[...dialog.querySelectorAll("button")].map(n => ({text:n.textContent.trim(),box:read(n)}))};
       });
@@ -134,24 +140,30 @@ try {
     for (const field of ["box","titleBox","contentBox","expansion","icon","actions"]) compare(surface[field], expected.collapsedDialog[field], field);
     assert.equal(surface.role, expected.collapsedDialog.role); assert.equal(surface.title, expected.collapsedDialog.title);
     assert.equal(surface.introText, expected.introText); assert.deepEqual(surface.buttons.map(b => b.text), expected.collapsedDialog.buttons.map(b => b.text));
+    if (contract) assert.equal(surface.introWhiteSpace, expected.introWhiteSpace);
     compare(surface.buttons[0].box, expected.collapsedDialog.buttons[0].box, "reload");
     assert.equal(await page.evaluate(() => document.activeElement.getAttribute("role")), expected.activeRole);
     await page.keyboard.press("Escape"); assert.equal(await page.locator("mat-dialog-container").count(), 1);
     await page.locator(".cdk-overlay-backdrop").click({position:{x:5,y:5}}); assert.equal(await page.locator("mat-dialog-container").count(), 1);
     const expansion = page.getByRole("button", {name:"Fehlerdetails",exact:true});
     await expansion.focus(); await page.keyboard.press("Enter");
-    await page.locator("mat-expansion-panel").filter({hasText:expected.errorDescription}).waitFor();
     await capture("expanded");
-    assert.ok((await page.locator("mat-expansion-panel").innerText()).includes(expected.errorDescription));
+    if (contract) {
+      const description = await page.locator("mat-expansion-panel p").first().evaluate(p => ({html:p.innerHTML,text:p.textContent}));
+      assert.deepEqual(description, expected.description);
+      states[key].description = description;
+    } else assert.ok((await page.locator("mat-expansion-panel").innerText()).includes(expected.errorDescription));
     } else {
       const fallback = page.locator("#participantRuntimeErrorFallback");
       assert.equal(await fallback.getAttribute("role"), "alertdialog");
       assert.equal(await fallback.locator("h2").textContent(), expected.collapsedDialog.title);
       assert.equal(await fallback.locator("article > p").textContent(), expected.introText);
+      if (contract) assert.equal(await fallback.locator("article > p").evaluate(p => getComputedStyle(p).whiteSpace), expected.introWhiteSpace);
       await page.keyboard.press("Escape"); assert.equal(await fallback.count(), 1);
       await fallback.click({position:{x:5,y:5}}); assert.equal(await fallback.count(), 1);
       await fallback.locator("summary").click();
-      assert.equal(await fallback.locator("details p").innerText(), expected.errorDescription);
+      if (contract) assert.deepEqual(await fallback.locator("details p").evaluate(p => ({html:p.innerHTML,text:p.textContent})), expected.description);
+      else assert.equal(await fallback.locator("details p").innerText(), expected.errorDescription);
       await page.waitForFunction(() => !!document.activeElement.closest("#participantRuntimeErrorFallback"));
       await page.screenshot({path:join(artifacts, `${key}-fallback.png`),fullPage:true});
       states[key] = {fallback:true};
@@ -161,7 +173,7 @@ try {
     assert.equal(await page.locator(failDialog ? "#participantRuntimeErrorFallback" : "mat-dialog-container").count(), expected.repeatedDialogCount);
     assert.ok(!(await page.locator(failDialog ? "#participantRuntimeErrorFallback details" : "mat-expansion-panel").innerText()).includes("Second owned runtime Ω"));
     for (let i = 0; i < 5; i++) { await page.keyboard.press("Tab"); assert.equal(await page.evaluate(() => !!document.activeElement.closest("mat-dialog-container, #participantRuntimeErrorFallback")), true); }
-    const unitLogsPath = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent("Runtime Error: runtime-error")}&unitKey=unit-intro`;
+    const unitLogsPath = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent(contract ? `Runtime Error: ${scenario.code}` : "Runtime Error: runtime-error")}&unitKey=unit-intro`;
     const controllerLogsPath = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=CONTROLLER&limit=100`;
     const runtimeLogs = await poll(() => api(unitLogsPath, undefined, operator), p => p.items.length === expected.repeatedRuntimeLogCount);
     assert.deepEqual(runtimeLogs.items.map(i => i.testLog.logContent).sort(), [expected.errorDescription,"Second owned runtime Ω"].sort());
@@ -267,7 +279,7 @@ try {
     assert.equal(recovered.items.filter(i => i.testLog.logContent === "ERROR").length, expected.controllerErrorWriteCount);
     assert.equal((await api(unitLogsPath, undefined, operator)).items.length, expectedRuntimeLogCount);
     assert.equal((await currentState()).testRun.unitResponses["unit-intro"], expectedPacket);
-    await context.close(); console.log(`original_runtime_error=${key}:passed`);
+    await context.close(); console.log(`${contract ? "original_runtime_error_contract" : "original_runtime_error"}=${key}:passed`);
   }
   assert.deepEqual(errors, []); failureGate.assertHealthy();
 } finally {

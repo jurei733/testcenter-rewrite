@@ -1072,13 +1072,15 @@ export class VeronaPlayerHostComponent
         : "runtime-error";
     const message =
       typeof messageValue === "string"
-        ? messageValue.trim().slice(0, 32_768)
+        ? messageValue.slice(0, 32_768)
         : "";
     return {
       code,
       message,
       entry: {
-        key: `Runtime Error: ${code}`,
+        key: `Runtime Error: ${typeof codeValue === "string"
+          ? codeValue.slice(0, 180)
+          : codeValue === undefined ? "undefined" : code}`,
         timeStamp: Date.now(),
         content: message
       }

@@ -5,12 +5,12 @@ import ts from "typescript";
 import { resolveVeronaPlayerApiVersion, isSupportedVeronaPlayerApiVersion,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN, SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX } from "@testcenter-rewrite-app/contracts";
 
-// Execute the actual ready/fail methods, including their once-per-frame output.
+// Execute the actual ready/runtime-error/fail methods and once-per-frame output.
 // The real iframe, dialog, persistence and reload are covered by the browser gate.
 const source = readFileSync(new URL("../apps/web/src/app/verona-player-host.component.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("verona-player-host.component.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "VeronaPlayerHostComponent");
-const methods = ["handleReady", "fail"].map(name => {
+const methods = ["handleReady", "fail", "handleRuntimeError", "normalizeRuntimeError"].map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `Production ${name} must exist.`); return method.getText(ast);
 });
@@ -80,4 +80,31 @@ test("a pending or already finished startup cannot emit another ready failure", 
     const {host,errors,logs,calls}=fixture();Object.assign(host,state);host.handleReady({metadata:{}});
     assert.deepEqual(errors,[]);assert.deepEqual(logs,[]);assert.deepEqual(calls,{clearedReady:0,clearedFrames:0});
   }
+});
+
+for (const code of ["session-id-missing", "unit-definition-missing", "wrong-session-id",
+  "unit-definition-type-unsupported", "unit-state-type-unsupported", "runtime-error", "future-error-code"]) {
+  test(`runtime ${code} preserves the exact Original description and log content`, () => {
+    const {host,errors,logs,playerLogs}=fixture();
+    const message=" \n  <b>Owned rich error</b><br>Second line Ω  \n ";
+    host.handleRuntimeError(code,message);
+    assert.equal(errors[0].description,message);
+    assert.equal(playerLogs[0].content,message);
+    assert.equal(playerLogs[0].key,`Runtime Error: ${code}`);
+    assert.deepEqual(logs.map(entry=>[entry.key,entry.content]),[["CONTROLLER","ERROR"]]);
+  });
+}
+test("a missing runtime code retains the Original log key while the generic error keeps its default", () => {
+  const {host,errors,playerLogs}=fixture();
+  host.handleRuntimeError(undefined,"Owned missing code Ω");
+  assert.equal(playerLogs[0].key,"Runtime Error: undefined");
+  assert.equal(errors[0].description,"Owned missing code Ω");
+  assert.equal(errors[0].message,"runtime-error: Owned missing code Ω");
+});
+test("an empty runtime description stays empty and existing diagnostic bounds still apply", () => {
+  const empty=fixture();empty.host.handleRuntimeError("runtime-error","");
+  assert.equal(empty.errors[0].description,"");assert.equal(empty.playerLogs[0].content,"");
+  const bounded=fixture();bounded.host.handleRuntimeError("x".repeat(201),"Ω".repeat(32_769));
+  assert.equal(bounded.playerLogs[0].key.length,195);
+  assert.equal(bounded.playerLogs[0].content.length,32_768);
 });

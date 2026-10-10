@@ -1164,8 +1164,8 @@ interface ParticipantVisibleCodeNotice {
               cdkTrapFocus [cdkTrapFocusAutoCapture]="true" aria-labelledby="participantErrorFallbackTitle">
               <article class="participant-confirmation-dialog">
                 <h2 id="participantErrorFallbackTitle">{{ request.title ?? "Fehler beim Abspielen der Aufgabe" }}</h2>
-                <p>{{ view.customText('booklet_errormessage') }}</p>
-                <details><summary>Fehlerdetails</summary><p>{{ redactBugReportText(request.description || request.message) }}</p></details>
+                <p style="white-space: pre-wrap">{{ view.customText('booklet_errormessage') }}</p>
+                <details><summary>Fehlerdetails</summary><p [innerHTML]="redactBugReportText(request.description ?? request.message)"></p></details>
                 <button id="participantRouteControllerReloadButton" cdkFocusInitial type="button"
                   (click)="view.reloadAfterControllerError(request)">Schließen und neu laden</button>
               </article>
