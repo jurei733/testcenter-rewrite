@@ -16,7 +16,8 @@ const {localDemoSourcePackage}=await import('../apps/api/dist/apps/api/src/local
 const demo=JSON.parse(localDemoSourcePackage.sourceDocument);
 const contract=process.env.ORIGINAL_RUNTIME_CONTRACT==='true';
 const overlap=process.env.ORIGINAL_RUNTIME_COMMAND_OVERLAP;
-assert.ok(!overlap||['pending-pause','pending-terminate','queued-pause','queued-terminate','pending-resume','queued-resume'].includes(overlap));
+assert.ok(!overlap||['pending-pause','pending-terminate','queued-pause','queued-terminate','pending-resume','queued-resume','queued-pause-resume','queued-pause-resume-reversed-acks'].includes(overlap));
+const pairedCommands=overlap?.startsWith('queued-pause-resume');
 assert.ok(!(overlap&&contract));
 const xmlText=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://localhost').pathname,file=resolve(root,extname(pathname)?'.'+pathname:'index.html');if(relative(root,file).startsWith('..'))return res.writeHead(404).end();res.setHeader('content-type',{'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(file)]||'application/octet-stream');res.end(await readFile(file));}catch{res.writeHead(404).end();}});
@@ -36,6 +37,7 @@ try{
   page.on('pageerror',error=>errors.push({key,error:String(error)}));
   let pauseRequested=false;
   let releaseCommand,commandBlocked,commandPollCount=0;
+  const acknowledgementCompletionOrder=[];
   const commandGate=new Promise(done=>{releaseCommand=done;});
   const commandStarted=new Promise(done=>{commandBlocked=done;});
   const auth={token:'owned-player-exit',displayName:'exit-person',loginName:'exit-person',groupLabel:'Exit Group',flags:[],customTexts:scenario.loginCustomTexts??{},groupToken:'owned-exit-group',viewSettings:{theme},claims:{test:[{id:'owned-exit',label:'Logo Testheft',workspaceId:'1',description:'',type:'test',flags:{}}]}};
@@ -57,12 +59,15 @@ try{
     if(overlap&&commandPollCount===1){
       const command={id:2,timestamp:Date.now(),keyword:overlap.split('-')[1],arguments:[]};
       if(overlap.startsWith('pending-')){commandBlocked();await commandGate;body=[command];}
-      else body=[{id:1,timestamp:Date.now(),keyword:'debug',arguments:['off']},command];
+      else body=pairedCommands?[{id:1,timestamp:Date.now(),keyword:'pause',arguments:[]},{...command,keyword:'resume'}]:[{id:1,timestamp:Date.now(),keyword:'debug',arguments:['off']},command];
     }else body=pauseRequested?[{id:1,timestamp:Date.now(),keyword:'pause',arguments:[]}]:[];
    }
    else if(/^\/api\/test\/1\/command\/[12]\/executed$/.test(pathname)&&method==='PATCH'){
     if(overlap?.startsWith('queued-')){if(pathname.endsWith('/1/executed'))commandBlocked();await commandGate;}
-    body={};
+    if(overlap==='queued-pause-resume-reversed-acks'&&pathname.endsWith('/1/executed'))await new Promise(done=>setTimeout(done,1800));
+    await route.fulfill({status:200,contentType:'application/json',body:'{}'});
+    acknowledgementCompletionOrder.push(Number(pathname.match(/\/command\/(\d+)\/executed$/)[1]));
+    return;
    }
    else if(pathname==='/api/test/1/state'&&method==='PATCH')body='';
    else if(pathname==='/api/test/1/lock'&&method==='PATCH')body=true;
@@ -97,14 +102,14 @@ try{
   await page.locator('mat-dialog-container').waitFor();
   if(overlap){
     const first=await capture('error');releaseCommand();
-    await new Promise(done=>setTimeout(done,1800));
+    await new Promise(done=>setTimeout(done,pairedCommands?3500:1800));
     const after=await capture('after-command');
     const acknowledgements=requests.filter(q=>/\/command\/[12]\/executed$/.test(q.pathname));
     if(overlap.startsWith('pending-')){
       assert.equal(acknowledgements.length,0);assert.equal(after.iframeCount,1);assert.equal(after.cardCount,0);assert.equal(after.url,first.url);
     }else assert.ok(acknowledgements.some(q=>q.pathname.endsWith('/2/executed')));
     assert.equal(first.dialog.title,'Fehler beim Abspielen der Aufgabe');
-    states[key]={first,after,commandPollCount,acknowledgements,requests};
+    states[key]={first,after,commandPollCount,acknowledgements,acknowledgementCompletionOrder,requests};
     await context.close();console.log(`source_runtime_command_overlap=${key}:passed`);continue;
   }
   if(contract)await page.mouse.move(0,0);
