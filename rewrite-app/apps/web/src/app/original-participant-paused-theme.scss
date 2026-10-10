@@ -1,0 +1,7 @@
+@use './original-system-check-content-theme';
+@use '@angular/material' as mat;
+
+// Pinned 19.0 material-overrides.scss uses a white drawer content surface.
+:host {
+  @include mat.sidenav-overrides((content-background-color: white));
+}
