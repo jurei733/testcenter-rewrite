@@ -1,5 +1,48 @@
 # Optional Original UI
 
+### Durable command identities and receipts (2026-10-11)
+
+Application checkpoint `5f88508c12e8` persists commands with independent IDs,
+per-Run sequences and an idempotent first acknowledgement in Memory, File,
+SQLite (schema 59) and PostgreSQL (schema 53). All four scope identifiers
+must match the parent Run. SQL reads also check the parent in the same query;
+writes serialize under a SQLite transaction or PostgreSQL Run lock. File
+receipts update the cache only after durable persistence succeeds. Run and
+workspace deletion remove their command history. Issuance and receipt alone
+leave status, saved answers, timers and the current Unit unchanged.
+
+Two additional pinned Source probes record pause/resume after ERROR with
+normal and reversed HTTP acknowledgement completion. The effect order follows
+successful acknowledgement completion, including RUNNING then PAUSED when
+responses finish in reverse order. This is frontend evidence on owned
+API/player fixtures, not a guarantee of execution in issuance order.
+`scripts/record-original-runtime-command-order.mjs` guards the actual controller
+states, command logs, DOM identity and response completion order in both cases.
+
+Fresh validation passes typecheck, the production web build, 1216 unit checks,
+733 full PostgreSQL integration checks and 32 additional command/migration
+checks. These include two actual SQLite writer processes, independent
+PostgreSQL pools, file write failure/recovery, selected-Run isolation,
+parent deletion, restart durability and failed migrations with exact saved
+answers retained after retry. The previously latest-schema-58 SQLite test
+was updated for the new migration. An initial 512-MiB private tmpfs was too
+small for the full corpus; the private-volume rerun passes and removes all
+owned resources.
+
+The new image `testcenter-rewrite-app:completeness-5f88508c12e8` has USER node
+and ID `sha256:215ebc9da10cf2997f9f5b707ffa0078a65646463126746027903b64dca2fdfb`.
+All four fresh container checks pass: PostgreSQL standard, demo and production
+secret boundaries plus SQLite. Exact inventory preserves the 24 existing
+containers, 85 volumes and protected presentation. Disk recovery initially
+reclaimed about 5 GiB; 9.2 GiB is free after the current builds and cleanup.
+
+This is storage infrastructure. Monitor issuance still mutates canonical
+state directly; no producer, authenticated command endpoint or browser
+consumer is connected to the new collection. The same-status resume regression
+and termination/save-drain equivalence remain open. All eight complete Original
+UI acceptance rows, remote CI for this checkpoint, real devices, release,
+deployment and production proof remain open. Nothing was pushed.
+
 ### Command reception and dependency caching (2026-10-11)
 
 Packaging checkpoint `26f74a5bd6be` installs workspace dependencies from the
