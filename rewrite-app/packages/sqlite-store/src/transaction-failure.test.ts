@@ -8,7 +8,7 @@ import { Worker } from "node:worker_threads";
 import test from "node:test";
 
 import type { ParticipantTestLog } from "@testcenter-rewrite-app/domain";
-import { createSqliteFirstSliceRepository, migrateSqliteFirstSliceStorage, SQLITE_BUSY_TIMEOUT_MS } from "./index.js";
+import { createSqliteFirstSliceRepository, migrateSqliteFirstSliceStorage, SQLITE_BUSY_TIMEOUT_MS, SQLITE_FIRST_SLICE_SCHEMA_VERSION } from "./index.js";
 
 const log = (id: string, content: string): ParticipantTestLog => ({
   participantTestLogId: id, tenantId: "own-tenant", workspaceId: "own-workspace",
@@ -168,10 +168,17 @@ test("SQLite rolls back a test-log batch after a busy COMMIT and accepts a later
 test("SQLite migration automatic rollback preserves its cause and leaves schema changes retryable", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sqlite-migration-failure-"));
   const databasePath = join(directory, "own.sqlite");
-  createSqliteFirstSliceRepository(databasePath);
+  const repository = createSqliteFirstSliceRepository(databasePath);
   const control = new DatabaseSync(databasePath);
   try {
-    control.exec(`DELETE FROM schema_migrations WHERE version = 58;
+    const run = { tenantId: "own", workspaceId: "own", participantSessionId: "own", testRunId: "own",
+      contentReleaseId: "own", bookletKey: "own", status: "running" as const, currentUnitKey: "unit",
+      unitResponses: { unit: "Exact answer before migration" }, testletTimers: {},
+      createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-10T00:00:00.000Z", completedAt: null };
+    await repository.saveTestRun(run);
+    const storedRun = await repository.getTestRunById(run.testRunId);
+    control.exec(`DELETE FROM schema_migrations WHERE version >= 58;
+      DROP TABLE participant_run_commands;
       DROP TABLE participant_connection_presence;
       ALTER TABLE participant_test_logs DROP COLUMN original_timestamp;
       CREATE TRIGGER own_migration_failure BEFORE INSERT ON schema_migrations
@@ -179,10 +186,15 @@ test("SQLite migration automatic rollback preserves its cause and leaves schema 
     await assert.rejects(migrateSqliteFirstSliceStorage(databasePath), /own migration failure/);
     assert.equal(control.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()?.version, 57);
     assert.equal(control.prepare("SELECT name FROM sqlite_master WHERE name = 'participant_connection_presence'").get(), undefined);
+    assert.equal(control.prepare("SELECT name FROM sqlite_master WHERE name = 'participant_run_commands'").get(), undefined);
     assert.equal(control.prepare("PRAGMA table_info(participant_test_logs)").all()
       .some(row => row.name === "original_timestamp"), false);
     control.exec("DROP TRIGGER own_migration_failure");
-    assert.equal((await migrateSqliteFirstSliceStorage(databasePath)).currentSchemaVersion, 58);
+    assert.equal((await migrateSqliteFirstSliceStorage(databasePath)).currentSchemaVersion, SQLITE_FIRST_SLICE_SCHEMA_VERSION);
+    const upgraded = createSqliteFirstSliceRepository(databasePath);
+    assert.deepEqual(await upgraded.getTestRunById(run.testRunId), storedRun);
+    assert.equal((await upgraded.appendParticipantRunCommand({ ...run, commandId: "new-command", commandType: "resume",
+      actorId: null, targetUnitKey: null, remainingSeconds: null, issuedAt: run.createdAt }))?.sequence, 1);
   } finally {
     control.close();
     await rm(directory, { recursive: true, force: true });

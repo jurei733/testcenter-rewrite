@@ -12,6 +12,8 @@ import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
 export { selectParticipantAssignmentRun } from "./participant-assignment-runs.js";
+export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
+  matchesParticipantRunCommandScope } from "./participant-run-commands.js";
 import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
 export { transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
   PARTICIPANT_PRESENCE_MAX_CONNECTIONS } from "./participant-presence.js";
@@ -144,6 +146,9 @@ import type {
   SystemCheckReportStatistics,
   Tenant,
   TestRun,
+  ParticipantRunCommand,
+  ParticipantRunCommandInput,
+  ParticipantRunCommandScope,
   TestRunStatus,
   UnitCodingScheme,
   UnitAttachmentRequest,
@@ -1453,6 +1458,12 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
+  appendParticipantRunCommand(command: ParticipantRunCommandInput): Promise<ParticipantRunCommand | null>;
+  listPendingParticipantRunCommands(scope: ParticipantRunCommandScope): Promise<ParticipantRunCommand[]>;
+  acknowledgeParticipantRunCommand(input: ParticipantRunCommandScope & {
+    commandId: string;
+    acknowledgedAt: string;
+  }): Promise<ParticipantRunCommand | null>;
   /** Reserve/reuse one exact assignment atomically; never reset an existing Run. */
   getOrCreateTestRunForAssignment(
     candidate: TestRun

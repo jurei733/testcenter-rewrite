@@ -15,6 +15,9 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
+  matchesParticipantRunCommandScope,
   type ParticipantPresence,
   type FirstSliceRepository,
   type ParticipantAccessCredential
@@ -39,6 +42,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   ParticipantTestLog,
+  ParticipantRunCommand,
   SourcePackage,
   Tenant,
   TestRun,
@@ -78,6 +82,7 @@ type PersistedFirstSliceState = {
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
+  participantRunCommands: Record<string, ParticipantRunCommand>;
   participantTestLogs: Record<string, ParticipantTestLog>;
   participantPresence: Record<string, ParticipantPresence>;
 };
@@ -122,6 +127,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
   testRuns: {},
+  participantRunCommands: {},
   participantTestLogs: {},
   participantPresence: {}
 });
@@ -589,6 +595,23 @@ export const createFileFirstSliceRepository = (
     return operation;
   };
 
+  const mutateCommandList = <Result>(
+    updater: (state: PersistedFirstSliceState) => Result
+  ): Promise<Result> => {
+    const operation = writeQueue.then(async () => {
+      const current = await getState();
+      const next = { ...current, participantRunCommands: { ...current.participantRunCommands } };
+      const result = updater(next);
+      if (result === null) return result;
+      await persistState(next);
+      // A failed durable receipt must remain pending in the cached state too.
+      cachePromise = Promise.resolve(next);
+      return result;
+    });
+    writeQueue = operation.then(() => undefined, () => undefined);
+    return operation;
+  };
+
   return {
     async getApplicationSettings() {
       const state = await getState();
@@ -853,6 +876,7 @@ export const createFileFirstSliceRepository = (
         };
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+        deleteMatching(state.participantRunCommands, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
@@ -1327,11 +1351,41 @@ export const createFileFirstSliceRepository = (
         state.testRuns[testRun.testRunId] = testRun;
       });
     },
+    async appendParticipantRunCommand(input) {
+      return mutateCommandList(state => {
+        const command = appendParticipantRunCommand(input, state.testRuns[input.testRunId] ?? null, {
+          existing: state.participantRunCommands[JSON.stringify([input.testRunId, input.commandId])] ?? null,
+          lastSequence: Object.values(state.participantRunCommands)
+            .reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+        });
+        if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = structuredClone(command);
+        return command;
+      });
+    },
+    async listPendingParticipantRunCommands(scope) {
+      const state = await getState();
+      if (!matchesParticipantRunCommandScope(state.testRuns[scope.testRunId], scope)) return [];
+      return structuredClone(Object.values(state.participantRunCommands)
+        .filter(command => matchesParticipantRunCommandScope(command, scope) && command.acknowledgedAt === null)
+        .sort((a, b) => a.sequence - b.sequence));
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      return mutateCommandList(state => {
+        const key = JSON.stringify([input.testRunId, input.commandId]);
+        const command = acknowledgeParticipantRunCommand(input, state.testRuns[input.testRunId] ?? null,
+          state.participantRunCommands[key] ?? null);
+        if (command) state.participantRunCommands[key] = structuredClone(command);
+        return command;
+      });
+    },
     async deleteTestRunsByIds(testRunIds) {
       let deletedCount = 0;
       await mutate(state => {
         for (const testRunId of testRunIds) {
           delete state.participantPresence[testRunId];
+          for (const [key, command] of Object.entries(state.participantRunCommands)) {
+            if (command.testRunId === testRunId) delete state.participantRunCommands[key];
+          }
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
             deletedCount += 1;

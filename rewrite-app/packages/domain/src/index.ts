@@ -1308,6 +1308,28 @@ export type MonitorRunCommandResult = {
   participantSession: ParticipantSession;
 };
 
+export type ParticipantRunCommandScope = {
+  tenantId: string;
+  workspaceId: string;
+  participantSessionId: string;
+  testRunId: string;
+};
+
+export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
+  commandId: string;
+  commandType: MonitorRunCommandType;
+  targetUnitKey: string | null;
+  remainingSeconds: number | null;
+  actorId: string | null;
+  issuedAt: string;
+};
+
+/** Durable delivery intent; acknowledging it does not mutate answers or Run state. */
+export type ParticipantRunCommand = ParticipantRunCommandInput & {
+  sequence: number;
+  acknowledgedAt: string | null;
+};
+
 export type ParticipantRuntimeStateStatus =
   | "ready_to_launch"
   | "in_progress"

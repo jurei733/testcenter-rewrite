@@ -3,6 +3,9 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
+  matchesParticipantRunCommandScope,
   type ParticipantPresence,
   type FirstSliceRepository,
   type ParticipantAccessCredential
@@ -24,6 +27,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   ParticipantTestLog,
+  ParticipantRunCommand,
   SourcePackage,
   Tenant,
   TestRun,
@@ -64,6 +68,7 @@ type InMemoryFirstSliceState = {
   participantRosterPasswordHashes: Map<string, string>;
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
+  participantRunCommands: Map<string, ParticipantRunCommand>;
   participantTestLogs: Map<string, ParticipantTestLog>;
   participantPresence: Map<string, ParticipantPresence>;
 };
@@ -94,6 +99,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantRosterPasswordHashes: new Map(),
   participantLoginAttempts: new Map(),
   testRuns: new Map(),
+  participantRunCommands: new Map(),
   participantTestLogs: new Map(),
   participantPresence: new Map()
 });
@@ -301,6 +307,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       };
       const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+      deleteMatching(state.participantRunCommands, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
       }
@@ -721,10 +728,35 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async saveTestRun(testRun) {
       state.testRuns.set(testRun.testRunId, testRun);
     },
+    async appendParticipantRunCommand(input) {
+      const command = appendParticipantRunCommand(input, state.testRuns.get(input.testRunId) ?? null, {
+        existing: state.participantRunCommands.get(JSON.stringify([input.testRunId, input.commandId])) ?? null,
+        lastSequence: Array.from(state.participantRunCommands.values())
+          .reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+      });
+      if (command) state.participantRunCommands.set(JSON.stringify([command.testRunId, command.commandId]), structuredClone(command));
+      return command;
+    },
+    async listPendingParticipantRunCommands(scope) {
+      if (!matchesParticipantRunCommandScope(state.testRuns.get(scope.testRunId), scope)) return [];
+      return structuredClone(Array.from(state.participantRunCommands.values())
+        .filter(command => matchesParticipantRunCommandScope(command, scope) && command.acknowledgedAt === null)
+        .sort((a, b) => a.sequence - b.sequence));
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      const key = JSON.stringify([input.testRunId, input.commandId]);
+      const command = acknowledgeParticipantRunCommand(input, state.testRuns.get(input.testRunId) ?? null,
+        state.participantRunCommands.get(key) ?? null);
+      if (command) state.participantRunCommands.set(key, structuredClone(command));
+      return command;
+    },
     async deleteTestRunsByIds(testRunIds) {
       let deletedCount = 0;
       for (const testRunId of testRunIds) {
         state.participantPresence.delete(testRunId);
+        for (const [key, command] of state.participantRunCommands) {
+          if (command.testRunId === testRunId) state.participantRunCommands.delete(key);
+        }
         if (state.testRuns.delete(testRunId)) {
           deletedCount += 1;
         }

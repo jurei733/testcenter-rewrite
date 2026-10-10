@@ -7,6 +7,8 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  appendParticipantRunCommand,
+  acknowledgeParticipantRunCommand,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -28,6 +30,7 @@ import type {
   ParticipantRosterEntry,
   ParticipantSession,
   ParticipantTestLog,
+  ParticipantRunCommand,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -1527,6 +1530,26 @@ const sqliteMigrations: SqliteMigration[] = [
       );
       CREATE INDEX idx_participant_connection_presence_expiry
         ON participant_connection_presence(next_expiry) WHERE next_expiry IS NOT NULL;
+    `
+  },
+  {
+    version: 59,
+    name: "add_participant_run_commands",
+    sql: `
+      CREATE TABLE participant_run_commands (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        command_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0 AND sequence <= 9007199254740991),
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        command_json TEXT NOT NULL,
+        acknowledged_at TEXT,
+        PRIMARY KEY (test_run_id, command_id),
+        UNIQUE (test_run_id, sequence)
+      );
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
     `
   }
 ];
@@ -3250,6 +3273,54 @@ export const createSqliteFirstSliceRepository = (
     },
     async saveTestRun(testRun) {
       persistTestRun(database, testRun);
+    },
+    async appendParticipantRunCommand(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const existing = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const last = database.prepare("SELECT sequence FROM participant_run_commands WHERE test_run_id = ? ORDER BY sequence DESC LIMIT 1")
+          .get(input.testRunId);
+        const command = appendParticipantRunCommand(input, run, {
+          existing: existing ? JSON.parse(String(existing.command_json)) as ParticipantRunCommand : null,
+          lastSequence: Number(last?.sequence ?? 0)
+        });
+        if (command) database.prepare(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, command_id) DO NOTHING`)
+          .run(command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt);
+        database.exec("COMMIT");
+        return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async listPendingParticipantRunCommands(scope) {
+      return database.prepare(`SELECT command.command_json FROM participant_run_commands AS command
+        JOIN test_runs AS run ON run.test_run_id = command.test_run_id
+        WHERE command.test_run_id = ? AND command.tenant_id = ? AND command.workspace_id = ? AND command.participant_session_id = ?
+          AND command.acknowledged_at IS NULL
+          AND run.tenant_id = command.tenant_id AND run.workspace_id = command.workspace_id
+          AND run.participant_session_id = command.participant_session_id
+        ORDER BY command.sequence`)
+        .all(scope.testRunId, scope.tenantId, scope.workspaceId, scope.participantSessionId)
+        .map(row => JSON.parse(String(row.command_json)) as ParticipantRunCommand);
+    },
+    async acknowledgeParticipantRunCommand(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const row = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const command = acknowledgeParticipantRunCommand(input, run,
+          row ? JSON.parse(String(row.command_json)) as ParticipantRunCommand : null);
+        if (command) database.prepare(`UPDATE participant_run_commands SET command_json = ?, acknowledged_at = ?
+          WHERE test_run_id = ? AND command_id = ?`).run(JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId);
+        database.exec("COMMIT");
+        return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
     },
     async deleteTestRunsByIds(testRunIds) {
       if (testRunIds.length === 0) {
