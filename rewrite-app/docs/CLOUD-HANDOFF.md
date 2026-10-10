@@ -19,8 +19,9 @@ mandatory quick-browser wrapper passes all 22 headful cases: 12 native states,
 such log deliveries with recovery. All 1158 unit/state checks pass, including
 499 frontend-state checks. The existing nine runtime-error cases and all 44
 pause cases also pass against this checkpoint. All 43 exit cases (37 Original,
-6 Rewrite), 32 header cases, the broad Systemcheck flow and the broad Verona
-flow also pass in the completed sequential regression run.
+6 Rewrite), 32 header cases and the broad Systemcheck flow pass. The broad
+Verona regression fails in its later adaptive-task selection check; that failure
+is retained and remains unresolved at this checkpoint.
 
 Two negative browser probes confirmed actual storage defects. Refresh could
 acknowledge a log-bearing packet merely because its answer text already matched
