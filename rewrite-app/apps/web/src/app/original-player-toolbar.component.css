@@ -11,6 +11,7 @@
   color: var(--mat-sys-on-surface);
 }
 .toolbar-header p { margin: 0; align-self: center; line-height: normal; color: inherit; }
+.toolbar-header.is-paused { min-height: 0; }
 .toolbar-right { margin-left: auto; display: flex; align-items: center; color: var(--secondary); }
 .toolbar-right button { font-size: inherit; cursor: default; }
 .toolbar-right p { margin-right: 20px; }

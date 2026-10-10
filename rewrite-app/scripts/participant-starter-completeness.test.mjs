@@ -29,8 +29,8 @@ for (const kind of kinds) test(`${kind}: starter exit preserves completeness, ti
   const tenant = await services.platform.createTenant({tenantKey:`exit-${randomUUID()}`,displayName:"Owned exit proof"});
   const workspace = await services.platform.createWorkspace({tenantKey:tenant.tenantKey,workspaceKey:"owned",displayName:"Owned exit proof"});
   const base = {tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,createdAt:timestamp};
-  const makeRun = async ({scope="booklet", leave="none", progress, mode="run-hot-return", override=false, unlocked=false, lockScope="unit", lockConfirm=true}) => {
-    const id=randomUUID(),policy=compileBookletRuntimePolicy(scope==="booklet"?{force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS"}:{});
+  const makeRun = async ({scope="booklet", leave="none", progress, mode="run-hot-return", override=false, unlocked=false, lockScope="unit", lockConfirm=true, silent=false, lockOnTermination=false}) => {
+    const id=randomUUID(),policy=compileBookletRuntimePolicy({...(scope==="booklet"?{force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS"}:{}),silent_mode:silent?"TRUE":"FALSE",lock_test_on_termination:lockOnTermination?"ON":"OFF"});
     const completeRestriction={presentation:"always",response:"always"};
     const restrictions={...(scope==="testlet"?{denyNavigationOnIncomplete:completeRestriction}:{}),
       ...(leave!=="none"?{timeMax:{minutes:5,leave}}:{}),lockAfterLeaving:{confirm:lockConfirm,scope:lockScope}};
@@ -205,5 +205,25 @@ for (const kind of kinds) test(`${kind}: starter exit preserves completeness, ti
       await repository.saveTestRun({...await repository.getTestRunById(id),status});
       await assert.rejects(services.participantRuntime.prepareStarterExit({testRunId:id,currentUnitKey:"unit"}),error=>error.errorCode==="test_run_not_running");
     });
+    for(const mode of ["run-hot-return","run-hot-restart"]) for(const leave of ["allowed","confirm","forbidden"])
+      for(const silent of [false,true]) for(const lockOnTermination of [false,true]) {
+      await t.test(`${mode}/${leave}/${silent}/${lockOnTermination}: paused status exit skips unit checks and preserves interrupted time`,async()=>{
+        const {id,response}=await makeRun({progress:completenessCases.both,mode,leave,silent,lockOnTermination});
+        await services.monitorControl.issueRunCommand({tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey,testRunId:id,commandType:"pause"});
+        const before=await repository.getTestRunById(id);
+        const logsBefore=(await repository.listParticipantTestLogsByWorkspace(tenant.tenantId,workspace.workspaceId)).filter(log=>log.testRunId===id);
+        await assert.rejects(services.participantRuntime.returnToStarter({testRunId:id,currentUnitKey:"unit",expectedStatus:"running"}),error=>error.errorCode==="starter_exit_state_changed");
+        assert.deepEqual(await repository.getTestRunById(id),before);
+        const returned=await services.participantRuntime.returnToStarter({testRunId:id,currentUnitKey:"unit",expectedStatus:"paused"});
+        assert.equal(returned.status,"paused");assert.equal(returned.currentUnitKey,"unit");assert.equal(returned.unitResponses.unit,response);
+        assert.deepEqual(returned.testletTimers,before.testletTimers);assert.deepEqual(returned.lockedUnitKeys,[]);assert.deepEqual(returned.lockedTestletKeys,[]);
+        assert.equal(returned.locked,silent&&lockOnTermination);
+        const logsAfter=(await repository.listParticipantTestLogsByWorkspace(tenant.tenantId,workspace.workspaceId)).filter(log=>log.testRunId===id);
+        const beforeIds=new Set(logsBefore.map(log=>log.participantTestLogId));
+        assert.deepEqual(logsAfter.filter(log=>!beforeIds.has(log.participantTestLogId)).map(log=>[log.logKey,log.logContent]).sort(),silent?
+          [["CONTROLLER","TERMINATED_PAUSED"],...(lockOnTermination?[["BOOKLETLOCKEDbyTESTEE",""]]:[])].sort():[]);
+        if(!silent)assert.deepEqual(returned,before);
+      });
+    }
   } finally { await storage?.shutdown(); await rm(directory,{recursive:true,force:true}); }
 });

@@ -35,10 +35,10 @@ const parentSource=await executableClass("participant-view.component.ts","Partic
 const Parent=new Function(`${parentSource}\nreturn ParticipantViewComponent;`)();
 const launcherSource=await executableClass("original-participant-confirmation-dialog.component.ts","OriginalParticipantConfirmationLauncherComponent");
 const signal=initial=>{let value=initial;const result=()=>value;result.set=next=>{value=next;};return result;};
-function facadeFixture({saving=true,force=true,timer=null,lock=null,customTexts={},progress={presentation:"complete",response:"complete"},required=false,unlocked=false,forceNavigation=true}={}) {
+function facadeFixture({saving=true,force=true,timer=null,lock=null,customTexts={},progress={presentation:"complete",response:"complete"},required=false,unlocked=false,forceNavigation=true,status="running",silent=false}={}) {
   const facade=new Facade(),returns=[],preparations=[];
-  let state={testRun:{testRunId:"run-a",monitorNavigationUnlocked:unlocked},executionMode:{saveResponses:saving,forceTimeRestrictions:force,forceNaviRestrictions:forceNavigation},
-    currentUnit:{unitKey:"own-unit"},booklet:{policy:compileBookletRuntimePolicy(required?{force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS"}:{})}};
+  let state={testRun:{testRunId:"run-a",status,monitorNavigationUnlocked:unlocked},executionMode:{saveResponses:saving,forceTimeRestrictions:force,forceNaviRestrictions:forceNavigation},
+    currentUnit:{unitKey:"own-unit"},booklet:{policy:compileBookletRuntimePolicy({...(required?{force_presentation_complete:"ALWAYS",force_response_complete:"ALWAYS"}:{}),silent_mode:silent?"TRUE":"FALSE"})}};
   facade.runtime={currentUnitResponse:serializeVeronaUnitResponse({unitState:{presentationProgress:progress.presentation,responseProgress:progress.response}})};
   facade.viewLifecycleSequence=1;facade.player={testletTimer:timer,leaveLock:lock};
   facade.readCurrentRunState=()=>state;facade.confirmationDialog=signal(null);
@@ -49,7 +49,7 @@ function facadeFixture({saving=true,force=true,timer=null,lock=null,customTexts=
   facade.returnToStarterInternal=async(...args)=>returns.push(args);
   facade.prepareStarterExitTimer=async route=>{preparations.push(route);facade.player.testletTimer={...timer,status:timer?.leave==="allowed"?"cancelled":"paused"};return true;};
   const parent=new Parent();parent.view=facade;
-  return{facade,parent,returns,preparations,replaceRun(){state={...state,testRun:{testRunId:"run-b"}};},replaceUnit(){state={...state,currentUnit:{unitKey:"new-unit"}};}};
+  return{facade,parent,returns,preparations,replaceRun(){state={...state,testRun:{testRunId:"run-b"}};},replaceUnit(){state={...state,currentUnit:{unitKey:"new-unit"}};},replaceStatus(){state={...state,testRun:{...state.testRun,status:"paused"}};}};
 }
 test("saved logo exit asks once, cancellation preserves the Run, and confirmation returns once",async()=>{
   const f=facadeFixture();const cancelled=f.facade.returnToStarterWithConfirmation();await Promise.resolve();
@@ -95,9 +95,9 @@ for(const leave of ["confirm","forbidden"])test(`unenforced non-saving ${leave} 
   assert.equal(f.facade.originalNavigationToast().text,leave==="confirm"?"Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.":"Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.");
   assert.deepEqual(f.preparations,[participantStarterExitPreparationRoute]);assert.deepEqual(f.returns,[[false,false]]);
 });
-for(const changed of ["run","lifecycle","unit"])test(`late ${changed} change cannot return a different live Run`,async()=>{
+for(const changed of ["run","lifecycle","unit","status"])test(`late ${changed} change cannot return a different live Run`,async()=>{
   const f=facadeFixture(),pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();const request=f.facade.confirmationDialog();
-  if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else f.facade.viewLifecycleSequence++;
+  if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else if(changed==="status")f.replaceStatus();else f.facade.viewLifecycleSequence++;
   f.parent.resolveOriginalConfirmation(request,true);await pending;assert.deepEqual(f.returns,[]);
 });
 test("a replaced confirmation cancels its old promise and rejects old overlay results",async()=>{
@@ -130,9 +130,9 @@ for(const forceNavigation of [false,true])test(`${forceNavigation?"monitor overr
   if(!forceNavigation)assert.match(f.facade.originalNavigationToast().text,/Es wurde nicht alles gesehen oder abgespielt\. Es wurde nicht alles bearbeitet\./);
   f.parent.resolveOriginalConfirmation(request,true);await pending;assert.deepEqual(f.returns,[[false,false]]);
 });
-for(const changed of ["run","lifecycle","unit"])test(`lazy policy boundary: changed ${changed} cannot open or return an obsolete Run`,async()=>{
+for(const changed of ["run","lifecycle","unit","status"])test(`lazy policy boundary: changed ${changed} cannot open or return an obsolete Run`,async()=>{
   const f=facadeFixture();const pending=f.facade.returnToStarterWithConfirmation();
-  if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else f.facade.viewLifecycleSequence++;
+  if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else if(changed==="status")f.replaceStatus();else f.facade.viewLifecycleSequence++;
   await pending;assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[]);
 });
 test("missing structured presentation is incomplete, while absent response progress does not fabricate a denial",async()=>{
@@ -153,7 +153,7 @@ test("a fresh unreported Player denies required presentation without fabricating
 });
 const internalSource=await executableClass("participant-view.facade.ts","ParticipantViewFacade",["returnToStarterInternal"]);
 const InternalFacade=new Function("productionApiRoutes","resolveRoutePath",`${internalSource}\nreturn ParticipantViewFacade;`)(productionApiRoutes,resolveRoutePath);
-for(const stage of ["settle","save"])for(const changed of ["run","lifecycle","unit"])test(`foreground ${stage}: late ${changed} cannot save or return a replacement Run`,async()=>{
+for(const stage of ["settle","save"])for(const changed of ["run","lifecycle","unit","status"])test(`foreground ${stage}: late ${changed} cannot save or return a replacement Run`,async()=>{
   const facade=new InternalFacade(),calls=[];
   let state={testRun:{testRunId:"run-a"},currentUnit:{unitKey:"unit-a"},executionMode:{saveResponses:true}},release;
   const gate=new Promise(done=>{release=done;});
@@ -162,10 +162,10 @@ for(const stage of ["settle","save"])for(const changed of ["run","lifecycle","un
   facade.saveCurrentDraftBeforeCompleteInternal=async()=>{calls.push("save");if(stage==="save")await gate;};
   facade.requestState={request(){throw Error("An obsolete foreground action must never send a return request.");}};
   const pending=facade.returnToStarterInternal(false,false);await Promise.resolve();
-  if(changed==="run"){state={...state,testRun:{testRunId:"run-b"}};facade.runtime.testRunId="run-b";}else if(changed==="unit")state={...state,currentUnit:{unitKey:"unit-b"}};else facade.viewLifecycleSequence++;
+  if(changed==="run"){state={...state,testRun:{testRunId:"run-b"}};facade.runtime.testRunId="run-b";}else if(changed==="unit")state={...state,currentUnit:{unitKey:"unit-b"}};else if(changed==="status")state={...state,testRun:{...state.testRun,status:"paused"}};else facade.viewLifecycleSequence++;
   release();await pending;assert.deepEqual(calls,stage==="settle"?[]:["save"]);
 });
-for(const changed of ["run","lifecycle","unit"])test(`late return response: changed ${changed} cannot clear a replacement view`,async()=>{
+for(const changed of ["run","lifecycle","unit","status"])test(`late return response: changed ${changed} cannot clear a replacement view`,async()=>{
   const facade=new InternalFacade();let state={testRun:{testRunId:"run-a"},currentUnit:{unitKey:"unit-a"},executionMode:{saveResponses:true}},release,path;
   const gate=new Promise(done=>{release=done;});
   facade.viewLifecycleSequence=1;facade.runtime={testRunId:"run-a"};facade.readCurrentRunState=()=>state;
@@ -174,7 +174,7 @@ for(const changed of ["run","lifecycle","unit"])test(`late return response: chan
   facade.participantEvents={stop(){throw Error("An obsolete response must not stop the new Run's stream.");}};
   const pending=facade.returnToStarterInternal(false,false);await Promise.resolve();await Promise.resolve();
   assert.ok(path.endsWith("/run-a/return-to-starter"));
-  if(changed==="run"){state={...state,testRun:{testRunId:"run-b"}};facade.runtime.testRunId="run-b";}else if(changed==="unit")state={...state,currentUnit:{unitKey:"unit-b"}};else facade.viewLifecycleSequence++;
+  if(changed==="run"){state={...state,testRun:{testRunId:"run-b"}};facade.runtime.testRunId="run-b";}else if(changed==="unit")state={...state,currentUnit:{unitKey:"unit-b"}};else if(changed==="status")state={...state,testRun:{...state.testRun,status:"paused"}};else facade.viewLifecycleSequence++;
   release();await pending;
 });
 function launcherFixture(confirmMeansContinue,theme="Primar") {
@@ -237,20 +237,20 @@ for(const scope of ["unit","testlet"]) for(const saving of [false,true]) test(`$
   assert.equal(f.facade.originalNavigationToast().text,`${scope} würde im Testmodus nun gesperrt werden.`);
   assert.deepEqual(f.returns,[[false,true]]);
 });
-for(const changed of ["run","lifecycle","unit"]) test(`preparation boundary rejects changed ${changed} before publishing or opening a dialog`,async()=>{
+for(const changed of ["run","lifecycle","unit","status"]) test(`preparation boundary rejects changed ${changed} before publishing or opening a dialog`,async()=>{
   const f=facadeFixture({force:false,timer:{leave:"confirm"},lock:{scope:"unit",confirm:true}});
-  f.facade.prepareStarterExitTimer=async()=>{if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else f.facade.viewLifecycleSequence++;return true;};
+  f.facade.prepareStarterExitTimer=async()=>{if(changed==="run")f.replaceRun();else if(changed==="unit")f.replaceUnit();else if(changed==="status")f.replaceStatus();else f.facade.viewLifecycleSequence++;return true;};
   await f.facade.returnToStarterWithConfirmation();assert.equal(f.facade.confirmationDialog(),null);
   assert.equal(f.facade.originalNavigationToast(),null);assert.deepEqual(f.returns,[]);
 });
 const prepareSource=await executableClass("participant-view.facade.ts","ParticipantViewFacade",["prepareStarterExitTimer"]);
 const PrepareFacade=new Function("resolveRoutePath",`${prepareSource}\nreturn ParticipantViewFacade;`)(resolveRoutePath);
-for(const phase of ["autosave","draft","request","refresh"]) for(const changed of ["run","lifecycle","unit"]) test(`production preparation ${phase}/${changed}: stale response cannot sync the replacement view`,async()=>{
+for(const phase of ["autosave","draft","request","refresh"]) for(const changed of ["run","lifecycle","unit","status"]) test(`production preparation ${phase}/${changed}: stale response cannot sync the replacement view`,async()=>{
   const facade=new PrepareFacade(),calls=[];
   let state={testRun:{testRunId:"a"},currentUnit:{unitKey:"u"},executionMode:{saveResponses:false}};
   facade.viewLifecycleSequence=1;facade.runtime={testRunId:"a",currentUnitResponse:"Exact Ω"};facade.player={testletTimer:{testletKey:"t"}};
   facade.readCurrentRunState=()=>state;facade.ephemeralUnitResponseRecord=()=>({u:"Exact Ω"});
-  const change=()=>{if(changed==="run")state={...state,testRun:{testRunId:"b"}};else if(changed==="unit")state={...state,currentUnit:{unitKey:"v"}};else facade.viewLifecycleSequence++;};
+  const change=()=>{if(changed==="run")state={...state,testRun:{testRunId:"b"}};else if(changed==="unit")state={...state,currentUnit:{unitKey:"v"}};else if(changed==="status")state={...state,testRun:{...state.testRun,status:"paused"}};else facade.viewLifecycleSequence++;};
   facade.settleVeronaAutoSaveBeforeForegroundAction=async()=>{calls.push("autosave");if(phase==="autosave")change();return null;};
   facade.saveCurrentDraftBeforeCompleteInternal=async()=>{calls.push("draft");if(phase==="draft")change();};
   facade.requestState={request:async(name,method,url,body)=>{calls.push("request");assert.equal(url,"/api/v1/participant/test-runs/a/prepare-starter-exit");assert.deepEqual(body,{currentUnitKey:"u",responseUnitKey:"u",unitResponse:"Exact Ω",transientUnitResponses:{u:"Exact Ω"}});if(phase==="request")change();return{testRun:state.testRun,timerEffect:"cancelled"};}};
@@ -269,4 +269,38 @@ test("production preparation retains the prior timer for the cancellation notice
   facade.refreshCurrentStateInternal=async()=>{facade.player={testletTimer:null};};facade.showTimerLifecycleEvent=(...args)=>calls.push(args);
   assert.equal(await facade.prepareStarterExitTimer(participantStarterExitPreparationRoute),true);
   assert.deepEqual(calls,[["a","cancelled",timer]]);
+});
+
+for(const leave of ["allowed","confirm","forbidden"]) for(const saving of [false,true]) for(const silent of [false,true])
+test(`paused ${leave}/${saving}/${silent}: status exit skips incomplete unit, timer and leave-lock guards`,async()=>{
+  const f=facadeFixture({status:"paused",silent,saving,required:true,progress:completenessCases.both,
+    timer:{leave,status:"paused"},lock:{scope:"unit",confirm:true}});
+  let pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();
+  if(saving&&silent) {
+    let request=f.facade.confirmationDialog();assert.equal(request.original.title,"Sicher, dass du den Test beenden möchtest?");
+    assert.equal(request.original.message,"");assert.equal(request.original.confirmMeansContinue,true);
+    f.parent.resolveOriginalConfirmation(request,false);await pending;assert.deepEqual(f.returns,[]);
+    pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();request=f.facade.confirmationDialog();
+    f.parent.resolveOriginalConfirmation(request,true);
+  }
+  await pending;assert.deepEqual(f.returns,[[false,false]]);assert.deepEqual(f.preparations,[]);assert.equal(f.facade.originalNavigationToast(),null);
+});
+test("a silent pause without forced time or navigation restrictions needs no termination confirmation",async()=>{
+  const f=facadeFixture({status:"paused",silent:true,force:false,forceNavigation:false});
+  await f.facade.returnToStarterWithConfirmation();assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[[false,false]]);
+});
+
+for(const remoteIsNewer of [false,true]) test(`late own return response ${remoteIsNewer?"cannot clear a newer remote pause":"accepts its exact SSE status before HTTP"}`,async()=>{
+  const facade=new InternalFacade();
+  let state={testRun:{testRunId:"run-a",status:"running",updatedAt:"before"},currentUnit:{unitKey:"unit-a"},executionMode:{saveResponses:true}};
+  facade.viewLifecycleSequence=1;facade.runtime={testRunId:"run-a"};facade.readCurrentRunState=()=>state;
+  facade.settleVeronaAutoSaveBeforeForegroundAction=async()=>null;facade.saveCurrentDraftBeforeCompleteInternal=async()=>{};
+  facade.requestState={request:async()=>{
+    state={...state,testRun:{...state.testRun,status:"paused",updatedAt:remoteIsNewer?"remote-after-return":"own-return"}};
+    return{testRun:{testRunId:"run-a",status:"paused",updatedAt:"own-return"}};
+  }};
+  const reachedOwnResult=new Error("own stored response accepted");
+  facade.participantEvents={stop(){throw reachedOwnResult;}};
+  if(remoteIsNewer)await facade.returnToStarterInternal(false,false);
+  else await assert.rejects(facade.returnToStarterInternal(false,false),error=>error===reachedOwnResult);
 });

@@ -2827,11 +2827,12 @@ export class ParticipantViewFacade {
     if (!initialState) return;
     const testRunId = initialState.testRun.testRunId;
     const currentUnitKey = initialState.currentUnit.unitKey;
+    const runStatus = initialState.testRun.status;
     const viewLifecycleSequence = this.viewLifecycleSequence;
     const { planParticipantStarterExit, participantStarterExitPreparationRoute } = await import("./participant-exit-policy");
     const currentState = this.readCurrentRunState();
     if (!currentState || currentState.testRun.testRunId !== testRunId ||
-        currentState.currentUnit.unitKey !== currentUnitKey ||
+        currentState.currentUnit.unitKey !== currentUnitKey || currentState.testRun.status !== runStatus ||
         this.viewLifecycleSequence !== viewLifecycleSequence) return;
     const plan = planParticipantStarterExit({ state: currentState,
       response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
@@ -2852,7 +2853,7 @@ export class ParticipantViewFacade {
     if (plan.prepareTimer && !(await this.prepareStarterExitTimer(participantStarterExitPreparationRoute))) return;
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
-        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey) return;
+        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
     if (plan.afterTimerNotices.length) {
       const notices = plan.prepareTimer ? plan.afterTimerNotices : [...plan.originalNotices, ...plan.afterTimerNotices];
       this.originalNavigationToast.set({text: notices[0], additionalTexts: notices.slice(1)});
@@ -2860,7 +2861,7 @@ export class ParticipantViewFacade {
     if (plan.confirmation && !(await this.requestConfirmation(plan.confirmation))) return;
     if (this.viewLifecycleSequence !== viewLifecycleSequence ||
         this.readCurrentRunState()?.testRun.testRunId !== testRunId ||
-        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey) return;
+        this.readCurrentRunState()?.currentUnit.unitKey !== currentUnitKey || this.readCurrentRunState()?.testRun.status !== runStatus) return;
     if (plan.confirmedNotices.length) this.originalNavigationToast.set({
       text: plan.confirmedNotices[0], additionalTexts: plan.confirmedNotices.slice(1)
     });
@@ -3812,10 +3813,11 @@ export class ParticipantViewFacade {
     const currentUnitKey = state?.currentUnit.unitKey;
     if (!state || !currentUnitKey) return false;
     const timerBeforePreparation = state.activeTestletTimer;
+    const runStatus = state.testRun.status;
     const testRunId = state.testRun.testRunId, viewLifecycleSequence = this.viewLifecycleSequence;
     const isCurrent = (): boolean => this.viewLifecycleSequence === viewLifecycleSequence &&
       this.readCurrentRunState()?.testRun.testRunId === testRunId &&
-      this.readCurrentRunState()?.currentUnit.unitKey === currentUnitKey && this.runtime.testRunId.trim() === testRunId;
+      this.readCurrentRunState()?.currentUnit.unitKey === currentUnitKey && this.readCurrentRunState()?.testRun.status === runStatus && this.runtime.testRunId.trim() === testRunId;
     const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
     if (!isCurrent()) return false;
     await this.saveCurrentDraftBeforeCompleteInternal(settled);
@@ -3848,9 +3850,18 @@ export class ParticipantViewFacade {
     }
     const testRunId = currentState.testRun.testRunId;
     const currentUnitKey = currentState.currentUnit.unitKey;
+    const runStatus = currentState.testRun.status;
     const viewLifecycleSequence = this.viewLifecycleSequence;
-    const isCurrent = (): boolean => this.viewLifecycleSequence === viewLifecycleSequence &&
-      this.readCurrentRunState()?.testRun.testRunId === testRunId && this.readCurrentRunState()?.currentUnit.unitKey === currentUnitKey && this.runtime.testRunId.trim() === testRunId;
+    const isCurrent = (returnedRun?: ReturnTestRunToStarterResponse["testRun"]): boolean => {
+      const live = this.readCurrentRunState();
+      // SSE can publish this action's own paused result before HTTP returns.
+      // Accept that exact stored result; a newer remote status remains fenced.
+      const ownStatusUpdate = returnedRun?.updatedAt && live?.testRun.updatedAt === returnedRun.updatedAt &&
+        live.testRun.status === returnedRun.status;
+      return this.viewLifecycleSequence === viewLifecycleSequence && live?.testRun.testRunId === testRunId &&
+        live.currentUnit.unitKey === currentUnitKey && (live.testRun.status === runStatus || Boolean(ownStatusUpdate)) &&
+        this.runtime.testRunId.trim() === testRunId;
+    };
     const saveResponses = currentState.executionMode.saveResponses;
     const settledVeronaResponse =
       await this.settleVeronaAutoSaveBeforeForegroundAction();
@@ -3867,6 +3878,7 @@ export class ParticipantViewFacade {
         }),
         {
           currentUnitKey,
+          expectedStatus: runStatus,
           responseUnitKey: saveResponses
             ? undefined
             : this.runtime.currentUnitKey.trim() || undefined,
@@ -3883,7 +3895,7 @@ export class ParticipantViewFacade {
         } satisfies ReturnTestRunToStarterRequest
       );
 
-    if (!isCurrent()) return;
+    if (!isCurrent(payload.testRun)) return;
     this.participantEvents.stop();
     this.invalidateCurrentStateRefreshes();
     discardParticipantSaveOutboxForRun(payload.testRun.testRunId);

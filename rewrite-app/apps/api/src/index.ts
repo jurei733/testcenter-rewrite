@@ -9057,6 +9057,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<ReturnTestRunToStarterRequest>();
         const testRun = await services.participantRuntime.returnToStarter({
           testRunId,
+          expectedStatus: body?.expectedStatus,
           currentUnitKey: body?.currentUnitKey,
           responseUnitKey: body?.responseUnitKey,
           unitResponse: body?.unitResponse,

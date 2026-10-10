@@ -1034,6 +1034,7 @@ export type CompleteTestRunRequest = {
 
 export type ReturnTestRunToStarterRequest = CompleteTestRunRequest & {
   currentUnitKey?: string | null;
+  expectedStatus?: TestRun["status"];
 };
 
 export type CreateTenantResponse = {

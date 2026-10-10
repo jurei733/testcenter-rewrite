@@ -11394,6 +11394,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       false
     );
 
+    const testLogsBeforePausedStarterReturn = await requestJsonAt<{
+      items: Array<{ testLog: { logKey: string; logContent: string } }>;
+    }>(isolated.baseUrl, "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs", {headers: {authorization}});
+    assert.equal(testLogsBeforePausedStarterReturn.status, 200);
+
     const returnToStarterDuringMonitorPause = await requestJsonAt<{
       testRun: { status: string; pauseSource?: string };
       runtimeState: {
@@ -11440,8 +11445,10 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
           item.testLog.logKey === "CONTROLLER" &&
           item.testLog.logContent === "TERMINATED_PAUSED"
       ),
-      true
+      false
     );
+    assert.deepEqual(testLogsAfterPausedStarterReturn.body.items, testLogsBeforePausedStarterReturn.body.items,
+      "Source's visible pause status page leaves without termination or another test-state write.");
 
     const participantResumeDuringMonitorPause = await requestJsonAt<{
       error: string;

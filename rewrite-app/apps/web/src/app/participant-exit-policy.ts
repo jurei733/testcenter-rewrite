@@ -30,6 +30,20 @@ export function planParticipantStarterExit(input: {
   const timer = input.timer && !["paused", "cancelled", "expired"].includes(input.timer.status) ? input.timer : null;
   const plan: ExitPlan = { confirmTestletTimeLeave: false, confirmTestletLeaveLock: false, originalNotices: [], afterTimerNotices: [], confirmedNotices: [], prepareTimer: false };
   const policy = state.booklet.policy;
+  // Source's status page does not deactivate a unit. Visible pauses leave
+  // directly; a forced silent pause keeps only the ordinary end-test question.
+  if (state.testRun.status === "paused") {
+    if (state.executionMode.saveResponses && policy.display.silentMode &&
+        (state.executionMode.forceTimeRestrictions || state.executionMode.forceNaviRestrictions)) {
+      plan.confirmation = {
+        title: "Return to test selection?", message: "Your saved progress will remain available.",
+        cancelLabel: "Continue working", confirmLabel: "Return to tests",
+        original: {title: "Sicher, dass du den Test beenden möchtest?", message: "",
+          cancelLabel: "Abbrechen", confirmLabel: "Bestätigen", confirmMeansContinue: true}
+      };
+    }
+    return plan;
+  }
   const parsed = parseVeronaUnitResponse(input.response);
   const hasResponse = input.response.length > 0 || state.currentUnit.unitKey != null &&
     state.testRun.unitResponses?.[state.currentUnit.unitKey] !== undefined;

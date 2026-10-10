@@ -821,6 +821,7 @@ export type ParticipantRuntimePort = {
   returnToStarter(input: {
     testRunId: string;
     currentUnitKey?: string | null;
+    expectedStatus?: TestRun["status"];
     responseUnitKey?: string | null;
     unitResponse?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -33670,6 +33671,10 @@ export const createFirstSliceServices = (
           storedTestRun.participantSessionId
         );
 
+        if (input.expectedStatus !== undefined && input.expectedStatus !== storedTestRun.status) {
+          throw new FirstSliceError(409, "starter_exit_state_changed", "The Run status changed before starter exit confirmation.");
+        }
+
         const contentRelease = await requireContentRelease(
           repository,
           storedTestRun.contentReleaseId
@@ -33695,6 +33700,14 @@ export const createFirstSliceServices = (
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
+        const pausedStatusExit = testRun.status === "paused";
+        const terminatePausedTest = executionMode.saveResponses && booklet?.policy?.display.silentMode === true &&
+          (executionMode.forceTimeRestrictions || executionMode.forceNaviRestrictions);
+        if (pausedStatusExit && !terminatePausedTest) {
+          // Source's visible status page leaves without a termination, timer
+          // change, leave lock or new participant test-state write.
+          return testRun;
+        }
         const responseUnitKey =
           input.responseUnitKey === undefined
             ? testRun.currentUnitKey
@@ -33749,7 +33762,7 @@ export const createFirstSliceServices = (
         const currentResponse = returnEvaluationRun.currentUnitKey
           ? returnEvaluationRun.unitResponses[returnEvaluationRun.currentUnitKey] : undefined;
         const parsedResponse = currentResponse === undefined ? null : parseVeronaUnitResponse(currentResponse);
-        const completenessDeniedReasons = !returnEvaluationRun.currentUnitKey ||
+        const completenessDeniedReasons = pausedStatusExit || !returnEvaluationRun.currentUnitKey ||
           !executionMode.forceNaviRestrictions || returnEvaluationRun.monitorNavigationUnlocked ||
           isUnitLeaveLocked(booklet, returnEvaluationRun, returnEvaluationRun.currentUnitKey) ? []
           : bookletStarterExitDeniedReasons({
@@ -33763,7 +33776,7 @@ export const createFirstSliceServices = (
               currentUnitKey: testRun.currentUnitKey, deniedReasons: completenessDeniedReasons
             });
         }
-        const leavingTimedTestlet = resolveLeavingTimedTestlet(
+        const leavingTimedTestlet = pausedStatusExit ? null : resolveLeavingTimedTestlet(
           booklet,
           returnEvaluationRun,
           null
@@ -33799,7 +33812,7 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const leavingLock = executionMode.forceNaviRestrictions &&
+        const leavingLock = !pausedStatusExit && executionMode.forceNaviRestrictions &&
           !(executionMode.forceTimeRestrictions && leavePolicy === "confirm")
           ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
           : null;
@@ -33877,12 +33890,15 @@ export const createFirstSliceServices = (
           returnedStateEntries.push({
             key: "CONTROLLER",
             timeStamp: Date.parse(timestamp),
-            content: lockOnTermination
-              ? "LOCKED"
-              : testRun.status === "paused" && testRun.pauseSource === "monitor"
-                ? "TERMINATED_PAUSED"
-                : "TERMINATED"
+            content: pausedStatusExit
+              ? "TERMINATED_PAUSED"
+              : lockOnTermination ? "LOCKED" : "TERMINATED"
           });
+          if (pausedStatusExit && lockOnTermination) {
+            // Source patchLock stores this event separately from CONTROLLER;
+            // it keeps the terminal paused state when setting tests.locked.
+            returnedStateEntries.push({key: "BOOKLETLOCKEDbyTESTEE", timeStamp: Date.parse(timestamp), content: ""});
+          }
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
               testRun: returnedRun,

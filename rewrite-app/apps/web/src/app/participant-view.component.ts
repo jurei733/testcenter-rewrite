@@ -20,6 +20,7 @@ import { ParticipantStatusStylesComponent } from "./participant-status-styles.co
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
+import { OriginalParticipantPausedComponent } from "./original-participant-paused.component";
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { OriginalReviewPanelComponent } from "./original-review-panel.component";
 import { OriginalToastContainerComponent } from "./original-toast-container.component";
@@ -36,7 +37,7 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent],
+    OriginalPlayerToolbarComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent],
   template: `
     <app-participant-status-styles />
     @defer (when interfaceMode.mode() === 'original') {
@@ -1081,7 +1082,13 @@ interface ParticipantVisibleCodeNotice {
           </div>
           </ng-container>
           <ng-template #participantPaused>
+            @defer (when interfaceMode.mode() === 'original') {
+              @if (interfaceMode.mode() === 'original') {
+                <app-original-participant-paused />
+              }
+            }
             <section
+              *ngIf="interfaceMode.mode() !== 'original'"
               id="participantRoutePausedState"
               class="participant-paused-state"
               role="status"
