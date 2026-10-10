@@ -1,5 +1,56 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Durable replacement logs and recovered retry (2026-10-10)
+
+Application checkpoint `bceb17b4db38` resolves the previous multi-unit answer
+outbox recovery failure. Restoration now protects only the actual packet in
+transit; a retry during the final status refresh can restore new work. A focus
+log takes the durable answer rather than an older runtime draft.
+
+Replacement answer packets retain unacknowledged logs with stable entry IDs.
+The optional, validated `clientEntryId` remains scoped to the authenticated Run;
+legacy callers retain the existing delivery/index IDs, and upgrading an old
+outbox reproduces those IDs exactly even after batch reorder. No store migration
+is required. Two new headful cases hold an old log-bearing request while a newer
+answer replaces it, then let the old request either succeed or return 503.
+Both preserve the latest exact answer and store each error log exactly once.
+Negative state probes also reproduce the lost retry and stale focus-answer bugs
+before their fixes.
+
+All 1168 unit/state checks pass, including 509 frontend-state checks. All 166
+API checks pass separately on memory, file and SQLite, and all 702 PostgreSQL
+integration checks pass. The new configured-store API case verifies legacy ID
+upgrade, reordered batches, distinct identical events, rejected IDs without
+answer mutation, and participant/Run authorization. The worker regression keeps
+the same log ID through an in-flight replacement and retry.
+
+The final production browser replay passes all 11 runtime-error cases, 22 version
+error cases, 44 pause cases, 43 exit cases (37 Original, 6 Rewrite), 32 header
+cases, the broad Systemcheck flow and the complete Verona/official-player flow.
+The latter includes three-Unit recovery plus STARS 28-Unit, parallel Run,
+mid-drain reload, process crash, background sync and capacity checks. The initial
+production bundle remains 469.41 kB under the unchanged 470 kB error limit;
+450 kB and component-style warnings remain. Typecheck passes; its development
+output was replaced by a fresh production build before the final browser replay.
+
+Current-image PostgreSQL Compose passes standard, demo and production-secret
+modes (schema 52), and standalone SQLite Docker passes (schema 58). Image
+`testcenter-rewrite-app:completeness-bceb17b4db38`, ID `sha256:f09ebe09d48b1fb657f629863c0a7efc9c64971a3809d4644f97320c68de32dd`, has USER node, revision
+bceb17b4db38 and timestamp 2026-10-10T18:57:05.043Z.
+All owned container resources are removed. Exact comparison preserves all 24
+preexisting container IDs, 85 volume names and the protected presentation SHA-256
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`. Approximately 7.5 GiB are free.
+
+The first file-store replay hit an HTTP timeout during a verified 902-second
+macOS Maintenance Sleep (20:57:34 to 21:12:36 local time). Its complete replay
+with process-scoped sleep prevention passes 166/166; the failed trace is retained.
+Pinned Original master is freshly verified at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Source frontend fixtures do not prove
+Source backend authorization/persistence. Custom help, further notification and
+command overlap cases, and all eight full Original UI acceptance rows remain
+open. Nothing was pushed; remote CI, real devices, release, deployment and
+overall production readiness remain unverified.
+
 ### Version-specific errors and acknowledged log delivery (2026-10-10)
 
 Application checkpoint `392692085f19` shows the pinned Original's titles and
@@ -20,7 +71,7 @@ such log deliveries with recovery. All 1158 unit/state checks pass, including
 499 frontend-state checks. The existing nine runtime-error cases and all 44
 pause cases also pass against this checkpoint. All 43 exit cases (37 Original,
 6 Rewrite), 32 header cases and the broad Systemcheck flow pass. The broad
-Verona regression fails in its later adaptive-task selection check; that failure
+Verona regression fails in its later multi-unit answer outbox recovery check; that failure
 is retained and remains unresolved at this checkpoint.
 
 Two negative browser probes confirmed actual storage defects. Refresh could
