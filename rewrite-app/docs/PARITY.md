@@ -23,9 +23,15 @@ including actual HTTP and expanded Booklet checks for a hidden code. The
 predecessor also passed 147 existing browser cases, 498 HTTP tests, 61 Original
 compatibility checks, three PostgreSQL container profiles, SQLite container
 runtime and 283 transaction/API checks inside its read-only image as `node`.
-A follow-up image requires validation against its own archived Git commit and
-a receipt identifying that exact image and checks. The predecessor's image
-proof does not establish this. Full Original visual/package acceptance, other native commands, remote
+Application checkpoint `02bce022a44a` also passed fresh standard/demo/production
+PostgreSQL container profiles, SQLite runtime, and all 286 transaction/API
+checks inside its read-only image as `node`. The image was built from a clean
+Git archive with all 876 tracked files verified, without host dependencies or
+untracked artifacts. PostgreSQL schema 57 remains unchanged. All 24 existing
+containers, every mount field, 85 volumes and the protected presentation were
+preserved; owned test resources and the build archive were removed. About
+12.27 GB of host space remains after validation. Full Original visual/package
+acceptance, other native commands, remote
 CI, rollout, release, deployment and production confirmation remain open.
 Previous sections preserve historical checkpoint evidence.
 

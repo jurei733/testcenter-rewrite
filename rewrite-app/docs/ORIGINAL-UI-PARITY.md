@@ -15,6 +15,11 @@ is changed. This deliberately hardens Original raw Debug property visibility.
 All 1,745 unit/frontend and 1,199 PostgreSQL tests passed, with typecheck,
 469.96 kB production build and all nine Chromium/SQLite Debug scenario groups.
 The expanded Booklet still displays its active code gate without the secret.
+Application checkpoint `02bce022a44a` additionally passed all three PostgreSQL
+container profiles, SQLite runtime and 286 checks in its read-only image as
+`node`, built from a clean, hash-verified Git archive. The 24 existing
+containers, all mount fields, 85 volumes and the protected presentation remain
+unchanged. Owned resources and the build archive were removed safely.
 Full parity and production readiness remain open. See
 [the current scope and evidence in PARITY](./PARITY.md#participant-debug-and-access-code-visibility-2026-10-12).
 
