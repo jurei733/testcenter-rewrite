@@ -3,6 +3,7 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  prepareParticipantControllerActivation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -728,6 +729,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveTestRun(testRun) {
       state.testRuns.set(testRun.testRunId, testRun);
+    },
+    async activateParticipantController(input) {
+      const result = prepareParticipantControllerActivation(input,
+        state.participantSessions.get(input.participantSessionId) ?? null, state.testRuns.get(input.testRunId) ?? null);
+      if (result?.activated) state.participantSessions.set(input.participantSessionId, structuredClone(result.participantSession));
+      return result;
     },
     async appendParticipantRunCommand(input) {
       const command = appendParticipantRunCommand(input, state.testRuns.get(input.testRunId) ?? null, {

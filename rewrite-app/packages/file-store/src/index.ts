@@ -15,6 +15,7 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  prepareParticipantControllerActivation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -623,6 +624,24 @@ export const createFileFirstSliceRepository = (
         participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
       const result = updater(next);
       if (!result?.applied) return result;
+      await persistState(next);
+      cachePromise = Promise.resolve(next);
+      return result;
+    });
+    writeQueue = operation.then(() => undefined, () => undefined);
+    return operation;
+  };
+
+  const mutateControllerActivation = (
+    input: Parameters<FirstSliceRepository["activateParticipantController"]>[0]
+  ): ReturnType<FirstSliceRepository["activateParticipantController"]> => {
+    const operation = writeQueue.then(async () => {
+      const current = await getState();
+      const result = prepareParticipantControllerActivation(input,
+        current.participantSessions[input.participantSessionId] ?? null, current.testRuns[input.testRunId] ?? null);
+      if (!result?.activated) return result;
+      const next = { ...current, participantSessions: { ...current.participantSessions,
+        [input.participantSessionId]: structuredClone(result.participantSession) } };
       await persistState(next);
       cachePromise = Promise.resolve(next);
       return result;
@@ -1370,6 +1389,7 @@ export const createFileFirstSliceRepository = (
         state.testRuns[testRun.testRunId] = testRun;
       });
     },
+    activateParticipantController: mutateControllerActivation,
     async appendParticipantRunCommand(input) {
       return mutateCommandList(state => {
         const command = appendParticipantRunCommand(input, state.testRuns[input.testRunId] ?? null, {

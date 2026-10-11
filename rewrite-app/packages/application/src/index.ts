@@ -1,4 +1,6 @@
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
+import { ParticipantControllerActivationError, type ParticipantControllerActivationInput,
+  type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
 import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import {
@@ -13,6 +15,8 @@ import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
 export { selectParticipantAssignmentRun } from "./participant-assignment-runs.js";
+export { prepareParticipantControllerActivation, ParticipantControllerActivationError,
+  type ParticipantControllerActivationInput, type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
 export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
   matchesParticipantRunCommandScope, prepareParticipantRunCommandApplication } from "./participant-run-commands.js";
 import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
@@ -1480,6 +1484,8 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   getOrCreateTestRunForAssignment(
     candidate: TestRun
   ): Promise<{ testRun: TestRun; created: boolean }>;
+  /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
+  activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
   listParticipantTestLogsByWorkspace(
     tenantId: string,
@@ -32819,13 +32825,15 @@ export const createFirstSliceServices = (
         const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
-        const activateSession = async (): Promise<void> => {
-          // A resumable Run also opens a controller. Read the current parent
-          // again so unrelated session fields are not restored from entry's
-          // earlier snapshot when enabling the participant event stream.
-          const currentSession = await requireAccessibleParticipantSession(participantSessionId);
-          if (currentSession.status !== "launched") {
-            await repository.saveParticipantSession({ ...currentSession, status: "launched" });
+        const activateSession = async (testRun: TestRun): Promise<void> => {
+          try {
+            const result = await repository.activateParticipantController({ testRunId: testRun.testRunId,
+              participantSessionId, tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+              contentReleaseId: testRun.contentReleaseId, activatedAt: now() });
+            if (!result) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
+          } catch (error) {
+            if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+            throw error;
           }
         };
         const contentRelease = await requireContentRelease(
@@ -32929,7 +32937,7 @@ export const createFirstSliceServices = (
             throw new FirstSliceError(409, "booklet_already_completed",
               `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
           }
-          await activateSession();
+          await activateSession(existingRun);
           return existingRun;
         }
 
@@ -32990,7 +32998,7 @@ export const createFirstSliceServices = (
             `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
         }
         if (!reservation.created) {
-          await activateSession();
+          await activateSession(effectiveTestRun);
           return effectiveTestRun;
         }
         if (activated.startedTestletKey) {
@@ -33028,7 +33036,7 @@ export const createFirstSliceServices = (
             })
           );
         }
-        await activateSession();
+        await activateSession(effectiveTestRun);
         await recordWorkspaceActivity({
           tenantId: effectiveTestRun.tenantId,
           workspaceId: effectiveTestRun.workspaceId,

@@ -7,6 +7,7 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  prepareParticipantControllerActivation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -3301,6 +3302,20 @@ export const createSqliteFirstSliceRepository = (
     },
     async saveTestRun(testRun) {
       persistTestRun(database, testRun);
+    },
+    async activateParticipantController(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const session = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const run = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const result = prepareParticipantControllerActivation(input, session, run);
+        if (result?.activated) database.prepare("UPDATE participant_sessions SET status = 'launched' WHERE participant_session_id = ?")
+          .run(input.participantSessionId);
+        database.exec("COMMIT");
+        return result;
+      } catch (error) { rollbackAfterFailure(database, error); }
     },
     async appendParticipantRunCommand(input) {
       database.exec("BEGIN IMMEDIATE");

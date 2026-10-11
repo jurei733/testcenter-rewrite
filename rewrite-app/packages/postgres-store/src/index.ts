@@ -5,6 +5,7 @@ import {
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
+  prepareParticipantControllerActivation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -3135,6 +3136,23 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async saveTestRun(testRun) {
       await persistTestRun(pool, testRun);
+    },
+    async activateParticipantController(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const session = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const run = mapTestRun((await client.query(
+          "SELECT * FROM test_runs WHERE test_run_id = $1 FOR UPDATE", [input.testRunId])).rows[0]);
+        const result = prepareParticipantControllerActivation(input, session, run);
+        if (result?.activated) await client.query("UPDATE participant_sessions SET status = 'launched' WHERE participant_session_id = $1", [input.participantSessionId]);
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
     },
     async appendParticipantRunCommand(input) {
       const client = await pool.connect();
