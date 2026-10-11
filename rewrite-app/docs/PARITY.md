@@ -1,5 +1,80 @@
 # Testcenter parity checklist
 
+### Durable participant deliveries and response field ordering (2026-10-11)
+
+Local application checkpoint `8ae5c5253e10` stores an immutable receipt for each
+accepted progress delivery inside the same Run transaction as answers, controls,
+logs, audit and any parent transition. Receipts bind Run, participant parent,
+tenant, workspace and content release. Repeating an accepted request returns the
+current scoped state without replaying its answer or control changes; a changed
+request under the same ID returns `participant_delivery_conflict`. Current
+authorization, access-window checks and timer reconciliation still apply before
+acknowledging a retry, including retries after lock or completion. Non-saving
+modes do not persist answers, their capture clocks or answer/log fingerprints.
+
+Pinned Original `ee2ab9ab64bd91209ef8534bbe6005838024e46d` uses strictly newer
+State and data-part timestamps. The rewrite now merges each response part and
+each Unit/Player field independently, retains absent fields and preserves raw
+part values. Equal or older captures cannot overwrite newer fields or satisfy
+navigation/completion restrictions. Shared parameters also have per-key ordering
+across Units. The Player stamps only actually reported fields, keeps its capture
+clock monotonic across reload and clock rollback for captured envelopes, and carries that metadata in
+the durable retry packet. Unclocked legacy packets retain arrival-based fallback;
+opaque response capture times are forwarded by foreground and background saves.
+Malformed ordering metadata is rejected instead of bypassing ordering through an
+opaque fallback. Fully accepted packets retain their exact serialization when
+no previous field or field clock needs merging; opaque barriers remain in the
+store sidecar without unnecessarily rewriting the packet.
+
+SQLite schema 63 and PostgreSQL schema 57 add response/shared-parameter clocks
+and scoped delivery receipts. Upgrade tests preserve exact legacy answers and
+inject failed migrations. Restart, duplicate concurrency, a genuinely uncommitted
+PostgreSQL first receipt, failed File publication and SQL Run/log/audit failures
+verify the combined boundary. Run/workspace deletion removes its receipts.
+File evidence covers one repository owner; PostgreSQL also exercises separate
+connections waiting for the first uncommitted receipt.
+
+Validation passed 1,522 unit/state tests, 1,078 complete PostgreSQL tests, 166 HTTP
+tests for each Memory/File/SQLite store (498 total), and 61 compatibility tests,
+without skips. The production web build remains 469.88 kB under the unchanged
+470 kB hard gate; the 450 kB and four style warnings remain. New Player capture
+helpers use scoped lazy imports; the existing generic Verona parser is unchanged.
+Chromium passed two received-termination/error/reentry cases, four actual
+input/offline/retry/reload cases, 36 player-exit states, 57 completeness/pixel
+reference cases and 44 paused-exit states (143 browser cases).
+
+A clean archive of the application commit passed PostgreSQL standard/demo/
+production-boundary checks, SQLite runtime and 196 transaction/API tests inside
+the read-only image as user node. Image `testcenter-rewrite-app:completeness-8ae5c5253e10`
+has ID `sha256:4b813d7bf4c13a4a2e20eb92cb71377c0fd601c8de5584539a72ccf8646f9031`.
+Recomputable Docker build cache cleanup reclaimed 2.861 GB; a temporary PostgreSQL
+readiness and SELECT 1 probe verified usable space before the complete runs.
+All 24 existing containers, their full mount configurations and all 85 volumes
+were preserved. The owned build archive was removed after unlinking its host
+node_modules symlink; host TypeScript and the protected presentation remain intact.
+
+Failed attempts remain evidence: an old policy assertion expected absent Player
+fields to be deleted and was corrected against State::applyPatch; the first retry
+browser exposed unnecessary opaque-barrier metadata, fixed without changing its
+strict byte assertions. Initial bundle-budget failures were fixed through scoped
+lazy module imports while retaining the 470 kB gate and reference fixtures.
+
+Full parity and production readiness remain open. A second owned Memory probe
+shows that a Player clock behind the server can have genuinely fresh captured
+input ignored after a legacy empty answer received a server arrival timestamp.
+Bootstrap Player capture clocks from the scoped stored field clocks before the
+next delivery changes. This prevents mixing independent browser/server clocks
+at that transition. An owned Memory probe also confirms
+that a distinct older packet arriving for the first time keeps the newer answer
+but can still reset current Unit and status. Response-only retry delivery or
+explicit control ordering is the next priority. Original's response endpoint
+writes answers without controls; its whole-test State path also documents a race,
+so that path is not an ordering guarantee. Fresh Run reservation/activation and
+initial artifacts still need one boundary. Remaining Source acceptance, root
+command lifetime/debug, remote CI, release and deployment proof remain open.
+The current GitHub CI snapshot covers older commit `143dc3e73ae8`, not this local
+checkpoint. No new remote publication or deployment was performed.
+
 ### Atomic runtime transitions and monitor intent persistence (2026-10-11)
 
 Local application checkpoint `225f0ff29ed7` extends the transaction used for

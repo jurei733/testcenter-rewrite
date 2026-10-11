@@ -1,5 +1,26 @@
 # Optional Original UI
 
+### Durable participant deliveries and response field ordering (2026-10-11)
+
+Local application checkpoint `8ae5c5253e10` adds immutable scoped delivery receipts
+and independently ordered response fields in all four stores. SQLite/PostgreSQL
+schemas are now 63/57. Repeated accepted deliveries cannot replay older answers
+or controls; new captured answer fields use strictly newer timestamps and retain
+absent values. Foreground and worker retries preserve their capture metadata.
+
+Validation passed 1,522 unit/state, 1,078 PostgreSQL, 498 HTTP and 61 compatibility
+tests, all 143 browser reference/state cases, and the clean-archive PostgreSQL/
+SQLite runtime checks plus 196 read-only image tests as node. The web build stays
+469.88 kB under the unchanged 470 kB gate. All 24 existing containers, 85 volumes,
+mount configurations and the protected presentation remain intact; build cache
+cleanup freed 2.861 GB and container starts completed successfully.
+
+Production readiness remains open: bootstrap Player clocks from stored scoped
+clocks for legacy answers, keep first delayed answer deliveries from resetting
+controls, and combine fresh Run creation with its initial artifacts. Remaining
+Source acceptance and remote CI/release/deployment proof also remain open.
+See [the full evidence and limits in PARITY](./PARITY.md#durable-participant-deliveries-and-response-field-ordering-2026-10-11).
+
 ### Atomic runtime transitions and monitor intent persistence (2026-10-11)
 
 Local application checkpoint `225f0ff29ed7` extends the transaction used for
