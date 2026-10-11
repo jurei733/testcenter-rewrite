@@ -1,5 +1,80 @@
 # Testcenter parity checklist
 
+### Atomic fresh participant Run initialization (2026-10-11)
+
+Local application checkpoint `613e2323e17c` closes the fresh-launch boundary
+confirmed under `e6587f2e626c`. Actual launch and fresh resume now reserve the
+assignment, start its timer, activate the current parent, and persist initial
+controller/current-unit/booklet/timer logs and timer/resumed audit in one store
+write. A failed initial insert returns an error without leaving a reserved Run,
+activated parent or partial artifacts; the same authenticated retry creates one
+complete Run. Concurrent losers reuse that Run without initializing artifacts.
+Timers start after the reservation lock, against current eligibility and expiry;
+late closure, expiry, participant-code or execution-mode changes reject entry.
+
+Memory prepares and validates the complete effect before publication. File uses
+its detached publication boundary, so a failed file write leaves both the cache
+and restarted state unchanged. SQLite uses BEGIN IMMEDIATE; PostgreSQL locks the
+parent on the transaction client. Initial logs and audit use INSERT rather than
+identity-overwriting upserts. Existing locked, completed or paused Runs remain
+unchanged; demo/review modes retain no initial state logs. No schema change is
+required: SQLite 63 and PostgreSQL 57 remain current. Legacy low-level callers
+may still reserve a row without an initializer; actual launch/resume provide one.
+Historically partial initial artifacts are not reconstructed by this checkpoint.
+
+Required unit and PostgreSQL commands include the new creation and real HTTP
+resume suites. Fault injection covers Run, initial log, timer/resumed audit and
+parent writes, failed File publication, immutable scope and artifact collisions.
+Independent PostgreSQL creators wait on a genuinely uncommitted first initial
+log; observers see no Run/log or parent activation until the winner commits.
+SQLite/PostgreSQL HTTP faults verify complete rollback and same-authentication
+retry, while foreign sessions remain unchanged. An owned Memory service probe
+also confirms zero partial artifacts after a prepared-effect failure and complete,
+idempotent retry without using the old standalone initial-log write.
+
+Local validation passed 1,587 unit/state tests, 1,157 complete PostgreSQL tests,
+166 HTTP tests for each Memory/File/SQLite store (498 total), and 61 compatibility
+tests, without skips. Chromium passed all 147 reference/state cases: two received
+termination/error/reentry cases, eight native input/offline/retry/reload cases,
+36 player-exit states, 57 completeness/pixel references and 44 paused-exit states.
+The production web build remains 469.88 kB under the unchanged 470 kB hard gate;
+the 450 kB and four style warnings remain.
+
+Browser harness checkpoint `66e1389d1171` corrects a confirmed observation race:
+the old waiter could be registered after the route already held a real retry,
+while a new focus packet coexisted with the previous queued status display. It
+now waits for the actual failed focus-bearing request and registers the retry
+waiter before either connectivity transition. The exact failed delivery ID,
+response bytes, native events and same-Run reload remain asserted; timeouts and
+reference fixtures were not relaxed. All eight cases passed three consecutive
+runs (24 total), including four clock-skew cases per run. Failed-attempt logs,
+the route/client diagnosis and screenshots remain in the evidence. Initial File
+restart serialization and API error-shape fixture failures were corrected against
+the real persistence/API contracts; the first evidence probe method-name error
+is also retained.
+
+A clean Git archive of application checkpoint `613e2323e17c` passed PostgreSQL
+standard/demo/production-boundary checks, SQLite runtime and 254 transaction/API
+tests inside its read-only image as node. Image
+`testcenter-rewrite-app:completeness-613e2323e17c` has ID
+`sha256:3692045ea688103d3292aea33167af786c57eb98e8b7eeb0461c5b9796121025`.
+The browser harness correction was committed after that image build; it changes
+only the browser test script. All 24 existing containers, every mount field and
+all 85 volumes were preserved. The owned archive was removed after unlinking
+its node_modules symlink, preserving host TypeScript and the protected
+presentation hashes. Approximately 12.4 GiB remained after the container checks;
+the earlier 2.861 GB cleanup removed recomputable Docker build cache.
+
+Full parity and production readiness remain open. Pinned Original
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` exposes the root `debug` command,
+case-insensitive `off` and the persistent `tc-debug` pane; these are absent from
+the rewrite command contract and root handler. Next implement that Source
+behavior and audit late ACK/effect lifetime across replacement controllers.
+Remaining Source acceptance, mixed-version rollout, remote CI, release and
+deployment proof remain open. File evidence covers one repository owner.
+Everything in this checkpoint is local; nothing was pushed or deployed.
+The preceding sections below preserve historical checkpoint evidence.
+
 ### Scoped Player clocks and response-only deliveries (2026-10-11)
 
 Local application checkpoint `e6587f2e626c` resolves the two delivery gaps

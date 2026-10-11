@@ -1,5 +1,38 @@
 # Optional Original UI
 
+### Atomic fresh participant Run initialization (2026-10-11)
+
+Local application checkpoint `613e2323e17c` resolves the reserved-Run/initial-log
+gap. Actual fresh launch/resume creates the Run, activates its current parent and
+persists initial timer/state logs and audit together in all four stores. Failed
+writes leave no partial Run or artifacts; retry creates one complete Run and
+concurrent losers reuse it. Timers start inside the parent reservation lock.
+Current closure, expiry, code and execution mode are checked there. Existing
+Runs remain unchanged; historically incomplete initial artifacts are not repaired.
+SQLite/PostgreSQL schemas remain 63/57; File proof covers one repository owner.
+
+Local validation passed 1,587 unit/state, 1,157 PostgreSQL, 498 HTTP and 61
+compatibility tests without skips, all 147 browser reference/state cases, three
+PostgreSQL container variants, SQLite runtime and 254 read-only image tests as
+node. The web build remains 469.88 kB under the unchanged 470 kB hard gate.
+All 24 existing containers, every mount field, 85 volumes and the protected
+presentation retain their identities/hashes; the owned archive was removed safely.
+
+Browser harness checkpoint `66e1389d1171` closes an observation race where the
+route held the real focus-bearing packet before the request waiter was registered.
+The check waits for its actual failure and subscribes before connectivity changes;
+exact delivery/answer/reload assertions and timeouts remain intact. Eight cases
+passed three consecutive runs, including four clock-skew cases each. The image
+was built from the application checkpoint before this test-script-only correction.
+Failed-attempt logs, route/client diagnosis and screenshots remain in the evidence.
+
+Full parity and production readiness remain open. Next implement the pinned
+Original root debug command and persistent pane, then audit command lifetime
+across replacement controllers. Remaining Source acceptance, mixed-version
+rollout, remote CI, release and deployment proof remain open. Nothing was pushed
+or deployed. Previous sections below preserve historical checkpoint evidence.
+See [the evidence and limits in PARITY](./PARITY.md#atomic-fresh-participant-run-initialization-2026-10-11).
+
 ### Scoped Player clocks and response-only deliveries (2026-10-11)
 
 Local application checkpoint `e6587f2e626c` resolves the stored-clock bootstrap
