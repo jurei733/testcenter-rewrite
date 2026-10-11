@@ -4,7 +4,7 @@ import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
 export { prepareParticipantRunMutation } from "./participant-run-mutation.js";
 export type { ParticipantRunMutationInput, ParticipantRunMutationContext,
   ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
-import { ParticipantControllerActivationError, type ParticipantControllerActivationInput,
+import { ParticipantControllerActivationError, prepareParticipantControllerActivation, type ParticipantControllerActivationInput,
   type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
 import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
@@ -5986,31 +5986,6 @@ const buildParticipantRuntimeBooklets = (input: {
       }
     ];
   });
-};
-
-const resolveParticipantSessionStatusAfterCompletion = async (
-  repository: FirstSliceRepository,
-  participantSession: ParticipantSession
-): Promise<ParticipantSessionStatus> => {
-  const [contentRelease, participantRosterEntry, testRuns] = await Promise.all([
-    requireContentRelease(repository, participantSession.contentReleaseId),
-    findParticipantRosterEntryByLoginKey(
-      repository,
-      participantSession.tenantId,
-      participantSession.workspaceId,
-      participantSession.loginKey
-    ),
-    repository.listTestRunsByParticipantSessionId(
-      participantSession.participantSessionId
-    )
-  ]);
-  const hasUnfinishedBooklet = buildParticipantRuntimeBooklets({
-    contentRelease,
-    participantRosterEntry,
-    participantCode: participantSession.participantCode,
-    testRuns: testRuns.map(normalizeTestRun)
-  }).some(booklet => booklet.status !== "completed");
-  return hasUnfinishedBooklet ? "signed_in" : "closed";
 };
 
 const buildParticipantRosterReadItems = (
@@ -25406,6 +25381,84 @@ export const createFirstSliceServices = (
     return normalizeTestRun(result.testRun);
   };
 
+  type RuntimeRunProjection = Omit<ParticipantRunMutationEffect, "testLogs" | "activityEvents"> & {
+    testLogs?: ParticipantTestLog[];
+    activityEvents?: WorkspaceActivityEvent[];
+  };
+  const projectCompletedParticipantSession = (input: {
+    context: ParticipantRunMutationContext;
+    contentRelease: ContentRelease;
+    participantRosterEntry: ParticipantRosterEntry | null;
+    testRun: TestRun;
+  }): ParticipantSession => {
+    const parent = input.context.participantSession;
+    const testRuns = input.context.testRuns.map(run => normalizeTestRun(run.testRunId === input.testRun.testRunId ? input.testRun : run));
+    const unfinished = buildParticipantRuntimeBooklets({ contentRelease: input.contentRelease,
+      participantRosterEntry: input.participantRosterEntry, participantCode: parent.participantCode, testRuns })
+      .some(booklet => booklet.status !== "completed");
+    return { ...parent, status: unfinished ? "signed_in" : "closed" };
+  };
+
+  const mutateRuntimeRun = async (
+    storedRun: TestRun,
+    project: (input: {
+      context: ParticipantRunMutationContext;
+      testRun: TestRun;
+      contentRelease: ContentRelease;
+      participantRosterEntry: ParticipantRosterEntry | null;
+      timestamp: string;
+      reconcileTimers: (testRun: TestRun) => TestRun;
+    }) => RuntimeRunProjection | null,
+    options: { reconcileBefore?: boolean; activateController?: boolean; participantAccess?: boolean } = {}
+  ): Promise<ParticipantRunMutationResult> => {
+    const parent = await requireParticipantSession(repository, storedRun.participantSessionId);
+    const contentRelease = await requireContentRelease(repository, storedRun.contentReleaseId);
+    const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
+    let completionError: unknown;
+    let result: ParticipantRunMutationResult | null;
+    try {
+      result = await repository.mutateParticipantRun(storedRun, context => {
+        const timestamp = now();
+        if (options.participantAccess !== false) assertParticipantAccessWindow(participantRosterEntry, timestamp, context.participantSession.validUntil);
+        const activation = options.activateController ? prepareParticipantControllerActivation({ ...context.testRun, activatedAt: timestamp }, context.participantSession, context.testRun) : null;
+        const compatibleRun = (run: TestRun): TestRun => ({ ...run, executionMode: context.testRun.executionMode,
+          bookletAssignmentKey: context.testRun.bookletAssignmentKey });
+        const before = options.reconcileBefore === false
+          ? { changed: false, effect: { testRun: context.testRun, testLogs: [], activityEvents: [] } as ParticipantRunMutationEffect }
+          : prepareEffectiveTestletTimerState({ contentRelease, context, participantRosterEntry, timestamp });
+        const timerEffects = [before.effect];
+        let timerChanged = before.changed;
+        const reconcileTimers = (run: TestRun): TestRun => {
+          const prepared = prepareEffectiveTestletTimerState({ contentRelease, context: { ...context, testRun: compatibleRun(run) }, participantRosterEntry, timestamp });
+          timerEffects.push(prepared.effect); timerChanged ||= prepared.changed;
+          return normalizeTestRun(prepared.effect.testRun);
+        };
+        let projected: RuntimeRunProjection | null;
+        try { projected = project({ context, testRun: normalizeTestRun(before.effect.testRun), contentRelease, participantRosterEntry, timestamp, reconcileTimers }); }
+        catch (error) {
+          // An elapsed final timer still completes durably when the requested
+          // operation rejects the now-completed Run.
+          if (!before.changed || before.effect.testRun.status !== "completed") throw error;
+          completionError = error; projected = null;
+        }
+        if (!projected && !timerChanged && !activation?.activated) return null;
+        const participantSession = [...timerEffects].reverse().find(effect => effect.participantSession)?.participantSession ??
+          projected?.participantSession ?? (activation?.activated ? activation.participantSession : undefined);
+        return { testRun: compatibleRun(projected?.testRun ?? timerEffects.at(-1)!.testRun),
+          testLogs: [...timerEffects.flatMap(effect => effect.testLogs), ...(projected?.testLogs ?? [])],
+          activityEvents: [...timerEffects.flatMap(effect => effect.activityEvents), ...(projected?.activityEvents ?? [])],
+          ...(participantSession ? { participantSession } : {}), ...(projected?.commandInput ? { commandInput: projected.commandInput } : {}) };
+      });
+    } catch (error) {
+      if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+      throw error;
+    }
+    if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+    if (completionError) throw completionError;
+    return { ...result, testRun: { ...normalizeTestRun(result.testRun),
+      executionMode: result.testRun.executionMode, bookletAssignmentKey: result.testRun.bookletAssignmentKey } };
+  };
+
   const importParticipantRosterDocumentsForWorkspace = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -26730,6 +26783,247 @@ export const createFirstSliceServices = (
       deletedTestRunIds
     };
   };
+
+  const launchParticipantRun = async (
+    input: Parameters<FirstSliceServices["participantRuntime"]["launch"]>[0],
+    deferExistingActivation = false
+  ): Promise<TestRun> => {
+    const participantSessionId = normalizeParticipantSessionId(
+      input.participantSessionId
+    );
+    const participantSession = await requireAccessibleParticipantSession(
+      participantSessionId
+    );
+    const activateSession = async (testRun: TestRun): Promise<void> => {
+      try {
+        const result = await repository.activateParticipantController({ testRunId: testRun.testRunId,
+          participantSessionId, tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+          contentReleaseId: testRun.contentReleaseId, activatedAt: now() });
+        if (!result) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
+      } catch (error) {
+        if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+        throw error;
+      }
+    };
+    const contentRelease = await requireContentRelease(
+      repository,
+      participantSession.contentReleaseId
+    );
+
+    const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
+      input.bookletKey
+    );
+    const rosterEntry = await findParticipantRosterEntryByLoginKey(
+      repository,
+      participantSession.tenantId,
+      participantSession.workspaceId,
+      participantSession.loginKey
+    );
+    const assignedBookletKeys = [
+      ...new Set(
+        getParticipantCodeBookletAssignments(
+          rosterEntry,
+          participantSession.participantCode
+        ).map(assignment => assignment.bookletKey)
+      )
+    ];
+    const testRuns = (
+      await repository.listTestRunsByParticipantSessionId(
+        participantSession.participantSessionId
+      )
+    ).map(normalizeTestRun);
+    testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const runtimeBooklets = buildParticipantRuntimeBooklets({
+      contentRelease,
+      participantRosterEntry: rosterEntry,
+      participantCode: participantSession.participantCode,
+      testRuns
+    });
+    const selectedRuntimeBooklet = requestedBookletKey
+      ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
+        runtimeBooklets.find(
+          booklet => booklet.sourceBookletKey === requestedBookletKey &&
+            (booklet.status === "in_progress" || booklet.status === "locked")
+        ) ??
+        runtimeBooklets.find(
+          booklet =>
+            booklet.sourceBookletKey === requestedBookletKey &&
+            booklet.status === "available"
+        ) ?? runtimeBooklets.find(booklet => booklet.sourceBookletKey === requestedBookletKey)
+      : runtimeBooklets.find(booklet => booklet.bookletKey ===
+          testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
+        runtimeBooklets.find(booklet => booklet.status === "available");
+    if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
+      throw new FirstSliceError(
+        403,
+        "booklet_not_assigned",
+        `Booklet assignment '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
+      );
+    }
+    const effectiveBookletKey =
+      selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
+    const bookletSource = requestedBookletKey
+      ? "request"
+      : assignedBookletKeys.length > 0
+        ? "participant_roster"
+        : "active_release_default";
+    const selectedBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+      booklet => booklet.bookletKey === effectiveBookletKey
+    );
+
+    if (effectiveBookletKey && !selectedBooklet) {
+      throw new FirstSliceError(
+        404,
+        "booklet_not_found",
+        `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
+      );
+    }
+    if (selectedRuntimeBooklet?.status === "completed") {
+      throw new FirstSliceError(
+        409,
+        "booklet_already_completed",
+        `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`
+      );
+    }
+    if (!selectedBooklet) {
+      throw new FirstSliceError(
+        409,
+        participantSession.status === "closed"
+          ? "participant_session_closed"
+          : "participant_session_has_no_available_booklet",
+        participantSession.status === "closed"
+          ? `Participant session '${participantSessionId}' is already closed.`
+          : `Participant session '${participantSessionId}' has no available booklet.`
+      );
+    }
+
+    const existingRun = testRuns.find(run =>
+      (run.bookletAssignmentKey ?? run.bookletKey) ===
+        (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
+    if (existingRun) {
+      requireParticipantTestRunUnlocked(existingRun);
+      if (existingRun.status === "completed") {
+        throw new FirstSliceError(409, "booklet_already_completed",
+          `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+      }
+      if (!deferExistingActivation) await activateSession(existingRun);
+      return existingRun;
+    }
+
+    const timestamp = now();
+    const executionMode = resolveParticipantExecutionMode(
+      participantSession.executionMode ?? rosterEntry?.executionMode
+    );
+    const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
+      testRunId: idGenerator(),
+      participantSessionId: participantSession.participantSessionId,
+      tenantId: participantSession.tenantId,
+      workspaceId: participantSession.workspaceId,
+      contentReleaseId: participantSession.contentReleaseId,
+      bookletKey: selectedBooklet.bookletKey,
+      executionMode: executionMode.mode,
+      bookletAssignmentKey:
+        selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
+      presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
+      status: "running",
+      locked: false,
+      currentUnitKey: null,
+      unitResponses: {},
+      unlockedTestletKeys: [],
+      monitorNavigationUnlocked: false,
+      testletTimers: {},
+      lockedTestletKeys: [],
+      lockedUnitKeys: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      completedAt: null
+    });
+    const firstUnit = resolveVisibleBookletUnits(
+      selectedBooklet,
+      initialTestRun
+    )[0];
+    const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
+      testletKey =>
+        Boolean(
+          selectedBooklet.testletEntries?.find(
+            testlet => testlet.testletKey === testletKey
+          )?.restrictions?.codeToEnter?.code
+        )
+    );
+    const testRun: TestRun = {
+      ...initialTestRun,
+      currentUnitKey: firstUnitRequiresCode
+        ? null
+        : firstUnit?.unitKey ?? null
+    };
+    // Initialize the timer inside the candidate before reservation. A loser
+    // must never overwrite the winner's timer, answer or current Unit.
+    const activated = activateCurrentTestletTimer(contentRelease, testRun, timestamp);
+    const reservation = await repository.getOrCreateTestRunForAssignment(activated.testRun);
+    const effectiveTestRun = normalizeTestRun(reservation.testRun);
+    requireParticipantTestRunUnlocked(effectiveTestRun);
+    if (effectiveTestRun.status === "completed") {
+      throw new FirstSliceError(409, "booklet_already_completed",
+        `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
+    }
+    if (!reservation.created) {
+      if (!deferExistingActivation) await activateSession(effectiveTestRun);
+      return effectiveTestRun;
+    }
+    if (activated.startedTestletKey) {
+      if (executionMode.saveResponses) {
+        await repository.saveParticipantTestLogs(buildParticipantTestLogs({
+          testRun: effectiveTestRun,
+          batches: [{ entries: [buildTestletTimeLeftTestStateEntry(effectiveTestRun, timestamp)] }]
+        }));
+      }
+      await recordStartedTestletTimer(effectiveTestRun, activated.startedTestletKey);
+    }
+    if (executionMode.saveResponses) {
+      await repository.saveParticipantTestLogs(
+        buildParticipantTestLogs({
+        testRun: effectiveTestRun,
+        batches: [{
+          entries: [
+            {
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: "RUNNING"
+            },
+            ...(effectiveTestRun.currentUnitKey
+              ? [{
+                  key: "CURRENT_UNIT_ID",
+                  timeStamp: Date.parse(timestamp),
+                  content: effectiveTestRun.currentUnitKey
+                }]
+              : []),
+            ...(Object.keys(effectiveTestRun.bookletStates ?? {}).length > 0
+              ? [buildBookletStatesTestStateEntry(effectiveTestRun, timestamp)]
+              : [])
+          ]
+        }]
+        })
+      );
+    }
+    await activateSession(effectiveTestRun);
+    await recordWorkspaceActivity({
+      tenantId: effectiveTestRun.tenantId,
+      workspaceId: effectiveTestRun.workspaceId,
+      eventType: "participant_session_resumed",
+      subjectType: "test_run",
+      subjectId: effectiveTestRun.testRunId,
+      summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
+      details: {
+        participantSessionId: participantSession.participantSessionId,
+        bookletKey: effectiveTestRun.bookletKey,
+        bookletAssignmentKey: effectiveTestRun.bookletAssignmentKey,
+        currentUnitKey: effectiveTestRun.currentUnitKey,
+        bookletSource
+      }
+    });
+    return effectiveTestRun;
+  };
+
 
   return {
     applicationSettings: {
@@ -32384,110 +32678,105 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
-        const testRun = normalizeTestRun(storedTestRun);
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        const participantSession = await requireAccessibleParticipantSession(
-          testRun.participantSessionId
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode ?? participantSession.executionMode
-        );
-        if (!executionMode.canChangeStateOptions) {
-          throw new FirstSliceError(
-            403,
-            "participant_state_option_change_not_allowed",
-            `Execution mode '${executionMode.mode}' does not allow adaptive state choices.`
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          const participantSession = context.participantSession;
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode ?? participantSession.executionMode
           );
-        }
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
+          if (!executionMode.canChangeStateOptions) {
+            throw new FirstSliceError(
+              403,
+              "participant_state_option_change_not_allowed",
+              `Execution mode '${executionMode.mode}' does not allow adaptive state choices.`
+            );
+          }
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
+          }
+          const stateKey = String(input.stateKey ?? "").trim();
+          if (!stateKey) {
+            throw new FirstSliceError(
+              400,
+              "participant_state_key_required",
+              "stateKey is required."
+            );
+          }
+          const optionKey = String(input.optionKey ?? "").trim();
+          if (!optionKey) {
+            throw new FirstSliceError(
+              400,
+              "participant_state_option_key_required",
+              "optionKey is required."
+            );
+          }
+
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const stateKey = String(input.stateKey ?? "").trim();
-        if (!stateKey) {
-          throw new FirstSliceError(
-            400,
-            "participant_state_key_required",
-            "stateKey is required."
+          const state = booklet?.stateEntries?.find(
+            candidate => candidate.stateKey === stateKey
           );
-        }
-        const optionKey = String(input.optionKey ?? "").trim();
-        if (!optionKey) {
-          throw new FirstSliceError(
-            400,
-            "participant_state_option_key_required",
-            "optionKey is required."
-          );
-        }
-        const contentRelease = await requireContentRelease(
-          repository,
-          testRun.contentReleaseId
-        );
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const state = booklet?.stateEntries?.find(
-          candidate => candidate.stateKey === stateKey
-        );
-        if (!state) {
-          throw new FirstSliceError(
-            404,
-            "participant_adaptive_state_not_found",
-            `Adaptive state '${stateKey}' was not found in booklet '${testRun.bookletKey}'.`
-          );
-        }
-        if (!state.options.some(option => option.optionKey === optionKey)) {
-          throw new FirstSliceError(
-            400,
-            "participant_adaptive_state_option_invalid",
-            `Option '${optionKey}' is not valid for adaptive state '${stateKey}'.`
-          );
-        }
-        const timestamp = now();
-        const updatedRun = withEvaluatedBookletStates(booklet, {
-          ...testRun,
-          bookletStateOverrides: {
-            ...(testRun.bookletStateOverrides ?? {}),
-            [stateKey]: optionKey
-          },
-          updatedAt: timestamp
-        });
-        await repository.saveTestRun(updatedRun);
-        if (
-          executionMode.saveResponses &&
-          Object.keys(updatedRun.bookletStates ?? {}).length > 0
-        ) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (!state) {
+            throw new FirstSliceError(
+              404,
+              "participant_adaptive_state_not_found",
+              `Adaptive state '${stateKey}' was not found in booklet '${testRun.bookletKey}'.`
+            );
+          }
+          if (!state.options.some(option => option.optionKey === optionKey)) {
+            throw new FirstSliceError(
+              400,
+              "participant_adaptive_state_option_invalid",
+              `Option '${optionKey}' is not valid for adaptive state '${stateKey}'.`
+            );
+          }
+          const updatedRun = withEvaluatedBookletStates(booklet, {
+            ...testRun,
+            bookletStateOverrides: {
+              ...(testRun.bookletStateOverrides ?? {}),
+              [stateKey]: optionKey
+            },
+            updatedAt: timestamp
+          });
+          if (
+            executionMode.saveResponses &&
+            Object.keys(updatedRun.bookletStates ?? {}).length > 0
+          ) {
+            testLogs.push(...buildParticipantTestLogs({
               testRun: updatedRun,
               batches: [{
                 entries: [
                   buildBookletStatesTestStateEntry(updatedRun, timestamp)
                 ]
               }]
-            })
-          );
-        }
-        await recordWorkspaceActivity({
-          tenantId: updatedRun.tenantId,
-          workspaceId: updatedRun.workspaceId,
-          eventType: "test_run_progress_saved",
-          actorId: participantSession.loginKey,
-          subjectType: "test_run",
-          subjectId: updatedRun.testRunId,
-          summary: `Participant selected adaptive state '${stateKey}=${optionKey}'.`,
-          details: {
-            participantSessionId: updatedRun.participantSessionId,
-            stateKey,
-            optionKey,
-            participantStateOverride: true
+            }));
           }
-        });
-        return updatedRun;
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: updatedRun.tenantId,
+            workspaceId: updatedRun.workspaceId,
+            eventType: "test_run_progress_saved",
+            actorId: participantSession.loginKey,
+            subjectType: "test_run",
+            subjectId: updatedRun.testRunId,
+            summary: `Participant selected adaptive state '${stateKey}=${optionKey}'.`,
+            details: {
+              participantSessionId: updatedRun.participantSessionId,
+              stateKey,
+              optionKey,
+              participantStateOverride: true
+            }
+          }));
+          return { testRun: updatedRun, testLogs, activityEvents };
+        }, { reconcileBefore: false });
+        return result.testRun;
       },
       async listReviews(input) {
         const { testRun } = await requireParticipantReviewContext(input.testRunId);
@@ -32789,242 +33078,7 @@ export const createFirstSliceServices = (
         }
         return resourceEntry;
       },
-      async launch(input) {
-        const participantSessionId = normalizeParticipantSessionId(
-          input.participantSessionId
-        );
-        const participantSession = await requireAccessibleParticipantSession(
-          participantSessionId
-        );
-        const activateSession = async (testRun: TestRun): Promise<void> => {
-          try {
-            const result = await repository.activateParticipantController({ testRunId: testRun.testRunId,
-              participantSessionId, tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
-              contentReleaseId: testRun.contentReleaseId, activatedAt: now() });
-            if (!result) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
-          } catch (error) {
-            if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
-            throw error;
-          }
-        };
-        const contentRelease = await requireContentRelease(
-          repository,
-          participantSession.contentReleaseId
-        );
-
-        const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
-          input.bookletKey
-        );
-        const rosterEntry = await findParticipantRosterEntryByLoginKey(
-          repository,
-          participantSession.tenantId,
-          participantSession.workspaceId,
-          participantSession.loginKey
-        );
-        const assignedBookletKeys = [
-          ...new Set(
-            getParticipantCodeBookletAssignments(
-              rosterEntry,
-              participantSession.participantCode
-            ).map(assignment => assignment.bookletKey)
-          )
-        ];
-        const testRuns = (
-          await repository.listTestRunsByParticipantSessionId(
-            participantSession.participantSessionId
-          )
-        ).map(normalizeTestRun);
-        testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-        const runtimeBooklets = buildParticipantRuntimeBooklets({
-          contentRelease,
-          participantRosterEntry: rosterEntry,
-          participantCode: participantSession.participantCode,
-          testRuns
-        });
-        const selectedRuntimeBooklet = requestedBookletKey
-          ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
-            runtimeBooklets.find(
-              booklet => booklet.sourceBookletKey === requestedBookletKey &&
-                (booklet.status === "in_progress" || booklet.status === "locked")
-            ) ??
-            runtimeBooklets.find(
-              booklet =>
-                booklet.sourceBookletKey === requestedBookletKey &&
-                booklet.status === "available"
-            ) ?? runtimeBooklets.find(booklet => booklet.sourceBookletKey === requestedBookletKey)
-          : runtimeBooklets.find(booklet => booklet.bookletKey ===
-              testRuns.find(run => run.status !== "completed")?.bookletAssignmentKey) ??
-            runtimeBooklets.find(booklet => booklet.status === "available");
-        if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
-          throw new FirstSliceError(
-            403,
-            "booklet_not_assigned",
-            `Booklet assignment '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
-          );
-        }
-        const effectiveBookletKey =
-          selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
-        const bookletSource = requestedBookletKey
-          ? "request"
-          : assignedBookletKeys.length > 0
-            ? "participant_roster"
-            : "active_release_default";
-        const selectedBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          booklet => booklet.bookletKey === effectiveBookletKey
-        );
-
-        if (effectiveBookletKey && !selectedBooklet) {
-          throw new FirstSliceError(
-            404,
-            "booklet_not_found",
-            `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
-          );
-        }
-        if (selectedRuntimeBooklet?.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "booklet_already_completed",
-            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`
-          );
-        }
-        if (!selectedBooklet) {
-          throw new FirstSliceError(
-            409,
-            participantSession.status === "closed"
-              ? "participant_session_closed"
-              : "participant_session_has_no_available_booklet",
-            participantSession.status === "closed"
-              ? `Participant session '${participantSessionId}' is already closed.`
-              : `Participant session '${participantSessionId}' has no available booklet.`
-          );
-        }
-
-        const existingRun = testRuns.find(run =>
-          (run.bookletAssignmentKey ?? run.bookletKey) ===
-            (selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey));
-        if (existingRun) {
-          requireParticipantTestRunUnlocked(existingRun);
-          if (existingRun.status === "completed") {
-            throw new FirstSliceError(409, "booklet_already_completed",
-              `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
-          }
-          await activateSession(existingRun);
-          return existingRun;
-        }
-
-        const timestamp = now();
-        const executionMode = resolveParticipantExecutionMode(
-          participantSession.executionMode ?? rosterEntry?.executionMode
-        );
-        const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
-          testRunId: idGenerator(),
-          participantSessionId: participantSession.participantSessionId,
-          tenantId: participantSession.tenantId,
-          workspaceId: participantSession.workspaceId,
-          contentReleaseId: participantSession.contentReleaseId,
-          bookletKey: selectedBooklet.bookletKey,
-          executionMode: executionMode.mode,
-          bookletAssignmentKey:
-            selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
-          presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
-          status: "running",
-          locked: false,
-          currentUnitKey: null,
-          unitResponses: {},
-          unlockedTestletKeys: [],
-          monitorNavigationUnlocked: false,
-          testletTimers: {},
-          lockedTestletKeys: [],
-          lockedUnitKeys: [],
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          completedAt: null
-        });
-        const firstUnit = resolveVisibleBookletUnits(
-          selectedBooklet,
-          initialTestRun
-        )[0];
-        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
-          testletKey =>
-            Boolean(
-              selectedBooklet.testletEntries?.find(
-                testlet => testlet.testletKey === testletKey
-              )?.restrictions?.codeToEnter?.code
-            )
-        );
-        const testRun: TestRun = {
-          ...initialTestRun,
-          currentUnitKey: firstUnitRequiresCode
-            ? null
-            : firstUnit?.unitKey ?? null
-        };
-        // Initialize the timer inside the candidate before reservation. A loser
-        // must never overwrite the winner's timer, answer or current Unit.
-        const activated = activateCurrentTestletTimer(contentRelease, testRun, timestamp);
-        const reservation = await repository.getOrCreateTestRunForAssignment(activated.testRun);
-        const effectiveTestRun = normalizeTestRun(reservation.testRun);
-        requireParticipantTestRunUnlocked(effectiveTestRun);
-        if (effectiveTestRun.status === "completed") {
-          throw new FirstSliceError(409, "booklet_already_completed",
-            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
-        }
-        if (!reservation.created) {
-          await activateSession(effectiveTestRun);
-          return effectiveTestRun;
-        }
-        if (activated.startedTestletKey) {
-          if (executionMode.saveResponses) {
-            await repository.saveParticipantTestLogs(buildParticipantTestLogs({
-              testRun: effectiveTestRun,
-              batches: [{ entries: [buildTestletTimeLeftTestStateEntry(effectiveTestRun, timestamp)] }]
-            }));
-          }
-          await recordStartedTestletTimer(effectiveTestRun, activated.startedTestletKey);
-        }
-        if (executionMode.saveResponses) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
-            testRun: effectiveTestRun,
-            batches: [{
-              entries: [
-                {
-                  key: "CONTROLLER",
-                  timeStamp: Date.parse(timestamp),
-                  content: "RUNNING"
-                },
-                ...(effectiveTestRun.currentUnitKey
-                  ? [{
-                      key: "CURRENT_UNIT_ID",
-                      timeStamp: Date.parse(timestamp),
-                      content: effectiveTestRun.currentUnitKey
-                    }]
-                  : []),
-                ...(Object.keys(effectiveTestRun.bookletStates ?? {}).length > 0
-                  ? [buildBookletStatesTestStateEntry(effectiveTestRun, timestamp)]
-                  : [])
-              ]
-            }]
-            })
-          );
-        }
-        await activateSession(effectiveTestRun);
-        await recordWorkspaceActivity({
-          tenantId: effectiveTestRun.tenantId,
-          workspaceId: effectiveTestRun.workspaceId,
-          eventType: "participant_session_resumed",
-          subjectType: "test_run",
-          subjectId: effectiveTestRun.testRunId,
-          summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
-          details: {
-            participantSessionId: participantSession.participantSessionId,
-            bookletKey: effectiveTestRun.bookletKey,
-            bookletAssignmentKey: effectiveTestRun.bookletAssignmentKey,
-            currentUnitKey: effectiveTestRun.currentUnitKey,
-            bookletSource
-          }
-        });
-        return effectiveTestRun;
-      },
+      async launch(input) { return launchParticipantRun(input); },
       async resumeSession(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
@@ -33040,114 +33094,36 @@ export const createFirstSliceServices = (
         );
         // Use launch's exact assignment resolution and authorization for both
         // new and existing entries; never choose an arbitrary open sibling.
-        const selectedRun = await this.launch({ participantSessionId, bookletKey: requestedBookletKey });
+        const selectedRun = await launchParticipantRun({ participantSessionId, bookletKey: requestedBookletKey }, true);
         if (!previousRuns.some(run => run.testRunId === selectedRun.testRunId)) return selectedRun;
         return serializeTestRunMutation(selectedRun.testRunId, async () => {
-          const existingRun = await repository.getTestRunById(selectedRun.testRunId);
-          if (!existingRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${selectedRun.testRunId}' was not found.`);
-          let normalizedExistingRun = normalizeTestRun(existingRun);
-          requireParticipantTestRunUnlocked(normalizedExistingRun);
-          if (normalizedExistingRun.status === "completed") {
-            throw new FirstSliceError(409, "booklet_already_completed",
-              `Booklet '${normalizedExistingRun.bookletKey}' is already completed in participant session '${participantSessionId}'.`);
-          }
-          // Monitor authority wins even in non-saving modes; entry cannot
-          // reset a paused Run and thereby resume it implicitly.
-          if (normalizedExistingRun.status === "paused" && normalizedExistingRun.pauseSource === "monitor") {
-            return normalizedExistingRun;
-          }
-
-          const executionMode = resolveParticipantExecutionMode(
-            normalizedExistingRun.executionMode ?? participantSession.executionMode
-          );
-          if (!executionMode.saveResponses) {
-            const contentRelease = await requireContentRelease(
-              repository,
-              normalizedExistingRun.contentReleaseId
-            );
-            const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-              candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
-            );
-            const resetRun = resetNonSavingTestRunForEntry({
-              booklet,
-              testRun: normalizedExistingRun,
-              timestamp: now()
-            });
-            if (
-              normalizedExistingRun.status !== resetRun.status ||
-              normalizedExistingRun.completedAt !== resetRun.completedAt ||
-              normalizedExistingRun.currentUnitKey !== resetRun.currentUnitKey ||
-              Object.keys(normalizedExistingRun.unitResponses).length > 0 ||
-              normalizedExistingRun.locked ||
-              normalizedExistingRun.monitorNavigationUnlocked ||
-              JSON.stringify(normalizedExistingRun.unlockedTestletKeys ?? []) !==
-                JSON.stringify(resetRun.unlockedTestletKeys ?? []) ||
-              Object.keys(normalizedExistingRun.testletTimers ?? {}).length > 0 ||
-              (normalizedExistingRun.lockedTestletKeys ?? []).length > 0 ||
-              (normalizedExistingRun.lockedUnitKeys ?? []).length > 0 ||
-              JSON.stringify(normalizedExistingRun.bookletStates ?? {}) !==
-                JSON.stringify(resetRun.bookletStates ?? {})
-            ) {
-              normalizedExistingRun = resetRun;
-              await repository.saveTestRun(normalizedExistingRun);
+          const result = await mutateRuntimeRun(selectedRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+            if (testRun.status === "paused" && testRun.pauseSource === "monitor") return null;
+            const executionMode = resolveParticipantExecutionMode(testRun.executionMode ?? context.participantSession.executionMode);
+            if (!executionMode.saveResponses) {
+              const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
+              const resetRun = resetNonSavingTestRunForEntry({ booklet, testRun, timestamp });
+              const changed = testRun.status !== resetRun.status || testRun.completedAt !== resetRun.completedAt ||
+                testRun.currentUnitKey !== resetRun.currentUnitKey || Object.keys(testRun.unitResponses).length > 0 || testRun.locked ||
+                testRun.monitorNavigationUnlocked || JSON.stringify(testRun.unlockedTestletKeys ?? []) !== JSON.stringify(resetRun.unlockedTestletKeys ?? []) ||
+                Object.keys(testRun.testletTimers ?? {}).length > 0 || (testRun.lockedTestletKeys ?? []).length > 0 ||
+                (testRun.lockedUnitKeys ?? []).length > 0 || JSON.stringify(testRun.bookletStates ?? {}) !== JSON.stringify(resetRun.bookletStates ?? {});
+              return changed ? { testRun: resetRun } : null;
             }
-          }
-
-          if (normalizedExistingRun.status === "paused") {
-            const timestamp = now();
-            const contentRelease = await requireContentRelease(
-              repository,
-              existingRun.contentReleaseId
-            );
-            const resumedRun = transitionTestletTimersForRunStatus(
-              normalizedExistingRun,
-              "running",
-              timestamp
-            );
-            await repository.saveTestRun(resumedRun);
-            if (
-              executionMode.saveResponses
-            ) {
-              const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
-                key: "CONTROLLER",
-                timeStamp: Date.parse(timestamp),
-                content: "RUNNING"
-              }];
-              if (testletTimerStateChanged(normalizedExistingRun, resumedRun)) {
-                resumedStateEntries.unshift(
-                  buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
-                );
-              }
-              await repository.saveParticipantTestLogs(
-                buildParticipantTestLogs({
-                  testRun: resumedRun,
-                  batches: [{
-                    entries: resumedStateEntries
-                  }]
-                })
-              );
-            }
-            const effectiveRun = await persistEffectiveTestletTimerState({
-              contentRelease,
-              testRun: resumedRun,
-              timestamp
-            });
-            await recordWorkspaceActivity({
-              tenantId: effectiveRun.tenantId,
-              workspaceId: effectiveRun.workspaceId,
-              eventType: "participant_session_resumed",
-              subjectType: "test_run",
-              subjectId: effectiveRun.testRunId,
-              summary: `Participant session '${participantSession.participantSessionId}' resumed an existing run.`,
-              details: {
-                participantSessionId: participantSession.participantSessionId,
-                currentUnitKey: effectiveRun.currentUnitKey
-              }
-            });
-            return effectiveRun;
-          }
-
-          return normalizedExistingRun;
+            if (testRun.status !== "paused") return null;
+            const resumedRun = transitionTestletTimersForRunStatus(testRun, "running", timestamp);
+            const entries: ParticipantTestLogEntryInput[] = [{ key: "CONTROLLER", timeStamp: Date.parse(timestamp), content: "RUNNING" }];
+            if (testletTimerStateChanged(testRun, resumedRun)) entries.unshift(buildTestletTimeLeftTestStateEntry(resumedRun, timestamp));
+            const testLogs = buildParticipantTestLogs({ testRun: resumedRun, batches: [{ entries }] });
+            const effectiveRun = reconcileTimers(resumedRun);
+            return { testRun: effectiveRun, testLogs, activityEvents: [buildWorkspaceActivity({
+              tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId, eventType: "participant_session_resumed",
+              subjectType: "test_run", subjectId: effectiveRun.testRunId,
+              summary: `Participant session '${context.participantSession.participantSessionId}' resumed an existing run.`,
+              details: { participantSessionId: context.participantSession.participantSessionId, currentUnitKey: effectiveRun.currentUnitKey }
+            })] };
+          }, { reconcileBefore: false, activateController: true });
+          return result.testRun;
         });
       },
       async saveProgress(input) {
@@ -33604,137 +33580,122 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const testlet = booklet?.testletEntries?.find(
-          candidate => candidate.testletKey === testletKey
-        );
-        const expectedCode = testlet?.restrictions?.codeToEnter?.code;
-        if (!testlet || !expectedCode) {
-          throw new FirstSliceError(
-            404,
-            "testlet_code_gate_not_found",
-            `Block '${testletKey}' has no code gate in booklet '${testRun.bookletKey}'.`
-          );
-        }
-        if (testRun.unlockedTestletKeys?.includes(testletKey)) {
-          return testRun;
-        }
-        const navigation = resolveBookletNavigationState(contentRelease, testRun);
-        if (navigation.nextTestletGate?.testletKey !== testletKey) {
-          throw new FirstSliceError(
-            409,
-            "testlet_code_gate_not_reachable",
-            `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
-          );
-        }
-        // The original participant dialog normalizes letters to uppercase while
-        // imported booklet codes may use mixed case. Compare the normalized
-        // forms so the UI behavior does not invalidate otherwise compatible
-        // source packages.
-        const expectedCodeBuffer = Buffer.from(expectedCode.toUpperCase(), "utf8");
-        const providedCodeBuffer = Buffer.from(
-          input.code.trim().toUpperCase(),
-          "utf8"
-        );
-        if (
-          expectedCodeBuffer.length !== providedCodeBuffer.length ||
-          !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)
-        ) {
-          throw new FirstSliceError(
-            403,
-            "testlet_unlock_code_invalid",
-            "The block unlock code is invalid."
-          );
-        }
-        const unlockedRun = normalizeTestRun({
-          ...testRun,
-          unlockedTestletKeys: [
-            ...(testRun.unlockedTestletKeys ?? []),
-            testletKey
-          ],
-          updatedAt: timestamp
-        });
-        const navigationAfterUnlock = resolveBookletNavigationState(
-          contentRelease,
-          unlockedRun
-        );
-        const updatedRun: TestRun = {
-          ...unlockedRun,
-          ...(navigationAfterUnlock.nextTestletGate == null &&
-          navigationAfterUnlock.forwardDeniedReasons.length === 0 &&
-          navigation.nextUnitKey
-            ? { currentUnitKey: navigation.nextUnitKey }
-            : {})
-        };
-        await repository.saveTestRun(updatedRun);
-        const executionMode = resolveParticipantExecutionMode(
-          updatedRun.executionMode
-        );
-        if (executionMode.saveResponses) {
-          const testStateEntries: ParticipantTestLogEntryInput[] = [{
-            key: "TESTLETS_CLEARED_CODE",
-            timeStamp: Date.parse(timestamp),
-            content: JSON.stringify(updatedRun.unlockedTestletKeys ?? [])
-          }];
-          if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
-            testStateEntries.push({
-              key: "CURRENT_UNIT_ID",
-              timeStamp: Date.parse(timestamp),
-              content: updatedRun.currentUnitKey ?? ""
-            });
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
           }
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
+          );
+          const testlet = booklet?.testletEntries?.find(
+            candidate => candidate.testletKey === testletKey
+          );
+          const expectedCode = testlet?.restrictions?.codeToEnter?.code;
+          if (!testlet || !expectedCode) {
+            throw new FirstSliceError(
+              404,
+              "testlet_code_gate_not_found",
+              `Block '${testletKey}' has no code gate in booklet '${testRun.bookletKey}'.`
+            );
+          }
+          if (testRun.unlockedTestletKeys?.includes(testletKey)) {
+            return null;
+          }
+          const navigation = resolveBookletNavigationState(contentRelease, testRun);
+          if (navigation.nextTestletGate?.testletKey !== testletKey) {
+            throw new FirstSliceError(
+              409,
+              "testlet_code_gate_not_reachable",
+              `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
+            );
+          }
+          // The original participant dialog normalizes letters to uppercase while
+          // imported booklet codes may use mixed case. Compare the normalized
+          // forms so the UI behavior does not invalidate otherwise compatible
+          // source packages.
+          const expectedCodeBuffer = Buffer.from(expectedCode.toUpperCase(), "utf8");
+          const providedCodeBuffer = Buffer.from(
+            input.code.trim().toUpperCase(),
+            "utf8"
+          );
+          if (
+            expectedCodeBuffer.length !== providedCodeBuffer.length ||
+            !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)
+          ) {
+            throw new FirstSliceError(
+              403,
+              "testlet_unlock_code_invalid",
+              "The block unlock code is invalid."
+            );
+          }
+          const unlockedRun = normalizeTestRun({
+            ...testRun,
+            unlockedTestletKeys: [
+              ...(testRun.unlockedTestletKeys ?? []),
+              testletKey
+            ],
+            updatedAt: timestamp
+          });
+          const navigationAfterUnlock = resolveBookletNavigationState(
+            contentRelease,
+            unlockedRun
+          );
+          const updatedRun: TestRun = {
+            ...unlockedRun,
+            ...(navigationAfterUnlock.nextTestletGate == null &&
+              navigationAfterUnlock.forwardDeniedReasons.length === 0 &&
+              navigation.nextUnitKey
+              ? { currentUnitKey: navigation.nextUnitKey }
+              : {})
+          };
+          const executionMode = resolveParticipantExecutionMode(
+            updatedRun.executionMode
+          );
+          if (executionMode.saveResponses) {
+            const testStateEntries: ParticipantTestLogEntryInput[] = [{
+              key: "TESTLETS_CLEARED_CODE",
+              timeStamp: Date.parse(timestamp),
+              content: JSON.stringify(updatedRun.unlockedTestletKeys ?? [])
+            }];
+            if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
+              testStateEntries.push({
+                key: "CURRENT_UNIT_ID",
+                timeStamp: Date.parse(timestamp),
+                content: updatedRun.currentUnitKey ?? ""
+              });
+            }
+            testLogs.push(...buildParticipantTestLogs({
               testRun: updatedRun,
               batches: [{
                 entries: testStateEntries
               }]
-            })
-          );
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: updatedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
-          tenantId: effectiveRun.tenantId,
-          workspaceId: effectiveRun.workspaceId,
-          eventType: "testlet_unlocked",
-          subjectType: "test_run",
-          subjectId: effectiveRun.testRunId,
-          summary: `Block '${testletKey}' unlocked for run '${effectiveRun.testRunId}'.`,
-          details: {
-            testletKey,
-            participantSessionId: effectiveRun.participantSessionId,
-            currentUnitKey: effectiveRun.currentUnitKey
+            }));
           }
+          const effectiveRun = reconcileTimers(updatedRun);
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: effectiveRun.tenantId,
+            workspaceId: effectiveRun.workspaceId,
+            eventType: "testlet_unlocked",
+            subjectType: "test_run",
+            subjectId: effectiveRun.testRunId,
+            summary: `Block '${testletKey}' unlocked for run '${effectiveRun.testRunId}'.`,
+            details: {
+              testletKey,
+              participantSessionId: effectiveRun.participantSessionId,
+              currentUnitKey: effectiveRun.currentUnitKey
+            }
+          }));
+          return { testRun: effectiveRun, testLogs, activityEvents };
         });
-        return effectiveRun;
+        return result.testRun;
       },
       async resumeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -33748,141 +33709,130 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
-        }
-
-        if (testRun.status === "running") {
-          return testRun;
-        }
-
-        requireParticipantTestRunNotMonitorPaused(testRun);
-
-        const resumedRun = transitionTestletTimersForRunStatus(
-          testRun,
-          "running",
-          timestamp
-        );
-        await repository.saveTestRun(resumedRun);
-        if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
-          const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: "RUNNING"
-          }];
-          if (testletTimerStateChanged(testRun, resumedRun)) {
-            resumedStateEntries.unshift(
-              buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
             );
           }
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
-            testRun: resumedRun,
-            batches: [{
-              entries: resumedStateEntries
-            }]
-            })
-          );
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: resumedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
-          tenantId: effectiveRun.tenantId,
-          workspaceId: effectiveRun.workspaceId,
-          eventType: "test_run_resumed",
-          subjectType: "test_run",
-          subjectId: effectiveRun.testRunId,
-          summary: `Run '${effectiveRun.testRunId}' resumed.`,
-          details: {
-            currentUnitKey: effectiveRun.currentUnitKey
+
+          if (testRun.status === "running") {
+            return null;
           }
+
+          requireParticipantTestRunNotMonitorPaused(testRun);
+
+          const resumedRun = transitionTestletTimersForRunStatus(
+            testRun,
+            "running",
+            timestamp
+          );
+          if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
+            const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: "RUNNING"
+            }];
+            if (testletTimerStateChanged(testRun, resumedRun)) {
+              resumedStateEntries.unshift(
+                buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+              );
+            }
+            testLogs.push(...buildParticipantTestLogs({
+              testRun: resumedRun,
+              batches: [{
+                entries: resumedStateEntries
+              }]
+            }));
+          }
+          const effectiveRun = reconcileTimers(resumedRun);
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: effectiveRun.tenantId,
+            workspaceId: effectiveRun.workspaceId,
+            eventType: "test_run_resumed",
+            subjectType: "test_run",
+            subjectId: effectiveRun.testRunId,
+            summary: `Run '${effectiveRun.testRunId}' resumed.`,
+            details: {
+              currentUnitKey: effectiveRun.currentUnitKey
+            }
+          }));
+          return { testRun: effectiveRun, testLogs, activityEvents };
         });
-        return effectiveRun;
+        return result.testRun;
       },
       async prepareStarterExit(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
         const storedRun = await repository.getTestRunById(testRunId);
         if (!storedRun) throw new FirstSliceError(404, "test_run_not_found", `Test run '${testRunId}' was not found.`);
-        await requireAccessibleParticipantSession(storedRun.participantSessionId);
-        const contentRelease = await requireContentRelease(repository, storedRun.contentReleaseId);
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({contentRelease, testRun: normalizeTestRun(storedRun), timestamp});
-        requireParticipantTestRunUnlocked(testRun);
-        if (testRun.status !== "running") throw new FirstSliceError(409, "test_run_not_running", "Only a running Run can prepare a starter exit.");
-        const currentUnitKey = normalizeOptionalResponseUnitKey(input.currentUnitKey);
-        if (!currentUnitKey || currentUnitKey !== testRun.currentUnitKey) {
-          throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit preparation.");
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
-        const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
-        const responseUnitKey = input.responseUnitKey === undefined ? currentUnitKey : normalizeOptionalResponseUnitKey(input.responseUnitKey);
-        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
-        if (responseUnitKey) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, responseUnitKey);
-        const transient = normalizeTransientUnitResponses(input.transientUnitResponses);
-        if (executionMode.saveResponses && Object.keys(transient).length) {
-          throw new FirstSliceError(400, "transient_unit_responses_not_allowed", "transientUnitResponses are only accepted for non-saving execution modes.");
-        }
-        for (const unitKey of Object.keys(transient)) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, unitKey);
-        const evaluationRun = executionMode.saveResponses ? testRun : withEvaluatedBookletStates(booklet, {
-          ...testRun, unitResponses: {...testRun.unitResponses, ...transient,
-            ...(responseUnitKey && unitResponse != null ? {[responseUnitKey]: unitResponse} : {})}
-        });
-        const response = evaluationRun.unitResponses[currentUnitKey];
-        const parsed = response === undefined ? null : parseVeronaUnitResponse(response);
-        if (executionMode.forceNaviRestrictions && !testRun.monitorNavigationUnlocked && !isUnitLeaveLocked(booklet, evaluationRun, currentUnitKey)) {
-          const reasons = bookletStarterExitDeniedReasons({
-            policy: resolveTestletCompletenessPolicy(booklet, currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
-            presentationProgress: parsed ? parsed.unitState.presentationProgress : response === undefined ? undefined : "complete",
-            responseProgress: parsed ? parsed.unitState.responseProgress : response === undefined ? undefined : response.trim() ? "complete" : "none"
+        let timerEffect: "cancelled" | "interrupted" | null = null;
+        const result = await mutateRuntimeRun(storedRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status !== "running") throw new FirstSliceError(409, "test_run_not_running", "Only a running Run can prepare a starter exit.");
+          const currentUnitKey = normalizeOptionalResponseUnitKey(input.currentUnitKey);
+          if (!currentUnitKey || currentUnitKey !== testRun.currentUnitKey) {
+            throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit preparation.");
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(candidate => candidate.bookletKey === testRun.bookletKey);
+          const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
+          const responseUnitKey = input.responseUnitKey === undefined ? currentUnitKey : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, responseUnitKey);
+          const transient = normalizeTransientUnitResponses(input.transientUnitResponses);
+          if (executionMode.saveResponses && Object.keys(transient).length) {
+            throw new FirstSliceError(400, "transient_unit_responses_not_allowed", "transientUnitResponses are only accepted for non-saving execution modes.");
+          }
+          for (const unitKey of Object.keys(transient)) requireRuntimeUnitForBooklet(contentRelease, testRun.bookletKey, unitKey);
+          const evaluationRun = executionMode.saveResponses ? testRun : withEvaluatedBookletStates(booklet, {
+            ...testRun, unitResponses: {
+              ...testRun.unitResponses, ...transient,
+              ...(responseUnitKey && unitResponse != null ? { [responseUnitKey]: unitResponse } : {})
+            }
           });
-          if (reasons.length) throw new FirstSliceError(409, "booklet_starter_return_denied", "The current unit is incomplete.", {currentUnitKey, deniedReasons: reasons});
-        }
-        const timed = resolveLeavingTimedTestlet(booklet, evaluationRun, null);
-        const timer = timed ? testRun.testletTimers?.[timed.testletKey] : null;
-        if (!timed || timer?.status !== "running") return {testRun, timerEffect: null};
-        const leave = timed.restrictions?.timeMax?.leave;
-        const timerEffect = leave === "allowed" ? "cancelled" : !executionMode.forceTimeRestrictions ? "interrupted" : null;
-        if (!timerEffect) return {testRun, timerEffect: null};
-        let prepared = timerEffect === "cancelled" ? cancelTestletTimerAfterLeave(testRun, timed.testletKey, timestamp)
-          : interruptTestletTimerAfterLeave(testRun, timed.testletKey, timestamp);
-        if (timerEffect === "interrupted") {
-          prepared = normalizeTestRun({...prepared, testletTimers: {
-            ...prepared.testletTimers,
-            [timed.testletKey]: {...prepared.testletTimers![timed.testletKey]!, interruptedAtUnitKey: currentUnitKey}
-          }});
-        }
-        await repository.saveTestRun(prepared);
-        if (executionMode.saveResponses && timerEffect === "cancelled") {
-          await repository.saveParticipantTestLogs(buildParticipantTestLogs({
-            testRun: prepared,
-            batches: [{entries: [buildTestletTimeLeftTestStateEntry(prepared, timestamp)]}]
-          }));
-        }
-        // Neither preparation nor cancelled confirmation may apply a leave lock,
-        // stop the Run, or persist a non-saving Player packet.
-        return {testRun: prepared, timerEffect};
+          const response = evaluationRun.unitResponses[currentUnitKey];
+          const parsed = response === undefined ? null : parseVeronaUnitResponse(response);
+          if (executionMode.forceNaviRestrictions && !testRun.monitorNavigationUnlocked && !isUnitLeaveLocked(booklet, evaluationRun, currentUnitKey)) {
+            const reasons = bookletStarterExitDeniedReasons({
+              policy: resolveTestletCompletenessPolicy(booklet, currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
+              presentationProgress: parsed ? parsed.unitState.presentationProgress : response === undefined ? undefined : "complete",
+              responseProgress: parsed ? parsed.unitState.responseProgress : response === undefined ? undefined : response.trim() ? "complete" : "none"
+            });
+            if (reasons.length) throw new FirstSliceError(409, "booklet_starter_return_denied", "The current unit is incomplete.", { currentUnitKey, deniedReasons: reasons });
+          }
+          const timed = resolveLeavingTimedTestlet(booklet, evaluationRun, null);
+          const timer = timed ? testRun.testletTimers?.[timed.testletKey] : null;
+          if (!timed || timer?.status !== "running") return null;
+          const leave = timed.restrictions?.timeMax?.leave;
+          timerEffect = leave === "allowed" ? "cancelled" : !executionMode.forceTimeRestrictions ? "interrupted" : null;
+          if (!timerEffect) return null;
+          let prepared = timerEffect === "cancelled" ? cancelTestletTimerAfterLeave(testRun, timed.testletKey, timestamp)
+            : interruptTestletTimerAfterLeave(testRun, timed.testletKey, timestamp);
+          if (timerEffect === "interrupted") {
+            prepared = normalizeTestRun({
+              ...prepared, testletTimers: {
+                ...prepared.testletTimers,
+                [timed.testletKey]: { ...prepared.testletTimers![timed.testletKey]!, interruptedAtUnitKey: currentUnitKey }
+              }
+            });
+          }
+          if (executionMode.saveResponses && timerEffect === "cancelled") {
+            testLogs.push(...buildParticipantTestLogs({
+              testRun: prepared,
+              batches: [{ entries: [buildTestletTimeLeftTestStateEntry(prepared, timestamp)] }]
+            }));
+          }
+          // Neither preparation nor cancelled confirmation may apply a leave lock,
+          // stop the Run, or persist a non-saving Player packet.
+          return { testRun: prepared, testLogs, activityEvents };
+        });
+        return { testRun: result.testRun, timerEffect };
       },
       async returnToStarter(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -33896,85 +33846,73 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          if (input.expectedStatus !== undefined && input.expectedStatus !== context.testRun.status) {
+            throw new FirstSliceError(409, "starter_exit_state_changed", "The Run status changed before starter exit confirmation.");
+          }
+          requireParticipantTestRunUnlocked(testRun);
+          if (testRun.status === "completed") {
+            return null;
+          }
 
-        if (input.expectedStatus !== undefined && input.expectedStatus !== storedTestRun.status) {
-          throw new FirstSliceError(409, "starter_exit_state_changed", "The Run status changed before starter exit confirmation.");
-        }
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        if (testRun.status === "completed") {
-          return testRun;
-        }
-
-        if (input.currentUnitKey !== undefined &&
+          if (input.currentUnitKey !== undefined &&
             normalizeOptionalResponseUnitKey(input.currentUnitKey) !== testRun.currentUnitKey) {
-          throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit confirmation.");
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode
-        );
-        const pausedStatusExit = testRun.status === "paused";
-        const terminatePausedTest = executionMode.saveResponses && booklet?.policy?.display.silentMode === true &&
-          (executionMode.forceTimeRestrictions || executionMode.forceNaviRestrictions);
-        if (pausedStatusExit && !terminatePausedTest) {
-          // Source's visible status page leaves without a termination, timer
-          // change, leave lock or new participant test-state write.
-          return storedTestRun;
-        }
-        const responseUnitKey =
-          input.responseUnitKey === undefined
-            ? testRun.currentUnitKey
-            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
-        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
-        if (responseUnitKey) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            responseUnitKey
+            throw new FirstSliceError(409, "starter_exit_unit_changed", "The current unit changed before starter exit confirmation.");
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const transientUnitResponses = normalizeTransientUnitResponses(
-          input.transientUnitResponses
-        );
-        if (
-          executionMode.saveResponses &&
-          Object.keys(transientUnitResponses).length > 0
-        ) {
-          throw new FirstSliceError(
-            400,
-            "transient_unit_responses_not_allowed",
-            "transientUnitResponses are only accepted for non-saving execution modes."
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode
           );
-        }
-        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            transientUnitKey
+          const pausedStatusExit = testRun.status === "paused";
+          const terminatePausedTest = executionMode.saveResponses && booklet?.policy?.display.silentMode === true &&
+            (executionMode.forceTimeRestrictions || executionMode.forceNaviRestrictions);
+          if (pausedStatusExit && !terminatePausedTest) {
+            // Source's visible status page leaves without a termination, timer
+            // change, leave lock or new participant test-state write.
+            return null;
+          }
+          const responseUnitKey =
+            input.responseUnitKey === undefined
+              ? testRun.currentUnitKey
+              : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              responseUnitKey
+            );
+          }
+          const transientUnitResponses = normalizeTransientUnitResponses(
+            input.transientUnitResponses
           );
-        }
-        const hasTransientEvaluation =
-          !executionMode.saveResponses &&
-          (Object.keys(transientUnitResponses).length > 0 ||
-            Boolean(responseUnitKey && unitResponse != null));
-        const returnEvaluationRun = hasTransientEvaluation
-          ? withEvaluatedBookletStates(booklet, {
+          if (
+            executionMode.saveResponses &&
+            Object.keys(transientUnitResponses).length > 0
+          ) {
+            throw new FirstSliceError(
+              400,
+              "transient_unit_responses_not_allowed",
+              "transientUnitResponses are only accepted for non-saving execution modes."
+            );
+          }
+          for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              transientUnitKey
+            );
+          }
+          const hasTransientEvaluation =
+            !executionMode.saveResponses &&
+            (Object.keys(transientUnitResponses).length > 0 ||
+              Boolean(responseUnitKey && unitResponse != null));
+          const returnEvaluationRun = hasTransientEvaluation
+            ? withEvaluatedBookletStates(booklet, {
               ...testRun,
               unitResponses: {
                 ...testRun.unitResponses,
@@ -33984,105 +33922,105 @@ export const createFirstSliceServices = (
                   : {})
               }
             })
-          : testRun;
-        // A logo exit leaves the current unit in the forward direction. Source
-        // checks completeness before any timer/leave-lock confirmation, and a
-        // direct API caller must not bypass that decision with confirm flags.
-        const currentResponse = returnEvaluationRun.currentUnitKey
-          ? returnEvaluationRun.unitResponses[returnEvaluationRun.currentUnitKey] : undefined;
-        const parsedResponse = currentResponse === undefined ? null : parseVeronaUnitResponse(currentResponse);
-        const completenessDeniedReasons = pausedStatusExit || !returnEvaluationRun.currentUnitKey ||
-          !executionMode.forceNaviRestrictions || returnEvaluationRun.monitorNavigationUnlocked ||
-          isUnitLeaveLocked(booklet, returnEvaluationRun, returnEvaluationRun.currentUnitKey) ? []
-          : bookletStarterExitDeniedReasons({
+            : testRun;
+          // A logo exit leaves the current unit in the forward direction. Source
+          // checks completeness before any timer/leave-lock confirmation, and a
+          // direct API caller must not bypass that decision with confirm flags.
+          const currentResponse = returnEvaluationRun.currentUnitKey
+            ? returnEvaluationRun.unitResponses[returnEvaluationRun.currentUnitKey] : undefined;
+          const parsedResponse = currentResponse === undefined ? null : parseVeronaUnitResponse(currentResponse);
+          const completenessDeniedReasons = pausedStatusExit || !returnEvaluationRun.currentUnitKey ||
+            !executionMode.forceNaviRestrictions || returnEvaluationRun.monitorNavigationUnlocked ||
+            isUnitLeaveLocked(booklet, returnEvaluationRun, returnEvaluationRun.currentUnitKey) ? []
+            : bookletStarterExitDeniedReasons({
               policy: resolveTestletCompletenessPolicy(booklet, returnEvaluationRun.currentUnitKey, booklet?.policy ?? compileBookletRuntimePolicy({})),
               presentationProgress: parsedResponse ? parsedResponse.unitState.presentationProgress : currentResponse === undefined ? undefined : "complete",
               responseProgress: parsedResponse ? parsedResponse.unitState.responseProgress : currentResponse === undefined ? undefined : currentResponse.trim() ? "complete" : "none"
             });
-        if (completenessDeniedReasons.length > 0) {
-          throw new FirstSliceError(409, "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter before completing the current unit.`, {
+          if (completenessDeniedReasons.length > 0) {
+            throw new FirstSliceError(409, "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter before completing the current unit.`, {
               currentUnitKey: testRun.currentUnitKey, deniedReasons: completenessDeniedReasons
             });
-        }
-        const leavingTimedTestlet = pausedStatusExit ? null : resolveLeavingTimedTestlet(
-          booklet,
-          returnEvaluationRun,
-          null
-        );
-        const leavePolicy =
-          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "forbidden"
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter while the active timed block forbids leaving.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_time_leave_forbidden"]
-            }
+          }
+          const leavingTimedTestlet = pausedStatusExit ? null : resolveLeavingTimedTestlet(
+            booklet,
+            returnEvaluationRun,
+            null
           );
-        }
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "confirm" &&
-          !input.confirmTestletTimeLeave
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter without confirming that the active timed block will be closed.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_time_leave_confirmation_required"]
-            }
-          );
-        }
-        const leavingLock = !pausedStatusExit && executionMode.forceNaviRestrictions &&
-          !(executionMode.forceTimeRestrictions && leavePolicy === "confirm")
-          ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
-          : null;
-        if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {
-          throw new FirstSliceError(
-            409,
-            "booklet_starter_return_denied",
-            `Run '${testRunId}' cannot return to the starter without confirming that the active leave lock will be applied.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: ["testlet_leave_confirmation_required"]
-            }
-          );
-        }
+          const leavePolicy =
+            leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "forbidden"
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter while the active timed block forbids leaving.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_time_leave_forbidden"]
+              }
+            );
+          }
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "confirm" &&
+            !input.confirmTestletTimeLeave
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter without confirming that the active timed block will be closed.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_time_leave_confirmation_required"]
+              }
+            );
+          }
+          const leavingLock = !pausedStatusExit && executionMode.forceNaviRestrictions &&
+            !(executionMode.forceTimeRestrictions && leavePolicy === "confirm")
+            ? resolveCurrentLeaveLock(booklet, returnEvaluationRun, null)
+            : null;
+          if (leavingLock?.confirm && !input.confirmTestletLeaveLock) {
+            throw new FirstSliceError(
+              409,
+              "booklet_starter_return_denied",
+              `Run '${testRunId}' cannot return to the starter without confirming that the active leave lock will be applied.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: ["testlet_leave_confirmation_required"]
+              }
+            );
+          }
 
-        const timeAdjustedRun =
-          leavingTimedTestlet &&
-          (leavePolicy === "allowed" ||
-            (executionMode.forceTimeRestrictions &&
-              leavePolicy === "confirm" &&
-              input.confirmTestletTimeLeave))
-            ? cancelTestletTimerAfterLeave(
+          const timeAdjustedRun =
+            leavingTimedTestlet &&
+              (leavePolicy === "allowed" ||
+                (executionMode.forceTimeRestrictions &&
+                  leavePolicy === "confirm" &&
+                  input.confirmTestletTimeLeave))
+              ? cancelTestletTimerAfterLeave(
                 returnEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? interruptTestletTimerAfterLeave(
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? interruptTestletTimerAfterLeave(
                   returnEvaluationRun,
                   leavingTimedTestlet.testletKey,
                   timestamp
                 )
-              : returnEvaluationRun;
-        const returnBaseRun = leavingLock
-          ? activateCurrentLeaveLock(timeAdjustedRun, leavingLock)
-          : timeAdjustedRun;
-        const lockOnTermination =
-          executionMode.monitorable &&
-          booklet?.policy?.completion.lockOnTermination === true;
-        const returnedRun = executionMode.saveResponses
-          ? normalizeTestRun({
+                : returnEvaluationRun;
+          const returnBaseRun = leavingLock
+            ? activateCurrentLeaveLock(timeAdjustedRun, leavingLock)
+            : timeAdjustedRun;
+          const lockOnTermination =
+            executionMode.monitorable &&
+            booklet?.policy?.completion.lockOnTermination === true;
+          const returnedRun = executionMode.saveResponses
+            ? normalizeTestRun({
               ...transitionTestletTimersForRunStatus(
                 returnBaseRun,
                 "paused",
@@ -34092,88 +34030,87 @@ export const createFirstSliceServices = (
               updatedAt: timestamp,
               completedAt: null
             })
-          : resetNonSavingTestRunForEntry({
+            : resetNonSavingTestRunForEntry({
               booklet,
               testRun: returnBaseRun,
               timestamp
             });
 
-        await repository.saveTestRun(returnedRun);
-        if (executionMode.saveResponses) {
-          const returnedStateEntries: ParticipantTestLogEntryInput[] = [];
-          if (testletTimerStateChanged(testRun, returnedRun)) {
-            returnedStateEntries.push(
-              buildTestletTimeLeftTestStateEntry(returnedRun, timestamp)
-            );
-          }
-          if (leavingLock) {
-            returnedStateEntries.push(
-              buildLeaveLockTestStateEntry({
-                booklet,
-                testRun: returnedRun,
-                leaveLock: leavingLock,
-                timestamp: Date.parse(timestamp)
-              })
-            );
-          }
-          returnedStateEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: pausedStatusExit
-              ? "TERMINATED_PAUSED"
-              : lockOnTermination ? "LOCKED" : "TERMINATED"
-          });
-          if (pausedStatusExit && lockOnTermination) {
-            // Source patchLock stores this event separately from CONTROLLER;
-            // it keeps the terminal paused state when setting tests.locked.
-            returnedStateEntries.push({key: "BOOKLETLOCKEDbyTESTEE", timeStamp: Date.parse(timestamp), content: ""});
-          }
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (executionMode.saveResponses) {
+            const returnedStateEntries: ParticipantTestLogEntryInput[] = [];
+            if (testletTimerStateChanged(testRun, returnedRun)) {
+              returnedStateEntries.push(
+                buildTestletTimeLeftTestStateEntry(returnedRun, timestamp)
+              );
+            }
+            if (leavingLock) {
+              returnedStateEntries.push(
+                buildLeaveLockTestStateEntry({
+                  booklet,
+                  testRun: returnedRun,
+                  leaveLock: leavingLock,
+                  timestamp: Date.parse(timestamp)
+                })
+              );
+            }
+            returnedStateEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: pausedStatusExit
+                ? "TERMINATED_PAUSED"
+                : lockOnTermination ? "LOCKED" : "TERMINATED"
+            });
+            if (pausedStatusExit && lockOnTermination) {
+              // Source patchLock stores this event separately from CONTROLLER;
+              // it keeps the terminal paused state when setting tests.locked.
+              returnedStateEntries.push({ key: "BOOKLETLOCKEDbyTESTEE", timeStamp: Date.parse(timestamp), content: "" });
+            }
+            testLogs.push(...buildParticipantTestLogs({
               testRun: returnedRun,
               batches: [{ entries: returnedStateEntries }]
-            })
-          );
-        }
-
-        await recordWorkspaceActivity({
-          tenantId: returnedRun.tenantId,
-          workspaceId: returnedRun.workspaceId,
-          eventType: lockOnTermination
-            ? "test_run_locked"
-            : "test_run_returned_to_starter",
-          subjectType: "test_run",
-          subjectId: returnedRun.testRunId,
-          summary: lockOnTermination
-            ? `Run '${returnedRun.testRunId}' locked after participant termination.`
-            : `Run '${returnedRun.testRunId}' returned to the participant starter.`,
-          details: {
-            currentUnitKey: returnedRun.currentUnitKey,
-            lockOnTermination,
-            executionMode: executionMode.mode
+            }));
           }
-        });
-        if (leavingLock) {
-          await recordWorkspaceActivity({
+
+          activityEvents.push(buildWorkspaceActivity({
             tenantId: returnedRun.tenantId,
             workspaceId: returnedRun.workspaceId,
-            eventType: "testlet_leave_lock_activated",
+            eventType: lockOnTermination
+              ? "test_run_locked"
+              : "test_run_returned_to_starter",
             subjectType: "test_run",
             subjectId: returnedRun.testRunId,
-            summary:
-              leavingLock.scope === "testlet"
-                ? `Block '${leavingLock.testlet.testletKey}' locked while returning to the starter.`
-                : `Unit '${leavingLock.unit.unitKey}' locked while returning to the starter.`,
+            summary: lockOnTermination
+              ? `Run '${returnedRun.testRunId}' locked after participant termination.`
+              : `Run '${returnedRun.testRunId}' returned to the participant starter.`,
             details: {
-              scope: leavingLock.scope,
-              testletKey: leavingLock.testlet.testletKey,
-              unitKey: leavingLock.unit.unitKey,
-              reason: "participant_starter_return"
+              currentUnitKey: returnedRun.currentUnitKey,
+              lockOnTermination,
+              executionMode: executionMode.mode
             }
-          });
-        }
+          }));
+          if (leavingLock) {
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: returnedRun.tenantId,
+              workspaceId: returnedRun.workspaceId,
+              eventType: "testlet_leave_lock_activated",
+              subjectType: "test_run",
+              subjectId: returnedRun.testRunId,
+              summary:
+                leavingLock.scope === "testlet"
+                  ? `Block '${leavingLock.testlet.testletKey}' locked while returning to the starter.`
+                  : `Unit '${leavingLock.unit.unitKey}' locked while returning to the starter.`,
+              details: {
+                scope: leavingLock.scope,
+                testletKey: leavingLock.testlet.testletKey,
+                unitKey: leavingLock.unit.unitKey,
+                reason: "participant_starter_return"
+              }
+            }));
+          }
 
-        return returnedRun;
+          return { testRun: returnedRun, testLogs, activityEvents };
+        });
+        return result.testRun;
       },
       async completeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -34187,70 +34124,60 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedTestRun.contentReleaseId
-        );
-        const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
-        requireParticipantTestRunUnlocked(testRun);
-        requireParticipantTestRunNotMonitorPaused(testRun);
-        if (testRun.status === "completed") {
-          return testRun;
-        }
-        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          candidate => candidate.bookletKey === testRun.bookletKey
-        );
-        const executionMode = resolveParticipantExecutionMode(
-          testRun.executionMode
-        );
-        const responseUnitKey =
-          input.responseUnitKey === undefined
-            ? testRun.currentUnitKey
-            : normalizeOptionalResponseUnitKey(input.responseUnitKey);
-        const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
-        if (responseUnitKey) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            responseUnitKey
+        let completionView: TestRun | undefined;
+        const result = await mutateRuntimeRun(storedTestRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp }) => {
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          requireParticipantTestRunUnlocked(testRun);
+          requireParticipantTestRunNotMonitorPaused(testRun);
+          if (testRun.status === "completed") {
+            return null;
+          }
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
           );
-        }
-        const transientUnitResponses = normalizeTransientUnitResponses(
-          input.transientUnitResponses
-        );
-        if (
-          executionMode.saveResponses &&
-          Object.keys(transientUnitResponses).length > 0
-        ) {
-          throw new FirstSliceError(
-            400,
-            "transient_unit_responses_not_allowed",
-            "transientUnitResponses are only accepted for non-saving execution modes."
+          const executionMode = resolveParticipantExecutionMode(
+            testRun.executionMode
           );
-        }
-        for (const transientUnitKey of Object.keys(transientUnitResponses)) {
-          requireRuntimeUnitForBooklet(
-            contentRelease,
-            testRun.bookletKey,
-            transientUnitKey
+          const responseUnitKey =
+            input.responseUnitKey === undefined
+              ? testRun.currentUnitKey
+              : normalizeOptionalResponseUnitKey(input.responseUnitKey);
+          const unitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+          if (responseUnitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              responseUnitKey
+            );
+          }
+          const transientUnitResponses = normalizeTransientUnitResponses(
+            input.transientUnitResponses
           );
-        }
-        const hasTransientEvaluation =
-          !executionMode.saveResponses &&
-          (Object.keys(transientUnitResponses).length > 0 ||
-            Boolean(responseUnitKey && unitResponse != null));
-        const completionEvaluationRun =
-          hasTransientEvaluation
-            ? withEvaluatedBookletStates(booklet, {
+          if (
+            executionMode.saveResponses &&
+            Object.keys(transientUnitResponses).length > 0
+          ) {
+            throw new FirstSliceError(
+              400,
+              "transient_unit_responses_not_allowed",
+              "transientUnitResponses are only accepted for non-saving execution modes."
+            );
+          }
+          for (const transientUnitKey of Object.keys(transientUnitResponses)) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              testRun.bookletKey,
+              transientUnitKey
+            );
+          }
+          const hasTransientEvaluation =
+            !executionMode.saveResponses &&
+            (Object.keys(transientUnitResponses).length > 0 ||
+              Boolean(responseUnitKey && unitResponse != null));
+          const completionEvaluationRun =
+            hasTransientEvaluation
+              ? withEvaluatedBookletStates(booklet, {
                 ...testRun,
                 unitResponses: {
                   ...testRun.unitResponses,
@@ -34260,207 +34187,191 @@ export const createFirstSliceServices = (
                     : {})
                 }
               })
-            : testRun;
-        const leavingTimedTestlet = resolveLeavingTimedTestlet(
-          booklet,
-          completionEvaluationRun,
-          null
-        );
-        const leavePolicy =
-          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
-        if (
-          executionMode.forceTimeRestrictions &&
-          leavePolicy === "confirm" &&
-          !input.confirmTestletTimeLeave
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed without confirming that the active timed block will be closed.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: [
-                "testlet_time_leave_confirmation_required"
-              ]
-            }
+              : testRun;
+          const leavingTimedTestlet = resolveLeavingTimedTestlet(
+            booklet,
+            completionEvaluationRun,
+            null
           );
-        }
-        const leavingLock = executionMode.forceNaviRestrictions
-          ? resolveCurrentLeaveLock(booklet, completionEvaluationRun, null)
-          : null;
-        if (
-          leavingLock?.confirm &&
-          !input.confirmTestletLeaveLock
-        ) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed without confirming that the active leave lock will be applied.`,
-            {
-              currentUnitKey: testRun.currentUnitKey,
-              deniedReasons: [
-                "testlet_leave_confirmation_required"
-              ]
-            }
-          );
-        }
-        const timeAdjustedCompletionRun =
-          leavingTimedTestlet &&
-          (leavePolicy === "allowed" ||
-            (executionMode.forceTimeRestrictions &&
-              leavePolicy === "confirm" &&
-              input.confirmTestletTimeLeave))
-            ? cancelTestletTimerAfterLeave(
+          const leavePolicy =
+            leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+          if (
+            executionMode.forceTimeRestrictions &&
+            leavePolicy === "confirm" &&
+            !input.confirmTestletTimeLeave
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed without confirming that the active timed block will be closed.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: [
+                  "testlet_time_leave_confirmation_required"
+                ]
+              }
+            );
+          }
+          const leavingLock = executionMode.forceNaviRestrictions
+            ? resolveCurrentLeaveLock(booklet, completionEvaluationRun, null)
+            : null;
+          if (
+            leavingLock?.confirm &&
+            !input.confirmTestletLeaveLock
+          ) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed without confirming that the active leave lock will be applied.`,
+              {
+                currentUnitKey: testRun.currentUnitKey,
+                deniedReasons: [
+                  "testlet_leave_confirmation_required"
+                ]
+              }
+            );
+          }
+          const timeAdjustedCompletionRun =
+            leavingTimedTestlet &&
+              (leavePolicy === "allowed" ||
+                (executionMode.forceTimeRestrictions &&
+                  leavePolicy === "confirm" &&
+                  input.confirmTestletTimeLeave))
+              ? cancelTestletTimerAfterLeave(
                 completionEvaluationRun,
                 leavingTimedTestlet.testletKey,
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? interruptTestletTimerAfterLeave(
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? interruptTestletTimerAfterLeave(
                   completionEvaluationRun,
                   leavingTimedTestlet.testletKey,
                   timestamp
                 )
-            : completionEvaluationRun;
-        const completionBaseRun = leavingLock
-          ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
-          : timeAdjustedCompletionRun;
-        const navigation = resolveBookletNavigationState(
-          contentRelease,
-          completionBaseRun
-        );
-        if (!navigation.canComplete) {
-          throw new FirstSliceError(
-            409,
-            "booklet_completion_denied",
-            `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
-            {
-              currentUnitKey: completionBaseRun.currentUnitKey,
-              deniedReasons: navigation.forwardDeniedReasons
-            }
+                : completionEvaluationRun;
+          const completionBaseRun = leavingLock
+            ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
+            : timeAdjustedCompletionRun;
+          const navigation = resolveBookletNavigationState(
+            contentRelease,
+            completionBaseRun
           );
-        }
+          if (!navigation.canComplete) {
+            throw new FirstSliceError(
+              409,
+              "booklet_completion_denied",
+              `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
+              {
+                currentUnitKey: completionBaseRun.currentUnitKey,
+                deniedReasons: navigation.forwardDeniedReasons
+              }
+            );
+          }
 
-        const lockOnTermination =
-          executionMode.monitorable &&
-          booklet?.policy?.completion.lockOnTermination === true;
-        const completedRun: TestRun = {
-          ...(lockOnTermination
-            ? transitionTestletTimersForRunStatus(
+          const lockOnTermination =
+            executionMode.monitorable &&
+            booklet?.policy?.completion.lockOnTermination === true;
+          const completedRun: TestRun = {
+            ...(lockOnTermination
+              ? transitionTestletTimersForRunStatus(
                 completionBaseRun,
                 "paused",
                 timestamp
               )
-            : leavingTimedTestlet && !executionMode.forceTimeRestrictions
-              ? completionBaseRun
-            : closeRunningTestletTimers(completionBaseRun, timestamp)),
-          status: lockOnTermination ? "paused" : "completed",
-          locked: lockOnTermination,
-          currentUnitKey: lockOnTermination
-            ? completionBaseRun.currentUnitKey
-            : null,
-          updatedAt: timestamp,
-          completedAt: lockOnTermination ? null : timestamp
-        };
-        if (!executionMode.saveResponses) {
-          completedRun.unitResponses = testRun.unitResponses;
-          completedRun.bookletStates = withEvaluatedBookletStates(booklet, {
-            ...completedRun,
-            unitResponses: testRun.unitResponses
-          }).bookletStates;
-        }
-        const persistedRun = executionMode.saveResponses
-          ? completedRun
-          : resetNonSavingTestRunForEntry({
+              : leavingTimedTestlet && !executionMode.forceTimeRestrictions
+                ? completionBaseRun
+                : closeRunningTestletTimers(completionBaseRun, timestamp)),
+            status: lockOnTermination ? "paused" : "completed",
+            locked: lockOnTermination,
+            currentUnitKey: lockOnTermination
+              ? completionBaseRun.currentUnitKey
+              : null,
+            updatedAt: timestamp,
+            completedAt: lockOnTermination ? null : timestamp
+          };
+          if (!executionMode.saveResponses) {
+            completedRun.unitResponses = testRun.unitResponses;
+            completedRun.bookletStates = withEvaluatedBookletStates(booklet, {
+              ...completedRun,
+              unitResponses: testRun.unitResponses
+            }).bookletStates;
+          }
+          const persistedRun = executionMode.saveResponses
+            ? completedRun
+            : resetNonSavingTestRunForEntry({
               booklet,
               testRun: completedRun,
               timestamp
             });
-        await repository.saveTestRun(persistedRun);
-        if (executionMode.saveResponses) {
-          const completedStateEntries: ParticipantTestLogEntryInput[] = [];
-          if (testletTimerStateChanged(testRun, completedRun)) {
-            completedStateEntries.push(
-              buildTestletTimeLeftTestStateEntry(completedRun, timestamp)
-            );
-          }
-          if (leavingLock) {
-            completedStateEntries.push(
-              buildLeaveLockTestStateEntry({
-                booklet,
-                testRun: completedRun,
-                leaveLock: leavingLock,
-                timestamp: Date.parse(timestamp)
-              })
-            );
-          }
-          completedStateEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(timestamp),
-            content: lockOnTermination ? "LOCKED" : "TERMINATED"
-          });
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (executionMode.saveResponses) {
+            const completedStateEntries: ParticipantTestLogEntryInput[] = [];
+            if (testletTimerStateChanged(testRun, completedRun)) {
+              completedStateEntries.push(
+                buildTestletTimeLeftTestStateEntry(completedRun, timestamp)
+              );
+            }
+            if (leavingLock) {
+              completedStateEntries.push(
+                buildLeaveLockTestStateEntry({
+                  booklet,
+                  testRun: completedRun,
+                  leaveLock: leavingLock,
+                  timestamp: Date.parse(timestamp)
+                })
+              );
+            }
+            completedStateEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(timestamp),
+              content: lockOnTermination ? "LOCKED" : "TERMINATED"
+            });
+            testLogs.push(...buildParticipantTestLogs({
               testRun: completedRun,
               batches: [{ entries: completedStateEntries }]
-            })
-          );
-        }
-
-        const participantSession = await repository.getParticipantSessionById(
-          testRun.participantSessionId
-        );
-        if (
-          participantSession &&
-          !lockOnTermination &&
-          executionMode.saveResponses
-        ) {
-          const nextSessionStatus =
-            await resolveParticipantSessionStatusAfterCompletion(
-              repository,
-              participantSession
-            );
-          await repository.saveParticipantSession({
-            ...participantSession,
-            status: nextSessionStatus
-          });
-        }
-
-        await recordWorkspaceActivity({
-          tenantId: completedRun.tenantId,
-          workspaceId: completedRun.workspaceId,
-          eventType: lockOnTermination ? "test_run_locked" : "test_run_completed",
-          subjectType: "test_run",
-          subjectId: completedRun.testRunId,
-          summary: lockOnTermination
-            ? `Run '${completedRun.testRunId}' locked after participant termination.`
-            : `Run '${completedRun.testRunId}' completed.`,
-          details: {
-            completedAt: completedRun.completedAt,
-            lockOnTermination
+            }));
           }
-        });
-        if (leavingLock) {
-          await recordWorkspaceActivity({
+
+          const participantSession = !lockOnTermination && executionMode.saveResponses
+            ? projectCompletedParticipantSession({ context, contentRelease, participantRosterEntry, testRun: persistedRun }) : undefined;
+
+          activityEvents.push(buildWorkspaceActivity({
             tenantId: completedRun.tenantId,
             workspaceId: completedRun.workspaceId,
-            eventType: "testlet_leave_lock_activated",
+            eventType: lockOnTermination ? "test_run_locked" : "test_run_completed",
             subjectType: "test_run",
             subjectId: completedRun.testRunId,
-            summary:
-              leavingLock.scope === "testlet"
-                ? `Block '${leavingLock.testlet.testletKey}' locked during participant completion.`
-                : `Unit '${leavingLock.unit.unitKey}' locked during participant completion.`,
+            summary: lockOnTermination
+              ? `Run '${completedRun.testRunId}' locked after participant termination.`
+              : `Run '${completedRun.testRunId}' completed.`,
             details: {
-              scope: leavingLock.scope,
-              testletKey: leavingLock.testlet.testletKey,
-              unitKey: leavingLock.unit.unitKey,
-              reason: "participant_completion"
+              completedAt: completedRun.completedAt,
+              lockOnTermination
             }
-          });
-        }
+          }));
+          if (leavingLock) {
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: completedRun.tenantId,
+              workspaceId: completedRun.workspaceId,
+              eventType: "testlet_leave_lock_activated",
+              subjectType: "test_run",
+              subjectId: completedRun.testRunId,
+              summary:
+                leavingLock.scope === "testlet"
+                  ? `Block '${leavingLock.testlet.testletKey}' locked during participant completion.`
+                  : `Unit '${leavingLock.unit.unitKey}' locked during participant completion.`,
+              details: {
+                scope: leavingLock.scope,
+                testletKey: leavingLock.testlet.testletKey,
+                unitKey: leavingLock.unit.unitKey,
+                reason: "participant_completion"
+              }
+            }));
+          }
 
-        return completedRun;
+          completionView = completedRun;
+          return { testRun: persistedRun, testLogs, activityEvents, ...(participantSession ? { participantSession } : {}) };
+        });
+        return completionView ?? result.testRun;
       }
     },
     monitorRead: {
@@ -34626,7 +34537,7 @@ export const createFirstSliceServices = (
               : null;
         const remainingSeconds =
           commandType === "set_testlet_time" ||
-          (commandType === "goto" && input.remainingSeconds != null)
+            (commandType === "goto" && input.remainingSeconds != null)
             ? normalizeMonitorTimeRemainingSeconds(input.remainingSeconds)
             : null;
         const actorId =
@@ -34667,75 +34578,73 @@ export const createFirstSliceServices = (
           );
         }
 
-        const issuedAt = now();
-        const contentRelease = await requireContentRelease(
-          repository,
-          storedNormalizedRun.contentReleaseId
-        );
         if (["pause", "resume", "goto", "complete", "complete_and_lock"].includes(commandType)) {
-          const testRun = storedNormalizedRun;
-          if (testRun.status === "completed") throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
-          // Validate immutable content and target parameters without applying the intent.
-          projectParticipantRunCommand({ contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp: issuedAt });
-          const participantSession = await requireParticipantSession(repository, testRun.participantSessionId);
-          const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository,
-            workspace.tenantId, workspace.workspaceId, participantSession.loginKey);
-          const commandId = idGenerator();
-          const queued = await repository.appendParticipantRunCommand({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
-            participantSessionId: participantSession.participantSessionId, testRunId, commandId, commandType, targetUnitKey,
-            remainingSeconds, actorId, issuedAt, effectsDeferred: true });
-          if (!queued) throw new FirstSliceError(409, "monitor_command_delivery_unavailable", "The Run no longer accepts commands.");
-          await recordWorkspaceActivity({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
-            eventType: "monitor_run_command_issued", actorId, subjectType: "test_run", subjectId: testRunId,
-            summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
-            details: { commandId, commandType, previousStatus: testRun.status, nextStatus: testRun.status,
-              previousLocked: testRun.locked === true, locked: testRun.locked === true, participantSessionId: participantSession.participantSessionId,
-              loginKey: participantSession.loginKey, groupKey: participantSession.groupKey, bookletKey: testRun.bookletKey, targetUnitKey, remainingSeconds,
-              displayName: participantRosterEntry?.displayName ?? null,
-              effectsDeferred: true } });
-          return { commandId, commandType, actorId, issuedAt, previousStatus: testRun.status, previousLocked: testRun.locked === true,
-            testRun, participantSession };
+          let issued: MonitorRunCommandResult | undefined;
+          const result = await mutateRuntimeRun(storedNormalizedRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp }) => {
+            const mode = resolveParticipantExecutionMode(testRun.executionMode);
+            if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "monitor_run_commands_disabled", `Execution mode '${mode.mode}' does not accept monitor commands.`);
+            if (testRun.status === "completed") throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
+            projectParticipantRunCommand({ contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp });
+            const participantSession = context.participantSession;
+            const commandId = idGenerator();
+            const commandInput = {
+              tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+              participantSessionId: participantSession.participantSessionId, testRunId, commandId, commandType, targetUnitKey,
+              remainingSeconds, actorId, issuedAt: timestamp, effectsDeferred: true as const
+            };
+            const activityEvents = [buildWorkspaceActivity({
+              tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+              eventType: "monitor_run_command_issued", actorId, subjectType: "test_run", subjectId: testRunId,
+              summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
+              details: {
+                commandId, commandType, previousStatus: testRun.status, nextStatus: testRun.status,
+                previousLocked: testRun.locked === true, locked: testRun.locked === true, participantSessionId: participantSession.participantSessionId,
+                loginKey: participantSession.loginKey, groupKey: participantSession.groupKey, bookletKey: testRun.bookletKey, targetUnitKey, remainingSeconds,
+                displayName: participantRosterEntry?.displayName ?? null, effectsDeferred: true
+              }
+            })];
+            issued = {
+              commandId, commandType, actorId, issuedAt: timestamp, previousStatus: testRun.status,
+              previousLocked: testRun.locked === true, testRun, participantSession
+            };
+            return { testRun, activityEvents, commandInput };
+          }, { reconcileBefore: false, participantAccess: false });
+          if (!issued) throw new Error("Monitor intent projection did not produce a receipt.");
+          return { ...issued, testRun: result.testRun, participantSession: result.participantSession };
         }
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: storedNormalizedRun,
-          timestamp: issuedAt
-        });
-        if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
-        }
+        let issued: MonitorRunCommandResult | undefined;
+        const result = await mutateRuntimeRun(storedNormalizedRun, ({ context, testRun, contentRelease, participantRosterEntry, timestamp, reconcileTimers }) => {
+          const issuedAt = timestamp;
+          const testLogs: ParticipantTestLog[] = [];
+          const activityEvents: WorkspaceActivityEvent[] = [];
+          const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
+          if (!executionMode.receiveRemoteCommands) throw new FirstSliceError(409, "monitor_run_commands_disabled", `Execution mode '${executionMode.mode}' does not accept monitor commands.`);
+          if (testRun.status === "completed") {
+            throw new FirstSliceError(
+              409,
+              "test_run_already_completed",
+              `Test run '${testRunId}' is already completed.`
+            );
+          }
 
-        const participantSession = await requireParticipantSession(
-          repository,
-          testRun.participantSessionId
-        );
-        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
-          repository,
-          workspace.tenantId,
-          workspace.workspaceId,
-          participantSession.loginKey
-        );
-        let nextStatus: TestRunStatus = testRun.status;
-        if (commandType === "pause") {
-          nextStatus = "paused";
-        } else if (commandType === "resume" || commandType === "goto") {
-          nextStatus = "running";
-        } else if (
-          commandType === "complete" ||
-          commandType === "complete_and_lock"
-        ) {
-          nextStatus = "completed";
-        }
-        let adjustedTestletKey: string | null = null;
-        let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
-          null;
-        const transitionedTestRun: TestRun =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? {
+          const participantSession = context.participantSession;
+          let nextStatus: TestRunStatus = testRun.status;
+          if (commandType === "pause") {
+            nextStatus = "paused";
+          } else if (commandType === "resume" || commandType === "goto") {
+            nextStatus = "running";
+          } else if (
+            commandType === "complete" ||
+            commandType === "complete_and_lock"
+          ) {
+            nextStatus = "completed";
+          }
+          let adjustedTestletKey: string | null = null;
+          let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
+            null;
+          const transitionedTestRun: TestRun =
+            commandType === "complete" || commandType === "complete_and_lock"
+              ? {
                 ...closeRunningTestletTimers(testRun, issuedAt),
                 status: "completed",
                 locked: commandType === "complete_and_lock",
@@ -34743,20 +34652,20 @@ export const createFirstSliceServices = (
                 updatedAt: issuedAt,
                 completedAt: issuedAt
               }
-            : commandType === "lock_test"
-              ? normalizeTestRun({
+              : commandType === "lock_test"
+                ? normalizeTestRun({
                   ...testRun,
                   locked: true,
                   updatedAt: issuedAt
                 })
-              : commandType === "unlock_test"
-                ? normalizeTestRun({
+                : commandType === "unlock_test"
+                  ? normalizeTestRun({
                     ...testRun,
                     locked: false,
                     updatedAt: issuedAt
                   })
-                : commandType === "goto" && targetUnitKey
-                  ? (() => {
+                  : commandType === "goto" && targetUnitKey
+                    ? (() => {
                       const adjusted = applyMonitorGoto({
                         contentRelease,
                         testRun,
@@ -34768,21 +34677,21 @@ export const createFirstSliceServices = (
                       previousTimer = adjusted.previousTimer;
                       return adjusted.testRun;
                     })()
-                  : commandType === "unlock_navigation"
-                    ? applyMonitorNavigationUnlock({
+                    : commandType === "unlock_navigation"
+                      ? applyMonitorNavigationUnlock({
                         contentRelease,
                         testRun,
                         timestamp: issuedAt
                       })
-                    : commandType === "lock_navigation"
-                      ? applyMonitorNavigationLock({
+                      : commandType === "lock_navigation"
+                        ? applyMonitorNavigationLock({
                           testRun,
                           timestamp: issuedAt
                         })
-                      : commandType === "set_testlet_time" &&
+                        : commandType === "set_testlet_time" &&
                           targetUnitKey &&
                           remainingSeconds
-                        ? (() => {
+                          ? (() => {
                             const adjusted = applyMonitorSetTestletTime({
                               contentRelease,
                               testRun,
@@ -34794,7 +34703,7 @@ export const createFirstSliceServices = (
                             previousTimer = adjusted.previousTimer;
                             return adjusted.testRun;
                           })()
-                        : transitionTestletTimersForRunStatus(
+                          : transitionTestletTimersForRunStatus(
                             testRun,
                             nextStatus as Extract<
                               TestRunStatus,
@@ -34802,191 +34711,176 @@ export const createFirstSliceServices = (
                             >,
                             issuedAt
                           );
-        const nextTestRun = normalizeTestRun({
-          ...transitionedTestRun,
-          pauseSource:
-            commandType === "pause"
-              ? "monitor"
-              : commandType === "resume" ||
+          const nextTestRun = normalizeTestRun({
+            ...transitionedTestRun,
+            pauseSource:
+              commandType === "pause"
+                ? "monitor"
+                : commandType === "resume" ||
                   commandType === "goto" ||
                   commandType === "complete" ||
                   commandType === "complete_and_lock"
-                ? undefined
-                : transitionedTestRun.pauseSource
-        });
-        if (nextTestRun !== testRun) {
-          await repository.saveTestRun(nextTestRun);
-        }
-        const monitorTestLogEntries: ParticipantTestLogEntryInput[] = [];
-        if (nextTestRun.status !== testRun.status) {
-          monitorTestLogEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(issuedAt),
-            content:
-              nextTestRun.status === "completed"
-                ? "TERMINATED"
+                  ? undefined
+                  : transitionedTestRun.pauseSource
+          });
+          const monitorTestLogEntries: ParticipantTestLogEntryInput[] = [];
+          if (nextTestRun.status !== testRun.status) {
+            monitorTestLogEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(issuedAt),
+              content:
+                nextTestRun.status === "completed"
+                  ? "TERMINATED"
+                  : nextTestRun.status.toUpperCase()
+            });
+          }
+          if (nextTestRun.locked !== testRun.locked) {
+            monitorTestLogEntries.push({
+              key: "CONTROLLER",
+              timeStamp: Date.parse(issuedAt),
+              content: nextTestRun.locked
+                ? "LOCKED"
                 : nextTestRun.status.toUpperCase()
+            });
+          }
+          if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
+            monitorTestLogEntries.push({
+              key: "CURRENT_UNIT_ID",
+              timeStamp: Date.parse(issuedAt),
+              content: nextTestRun.currentUnitKey ?? ""
+            });
+          }
+          if (testletTimerStateChanged(testRun, nextTestRun)) {
+            monitorTestLogEntries.unshift(
+              buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
+            );
+          }
+          const reopenedClosedTestlet =
+            commandType === "goto" &&
+            adjustedTestletKey != null &&
+            remainingSeconds != null &&
+            previousTimer != null &&
+            (previousTimer.status === "expired" ||
+              previousTimer.status === "cancelled" ||
+              getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0);
+          const originalCommandLogContent = formatOriginalMonitorCommandLogContent({
+            commandType,
+            targetUnitKey,
+            reopenedClosedTestlet,
+            remainingSeconds
           });
-        }
-        if (nextTestRun.locked !== testRun.locked) {
-          monitorTestLogEntries.push({
-            key: "CONTROLLER",
-            timeStamp: Date.parse(issuedAt),
-            content: nextTestRun.locked
-              ? "LOCKED"
-              : nextTestRun.status.toUpperCase()
-          });
-        }
-        if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
-          monitorTestLogEntries.push({
-            key: "CURRENT_UNIT_ID",
-            timeStamp: Date.parse(issuedAt),
-            content: nextTestRun.currentUnitKey ?? ""
-          });
-        }
-        if (testletTimerStateChanged(testRun, nextTestRun)) {
-          monitorTestLogEntries.unshift(
-            buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
-          );
-        }
-        const reopenedClosedTestlet =
-          commandType === "goto" &&
-          adjustedTestletKey != null &&
-          remainingSeconds != null &&
-          previousTimer != null &&
-          (previousTimer.status === "expired" ||
-            previousTimer.status === "cancelled" ||
-            getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0);
-        const originalCommandLogContent = formatOriginalMonitorCommandLogContent({
-          commandType,
-          targetUnitKey,
-          reopenedClosedTestlet,
-          remainingSeconds
-        });
-        if (originalCommandLogContent) {
-          monitorTestLogEntries.push({
-            key: "command executed",
-            timeStamp: Date.parse(issuedAt),
-            content: originalCommandLogContent
-          });
-        }
-        if (commandType === "lock_test" || commandType === "complete_and_lock") {
-          monitorTestLogEntries.push({
-            key: "locked by monitor",
-            timeStamp: Date.parse(issuedAt),
-            content: actorId ?? ""
-          });
-        }
-        if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
-          await repository.saveParticipantTestLogs(
-            buildParticipantTestLogs({
+          if (originalCommandLogContent) {
+            monitorTestLogEntries.push({
+              key: "command executed",
+              timeStamp: Date.parse(issuedAt),
+              content: originalCommandLogContent
+            });
+          }
+          if (commandType === "lock_test" || commandType === "complete_and_lock") {
+            monitorTestLogEntries.push({
+              key: "locked by monitor",
+              timeStamp: Date.parse(issuedAt),
+              content: actorId ?? ""
+            });
+          }
+          if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
+            testLogs.push(...buildParticipantTestLogs({
               testRun: nextTestRun,
               batches: [{ entries: monitorTestLogEntries }]
-            })
-          );
-        }
-        const effectiveNextTestRun =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? nextTestRun
-            : await persistEffectiveTestletTimerState({
-                contentRelease,
-                testRun: nextTestRun,
-                timestamp: issuedAt
-              });
-        if (
-          reopenedClosedTestlet &&
-          adjustedTestletKey &&
-          remainingSeconds != null &&
-          previousTimer
-        ) {
-          const restoredTimer =
-            effectiveNextTestRun.testletTimers?.[adjustedTestletKey];
-          await recordWorkspaceActivity({
-            tenantId: effectiveNextTestRun.tenantId,
-            workspaceId: effectiveNextTestRun.workspaceId,
-            eventType: "testlet_timer_started",
-            actorId,
-            subjectType: "test_run",
-            subjectId: effectiveNextTestRun.testRunId,
-            summary: `Timed block '${adjustedTestletKey}' reopened by monitor for run '${effectiveNextTestRun.testRunId}'.`,
-            details: {
-              testletKey: adjustedTestletKey,
-              durationSeconds: restoredTimer?.durationSeconds ?? remainingSeconds,
-              expiresAt: restoredTimer?.expiresAt ?? null,
-              currentUnitKey: effectiveNextTestRun.currentUnitKey,
-              restoredByMonitor: true
-            }
-          });
-        }
-        const nextParticipantSession =
-          commandType === "complete" || commandType === "complete_and_lock"
-            ? {
-                ...participantSession,
-                status: await resolveParticipantSessionStatusAfterCompletion(
-                  repository,
-                  participantSession
-                )
+            }));
+          }
+          const effectiveNextTestRun =
+            commandType === "complete" || commandType === "complete_and_lock"
+              ? nextTestRun
+              : reconcileTimers(nextTestRun);
+          if (
+            reopenedClosedTestlet &&
+            adjustedTestletKey &&
+            remainingSeconds != null &&
+            previousTimer
+          ) {
+            const restoredTimer =
+              effectiveNextTestRun.testletTimers?.[adjustedTestletKey];
+            activityEvents.push(buildWorkspaceActivity({
+              tenantId: effectiveNextTestRun.tenantId,
+              workspaceId: effectiveNextTestRun.workspaceId,
+              eventType: "testlet_timer_started",
+              actorId,
+              subjectType: "test_run",
+              subjectId: effectiveNextTestRun.testRunId,
+              summary: `Timed block '${adjustedTestletKey}' reopened by monitor for run '${effectiveNextTestRun.testRunId}'.`,
+              details: {
+                testletKey: adjustedTestletKey,
+                durationSeconds: restoredTimer?.durationSeconds ?? remainingSeconds,
+                expiresAt: restoredTimer?.expiresAt ?? null,
+                currentUnitKey: effectiveNextTestRun.currentUnitKey,
+                restoredByMonitor: true
               }
-            : participantSession;
-        if (nextParticipantSession !== participantSession) {
-          await repository.saveParticipantSession(nextParticipantSession);
-        }
+            }));
+          }
+          const nextParticipantSession = commandType === "complete" || commandType === "complete_and_lock"
+            ? projectCompletedParticipantSession({ context, contentRelease, participantRosterEntry, testRun: effectiveNextTestRun }) : participantSession;
 
-        const commandId = idGenerator();
-        if (commandType !== "complete" && commandType !== "complete_and_lock") {
-          const queued = await repository.appendParticipantRunCommand({
+          const commandId = idGenerator();
+          const commandInput = commandType !== "complete" && commandType !== "complete_and_lock" ? {
             tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
             participantSessionId: participantSession.participantSessionId, testRunId,
             commandId, commandType, targetUnitKey, remainingSeconds, actorId, issuedAt
-          });
-          if (!queued) throw new FirstSliceError(409, "monitor_command_delivery_unavailable", "The Run no longer accepts commands.");
-        }
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "monitor_run_command_issued",
-          actorId,
-          subjectType: "test_run",
-          subjectId: testRunId,
-          summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
-          details: {
+          } : undefined;
+          activityEvents.push(buildWorkspaceActivity({
+            tenantId: workspace.tenantId,
+            workspaceId: workspace.workspaceId,
+            eventType: "monitor_run_command_issued",
+            actorId,
+            subjectType: "test_run",
+            subjectId: testRunId,
+            summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
+            details: {
+              commandId,
+              commandType,
+              previousStatus: testRun.status,
+              nextStatus: effectiveNextTestRun.status,
+              previousLocked: testRun.locked === true,
+              locked: effectiveNextTestRun.locked === true,
+              completedAt: effectiveNextTestRun.completedAt ?? null,
+              previousUnitKey: testRun.currentUnitKey,
+              targetUnitKey,
+              targetTestletKey: adjustedTestletKey,
+              previousTimerStatus: previousTimer?.status ?? null,
+              previousRemainingSeconds: previousTimer
+                ? getTestletTimerRemainingSeconds(previousTimer, issuedAt)
+                : null,
+              remainingSeconds,
+              previousNavigationUnlocked:
+                testRun.monitorNavigationUnlocked === true,
+              navigationUnlocked:
+                effectiveNextTestRun.monitorNavigationUnlocked === true,
+              participantSessionId: participantSession.participantSessionId,
+              loginKey: participantSession.loginKey,
+              groupKey: participantSession.groupKey,
+              bookletKey: testRun.bookletKey,
+              displayName: participantRosterEntry?.displayName ?? null
+            }
+          }));
+
+          issued = {
             commandId,
             commandType,
+            actorId,
+            issuedAt,
             previousStatus: testRun.status,
-            nextStatus: effectiveNextTestRun.status,
             previousLocked: testRun.locked === true,
-            locked: effectiveNextTestRun.locked === true,
-            completedAt: effectiveNextTestRun.completedAt ?? null,
-            previousUnitKey: testRun.currentUnitKey,
-            targetUnitKey,
-            targetTestletKey: adjustedTestletKey,
-            previousTimerStatus: previousTimer?.status ?? null,
-            previousRemainingSeconds: previousTimer
-              ? getTestletTimerRemainingSeconds(previousTimer, issuedAt)
-              : null,
-            remainingSeconds,
-            previousNavigationUnlocked:
-              testRun.monitorNavigationUnlocked === true,
-            navigationUnlocked:
-              effectiveNextTestRun.monitorNavigationUnlocked === true,
-            participantSessionId: participantSession.participantSessionId,
-            loginKey: participantSession.loginKey,
-            groupKey: participantSession.groupKey,
-            bookletKey: testRun.bookletKey,
-            displayName: participantRosterEntry?.displayName ?? null
-          }
-        });
-
-        return {
-          commandId,
-          commandType,
-          actorId,
-          issuedAt,
-          previousStatus: testRun.status,
-          previousLocked: testRun.locked === true,
-          testRun: effectiveNextTestRun,
-          participantSession: nextParticipantSession
-        };
+            testRun: effectiveNextTestRun,
+            participantSession: nextParticipantSession
+          };
+          return {
+            testRun: effectiveNextTestRun, testLogs, activityEvents,
+            ...(nextParticipantSession !== participantSession ? { participantSession: nextParticipantSession } : {}),
+            ...(commandInput ? { commandInput } : {})
+          };
+        }, { participantAccess: false });
+        if (!issued) throw new Error("Monitor command projection did not produce a receipt.");
+        return { ...issued, testRun: result.testRun, participantSession: result.participantSession };
       },
       async issueRunCommands(input) {
         const commands: MonitorRunCommandResult[] = [];

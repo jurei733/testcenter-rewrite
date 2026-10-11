@@ -3379,6 +3379,22 @@ export const createSqliteFirstSliceRepository = (
           testRun && participantSession ? { testRun, participantSession, testRuns } : null, transform);
         if (prepared?.effect) {
           const effect = prepared.effect;
+          if (effect.commandInput) {
+            const existing = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+              .get(input.testRunId, effect.commandInput.commandId);
+            const last = database.prepare("SELECT sequence FROM participant_run_commands WHERE test_run_id = ? ORDER BY sequence DESC LIMIT 1")
+              .get(input.testRunId);
+            const command = appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+              existing: existing ? JSON.parse(String(existing.command_json)) as ParticipantRunCommand : null,
+              lastSequence: Number(last?.sequence ?? 0)
+          });
+        if (!command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) database.prepare(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, command_id) DO NOTHING`)
+          .run(command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt);
+        }
           persistTestRun(database, effect.testRun);
           for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)

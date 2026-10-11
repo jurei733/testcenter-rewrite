@@ -1,4 +1,4 @@
-import type { ParticipantSession, ParticipantRunCommandEffect, TestRun } from "@testcenter-rewrite-app/domain";
+import type { ParticipantSession, ParticipantRunCommandEffect, ParticipantRunCommandInput, TestRun } from "@testcenter-rewrite-app/domain";
 import { matchesParticipantRunCommandScope } from "./participant-run-commands.js";
 
 export type ParticipantRunMutationInput = Pick<TestRun,
@@ -8,7 +8,10 @@ export type ParticipantRunMutationContext = {
   participantSession: ParticipantSession;
   testRuns: TestRun[];
 };
-export type ParticipantRunMutationEffect = ParticipantRunCommandEffect;
+export type ParticipantRunMutationEffect = ParticipantRunCommandEffect & {
+  /** Queue an intent in the same transaction as its Run projection and audit. */
+  commandInput?: ParticipantRunCommandInput;
+};
 export type ParticipantRunMutationResult = {
   testRun: TestRun;
   participantSession: ParticipantSession;
@@ -37,6 +40,7 @@ export const prepareParticipantRunMutation = (
     effect.testRun.bookletAssignmentKey !== testRun.bookletAssignmentKey || effect.testRun.executionMode !== testRun.executionMode ||
     effect.testRun.createdAt !== testRun.createdAt || effect.testLogs.some(log => !matchesParticipantRunCommandScope(log, input)) ||
     effect.activityEvents.some(event => event.tenantId !== input.tenantId || event.workspaceId !== input.workspaceId) ||
+    effect.commandInput && !matchesParticipantRunCommandScope(effect.commandInput, input) ||
     effect.participantSession && Object.keys({ ...participantSession, ...effect.participantSession }).some(key => key !== "status" &&
       effect.participantSession![key as keyof ParticipantSession] !== participantSession[key as keyof ParticipantSession]))) {
     throw new Error("A participant Run mutation cannot cross its immutable parent scope.");

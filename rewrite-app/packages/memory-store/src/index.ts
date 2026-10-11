@@ -766,6 +766,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         testRuns: Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
+        const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+          existing: state.participantRunCommands.get(JSON.stringify([input.testRunId, effect.commandInput.commandId])) ?? null,
+          lastSequence: Array.from(state.participantRunCommands.values()).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+        }) : null;
+        if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) state.participantRunCommands.set(JSON.stringify([command.testRunId, command.commandId]), command);
         state.testRuns.set(input.testRunId, effect.testRun);
         for (const log of effect.testLogs) state.participantTestLogs.set(log.participantTestLogId, log);
         for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);

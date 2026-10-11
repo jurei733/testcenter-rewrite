@@ -19,7 +19,7 @@ const timestamp = '2026-10-11T00:00:00.000Z';
 const kinds = ['memory', 'file', 'sqlite'];
 if (process.env.FIRST_SLICE_STORE === 'postgres') { assert.ok(process.env.FIRST_SLICE_POSTGRES_URL); kinds.push('postgres'); }
 
-for (const kind of kinds) test(`${kind}: participant progress and timers commit from the current Run`, async t => {
+for (const kind of kinds) test(`${kind}: participant runtime transitions, progress and timers commit from the current Run`, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'testcenter-run-mutation-'));
   const file = join(directory, kind === 'sqlite' ? 'owned.sqlite' : 'owned.json');
   const schema = 'owned_run_mutation_' + randomUUID().replaceAll('-', '');
@@ -47,32 +47,48 @@ for (const kind of kinds) test(`${kind}: participant progress and timers commit 
       return Reflect.get(target, property);
     } });
   };
-  const fixture = async ({ timed = false } = {}) => {
+  const fixture = async ({ timed = false, liveTimer = false, gate = false, adaptive = false, mode = 'run-hot-return', status = 'running' } = {}) => {
     const services = service(repository);
     const tenant = await services.platform.createTenant({ tenantKey: 'owned-' + randomUUID(), displayName: 'Owned mutation test' });
     const workspace = await services.platform.createWorkspace({ tenantKey: tenant.tenantKey, workspaceKey: 'owned', displayName: 'Owned mutation test' });
     const id = randomUUID(), base = { tenantId: tenant.tenantId, workspaceId: workspace.workspaceId, createdAt: timestamp };
     const booklet = key => ({ bookletKey: key, displayLabel: key, policy: compileBookletRuntimePolicy({}),
-      testletEntries: [{ testletKey: 'outer', displayLabel: 'Outer', parentTestletKey: null, restrictions: timed ? { timeMax: { minutes: 5, leave: 'allowed' } } : {} }],
-      unitEntries: ['unit', 'second'].map(unitKey => ({ unitKey, displayLabel: unitKey, testletPath: ['outer'] })) });
+      ...(adaptive ? { stateEntries: [{ stateKey: 'choice', displayLabel: 'Choice', options: ['first', 'second'].map(optionKey => ({ optionKey, displayLabel: optionKey, conditions: [] })) }] } : {}),
+      testletEntries: [{ testletKey: 'outer', displayLabel: 'Outer', parentTestletKey: null, restrictions: timed ? { timeMax: { minutes: 5, leave: 'allowed' } } : {} },
+        ...(gate ? [{ testletKey: 'gate', displayLabel: 'Owned gate', parentTestletKey: 'outer', restrictions: { codeToEnter: { code: 'OWN', prompt: 'Code' } } }] : [])],
+      unitEntries: ['unit', 'second'].map(unitKey => ({ unitKey, displayLabel: unitKey, testletPath: gate && unitKey === 'second' ? ['outer', 'gate'] : ['outer'] })) });
     await repository.saveContentRelease({ ...base, contentReleaseId: id, importJobId: id, releaseLabel: 'Owned', status: 'active', activatedAt: timestamp,
       runtimeSnapshot: { bookletEntries: [booklet('owned'), booklet('other')] } });
-    const parent = { ...base, participantSessionId: id, contentReleaseId: id, loginKey: id, groupKey: 'owned', participantCode: 'owned original code', status: 'launched', executionMode: 'run-hot-return' };
+    const parent = { ...base, participantSessionId: id, contentReleaseId: id, loginKey: id, groupKey: 'owned', participantCode: 'owned original code', status: 'launched', executionMode: mode };
     await repository.saveParticipantSession(parent);
-    const run = { ...base, testRunId: id, participantSessionId: id, contentReleaseId: id, bookletKey: 'owned', executionMode: 'run-hot-return', status: 'running',
+    const run = { ...base, testRunId: id, participantSessionId: id, contentReleaseId: id, bookletKey: 'owned', executionMode: mode, status,
       currentUnitKey: 'unit', unitResponses: { unit: 'Exact baseline Ä/β\n  spaces  ' }, updatedAt: timestamp, completedAt: null,
       testletTimers: timed ? { outer: { testletKey: 'outer', status: 'running', durationSeconds: 300, remainingSeconds: 300,
-        startedAt: '2026-10-10T23:50:00.000Z', expiresAt: '2026-10-10T23:55:00.000Z', updatedAt: timestamp, endedAt: null } } : {} };
+        startedAt: liveTimer ? timestamp : '2026-10-10T23:50:00.000Z', expiresAt: liveTimer ? '2026-10-11T00:05:00.000Z' : '2026-10-10T23:55:00.000Z', updatedAt: timestamp, endedAt: null } } : {} };
     await repository.saveTestRun(run);
-    return { id, run: await repository.getTestRunById(id), parent, services, base };
+    return { id, run: await repository.getTestRunById(id), parent, services, base, tenantKey: tenant.tenantKey, workspaceKey: workspace.workspaceKey };
   };
   const snapshot = async f => ({ run: await repository.getTestRunById(f.id), parent: await repository.getParticipantSessionById(f.id),
     logs: await repository.listParticipantTestLogsByWorkspace(f.base.tenantId, f.base.workspaceId),
-    events: await repository.listWorkspaceActivityEventsByWorkspace(f.base.tenantId, f.base.workspaceId) });
+    events: await repository.listWorkspaceActivityEventsByWorkspace(f.base.tenantId, f.base.workspaceId),
+    commands: await repository.listPendingParticipantRunCommands(f.run) });
   const effect = (context, answer = 'Owned newer answer') => ({ testRun: { ...context.testRun, unitResponses: { ...context.testRun.unitResponses, second: answer } },
     testLogs: [{ participantTestLogId: 'owned-log-' + context.testRun.testRunId, ...context.testRun, unitKey: 'second', originalUnitId: 'second', logKey: 'RESPONSE_SAVED', logContent: answer, timestamp: Date.parse(timestamp), recordedAt: timestamp }],
     activityEvents: [{ activityEventId: 'owned-event-' + context.testRun.testRunId, tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId,
       eventType: 'test_run_progress_saved', actorId: null, subjectType: 'test_run', subjectId: context.testRun.testRunId, occurredAt: timestamp, summary: 'Owned projection', details: {} }] });
+  const issue = (services, f, commandType) => services.monitorControl.issueRunCommand({
+    tenantKey: f.tenantKey, workspaceKey: f.workspaceKey, testRunId: f.id, commandType, actorId: 'owned-monitor' });
+  const operations = [
+    { name: 'resumeRun', options: { status: 'paused' }, invoke: (s, f) => s.participantRuntime.resumeRun({ testRunId: f.id }) },
+    { name: 'resumeSession', options: { status: 'paused' }, invoke: (s, f) => s.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }) },
+    { name: 'prepareStarterExit', options: { timed: true, liveTimer: true }, invoke: (s, f) => s.participantRuntime.prepareStarterExit({ testRunId: f.id, currentUnitKey: 'unit' }) },
+    { name: 'returnToStarter', invoke: (s, f) => s.participantRuntime.returnToStarter({ testRunId: f.id, currentUnitKey: 'unit', expectedStatus: 'running' }) },
+    { name: 'completeRun', invoke: (s, f) => s.participantRuntime.completeRun({ testRunId: f.id }) },
+    { name: 'unlockTestlet', options: { gate: true }, invoke: (s, f) => s.participantRuntime.unlockTestlet({ testRunId: f.id, testletKey: 'gate', code: 'OWN' }) },
+    { name: 'selectAdaptiveState', options: { adaptive: true, mode: 'run-trial' }, invoke: (s, f) => s.participantRuntime.selectAdaptiveState({ testRunId: f.id, stateKey: 'choice', optionKey: 'second' }) },
+    { name: 'monitor native lock', monitor: true, invoke: (s, f) => issue(s, f, 'lock_test') },
+    { name: 'monitor deferred pause', monitor: true, invoke: (s, f) => issue(s, f, 'pause') }
+  ];
   try {
     if (url) { rootPool = new Pool({ connectionString: process.env.FIRST_SLICE_POSTGRES_URL }); await rootPool.query(`CREATE SCHEMA "${schema}"`); created = true; }
     repository = await create();
@@ -97,6 +113,10 @@ for (const kind of kinds) test(`${kind}: participant progress and timers commit 
           return projected;
         }), /immutable parent scope/);
       }
+      await assert.rejects(repository.mutateParticipantRun(f.run, context => ({ ...effect(context), commandInput: {
+        ...f.run, workspaceId: 'foreign', commandId: randomUUID(), commandType: 'pause', issuedAt: timestamp,
+        actorId: null, targetUnitKey: null, remainingSeconds: null, effectsDeferred: true
+      } })), /immutable parent scope/);
       assert.deepEqual(await snapshot(f), before);
     });
     await t.test('Run, artifacts and parent commit together and returned values are detached', async () => {
@@ -153,6 +173,130 @@ for (const kind of kinds) test(`${kind}: participant progress and timers commit 
       const after = await snapshot(f); assert.equal(after.run.status, 'completed'); assert.equal(after.parent.status, 'closed');
       assert.equal(after.events.filter(e => e.subjectId === f.id && e.eventType === 'test_run_completed').length, 1);
       assert.ok(after.logs.some(log => log.logKey === 'TESTLETS_TIMELEFT'));
+    });
+    for (const operation of operations) await t.test(`${operation.name} preserves an answer committed after its initial Run read`, async () => {
+      const f = await fixture(operation.options), answer = `Concurrent ${operation.name}: Ä/β\n  exact spaces  `;
+      const first = service(writeAfterInitialRead(repository, () => service(repository).participantRuntime.saveProgress({
+        testRunId: f.id, responseUnitKey: 'second', unitResponse: answer, status: f.run.status })));
+      await operation.invoke(first, f);
+      const after = await snapshot(f);
+      assert.equal(after.run.unitResponses.second, answer);
+      assert.equal(after.run.unitResponses.unit, f.run.unitResponses.unit);
+      if (operation.monitor) {
+        assert.equal(after.commands.length, 1);
+        const issued = after.events.filter(event => event.eventType === 'monitor_run_command_issued');
+        assert.equal(issued.length, 1); assert.equal(issued[0].details.commandId, after.commands[0].commandId);
+        assert.equal(after.run.locked === true, operation.name === 'monitor native lock');
+        assert.equal(after.run.status, 'running');
+      }
+    });
+    for (const operation of operations.filter(operation => !operation.monitor)) await t.test(`${operation.name} denies a lock and expired parent committed after its initial read`, async () => {
+      for (const target of ['run', 'parent']) {
+        const f = await fixture(operation.options);
+        let expected;
+        const first = service(writeAfterInitialRead(repository, async () => {
+          if (target === 'run') await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun, locked: true }, testLogs: [], activityEvents: [] }));
+          else await repository.saveParticipantSession({ ...f.parent, validUntil: '2026-10-10T00:00:00.000Z' });
+          expected = await snapshot(f);
+        }));
+        await assert.rejects(operation.invoke(first, f), error => error.errorCode === (target === 'run' ? 'test_run_locked' : 'participant_access_expired'));
+        assert.deepEqual(await snapshot(f), expected);
+      }
+    });
+    for (const operation of operations.filter(operation => ['prepareStarterExit', 'returnToStarter'].includes(operation.name))) await t.test(`${operation.name} rejects a stale current-unit confirmation without changing the newer Run`, async () => {
+      const f = await fixture(operation.options); let expected;
+      const first = service(writeAfterInitialRead(repository, async () => {
+        await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun, currentUnitKey: 'second' }, testLogs: [], activityEvents: [] }));
+        expected = await snapshot(f);
+      }));
+      await assert.rejects(operation.invoke(first, f), error => error.errorCode === 'starter_exit_unit_changed');
+      assert.deepEqual(await snapshot(f), expected);
+    });
+    await t.test('starter status confirmation and session reentry respect a newer monitor pause', async () => {
+      for (const action of ['return', 'resume']) {
+        const f = await fixture(); let expected;
+        const first = service(writeAfterInitialRead(repository, async () => {
+          await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun, status: 'paused', pauseSource: 'monitor' }, testLogs: [], activityEvents: [] }));
+          expected = await snapshot(f);
+        }));
+        if (action === 'return') await assert.rejects(first.participantRuntime.returnToStarter({ testRunId: f.id, currentUnitKey: 'unit', expectedStatus: 'running' }), error => error.errorCode === 'starter_exit_state_changed');
+        else { const result = await first.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }); assert.equal(result.status, 'paused'); assert.equal(result.pauseSource, 'monitor'); }
+        assert.deepEqual(await snapshot(f), expected);
+      }
+    });
+    await t.test('explicit completion uses the current sibling status and preserves the current parent identity', async () => {
+      const f = await fixture(), sibling = { ...f.run, testRunId: randomUUID(), bookletKey: 'other', bookletAssignmentKey: 'other' };
+      await repository.saveTestRun(sibling);
+      const first = service(writeAfterInitialRead(repository, async () => {
+        await repository.mutateParticipantRun(sibling, context => ({ testRun: { ...context.testRun, status: 'completed', completedAt: timestamp }, testLogs: [], activityEvents: [] }));
+        await repository.saveParticipantSession({ ...f.parent, participantCode: 'newest parent code' });
+      }));
+      await first.participantRuntime.completeRun({ testRunId: f.id });
+      const after = await snapshot(f); assert.equal(after.run.status, 'completed'); assert.equal(after.parent.status, 'closed');
+      assert.equal(after.parent.participantCode, 'newest parent code');
+      assert.equal(after.events.filter(event => event.eventType === 'test_run_completed').length, 1);
+    });
+    for (const commandType of ['pause', 'lock_test']) await t.test(`${commandType} cannot queue an intent after concurrent completion`, async () => {
+      const f = await fixture(); let expected;
+      const first = service(writeAfterInitialRead(repository, async () => {
+        await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun, status: 'completed', completedAt: timestamp }, testLogs: [], activityEvents: [] }));
+        expected = await snapshot(f);
+      }));
+      await assert.rejects(issue(first, f, commandType), error => error.errorCode === 'test_run_already_completed');
+      assert.deepEqual(await snapshot(f), expected);
+    });
+    if (kind === 'file') for (const operation of operations) await t.test(`${operation.name}: failed File persistence rolls back Run, parent, logs, command and audit together`, async () => {
+      const f = await fixture(operation.options), before = await snapshot(f), backup = join(directory, 'runtime-backup.json');
+      await rename(file, backup); await mkdir(file);
+      try { await assert.rejects(operation.invoke(f.services, f)); assert.deepEqual(await snapshot(f), before); }
+      finally { await rm(file, { recursive: true }); await rename(backup, file); }
+      const restarted = await create();
+      assert.deepEqual(await restarted.getTestRunById(f.id), before.run);
+      assert.deepEqual(await restarted.listPendingParticipantRunCommands(f.run), before.commands);
+      await operation.invoke(service(repository), f);
+      const durable = await create(); assert.deepEqual(await durable.getTestRunById(f.id), JSON.parse(JSON.stringify((await snapshot(f)).run)));
+      if (operation.monitor) assert.equal((await durable.listPendingParticipantRunCommands(f.run)).length, 1);
+    });
+    if (control) for (const commandType of ['pause', 'lock_test']) await t.test(`${commandType}: audit failure after command insertion rolls back the intent and Run together`, async () => {
+      const f = await fixture(), before = await snapshot(f);
+      const install = kind === 'sqlite' ? `CREATE TRIGGER owned_command_audit_failure BEFORE INSERT ON workspace_activity_events WHEN NEW.subject_id='${f.id}' BEGIN SELECT RAISE(ABORT,'owned command audit failure'); END` :
+        `CREATE FUNCTION owned_command_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned command audit failure'; END $$; CREATE TRIGGER owned_command_audit_failure BEFORE INSERT ON workspace_activity_events FOR EACH ROW WHEN (NEW.subject_id='${f.id}') EXECUTE FUNCTION owned_command_audit_failure()`;
+      const remove = kind === 'sqlite' ? 'DROP TRIGGER owned_command_audit_failure' : 'DROP TRIGGER owned_command_audit_failure ON workspace_activity_events; DROP FUNCTION owned_command_audit_failure()';
+      const execute = query => kind === 'sqlite' ? control.exec(query) : control.query(query);
+      await execute(install);
+      try { await assert.rejects(issue(f.services, f, commandType), /owned command audit failure/); assert.deepEqual(await snapshot(f), before); }
+      finally { await execute(remove); }
+      await issue(service(await create()), f, commandType);
+      const after = await snapshot(f); assert.equal(after.commands.length, 1); assert.equal(after.commands[0].sequence, 1);
+      assert.equal(after.events.filter(event => event.eventType === 'monitor_run_command_issued').length, 1);
+    });
+    if (control) for (const operation of operations.filter(operation => !operation.monitor)) await t.test(`${operation.name}: SQL artifact failure rolls back every runtime change`, async () => {
+      const f = await fixture(operation.options), before = await snapshot(f);
+      const logs = operation.name === 'prepareStarterExit';
+      const table = logs ? 'participant_test_logs' : 'workspace_activity_events', field = logs ? 'test_run_id' : 'subject_id';
+      const install = kind === 'sqlite' ? `CREATE TRIGGER owned_runtime_failure BEFORE INSERT ON ${table} WHEN NEW.${field}='${f.id}' BEGIN SELECT RAISE(ABORT,'owned runtime artifact failure'); END` :
+        `CREATE FUNCTION owned_runtime_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned runtime artifact failure'; END $$; CREATE TRIGGER owned_runtime_failure BEFORE INSERT ON ${table} FOR EACH ROW WHEN (NEW.${field}='${f.id}') EXECUTE FUNCTION owned_runtime_failure()`;
+      const remove = kind === 'sqlite' ? 'DROP TRIGGER owned_runtime_failure' : `DROP TRIGGER owned_runtime_failure ON ${table}; DROP FUNCTION owned_runtime_failure()`;
+      const execute = query => kind === 'sqlite' ? control.exec(query) : control.query(query);
+      await execute(install);
+      try { await assert.rejects(operation.invoke(f.services, f), /owned runtime artifact failure/); assert.deepEqual(await snapshot(f), before); }
+      finally { await execute(remove); }
+      await operation.invoke(service(await create()), f);
+    });
+    if (control) for (const name of ['resumeSession', 'completeRun']) await t.test(`${name}: final parent failure rolls back Run and all earlier artifacts`, async () => {
+      const f = await fixture({ status: name === 'resumeSession' ? 'paused' : 'running' });
+      if (name === 'resumeSession') await repository.saveParticipantSession({ ...f.parent, status: 'signed_in' });
+      else await repository.saveTestRun({ ...f.run, testRunId: randomUUID(), bookletKey: 'other', bookletAssignmentKey: 'other', status: 'completed', completedAt: timestamp });
+      const before = await snapshot(f), operation = operations.find(operation => operation.name === name);
+      const install = kind === 'sqlite' ? `CREATE TRIGGER owned_runtime_parent_failure BEFORE UPDATE OF status ON participant_sessions WHEN NEW.participant_session_id='${f.id}' BEGIN SELECT RAISE(ABORT,'owned runtime parent failure'); END` :
+        `CREATE FUNCTION owned_runtime_parent_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned runtime parent failure'; END $$; CREATE TRIGGER owned_runtime_parent_failure BEFORE UPDATE OF status ON participant_sessions FOR EACH ROW WHEN (NEW.participant_session_id='${f.id}') EXECUTE FUNCTION owned_runtime_parent_failure()`;
+      const remove = kind === 'sqlite' ? 'DROP TRIGGER owned_runtime_parent_failure' : 'DROP TRIGGER owned_runtime_parent_failure ON participant_sessions; DROP FUNCTION owned_runtime_parent_failure()';
+      const execute = query => kind === 'sqlite' ? control.exec(query) : control.query(query);
+      await execute(install);
+      try { await assert.rejects(operation.invoke(f.services, f), /owned runtime parent failure/); assert.deepEqual(await snapshot(f), before); }
+      finally { await execute(remove); }
+      await operation.invoke(service(await create()), f);
+      assert.equal((await snapshot(f)).parent.status, name === 'resumeSession' ? 'launched' : 'closed');
     });
     if (kind === 'file') await t.test('failed persistence leaves cached Run/logs/activity/parent unchanged and retry succeeds', async () => {
       const f = await fixture(), before = await snapshot(f), backup = join(directory, 'backup.json');

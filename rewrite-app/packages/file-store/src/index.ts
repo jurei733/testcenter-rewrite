@@ -1426,6 +1426,12 @@ export const createFileFirstSliceRepository = (
         testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
+        const command = effect.commandInput ? appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+          existing: state.participantRunCommands[JSON.stringify([input.testRunId, effect.commandInput.commandId])] ?? null,
+          lastSequence: Object.values(state.participantRunCommands).reduce((max, entry) => entry.testRunId === input.testRunId ? Math.max(max, entry.sequence) : max, 0)
+        }) : null;
+        if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = command;
         state.testRuns[input.testRunId] = effect.testRun;
         for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
         for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;

@@ -3211,6 +3211,20 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           testRun && participantSession ? { testRun, participantSession, testRuns } : null, transform);
         if (prepared?.effect) {
           const effect = prepared.effect;
+          if (effect.commandInput) {
+            const existing = await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2", [input.testRunId, effect.commandInput.commandId]);
+            const last = await client.query("SELECT sequence FROM participant_run_commands WHERE test_run_id = $1 ORDER BY sequence DESC LIMIT 1", [input.testRunId]);
+            const command = appendParticipantRunCommand(effect.commandInput, effect.testRun, {
+              existing: existing.rows[0]?.command_json ?? null,
+              lastSequence: Number(last.rows[0]?.sequence ?? 0)
+          });
+        if (!command) throw new Error("The Run no longer accepts the projected command.");
+        if (command) await client.query(`INSERT INTO participant_run_commands
+          (test_run_id, command_id, sequence, tenant_id, workspace_id, participant_session_id, command_json, acknowledged_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) ON CONFLICT(test_run_id, command_id) DO NOTHING`,
+          [command.testRunId, command.commandId, command.sequence, command.tenantId, command.workspaceId,
+            command.participantSessionId, JSON.stringify(command), command.acknowledgedAt]);
+        }
           await persistTestRun(client, effect.testRun);
           for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
             (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
