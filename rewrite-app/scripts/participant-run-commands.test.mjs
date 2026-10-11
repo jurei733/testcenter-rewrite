@@ -296,7 +296,7 @@ if (kinds.includes("postgres")) {
       await storage.shutdown();
       storage = undefined;
       await control.query(`DROP TABLE participant_run_commands;
-        DELETE FROM schema_migrations WHERE version = 53;
+        DELETE FROM schema_migrations WHERE version >= 53;
         CREATE FUNCTION own_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$
           BEGIN RAISE EXCEPTION 'own command migration failure'; END $$;
         CREATE TRIGGER own_migration_failure BEFORE INSERT ON schema_migrations

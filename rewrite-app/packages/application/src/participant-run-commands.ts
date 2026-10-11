@@ -3,6 +3,10 @@ import {
   type ParticipantRunCommand,
   type ParticipantRunCommandInput,
   type ParticipantRunCommandScope,
+  type ParticipantRunCommandApplicationInput,
+  type ParticipantRunCommandApplicationContext,
+  type ParticipantRunCommandApplicationResult,
+  type ParticipantRunCommandEffect,
   type TestRun
 } from "@testcenter-rewrite-app/domain";
 
@@ -57,7 +61,7 @@ export const appendParticipantRunCommand = (
   if (run!.status === "completed") return null;
   const sequence = history.lastSequence + 1;
   if (!Number.isSafeInteger(sequence) || sequence <= 0) throw new Error("Participant command sequence is exhausted.");
-  return { ...normalized, sequence, acknowledgedAt: null };
+  return { ...normalized, sequence, acknowledgedAt: null, executedAt: null, executionSequence: null };
 };
 
 /** Idempotent receipt under the same scope and store lock as enqueueing. */
@@ -70,4 +74,50 @@ export const acknowledgeParticipantRunCommand = (
   if (!matchesParticipantRunCommandScope(run, input) ||
     !matchesParticipantRunCommandScope(command, input) || command?.commandId !== input.commandId) return null;
   return structuredClone(command!.acknowledgedAt ? command! : { ...command!, acknowledgedAt });
+};
+
+/** Prepare one application under the store's parent/Run lock; never write here. */
+export const prepareParticipantRunCommandApplication = (
+  input: ParticipantRunCommandApplicationInput,
+  context: ParticipantRunCommandApplicationContext | null,
+  lastExecutionSequence: number,
+  transform: (context: ParticipantRunCommandApplicationContext) => ParticipantRunCommandEffect
+): { result: ParticipantRunCommandApplicationResult; effect: ParticipantRunCommandEffect | null } | null => {
+  const executedAt = timestamp(input.executedAt);
+  if (!context || !matchesParticipantRunCommandScope(context.testRun, input) ||
+      !matchesParticipantRunCommandScope(context.command, input) || context.command.commandId !== input.commandId ||
+      context.participantSession.participantSessionId !== input.participantSessionId ||
+      context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId) return null;
+  const { command, testRun, participantSession } = context;
+  if (!command.acknowledgedAt) throw new Error("Only an acknowledged participant command may be applied.");
+  if (command.executedAt) {
+    if (!Number.isSafeInteger(command.executionSequence) || Number(command.executionSequence) < 1) {
+      throw new Error("The persisted command application receipt is invalid.");
+    }
+    return { result: structuredClone({ command, testRun, participantSession, applied: false }), effect: null };
+  }
+  if (command.executionSequence != null) throw new Error("The persisted command application receipt is invalid.");
+  if (testRun.status === "completed") throw new Error("A completed Run cannot apply another command.");
+  const executionSequence = lastExecutionSequence + 1;
+  if (!Number.isSafeInteger(executionSequence) || executionSequence < 1) throw new Error("Participant command application sequence is exhausted.");
+  const effect = structuredClone(transform(structuredClone(context)));
+  if (new Set(effect.testLogs.map(log => log.participantTestLogId)).size !== effect.testLogs.length ||
+      new Set(effect.activityEvents.map(event => event.activityEventId)).size !== effect.activityEvents.length) {
+    throw new Error("A participant command effect contains duplicate artifact identities.");
+  }
+  if (!matchesParticipantRunCommandScope(effect.testRun, input) ||
+      effect.testRun.contentReleaseId !== testRun.contentReleaseId || effect.testRun.bookletKey !== testRun.bookletKey ||
+      effect.testRun.bookletAssignmentKey !== testRun.bookletAssignmentKey || effect.testRun.createdAt !== testRun.createdAt ||
+      effect.testRun.executionMode !== testRun.executionMode ||
+      effect.testLogs.some(log => !matchesParticipantRunCommandScope(log, input)) ||
+      effect.activityEvents.some(event => event.tenantId !== input.tenantId || event.workspaceId !== input.workspaceId) ||
+      effect.participantSession && (effect.participantSession.participantSessionId !== input.participantSessionId ||
+        effect.participantSession.tenantId !== input.tenantId || effect.participantSession.workspaceId !== input.workspaceId ||
+        Object.keys({ ...participantSession, ...effect.participantSession }).some(key => key !== "status" &&
+          effect.participantSession![key as keyof typeof participantSession] !== participantSession[key as keyof typeof participantSession]))) {
+    throw new Error("A participant command effect cannot cross its immutable parent scope.");
+  }
+  const appliedCommand = { ...command, executedAt, executionSequence };
+  return { result: structuredClone({ command: appliedCommand, testRun: effect.testRun,
+    participantSession: effect.participantSession ?? participantSession, applied: true }), effect };
 };

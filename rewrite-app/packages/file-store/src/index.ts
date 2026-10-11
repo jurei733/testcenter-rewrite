@@ -17,6 +17,7 @@ import {
   selectParticipantAssignmentRun,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   matchesParticipantRunCommandScope,
   type ParticipantPresence,
   type FirstSliceRepository,
@@ -605,6 +606,24 @@ export const createFileFirstSliceRepository = (
       if (result === null) return result;
       await persistState(next);
       // A failed durable receipt must remain pending in the cached state too.
+      cachePromise = Promise.resolve(next);
+      return result;
+    });
+    writeQueue = operation.then(() => undefined, () => undefined);
+    return operation;
+  };
+
+  const mutateCommandApplication = <Result extends { applied: boolean } | null>(
+    updater: (state: PersistedFirstSliceState) => Result
+  ): Promise<Result> => {
+    const operation = writeQueue.then(async () => {
+      const current = await getState();
+      const next = { ...current, participantRunCommands: { ...current.participantRunCommands },
+        testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
+        participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
+      const result = updater(next);
+      if (!result?.applied) return result;
+      await persistState(next);
       cachePromise = Promise.resolve(next);
       return result;
     });
@@ -1376,6 +1395,34 @@ export const createFileFirstSliceRepository = (
           state.participantRunCommands[key] ?? null);
         if (command) state.participantRunCommands[key] = structuredClone(command);
         return command;
+      });
+    },
+    async applyParticipantRunCommand(input, transform) {
+      return mutateCommandApplication(state => {
+        const key = JSON.stringify([input.testRunId, input.commandId]);
+        const command = state.participantRunCommands[key];
+        const testRun = state.testRuns[input.testRunId];
+        const participantSession = state.participantSessions[input.participantSessionId];
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession,
+            testRuns: terminal ? Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) : [testRun] } : null,
+          Object.values(state.participantRunCommands).reduce((max, record) =>
+            record.testRunId === input.testRunId ? Math.max(max, record.executionSequence ?? 0) : max, 0), transform);
+        if (!prepared) return null;
+        if (prepared.effect) {
+          const effect = prepared.effect;
+          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
+              effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
+            throw new Error("A participant command effect cannot overwrite an existing artifact identity.");
+          }
+          state.testRuns[input.testRunId] = effect.testRun;
+          state.participantRunCommands[key] = prepared.result.command;
+          for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+          for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+          if (effect.participantSession) state.participantSessions[input.participantSessionId] = effect.participantSession;
+        }
+        return structuredClone(prepared.result);
       });
     },
     async deleteTestRunsByIds(testRunIds) {

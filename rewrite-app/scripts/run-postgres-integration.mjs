@@ -52,7 +52,7 @@ process.stdout.write(
 
 const child = spawn(
   process.execPath,
-  ["--test", "--test-concurrency=1", "apps/api/dist/apps/api/src/integration.test.js", "scripts/participant-presence.test.mjs", "scripts/participant-assignment-runs.test.mjs", "scripts/group-result-deletion-presence.test.mjs", "scripts/participant-starter-completeness.test.mjs", "scripts/participant-run-commands.test.mjs", "scripts/participant-command-api.test.mjs"],
+  ["--test", "--test-concurrency=1", "apps/api/dist/apps/api/src/integration.test.js", "scripts/participant-presence.test.mjs", "scripts/participant-assignment-runs.test.mjs", "scripts/group-result-deletion-presence.test.mjs", "scripts/participant-starter-completeness.test.mjs", "scripts/participant-run-commands.test.mjs", "scripts/participant-command-application.test.mjs", "scripts/participant-command-api.test.mjs"],
   {
     stdio: "inherit",
     env: {

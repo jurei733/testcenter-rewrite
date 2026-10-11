@@ -9,6 +9,7 @@ import {
   selectParticipantAssignmentRun,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -1550,6 +1551,15 @@ const sqliteMigrations: SqliteMigration[] = [
       );
       CREATE INDEX idx_participant_run_commands_pending
         ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 60,
+    name: "index_participant_command_application_order",
+    sql: `
+      CREATE UNIQUE INDEX idx_participant_run_commands_execution
+        ON participant_run_commands(test_run_id, json_extract(command_json, '$.executionSequence'))
+        WHERE json_extract(command_json, '$.executionSequence') IS NOT NULL;
     `
   }
 ];
@@ -3320,6 +3330,46 @@ export const createSqliteFirstSliceRepository = (
           WHERE test_run_id = ? AND command_id = ?`).run(JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId);
         database.exec("COMMIT");
         return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async applyParticipantRunCommand(input, transform) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const testRun = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const participantSession = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const row = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
+          .get(input.testRunId, input.commandId);
+        const command = row ? JSON.parse(String(row.command_json)) as ParticipantRunCommand : null;
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const testRuns = terminal ? database.prepare("SELECT * FROM test_runs WHERE participant_session_id = ?").all(input.participantSessionId)
+          .map(row => mapTestRun(row as Record<string, unknown>)).filter((run): run is TestRun => run !== null) : testRun ? [testRun] : [];
+        const last = database.prepare(`SELECT json_extract(command_json, '$.executionSequence') AS sequence
+          FROM participant_run_commands WHERE test_run_id = ? AND json_extract(command_json, '$.executionSequence') IS NOT NULL
+          ORDER BY json_extract(command_json, '$.executionSequence') DESC LIMIT 1`).get(input.testRunId);
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession, testRuns } : null,
+          Number(last?.sequence ?? 0), transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          persistTestRun(database, effect.testRun);
+          for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+              log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+          for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+          if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+            .run(effect.participantSession.status, input.participantSessionId);
+          database.prepare("UPDATE participant_run_commands SET command_json = ? WHERE test_run_id = ? AND command_id = ?")
+            .run(JSON.stringify(prepared.result.command), input.testRunId, input.commandId);
+        }
+        database.exec("COMMIT");
+        return prepared?.result ?? null;
       } catch (error) { rollbackAfterFailure(database, error); }
     },
     async deleteTestRunsByIds(testRunIds) {

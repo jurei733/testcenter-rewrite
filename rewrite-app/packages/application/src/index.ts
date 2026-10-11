@@ -13,7 +13,7 @@ import { inflateRawSync } from "node:zlib";
 import iconv from "iconv-lite";
 export { selectParticipantAssignmentRun } from "./participant-assignment-runs.js";
 export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
-  matchesParticipantRunCommandScope } from "./participant-run-commands.js";
+  matchesParticipantRunCommandScope, prepareParticipantRunCommandApplication } from "./participant-run-commands.js";
 import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
 export { transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
   PARTICIPANT_PRESENCE_MAX_CONNECTIONS } from "./participant-presence.js";
@@ -149,6 +149,10 @@ import type {
   ParticipantRunCommand,
   ParticipantRunCommandInput,
   ParticipantRunCommandScope,
+  ParticipantRunCommandApplicationInput,
+  ParticipantRunCommandApplicationContext,
+  ParticipantRunCommandApplicationResult,
+  ParticipantRunCommandEffect,
   TestRunStatus,
   UnitCodingScheme,
   UnitAttachmentRequest,
@@ -1466,6 +1470,10 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     commandId: string;
     acknowledgedAt: string;
   }): Promise<ParticipantRunCommand | null>;
+  /** Receipt, Run, logs, activity and optional parent status commit together. */
+  applyParticipantRunCommand(input: ParticipantRunCommandApplicationInput,
+    transform: (context: ParticipantRunCommandApplicationContext) => ParticipantRunCommandEffect
+  ): Promise<ParticipantRunCommandApplicationResult | null>;
   /** Reserve/reuse one exact assignment atomically; never reset an existing Run. */
   getOrCreateTestRunForAssignment(
     candidate: TestRun

@@ -1,5 +1,38 @@
 # Testcenter parity checklist
 
+### Atomic application of acknowledged commands (2026-10-11)
+
+The repository now commits an acknowledged command's Run effect, execution
+receipt, participant logs, workspace activity and optional session status in
+one operation. Memory uses a synchronous detached transform, File publishes
+its cache only after persistence, SQLite uses BEGIN IMMEDIATE and PostgreSQL
+locks the parent session before the Run. SQLite schema 60 and PostgreSQL schema
+54 add a unique execution-order index. Older ACK records remain valid.
+
+The first application receives a server execution timestamp and a per-Run
+execution sequence. Retries do not execute the transform again or replace newer
+saved answers. The transform reads the latest stored Run under the same lock;
+immutable parent fields and foreign or duplicate log identities are rejected.
+Failures in any associated SQL write roll back the entire operation. File
+persistence failure leaves both cached and durable state unchanged for retry.
+
+Fresh checks pass typecheck, the production web build (469.85 kB, unchanged
+470 kB error budget), all 1269 unit/state checks and 787 full PostgreSQL
+integration checks. The 56 targeted local command checks include real SQLite
+writer processes, restart/retry, injected write failures and failed/retried
+legacy migrations. PostgreSQL additionally covers independent pools and the
+same transactional failures. Owned PostgreSQL resources are removed; exact
+inventory retains 24 pre-existing containers and 85 volumes.
+
+This is repository infrastructure. Monitor issuance and the participant browser
+still use the previous immediate canonical effect, so the confirmed PAUSED/ERROR
+log-order mismatch remains open. Storage order tests use pinned Source fixtures
+and do not prove integrated browser effect order. The next step is to connect
+application through the participant API and move command effects to successful
+browser dispatch, including terminal save drain. Cross-server stale progress
+writes, complete Original acceptance, devices, remote CI, release and deployment
+remain unproven. This checkpoint is local and has not been pushed.
+
 ### Scoped command transport and same-status resume (2026-10-11)
 
 Application checkpoint `357eba0ffd84` connects nonterminal monitor commands

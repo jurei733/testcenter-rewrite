@@ -1328,6 +1328,36 @@ export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
 export type ParticipantRunCommand = ParticipantRunCommandInput & {
   sequence: number;
   acknowledgedAt: string | null;
+  /** Absent on legacy records; ACK and application are separate operations. */
+  executedAt?: string | null;
+  executionSequence?: number | null;
+};
+
+export type ParticipantRunCommandApplicationInput = ParticipantRunCommandScope & {
+  commandId: string;
+  executedAt: string;
+};
+
+export type ParticipantRunCommandApplicationContext = {
+  testRun: TestRun;
+  command: ParticipantRunCommand;
+  participantSession: ParticipantSession;
+  /** All session Runs for termination; otherwise only the selected Run. */
+  testRuns: TestRun[];
+};
+
+export type ParticipantRunCommandEffect = {
+  testRun: TestRun;
+  testLogs: ParticipantTestLog[];
+  activityEvents: WorkspaceActivityEvent[];
+  participantSession?: ParticipantSession;
+};
+
+export type ParticipantRunCommandApplicationResult = {
+  command: ParticipantRunCommand;
+  testRun: TestRun;
+  participantSession: ParticipantSession;
+  applied: boolean;
 };
 
 export type ParticipantRuntimeStateStatus =

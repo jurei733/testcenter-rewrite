@@ -7,6 +7,7 @@ import {
   selectParticipantAssignmentRun,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   type ParticipantPresence,
   type FirstSliceRepository
 } from "@testcenter-rewrite-app/application";
@@ -1481,6 +1482,15 @@ const migrations: PostgresMigration[] = [
       );
       CREATE INDEX idx_participant_run_commands_pending
         ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
+  },
+  {
+    version: 54,
+    name: "index_participant_command_application_order",
+    sql: `
+      CREATE UNIQUE INDEX idx_participant_run_commands_execution
+        ON participant_run_commands(test_run_id, ((command_json->>'executionSequence')::bigint))
+        WHERE command_json->>'executionSequence' IS NOT NULL;
     `
   }
 ];
@@ -3148,6 +3158,47 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           WHERE test_run_id = $3 AND command_id = $4`, [JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId]);
         await client.query("COMMIT");return command;
       } catch (error) { await client.query("ROLLBACK");throw error; }
+      finally { client.release(); }
+    },
+    async applyParticipantRunCommand(input, transform) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Parent first, matching assignment reservation and parent deletion.
+        const participantSession = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const testRun = mapTestRun((await client.query("SELECT * FROM test_runs WHERE test_run_id = $1 FOR UPDATE", [input.testRunId])).rows[0]);
+        const command = (await client.query("SELECT command_json FROM participant_run_commands WHERE test_run_id = $1 AND command_id = $2",
+          [input.testRunId, input.commandId])).rows[0]?.command_json as ParticipantRunCommand | undefined;
+        const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+        const testRuns = terminal ? (await client.query("SELECT * FROM test_runs WHERE participant_session_id = $1", [input.participantSessionId]))
+          .rows.map(mapTestRun).filter((run): run is TestRun => run !== null) : testRun ? [testRun] : [];
+        const last = await client.query(`SELECT (command_json->>'executionSequence')::bigint AS sequence
+          FROM participant_run_commands WHERE test_run_id = $1 AND command_json->>'executionSequence' IS NOT NULL
+          ORDER BY (command_json->>'executionSequence')::bigint DESC LIMIT 1`, [input.testRunId]);
+        const prepared = prepareParticipantRunCommandApplication(input,
+          command && testRun && participantSession ? { command, testRun, participantSession, testRuns } : null,
+          Number(last.rows[0]?.sequence ?? 0), transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          await persistTestRun(client, effect.testRun);
+          for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
+              log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+          for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+          if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+            [effect.participantSession.status, input.participantSessionId]);
+          await client.query("UPDATE participant_run_commands SET command_json = $1::jsonb WHERE test_run_id = $2 AND command_id = $3",
+            [JSON.stringify(prepared.result.command), input.testRunId, input.commandId]);
+        }
+        await client.query("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
     async deleteTestRunsByIds(testRunIds) {

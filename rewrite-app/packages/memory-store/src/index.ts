@@ -5,6 +5,7 @@ import {
   selectParticipantAssignmentRun,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
+  prepareParticipantRunCommandApplication,
   matchesParticipantRunCommandScope,
   type ParticipantPresence,
   type FirstSliceRepository,
@@ -749,6 +750,32 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.participantRunCommands.get(key) ?? null);
       if (command) state.participantRunCommands.set(key, structuredClone(command));
       return command;
+    },
+    async applyParticipantRunCommand(input, transform) {
+      const key = JSON.stringify([input.testRunId, input.commandId]);
+      const command = state.participantRunCommands.get(key);
+      const testRun = state.testRuns.get(input.testRunId);
+      const participantSession = state.participantSessions.get(input.participantSessionId);
+      const terminal = command?.commandType === "complete" || command?.commandType === "complete_and_lock";
+      const prepared = prepareParticipantRunCommandApplication(input,
+        command && testRun && participantSession ? { command, testRun, participantSession,
+          testRuns: terminal ? Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) : [testRun] } : null,
+        Array.from(state.participantRunCommands.values()).reduce((max, record) =>
+          record.testRunId === input.testRunId ? Math.max(max, record.executionSequence ?? 0) : max, 0), transform);
+      if (!prepared) return null;
+      if (prepared.effect) {
+        const effect = prepared.effect;
+        if (effect.testLogs.some(log => state.participantTestLogs.has(log.participantTestLogId)) ||
+            effect.activityEvents.some(event => state.workspaceActivityEvents.has(event.activityEventId))) {
+          throw new Error("A participant command effect cannot overwrite an existing artifact identity.");
+        }
+        state.testRuns.set(input.testRunId, effect.testRun);
+        state.participantRunCommands.set(key, prepared.result.command);
+        for (const log of effect.testLogs) state.participantTestLogs.set(log.participantTestLogId, log);
+        for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
+        if (effect.participantSession) state.participantSessions.set(input.participantSessionId, effect.participantSession);
+      }
+      return structuredClone(prepared.result);
     },
     async deleteTestRunsByIds(testRunIds) {
       let deletedCount = 0;
