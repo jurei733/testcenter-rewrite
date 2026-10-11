@@ -153,24 +153,38 @@ try {
     });
     const requested = page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST" &&
       request.postDataJSON()?.responseUnitKey==="unit-intro", {timeout:15_000});
+    const focusedFailure = page.waitForEvent("requestfailed", {timeout:15_000, predicate: request=>{
+      if (request.url()!==base+savePath || request.method()!=="POST") return false;
+      const body=request.postDataJSON();
+      let value;
+      try { value=JSON.parse(body.unitResponse).unitState?.dataParts?.answer; } catch {}
+      return body.responseUnitKey==="unit-intro" && value===answer &&
+        body.logs?.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS"));
+    }});
     await frame.locator("#demoPlayerAnswer").fill(answer);
     await requested;
     // Native focus is itself logged by the host after its debounce. Let that
     // real newer packet finish its initial failed attempt before holding a
     // retry of the final durable packet. No extra input is made afterwards.
-    await page.waitForFunction(runId=>{
+    const failedFocusPacket=(await focusedFailure).postDataJSON();
+    await page.waitForFunction(({runId,deliveryId})=>{
       const packet=JSON.parse(localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1")||"{}").entries
         ?.find(entry=>entry.testRunId===runId && entry.unitKey==="unit-intro");
-      return packet?.logs?.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS")) &&
+      return packet?.deliveryId===deliveryId &&
+        packet.logs.some(batch=>batch.entries.some(entry=>entry.key==="FOCUS")) &&
         document.querySelector("#participantVeronaSaveStatus")?.textContent==="queued offline";
-    },runId,{timeout:15_000});
+    },{runId,deliveryId:failedFocusPacket.deliveryId},{timeout:15_000});
+    // Register before either connectivity transition: the real retry can
+    // reach the route while setOffline is still settling its native events.
+    const heldRequest=page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST" &&
+      request.postDataJSON()?.deliveryId===failedFocusPacket.deliveryId,{timeout:15_000});
     holdNext=true;
     await context.setOffline(true);
     await page.waitForFunction(()=>!navigator.onLine && globalThis.ownRetryEvents.some(event=>event.type==="offline" && event.trusted));
-    const heldRequest=page.waitForRequest(request=>request.url()===base+savePath && request.method()==="POST",{timeout:15_000});
     await context.setOffline(false);
     await heldRequest;
     const packet = await held;
+    assert.equal(packet.deliveryId,failedFocusPacket.deliveryId,"Retry the actual failed focus-bearing delivery");
     assert.equal(packet.responseOnly,true,"Durable answers must use response-only transport");
     if (clockSkewMs) {
       assert.ok(await page.evaluate(()=>Date.now())<legacyClock,"Exercise an actual device clock behind the stored legacy response");
