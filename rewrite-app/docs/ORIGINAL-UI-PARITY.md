@@ -2,6 +2,7 @@
 
 ### Atomic application of acknowledged commands (2026-10-11)
 
+Application checkpoint `6ef2057f7fb5` commits the storage infrastructure below.
 The repository now commits an acknowledged command's Run effect, execution
 receipt, participant logs, workspace activity and optional session status in
 one operation. Memory uses a synchronous detached transform, File publishes
@@ -23,6 +24,25 @@ writer processes, restart/retry, injected write failures and failed/retried
 legacy migrations. PostgreSQL additionally covers independent pools and the
 same transactional failures. Owned PostgreSQL resources are removed; exact
 inventory retains 24 pre-existing containers and 85 volumes.
+
+All four clean-image checks pass for this application commit: PostgreSQL
+standard/demo/production-secret boundaries on schema 54 and SQLite on schema 60.
+Image `testcenter-rewrite-app:completeness-6ef2057f7fb5` has USER node and ID
+`sha256:4be48633796c9968efc0fda8ed21f91680b4fc97619d37d773fb2d762ef82675`.
+The tracked build archive is removed after the checks, with the protected
+presentation excluded and all pre-existing container and volume IDs preserved.
+
+Four fresh browser checks at the same application commit also pass received
+pause/resume with native and fallback dialogs, actual iframe lifecycle and saved
+answers retained; all four owned API processes shut down. These verify the
+existing transport and do not prove deferred command application or Source
+PAUSED/ERROR log-order parity.
+
+Pinned Source backend revision `ee2ab9ab64bd91209ef8534bbe6005838024e46d`
+confirms the separation: MonitorController.putCommand stores and broadcasts;
+TestDAO.setCommandExecuted only updates the receipt flag. Neither operation
+applies a controller effect. Native must apply it following successful browser
+dispatch, rather than treating the transport ACK as the effect itself.
 
 This is repository infrastructure. Monitor issuance and the participant browser
 still use the previous immediate canonical effect, so the confirmed PAUSED/ERROR
