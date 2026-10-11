@@ -52,8 +52,23 @@ test("background saves retain exact responses and IDs across authentication and 
     assert.equal(sent[0].url, "https://testcenter.example/api/v1/participant/test-runs/run-a/save-progress");
     assert.deepEqual(JSON.parse(sent[0].init.body), {
       deliveryId: "delivery-a", responseUnitKey: "unit-a", status: "running",
+      responseTimestamp: Date.parse(original[0].entry.queuedAt),
       unitResponse: original[0].entry.response, logs: []
     });
+  }
+});
+
+test("legacy background records without a valid capture time retain their exact answer and retry identity", async () => {
+  for (const queuedAt of [undefined, "invalid-date"]) {
+    const item = record(); item.entry.queuedAt = queuedAt;
+    const { pending, sent, run } = fixture([item]);
+    await assert.rejects(run(async () => response(503)), /remain queued/);
+    await run(async () => response(200));
+    assert.equal(pending.size, 0);
+    assert.equal(sent[0].init.body, sent[1].init.body);
+    const body = JSON.parse(sent[1].init.body);
+    assert.equal(Object.hasOwn(body, "responseTimestamp"), false);
+    assert.equal(body.unitResponse, item.entry.response); assert.equal(body.deliveryId, item.entry.deliveryId);
   }
 });
 

@@ -46,6 +46,7 @@ import type {
   ParticipantSession,
   ParticipantTestLog,
   ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   Tenant,
   TestRun,
@@ -86,6 +87,7 @@ type PersistedFirstSliceState = {
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
   participantRunCommands: Record<string, ParticipantRunCommand>;
+  participantProgressDeliveries: Record<string, ParticipantProgressDelivery>;
   participantTestLogs: Record<string, ParticipantTestLog>;
   participantPresence: Record<string, ParticipantPresence>;
 };
@@ -131,6 +133,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantLoginAttempts: {},
   testRuns: {},
   participantRunCommands: {},
+  participantProgressDeliveries: {},
   participantTestLogs: {},
   participantPresence: {}
 });
@@ -621,6 +624,7 @@ export const createFileFirstSliceRepository = (
     const operation = writeQueue.then(async () => {
       const current = await getState();
       const next = { ...current, participantRunCommands: { ...current.participantRunCommands },
+        participantProgressDeliveries: { ...current.participantProgressDeliveries },
         testRuns: { ...current.testRuns }, participantSessions: { ...current.participantSessions },
         participantTestLogs: { ...current.participantTestLogs }, workspaceActivityEvents: { ...current.workspaceActivityEvents } };
       const result = updater(next);
@@ -916,6 +920,7 @@ export const createFileFirstSliceRepository = (
         const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
         deleteMatching(state.participantRunCommands, workspaceMatches);
+      deleteMatching(state.participantProgressDeliveries, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
@@ -1423,6 +1428,7 @@ export const createFileFirstSliceRepository = (
       const testRun = state.testRuns[input.testRunId];
       const participantSession = state.participantSessions[input.participantSessionId];
       const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
+        progressDelivery: input.deliveryId ? state.participantProgressDeliveries[JSON.stringify([input.testRunId, input.deliveryId])] ?? null : null,
         testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
@@ -1432,6 +1438,7 @@ export const createFileFirstSliceRepository = (
         }) : null;
         if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
         if (command) state.participantRunCommands[JSON.stringify([command.testRunId, command.commandId])] = command;
+        if (effect.progressDelivery) state.participantProgressDeliveries[JSON.stringify([input.testRunId, effect.progressDelivery.deliveryId])] = effect.progressDelivery;
         state.testRuns[input.testRunId] = effect.testRun;
         for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
         for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
@@ -1475,6 +1482,9 @@ export const createFileFirstSliceRepository = (
           delete state.participantPresence[testRunId];
           for (const [key, command] of Object.entries(state.participantRunCommands)) {
             if (command.testRunId === testRunId) delete state.participantRunCommands[key];
+          }
+          for (const [key, receipt] of Object.entries(state.participantProgressDeliveries)) {
+            if (receipt.testRunId === testRunId) delete state.participantProgressDeliveries[key];
           }
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];

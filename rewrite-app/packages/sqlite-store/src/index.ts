@@ -34,6 +34,7 @@ import type {
   ParticipantSession,
   ParticipantTestLog,
   ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -572,6 +573,14 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
         unitResponses: JSON.parse(
           String(row.unit_responses_json ?? "{}")
         ) as Record<string, string>,
+        ...(() => {
+          const fields = JSON.parse(String(row.response_field_timestamps_json ?? "{}")) as NonNullable<TestRun["unitResponseFieldTimestamps"]>;
+          return Object.keys(fields).length ? { unitResponseFieldTimestamps: fields } : {};
+        })(),
+        ...(() => {
+          const fields = JSON.parse(String(row.shared_parameter_timestamps_json ?? "{}")) as NonNullable<TestRun["sharedParameterTimestamps"]>;
+          return Object.keys(fields).length ? { sharedParameterTimestamps: fields } : {};
+        })(),
         sharedParameters: (() => {
           try {
             const parsed = JSON.parse(
@@ -1581,6 +1590,26 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX idx_participant_run_commands_pending
         ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
     `
+  },
+  {
+    version: 63,
+    name: "participant_progress_delivery_and_field_ordering",
+    sql: `
+      ALTER TABLE test_runs ADD COLUMN response_field_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE test_runs ADD COLUMN shared_parameter_timestamps_json TEXT NOT NULL DEFAULT '{}';
+      CREATE TABLE participant_progress_deliveries (
+        test_run_id TEXT NOT NULL REFERENCES test_runs(test_run_id) ON DELETE CASCADE,
+        delivery_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        content_release_id TEXT NOT NULL,
+        delivery_json TEXT NOT NULL,
+        PRIMARY KEY (test_run_id, delivery_id)
+      );
+      CREATE INDEX idx_participant_progress_deliveries_workspace
+        ON participant_progress_deliveries(tenant_id, workspace_id);
+    `
   }
 ];
 
@@ -1722,8 +1751,8 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
   const result = database
     .prepare(
       `INSERT INTO test_runs (
-        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, pause_source, response_field_timestamps_json, shared_parameter_timestamps_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ${updateExisting ? `ON CONFLICT(test_run_id) DO UPDATE SET
         participant_session_id = excluded.participant_session_id,
         tenant_id = excluded.tenant_id,
@@ -1748,7 +1777,9 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         completed_at = excluded.completed_at,
-        pause_source = excluded.pause_source` : "ON CONFLICT(test_run_id) DO NOTHING"}`
+        pause_source = excluded.pause_source,
+        response_field_timestamps_json = excluded.response_field_timestamps_json,
+        shared_parameter_timestamps_json = excluded.shared_parameter_timestamps_json` : "ON CONFLICT(test_run_id) DO NOTHING"}`
     )
     .run(
       testRun.testRunId,
@@ -1775,7 +1806,9 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
       testRun.createdAt,
       testRun.updatedAt,
       testRun.completedAt,
-      testRun.status === "paused" ? testRun.pauseSource ?? null : null
+      testRun.status === "paused" ? testRun.pauseSource ?? null : null,
+      JSON.stringify(testRun.unitResponseFieldTimestamps ?? {}),
+      JSON.stringify(testRun.sharedParameterTimestamps ?? {})
     );
   return Number(result.changes) === 1;
 };
@@ -3234,7 +3267,7 @@ export const createSqliteFirstSliceRepository = (
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json
            FROM test_runs
            WHERE test_run_id = ?`
         )
@@ -3244,7 +3277,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json
            FROM test_runs
            WHERE participant_session_id = ?`
         )
@@ -3254,7 +3287,7 @@ export const createSqliteFirstSliceRepository = (
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json
            FROM test_runs
            WHERE participant_session_id = ? AND status != 'completed'
            ORDER BY updated_at ASC
@@ -3266,7 +3299,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, pause_source, locked, current_unit_key, unit_responses_json, shared_parameters_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at, response_field_timestamps_json, shared_parameter_timestamps_json
            FROM test_runs
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -3375,10 +3408,21 @@ export const createSqliteFirstSliceRepository = (
           .get(input.participantSessionId) as Record<string, unknown> | undefined);
         const testRuns = database.prepare("SELECT * FROM test_runs WHERE participant_session_id = ?").all(input.participantSessionId)
           .map(row => mapTestRun(row as Record<string, unknown>)).filter((run): run is TestRun => run !== null);
+        const deliveryRow = input.deliveryId ? database.prepare("SELECT delivery_json FROM participant_progress_deliveries WHERE test_run_id = ? AND delivery_id = ?")
+          .get(input.testRunId, input.deliveryId) : undefined;
+        const progressDelivery = deliveryRow ? JSON.parse(String(deliveryRow.delivery_json)) as ParticipantProgressDelivery : null;
         const prepared = prepareParticipantRunMutation(input,
-          testRun && participantSession ? { testRun, participantSession, testRuns } : null, transform);
+          testRun && participantSession ? { testRun, participantSession, testRuns, progressDelivery } : null, transform);
         if (prepared?.effect) {
           const effect = prepared.effect;
+          if (effect.progressDelivery) {
+            const receipt = effect.progressDelivery;
+            database.prepare(`INSERT INTO participant_progress_deliveries
+              (test_run_id, delivery_id, tenant_id, workspace_id, participant_session_id, content_release_id, delivery_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(test_run_id, delivery_id) DO NOTHING`)
+              .run(receipt.testRunId, receipt.deliveryId, receipt.tenantId, receipt.workspaceId, receipt.participantSessionId,
+                receipt.contentReleaseId, JSON.stringify(receipt));
+          }
           if (effect.commandInput) {
             const existing = database.prepare("SELECT command_json FROM participant_run_commands WHERE test_run_id = ? AND command_id = ?")
               .get(input.testRunId, effect.commandInput.commandId);

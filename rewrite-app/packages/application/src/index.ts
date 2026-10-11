@@ -1,4 +1,5 @@
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
+import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
   ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
 export { prepareParticipantRunMutation } from "./participant-run-mutation.js";
@@ -768,6 +769,7 @@ export type ParticipantRuntimePort = {
   saveProgress(input: {
     testRunId: string;
     deliveryId?: string;
+    responseTimestamp?: number;
     currentUnitKey?: string | null;
     responseUnitKey?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -852,6 +854,7 @@ export type ParticipantRuntimePort = {
   }): Promise<TestRun>;
   completeRun(input: {
     testRunId: string;
+    responseTimestamp?: number;
     responseUnitKey?: string | null;
     unitResponse?: string | null;
     transientUnitResponses?: Record<string, string>;
@@ -2139,6 +2142,19 @@ const normalizeOptionalParticipantDeliveryId = (
   }
   return value.trim();
 };
+
+const normalizeOptionalParticipantResponseTimestamp = (value: unknown): number | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    throw new FirstSliceError(400, "participant_response_timestamps_invalid", "responseTimestamp must be a positive safe integer when provided.");
+  }
+  return value;
+};
+
+const participantProgressPayloadSha256 = (value: unknown): string => createHash("sha256").update(
+  JSON.stringify(value, (_key, item) => item !== null && typeof item === "object" && !Array.isArray(item)
+    ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)
+).digest("hex");
 
 const normalizeOptionalRuntimeBookletKey = (value: unknown): string | undefined => {
   if (value === undefined || value === null) {
@@ -21178,7 +21194,9 @@ const resetNonSavingTestRunForEntry = (input: {
     locked: false,
     currentUnitKey: null,
     unitResponses: {},
+    ...(input.testRun.unitResponseFieldTimestamps ? { unitResponseFieldTimestamps: {} } : {}),
     sharedParameters: [],
+    ...(input.testRun.sharedParameterTimestamps ? { sharedParameterTimestamps: {} } : {}),
     unlockedTestletKeys: [],
     monitorNavigationUnlocked: false,
     testletTimers: {},
@@ -25384,6 +25402,13 @@ export const createFirstSliceServices = (
   type RuntimeRunProjection = Omit<ParticipantRunMutationEffect, "testLogs" | "activityEvents"> & {
     testLogs?: ParticipantTestLog[];
     activityEvents?: WorkspaceActivityEvent[];
+  };
+  const orderedParticipantResponse = (input: Parameters<typeof withOrderedParticipantResponse>[0]): TestRun => {
+    try { return withOrderedParticipantResponse(input); }
+    catch (error) {
+      if (error instanceof RangeError) throw new FirstSliceError(400, "participant_response_timestamps_invalid", error.message);
+      throw error;
+    }
   };
   const projectCompletedParticipantSession = (input: {
     context: ParticipantRunMutationContext;
@@ -33128,6 +33153,7 @@ export const createFirstSliceServices = (
       },
       async saveProgress(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
+        const responseTimestamp = normalizeOptionalParticipantResponseTimestamp(input.responseTimestamp);
         return serializeTestRunMutation(testRunId, async () => {
           const deliveryId = normalizeOptionalParticipantDeliveryId(
             input.deliveryId
@@ -33169,15 +33195,32 @@ export const createFirstSliceServices = (
           }
         }
         let timerCompletedBeforeProgress = false;
-        const result = await repository.mutateParticipantRun(storedTestRun, context => {
+        const result = await repository.mutateParticipantRun({ ...storedTestRun, deliveryId }, context => {
         const timestamp = now();
         assertParticipantAccessWindow(participantRosterEntry, timestamp, context.participantSession.validUntil);
         const before = prepareEffectiveTestletTimerState({ contentRelease, context, participantRosterEntry, timestamp });
         const testRun = normalizeTestRun(before.effect.testRun);
-        requireParticipantTestRunUnlocked(testRun);
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
+        const payloadSha256 = deliveryId ? participantProgressPayloadSha256({
+          status: normalizeTestRunProgressStatus(input.status),
+          currentUnitKey: input.currentUnitKey,
+          responseUnitKey: input.responseUnitKey,
+          confirmTestletTimeLeave: input.confirmTestletTimeLeave ?? false,
+          confirmTestletLeaveLock: input.confirmTestletLeaveLock ?? false,
+          ...(executionMode.saveResponses ? {
+            unitResponse: normalizeOptionalUnitResponse(input.unitResponse), responseTimestamp,
+            transientUnitResponses: input.transientUnitResponses, logs: incomingLogBatches
+          } : {})
+        }) : undefined;
+        if (context.progressDelivery) {
+          if (context.progressDelivery.payloadSha256 !== payloadSha256) {
+            throw new FirstSliceError(409, "participant_delivery_conflict", "An accepted deliveryId cannot be reused for different progress.");
+          }
+          return before.changed ? before.effect : null;
+        }
+        requireParticipantTestRunUnlocked(testRun);
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
@@ -33203,7 +33246,7 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' is paused by a monitor and cannot navigate until the monitor resumes it.`
           );
         }
-        const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        let nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         const hasResponseUnitKeyInput = input.responseUnitKey !== undefined;
         const responseUnitKey = hasResponseUnitKeyInput
           ? normalizeOptionalResponseUnitKey(input.responseUnitKey)
@@ -33237,11 +33280,17 @@ export const createFirstSliceServices = (
             transientUnitKey
           );
         }
+        const responseRun = executionMode.saveResponses && responseUnitKey && nextUnitResponse != null
+          ? orderedParticipantResponse({ testRun, unitKey: responseUnitKey, response: nextUnitResponse, responseTimestamp, timestamp })
+          : testRun;
+        if (executionMode.saveResponses && responseUnitKey && nextUnitResponse != null) {
+          nextUnitResponse = responseRun.unitResponses[responseUnitKey]!;
+        }
         const hasTransientEvaluation =
           Object.keys(transientUnitResponses).length > 0 ||
           Boolean(responseUnitKey && nextUnitResponse != null);
         const transientEvaluationResponses = {
-          ...testRun.unitResponses,
+          ...responseRun.unitResponses,
           ...transientUnitResponses,
           ...(responseUnitKey && nextUnitResponse != null
             ? { [responseUnitKey]: nextUnitResponse }
@@ -33250,11 +33299,11 @@ export const createFirstSliceServices = (
         const transientEvaluationRun =
           hasTransientEvaluation
             ? withEvaluatedBookletStates(booklet, {
-                ...testRun,
+                ...responseRun,
                 unitResponses: transientEvaluationResponses
               })
-            : testRun;
-        let navigationTestRun = testRun;
+            : responseRun;
+        let navigationTestRun = responseRun;
         let activatedLeaveLock: ReturnType<
           typeof resolveCurrentLeaveLock
         > = null;
@@ -33328,9 +33377,8 @@ export const createFirstSliceServices = (
             ? undefined
             : parseVeronaUnitResponse(nextUnitResponse)?.playerState
                 ?.sharedParameters;
-        const nextSharedParameters = mergeVeronaSharedParameters(
-          navigationTestRun.sharedParameters,
-          reportedSharedParameters
+        const nextSharedParameters = executionMode.saveResponses ? navigationTestRun.sharedParameters : mergeVeronaSharedParameters(
+          navigationTestRun.sharedParameters, reportedSharedParameters
         );
         const requestedStatus = normalizeTestRunProgressStatus(input.status);
         const nextStatus = monitorPauseActive ? "paused" : requestedStatus;
@@ -33491,6 +33539,11 @@ export const createFirstSliceServices = (
         const participantSession = after.effect.participantSession ?? before.effect.participantSession;
         return { testRun: effectiveRun,
           testLogs: [...before.effect.testLogs, ...participantTestLogs, ...after.effect.testLogs], activityEvents,
+          ...(deliveryId && payloadSha256 ? { progressDelivery: {
+            testRunId, participantSessionId: context.testRun.participantSessionId,
+            tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId,
+            contentReleaseId: context.testRun.contentReleaseId, deliveryId, payloadSha256, acceptedAt: timestamp
+          } } : {}),
           ...(participantSession ? { participantSession } : {}) };
         });
         if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
@@ -34114,6 +34167,7 @@ export const createFirstSliceServices = (
       },
       async completeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
+        const responseTimestamp = normalizeOptionalParticipantResponseTimestamp(input.responseTimestamp);
         const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
@@ -34175,6 +34229,9 @@ export const createFirstSliceServices = (
             !executionMode.saveResponses &&
             (Object.keys(transientUnitResponses).length > 0 ||
               Boolean(responseUnitKey && unitResponse != null));
+          const responseRun = executionMode.saveResponses && responseUnitKey && unitResponse != null
+            ? orderedParticipantResponse({ testRun, unitKey: responseUnitKey, response: unitResponse, responseTimestamp, timestamp })
+            : testRun;
           const completionEvaluationRun =
             hasTransientEvaluation
               ? withEvaluatedBookletStates(booklet, {
@@ -34187,7 +34244,7 @@ export const createFirstSliceServices = (
                     : {})
                 }
               })
-              : testRun;
+              : withEvaluatedBookletStates(booklet, responseRun);
           const leavingTimedTestlet = resolveLeavingTimedTestlet(
             booklet,
             completionEvaluationRun,

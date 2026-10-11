@@ -315,7 +315,10 @@ if (kinds.includes("postgres")) {
       const before = await storage.repository.getTestRunById(run.testRunId);
       await storage.shutdown();
       storage = undefined;
-      await control.query(`DROP TABLE participant_run_commands;
+      await control.query(`DROP TABLE participant_progress_deliveries;
+        ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
+        ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json;
+        DROP TABLE participant_run_commands;
         DELETE FROM schema_migrations WHERE version >= 53;
         CREATE FUNCTION own_migration_failure() RETURNS trigger LANGUAGE plpgsql AS $$
           BEGIN RAISE EXCEPTION 'own command migration failure'; END $$;

@@ -8862,6 +8862,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
           deliveryId: body.deliveryId,
+          responseTimestamp: body.responseTimestamp,
           currentUnitKey: body.currentUnitKey,
           responseUnitKey: body.responseUnitKey,
           transientUnitResponses: body.transientUnitResponses,
@@ -9152,6 +9153,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<CompleteTestRunRequest>();
         const testRun = await services.participantRuntime.completeRun({
           testRunId,
+          responseTimestamp: body?.responseTimestamp,
           responseUnitKey: body?.responseUnitKey,
           unitResponse: body?.unitResponse,
           transientUnitResponses: body?.transientUnitResponses,

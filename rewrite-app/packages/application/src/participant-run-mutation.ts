@@ -1,16 +1,19 @@
-import type { ParticipantSession, ParticipantRunCommandEffect, ParticipantRunCommandInput, TestRun } from "@testcenter-rewrite-app/domain";
+import type { ParticipantSession, ParticipantRunCommandEffect, ParticipantRunCommandInput,
+  ParticipantProgressDelivery, TestRun } from "@testcenter-rewrite-app/domain";
 import { matchesParticipantRunCommandScope } from "./participant-run-commands.js";
 
 export type ParticipantRunMutationInput = Pick<TestRun,
-  "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId">;
+  "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & { deliveryId?: string };
 export type ParticipantRunMutationContext = {
   testRun: TestRun;
   participantSession: ParticipantSession;
   testRuns: TestRun[];
+  progressDelivery?: ParticipantProgressDelivery | null;
 };
 export type ParticipantRunMutationEffect = ParticipantRunCommandEffect & {
   /** Queue an intent in the same transaction as its Run projection and audit. */
   commandInput?: ParticipantRunCommandInput;
+  progressDelivery?: ParticipantProgressDelivery;
 };
 export type ParticipantRunMutationResult = {
   testRun: TestRun;
@@ -28,11 +31,16 @@ export const prepareParticipantRunMutation = (
     const value = input[key];
     if (typeof value !== "string" || !value.trim()) throw new Error("Participant Run mutations require non-empty scoped identifiers.");
   }
+  if (input.deliveryId !== undefined && (typeof input.deliveryId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(input.deliveryId))) {
+    throw new Error("Participant progress mutations require a valid scoped delivery identifier.");
+  }
   if (!context || !matchesParticipantRunCommandScope(context.testRun, input) ||
     context.testRun.contentReleaseId !== input.contentReleaseId ||
     context.participantSession.participantSessionId !== input.participantSessionId ||
     context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId ||
-    context.participantSession.contentReleaseId !== input.contentReleaseId) return null;
+    context.participantSession.contentReleaseId !== input.contentReleaseId ||
+    context.progressDelivery && (!matchesParticipantRunCommandScope(context.progressDelivery, input) ||
+      context.progressDelivery.contentReleaseId !== input.contentReleaseId || context.progressDelivery.deliveryId !== input.deliveryId)) return null;
   const { testRun, participantSession } = context;
   const effect = structuredClone(transform(structuredClone(context)));
   if (effect && (!matchesParticipantRunCommandScope(effect.testRun, input) ||
@@ -44,6 +52,14 @@ export const prepareParticipantRunMutation = (
     effect.participantSession && Object.keys({ ...participantSession, ...effect.participantSession }).some(key => key !== "status" &&
       effect.participantSession![key as keyof ParticipantSession] !== participantSession[key as keyof ParticipantSession]))) {
     throw new Error("A participant Run mutation cannot cross its immutable parent scope.");
+  }
+  const receipt = effect?.progressDelivery;
+  if (receipt && (!matchesParticipantRunCommandScope(receipt, input) || receipt.contentReleaseId !== input.contentReleaseId ||
+    receipt.deliveryId !== input.deliveryId || typeof receipt.payloadSha256 !== "string" || !/^[a-f0-9]{64}$/.test(receipt.payloadSha256) ||
+    typeof receipt.acceptedAt !== "string" || !Number.isFinite(Date.parse(receipt.acceptedAt)) || context.progressDelivery &&
+      Object.keys({ ...context.progressDelivery, ...receipt }).some(key =>
+        receipt[key as keyof ParticipantProgressDelivery] !== context.progressDelivery![key as keyof ParticipantProgressDelivery]))) {
+    throw new Error("A progress delivery cannot change its accepted identity or cross its immutable parent scope.");
   }
   return { result: structuredClone({ testRun: effect?.testRun ?? testRun,
     participantSession: effect?.participantSession ?? participantSession, applied: effect !== null }), effect };

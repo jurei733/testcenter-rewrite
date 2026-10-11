@@ -1092,6 +1092,25 @@ export type ParticipantSession = {
   createdAt: string;
 };
 
+/** Capture timestamps for individual Verona fields, matching Source patch ordering. */
+export type ParticipantResponseFieldTimestamps = {
+  unitState?: Record<string, number>;
+  dataParts?: Record<string, number>;
+  playerState?: Record<string, number>;
+  opaque?: number;
+};
+
+export type ParticipantProgressDelivery = {
+  testRunId: string;
+  participantSessionId: string;
+  tenantId: string;
+  workspaceId: string;
+  contentReleaseId: string;
+  deliveryId: string;
+  payloadSha256: string;
+  acceptedAt: string;
+};
+
 export type TestRun = {
   testRunId: string;
   participantSessionId: string;
@@ -1113,8 +1132,10 @@ export type TestRun = {
   locked?: boolean;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
+  unitResponseFieldTimestamps?: Record<string, ParticipantResponseFieldTimestamps>;
   /** Original test-wide Verona 6 Player-to-Player communication state. */
   sharedParameters?: Array<{ key: string; value: string }>;
+  sharedParameterTimestamps?: Record<string, number>;
   unlockedTestletKeys?: string[];
   monitorNavigationUnlocked?: boolean;
   testletTimers?: Record<string, TestletTimerState>;

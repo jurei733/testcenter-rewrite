@@ -31,6 +31,7 @@ import type {
   ParticipantSession,
   ParticipantTestLog,
   ParticipantRunCommand,
+  ParticipantProgressDelivery,
   SourcePackage,
   Tenant,
   TestRun,
@@ -72,6 +73,7 @@ type InMemoryFirstSliceState = {
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
   participantRunCommands: Map<string, ParticipantRunCommand>;
+  participantProgressDeliveries: Map<string, ParticipantProgressDelivery>;
   participantTestLogs: Map<string, ParticipantTestLog>;
   participantPresence: Map<string, ParticipantPresence>;
 };
@@ -103,6 +105,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantLoginAttempts: new Map(),
   testRuns: new Map(),
   participantRunCommands: new Map(),
+  participantProgressDeliveries: new Map(),
   participantTestLogs: new Map(),
   participantPresence: new Map()
 });
@@ -311,6 +314,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
       deleteMatching(state.participantRunCommands, workspaceMatches);
+      deleteMatching(state.participantProgressDeliveries, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
       }
@@ -763,6 +767,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const testRun = state.testRuns.get(input.testRunId);
       const participantSession = state.participantSessions.get(input.participantSessionId);
       const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
+        progressDelivery: input.deliveryId ? state.participantProgressDeliveries.get(JSON.stringify([input.testRunId, input.deliveryId])) ?? null : null,
         testRuns: Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
       if (prepared?.effect) {
         const effect = prepared.effect;
@@ -772,6 +777,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         }) : null;
         if (effect.commandInput && !command) throw new Error("The Run no longer accepts the projected command.");
         if (command) state.participantRunCommands.set(JSON.stringify([command.testRunId, command.commandId]), command);
+        if (effect.progressDelivery) state.participantProgressDeliveries.set(JSON.stringify([input.testRunId, effect.progressDelivery.deliveryId]), effect.progressDelivery);
         state.testRuns.set(input.testRunId, effect.testRun);
         for (const log of effect.testLogs) state.participantTestLogs.set(log.participantTestLogId, log);
         for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
@@ -811,6 +817,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.participantPresence.delete(testRunId);
         for (const [key, command] of state.participantRunCommands) {
           if (command.testRunId === testRunId) state.participantRunCommands.delete(key);
+        }
+        for (const [key, receipt] of state.participantProgressDeliveries) {
+          if (receipt.testRunId === testRunId) state.participantProgressDeliveries.delete(key);
         }
         if (state.testRuns.delete(testRunId)) {
           deletedCount += 1;

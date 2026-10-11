@@ -17,6 +17,15 @@
     "paths": {
       "@testcenter-rewrite-app/domain": ["packages/domain/src/index.ts"],
       "@testcenter-rewrite-app/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite-app/contracts/participant-response-capture": [
+        "packages/contracts/src/participant-response-capture.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-response-order": [
+        "packages/contracts/src/participant-response-order.ts"
+      ],
+      "@testcenter-rewrite-app/contracts/participant-response-field-timestamps": [
+        "packages/contracts/src/participant-response-field-timestamps.ts"
+      ],
       "@testcenter-rewrite-app/contracts/participant-run-command": [
         "packages/contracts/src/participant-run-command.ts"
       ],

@@ -31,7 +31,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
     const rootPool = kind === "postgres" ? new Pool({ connectionString: process.env.FIRST_SLICE_POSTGRES_URL }) : null;
     let control, storage, created = false;
     const currentVersion = kind === "sqlite" ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
-    const applicationVersion = upgrade === "application" ? kind === "sqlite" ? 60 : 54 : currentVersion;
+    const applicationVersion = upgrade === "application" ? kind === "sqlite" ? 60 : 54 : kind === "sqlite" ? 62 : 56;
     const migration = () => kind === "sqlite" ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
     const create = async () => {
       if (kind === "sqlite") return createSqliteFirstSliceRepository(file);
@@ -69,6 +69,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
             ? "json_extract(command_json, '$.effectsDeferred') = 1 AND json_extract(command_json, '$.executedAt') IS NULL"
             : "command_json->>'effectsDeferred' = 'true' AND command_json->>'executedAt' IS NULL"})`);
       }
+      await execute("DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json; ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json");
       await execute(`DELETE FROM schema_migrations WHERE version >= ${applicationVersion}`);
       if (kind === "sqlite") await execute(`CREATE TRIGGER owned_application_upgrade_failure BEFORE INSERT ON schema_migrations
         WHEN NEW.version = ${applicationVersion} BEGIN SELECT RAISE(ABORT, 'owned application upgrade failure'); END`);

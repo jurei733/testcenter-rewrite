@@ -178,6 +178,9 @@ test("SQLite migration automatic rollback preserves its cause and leaves schema 
     await repository.saveTestRun(run);
     const storedRun = await repository.getTestRunById(run.testRunId);
     control.exec(`DELETE FROM schema_migrations WHERE version >= 58;
+      DROP TABLE participant_progress_deliveries;
+      ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
+      ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json;
       DROP TABLE participant_run_commands;
       DROP TABLE participant_connection_presence;
       ALTER TABLE participant_test_logs DROP COLUMN original_timestamp;

@@ -968,6 +968,8 @@ export type ResumeParticipantSessionRequest = {
 
 export type SaveTestRunProgressRequest = {
   deliveryId?: string;
+  /** Capture time for legacy responses; Verona envelopes carry field clocks. */
+  responseTimestamp?: number;
   currentUnitKey?: string | null;
   /** Unit receiving `unitResponse`; defaults to `currentUnitKey` for compatibility. */
   responseUnitKey?: string | null;
@@ -1034,6 +1036,7 @@ export type UnlockParticipantTestletRequest = {
 };
 
 export type CompleteTestRunRequest = {
+  responseTimestamp?: number;
   responseUnitKey?: string | null;
   unitResponse?: string | null;
   transientUnitResponses?: Record<string, string>;

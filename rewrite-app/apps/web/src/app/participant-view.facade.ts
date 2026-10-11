@@ -3552,6 +3552,7 @@ export class ParticipantViewFacade {
           }),
           {
             deliveryId: save.deliveryId,
+            responseTimestamp: Date.parse(save.queuedAt),
             responseUnitKey: save.unitKey,
             status: save.status,
             unitResponse: save.response,

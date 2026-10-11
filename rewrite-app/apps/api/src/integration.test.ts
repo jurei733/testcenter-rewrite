@@ -41309,9 +41309,14 @@ test("original BookletConfig compiles into enforced participant navigation polic
   });
   assert.equal(lateFirstSave.status, 200);
   assert.equal(lateFirstSave.body.testRun.currentUnitKey, secondUnitKey);
+  // Original State::applyPatch retains fields absent from a later patch.
+  // Updating the current page must preserve the previously reported parameters.
   assert.equal(
     lateFirstSave.body.testRun.unitResponses[firstUnitKey],
-    lateFirstResponse
+    unitResponse("complete", "complete", "page-4", [
+      { key: "avatar", value: "green" },
+      { key: "difficulty", value: "high" }
+    ])
   );
   assert.equal(
     (await save(secondUnitKey, unitResponse("some", "none", "page-1"))).status,

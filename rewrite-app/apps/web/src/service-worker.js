@@ -247,6 +247,7 @@ const drainParticipantBackgroundSaves = async ({
           },
           body: JSON.stringify({
             deliveryId: entry.deliveryId,
+            ...(Number.isFinite(Date.parse(entry.queuedAt)) ? { responseTimestamp: Date.parse(entry.queuedAt) } : {}),
             responseUnitKey: entry.unitKey,
             status: entry.status,
             unitResponse: entry.response,

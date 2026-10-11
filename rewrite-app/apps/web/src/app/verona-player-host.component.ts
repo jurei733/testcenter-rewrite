@@ -1,3 +1,4 @@
+import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { CommonModule } from "@angular/common";
 import {
   ChangeDetectorRef,
@@ -19,16 +20,15 @@ import type {
 
 import {
   isSupportedVeronaPlayerApiVersion,
-  mergeVeronaUnitResponse,
   normalizeVeronaStateLogEntries,
-  parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
+  serializeVeronaUnitResponse,
+  parseVeronaIncomingNotification,
   prepareVeronaUnitStateForPlayer,
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
   resolveVeronaPlayerApiVersion,
   resolveVeronaNavigationRequest,
-  serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN,
   type VeronaNavigationDeniedNotification,
@@ -569,9 +569,10 @@ export class VeronaPlayerHostComponent
             entries: logEntries
           });
         }
-        this.latestResponse = mergeVeronaUnitResponse(this.latestResponse, {
+        this.latestResponse = mergeCapturedVeronaUnitResponse(this.latestResponse, {
           unitState: notification.unitState,
-          playerState: notification.playerState
+          playerState: notification.playerState,
+          captureTimestamp: Date.now()
         });
         this.responseChange.emit(this.latestResponse);
         this.responseUpdate.emit({
@@ -1042,9 +1043,10 @@ export class VeronaPlayerHostComponent
         entries: logEntries
       });
     }
-    frame.latestResponse = mergeVeronaUnitResponse(frame.latestResponse, {
+    frame.latestResponse = mergeCapturedVeronaUnitResponse(frame.latestResponse, {
       unitState: notification.unitState,
-      playerState: notification.playerState
+      playerState: notification.playerState,
+      captureTimestamp: Date.now()
     });
     this.responseUpdate.emit({
       testRunId: frame.testRunId,
