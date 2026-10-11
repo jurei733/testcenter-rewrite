@@ -1,5 +1,23 @@
 # Optional Original UI
 
+### Participant Debug and hidden codes (2026-10-12)
+
+The selected-run Debug pane now implements all ten Source windows, explicit
+native/remote Debug commands, development-only preference restoration and
+offline local-response projection. Its initial checkpoint is `236cec382fba`;
+remaining visual and package acceptance is itemized below.
+
+Diagnostic GET/POST now retain the participant execution-mode boundary for
+Testlet access codes. Hot-return, hot-restart, simulation and the legacy default
+receive an empty code string with the original prompt and gate metadata; demo,
+review and trial retain the authored code. Only the cloned transport snapshot
+is changed. This deliberately hardens Original raw Debug property visibility.
+All 1,745 unit/frontend and 1,199 PostgreSQL tests passed, with typecheck,
+469.96 kB production build and all nine Chromium/SQLite Debug scenario groups.
+The expanded Booklet still displays its active code gate without the secret.
+Full parity and production readiness remain open. See
+[the current scope and evidence in PARITY](./PARITY.md#participant-debug-and-access-code-visibility-2026-10-12).
+
 ### Atomic fresh participant Run initialization (2026-10-11)
 
 Local application checkpoint `613e2323e17c` resolves the reserved-Run/initial-log
@@ -2092,6 +2110,8 @@ offline tracked-variable projection, pause/ERROR purity and rejection of a
 held response from a previously selected booklet. Pinned Source excerpts gate
 formatters, conditions, all 39 raw config defaults and six mode definitions.
 The Source MIT notice remains distributed in `assets/ORIGINAL-UI-LICENSE.txt`.
+Diagnostic snapshots also retain the rewrite's participant access-code
+visibility boundary, as described in the current checkpoint above.
 
 This is functional coverage with owned fixtures, not a live Original Debug
 pixel comparison. The other native console commands, early-loading ERROR,

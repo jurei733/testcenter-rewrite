@@ -62,9 +62,10 @@ try {
   const unit = content.bookletEntries[0].unitEntries[0];
   content.bookletEntries = [{ bookletKey: "first", displayLabel: "First debug booklet", customTexts: { owned_token: "Booklet override Ω" },
     config: { toolbar_show_unit_list: "FALSE", toolbar_show_reload_button: "FALSE", toolbar_show_fullscreen_button: "FALSE", lock_test_on_termination: "OFF" },
-    testletEntries: [{ testletKey: "timed", displayLabel: "Timed", parentTestletKey: null, restrictions: { timeMax: { minutes: 5, leave: "none" } } }],
+    testletEntries: [{ testletKey: "timed", displayLabel: "Timed", parentTestletKey: null, restrictions: { timeMax: { minutes: 5, leave: "none" } } },
+      { testletKey: "private-gate", displayLabel: "Private gate", parentTestletKey: "timed", restrictions: { codeToEnter: { code: "OWNED_PRIVATE_CODE_Ω", prompt: "Owned prompt" } } }],
     unitEntries: [{ ...unit, unitKey: "first-unit", originalUnitId: "original-first", displayLabel: "First unit", testletPath: ["timed"] },
-      { ...unit, unitKey: "next-unit", displayLabel: "Next unit", testletPath: ["timed"] }],
+      { ...unit, unitKey: "next-unit", displayLabel: "Next unit", testletPath: ["timed", "private-gate"] }],
     stateEntries: [{ stateKey: "level", displayLabel: "Level", options: [
       { optionKey: "high", displayLabel: "High", conditions: [{ source: { type: "Score", unitKey: "first-unit", variableKey: "x", defaultValue: "0" }, expression: { type: "greaterThan", value: "1" } }] },
       { optionKey: "base", displayLabel: "Base", conditions: [] }] }] },
@@ -94,6 +95,8 @@ try {
   assert.equal(await tabs.count(), 0); assert.deepEqual(requests, []); mark("production-disabled-until-command");
   await debug([]); await tabs.waitFor(); await windowPane("main").waitFor();
   assert.equal(await page.locator("[data-debug-tab]").count(), 10); await poll(() => Promise.resolve(requests.length === 1), "Selected snapshot was not requested");
+  const diagnostic = await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/debug-state?testRunId=${run.testRunId}`, undefined, identity.sessionToken);
+  assert.ok(!JSON.stringify(diagnostic).includes("OWNED_PRIVATE_CODE_Ω"));
   const main = windowPane("main"); assert.match(await main.innerText(), /MODE:\s*RUN-HOT-RETURN/);
   const beforeDrag = await main.boundingBox(); await main.locator("h1").hover({ position: { x: 8, y: 8 } });
   await page.mouse.down(); await page.mouse.move(beforeDrag.x + 108, beforeDrag.y + 58); await page.mouse.up();
@@ -103,7 +106,14 @@ try {
     await page.locator(`[data-debug-tab="${key}"]`).click(); await windowPane(key).waitFor();
     if (key === "config") assert.match(await windowPane(key).innerText(), /toolbar_show_unit_list:.*FALSE/);
     if (key === "testmode") assert.match(await windowPane(key).innerText(), /modeId:.*RUN-HOT-RETURN/);
-    if (key === "booklet") { await poll(async () => (await windowPane(key).innerText()).includes("first-unit"), "Booklet snapshot not projected"); await windowPane(key).getByRole("button", { name: "Toggle Testlet timed", exact: true }).click(); await poll(async () => /restrictions.timeMax/.test(await windowPane(key).innerText()), "Expanded Testlet did not render"); }
+    if (key === "booklet") {
+      await poll(async () => (await windowPane(key).innerText()).includes("first-unit"), "Booklet snapshot not projected");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet timed", exact: true }).click();
+      await poll(async () => /restrictions.timeMax/.test(await windowPane(key).innerText()), "Expanded Testlet did not render");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet private-gate", exact: true }).click();
+      await poll(async () => /Owned prompt/.test(await windowPane(key).innerText()), "Expanded code gate did not render");
+      assert.ok(!(await windowPane(key).innerText()).includes("OWNED_PRIVATE_CODE_Ω"));
+    }
     if (key === "unit") assert.match(await windowPane(key).innerText(), /original-first/);
     if (key === "customtexts") {
       const input = windowPane(key).getByRole("combobox"); await input.fill("owned_token"); await input.press("Escape"); await poll(async () => /Booklet override Ω/.test(await windowPane(key).innerText()), "Selected custom text did not render");

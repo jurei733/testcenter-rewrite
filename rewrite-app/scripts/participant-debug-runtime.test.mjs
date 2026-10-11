@@ -33,6 +33,7 @@ for(const kind of kinds)test(`${kind}: debug commands and diagnostics preserve t
   const keys={tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey},base={tenantId:tenant.tenantId,workspaceId:workspace.workspaceId};
   const releaseId=randomUUID();const condition={source:{type:'Score',unitKey:'unit',variableKey:'x',defaultValue:'0'},expression:{type:'greaterThan',value:'1'}};
   const booklet={bookletKey:'owned',displayLabel:'Owned',policy:compileBookletRuntimePolicy({}),unitEntries:[{unitKey:'unit',displayLabel:'Unit',unitDefinition:'<owned-definition/>'}],
+   testletEntries:[{testletKey:'private-gate',displayLabel:'Private',parentTestletKey:null,restrictions:{codeToEnter:{code:'OWNED_PRIVATE_CODE_Ω',prompt:'Owned prompt'}}}],
    stateEntries:[{stateKey:'level',displayLabel:'Level',options:[{optionKey:'high',displayLabel:'High',conditions:[condition]},{optionKey:'base',displayLabel:'Base',conditions:[]}]}]};
   await repository.saveContentRelease({...base,contentReleaseId:releaseId,importJobId:releaseId,releaseLabel:'Owned',status:'active',createdAt:timestamp,activatedAt:timestamp,
    runtimeSnapshot:{bookletEntries:[booklet,{...structuredClone(booklet),bookletKey:'other',unitEntries:[{unitKey:'other-unit',displayLabel:'Other unit',unitDefinition:'<other-secret/>'}],stateEntries:[]}]}});
@@ -75,6 +76,17 @@ for(const kind of kinds)test(`${kind}: debug commands and diagnostics preserve t
     try{await assert.rejects(service.participantRuntime.getDebugState(scope),error=>error.errorCode==='test_run_not_found');assert.deepEqual(await snapshot(),before);}
     finally{await repository.saveContentRelease(release);}
    }
+  });
+  await t.test('diagnostic snapshots retain the execution-mode boundary for hidden codes without altering the immutable release',async()=>{
+   const before=await snapshot(),release=await repository.getContentReleaseById(releaseId);
+   for(const [mode,visible] of [['run-hot-return',false],['run-hot-restart',false],['run-simulation',false],['run-demo',true],['run-review',true],['run-trial',true],[undefined,false]]){
+    const selected={...before.run,executionMode:mode};await repository.saveTestRun(selected);
+    const diagnostic=await service.participantRuntime.getDebugState(scope),gate=diagnostic.booklet.testletEntries[0].restrictions.codeToEnter;
+    assert.equal(gate.code,visible?'OWNED_PRIVATE_CODE_Ω':'');assert.equal(gate.prompt,'Owned prompt');
+    if(!visible)assert.ok(!JSON.stringify(diagnostic).includes('OWNED_PRIVATE_CODE_Ω'));
+    assert.deepEqual(await repository.getContentReleaseById(releaseId),release);assert.deepEqual((await snapshot()).run,selected);
+   }
+   await repository.saveTestRun(before.run);assert.deepEqual(await snapshot(),before);
   });
   await t.test('native console logs remain idempotent across restart without changing a paused Run or its parent',async()=>{
    const before=await snapshot();const input={testRunId:run.testRunId,logs:[{unitKey:null,originalUnitId:null,entries:[{

@@ -32302,6 +32302,12 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(400, "participant_debug_responses_invalid", "Debug responses must contain strings for Units in the selected booklet.");
         }
         const snapshot = buildParticipantDebugSnapshot(booklet, { ...selected, unitResponses: { ...selected.unitResponses, ...overrides } });
+        // Diagnostics retain the same access-code visibility as participant navigation.
+        if (!resolveParticipantExecutionMode(selected.executionMode).showCode) {
+          for (const testlet of snapshot.booklet.testletEntries ?? []) {
+            if (testlet.restrictions?.codeToEnter) testlet.restrictions.codeToEnter.code = "";
+          }
+        }
         if (input.conditionXml !== undefined) {
           const xml = input.conditionXml;
           if (typeof xml !== "string" || xml.length > 32_768 || /<!DOCTYPE|<!ENTITY/i.test(xml)) {

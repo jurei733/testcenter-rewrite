@@ -75,6 +75,10 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
     const content = JSON.parse(localDemoSourcePackage.sourceDocument);
     const firstBooklet = content.bookletEntries[0].bookletKey;
     const debugUnitKey = content.bookletEntries[0].unitEntries[0].unitKey;
+    content.bookletEntries[0].testletEntries = [...(content.bookletEntries[0].testletEntries ?? []), {
+      testletKey: "owned-debug-private-gate", displayLabel: "Private debug gate", parentTestletKey: null,
+      restrictions: { codeToEnter: { code: "OWNED_PRIVATE_CODE_Ω", prompt: "Owned prompt" } }
+    }];
     content.bookletEntries[0].stateEntries = [{ stateKey: "owned-debug-state", displayLabel: "Owned debug state", options: [
       { optionKey: "high", displayLabel: "High", conditions: [{ source: { type: "Score", unitKey: debugUnitKey, variableKey: "owned-score", defaultValue: "0" }, expression: { type: "greaterThan", value: "1" } }] },
       { optionKey: "base", displayLabel: "Base", conditions: [] }
@@ -217,6 +221,9 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       const selectedSnapshot = (await request("GET", `${path}?testRunId=${run.testRunId}`, undefined, selected.sessionToken)).debugState;
       assert.equal(selectedSnapshot.scope.testRunId, run.testRunId);
       assert.equal(selectedSnapshot.scope.bookletKey, firstBooklet);
+      assert.ok(!JSON.stringify(selectedSnapshot).includes("OWNED_PRIVATE_CODE_Ω"));
+      assert.deepEqual(selectedSnapshot.booklet.testletEntries.find(entry => entry.testletKey === "owned-debug-private-gate").restrictions.codeToEnter,
+        { code: "", prompt: "Owned prompt" });
       assert.ok(selectedSnapshot.booklet.unitEntries.every(unit => !unit.unitKey.startsWith("second-")));
       const otherSnapshot = (await request("GET", `${path}?testRunId=${otherBookletRun.testRunId}`, undefined, selected.sessionToken)).debugState;
       assert.equal(otherSnapshot.scope.testRunId, otherBookletRun.testRunId);
@@ -236,6 +243,7 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       const snapshot = (await request("POST", path, { unitResponses: { [debugUnitKey]: captured },
         conditionXml: `<If><Score of="owned-score" from="${debugUnitKey}"/><Is equal="2"/></If>` }, selected.sessionToken)).debugState;
       assert.deepEqual(snapshot.conditionResults, [true]); assert.equal(snapshot.adaptiveStates[0].optionKey, "high");
+      assert.ok(!JSON.stringify(snapshot).includes("OWNED_PRIVATE_CODE_Ω"));
       assert.deepEqual(await durable(), before);
       for (const body of [null, [], { unitResponses: { "second-foreign": "foreign" } },
         { conditionXml: "<Else/>" }, { conditionXml: "<If><Value/></If>" }, { conditionXml: "<!DOCTYPE If><If/>" }]) {

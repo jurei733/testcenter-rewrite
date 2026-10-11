@@ -1,5 +1,34 @@
 # Testcenter parity checklist
 
+### Participant Debug and access-code visibility (2026-10-12)
+
+The selected-run Debug workflow is implemented under `236cec382fba`; its
+scope and remaining Source acceptance are described below. A follow-up fixes
+raw Testlet codes leaking through the diagnostic snapshot in modes whose
+participant navigation contract hides them. The server clears only the cloned
+snapshot's code string for hot-return, hot-restart and simulation, including
+the legacy missing-mode default. Demo, review and trial retain visible codes.
+Prompts, code-gate metadata, immutable releases, selected/other Runs, parent
+sessions, logs and audit remain unchanged by a diagnostic read. Both GET and
+local-capture POST enforce this boundary. Browser projection keeps the gate
+visible without exposing its hidden code. This intentionally preserves the
+rewrite's participant visibility policy even though the Original raw Debug
+properties show codes; escaping condition error text is another deliberate
+diagnostic boundary.
+
+The follow-up passed 1,745 unit/frontend tests, all 1,199 PostgreSQL integration
+tests, typecheck and the production build (469.96 kB, unchanged 470 kB hard
+limit). All nine protected Chromium/SQLite Debug scenario groups passed again,
+including actual HTTP and expanded Booklet checks for a hidden code. The
+predecessor also passed 147 existing browser cases, 498 HTTP tests, 61 Original
+compatibility checks, three PostgreSQL container profiles, SQLite container
+runtime and 283 transaction/API checks inside its read-only image as `node`.
+A follow-up image requires validation against its own archived Git commit and
+a receipt identifying that exact image and checks. The predecessor's image
+proof does not establish this. Full Original visual/package acceptance, other native commands, remote
+CI, rollout, release, deployment and production confirmation remain open.
+Previous sections preserve historical checkpoint evidence.
+
 ### Atomic fresh participant Run initialization (2026-10-11)
 
 Local application checkpoint `613e2323e17c` closes the fresh-launch boundary
