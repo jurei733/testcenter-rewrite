@@ -1,5 +1,58 @@
 # Optional Original UI
 
+### Atomic participant progress and timer persistence (2026-10-11)
+
+Local application checkpoint `7037c86870cc` adds `mutateParticipantRun` to all
+four stores. Progress merges answers and shared parameters, evaluates navigation,
+locks and monitor-pause state, and projects timers from the current scoped Run
+inside the storage write boundary. The resulting Run, test logs, activity and
+any timer-completion parent status commit together. The projection performs no
+asynchronous repository access. Memory projects synchronously, File publishes
+its detached maps after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL
+locks the parent before the Run on one client. Schema versions remain 62/56.
+
+Current-state reads now calculate missing booklet-state snapshots inside the
+same timer transaction. Shared timer persistence also reads the current Run
+rather than writing the caller's old snapshot. Existing immutable Run identity
+and parent fields are preserved; no-op projections do not write. Source behavior
+was checked against the pinned controller/DAO at
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. That DAO explicitly notes a whole-test
+laststate race; the reference establishes behavior, not an atomicity guarantee.
+
+New required tests reproduce two independent service queues saving different
+answers, a monitor pause applied after a progress request's initial read,
+concurrent lock/expiry changes, and a current-state query overlapping a save.
+They check timer completion against current sibling Runs, scope denials,
+immutable fields and detached results. File persistence failure leaves cached
+state unchanged; SQL failures after Run/log writes or during the completion
+parent update roll back every artifact. A separate SQLite worker and independent
+PostgreSQL connections prove that a blocked mutation reads the writer's committed
+answer and preserves it. The new suite runs in both required local/PG gates.
+
+All 1,345 unit/state cases (80 + 177 + 520 + 568), 863 complete real-PostgreSQL
+integration cases and 166 HTTP integration cases each for Memory, File and
+SQLite pass without failures or skips. Core and production web builds pass at
+469.88 kB under the unchanged 470 kB error budget; existing bundle/style warnings
+remain. Both received-termination/ERROR-dialog/re-entry browser cases pass, as do
+four native offline/save/retry/reload cases in the Original and rewrite shells
+at widths 1280/390, preserving exact answers, the selected Run and foreign-session
+isolation. These are rewrite-host checks, not a new live Original backend run.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 39 command-API/Run-mutation cases inside the read-only image.
+Image `testcenter-rewrite-app:completeness-7037c86870cc` runs as node and has ID
+`sha256:4b058272e5456a2746faebd34854d10f9d81d97fec2a62431a18ad1de597abcf`.
+The tracked build archive is removed. All 24 pre-existing container IDs and
+85 volumes, host dependencies and the protected presentation are preserved.
+This checkpoint is local and unpushed.
+
+Full parity and production readiness remain unproven. Other whole-Run mutation
+paths still need the same atomic treatment, including resume, starter return,
+completion and direct monitor operations. Delivery replay/order and ACKs arriving
+after replacement-controller activation, the Source debug command, the full
+Original acceptance corpus, remote CI/release/deployment and live production
+proof remain open. The preceding checkpoints below are historical evidence.
+
 ### Atomic participant controller activation (2026-10-11)
 
 Local application checkpoint `73b60bf81b8b` replaces the preceding checkpoint's
