@@ -74,7 +74,7 @@ export const createParticipantCommandReceiver = (options: {
       let lastSequence = 0;
       for (const command of parsed) {
         if (!command || command.participantSessionId !== options.participantSessionId || command.testRunId !== options.testRunId ||
-            command.executedAt != null || command.acknowledgedAt !== null && !command.effectsDeferred ||
+            command.executedAt != null || command.acknowledgedAt !== null ||
             ids.has(command.commandId) || command.sequence <= lastSequence) return;
         ids.add(command.commandId);
         lastSequence = command.sequence;

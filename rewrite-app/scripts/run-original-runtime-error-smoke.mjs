@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 
 const variants = [
+  ["received-monitor-terminate", {UI_SMOKE_RUNTIME_RECEIVED_TERMINATE:"true"}],
+  ["received-monitor-terminate-fallback", {UI_SMOKE_RUNTIME_RECEIVED_TERMINATE:"true",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
   ["received-monitor-resume", {UI_SMOKE_RUNTIME_RECEIVED_RESUME:"true"}],
   ["received-monitor-resume-fallback", {UI_SMOKE_RUNTIME_RECEIVED_RESUME:"true",UI_SMOKE_RUNTIME_DIALOG_FAILURE:"true"}],
   ["late-save-monitor-pause", {UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE:"true"}],

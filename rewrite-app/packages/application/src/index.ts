@@ -32819,6 +32819,15 @@ export const createFirstSliceServices = (
         const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
+        const activateSession = async (): Promise<void> => {
+          // A resumable Run also opens a controller. Read the current parent
+          // again so unrelated session fields are not restored from entry's
+          // earlier snapshot when enabling the participant event stream.
+          const currentSession = await requireAccessibleParticipantSession(participantSessionId);
+          if (currentSession.status !== "launched") {
+            await repository.saveParticipantSession({ ...currentSession, status: "launched" });
+          }
+        };
         const contentRelease = await requireContentRelease(
           repository,
           participantSession.contentReleaseId
@@ -32920,6 +32929,7 @@ export const createFirstSliceServices = (
             throw new FirstSliceError(409, "booklet_already_completed",
               `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
           }
+          await activateSession();
           return existingRun;
         }
 
@@ -32979,7 +32989,10 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(409, "booklet_already_completed",
             `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
         }
-        if (!reservation.created) return effectiveTestRun;
+        if (!reservation.created) {
+          await activateSession();
+          return effectiveTestRun;
+        }
         if (activated.startedTestletKey) {
           if (executionMode.saveResponses) {
             await repository.saveParticipantTestLogs(buildParticipantTestLogs({
@@ -33015,10 +33028,7 @@ export const createFirstSliceServices = (
             })
           );
         }
-        await repository.saveParticipantSession({
-          ...participantSession,
-          status: "launched"
-        });
+        await activateSession();
         await recordWorkspaceActivity({
           tenantId: effectiveTestRun.tenantId,
           workspaceId: effectiveTestRun.workspaceId,

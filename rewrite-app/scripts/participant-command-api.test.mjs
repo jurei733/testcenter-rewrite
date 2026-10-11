@@ -154,7 +154,7 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       assert.equal(received.tenantId, run.tenantId); assert.equal(received.workspaceId, run.workspaceId);
       assert.deepEqual((await request("PATCH", acknowledgement(first.commandId), { testRunId: run.testRunId }, selected.sessionToken)).command, received);
       assert.deepEqual((await request("GET", currentPath, undefined, selected.sessionToken)).currentRunState.testRun, before);
-      assert.deepEqual((await list(run.testRunId)).commands.map(command => command.commandId), [first.commandId, secondCommand.commandId]);
+      assert.deepEqual((await list(run.testRunId)).commands.map(command => command.commandId), [secondCommand.commandId]);
       assert.equal((await list(run.testRunId)).commands[0].effectsDeferred, true);
       assert.equal((await list(otherBookletRun.testRunId)).commands.length, 1);
       const durable = await (await readFreshRepository()).acknowledgeParticipantRunCommand({ tenantId: run.tenantId,
@@ -209,6 +209,18 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       assert.equal(result.testRun.completedAt, null); assert.equal(result.participantSession.status, "signed_in");
       const resumed = (await request("POST", resolveRoutePath(routes.participant.resumeSession, { participantSessionId: sessionId }), { bookletKey: firstBooklet }, selected.sessionToken)).testRun;
       assert.equal(resumed.testRunId, run.testRunId); assert.equal(resumed.status, "running");
+      const restoredSession = await (await readFreshRepository()).getParticipantSessionById(sessionId);
+      assert.equal(restoredSession.status, "launched", "Resuming a terminated Run must reopen its controller's event stream.");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let reader;
+      try {
+        const stream = await fetch(base + resolveRoutePath(routes.participant.eventStream, { participantSessionId:sessionId }) + `?testRunId=${run.testRunId}`, {
+          headers:{authorization:`Bearer ${selected.sessionToken}`,accept:"text/event-stream"}, signal:controller.signal
+        });
+        assert.equal(stream.status, 200); assert.match(stream.headers.get("content-type"), /text\/event-stream/);
+        reader = stream.body.getReader(); assert.equal((await reader.read()).done, false);
+      } finally { clearTimeout(timeout); controller.abort(); reader?.releaseLock(); }
     });
     await t.test("session revocation also closes command access", async () => {
       await request("DELETE", resolveRoutePath(routes.participant.signOut, { participantSessionId: sessionId }), undefined, selected.sessionToken, 205);

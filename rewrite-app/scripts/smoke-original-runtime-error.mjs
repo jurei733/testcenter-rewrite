@@ -41,6 +41,7 @@ const monitorCommand = process.env.UI_SMOKE_RUNTIME_LATE_COMMAND;
 const receivedPauseOldSave = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE_OLD_SAVE === 'true';
 const receivedPause = process.env.UI_SMOKE_RUNTIME_RECEIVED_PAUSE === 'true' || receivedPauseOldSave;
 const receivedResume = process.env.UI_SMOKE_RUNTIME_RECEIVED_RESUME === 'true';
+const receivedTerminate = process.env.UI_SMOKE_RUNTIME_RECEIVED_TERMINATE === 'true';
 const lateSavePause = process.env.UI_SMOKE_RUNTIME_LATE_SAVE_PAUSE === 'true';
 const commandOverlap = JSON.parse(await readFile(new URL('./fixtures/original-runtime-command-overlap.json', import.meta.url), 'utf8'));
 assert.equal(commandOverlap.referenceRevision, reference.referenceRevision);
@@ -48,6 +49,7 @@ assert.ok(!monitorCommand || ['pause','complete'].includes(monitorCommand));
 assert.ok(!(monitorCommand && receivedPause));
 assert.ok(!(lateSavePause && (monitorCommand || receivedPause || replacementMode || saveFailure)));
 assert.ok(!(receivedResume && (monitorCommand || receivedPause || lateSavePause || replacementMode || saveFailure)));
+assert.ok(!(receivedTerminate && (monitorCommand || receivedResume || receivedPause || lateSavePause || replacementMode || saveFailure)));
 assert.ok(!replacementMode || ["success", "reject"].includes(replacementMode));
 try {
   const port = await new Promise((done, reject) => {
@@ -121,7 +123,31 @@ try {
     });
     const runId = current.testRun.testRunId;
     let packet = current.testRun.unitResponses["unit-intro"];
-    if (monitorCommand || receivedPause || lateSavePause || receivedResume) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    if (monitorCommand || receivedPause || lateSavePause || receivedResume || receivedTerminate) await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
+    let releaseReceivedTerminate, releaseStoppedResume, terminalCommandId, stoppedResumeCommandId;
+    if (receivedTerminate) {
+      const receipts = new Map();
+      let terminalAccepted, resumeAccepted;
+      const accepted = Promise.all([new Promise(done => { terminalAccepted = done; }), new Promise(done => { resumeAccepted = done; })]);
+      const terminalGate = new Promise(done => { releaseReceivedTerminate = done; });
+      const resumeGate = new Promise(done => { releaseStoppedResume = done; });
+      await context.route('**/api/v1/participant/sessions/**/commands/*/acknowledgement', async route => {
+        const response = await route.fetch(); const body = await response.json();
+        if (body.command?.testRunId === runId && !receipts.has(body.command.commandId)) {
+          assert.ok(body.command.acknowledgedAt); assert.equal(body.command.executedAt, null);
+          receipts.set(body.command.commandId, body.command);
+          if (body.command.commandType === 'complete') { terminalAccepted(); await terminalGate; }
+          else if (body.command.commandType === 'resume') { resumeAccepted(); await resumeGate; }
+        }
+        await route.fulfill({ response });
+      });
+      terminalCommandId = (await api(workspace + `/monitor/open-runs/${runId}/commands`, { commandType:'complete', actorId:'owned-received-terminate' }, operator)).command.commandId;
+      stoppedResumeCommandId = (await api(workspace + `/monitor/open-runs/${runId}/commands`, { commandType:'resume', actorId:'owned-stopped-resume' }, operator)).command.commandId;
+      let timer;
+      try { await Promise.race([accepted, new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Owned termination/resume acknowledgements did not start')), 15000); })]); }
+      finally { clearTimeout(timer); }
+      assert.equal(receipts.size, 2); assert.equal((await currentState()).testRun.status, 'running');
+    }
     let releaseReceivedResume, receivedResumeCommand, receivedResumeReceipt;
     if (receivedResume) {
       let accepted, held=false;
@@ -206,6 +232,55 @@ try {
     await delay(200);
     assert.equal(await page.locator("mat-dialog-container").count(), 0);
     await frame.locator("#ownedRuntimeError").click(); await page.locator(failDialog ? "#participantRuntimeErrorFallback" : "mat-dialog-container").waitFor();
+    if (receivedTerminate) {
+      releaseReceivedTerminate();
+      const starter = page.locator('app-original-participant-starter');
+      await starter.locator('mat-card').waitFor(); await page.locator('iframe').waitFor({ state:'detached' });
+      const source = commandOverlap.cases['queued-terminate'];
+      const dialog = page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container');
+      assert.equal(await dialog.count(), Number(source.dialogRetained));
+      const fallbackSurface = failDialog ? await dialog.locator('article').evaluate(card => ({
+        background:getComputedStyle(card).backgroundColor, titleColor:getComputedStyle(card.querySelector('h2')).color,
+        textColor:getComputedStyle(card.querySelector('p')).color
+      })) : null;
+      if (fallbackSurface) assert.equal(fallbackSurface.background, 'rgb(255, 255, 255)', 'The fallback card must be opaque even without a custom surface variable.');
+      assert.equal(await page.locator('mat-card').count(), source.cardCount);
+      assert.equal(await element.evaluate(el => el.isConnected), source.samePlayerFrameAsBeforeError);
+      const terminated = await currentState();
+      assert.equal(terminated.testRun.status, 'paused'); assert.equal(terminated.testRun.locked, false);
+      assert.equal(terminated.testRun.currentUnitKey, 'unit-intro'); assert.equal(terminated.testRun.completedAt, null);
+      assert.equal(terminated.participantSession.status, 'signed_in');
+      assert.equal(terminated.testRun.unitResponses['unit-intro'], packet);
+      const logs = await poll(() => api(workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=CONTROLLER&limit=100`, undefined, operator), payload =>
+        payload.items.some(item => item.testLog.logContent === 'TERMINATED'));
+      const controllers = logs.items.map(item => item.testLog).sort((a,b) => a.timestamp - b.timestamp).map(entry => entry.logContent);
+      assert.deepEqual(controllers.slice(controllers.indexOf('ERROR')), source.controllerStates.slice(source.controllerStates.indexOf('ERROR')));
+      await page.screenshot({ path:join(artifacts, `${key}-received-terminate.png`), fullPage:true });
+      releaseStoppedResume(); await delay(300);
+      const commandPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/commands`;
+      const readStoppedResume = async () => (await api(commandPath + `/${stoppedResumeCommandId}/acknowledgement`, {testRunId:runId}, token, 'PATCH')).command;
+      const discarded = await readStoppedResume(); assert.ok(discarded.acknowledgedAt); assert.equal(discarded.executedAt, null);
+      assert.deepEqual((await api(commandPath + `?testRunId=${runId}`, undefined, token)).commands, []);
+      await page.locator('#participantRouteControllerReloadButton').click();
+      await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({ state:'detached' });
+      await starter.locator('mat-card').waitFor();
+      const resume = starter.locator('mat-card-actions button').first(); assert.equal(await resume.isEnabled(), true);
+      await resume.click(); await frame.locator('#demoPlayerAnswer').waitFor();
+      states[key] = {phase:'resumed-after-terminate', terminalCommandId, stoppedResumeCommandId, discardedReceipt:discarded,
+        resumedSession:(await currentState()).participantSession};
+      await page.screenshot({path:join(artifacts, `${key}-resumed-after-terminate.png`), fullPage:true});
+      await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({ state:'attached' }); await delay(1300);
+      assert.equal(await frame.locator('#demoPlayerAnswer').inputValue(), answer);
+      assert.equal((await currentState()).testRun.testRunId, runId);
+      assert.deepEqual(await readStoppedResume(), discarded, 'The old ACKed resume must remain unapplied after re-entry.');
+      const executed = await api(workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('command executed')}&limit=100`, undefined, operator);
+      assert.deepEqual(executed.items.map(item => item.testLog.logContent), ['terminate']);
+      states[key] = {receivedTerminate:true, terminalCommandId, stoppedResumeCommandId, dialogRetained:true,
+        controllerStatesAfterError:controllers.slice(controllers.indexOf('ERROR')), discardedReceipt:discarded,
+        resumedSameRun:true, savedResponsePreserved:true, oldCommandRedelivered:false, fallbackSurface};
+      await page.screenshot({ path:join(artifacts, `${key}-resumed-after-terminate.png`), fullPage:true });
+      await context.close(); console.log('original_runtime_received_terminate=preserved:passed'); continue;
+    }
     if(receivedResume){
       assert.equal(await element.evaluate(el=>el.isConnected),true);
       releaseReceivedResume();await delay(1800);

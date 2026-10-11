@@ -137,6 +137,25 @@ for (const kind of kinds) {
         await repository.saveTestRun(run);
       });
 
+      await t.test("ACK ends deferred delivery across controller termination and re-entry without applying the command", async () => {
+        const original = await repository.getTestRunById(run.testRunId);
+        const before = await pending();
+        const received = await repository.appendParticipantRunCommand(input("deferred-before-stop", { effectsDeferred: true }));
+        const late = await repository.appendParticipantRunCommand(input("deferred-after-stop", { effectsDeferred: true }));
+        const unreceived = await repository.appendParticipantRunCommand(input("deferred-unreceived", { effectsDeferred: true }));
+        const receipt = await repository.acknowledgeParticipantRunCommand(ack(received.commandId));
+        await repository.saveParticipantSession({ ...session, status: "signed_in" });
+        const lateReceipt = await repository.acknowledgeParticipantRunCommand(ack(late.commandId));
+        await repository.saveParticipantSession(session);
+        if (kind !== "memory") repository = await create();
+        assert.deepEqual(await pending(), [...before, unreceived]);
+        for (const record of [receipt, lateReceipt]) {
+          assert.equal(record.executedAt, null);
+          assert.deepEqual(await repository.acknowledgeParticipantRunCommand(ack(record.commandId, { acknowledgedAt: issuedAt })), record);
+        }
+        assert.deepEqual(await repository.getTestRunById(run.testRunId), original);
+      });
+
       if (kind === "file") {
         await t.test("failed durable writes never consume cached pending commands", async () => {
           const before = await pending();
@@ -154,7 +173,8 @@ for (const kind of kinds) {
           }
           assert.deepEqual(await (await create()).listPendingParticipantRunCommands(scope), before);
           assert.ok(await repository.acknowledgeParticipantRunCommand(ack("after-restart")));
-          assert.equal((await repository.appendParticipantRunCommand(input("write-recovered"))).sequence, 29);
+          assert.equal((await repository.appendParticipantRunCommand(input("write-recovered"))).sequence,
+            Math.max(...before.map(command => command.sequence)) + 1, "A failed append must not consume the next sequence.");
         });
       }
 

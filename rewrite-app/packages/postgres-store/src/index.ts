@@ -1501,6 +1501,15 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX idx_participant_run_commands_pending
         ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL OR (command_json->>'effectsDeferred' = 'true' AND command_json->>'executedAt' IS NULL);
     `
+  },
+  {
+    version: 56,
+    name: "index_unacknowledged_participant_commands",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL;
+    `
   }
 ];
 
@@ -3151,7 +3160,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       const result = await pool.query(`SELECT command.command_json FROM participant_run_commands AS command
         JOIN test_runs AS run ON run.test_run_id = command.test_run_id
         WHERE command.test_run_id = $1 AND command.tenant_id = $2 AND command.workspace_id = $3
-          AND command.participant_session_id = $4 AND (command.acknowledged_at IS NULL OR (command.command_json->>'effectsDeferred' = 'true' AND command.command_json->>'executedAt' IS NULL))
+          AND command.participant_session_id = $4 AND command.acknowledged_at IS NULL
           AND run.tenant_id = $2 AND run.workspace_id = $3 AND run.participant_session_id = $4
         ORDER BY command.sequence`, [scope.testRunId, scope.tenantId, scope.workspaceId, scope.participantSessionId]);
       return result.rows.map(row => row.command_json as ParticipantRunCommand);

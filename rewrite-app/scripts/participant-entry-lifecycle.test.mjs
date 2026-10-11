@@ -215,6 +215,19 @@ for (const ui of ["original", "rewrite", null, "unknown"]) {
   });
 }
 
+test("a terminated controller synchronizes the starter address before reload; a resumed controller clears it", async () => {
+  for (const starter of [true, false]) await withRouter("original", async ({ entry, calls, resolveNavigation }) => {
+    entry.isParticipantStarter = starter;
+    entry.createParticipantSessionEntryLink = () => `https://owned.example/participant?participantSessionId=session${starter ? '' : '&testRunId=run'}`;
+    const result = entry.replaceSelectedRunEntryLink();
+    const target = new URL(calls.routed[0].url, "https://owned.example");
+    assert.equal(target.searchParams.get("view"), starter ? "starter" : null);
+    assert.equal(target.searchParams.get("testRunId"), starter ? null : "run");
+    assert.equal(target.searchParams.get("ui"), "original");
+    resolveNavigation(true); await result;
+  });
+});
+
 for (const method of ["reloadPage", "reloadAfterControllerError"]) {
   test(`${method} waits for the exact Router URL before reloading the page`, async () => {
     await withRouter("original", async ({ entry, calls, resolveNavigation }) => {

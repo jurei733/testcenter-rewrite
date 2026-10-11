@@ -1408,6 +1408,7 @@ export class ParticipantViewFacade {
     const url = new URL(entryLink, globalThis.window.location.origin);
     const ui = new URLSearchParams(globalThis.window.location.search).get("ui");
     if (ui === "original" || ui === "rewrite") url.searchParams.set("ui", ui);
+    if (this.isParticipantStarter) url.searchParams.set("view", "starter");
     const routeUrl = this.router.serializeUrl(
       this.router.parseUrl(`${url.pathname}${url.search}`)
     );

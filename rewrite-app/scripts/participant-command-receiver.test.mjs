@@ -174,11 +174,9 @@ test("route cleanup aborts an active application and cancels its queued successo
   assert.equal(calls.length, 1); assert.equal(f.receiver.hasOutstanding(), false);
 });
 
-test("reload can retry a deferred acknowledged receipt while applied and legacy receipts stay inert", async () => {
+test("a new controller never redelivers acknowledged receipts, including deferred unapplied commands", async () => {
   const accepted = command(1, "pause", { effectsDeferred: true, acknowledgedAt: "2026-10-11T00:00:01.000Z" });
-  const f = fixture(); f.receiver.accept([accepted]); f.acknowledge(1); await flush(); await flush();
-  assert.equal(f.effects.length, 1); f.receiver.stop();
-  for (const record of [command(1, "pause", { acknowledgedAt: accepted.acknowledgedAt }),
+  for (const record of [accepted, command(1, "pause", { acknowledgedAt: accepted.acknowledgedAt }),
     { ...accepted, executedAt: "2026-10-11T00:00:02.000Z", executionSequence: 1 }]) {
     const inert = fixture(); inert.receiver.accept([record]);
     assert.equal(inert.started.length, 0); assert.equal(inert.receiver.hasOutstanding(), false); inert.receiver.stop();

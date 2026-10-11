@@ -20,7 +20,8 @@ if (process.env.FIRST_SLICE_STORE === "postgres") {
 }
 
 for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres")) {
-  test(`${kind}: an application-index upgrade preserves legacy ACKs and retries a failed migration`, async () => {
+  for (const upgrade of ["application", "delivery"]) {
+  test(`${kind}: a ${upgrade}-index upgrade preserves receipts and retries a failed migration`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "testcenter-command-application-upgrade-"));
     const file = join(directory, "owned.sqlite");
     const schema = `owned_application_upgrade_${randomUUID().replaceAll("-", "")}`;
@@ -30,7 +31,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
     const rootPool = kind === "postgres" ? new Pool({ connectionString: process.env.FIRST_SLICE_POSTGRES_URL }) : null;
     let control, storage, created = false;
     const currentVersion = kind === "sqlite" ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
-    const applicationVersion = kind === "sqlite" ? 60 : 54;
+    const applicationVersion = upgrade === "application" ? kind === "sqlite" ? 60 : 54 : currentVersion;
     const migration = () => kind === "sqlite" ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
     const create = async () => {
       if (kind === "sqlite") return createSqliteFirstSliceRepository(file);
@@ -51,12 +52,24 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
       await repository.appendParticipantRunCommand({ ...scope, commandId: "legacy", commandType: "pause", issuedAt,
         actorId: null, targetUnitKey: null, remainingSeconds: null });
       const command = await repository.acknowledgeParticipantRunCommand({ ...scope, commandId: "legacy", acknowledgedAt });
+      for (const commandId of ["deferred-acknowledged", "deferred-unreceived"]) {
+        await repository.appendParticipantRunCommand({ ...scope, commandId, commandType: "resume", issuedAt,
+          actorId: null, targetUnitKey: null, remainingSeconds: null, effectsDeferred: true });
+      }
+      const deferredReceipt = await repository.acknowledgeParticipantRunCommand({ ...scope, commandId: "deferred-acknowledged", acknowledgedAt });
       delete command.executedAt; delete command.executionSequence;
       if (kind === "sqlite") control.prepare("UPDATE participant_run_commands SET command_json = ? WHERE command_id = 'legacy'").run(JSON.stringify(command));
       else await control.query("UPDATE participant_run_commands SET command_json = $1::jsonb WHERE command_id = 'legacy'", [JSON.stringify(command)]);
       const savedRun = await repository.getTestRunById(scope.testRunId);
       await storage?.shutdown(); storage = undefined;
-      await execute(`DROP INDEX idx_participant_run_commands_execution; DELETE FROM schema_migrations WHERE version >= ${applicationVersion}`);
+      if (upgrade === "application") await execute("DROP INDEX idx_participant_run_commands_execution");
+      else {
+        await execute(`DROP INDEX idx_participant_run_commands_pending; CREATE INDEX idx_participant_run_commands_pending
+          ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL OR (${kind === "sqlite"
+            ? "json_extract(command_json, '$.effectsDeferred') = 1 AND json_extract(command_json, '$.executedAt') IS NULL"
+            : "command_json->>'effectsDeferred' = 'true' AND command_json->>'executedAt' IS NULL"})`);
+      }
+      await execute(`DELETE FROM schema_migrations WHERE version >= ${applicationVersion}`);
       if (kind === "sqlite") await execute(`CREATE TRIGGER owned_application_upgrade_failure BEFORE INSERT ON schema_migrations
         WHEN NEW.version = ${applicationVersion} BEGIN SELECT RAISE(ABORT, 'owned application upgrade failure'); END`);
       else await execute(`CREATE FUNCTION owned_application_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -67,12 +80,19 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
       assert.equal(Number(await value("SELECT MAX(version) AS value FROM schema_migrations")), applicationVersion - 1);
       assert.equal(await value(kind === "sqlite"
         ? "SELECT COUNT(*) AS value FROM sqlite_master WHERE name = 'idx_participant_run_commands_execution'"
-        : "SELECT COUNT(*)::int AS value FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'idx_participant_run_commands_execution'"), 0);
+        : "SELECT COUNT(*)::int AS value FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'idx_participant_run_commands_execution'"), upgrade === "application" ? 0 : 1);
       await execute(kind === "sqlite" ? "DROP TRIGGER owned_application_upgrade_failure"
         : "DROP TRIGGER owned_application_upgrade_failure ON schema_migrations; DROP FUNCTION owned_application_upgrade_failure()");
       assert.equal((await migration()).currentSchemaVersion, currentVersion);
       repository = await create();
       assert.deepEqual(await repository.getTestRunById(scope.testRunId), savedRun);
+      assert.deepEqual(await repository.listPendingParticipantRunCommands(scope), [await repository.appendParticipantRunCommand({
+        ...scope, commandId: "deferred-unreceived", commandType: "resume", issuedAt,
+        actorId: null, targetUnitKey: null, remainingSeconds: null, effectsDeferred: true })]);
+      assert.deepEqual(await repository.acknowledgeParticipantRunCommand({ ...scope, commandId: "deferred-acknowledged", acknowledgedAt: executedAt }), deferredReceipt);
+      const pendingIndex = await value(kind === "sqlite" ? "SELECT sql AS value FROM sqlite_master WHERE name = 'idx_participant_run_commands_pending'"
+        : "SELECT indexdef AS value FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'idx_participant_run_commands_pending'");
+      assert.match(pendingIndex, /acknowledged_at IS NULL/); assert.doesNotMatch(pendingIndex, /effectsDeferred|executedAt/);
       assert.deepEqual(await repository.acknowledgeParticipantRunCommand({ ...scope, commandId: "legacy", acknowledgedAt: executedAt }), command);
       const applied = await repository.applyParticipantRunCommand({ ...scope, commandId: "legacy", executedAt }, context => ({
         testRun: { ...context.testRun, status: "paused", pauseSource: "monitor", updatedAt: executedAt }, testLogs: [], activityEvents: [] }));
@@ -85,6 +105,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
       finally { await rootPool?.end(); await rm(directory, { recursive: true, force: true }); }
     }
   });
+  }
 }
 
 for (const kind of kinds) {

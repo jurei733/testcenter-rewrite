@@ -1328,7 +1328,7 @@ export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
   effectsDeferred?: true;
 };
 
-/** Durable delivery intent; acknowledging it does not mutate answers or Run state. */
+/** Durable delivery intent. ACK ends delivery without mutating answers or Run state. */
 export type ParticipantRunCommand = ParticipantRunCommandInput & {
   sequence: number;
   acknowledgedAt: string | null;

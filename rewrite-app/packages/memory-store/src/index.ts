@@ -741,7 +741,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async listPendingParticipantRunCommands(scope) {
       if (!matchesParticipantRunCommandScope(state.testRuns.get(scope.testRunId), scope)) return [];
       return structuredClone(Array.from(state.participantRunCommands.values())
-        .filter(command => matchesParticipantRunCommandScope(command, scope) && (command.acknowledgedAt === null || command.effectsDeferred === true && !command.executedAt))
+        .filter(command => matchesParticipantRunCommandScope(command, scope) && command.acknowledgedAt === null)
         .sort((a, b) => a.sequence - b.sequence));
     },
     async acknowledgeParticipantRunCommand(input) {
