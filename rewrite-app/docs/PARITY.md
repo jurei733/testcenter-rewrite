@@ -1,6 +1,47 @@
 # Testcenter parity checklist
 
-### Command delivery after controller termination (2026-10-11)
+### Atomic participant controller activation (2026-10-11)
+
+Local application checkpoint `73b60bf81b8b` replaces the preceding checkpoint's
+separate session read/write during launch and re-entry with
+`activateParticipantController`. The repository reads the current parent and
+selected Run inside its write boundary, validates tenant/workspace/session/Run
+and content-release scope, checks closed/expired parent and locked/completed
+Run states, and changes only the parent's status. It preserves all current
+session fields and every Run field. A repeated eligible activation is read-only.
+Memory uses a synchronous decision, File publishes its detached session map only
+after persistence, SQLite uses BEGIN IMMEDIATE, and PostgreSQL locks the parent
+before the Run on the same client. Schema versions remain 62/56.
+
+New required tests cover scope denials, expiry and pause semantics, detached and
+idempotent results, File persistence failure/cache recovery, and SQL rollback.
+Independent SQLite workers hold writes while activation starts; separate
+PostgreSQL pools demonstrably wait on parent/Run row locks. A concurrent close
+or lock survives and activation rejects it without restoring a stale parent.
+These tests run in the local unit gate and full PostgreSQL gate.
+
+All 1,317 local unit/state tests (80 + 177 + 492 + 568) and the complete
+824-case PostgreSQL integration pass without skips. Core and production web
+builds pass at 469.88 kB under the unchanged 470 kB error budget. Both regular
+and replacement-dialog browser termination/re-entry cases pass again, including
+the same saved Run, restored SSE and unapplied acknowledged follow-up command.
+The earlier eight command-overlap browser cases belong to checkpoint
+`876192634bf8` below. Five new clean-image checks pass, including 11 real command
+API tests inside the read-only image. Image
+`testcenter-rewrite-app:completeness-73b60bf81b8b` has USER node and ID
+`sha256:0ba767ebcd2dde32aeb3569c85047344f3ed4bd291854c44bf0df3c441a223ab`.
+The tracked build archive is removed. All 24 original container IDs, 85 volumes,
+the host dependencies and protected presentation digest are preserved. About
+9.45 GiB are free; the initial warning and four style warnings remain.
+
+Full parity and production readiness remain open: protect stale progress and
+current-state writes across API servers; resolve cross-controller late ACK and
+integrated multi-command ordering; implement debug; complete the Original corpus
+and full-page/device acceptance. This operation protects controller activation,
+not the entire launch/resume/logging transaction. Remote CI, release, deployment
+and live production remain unverified. These checkpoints are local and unpushed.
+
+### Historical command delivery after controller termination (2026-10-11, 876192634bf8)
 
 Local application checkpoint `876192634bf8` corrects the preceding checkpoint's
 redelivery of acknowledged deferred commands. Pinned Source
