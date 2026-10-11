@@ -1,3 +1,4 @@
+import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -2483,6 +2484,7 @@ const participantEventAcknowledgementPattern = createRoutePattern(
 );
 const participantRunCommandsPattern = createRoutePattern(productionApiRoutes.participant.listPendingCommands);
 const participantRunCommandAcknowledgementPattern = createRoutePattern(productionApiRoutes.participant.acknowledgeCommand);
+const participantRunCommandApplicationPattern = createRoutePattern(participantCommandExecutionRoute);
 const participantResourcePattern =
   /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
@@ -2528,7 +2530,7 @@ const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
   ["POST", participantEventAcknowledgementPattern],
-  ["GET", participantRunCommandsPattern], ["PATCH", participantRunCommandAcknowledgementPattern],
+  ["GET", participantRunCommandsPattern], ["PATCH", participantRunCommandAcknowledgementPattern], ["POST", participantRunCommandApplicationPattern],
   ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
   ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
   ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
@@ -3747,6 +3749,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", participantEventAcknowledgementPattern, productionApiRoutes.participant.acknowledgeEventStream],
     ["GET", participantRunCommandsPattern, productionApiRoutes.participant.listPendingCommands],
     ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
+    ["POST", participantRunCommandApplicationPattern, participantCommandExecutionRoute],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -4261,7 +4264,7 @@ const streamParticipantEvents = async (input: {
   const register = () => input.participantRuntime.updateConnection({
     participantSessionId: input.participantSessionId, testRunId, action: "open", connectionId
   });
-  if (!await register()) {
+  if (initialState.participantSession.status !== "launched" || !await register()) {
     sendError(input.response, 409, "participant_connection_unavailable",
       "A live connection is unavailable for this run. Refresh the participant state.");
     return;
@@ -4329,6 +4332,11 @@ const streamParticipantEvents = async (input: {
       }))
       .then(async currentState => {
         if (closed) {
+          return;
+        }
+        if (currentState.participantSession.status !== "launched") {
+          stop();
+          if (!input.response.writableEnded) input.response.end();
           return;
         }
         commands = await input.participantRuntime.listPendingCommands({
@@ -8486,6 +8494,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       const participantRunCommandsMatch = participantRunCommandsPattern.exec(pathname);
       const participantRunCommandAcknowledgementMatch = participantRunCommandAcknowledgementPattern.exec(pathname);
+      const participantRunCommandApplicationMatch = participantRunCommandApplicationPattern.exec(pathname);
       if (request.method === "GET" && participantRunCommandsMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantRunCommandsMatch.groups.participantSessionId);
         const testRunId = url.searchParams.get("testRunId");
@@ -8507,6 +8516,23 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const command = await services.participantRuntime.acknowledgeCommand({ participantSessionId, commandId, testRunId: body.testRunId });
         sendJson(response, 200, { command });
+        return;
+      }
+      if (request.method === "POST" && participantRunCommandApplicationMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.participantSessionId);
+        const commandId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.commandId);
+        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown }>();
+        if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
+          return;
+        }
+        if (body.controllerStatus !== undefined && typeof body.controllerStatus !== "string") {
+          sendError(response, 400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
+          return;
+        }
+        const application = await services.participantRuntime.executeCommand({ participantSessionId, commandId,
+          testRunId: body.testRunId, controllerStatus: body.controllerStatus });
+        sendJson(response, 200, { application });
         return;
       }
       const currentRunStateMatch = currentRunStatePattern.exec(pathname);

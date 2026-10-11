@@ -151,8 +151,26 @@ test("a fresh unreported Player denies required presentation without fabricating
   assert.equal(request.kind,"information");assert.equal(request.message,resolveParticipantCustomText({},"booklet_msgNavigationDeniedText_presentationIncomplete"));
   f.parent.resolveOriginalConfirmation(request,false);await pending;
 });
-const internalSource=await executableClass("participant-view.facade.ts","ParticipantViewFacade",["returnToStarterInternal"]);
-const InternalFacade=new Function("productionApiRoutes","resolveRoutePath",`${internalSource}\nreturn ParticipantViewFacade;`)(productionApiRoutes,resolveRoutePath);
+const internalSource=await executableClass("participant-view.facade.ts","ParticipantViewFacade",["returnToStarterInternal","presentParticipantStarter","readCurrentRunState","isParticipantStarter"]);
+const discarded=[];
+const InternalFacade=new Function("productionApiRoutes","resolveRoutePath","discardParticipantSaveOutboxForRun",`${internalSource}\nreturn ParticipantViewFacade;`)(productionApiRoutes,resolveRoutePath,id=>discarded.push(id));
+for(const preserveError of [false,true]) test(`starter cleanup cannot resurrect serialized Run state; retained error=${preserveError}`,()=>{
+  const facade=new InternalFacade(),state={testRun:{testRunId:"run-a"}},error={testRunId:"run-a",message:"Owned error"};
+  const runtimeState={participantSession:{participantSessionId:"session-a"},participantRosterEntry:null,booklets:[]};
+  Object.assign(facade,{currentRunState:state,runtime:{participantSessionId:"session-a",testRunId:"run-a",currentRunStateView:JSON.stringify({currentRunState:state})},
+    participantEvents:{stop(){}},invalidateCurrentStateRefreshes(){},ephemeralUnitResponses:new Map([["run-a","answer"]]),
+    activeControllerError:Object.assign(()=>error,{set(){}}),loadedBookletAssets:{set(){}},
+    syncParticipantSessionFields(){},syncParticipantRosterEntry(){},syncRuntimeBooklets(){},
+    // The actual helper calls getters while synchronizing the header; exercise
+    // its actual serialized fallback at that point, before helper completion.
+    syncParticipantHeaderVisibility(){assert.equal(this.readCurrentRunState(),null);},
+    resetTimerLifecyclePresentation(){},persistState(){},hasControllerError:false});
+  facade.presentParticipantStarter(runtimeState,"run-a",preserveError);
+  assert.equal(facade.readCurrentRunState(),null);assert.equal(facade.isParticipantStarter,true);
+  assert.equal(facade.runtime.currentRunStateView,"");assert.equal(facade.runtime.testRunId,"");
+  assert.equal(facade.ephemeralUnitResponses.has("run-a"),false);assert.equal(discarded.at(-1),"run-a");
+  assert.equal(facade.remoteTerminalErrorRunId,preserveError?"run-a":null);
+});
 for(const stage of ["settle","save"])for(const changed of ["run","lifecycle","unit","status"])test(`foreground ${stage}: late ${changed} cannot save or return a replacement Run`,async()=>{
   const facade=new InternalFacade(),calls=[];
   let state={testRun:{testRunId:"run-a"},currentUnit:{unitKey:"unit-a"},executionMode:{saveResponses:true}},release;

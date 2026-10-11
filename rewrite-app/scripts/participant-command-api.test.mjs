@@ -1,3 +1,4 @@
+import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -92,7 +93,9 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
     const listPath = resolveRoutePath(routes.participant.listPendingCommands, { participantSessionId: sessionId });
     const list = (testRunId, token = selected.sessionToken) => request("GET", `${listPath}?testRunId=${encodeURIComponent(testRunId)}`, undefined, token);
     const acknowledgement = commandId => resolveRoutePath(routes.participant.acknowledgeCommand, { participantSessionId: sessionId, commandId });
-    const issue = async testRunId => (await request("POST", workspace + `/monitor/open-runs/${testRunId}/commands`, { commandType: "resume" }, operator)).command;
+    const issue = async (testRunId, commandType = "resume") => (await request("POST", workspace + `/monitor/open-runs/${testRunId}/commands`, { commandType }, operator)).command;
+    const application = commandId => resolveRoutePath(participantCommandExecutionRoute, { participantSessionId: sessionId, commandId });
+    const apply = (commandId, controllerStatus = "RUNNING") => request("POST", application(commandId), { testRunId: run.testRunId, controllerStatus }, selected.sessionToken);
     await request("POST", resolveRoutePath(routes.participant.saveProgress, { testRunId: run.testRunId }),
       { status: "running", currentUnitKey: run.currentUnitKey, unitResponse: 'Exact saved answer Ä/β\n";' }, selected.sessionToken);
     const first = await issue(run.testRunId), secondCommand = await issue(run.testRunId), retained = await issue(otherBookletRun.testRunId);
@@ -105,6 +108,7 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       for (const token of [undefined, "invalid-token", other.sessionToken, operator]) {
         await request("GET", `${listPath}?testRunId=${run.testRunId}`, undefined, token, 401);
         await request("PATCH", acknowledgement(first.commandId), { testRunId: run.testRunId }, token, 401);
+        await request("POST", application(first.commandId), { testRunId: run.testRunId }, token, 401);
       }
       await request("GET", `${listPath}?testRunId=${foreign.testRunId}`, undefined, selected.sessionToken, 404);
       await request("PATCH", acknowledgement(first.commandId), { testRunId: foreign.testRunId }, selected.sessionToken, 404);
@@ -114,6 +118,10 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       for (const body of [{}, { testRunId: null }, { testRunId: 42 }, { testRunId: " " }]) {
         await request("PATCH", acknowledgement(first.commandId), body, selected.sessionToken, 400);
       }
+      await request("POST", application(first.commandId), { testRunId: run.testRunId }, selected.sessionToken, 409);
+      await request("POST", application(first.commandId), { testRunId: otherBookletRun.testRunId }, selected.sessionToken, 404);
+      await request("POST", application(first.commandId), { testRunId: foreign.testRunId }, selected.sessionToken, 404);
+      await request("POST", application("unknown"), { testRunId: run.testRunId }, selected.sessionToken, 404);
       assert.equal((await list(run.testRunId)).commands.length, 2);
     });
     await t.test("the SSE snapshot carries the selected Run's concrete commands", async () => {
@@ -146,18 +154,61 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       assert.equal(received.tenantId, run.tenantId); assert.equal(received.workspaceId, run.workspaceId);
       assert.deepEqual((await request("PATCH", acknowledgement(first.commandId), { testRunId: run.testRunId }, selected.sessionToken)).command, received);
       assert.deepEqual((await request("GET", currentPath, undefined, selected.sessionToken)).currentRunState.testRun, before);
-      assert.deepEqual((await list(run.testRunId)).commands.map(command => command.commandId), [secondCommand.commandId]);
+      assert.deepEqual((await list(run.testRunId)).commands.map(command => command.commandId), [first.commandId, secondCommand.commandId]);
+      assert.equal((await list(run.testRunId)).commands[0].effectsDeferred, true);
       assert.equal((await list(otherBookletRun.testRunId)).commands.length, 1);
       const durable = await (await readFreshRepository()).acknowledgeParticipantRunCommand({ tenantId: run.tenantId,
         workspaceId: run.workspaceId, participantSessionId: sessionId, testRunId: run.testRunId,
         commandId: first.commandId, acknowledgedAt: "1970-01-01T00:00:00.000Z" });
       assert.deepEqual(durable, received, "A fresh storage instance must return the same persisted first receipt.");
     });
-    await t.test("already accepted commands can be acknowledged after completion without reopening the Run", async () => {
-      await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "complete" }, operator);
-      assert.equal((await request("PATCH", acknowledgement(secondCommand.commandId), { testRunId: run.testRunId }, selected.sessionToken)).command.commandId, secondCommand.commandId);
-      assert.equal((await (await readFreshRepository()).getTestRunById(run.testRunId)).status, "completed");
-      assert.equal((await list(run.testRunId)).commands.length, 0);
+    await t.test("application derives the effect from its stored command and retains the first execution receipt", async () => {
+      const before = await (await readFreshRepository()).getTestRunById(run.testRunId);
+      const applied = (await request("POST", application(first.commandId), { testRunId: run.testRunId,
+        commandType: "complete_and_lock", targetUnitKey: "foreign", executedAt: "1970-01-01T00:00:00.000Z", controllerStatus: "ERROR" }, selected.sessionToken)).application;
+      assert.equal(applied.command.commandType, "resume"); assert.equal(applied.applied, true);
+      assert.ok(applied.command.executedAt); assert.notEqual(applied.command.executedAt, "1970-01-01T00:00:00.000Z");
+      assert.equal(applied.command.executionSequence, 1); assert.equal(applied.testRun.status, "running");
+      assert.deepEqual(applied.testRun.unitResponses, before.unitResponses);
+      const retry = (await apply(first.commandId)).application;
+      assert.equal(retry.applied, false); assert.deepEqual(retry.command, applied.command);
+      assert.deepEqual((await list(run.testRunId)).commands.map(command => command.commandId), [secondCommand.commandId]);
+      await request("PATCH", acknowledgement(secondCommand.commandId), { testRunId: run.testRunId }, selected.sessionToken);
+      await apply(secondCommand.commandId);
+    });
+    await t.test("pause does not change the Run or logs at issuance or ACK and applies after ERROR", async () => {
+      const before = await (await readFreshRepository()).getTestRunById(run.testRunId);
+      const paused = await issue(run.testRunId, "pause");
+      assert.equal(paused.testRun.status, "running");
+      assert.deepEqual(await (await readFreshRepository()).getTestRunById(run.testRunId), before);
+      await request("PATCH", acknowledgement(paused.commandId), { testRunId: run.testRunId }, selected.sessionToken);
+      assert.deepEqual(await (await readFreshRepository()).getTestRunById(run.testRunId), before);
+      const applied = (await apply(paused.commandId, "ERROR")).application;
+      assert.equal(applied.testRun.status, "paused"); assert.equal(applied.testRun.pauseSource, "monitor");
+      assert.deepEqual(applied.testRun.unitResponses, before.unitResponses);
+      const logs = await (await readFreshRepository()).listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId);
+      assert.equal(logs.filter(log => log.testRunId === run.testRunId && log.logKey === "CONTROLLER" && log.logContent === "PAUSED").length, 1);
+    });
+    for (const reversed of [false, true]) await t.test(`server effects follow ${reversed ? "reversed" : "normal"} successful ACK dispatch`, async () => {
+      const pause = await issue(run.testRunId, "pause"), resume = await issue(run.testRunId, "resume");
+      for (const command of [pause, resume]) await request("PATCH", acknowledgement(command.commandId), { testRunId: run.testRunId }, selected.sessionToken);
+      const commands = reversed ? [resume, pause] : [pause, resume], receipts = [];
+      for (const command of commands) receipts.push((await apply(command.commandId, receipts.length ? receipts.at(-1).testRun.status.toUpperCase() : "ERROR")).application);
+      assert.deepEqual(receipts.map(result => result.command.commandType), reversed ? ["resume", "pause"] : ["pause", "resume"]);
+      assert.equal(receipts[1].command.executionSequence, receipts[0].command.executionSequence + 1);
+      assert.equal((await (await readFreshRepository()).getTestRunById(run.testRunId)).status, reversed ? "paused" : "running");
+    });
+    await t.test("remote termination preserves the current Unit and answers and permits re-entry", async () => {
+      const before = await (await readFreshRepository()).getTestRunById(run.testRunId);
+      const terminal = await issue(run.testRunId, "complete");
+      assert.deepEqual(await (await readFreshRepository()).getTestRunById(run.testRunId), before);
+      await request("PATCH", acknowledgement(terminal.commandId), { testRunId: run.testRunId }, selected.sessionToken);
+      const result = (await apply(terminal.commandId, "ERROR")).application;
+      assert.equal(result.testRun.status, "paused"); assert.equal(result.testRun.locked, false);
+      assert.equal(result.testRun.currentUnitKey, before.currentUnitKey); assert.deepEqual(result.testRun.unitResponses, before.unitResponses);
+      assert.equal(result.testRun.completedAt, null); assert.equal(result.participantSession.status, "signed_in");
+      const resumed = (await request("POST", resolveRoutePath(routes.participant.resumeSession, { participantSessionId: sessionId }), { bookletKey: firstBooklet }, selected.sessionToken)).testRun;
+      assert.equal(resumed.testRunId, run.testRunId); assert.equal(resumed.status, "running");
     });
     await t.test("session revocation also closes command access", async () => {
       await request("DELETE", resolveRoutePath(routes.participant.signOut, { participantSessionId: sessionId }), undefined, selected.sessionToken, 205);

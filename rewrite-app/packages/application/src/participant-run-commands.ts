@@ -24,6 +24,12 @@ const timestamp = (value: string): string => {
   return new Date(value).toISOString();
 };
 
+export class ParticipantRunCommandApplicationError extends Error {
+  constructor(readonly errorCode: "participant_command_not_acknowledged" | "test_run_already_completed", message: string) {
+    super(message);
+  }
+}
+
 /** Called inside the store's serialized write/Run lock. */
 export const appendParticipantRunCommand = (
   input: ParticipantRunCommandInput,
@@ -46,11 +52,15 @@ export const appendParticipantRunCommand = (
     participantSessionId: input.participantSessionId, testRunId: input.testRunId,
     commandId: input.commandId, commandType: input.commandType,
     targetUnitKey: input.targetUnitKey, remainingSeconds: input.remainingSeconds,
-    actorId: input.actorId, issuedAt: timestamp(input.issuedAt)
+    actorId: input.actorId, issuedAt: timestamp(input.issuedAt),
+    ...(input.effectsDeferred === true ? { effectsDeferred: true as const } : {})
   };
   if (!matchesParticipantRunCommandScope(run, input)) return null;
   const existing = history.existing;
   if (existing) {
+    if (Boolean(existing.effectsDeferred) !== Boolean(normalized.effectsDeferred)) {
+      throw new Error("Participant command identity cannot be reused for another command.");
+    }
     for (const key of Object.keys(normalized) as Array<keyof ParticipantRunCommandInput>) {
       if (existing[key] !== normalized[key]) {
         throw new Error("Participant command identity cannot be reused for another command.");
@@ -89,7 +99,7 @@ export const prepareParticipantRunCommandApplication = (
       context.participantSession.participantSessionId !== input.participantSessionId ||
       context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId) return null;
   const { command, testRun, participantSession } = context;
-  if (!command.acknowledgedAt) throw new Error("Only an acknowledged participant command may be applied.");
+  if (!command.acknowledgedAt) throw new ParticipantRunCommandApplicationError("participant_command_not_acknowledged", "Only an acknowledged participant command may be applied.");
   if (command.executedAt) {
     if (!Number.isSafeInteger(command.executionSequence) || Number(command.executionSequence) < 1) {
       throw new Error("The persisted command application receipt is invalid.");
@@ -97,7 +107,7 @@ export const prepareParticipantRunCommandApplication = (
     return { result: structuredClone({ command, testRun, participantSession, applied: false }), effect: null };
   }
   if (command.executionSequence != null) throw new Error("The persisted command application receipt is invalid.");
-  if (testRun.status === "completed") throw new Error("A completed Run cannot apply another command.");
+  if (testRun.status === "completed") throw new ParticipantRunCommandApplicationError("test_run_already_completed", "A completed Run cannot apply another command.");
   const executionSequence = lastExecutionSequence + 1;
   if (!Number.isSafeInteger(executionSequence) || executionSequence < 1) throw new Error("Participant command application sequence is exhausted.");
   const effect = structuredClone(transform(structuredClone(context)));

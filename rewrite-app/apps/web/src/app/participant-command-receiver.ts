@@ -14,7 +14,7 @@ export const createParticipantCommandReceiver = (options: {
   participantSessionId: string;
   testRunId: string;
   acknowledge: (command: ParticipantRunCommand, signal: AbortSignal) => Promise<unknown>;
-  execute: (command: ParticipantRunCommand) => void;
+  execute: (command: ParticipantRunCommand, signal: AbortSignal) => void | Promise<void>;
   now?: () => number;
   schedule?: (callback: () => void, delay: number) => () => void;
 }): ParticipantCommandReceiver => {
@@ -27,18 +27,38 @@ export const createParticipantCommandReceiver = (options: {
   const seen = new Set<string>();
   const outstanding = new Set<string>();
   const timers = new Set<() => void>();
+  const executionQueue: ParticipantRunCommand[] = [];
+  let executing = false;
+  const executeNext = (): void => {
+    if (controller.signal.aborted || executing || !executionQueue.length) return;
+    executing = true;
+    const command = executionQueue[0]!;
+    void Promise.resolve().then(() => options.execute(command, controller.signal)).then(() => {
+      if (controller.signal.aborted) return;
+      executionQueue.shift(); outstanding.delete(command.commandId); executing = false; executeNext();
+    }).catch(error => {
+      if (controller.signal.aborted) return;
+      if (error?.retryable === false) {
+        executionQueue.shift(); outstanding.delete(command.commandId); executing = false; executeNext();
+        return;
+      }
+      let cancel: () => void;
+      cancel = schedule(() => { timers.delete(cancel); executing = false; executeNext(); }, 1_000);
+      timers.add(cancel);
+    });
+  };
   let nextStartAt = 0;
   const start = (command: ParticipantRunCommand) => {
     if (controller.signal.aborted) return;
     void options.acknowledge(command, controller.signal).then(value => {
       if (controller.signal.aborted) return;
       const receipt = parseParticipantRunCommand(value);
-      if (!receipt?.acknowledgedAt || Object.keys(command).some(key => key !== "acknowledgedAt" &&
+      if (!receipt?.acknowledgedAt || Object.keys(command).some(key => !["acknowledgedAt", "executedAt", "executionSequence"].includes(key) &&
         receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand])) {
         throw new Error("The command receipt does not match the accepted command.");
       }
-      outstanding.delete(command.commandId);
-      options.execute(receipt);
+      executionQueue.push(receipt);
+      executeNext();
     }).catch(() => {
       // A failed acknowledgement never authorizes an effect. A subsequent
       // server delivery may retry it; the server retains the first receipt.
@@ -54,7 +74,8 @@ export const createParticipantCommandReceiver = (options: {
       let lastSequence = 0;
       for (const command of parsed) {
         if (!command || command.participantSessionId !== options.participantSessionId || command.testRunId !== options.testRunId ||
-            command.acknowledgedAt !== null || ids.has(command.commandId) || command.sequence <= lastSequence) return;
+            command.executedAt != null || command.acknowledgedAt !== null && !command.effectsDeferred ||
+            ids.has(command.commandId) || command.sequence <= lastSequence) return;
         ids.add(command.commandId);
         lastSequence = command.sequence;
       }
@@ -78,6 +99,7 @@ export const createParticipantCommandReceiver = (options: {
       controller.abort();
       for (const cancel of timers) cancel();
       timers.clear();
+      executionQueue.length = 0;
       outstanding.clear();
     }
   };
@@ -91,7 +113,7 @@ export type ParticipantCommandChannel = ParticipantCommandReceiver & {
 export const createParticipantCommandChannel = (options: {
   participantSessionId: string; testRunId: string;
   readCredential: () => string | null;
-  execute: (command: ParticipantRunCommand) => void;
+  execute: (command: ParticipantRunCommand, signal: AbortSignal) => void | Promise<void>;
 }): ParticipantCommandChannel => {
   const headers = (): Record<string, string> => {
     const token = options.readCredential();

@@ -1561,6 +1561,15 @@ const sqliteMigrations: SqliteMigration[] = [
         ON participant_run_commands(test_run_id, json_extract(command_json, '$.executionSequence'))
         WHERE json_extract(command_json, '$.executionSequence') IS NOT NULL;
     `
+  },
+  {
+    version: 61,
+    name: "index_pending_participant_command_effects",
+    sql: `
+      DROP INDEX idx_participant_run_commands_pending;
+      CREATE INDEX idx_participant_run_commands_pending
+        ON participant_run_commands(test_run_id, sequence) WHERE acknowledged_at IS NULL OR (json_extract(command_json, '$.effectsDeferred') = 1 AND json_extract(command_json, '$.executedAt') IS NULL);
+    `
   }
 ];
 
@@ -3310,7 +3319,7 @@ export const createSqliteFirstSliceRepository = (
       return database.prepare(`SELECT command.command_json FROM participant_run_commands AS command
         JOIN test_runs AS run ON run.test_run_id = command.test_run_id
         WHERE command.test_run_id = ? AND command.tenant_id = ? AND command.workspace_id = ? AND command.participant_session_id = ?
-          AND command.acknowledged_at IS NULL
+          AND (command.acknowledged_at IS NULL OR (json_extract(command.command_json, '$.effectsDeferred') = 1 AND json_extract(command.command_json, '$.executedAt') IS NULL))
           AND run.tenant_id = command.tenant_id AND run.workspace_id = command.workspace_id
           AND run.participant_session_id = command.participant_session_id
         ORDER BY command.sequence`)

@@ -209,6 +209,7 @@ try {
     if(receivedResume){
       assert.equal(await element.evaluate(el=>el.isConnected),true);
       releaseReceivedResume();await delay(1800);
+      await page.locator('#participantRouteConnectionState[data-status="live"]').waitFor({state:'attached'});
       const actual={receivedResumeCommand,acknowledgedAt:receivedResumeReceipt.acknowledgedAt,
         samePlayerFrameAsBeforeError:await element.evaluate(el=>el.isConnected),
         iframeCount:await page.locator('iframe').count(),cardCount:await page.locator('mat-card').count(),
@@ -241,7 +242,7 @@ try {
       try {await Promise.race([lateSaveStarted,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Owned runtime log save did not start')),15000);})]);}
       finally {clearTimeout(timer);}
       await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:'pause',actorId:'owned-late-save-pause'}, operator);
-      await poll(currentState,s=>s.testRun.status==='paused');
+      assert.equal((await currentState()).testRun.status,'running','Issuance after ERROR cannot apply an unreceived pause.');
       releaseLateSave();
       const logs=workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('Runtime Error: runtime-error')}&unitKey=unit-intro`;
       const stored=await poll(()=>api(logs,undefined,operator),p=>p.items.length===1);
@@ -283,6 +284,16 @@ try {
       if (receivedPauseOldSave) {await delay(700);releaseAfterPauseLog();}
       const logs = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=${encodeURIComponent('Runtime Error: runtime-error')}&unitKey=unit-intro`;
       await poll(()=>api(logs,undefined,operator),p=>p.items.length===1);
+      const controllerLogPath = workspace + `/test-logs?testRunId=${encodeURIComponent(runId)}&logKey=CONTROLLER&limit=100`;
+      const controllerLogs = await poll(()=>api(controllerLogPath,undefined,operator),payload=>{
+        const entries=payload.items.map(item=>item.testLog).sort((a,b)=>a.timestamp-b.timestamp);
+        const error=entries.findIndex(entry=>entry.logContent==='ERROR');
+        return error>=0 && entries.slice(error+1).some(entry=>entry.logContent==='PAUSED');
+      });
+      const controllerStates=controllerLogs.items.map(item=>item.testLog).sort((a,b)=>a.timestamp-b.timestamp).map(entry=>entry.logContent);
+      assert.deepEqual(controllerStates.slice(controllerStates.indexOf('ERROR')),
+        sourcePause.controllerStates.slice(sourcePause.controllerStates.indexOf('ERROR')),
+        'Issuing and acknowledging pause must not persist PAUSED before the accepted command executes after ERROR.');
       if (receivedPauseOldSave) {
         await page.waitForFunction(()=>localStorage.getItem('testcenter-rewrite:participant-save-outbox:v1')===null);
         await delay(700);await page.locator('app-original-participant-paused mat-card').waitFor();
@@ -366,11 +377,14 @@ try {
     assert.equal(failed.testRun.status, "running"); assert.equal(failed.testRun.unitResponses["unit-intro"], packet);
     assert.deepEqual(failed.testRun.lockedUnitKeys, []); assert.deepEqual(failed.testRun.lockedTestletKeys, []);
     if (monitorCommand) {
-      await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:monitorCommand,actorId:'owned-error-overlap'}, operator);
-      const status = monitorCommand === 'pause' ? 'paused' : 'completed';
-      await poll(currentState, state => state.testRun.status === status);
+      const issued=(await api(workspace + `/monitor/open-runs/${runId}/commands`, {commandType:monitorCommand,actorId:'owned-error-overlap'}, operator)).command;
+      assert.equal(issued.testRun.status,'running','Issuance after ERROR cannot change the controller state.');
       await delay(700);
-      states[key].lateCommand = {command:monitorCommand,serverStatus:status,
+      const pending=await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/commands?testRunId=${runId}`,undefined,identity.sessionToken);
+      const receipt=pending.commands.find(command=>command.commandId===issued.commandId);
+      assert.ok(receipt);assert.equal(receipt.acknowledgedAt,null);assert.equal(receipt.executedAt,null);
+      assert.equal((await currentState()).testRun.status,'running');
+      states[key].lateCommand = {command:monitorCommand,serverStatus:'running',acknowledgedAt:null,executedAt:null,
         iframePreserved:await element.evaluate(el=>el.isConnected),
         dialogCount:await page.locator(failDialog ? '#participantRuntimeErrorFallback' : 'mat-dialog-container').count()};
       await page.screenshot({path:join(artifacts,`${key}-late-${monitorCommand}.png`),fullPage:true});
@@ -381,7 +395,18 @@ try {
       await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').waitFor({state:'detached'});
       await page.locator('iframe').waitFor({state:'detached'});
       if (monitorCommand === 'pause') await page.locator('app-original-participant-paused mat-card').waitFor();
-      else await page.locator('#participantRouteCompletedState').waitFor();
+      else {
+        const starter=page.locator('app-original-participant-starter');
+        await starter.locator('mat-card').waitFor();
+        const terminated=await currentState();
+        assert.equal(terminated.testRun.status,'paused');assert.equal(terminated.testRun.locked,false);
+        assert.equal(terminated.testRun.currentUnitKey,'unit-intro');assert.equal(terminated.testRun.completedAt,null);
+        assert.equal(terminated.participantSession.status,'signed_in');
+        const resume=starter.locator('mat-card-actions button').first();assert.equal(await resume.isEnabled(),true);
+        await resume.click();await frame.locator('#demoPlayerAnswer').waitFor();
+        assert.equal(await frame.locator('#demoPlayerAnswer').inputValue(),answer);
+        assert.equal((await currentState()).testRun.testRunId,runId,'Monitor termination must resume the same saved Run.');
+      }
       assert.equal((await currentState()).testRun.unitResponses['unit-intro'],packet);
       await context.close();console.log(`original_runtime_late_command=${monitorCommand}:passed`);continue;
     }

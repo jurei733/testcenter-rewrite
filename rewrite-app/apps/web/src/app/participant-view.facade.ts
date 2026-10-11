@@ -52,6 +52,7 @@ import {
   type ParticipantRosterEntry,
   type ParticipantViewSettings,
   type ParticipantRuntimeBooklet,
+  type ParticipantRuntimeState,
   type ParticipantTestLogEntryInput,
   type WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
@@ -483,32 +484,47 @@ export class ParticipantViewFacade {
   private readonly refreshFromParticipantEvents = (): Promise<void> =>
     this.refreshCurrentStateInternal(true);
   private readonly commandReloadSequence = signal(0);
-  private readonly receiveParticipantCommand = (command: ParticipantRunCommand): void => {
-    void this.applyReceivedParticipantCommand(command).catch(() => undefined);
-  };
+  private remoteTerminalErrorRunId: string | null = null;
+  private commandControllerState: { testRunId: string; status: string } | null = null;
+  private readonly receiveParticipantCommand = (command: ParticipantRunCommand, signal: AbortSignal): Promise<void> =>
+    this.applyReceivedParticipantCommand(command, signal);
 
-  private async applyReceivedParticipantCommand(command: ParticipantRunCommand): Promise<void> {
+  private async applyReceivedParticipantCommand(command: ParticipantRunCommand, signal: AbortSignal): Promise<void> {
     const state = this.readCurrentRunState();
     if (!state || !command.acknowledgedAt || state.testRun.status === "completed" ||
         command.participantSessionId !== state.participantSession.participantSessionId ||
         command.testRunId !== state.testRun.testRunId || command.tenantId !== state.testRun.tenantId ||
         command.workspaceId !== state.testRun.workspaceId) return;
     const lifecycle = this.viewLifecycleSequence;
-    const replacesPlayer = command.commandType === "resume" || command.commandType === "goto";
-    let reloaded = false;
-    if (replacesPlayer && state.testRun.status === "running" &&
-        (command.commandType === "resume" || command.targetUnitKey === state.currentUnit.unitKey)) {
-      this.participantErrorReceptionSuspended = false;
-      this.commandReloadSequence.update(sequence => sequence + 1);
-      reloaded = true;
-    }
-    await this.refreshCurrentStateInternal(true, true);
-    const current = this.readCurrentRunState();
-    if (lifecycle !== this.viewLifecycleSequence || current?.testRun.testRunId !== command.testRunId) return;
-    if (replacesPlayer && !reloaded && current.testRun.status === "running") {
-      this.participantErrorReceptionSuspended = false;
-      this.commandReloadSequence.update(sequence => sequence + 1);
-    }
+    const isCurrent = (): boolean => lifecycle === this.viewLifecycleSequence && this.readCurrentRunState()?.testRun.testRunId === command.testRunId;
+    const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
+    await (await import("./participant-command-execution")).executeReceivedParticipantCommand(command, signal, {
+      isCurrent, controllerStatus: () => this.hasControllerError ? "ERROR" : this.readCurrentRunState()?.testRun.status === "paused" ? "PAUSED" : "RUNNING",
+      prepare: async () => {
+        if (terminal) await this.saveCurrentDraftBeforeCompleteInternal(await this.settleVeronaAutoSaveBeforeForegroundAction());
+      },
+      apply: async () => {
+        if (!isCurrent() || signal.aborted) return;
+        if (command.effectsDeferred) this.commandControllerState = { testRunId: command.testRunId,
+          status: terminal ? "TERMINATED" : command.commandType === "pause" ? "PAUSED" : "RUNNING" };
+        if (terminal) {
+          const payload = await this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
+            resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: command.participantSessionId }), undefined, { quiet: true });
+          if (!isCurrent() || signal.aborted) return;
+          this.presentParticipantStarter(payload.runtimeState, command.testRunId, true);
+          await this.replaceSelectedRunEntryLink();
+          return;
+        }
+        const replacesPlayer = command.commandType === "resume" || command.commandType === "goto";
+        await this.refreshCurrentStateInternal(true, true);
+        const current = this.readCurrentRunState();
+        if (!isCurrent() || signal.aborted) return;
+        if (replacesPlayer && current?.testRun.status === "running") {
+          this.participantErrorReceptionSuspended = false;
+          this.commandReloadSequence.update(sequence => sequence + 1);
+        }
+      }
+    });
   }
 
   init(): void {
@@ -565,6 +581,7 @@ export class ParticipantViewFacade {
 
   destroy(): void {
     this.viewLifecycleSequence += 1;
+    this.remoteTerminalErrorRunId = null;
     // Stopping event delivery does not cancel requests already in flight.
     // Their responses must not restore participant scope after a route change.
     this.invalidateCurrentStateRefreshes();
@@ -1511,9 +1528,7 @@ export class ParticipantViewFacade {
   get controllerError(): VeronaControllerError | null {
     const currentState = this.readCurrentRunState();
     const error = this.activeControllerError();
-    return currentState && error?.testRunId === currentState.testRun.testRunId
-      ? error
-      : null;
+    return error && (error.testRunId === currentState?.testRun.testRunId || error.testRunId === this.remoteTerminalErrorRunId) ? error : null;
   }
 
   get controllerErrorText(): string {
@@ -2517,6 +2532,13 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
+    entries = entries.filter(entry => {
+      if (entry.key !== "CONTROLLER") return true;
+      const previous = this.commandControllerState;
+      this.commandControllerState = { testRunId: currentState.testRun.testRunId, status: String(entry.content) };
+      return previous?.testRunId !== currentState.testRun.testRunId || previous.status !== String(entry.content);
+    });
+    if (!entries.length) return;
     const batch: ParticipantTestLogBatch & { testRunId: string } = {
       testRunId: currentState.testRun.testRunId,
       unitKey: null,
@@ -3956,22 +3978,7 @@ export class ParticipantViewFacade {
       );
 
     if (!isCurrent(payload.testRun)) return;
-    this.participantEvents.stop();
-    this.invalidateCurrentStateRefreshes();
-    discardParticipantSaveOutboxForRun(payload.testRun.testRunId);
-    this.pendingVeronaSave = null;
-    this.optimisticVeronaResponse = null;
-    this.ephemeralUnitResponses.delete(payload.testRun.testRunId);
-    this.currentRunState = null;
-    this.activeControllerError.set(null);
-    this.loadedBookletAssets.set(null);
-    this.runtime.testRunId = "";
-    this.runtime.currentUnitKey = "";
-    this.runtime.currentUnitResponse = "";
-    this.syncParticipantSessionFields(payload.runtimeState.participantSession);
-    this.syncParticipantRosterEntry(payload.runtimeState.participantRosterEntry);
-    this.syncRuntimeBooklets(payload.runtimeState.booklets);
-    this.syncParticipantHeaderVisibility();
+    this.presentParticipantStarter(payload.runtimeState, payload.testRun.testRunId);
     this.runtime.currentRunStateView = prettyPrintJson(
       {
         status: "participant_returned_to_starter",
@@ -3984,6 +3991,32 @@ export class ParticipantViewFacade {
       payload,
       this.runtime.runtimeMonitorView
     );
+    this.resetTimerLifecyclePresentation();
+    this.persistState();
+  }
+
+  private presentParticipantStarter(runtimeState: ParticipantRuntimeState, testRunId: string, preserveControllerError = false): void {
+    this.participantEvents.stop();
+    this.invalidateCurrentStateRefreshes();
+    discardParticipantSaveOutboxForRun(testRunId);
+    this.pendingVeronaSave = null;
+    this.optimisticVeronaResponse = null;
+    this.ephemeralUnitResponses.delete(testRunId);
+    this.currentRunState = null;
+    // readCurrentRunState can restore its cache from this serialized view.
+    // Clear that fallback before rendering the starter or the terminated Run
+    // would be reconstructed during the next getter evaluation.
+    this.runtime.currentRunStateView = "";
+    this.remoteTerminalErrorRunId = preserveControllerError ? this.activeControllerError()?.testRunId ?? null : null;
+    if (!preserveControllerError) this.activeControllerError.set(null);
+    this.loadedBookletAssets.set(null);
+    this.runtime.testRunId = "";
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentUnitResponse = "";
+    this.syncParticipantSessionFields(runtimeState.participantSession);
+    this.syncParticipantRosterEntry(runtimeState.participantRosterEntry);
+    this.syncRuntimeBooklets(runtimeState.booklets);
+    this.syncParticipantHeaderVisibility();
     this.resetTimerLifecyclePresentation();
     this.persistState();
   }

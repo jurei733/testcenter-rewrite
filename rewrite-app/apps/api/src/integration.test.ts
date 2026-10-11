@@ -31,12 +31,13 @@ import {
   type CreateProofOfWorkChallengeResponse,
   type ProofOfWorkSolution
 } from "@testcenter-rewrite-app/contracts";
+import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
 import { createFileFirstSliceRepository } from "@testcenter-rewrite-app/file-store";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
 import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
 import { createFirstSliceServices, type FirstSliceRepository } from "@testcenter-rewrite-app/application";
-import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
+import type { MonitorRunCommandResult, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createProductionApiServer } from "./index.js";
 import { ProofOfWorkManager } from "./proof-of-work.js";
@@ -536,6 +537,34 @@ const requestJson = async <T>(
     body?: unknown;
   }
 ): Promise<JsonResponse<T>> => requestJsonAt<T>(baseUrl, path, init);
+
+// Effect-oriented workflows explicitly deliver the issued intent through the
+// real participant ACK and application routes. Issuance-only behavior is covered
+// separately by participant-command-api.test.mjs.
+const issueMonitorCommandAndExecuteAt = async <T>(
+  rootUrl: string, path: string, init?: Parameters<typeof requestJsonAt>[2]
+): Promise<JsonResponse<T>> => {
+  const issued = await requestJsonAt<{ command?: MonitorRunCommandResult; commands?: MonitorRunCommandResult[] }>(rootUrl, path, init);
+  if (issued.status !== 200) return issued as unknown as JsonResponse<T>;
+  for (const command of issued.body.commands ?? (issued.body.command ? [issued.body.command] : [])) {
+    if (!["pause", "resume", "goto", "complete", "complete_and_lock"].includes(command.commandType)) continue;
+    const sessionId = command.participantSession.participantSessionId;
+    const testRunId = command.testRun.testRunId;
+    const acknowledged = await requestJsonAt(rootUrl, resolveRoutePath(productionApiRoutes.participant.acknowledgeCommand, {
+      participantSessionId: sessionId, commandId: command.commandId
+    }), { method: "PATCH", body: { testRunId } });
+    assert.equal(acknowledged.status, 200, "The real participant must receive the issued command.");
+    const applied = await requestJsonAt<{ application: { testRun: TestRun; participantSession: ParticipantSession } }>(
+      rootUrl, resolveRoutePath(participantCommandExecutionRoute, { participantSessionId: sessionId, commandId: command.commandId }),
+      { method: "POST", body: { testRunId, controllerStatus: command.previousStatus === "paused" ? "PAUSED" : "RUNNING" } });
+    assert.equal(applied.status, 200, "The received command must execute in its authorized Run.");
+    command.testRun = applied.body.application.testRun;
+    command.participantSession = applied.body.application.participantSession;
+  }
+  return issued as unknown as JsonResponse<T>;
+};
+const issueMonitorCommandAndExecute = <T>(path: string, init?: Parameters<typeof requestJsonAt>[2]): Promise<JsonResponse<T>> =>
+  issueMonitorCommandAndExecuteAt<T>(baseUrl, path, init);
 
 const completeRequiredAdminPasswordChangeAt = async (
   rootUrl: string,
@@ -7089,7 +7118,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(rejectedOverviewByGroupMonitor.status, 403);
     assert.equal(rejectedOverviewByGroupMonitor.body.error, "admin_role_required");
 
-    const rejectedUnknownRunByGroupMonitor = await requestJsonAt<{
+    const rejectedUnknownRunByGroupMonitor = await issueMonitorCommandAndExecuteAt<{
       error: string;
     }>(
       isolated.baseUrl,
@@ -11362,7 +11391,7 @@ test("local demo bootstrap preserves customized roster state across durable rest
   }
 });
 
-test("monitor command endpoint pauses, resumes, and atomically completes and locks a run", async () => {
+test("received monitor commands pause, resume, and return a locked Run to the starter", async () => {
   const requestedStore = process.env.FIRST_SLICE_STORE;
   const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
     ? requestedStore
@@ -11428,7 +11457,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(resumed.body.testRun.bookletKey, "booklet:demo");
 
     const commandPath = `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`;
-    const pauseCommand = await requestJsonAt<{
+    const pauseCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandId: string;
         commandType: string;
@@ -11673,7 +11702,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(openRunsByOtherSpecies.status, 200);
     assert.equal(openRunsByOtherSpecies.body.items.length, 0);
 
-    const unlockNavigationCommand = await requestJsonAt<{
+    const unlockNavigationCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11699,7 +11728,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       true
     );
 
-    const lockNavigationCommand = await requestJsonAt<{
+    const lockNavigationCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11725,7 +11754,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       false
     );
 
-    const lockTestCommand = await requestJsonAt<{
+    const lockTestCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousLocked: boolean;
@@ -11785,7 +11814,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       true
     );
 
-    const unlockTestCommand = await requestJsonAt<{
+    const unlockTestCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousLocked: boolean;
@@ -11805,7 +11834,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(unlockTestCommand.body.command.testRun.status, "paused");
     assert.equal(unlockTestCommand.body.command.testRun.locked, false);
 
-    const resumeCommand = await requestJsonAt<{
+    const resumeCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11826,7 +11855,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(resumeCommand.body.command.testRun.status, "running");
     assert.equal(resumeCommand.body.command.testRun.pauseSource, undefined);
 
-    const missingTimeTarget = await requestJsonAt<{ error: string }>(
+    const missingTimeTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11841,7 +11870,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_time_target_unit_required"
     );
 
-    const invalidTime = await requestJsonAt<{ error: string }>(
+    const invalidTime = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11860,7 +11889,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_time_remaining_seconds_invalid"
     );
 
-    const nonTimedTarget = await requestJsonAt<{ error: string }>(
+    const nonTimedTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11876,7 +11905,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(nonTimedTarget.status, 400);
     assert.equal(nonTimedTarget.body.error, "monitor_time_target_not_timed");
 
-    const nonTimedGotoRestoration = await requestJsonAt<{ error: string }>(
+    const nonTimedGotoRestoration = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11895,7 +11924,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_time_target_not_timed"
     );
 
-    const missingGotoTarget = await requestJsonAt<{ error: string }>(
+    const missingGotoTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11913,7 +11942,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_target_unit_required"
     );
 
-    const invalidGotoTarget = await requestJsonAt<{ error: string }>(
+    const invalidGotoTarget = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -11932,7 +11961,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "monitor_goto_target_unit_invalid"
     );
 
-    const gotoCommand = await requestJsonAt<{
+    const gotoCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11956,7 +11985,7 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       "unit-finish"
     );
 
-    const completeCommand = await requestJsonAt<{
+    const completeCommand = await issueMonitorCommandAndExecuteAt<{
       command: {
         commandType: string;
         previousStatus: string;
@@ -11980,11 +12009,11 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
     assert.equal(completeCommand.status, 200);
     assert.equal(completeCommand.body.command.commandType, "complete_and_lock");
     assert.equal(completeCommand.body.command.previousStatus, "running");
-    assert.equal(completeCommand.body.command.testRun.status, "completed");
+    assert.equal(completeCommand.body.command.testRun.status, "paused");
     assert.equal(completeCommand.body.command.testRun.locked, true);
-    assert.equal(completeCommand.body.command.testRun.currentUnitKey, null);
-    assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
-    assert.equal(completeCommand.body.command.participantSession.status, "closed");
+    assert.equal(completeCommand.body.command.testRun.currentUnitKey, "unit-finish");
+    assert.equal(completeCommand.body.command.testRun.completedAt, null);
+    assert.equal(completeCommand.body.command.participantSession.status, "signed_in");
 
     const originalMonitorCommandLogs = await requestJsonAt<{
       items: Array<{
@@ -12026,7 +12055,19 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       )
     );
 
-    const repeatCommand = await requestJsonAt<{ error: string }>(
+    const lockedResume = await requestJsonAt<{ error: string }>(isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" });
+    assert.equal(lockedResume.status, 423);
+    assert.equal(lockedResume.body.error, "test_run_locked");
+
+    // Final completion is a separate participant operation. Its closed-Run
+    // guard still rejects subsequently issued monitor commands.
+    assert.equal((await issueMonitorCommandAndExecuteAt(isolated.baseUrl, commandPath,
+      { method: "POST", headers: { authorization }, body: { commandType: "unlock_test" } })).status, 200);
+    assert.equal((await requestJsonAt(isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`, { method: "POST" })).status, 200);
+    const repeatCommand = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
       {
@@ -12086,11 +12127,12 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=8",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=20",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
+    assert.equal(commandActivity.body.items.shift()?.activityEvent.details.commandType, "unlock_test");
     assert.equal(commandActivity.body.items.length, 8);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
@@ -12114,13 +12156,9 @@ test("monitor command endpoint pauses, resumes, and atomically completes and loc
       resumed.body.testRun.testRunId
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "running");
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "completed");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "running");
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousLocked, false);
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.locked, true);
-    assert.match(
-      String(commandActivity.body.items[0]?.activityEvent.details.completedAt ?? ""),
-      ISO_DATE_REGEX
-    );
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.locked, false);
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.loginKey, "student-demo");
     assert.equal(
       commandActivity.body.items[0]?.activityEvent.details.participantSessionId,
@@ -12321,7 +12359,7 @@ test("participant event stream publishes session snapshots and monitor changes",
     };
     assert.equal(await connection(), "WEBSOCKET");
 
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -12356,7 +12394,7 @@ test("participant event stream publishes session snapshots and monitor changes",
     assert.equal(connectionLogs.status, 200);
     assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : LOST"'));
     assert.ok(connectionLogs.body.includes('"0";"""CONNECTION"" : POLLING"'));
-    const completed = await requestJsonAt(isolated.baseUrl,
+    const completed = await issueMonitorCommandAndExecuteAt(isolated.baseUrl,
       `${openRunsPath}/${snapshot.testRunId}/commands`, {
         method: "POST", body: { commandType: "complete", actorId: "participant-stream-test" }
       });
@@ -12515,7 +12553,7 @@ test("monitor event stream publishes authenticated snapshots and run changes", a
     assert.match(snapshot.revision, /^[a-f0-9]{64}$/);
     assert.equal(snapshot.openRunCount, 1);
 
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -25405,7 +25443,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       rejectedOtherGroupQuery.body.error,
       "monitor_group_access_required"
     );
-    const rejectedOutsiderCommand = await requestJsonAt<{ error: string }>(
+    const rejectedOutsiderCommand = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
       `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${outsiderRun.body.testRun.testRunId}/commands`,
       {
@@ -25421,7 +25459,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     );
 
     const commandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`;
-    const pause = await requestJsonAt<{
+    const pause = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25430,7 +25468,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     });
     assert.equal(pause.status, 200);
     assert.equal(pause.body.command.testRun.status, "paused");
-    const resume = await requestJsonAt<{
+    const resume = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25438,7 +25476,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       body: { commandType: "resume", actorId: "GM-1" }
     });
     assert.equal(resume.body.command.testRun.status, "running");
-    const goTo = await requestJsonAt<{
+    const goTo = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; currentUnitKey: string | null } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25467,7 +25505,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       "Aufgabenblock 1"
     );
 
-    const lock = await requestJsonAt<{
+    const lock = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; locked?: boolean } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25485,7 +25523,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     );
     assert.equal(lockedRuntime.body.runtimeState.runtimeStatus, "locked");
     assert.equal(lockedRuntime.body.runtimeState.availableAction, "none");
-    const unlock = await requestJsonAt<{
+    const unlock = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string; locked?: boolean } };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
@@ -25518,7 +25556,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
       participantSessionId
     );
 
-    const finishAll = await requestJsonAt<{
+    const finishAll = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -25543,7 +25581,7 @@ test("original Testcenter compatibility corpus executes the current passwordless
     assert.equal(finishAll.body.succeededCount, 1);
     assert.equal(finishAll.body.failedCount, 0);
     assert.equal(finishAll.body.commands[0]?.testRun.testRunId, testRunId);
-    assert.equal(finishAll.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finishAll.body.commands[0]?.testRun.status, "paused");
     assert.equal(finishAll.body.commands[0]?.testRun.locked, true);
 
     const outsiderAfterFinish = await requestJsonAt<{
@@ -33426,7 +33464,7 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     { method: "POST", body: { bookletKey } }
   );
   assert.equal(monitorRun.body.testRun.currentUnitKey, null);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: {
@@ -33647,7 +33685,7 @@ test("original Testcenter root restrictions govern the complete booklet", async 
     "testlet_time_leave_forbidden"
   ]);
 
-  const shortenedTimer = await requestJson<{
+  const shortenedTimer = await issueMonitorCommandAndExecute<{
     command: { testRun: { testletTimers?: Record<string, {
       durationSeconds: number; status: string; expiresAt: string | null;
     }> } };
@@ -34208,7 +34246,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       testRun: {
         monitorNavigationUnlocked?: boolean;
@@ -34243,7 +34281,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
-  const restoredTimer = await requestJson<{
+  const restoredTimer = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       previousStatus: string;
@@ -34330,7 +34368,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "expired"
   );
 
-  const monitorReopenedTimer = await requestJson<{
+  const monitorReopenedTimer = await issueMonitorCommandAndExecute<{
     command: {
       testRun: {
         currentUnitKey: string | null;
@@ -34385,7 +34423,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     ISO_DATE_REGEX
   );
 
-  const batchReopenedTimer = await requestJson<{
+  const batchReopenedTimer = await issueMonitorCommandAndExecute<{
     succeededCount: number;
     failedCount: number;
     commands: Array<{
@@ -34433,6 +34471,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const monitorActivity = await requestJson<{
     items: Array<{
       activityEvent: {
+        eventType: string;
         details: {
           commandType?: string;
           targetUnitKey?: string | null;
@@ -34445,7 +34484,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       };
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=monitor_run_command_issued&limit=10`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?limit=100`
   );
   const setTimeActivity = monitorActivity.body.items.find(
     item => item.activityEvent.details.commandType === "set_testlet_time"
@@ -34453,6 +34492,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const gotoRestorationActivity = monitorActivity.body.items.find(
     item =>
       item.activityEvent.details.commandType === "goto" &&
+      item.activityEvent.eventType === "monitor_run_command_executed" &&
       item.activityEvent.details.remainingSeconds === 10
   );
   assert.ok(gotoRestorationActivity);
@@ -34987,7 +35027,7 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "testlet_leave_locked"
   ]);
 
-  const monitorGoto = await requestJson<{
+  const monitorGoto = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       actorId: string | null;
@@ -35024,7 +35064,7 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "UNIT.LOCK.1",
     "UNIT.LOCK.2"
   ]);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: {
@@ -35334,7 +35374,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   assert.equal(hiddenJump.body.error, "booklet_navigation_denied");
   assert.deepEqual(hiddenJump.body.details?.deniedReasons, ["adaptive_unit_hidden"]);
 
-  const hiddenMonitorGoto = await requestJson<{ error: string }>(
+  const hiddenMonitorGoto = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
     {
       method: "POST",
@@ -41398,7 +41438,7 @@ test("returning to the starter applies lock_test_on_termination before exposing 
     "test_run_locked"
   );
 
-  const unlock = await requestJson<{
+  const unlock = await issueMonitorCommandAndExecute<{
     command: { testRun: { locked?: boolean; status: string } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -41813,7 +41853,7 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
     "presentation_incomplete",
     "response_incomplete"
   ]);
-  const monitorUnlock = await requestJson<{
+  const monitorUnlock = await issueMonitorCommandAndExecute<{
     command: { testRun: { monitorNavigationUnlocked?: boolean } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -41829,7 +41869,7 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
     (await save(globalSecondUnitKey, response("some", "none"))).status,
     200
   );
-  const monitorLock = await requestJson<{
+  const monitorLock = await issueMonitorCommandAndExecute<{
     command: { testRun: { monitorNavigationUnlocked?: boolean } };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
@@ -44330,7 +44370,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${review.testRunId}`
   );
   assert.deepEqual(reviewOpenRuns.body.items, []);
-  const rejectedReviewCommand = await requestJson<{ error: string }>(
+  const rejectedReviewCommand = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${review.testRunId}/commands`,
     { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
   );
@@ -44522,7 +44562,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     trialOpenRuns.body.items.map(item => [item.testRunId, item.executionMode]),
     [[trial.testRunId, "run-trial"]]
   );
-  const rejectedTrialCommand = await requestJson<{ error: string }>(
+  const rejectedTrialCommand = await issueMonitorCommandAndExecute<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${trial.testRunId}/commands`,
     { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
   );
@@ -46637,7 +46677,7 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(unassignedWhileOpen.status, 403);
   assert.equal(unassignedWhileOpen.body.error, "booklet_not_assigned");
   const alphaCommandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${earlierAlphaRun.testRunId}/commands`;
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "pause" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "pause" } })).status, 200);
   const monitorPausedAlpha = await requestJson<{ testRun: { status: string; pauseSource: string; unitResponses: Record<string, string> } }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST", body: { bookletKey: "booklet:alpha" } });
@@ -46645,7 +46685,7 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(monitorPausedAlpha.body.testRun.status, "paused");
   assert.equal(monitorPausedAlpha.body.testRun.pauseSource, "monitor");
   assert.deepEqual(monitorPausedAlpha.body.testRun.unitResponses, { "unit-alpha-1": "Independent alpha: β  " });
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "lock_test" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "lock_test" } })).status, 200);
   const lockedAlphaEntry = await requestJson<{ error: string }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST", body: { bookletKey: "booklet:alpha" } });
@@ -46665,8 +46705,8 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(blockedSiblingState.body.runtimeState.runtimeStatus, "locked");
   assert.equal(blockedSiblingState.body.runtimeState.availableAction, "none",
     "Completing another Booklet cannot make a locked sibling resumable.");
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "unlock_test" } })).status, 200);
-  assert.equal((await requestJson(alphaCommandPath, { method: "POST", body: { commandType: "resume" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "unlock_test" } })).status, 200);
+  assert.equal((await issueMonitorCommandAndExecute(alphaCommandPath, { method: "POST", body: { commandType: "resume" } })).status, 200);
 
   const betweenBooklets = await requestJson<{
     runtimeState: {
@@ -47130,7 +47170,7 @@ test("activation guard returns blocking open-run details", async () => {
   );
 });
 
-test("activation guard clears after monitor completes blocking run", async () => {
+test("activation guard remains after monitor termination and clears after participant completion", async () => {
   const tenantKey = "integration-tenant-activation-monitor";
   const workspaceKey = "integration-workspace-activation-monitor";
 
@@ -47228,7 +47268,7 @@ test("activation guard clears after monitor completes blocking run", async () =>
     resumed.body.testRun.testRunId
   );
 
-  const completeCommand = await requestJson<{
+  const completeCommand = await issueMonitorCommandAndExecute<{
     command: {
       commandType: string;
       testRun: { status: string; completedAt: string | null };
@@ -47247,9 +47287,14 @@ test("activation guard clears after monitor completes blocking run", async () =>
 
   assert.equal(completeCommand.status, 200);
   assert.equal(completeCommand.body.command.commandType, "complete");
-  assert.equal(completeCommand.body.command.testRun.status, "completed");
-  assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
-  assert.equal(completeCommand.body.command.participantSession.status, "closed");
+  assert.equal(completeCommand.body.command.testRun.status, "paused");
+  assert.equal(completeCommand.body.command.testRun.completedAt, null);
+  assert.equal(completeCommand.body.command.participantSession.status, "signed_in");
+
+  const terminatedReadiness = await requestJson<{ activationReadiness: { canActivate: boolean } }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondReleaseId}/activation-readiness`);
+  assert.equal(terminatedReadiness.body.activationReadiness.canActivate, false, "A resumable Run still protects its content release.");
+  assert.equal((await requestJson(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`, { method: "POST" })).status, 200);
 
   const clearReadiness = await requestJson<{
     activationReadiness: {
@@ -48380,7 +48425,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       { method: "POST" }
     );
     assert.equal(launched.status, 200);
-    const completed = await requestJsonAt<{
+    const completed = await issueMonitorCommandAndExecuteAt<{
       command: { testRun: { status: string } };
     }>(
       isolated.baseUrl,
@@ -48391,7 +48436,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       }
     );
     assert.equal(completed.status, 200);
-    assert.equal(completed.body.command.testRun.status, "completed");
+    assert.equal(completed.body.command.testRun.status, "paused");
 
     const secondRelativeSignIn = await requestJsonAt<{
       participantSession: {
@@ -48407,7 +48452,7 @@ test("participant access windows enforce Original Testcenter timing semantics", 
       }
     });
     assert.equal(secondRelativeSignIn.status, 200);
-    assert.notEqual(
+    assert.equal(
       secondRelativeSignIn.body.participantSession.participantSessionId,
       relativeSignIn.body.participantSession.participantSessionId
     );
@@ -49086,9 +49131,20 @@ test("monitor bulk commands report per-run successes and failures", async () => 
   });
 
   try {
+    // Implicit bulk scopes must use a private workspace: Source termination
+    // intentionally leaves earlier tests' Runs resumable in a shared database.
+    const tenantKey = `owned-bulk-${randomUUID()}`, workspaceKey = "owned-bulk";
+    const workspacePath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+    assert.equal((await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", { method: "POST", body: { tenantKey, displayName: "Owned bulk fixture" } })).status, 201);
+    assert.equal((await requestJsonAt(isolated.baseUrl, `/api/v1/tenants/${tenantKey}/workspaces`, { method: "POST", body: { workspaceKey, displayName: "Owned bulk fixture" } })).status, 201);
+    const source = await requestJsonAt<{ sourcePackage: { sourcePackageId: string } }>(isolated.baseUrl, workspacePath + "/source-packages", { method: "POST", body: { fileName: "owned-bulk.json", mediaType: "application/json", contentStructure: { bookletEntries: [{ bookletKey: "booklet:demo", displayLabel: "Owned bulk", unitEntries: [{ unitKey: "owned-bulk-unit", displayLabel: "Owned unit", content: "Owned bulk fixture" }] }] } } });
+    assert.equal(source.status, 201);
+    const imported = await requestJsonAt<{ stagedContentRelease: { contentReleaseId: string } }>(isolated.baseUrl, workspacePath + "/import-jobs", { method: "POST", body: { sourcePackageId: source.body.sourcePackage.sourcePackageId } });
+    assert.equal(imported.status, 201);
+    assert.equal((await requestJsonAt(isolated.baseUrl, workspacePath + `/content-releases/${imported.body.stagedContentRelease.contentReleaseId}/activate`, { method: "POST", body: {} })).status, 200);
     const rosterImport = await requestJsonAt<{ updatedCount: number }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      `${workspacePath}/participant-roster`,
       {
         method: "POST",
         body: {
@@ -49109,8 +49165,8 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
         method: "POST",
         body: {
-          tenantKey: "demo-tenant",
-          workspaceKey: "demo-workspace",
+          tenantKey: tenantKey,
+          workspaceKey: workspaceKey,
           loginKey
         }
       });
@@ -49126,9 +49182,9 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       runIds.push(resumed.body.testRun.testRunId);
     }
 
-    const invalidBulk = await requestJsonAt<{ error: string }>(
+    const invalidBulk = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: { commandType: "pause", testRunIds: [] }
@@ -49137,7 +49193,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(invalidBulk.status, 400);
     assert.equal(invalidBulk.body.error, "monitor_bulk_test_run_ids_invalid");
 
-    const paused = await requestJsonAt<{
+    const paused = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -49153,7 +49209,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49183,13 +49239,13 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(paused.body.failures[0]?.statusCode, 404);
     assert.equal(paused.body.failures[0]?.error, "test_run_not_found");
 
-    const resumed = await requestJsonAt<{
+    const resumed = await issueMonitorCommandAndExecuteAt<{
       succeededCount: number;
       failedCount: number;
       commands: Array<{ testRun: { status: string } }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49213,7 +49269,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=10"
+      `${workspacePath}/activity-events?eventType=monitor_run_command_issued&limit=10`
     );
     assert.equal(commandHistory.status, 200);
     const bulkCommandHistory = commandHistory.body.items.filter(
@@ -49227,11 +49283,11 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       [...runIds, ...runIds].sort()
     );
 
-    const lockBeforeFinish = await requestJsonAt<{
+    const lockBeforeFinish = await issueMonitorCommandAndExecuteAt<{
       commands: Array<{ testRun: { locked: boolean } }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49243,9 +49299,9 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(lockBeforeFinish.status, 200);
     assert.equal(lockBeforeFinish.body.commands[0]?.testRun.locked, true);
 
-    const invalidFinishScope = await requestJsonAt<{ error: string }>(
+    const invalidFinishScope = await issueMonitorCommandAndExecuteAt<{ error: string }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49257,7 +49313,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(invalidFinishScope.status, 400);
     assert.equal(invalidFinishScope.body.error, "monitor_bulk_scope_invalid");
 
-    const finished = await requestJsonAt<{
+    const finished = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
@@ -49267,7 +49323,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {
@@ -49283,16 +49339,16 @@ test("monitor bulk commands report per-run successes and failures", async () => 
     assert.equal(finished.body.failedCount, 0);
     assert.equal(finished.body.commands[0]?.commandType, "complete_and_lock");
     assert.equal(finished.body.commands[0]?.testRun.testRunId, runIds[1]);
-    assert.equal(finished.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finished.body.commands[0]?.testRun.status, "paused");
     assert.equal(finished.body.commands[0]?.testRun.locked, true);
 
-    const finishedAgain = await requestJsonAt<{
+    const finishedAgain = await issueMonitorCommandAndExecuteAt<{
       requestedCount: number;
       succeededCount: number;
       failedCount: number;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      `${workspacePath}/monitor/open-runs/commands`,
       {
         method: "POST",
         body: {

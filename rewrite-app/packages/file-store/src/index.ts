@@ -1385,7 +1385,7 @@ export const createFileFirstSliceRepository = (
       const state = await getState();
       if (!matchesParticipantRunCommandScope(state.testRuns[scope.testRunId], scope)) return [];
       return structuredClone(Object.values(state.participantRunCommands)
-        .filter(command => matchesParticipantRunCommandScope(command, scope) && command.acknowledgedAt === null)
+        .filter(command => matchesParticipantRunCommandScope(command, scope) && (command.acknowledgedAt === null || command.effectsDeferred === true && !command.executedAt))
         .sort((a, b) => a.sequence - b.sequence));
     },
     async acknowledgeParticipantRunCommand(input) {

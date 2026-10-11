@@ -272,6 +272,7 @@ export type WorkspaceActivityEventType =
   | "test_run_locked"
   | "test_run_completed"
   | "monitor_run_command_issued"
+  | "monitor_run_command_executed"
   | "group_results_deleted"
   | "review_created"
   | "review_updated"
@@ -305,6 +306,7 @@ export const workspaceActivityEventTypes = [
   "test_run_locked",
   "test_run_completed",
   "monitor_run_command_issued",
+  "monitor_run_command_executed",
   "group_results_deleted",
   "review_created",
   "review_updated",
@@ -1322,6 +1324,8 @@ export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
   remainingSeconds: number | null;
   actorId: string | null;
   issuedAt: string;
+  /** New controller commands apply only after successful browser dispatch. */
+  effectsDeferred?: true;
 };
 
 /** Durable delivery intent; acknowledging it does not mutate answers or Run state. */

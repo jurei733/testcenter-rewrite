@@ -30,6 +30,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
     const rootPool = kind === "postgres" ? new Pool({ connectionString: process.env.FIRST_SLICE_POSTGRES_URL }) : null;
     let control, storage, created = false;
     const currentVersion = kind === "sqlite" ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
+    const applicationVersion = kind === "sqlite" ? 60 : 54;
     const migration = () => kind === "sqlite" ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
     const create = async () => {
       if (kind === "sqlite") return createSqliteFirstSliceRepository(file);
@@ -55,15 +56,15 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
       else await control.query("UPDATE participant_run_commands SET command_json = $1::jsonb WHERE command_id = 'legacy'", [JSON.stringify(command)]);
       const savedRun = await repository.getTestRunById(scope.testRunId);
       await storage?.shutdown(); storage = undefined;
-      await execute(`DROP INDEX idx_participant_run_commands_execution; DELETE FROM schema_migrations WHERE version = ${currentVersion}`);
+      await execute(`DROP INDEX idx_participant_run_commands_execution; DELETE FROM schema_migrations WHERE version >= ${applicationVersion}`);
       if (kind === "sqlite") await execute(`CREATE TRIGGER owned_application_upgrade_failure BEFORE INSERT ON schema_migrations
-        WHEN NEW.version = ${currentVersion} BEGIN SELECT RAISE(ABORT, 'owned application upgrade failure'); END`);
+        WHEN NEW.version = ${applicationVersion} BEGIN SELECT RAISE(ABORT, 'owned application upgrade failure'); END`);
       else await execute(`CREATE FUNCTION owned_application_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN RAISE EXCEPTION 'owned application upgrade failure'; END $$;
         CREATE TRIGGER owned_application_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW
-        WHEN (NEW.version = ${currentVersion}) EXECUTE FUNCTION owned_application_upgrade_failure()`);
+        WHEN (NEW.version = ${applicationVersion}) EXECUTE FUNCTION owned_application_upgrade_failure()`);
       await assert.rejects(migration(), /owned application upgrade failure/);
-      assert.equal(Number(await value("SELECT MAX(version) AS value FROM schema_migrations")), currentVersion - 1);
+      assert.equal(Number(await value("SELECT MAX(version) AS value FROM schema_migrations")), applicationVersion - 1);
       assert.equal(await value(kind === "sqlite"
         ? "SELECT COUNT(*) AS value FROM sqlite_master WHERE name = 'idx_participant_run_commands_execution'"
         : "SELECT COUNT(*)::int AS value FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'idx_participant_run_commands_execution'"), 0);

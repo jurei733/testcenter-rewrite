@@ -1,3 +1,4 @@
+import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
 import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import {
@@ -724,6 +725,7 @@ export type WorkspaceReviewPort = {
 export type ParticipantRuntimePort = {
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
+  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string }): Promise<ParticipantRunCommandApplicationResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
     action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
@@ -21860,6 +21862,110 @@ const interruptTestletTimerAfterLeave = (
   });
 };
 
+/** Project a received controller command without writing outside its store lock. */
+const projectParticipantRunCommand = (input: {
+  contentRelease: ContentRelease; testRun: TestRun; commandType: MonitorRunCommandType;
+  targetUnitKey: string | null; remainingSeconds: number | null; timestamp: string; controllerStatus?: string;
+}): { testRun: TestRun; adjustedTestletKey: string | null; previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null } => {
+  const { contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp, controllerStatus } = input;
+  let nextStatus: TestRunStatus = testRun.status;
+  if (commandType === "pause") {
+    nextStatus = "paused";
+  } else if (commandType === "resume" || commandType === "goto") {
+    nextStatus = "running";
+  } else if (
+    commandType === "complete" ||
+    commandType === "complete_and_lock"
+  ) {
+    nextStatus = "completed";
+  }
+  let adjustedTestletKey: string | null = null;
+  let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
+    null;
+  const transitionedTestRun: TestRun =
+    commandType === "complete" || commandType === "complete_and_lock"
+      ? {
+          ...transitionTestletTimersForRunStatus(testRun, "paused", timestamp),
+          status: "paused",
+          locked: commandType === "complete_and_lock" || testRun.locked === true,
+          updatedAt: timestamp,
+          completedAt: null
+        }
+      : commandType === "lock_test"
+        ? normalizeTestRun({
+            ...testRun,
+            locked: true,
+            updatedAt: timestamp
+          })
+        : commandType === "unlock_test"
+          ? normalizeTestRun({
+              ...testRun,
+              locked: false,
+              updatedAt: timestamp
+            })
+          : commandType === "goto" && targetUnitKey
+            ? (() => {
+                const adjusted = applyMonitorGoto({
+                  contentRelease,
+                  testRun,
+                  targetUnitKey,
+                  remainingSeconds,
+                  timestamp: timestamp
+                });
+                adjustedTestletKey = adjusted.restoredTestletKey;
+                previousTimer = adjusted.previousTimer;
+                return adjusted.testRun;
+              })()
+            : commandType === "unlock_navigation"
+              ? applyMonitorNavigationUnlock({
+                  contentRelease,
+                  testRun,
+                  timestamp: timestamp
+                })
+              : commandType === "lock_navigation"
+                ? applyMonitorNavigationLock({
+                    testRun,
+                    timestamp: timestamp
+                  })
+                : commandType === "set_testlet_time" &&
+                    targetUnitKey &&
+                    remainingSeconds
+                  ? (() => {
+                      const adjusted = applyMonitorSetTestletTime({
+                        contentRelease,
+                        testRun,
+                        targetUnitKey,
+                        remainingSeconds,
+                        timestamp: timestamp
+                      });
+                      adjustedTestletKey = adjusted.testletKey;
+                      previousTimer = adjusted.previousTimer;
+                      return adjusted.testRun;
+                    })()
+                  : transitionTestletTimersForRunStatus(
+                      testRun,
+                      nextStatus as Extract<
+                        TestRunStatus,
+                        "running" | "paused"
+                      >,
+                      timestamp
+                    );
+  const nextTestRun = normalizeTestRun({
+    ...transitionedTestRun,
+    pauseSource:
+      commandType === "complete" || commandType === "complete_and_lock"
+        ? (controllerStatus ?? testRun.status.toUpperCase()) === "PAUSED" ? "monitor" : "participant"
+        : commandType === "pause"
+        ? "monitor"
+        : commandType === "resume" ||
+            commandType === "goto"
+          ? undefined
+          : transitionedTestRun.pauseSource
+  });
+
+  return { testRun: nextTestRun, adjustedTestletKey, previousTimer };
+};
+
 const applyMonitorGoto = (input: {
   contentRelease: ContentRelease;
   testRun: TestRun;
@@ -32036,6 +32142,78 @@ export const createFirstSliceServices = (
         if (!command) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
         return command;
       },
+      async executeCommand(input) {
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!selected || !resolveParticipantExecutionMode(selected.executionMode).receiveRemoteCommands) {
+          throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+        }
+        const commandId = input.commandId?.trim();
+        if (!commandId || commandId.length > 160) throw new FirstSliceError(400, "invalid_participant_command_id", "A command identifier is required.");
+        if (input.controllerStatus !== undefined && !["RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus)) {
+          throw new FirstSliceError(400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
+        }
+        const contentRelease = await requireContentRelease(repository, selected.contentReleaseId);
+        const executedAt = now();
+        try {
+          const result = await serializeTestRunMutation(selected.testRunId, () => repository.applyParticipantRunCommand({
+            tenantId: session.tenantId, workspaceId: session.workspaceId, participantSessionId: session.participantSessionId,
+            testRunId: selected.testRunId, commandId, executedAt
+          }, context => {
+            // Legacy records already changed the Run at issuance. Do not repeat their effects.
+            if (!context.command.effectsDeferred) return { testRun: context.testRun, testLogs: [], activityEvents: [] };
+            const { command, participantSession } = context;
+            const testRun = normalizeTestRun(context.testRun);
+            const mode = resolveParticipantExecutionMode(testRun.executionMode);
+            if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+            const projected = projectParticipantRunCommand({ contentRelease, testRun, commandType: command.commandType,
+              targetUnitKey: command.targetUnitKey, remainingSeconds: command.remainingSeconds, timestamp: executedAt, controllerStatus: input.controllerStatus });
+            const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
+            const activated = terminal ? { testRun: projected.testRun, startedTestletKey: null }
+              : activateCurrentTestletTimer(contentRelease, projected.testRun, executedAt);
+            // Runtime normalization supplies defaults for legacy snapshots,
+            // but a command must retain the stored immutable assignment and
+            // execution-mode identities under the repository's strict guard.
+            const nextRun: TestRun = { ...activated.testRun,
+              executionMode: context.testRun.executionMode,
+              bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+            const logs: ParticipantTestLogEntryInput[] = [];
+            const previousController = input.controllerStatus ?? testRun.status.toUpperCase();
+            const controller = terminal ? previousController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
+            if (terminal || controller !== previousController) logs.push({ key: "CONTROLLER", timeStamp: Date.parse(executedAt), content: controller });
+            if (nextRun.currentUnitKey !== testRun.currentUnitKey) logs.push({ key: "CURRENT_UNIT_ID", timeStamp: Date.parse(executedAt), content: nextRun.currentUnitKey ?? "" });
+            if (testletTimerStateChanged(testRun, nextRun)) logs.unshift(buildTestletTimeLeftTestStateEntry(nextRun, executedAt));
+            const reopened = command.commandType === "goto" && projected.adjustedTestletKey != null && command.remainingSeconds != null &&
+              projected.previousTimer != null && (projected.previousTimer.status === "expired" || projected.previousTimer.status === "cancelled" ||
+              getTestletTimerRemainingSeconds(projected.previousTimer, executedAt) <= 0);
+            const logContent = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+              reopenedClosedTestlet: reopened, remainingSeconds: command.remainingSeconds });
+            if (logContent) logs.push({ key: "command executed", timeStamp: Date.parse(executedAt), content: logContent });
+            if (command.commandType === "complete_and_lock") logs.push({ key: "locked by monitor", timeStamp: Date.parse(executedAt), content: command.actorId ?? "" });
+            const activityEvents: WorkspaceActivityEvent[] = [{ activityEventId: idGenerator(), tenantId: testRun.tenantId,
+              workspaceId: testRun.workspaceId, eventType: "monitor_run_command_executed", actorId: command.actorId, subjectType: "test_run",
+              subjectId: testRun.testRunId, occurredAt: executedAt, summary: `Monitor command '${command.commandType}' executed for run '${testRun.testRunId}'.`,
+              details: { commandId: command.commandId, commandType: command.commandType, previousStatus: testRun.status, nextStatus: nextRun.status,
+                previousLocked: testRun.locked === true, locked: nextRun.locked === true, targetUnitKey: command.targetUnitKey,
+                targetTestletKey: projected.adjustedTestletKey, previousTimerStatus: projected.previousTimer?.status ?? null,
+                previousRemainingSeconds: projected.previousTimer ? getTestletTimerRemainingSeconds(projected.previousTimer, executedAt) : null,
+                remainingSeconds: command.remainingSeconds } }];
+            const timerKey = activated.startedTestletKey ?? (reopened ? projected.adjustedTestletKey : null);
+            if (timerKey) activityEvents.push({ activityEventId: idGenerator(), tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
+              eventType: "testlet_timer_started", actorId: command.actorId, subjectType: "test_run", subjectId: testRun.testRunId,
+              occurredAt: executedAt, summary: `Timed block '${timerKey}' started for run '${testRun.testRunId}'.`,
+              details: { testletKey: timerKey, durationSeconds: nextRun.testletTimers?.[timerKey]?.durationSeconds ?? command.remainingSeconds,
+                expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
+            return { testRun: nextRun, testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
+              activityEvents, ...(terminal ? { participantSession: { ...participantSession, status: "signed_in" as const } } : {}) };
+          }));
+          if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
+          return result;
+        } catch (error) {
+          if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, error.errorCode, error.message);
+          throw error;
+        }
+      },
       async getCurrentRunState(input) {
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
@@ -33769,7 +33947,7 @@ export const createFirstSliceServices = (
         if (pausedStatusExit && !terminatePausedTest) {
           // Source's visible status page leaves without a termination, timer
           // change, leave lock or new participant test-state write.
-          return testRun;
+          return storedTestRun;
         }
         const responseUnitKey =
           input.responseUnitKey === undefined
@@ -34506,6 +34684,30 @@ export const createFirstSliceServices = (
           repository,
           storedNormalizedRun.contentReleaseId
         );
+        if (["pause", "resume", "goto", "complete", "complete_and_lock"].includes(commandType)) {
+          const testRun = storedNormalizedRun;
+          if (testRun.status === "completed") throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
+          // Validate immutable content and target parameters without applying the intent.
+          projectParticipantRunCommand({ contentRelease, testRun, commandType, targetUnitKey, remainingSeconds, timestamp: issuedAt });
+          const participantSession = await requireParticipantSession(repository, testRun.participantSessionId);
+          const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository,
+            workspace.tenantId, workspace.workspaceId, participantSession.loginKey);
+          const commandId = idGenerator();
+          const queued = await repository.appendParticipantRunCommand({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            participantSessionId: participantSession.participantSessionId, testRunId, commandId, commandType, targetUnitKey,
+            remainingSeconds, actorId, issuedAt, effectsDeferred: true });
+          if (!queued) throw new FirstSliceError(409, "monitor_command_delivery_unavailable", "The Run no longer accepts commands.");
+          await recordWorkspaceActivity({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+            eventType: "monitor_run_command_issued", actorId, subjectType: "test_run", subjectId: testRunId,
+            summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
+            details: { commandId, commandType, previousStatus: testRun.status, nextStatus: testRun.status,
+              previousLocked: testRun.locked === true, locked: testRun.locked === true, participantSessionId: participantSession.participantSessionId,
+              loginKey: participantSession.loginKey, groupKey: participantSession.groupKey, bookletKey: testRun.bookletKey, targetUnitKey, remainingSeconds,
+              displayName: participantRosterEntry?.displayName ?? null,
+              effectsDeferred: true } });
+          return { commandId, commandType, actorId, issuedAt, previousStatus: testRun.status, previousLocked: testRun.locked === true,
+            testRun, participantSession };
+        }
         const testRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: storedNormalizedRun,

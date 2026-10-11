@@ -31,13 +31,13 @@ const command = (sequence, type = "resume", extra = {}) => ({ tenantId: "owned",
   sequence, targetUnitKey: null, remainingSeconds: null, actorId: null, issuedAt: "2026-10-11T00:00:00.000Z",
   acknowledgedAt: null, ...extra });
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
-const fixture = () => {
+const fixture = (execute) => {
   let time = 0;
   const timers = [], started = [], effects = [], requests = new Map();
   const receiver = createReceiver({ participantSessionId: "owned-session", testRunId: "owned-run", now: () => time,
     schedule(callback, delay) { const entry = { at: time + delay, callback, canceled: false }; timers.push(entry); return () => { entry.canceled = true; }; },
     acknowledge(record, signal) { const request = deferred(); requests.set(record.commandId, { ...request, record, signal }); started.push({ id: record.commandId, at: time }); return request.promise; },
-    execute: record => effects.push(record) });
+    execute: (record, signal) => execute ? execute(record, signal) : effects.push(record) });
   const advance = value => { time = value; for (const entry of timers) { if (!entry.canceled && entry.at <= time) { entry.canceled = true; entry.callback(); } } };
   const acknowledge = (sequence, extra = {}) => { const request = requests.get(`command-${sequence}`); request.resolve({ ...request.record, acknowledgedAt: "2026-10-11T00:00:01.000Z", ...extra }); };
   return { receiver, started, effects, requests, advance, acknowledge };
@@ -129,6 +129,61 @@ for (const interruption of ["stopReception", "stop", "generation"]) {
     channel.stop();
   });
 }
+
+test("ACK completion order survives a held application and suppresses opaque refreshes", async () => {
+  const held = deferred(), calls = [];
+  const f = fixture((record, signal) => { calls.push({ record, signal }); return calls.length === 1 ? held.promise : undefined; });
+  f.receiver.accept([command(1, "pause"), command(2)]);
+  f.acknowledge(1); await flush(); f.advance(1000); f.acknowledge(2); await flush();
+  assert.deepEqual(calls.map(item => item.record.commandType), ["pause"]);
+  assert.equal(f.receiver.hasOutstanding(), true);
+  held.resolve(); await flush(); await flush();
+  assert.deepEqual(calls.map(item => item.record.commandType), ["pause", "resume"]);
+  assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
+});
+
+test("transient application failure retries the same receipt before the next command", async () => {
+  const calls = [];
+  const f = fixture(record => { calls.push(record.commandId); if (calls.length === 1) throw new Error("Owned HTTP 503"); });
+  f.receiver.accept([command(1, "pause"), command(2)]);
+  f.acknowledge(1); await flush(); await flush();
+  assert.equal(f.receiver.hasOutstanding(), true);
+  f.advance(1000); f.acknowledge(2); await flush(); await flush();
+  assert.deepEqual(calls, ["command-1", "command-1", "command-2"]);
+  assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
+});
+
+test("permanent rejection allows the next accepted command without repeating a forged response", async () => {
+  const calls = [];
+  const f = fixture(record => { calls.push(record.commandId); if (calls.length === 1) throw Object.assign(new Error("Foreign receipt"), { retryable: false }); });
+  f.receiver.accept([command(1, "pause"), command(2)]);
+  f.acknowledge(1); await flush(); await flush();
+  f.advance(1000); f.acknowledge(2); await flush(); await flush();
+  assert.deepEqual(calls, ["command-1", "command-2"]);
+  f.receiver.accept([command(1)]); f.advance(2000);
+  assert.equal(f.started.length, 2); assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
+});
+
+test("route cleanup aborts an active application and cancels its queued successor", async () => {
+  const held = deferred(), calls = [];
+  const f = fixture((record, signal) => { calls.push({ record, signal }); return held.promise; });
+  f.receiver.accept([command(1, "pause"), command(2)]); f.acknowledge(1); await flush();
+  f.advance(1000); f.acknowledge(2); await flush();
+  f.receiver.stop(); assert.equal(calls[0].signal.aborted, true);
+  held.resolve(); await flush(); await flush();
+  assert.equal(calls.length, 1); assert.equal(f.receiver.hasOutstanding(), false);
+});
+
+test("reload can retry a deferred acknowledged receipt while applied and legacy receipts stay inert", async () => {
+  const accepted = command(1, "pause", { effectsDeferred: true, acknowledgedAt: "2026-10-11T00:00:01.000Z" });
+  const f = fixture(); f.receiver.accept([accepted]); f.acknowledge(1); await flush(); await flush();
+  assert.equal(f.effects.length, 1); f.receiver.stop();
+  for (const record of [command(1, "pause", { acknowledgedAt: accepted.acknowledgedAt }),
+    { ...accepted, executedAt: "2026-10-11T00:00:02.000Z", executionSequence: 1 }]) {
+    const inert = fixture(); inert.receiver.accept([record]);
+    assert.equal(inert.started.length, 0); assert.equal(inert.receiver.hasOutstanding(), false); inert.receiver.stop();
+  }
+});
 
 const streamSource = readFileSync(new URL("../apps/web/src/app/participant-event-stream.service.ts", import.meta.url), "utf8");
 const streamAst = ts.createSourceFile("stream.ts", streamSource, ts.ScriptTarget.ES2022, true);

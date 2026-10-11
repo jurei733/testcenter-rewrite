@@ -209,7 +209,9 @@ for (const kind of kinds) test(`${kind}: starter exit preserves completeness, ti
       for(const silent of [false,true]) for(const lockOnTermination of [false,true]) {
       await t.test(`${mode}/${leave}/${silent}/${lockOnTermination}: paused status exit skips unit checks and preserves interrupted time`,async()=>{
         const {id,response}=await makeRun({progress:completenessCases.both,mode,leave,silent,lockOnTermination});
-        await services.monitorControl.issueRunCommand({tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey,testRunId:id,commandType:"pause"});
+        const command = await services.monitorControl.issueRunCommand({tenantKey:tenant.tenantKey,workspaceKey:workspace.workspaceKey,testRunId:id,commandType:"pause"});
+        await services.participantRuntime.acknowledgeCommand({ participantSessionId:id, testRunId:id, commandId:command.commandId });
+        await services.participantRuntime.executeCommand({ participantSessionId:id, testRunId:id, commandId:command.commandId, controllerStatus:"RUNNING" });
         const before=await repository.getTestRunById(id);
         const logsBefore=(await repository.listParticipantTestLogsByWorkspace(tenant.tenantId,workspace.workspaceId)).filter(log=>log.testRunId===id);
         await assert.rejects(services.participantRuntime.returnToStarter({testRunId:id,currentUnitKey:"unit",expectedStatus:"running"}),error=>error.errorCode==="starter_exit_state_changed");
