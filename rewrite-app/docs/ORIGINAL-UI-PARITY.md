@@ -1,5 +1,29 @@
 # Optional Original UI
 
+### Scoped Player clocks and response-only deliveries (2026-10-11)
+
+Local application checkpoint `e6587f2e626c` resolves the stored-clock bootstrap
+and delayed-answer control gaps. The selected Run supplies immutable Unit clock
+snapshots to active and retired Player frames; fresh captures advance beyond a
+legacy server clock without carrying the opaque barrier in the packet. Foreground
+and worker outbox requests explicitly use response-only transport, preserving
+current navigation, status, pause source and timer state. Existing legacy receipts
+remain acknowledgeable, and non-saving modes retain no answer data or clocks.
+
+Validation passed 1,549 unit/state, 1,104 PostgreSQL, 498 HTTP and 61 compatibility
+tests without skips, all 147 browser reference/state cases including four actual
+clock-skew cases, three PostgreSQL container variants, SQLite runtime and 216
+read-only image tests as node. The web build remains 469.88 kB under the unchanged
+470 kB gate. All 24 existing containers, mount configurations, 85 volumes and the
+protected presentation remain intact. The owned build archive was removed safely.
+
+Production readiness remains open. The actual launch service leaves a reserved
+Run when its first initial-log write fails; retry does not recover those logs.
+Combine fresh reservation, parent activation, initial logs and audit in one store
+write. Remaining Source acceptance, root command lifetime/debug, mixed-version
+rollout and remote CI/release/deployment proof also remain open.
+See [the evidence and limits in PARITY](./PARITY.md#scoped-player-clocks-and-response-only-deliveries-2026-10-11).
+
 ### Durable participant deliveries and response field ordering (2026-10-11)
 
 Local application checkpoint `8ae5c5253e10` adds immutable scoped delivery receipts

@@ -1,5 +1,61 @@
 # Testcenter parity checklist
 
+### Scoped Player clocks and response-only deliveries (2026-10-11)
+
+Local application checkpoint `e6587f2e626c` resolves the two delivery gaps
+recorded under `8ae5c5253e10`. The participant facade supplies the selected Run's
+stored response clocks to the lazy Player host. Active captures use an immutable
+snapshot for their Unit; retired frames keep their own Run/Unit/session snapshot
+when another Run loads the same Unit key. Same-Run clock refreshes update the
+baseline without remounting. New capture timestamps exceed both embedded and
+stored clocks even when the device clock is behind a legacy server arrival clock.
+The opaque store barrier only seeds that calculation and is excluded from Player
+packet metadata, preserving exact response bytes and per-field ordering.
+
+Foreground and worker outbox deliveries now explicitly set `responseOnly: true`.
+The API forwards and validates that mode. It requires an explicit response Unit
+and rejects navigation or leave-confirmation changes. First delayed deliveries
+can merge answers and logs while retaining current Unit, status, pause source,
+locks and status-driven timer state, including monitor pauses and created Runs.
+Current authorization, access checks, timer reconciliation and completion/lock
+guards still apply. The fingerprint binds the new mode; an upgraded transport
+can acknowledge the exact previously accepted legacy payload without replaying
+it. Non-saving modes retain no answers, clocks or answer/log fingerprints.
+Callers that omit the flag retain the existing explicit progress-control API;
+this checkpoint does not establish a mixed-version rollout guarantee.
+
+Validation passed 1,549 unit/state tests, 1,104 complete PostgreSQL tests,
+166 HTTP tests for each Memory/File/SQLite store (498 total), and 61 compatibility
+tests, without skips. Chromium passed 147 reference/state cases: two received
+termination/error/reentry cases, eight native input/offline/retry/reload cases,
+36 player-exit states, 57 completeness/pixel references and 44 paused-exit states.
+Four native retry cases use a device clock one minute behind the server, in both
+surfaces and both viewport sizes, with exact saved answers and same-Run reload.
+The production build remains 469.88 kB under the unchanged 470 kB hard gate;
+the 450 kB and four style warnings remain. Schemas remain SQLite 63/PostgreSQL 57.
+The first native retry attempt exposed an opaque bootstrap barrier leaking into
+the packet; capture metadata was corrected without weakening exact byte checks.
+The first targeted timer fixture was replaced with a real monitor pause command.
+Failed-attempt logs and the browser screenshot remain in the evidence.
+
+A clean Git archive of the application checkpoint passed PostgreSQL standard,
+demo and production-boundary checks, SQLite runtime, and 216 transaction/API
+tests in the read-only image as node. Image `testcenter-rewrite-app:completeness-e6587f2e626c` has ID
+`sha256:1f696e2f096dd436020b8a005d01557efb0f62ee4a673732c92081a7be312f62`. All 24 existing containers, every mount field and all
+85 volumes were preserved. The owned build archive was removed after unlinking
+its node_modules symlink; host TypeScript and the protected presentation retain
+their hashes. Approximately 13.1 GiB remained available after the runs; the earlier
+2.861 GB cleanup removed recomputable Docker build cache.
+
+Full parity and production readiness remain open. An owned Memory probe through
+the actual launch service now confirms the next boundary gap: injecting the first
+initial-log failure rejects launch but leaves a reserved Run and an unactivated
+parent. Retrying reuses that Run without writing the missing initial logs. Fresh
+assignment reservation, parent activation, initial logs and timer/resumed audit
+must commit together. Remaining Source acceptance, root command lifetime/debug,
+mixed-version rollout, remote CI, release and deployment proof remain open.
+No new remote publication or deployment was performed.
+
 ### Durable participant deliveries and response field ordering (2026-10-11)
 
 Local application checkpoint `8ae5c5253e10` stores an immutable receipt for each
