@@ -185,3 +185,35 @@ test("an empty packet cannot persist a future clock for an unreported field", ()
   const next = mergeCapturedVeronaUnitResponse(first.response, { unitState: { dataParts: { answer: "Actual" } }, captureTimestamp: 20 });
   assert.deepEqual(parseVeronaUnitResponse(next)?.fieldTimestamps, { dataParts: { answer: 20 } });
 });
+
+test("a fresh Player capture starts beyond the stored legacy clock even when its device clock is behind", () => {
+  const storedFieldTimestamps = { opaque: 60_000 };
+  const response = mergeCapturedVeronaUnitResponse(undefined, {
+    unitState: { dataParts: { answer: "Fresh Ä/β\n  \u0000 " } }, captureTimestamp: 1_000, storedFieldTimestamps
+  });
+  assert.deepEqual(parseVeronaUnitResponse(response)?.fieldTimestamps, { dataParts: { answer: 60_001 } });
+  const accepted = reconcileParticipantResponse({ currentResponse: "Legacy opaque answer", currentTimestamps: storedFieldTimestamps,
+    incomingResponse: response, capturedAt: 1_001 });
+  assert.equal(accepted.response, response); assert.equal(accepted.acceptedFields, 1);
+  assert.deepEqual(storedFieldTimestamps, { opaque: 60_000 });
+});
+
+test("a stored opaque bootstrap barrier cannot rewrite a captured packet when addressed to another Unit", () => {
+  const captured = mergeCapturedVeronaUnitResponse(undefined, {
+    unitState: { dataParts: { answer: "Fresh Ä/β\n  \u0000 " } }, captureTimestamp: 1_000,
+    storedFieldTimestamps: { opaque: 60_000 }
+  }) + "\n  ";
+  const accepted = reconcileParticipantResponse({ currentResponse: undefined, incomingResponse: captured, capturedAt: 1_001 });
+  assert.equal(accepted.response, captured);
+  assert.deepEqual(accepted.timestamps, { dataParts: { answer: 60_001 } });
+});
+
+test("stored and embedded clocks keep their maxima without restamping cached fields", () => {
+  const previous = serializeVeronaUnitResponse({ unitState: { dataParts: { a: "Cached A", b: "Cached B" } },
+    fieldTimestamps: { dataParts: { a: 150, b: 300 } } });
+  const storedFieldTimestamps = { dataParts: { a: 200, b: 250 }, playerState: { currentPage: 200 } };
+  const updated = mergeCapturedVeronaUnitResponse(previous, { playerState: { currentPage: "p2" }, captureTimestamp: 10, storedFieldTimestamps });
+  assert.deepEqual(parseVeronaUnitResponse(updated)?.fieldTimestamps, { dataParts: { a: 200, b: 300 }, playerState: { currentPage: 301 } });
+  assert.deepEqual(parseVeronaUnitResponse(updated)?.unitState.dataParts, { a: "Cached A", b: "Cached B" });
+  assert.deepEqual(storedFieldTimestamps, { dataParts: { a: 200, b: 250 }, playerState: { currentPage: 200 } });
+});

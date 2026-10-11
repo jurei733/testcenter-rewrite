@@ -41,7 +41,7 @@ import {
   type VeronaSharedParameter,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
-import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
+import type { ParticipantResponseFieldTimestamps, ParticipantTestLogEntryInput, TestRun } from "@testcenter-rewrite-app/domain";
 import { OriginalPlayerNavigationComponent } from "./original-player-navigation.component";
 
 const controllerRecoveryStorageKey =
@@ -77,6 +77,7 @@ type RetiredVeronaFrame = {
   testRunId: string;
   unitKey: string;
   latestResponse: string;
+  responseTimestamps?: ParticipantResponseFieldTimestamps;
 };
 
 @Component({
@@ -274,6 +275,7 @@ export class VeronaPlayerHostComponent
   @Input() unitDefinitionType = "";
   @Input() resourceBasePath = "";
   @Input() savedResponse = "";
+  @Input() responseClocks: TestRun["unitResponseFieldTimestamps"];
   @Input() sharedParameters: VeronaSharedParameter[] = [];
   @Input() unitNumber = 1;
   @Input() unitCount = 1;
@@ -353,6 +355,7 @@ export class VeronaPlayerHostComponent
   private controllerErrorLoggedForFrame = false;
   private controllerRecoveryTestRunId: string | null = null;
   private latestResponse = "";
+  private frameResponseTimestamps?: ParticipantResponseFieldTimestamps;
   private frameTestRunId = "";
   private frameUnitKey = "";
   private frameSessionId = "";
@@ -473,6 +476,9 @@ export class VeronaPlayerHostComponent
     if (!this.viewReady) {
       return;
     }
+    if (changes["responseClocks"] && this.frameTestRunId === this.testRunId && this.frameUnitKey === this.unitKey) {
+      this.frameResponseTimestamps = this.readScopedResponseTimestamps();
+    }
     if (
       changes["playerHtml"] ||
       changes["playerKey"] ||
@@ -572,7 +578,8 @@ export class VeronaPlayerHostComponent
         this.latestResponse = mergeCapturedVeronaUnitResponse(this.latestResponse, {
           unitState: notification.unitState,
           playerState: notification.playerState,
-          captureTimestamp: Date.now()
+          captureTimestamp: Date.now(),
+          storedFieldTimestamps: this.frameResponseTimestamps
         });
         this.responseChange.emit(this.latestResponse);
         this.responseUpdate.emit({
@@ -626,6 +633,7 @@ export class VeronaPlayerHostComponent
     this.frameTestRunId = this.testRunId;
     this.frameUnitKey = this.unitKey;
     this.frameSessionId = this.sessionId;
+    this.frameResponseTimestamps = this.readScopedResponseTimestamps();
     this.status = "loading";
     this.loadingPhase = "pending";
     this.apiVersionLabel = "Waiting for player";
@@ -980,7 +988,8 @@ export class VeronaPlayerHostComponent
         sessionId: this.frameSessionId,
         testRunId: this.frameTestRunId,
         unitKey: this.frameUnitKey,
-        latestResponse: this.latestResponse
+        latestResponse: this.latestResponse,
+        responseTimestamps: this.frameResponseTimestamps
       });
       globalThis.window?.setTimeout(() => {
         this.retiredFrames.delete(source);
@@ -988,6 +997,11 @@ export class VeronaPlayerHostComponent
     }
     frame?.remove();
     this.frame = null;
+  }
+
+  private readScopedResponseTimestamps(): ParticipantResponseFieldTimestamps | undefined {
+    return this.responseClocks && Object.hasOwn(this.responseClocks, this.unitKey)
+      ? structuredClone(this.responseClocks[this.unitKey]) : undefined;
   }
 
   private handleRetiredFrameNotification(
@@ -1046,7 +1060,8 @@ export class VeronaPlayerHostComponent
     frame.latestResponse = mergeCapturedVeronaUnitResponse(frame.latestResponse, {
       unitState: notification.unitState,
       playerState: notification.playerState,
-      captureTimestamp: Date.now()
+      captureTimestamp: Date.now(),
+      storedFieldTimestamps: frame.responseTimestamps
     });
     this.responseUpdate.emit({
       testRunId: frame.testRunId,

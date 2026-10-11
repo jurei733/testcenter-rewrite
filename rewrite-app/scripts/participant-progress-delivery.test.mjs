@@ -1,4 +1,4 @@
-import { parseCapturedVeronaUnitResponse as parseVeronaUnitResponse, serializeCapturedVeronaUnitResponse as serializeVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
+import { mergeCapturedVeronaUnitResponse, parseCapturedVeronaUnitResponse as parseVeronaUnitResponse, serializeCapturedVeronaUnitResponse as serializeVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, rename, rm } from 'node:fs/promises';
@@ -248,13 +248,90 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       await assert.rejects(f.services.participantRuntime.saveProgress({ ...input, unitResponse: invalid }), denied('participant_response_timestamps_invalid'));
       assert.deepEqual(await snapshot(f, input.deliveryId), before);
     });
+    await t.test('fresh Player input uses the stored legacy clock when the device is one minute behind', async () => {
+      const f = await fixture();
+      await f.services.participantRuntime.saveProgress({ testRunId: f.id, responseUnitKey: 'unit', unitResponse: '', status: 'running' });
+      const stored = await repository.getTestRunById(f.id), baseline = stored.unitResponseFieldTimestamps.unit;
+      const response = mergeCapturedVeronaUnitResponse('', { unitState: { dataParts: { answer: 'Fresh input Ω\n  \u0000 ' } },
+        captureTimestamp: Date.parse(timestamp) - 60_000, storedFieldTimestamps: baseline });
+      const accepted = await f.services.participantRuntime.saveProgress(request(f, { responseOnly: true, unitResponse: response,
+        responseTimestamp: Date.parse(timestamp) - 60_000 }));
+      assert.equal(accepted.unitResponses.unit, response);
+      assert.equal(accepted.unitResponseFieldTimestamps.unit.dataParts.answer, baseline.opaque + 1);
+      assert.equal((await (await create()).getTestRunById(f.id)).unitResponses.unit, response);
+    });
+    await t.test('first delayed response-only deliveries cannot reset current navigation, status, pause source or timers', async () => {
+      for (const status of ['running', 'paused']) {
+        const f = await fixture({ timed: true });
+        await f.services.participantRuntime.saveProgress(request(f, { currentUnitKey: 'second', status, unitResponse: 'Newest answer', responseTimestamp: 20 }));
+        const before = await snapshot(f);
+        const delayed = request(f, { responseOnly: true, status: status === 'paused' ? 'running' : 'paused', unitResponse: 'Older answer', responseTimestamp: 10 });
+        const accepted = await f.services.participantRuntime.saveProgress(delayed);
+        assert.equal(accepted.unitResponses.unit, 'Newest answer'); assert.equal(accepted.currentUnitKey, 'second');
+        assert.equal(accepted.status, status); assert.equal(accepted.pauseSource, before.run.pauseSource);
+        assert.equal(accepted.locked, before.run.locked); assert.deepEqual(accepted.lockedUnitKeys, before.run.lockedUnitKeys);
+        assert.equal(accepted.testletTimers.outer.status, before.run.testletTimers.outer.status);
+        assert.equal(accepted.testletTimers.outer.startedAt, before.run.testletTimers.outer.startedAt);
+        assert.equal(accepted.testletTimers.outer.expiresAt, before.run.testletTimers.outer.expiresAt);
+        assert.equal(accepted.testletTimers.outer.endedAt, before.run.testletTimers.outer.endedAt);
+        assert.deepEqual((await snapshot(f)).parent, before.parent);
+        assert.ok(await receipt(repository, f, delayed.deliveryId));
+      }
+    });
+    await t.test('response-only answers preserve a monitor pause and its timers while accepting actual new fields', async () => {
+      const f = await fixture({ timed: true });
+      await f.services.participantRuntime.saveProgress(request(f));
+      const running = await repository.getTestRunById(f.id);
+      const commandId = randomUUID();
+      await repository.appendParticipantRunCommand({ ...running, commandId, commandType: 'pause', issuedAt: timestamp,
+        actorId: null, targetUnitKey: null, remainingSeconds: null, effectsDeferred: true });
+      await repository.acknowledgeParticipantRunCommand({ ...running, commandId, acknowledgedAt: timestamp });
+      await f.services.participantRuntime.executeCommand({ participantSessionId: f.id, testRunId: f.id, commandId, controllerStatus: 'RUNNING' });
+      const before = await repository.getTestRunById(f.id);
+      const input = request(f, { responseOnly: true, status: 'running', unitResponse: 'New paused response' });
+      const accepted = await f.services.participantRuntime.saveProgress(input);
+      assert.equal(accepted.unitResponses.unit, input.unitResponse); assert.equal(accepted.status, 'paused');
+      assert.equal(accepted.pauseSource, 'monitor'); assert.equal(accepted.currentUnitKey, 'unit');
+      assert.equal(accepted.testletTimers.outer.status, 'paused'); assert.equal(accepted.testletTimers.outer.expiresAt, null);
+      assert.equal(accepted.testletTimers.outer.startedAt, before.testletTimers.outer.startedAt);
+      assert.equal(accepted.testletTimers.outer.remainingSeconds, before.testletTimers.outer.remainingSeconds);
+    });
+    await t.test('response-only mode rejects missing addressing and all attempted control changes without writing artifacts', async () => {
+      const f = await fixture(), input = request(f, { responseOnly: true }), before = await snapshot(f, input.deliveryId);
+      for (const patch of [{ responseOnly: null }, { responseOnly: 'true' }, { responseOnly: 1 },
+        { responseUnitKey: undefined }, { responseUnitKey: null }, { responseUnitKey: '' },
+        { currentUnitKey: 'second' }, { currentUnitKey: null }, { confirmTestletTimeLeave: true }, { confirmTestletLeaveLock: true }]) {
+        await assert.rejects(f.services.participantRuntime.saveProgress({ ...input, ...patch }), denied('participant_response_delivery_invalid'));
+      }
+      assert.deepEqual(await snapshot(f, input.deliveryId), before);
+    });
+    await t.test('response-only delivery cannot activate a created Run or start its timers', async () => {
+      const f = await fixture({ timed: true });
+      await repository.saveTestRun({ ...f.run, status: 'created', currentUnitKey: null });
+      const accepted = await f.services.participantRuntime.saveProgress(request(f, { responseOnly: true }));
+      assert.equal(accepted.status, 'created'); assert.equal(accepted.currentUnitKey, null);
+      assert.deepEqual(accepted.testletTimers ?? {}, {});
+    });
+    await t.test('upgraded response-only transport acknowledges a legacy receipt while new receipts bind the delivery mode', async () => {
+      const f = await fixture(), legacy = request(f); await f.services.participantRuntime.saveProgress(legacy);
+      await f.services.participantRuntime.saveProgress(request(f, { currentUnitKey: 'second', status: 'paused', unitResponse: 'Newest' }));
+      const before = await snapshot(f, legacy.deliveryId);
+      const acknowledged = await f.services.participantRuntime.saveProgress({ ...legacy, responseOnly: true });
+      assert.equal(acknowledged.unitResponses.unit, 'Newest'); assert.equal(acknowledged.status, 'paused');
+      assert.equal(acknowledged.currentUnitKey, 'second'); assert.deepEqual(await snapshot(f, legacy.deliveryId), before);
+      await assert.rejects(f.services.participantRuntime.saveProgress({ ...legacy, responseOnly: true, unitResponse: 'Changed request' }), denied('participant_delivery_conflict'));
+      const modern = request(f, { responseOnly: true }); await f.services.participantRuntime.saveProgress(modern);
+      await assert.rejects(f.services.participantRuntime.saveProgress({ ...modern, responseOnly: false }), denied('participant_delivery_conflict'));
+    });
     await t.test('non-saving mode persists no answer clocks or answer fingerprint and duplicate controls remain stable', async () => {
-      const f = await fixture({ mode: 'run-demo' }), input = request(f); await f.services.participantRuntime.saveProgress(input);
+      for (const responseOnly of [false, true]) {
+      const f = await fixture({ mode: 'run-demo' }), input = request(f, { responseOnly }); await f.services.participantRuntime.saveProgress(input);
       const before = await snapshot(f, input.deliveryId);
       assert.deepEqual(before.run.unitResponses, {}); assert.equal(before.run.unitResponseFieldTimestamps, undefined);
       await f.services.participantRuntime.saveProgress({ ...input, unitResponse: 'Different transient answer', responseTimestamp: 20 });
       assert.deepEqual(await snapshot(f, input.deliveryId), before);
       await assert.rejects(f.services.participantRuntime.saveProgress({ ...input, status: 'paused' }), denied('participant_delivery_conflict'));
+      }
     });
     await t.test('concurrent same-ID deliveries produce one accepted receipt and one set of artifacts', async () => {
       const f = await fixture(), input = request(f);
@@ -266,7 +343,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       assert.equal(saved.logs.filter(log => log.logKey === 'RESPONSE_SAVED').length, 1);
     });
     if (kind === 'file') await t.test('failed File publication rolls back receipt and clocks in cache and after restart', async () => {
-      const f = await fixture(), input = request(f), before = await snapshot(f, input.deliveryId), backup = file + '.owned-backup';
+      const f = await fixture(), input = request(f, { responseOnly: true }), before = await snapshot(f, input.deliveryId), backup = file + '.owned-backup';
       await rename(file, backup); await mkdir(file);
       try { await assert.rejects(f.services.participantRuntime.saveProgress(input)); assert.deepEqual(await snapshot(f, input.deliveryId), before); }
       finally { await rm(file, { recursive: true }); await rename(backup, file); }
@@ -275,7 +352,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       await f.services.participantRuntime.saveProgress(input); assert.ok(await receipt(await create(), f, input.deliveryId));
     });
     if (control) for (const target of ['run', 'log', 'audit']) await t.test(`${target} failure after receipt insertion rolls back receipt, answers, clocks and artifacts`, async () => {
-      const f = await fixture(), input = request(f, { unitResponse: packet({ dataParts: { a: 'Transactional A' } }, { dataParts: { a: 20 } }) }), before = await snapshot(f, input.deliveryId);
+      const f = await fixture(), input = request(f, { responseOnly: true, unitResponse: packet({ dataParts: { a: 'Transactional A' } }, { dataParts: { a: 20 } }) }), before = await snapshot(f, input.deliveryId);
       const table = target === 'run' ? 'test_runs' : target === 'log' ? 'participant_test_logs' : 'workspace_activity_events';
       const field = target === 'audit' ? 'subject_id' : 'test_run_id';
       const install = kind === 'sqlite' ? `CREATE TRIGGER owned_delivery_failure BEFORE INSERT ON ${table} WHEN NEW.${field}='${f.id}' BEGIN SELECT RAISE(ABORT,'owned delivery failure'); END` :

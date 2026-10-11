@@ -769,6 +769,7 @@ export type ParticipantRuntimePort = {
   saveProgress(input: {
     testRunId: string;
     deliveryId?: string;
+    responseOnly?: boolean;
     responseTimestamp?: number;
     currentUnitKey?: string | null;
     responseUnitKey?: string | null;
@@ -33154,6 +33155,15 @@ export const createFirstSliceServices = (
       async saveProgress(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
         const responseTimestamp = normalizeOptionalParticipantResponseTimestamp(input.responseTimestamp);
+        const responseOnly = input.responseOnly === undefined ? false : input.responseOnly;
+        if (typeof responseOnly !== "boolean" || responseOnly && (
+          input.currentUnitKey !== undefined || !normalizeOptionalResponseUnitKey(input.responseUnitKey) ||
+          input.confirmTestletTimeLeave !== undefined && input.confirmTestletTimeLeave !== false ||
+          input.confirmTestletLeaveLock !== undefined && input.confirmTestletLeaveLock !== false
+        )) {
+          throw new FirstSliceError(400, "participant_response_delivery_invalid",
+            "Response-only deliveries require an explicit responseUnitKey and cannot request navigation or leave confirmations.");
+        }
         return serializeTestRunMutation(testRunId, async () => {
           const deliveryId = normalizeOptionalParticipantDeliveryId(
             input.deliveryId
@@ -33203,7 +33213,7 @@ export const createFirstSliceServices = (
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
-        const payloadSha256 = deliveryId ? participantProgressPayloadSha256({
+        const deliveryPayload = {
           status: normalizeTestRunProgressStatus(input.status),
           currentUnitKey: input.currentUnitKey,
           responseUnitKey: input.responseUnitKey,
@@ -33213,9 +33223,15 @@ export const createFirstSliceServices = (
             unitResponse: normalizeOptionalUnitResponse(input.unitResponse), responseTimestamp,
             transientUnitResponses: input.transientUnitResponses, logs: incomingLogBatches
           } : {})
-        }) : undefined;
+        };
+        const legacyPayloadSha256 = deliveryId ? participantProgressPayloadSha256(deliveryPayload) : undefined;
+        const payloadSha256 = responseOnly && deliveryId
+          ? participantProgressPayloadSha256({ ...deliveryPayload, responseOnly: true }) : legacyPayloadSha256;
         if (context.progressDelivery) {
-          if (context.progressDelivery.payloadSha256 !== payloadSha256) {
+          // Upgraded outbox transport can acknowledge the same legacy request.
+          // A newly accepted response-only receipt still binds its delivery mode.
+          if (context.progressDelivery.payloadSha256 !== payloadSha256 &&
+            (!responseOnly || context.progressDelivery.payloadSha256 !== legacyPayloadSha256)) {
             throw new FirstSliceError(409, "participant_delivery_conflict", "An accepted deliveryId cannot be reused for different progress.");
           }
           return before.changed ? before.effect : null;
@@ -33381,10 +33397,10 @@ export const createFirstSliceServices = (
           navigationTestRun.sharedParameters, reportedSharedParameters
         );
         const requestedStatus = normalizeTestRunProgressStatus(input.status);
-        const nextStatus = monitorPauseActive ? "paused" : requestedStatus;
-        const statusAdjustedRun = transitionTestletTimersForRunStatus(
+        const nextStatus = responseOnly ? testRun.status : monitorPauseActive ? "paused" : requestedStatus;
+        const statusAdjustedRun = responseOnly ? navigationTestRun : transitionTestletTimersForRunStatus(
           navigationTestRun,
-          nextStatus,
+          monitorPauseActive ? "paused" : requestedStatus,
           timestamp
         );
 
@@ -33392,7 +33408,7 @@ export const createFirstSliceServices = (
           ...statusAdjustedRun,
           status: nextStatus,
           pauseSource:
-            nextStatus === "paused"
+            responseOnly ? testRun.pauseSource : nextStatus === "paused"
               ? monitorPauseActive
                 ? "monitor"
                 : "participant"

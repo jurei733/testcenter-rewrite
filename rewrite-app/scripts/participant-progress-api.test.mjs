@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { Pool } from "pg";
 import { productionApiRoutes as routes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
+import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
 import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
 import { createProductionApiServer } from "../apps/api/dist/apps/api/src/index.js";
@@ -125,6 +126,42 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant progress API preser
       const invalid = JSON.stringify({ kind: 'verona_unit_state', version: 1, unitState: { dataParts: { a: 'Forged' } }, fieldTimestamps: { dataParts: { a: -1 } } });
       await save({ ...old, deliveryId: randomUUID(), unitResponse: invalid }, selected.sessionToken, 400);
       assert.deepEqual(await repository.getTestRunById(run.testRunId), before);
+    });
+    await t.test('response-only first receipts retain the current controls and upgraded legacy retries keep their identity', async () => {
+      const secondUnitKey = content.bookletEntries[0].unitEntries[1].unitKey;
+      const newest = { ...old, deliveryId: randomUUID(), currentUnitKey: secondUnitKey, status: 'paused',
+        unitResponse: 'Newest answer with current paused controls', responseTimestamp: 30 };
+      await save(newest);
+      const before = await repository.getTestRunById(run.testRunId);
+      const delayed = { ...old, deliveryId: randomUUID(), responseOnly: true, responseTimestamp: 25 };
+      const accepted = await save(delayed);
+      assert.equal(accepted.testRun.status, 'paused'); assert.equal(accepted.testRun.pauseSource, before.pauseSource);
+      assert.equal(accepted.testRun.currentUnitKey, secondUnitKey);
+      assert.equal(accepted.testRun.unitResponses[run.currentUnitKey], newest.unitResponse);
+      const upgraded = await save({ ...old, responseOnly: true });
+      assert.deepEqual(upgraded.testRun, accepted.testRun);
+      const conflict = await save({ ...delayed, responseOnly: false }, selected.sessionToken, 409);
+      assert.equal(conflict.error, 'participant_delivery_conflict');
+      for (const patch of [{ responseOnly: 'true' }, { responseOnly: null }, { currentUnitKey: secondUnitKey },
+        { responseUnitKey: undefined }, { confirmTestletTimeLeave: true }]) {
+        const rejected = await save({ ...delayed, deliveryId: randomUUID(), ...patch }, selected.sessionToken, 400);
+        assert.equal(rejected.error, 'participant_response_delivery_invalid');
+      }
+      assert.deepEqual(JSON.parse(JSON.stringify(await repository.getTestRunById(run.testRunId))), accepted.testRun);
+    });
+    await t.test('the selected-Run HTTP state carries legacy clocks needed for fresh input from a slower device clock', async () => {
+      const unitKey = otherBookletRun.currentUnitKey, target = otherBookletRun.testRunId;
+      await save({ deliveryId: randomUUID(), responseUnitKey: unitKey, unitResponse: '', status: 'running' }, selected.sessionToken, 200, target);
+      const scoped = await request('GET', `/api/v1/participant/sessions/${sessionId}/current-state?testRunId=${target}`, undefined, selected.sessionToken);
+      const clocks = scoped.currentRunState.testRun.unitResponseFieldTimestamps[unitKey];
+      const clientClock = Date.now() - 60_000;
+      const response = mergeCapturedVeronaUnitResponse('', { unitState: { dataParts: { answer: 'Fresh HTTP input Ä/β\n  \u0000 ' } },
+        captureTimestamp: clientClock, storedFieldTimestamps: clocks });
+      const accepted = await save({ deliveryId: randomUUID(), responseOnly: true, responseUnitKey: unitKey, unitResponse: response,
+        responseTimestamp: clientClock, status: 'running' }, selected.sessionToken, 200, target);
+      assert.equal(accepted.testRun.unitResponses[unitKey], response);
+      assert.equal(accepted.testRun.unitResponseFieldTimestamps[unitKey].dataParts.answer, clocks.opaque + 1);
+      assert.equal((await repository.getTestRunById(target)).unitResponses[unitKey], response);
     });
     await t.test('an accepted retry after a monitor lock returns the locked Run while a new delivery rejects', async () => {
       await request('POST', workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: 'lock_test' }, operator);

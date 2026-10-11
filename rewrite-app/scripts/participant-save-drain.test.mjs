@@ -125,6 +125,7 @@ test("a successful save during ERROR acknowledges exact data without applying it
     assert.deepEqual(calls.synchronized,[]);assert.equal(currentState.testRun.status,"running");
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
     assert.equal(host.veronaSaveStatus,"saved");assert.equal(calls.requests[0].body.unitResponse,packet.response);
+    assert.equal(calls.requests[0].body.responseOnly, true);
   });
 });
 

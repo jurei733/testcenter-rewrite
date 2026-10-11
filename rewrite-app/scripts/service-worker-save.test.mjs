@@ -52,6 +52,7 @@ test("background saves retain exact responses and IDs across authentication and 
     assert.equal(sent[0].url, "https://testcenter.example/api/v1/participant/test-runs/run-a/save-progress");
     assert.deepEqual(JSON.parse(sent[0].init.body), {
       deliveryId: "delivery-a", responseUnitKey: "unit-a", status: "running",
+      responseOnly: true,
       responseTimestamp: Date.parse(original[0].entry.queuedAt),
       unitResponse: original[0].entry.response, logs: []
     });

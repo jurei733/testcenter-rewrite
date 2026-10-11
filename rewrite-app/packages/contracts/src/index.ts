@@ -968,6 +968,8 @@ export type ResumeParticipantSessionRequest = {
 
 export type SaveTestRunProgressRequest = {
   deliveryId?: string;
+  /** Deliver an explicitly addressed response without changing Run controls. */
+  responseOnly?: boolean;
   /** Capture time for legacy responses; Verona envelopes carry field clocks. */
   responseTimestamp?: number;
   currentUnitKey?: string | null;

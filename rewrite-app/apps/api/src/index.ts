@@ -8863,6 +8863,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           testRunId,
           deliveryId: body.deliveryId,
           responseTimestamp: body.responseTimestamp,
+          responseOnly: body.responseOnly,
           currentUnitKey: body.currentUnitKey,
           responseUnitKey: body.responseUnitKey,
           transientUnitResponses: body.transientUnitResponses,

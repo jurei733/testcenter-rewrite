@@ -31,6 +31,25 @@ export const normalizeParticipantResponseFieldTimestamps = (
   return result;
 };
 
+/** Combine stored and locally captured clocks without changing either source. */
+export const mergeParticipantResponseFieldTimestamps = (
+  ...sources: Array<ParticipantResponseFieldTimestamps | undefined>
+): ParticipantResponseFieldTimestamps => {
+  const result: ParticipantResponseFieldTimestamps = {};
+  for (const source of sources) {
+    const normalized = normalizeParticipantResponseFieldTimestamps(source);
+    for (const group of groups) {
+      const fields = new Map(Object.entries(result[group] ?? {}));
+      for (const [key, timestamp] of Object.entries(normalized[group] ?? {})) {
+        fields.set(key, Math.max(fields.get(key) ?? 0, timestamp));
+      }
+      if (fields.size) result[group] = Object.fromEntries(fields);
+    }
+    if (normalized.opaque !== undefined) result.opaque = Math.max(result.opaque ?? 0, normalized.opaque);
+  }
+  return result;
+};
+
 /** Stamp only fields actually reported by this Player notification. */
 export const captureParticipantResponseFieldTimestamps = (
   previous: ParticipantResponseFieldTimestamps | undefined,

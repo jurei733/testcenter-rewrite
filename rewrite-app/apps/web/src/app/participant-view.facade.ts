@@ -53,6 +53,7 @@ import {
   type ParticipantViewSettings,
   type ParticipantRuntimeBooklet,
   type ParticipantRuntimeState,
+  type TestRun,
   type ParticipantTestLogEntryInput,
   type WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
@@ -200,6 +201,7 @@ export type ParticipantVeronaPlayerState = {
   unitDefinitionType: string;
   resourceBasePath: string;
   savedResponse: string;
+  responseClocks?: TestRun["unitResponseFieldTimestamps"];
   sharedParameters: Array<{ key: string; value: string }>;
   unitNumber: number;
   unitCount: number;
@@ -1601,6 +1603,7 @@ export class ParticipantViewFacade {
         this.optimisticVeronaResponse.unitKey === unitKey
           ? this.optimisticVeronaResponse.response
           : this.effectiveUnitResponse(currentState, unitKey),
+      responseClocks: currentState.testRun.unitResponseFieldTimestamps,
       sharedParameters: currentState.testRun.sharedParameters ?? [],
       unitNumber: Math.max(unitIndex + 1, 1),
       unitCount: currentState.bookletUnits.length,
@@ -3552,6 +3555,7 @@ export class ParticipantViewFacade {
           }),
           {
             deliveryId: save.deliveryId,
+            responseOnly: true,
             responseTimestamp: Date.parse(save.queuedAt),
             responseUnitKey: save.unitKey,
             status: save.status,
