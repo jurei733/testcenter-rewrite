@@ -1554,6 +1554,7 @@ export type MonitorOpenRunsQuery = {
 
 export type IssueMonitorRunCommandRequest = {
   commandType: MonitorRunCommandType;
+  debugArguments?: string[];
   actorId?: string | null;
   targetUnitKey?: string | null;
   remainingSeconds?: number | null;

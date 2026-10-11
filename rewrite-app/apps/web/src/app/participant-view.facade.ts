@@ -507,6 +507,10 @@ export class ParticipantViewFacade {
       },
       apply: async () => {
         if (!isCurrent() || signal.aborted) return;
+        if (command.commandType === "debug") {
+          (await import("./participant-debug-control")).applyParticipantDebugArguments(command.debugArguments ?? [], command);
+          return;
+        }
         if (command.effectsDeferred) this.commandControllerState = { testRunId: command.testRunId,
           status: terminal ? "TERMINATED" : command.commandType === "pause" ? "PAUSED" : "RUNNING" };
         if (terminal) {
@@ -785,6 +789,14 @@ export class ParticipantViewFacade {
     }
 
     this.restoreEntryDraft(normalized);
+  }
+
+  get debugRunState(): ParticipantCurrentRunStateResponse["currentRunState"] | null {
+    return this.readCurrentRunState();
+  }
+
+  get debugResponseCaptures() {
+    return { pending: this.pendingVeronaSave, optimistic: this.optimisticVeronaResponse, ephemeral: this.ephemeralUnitResponses };
   }
 
   get player(): ParticipantPlayerState {

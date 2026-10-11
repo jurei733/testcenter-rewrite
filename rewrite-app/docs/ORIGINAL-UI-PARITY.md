@@ -2081,6 +2081,23 @@ Production answer behavior is unchanged and full current CI stays unconfirmed.
 | System administration | Admins, workspaces, settings, authentication and destructive-action dialogs |
 | Cross-cutting | Keyboard/focus, narrow viewport, long texts, all three themes, switching persistence |
 
+## Participant Debug pane checkpoint (2026-10-12)
+
+All ten Source Debug windows are now available through explicit local or
+selected-run remote `debug` commands. Saved window selection automatically
+restores only in development, matching the pinned Source production guard.
+Production Chromium/SQLite verifies window toggling/closing, native dragging,
+configuration/mode fields, Custom Text keyboard selection, condition parsing,
+offline tracked-variable projection, pause/ERROR purity and rejection of a
+held response from a previously selected booklet. Pinned Source excerpts gate
+formatters, conditions, all 39 raw config defaults and six mode definitions.
+The Source MIT notice remains distributed in `assets/ORIGINAL-UI-LICENSE.txt`.
+
+This is functional coverage with owned fixtures, not a live Original Debug
+pixel comparison. The other native console commands, early-loading ERROR,
+inherited lock descriptions and large real-package Debug acceptance remain
+open; full parity and production acceptance are not established.
+
 ## Current upstream functional delta
 
 The new baseline includes changes since the previous audit. Before updating

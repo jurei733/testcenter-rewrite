@@ -37,14 +37,26 @@
     "./participant-response-field-timestamps": {
       "types": "./dist/packages/contracts/src/participant-response-field-timestamps.d.ts",
       "default": "./dist/packages/contracts/src/participant-response-field-timestamps.js"
+    },
+    "./participant-debug": {
+      "types": "./dist/packages/contracts/src/participant-debug.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug.js"
+    },
+    "./participant-debug-runtime": {
+      "types": "./dist/packages/contracts/src/participant-debug-runtime.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug-runtime.js"
+    },
+    "./participant-debug-condition": {
+      "types": "./dist/packages/contracts/src/participant-debug-condition.d.ts",
+      "default": "./dist/packages/contracts/src/participant-debug-condition.js"
     }
   },
   "dependencies": {
-    "@testcenter-rewrite-app/domain": "0.0.0"
+    "@testcenter-rewrite-app/domain": "0.0.0",
+    "@iqb/responses": "5.2.2",
+    "@iqbspecs/coding-scheme": "3.4.1"
   },
   "devDependencies": {
-    "@iqb/responses": "5.2.2",
-    "@iqbspecs/coding-scheme": "3.4.1",
     "@iqbspecs/response": "2.0.0"
   }
 }

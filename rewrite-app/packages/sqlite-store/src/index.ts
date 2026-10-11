@@ -3581,7 +3581,8 @@ export const createSqliteFirstSliceRepository = (
           log_content = excluded.log_content,
           timestamp = excluded.timestamp,
           recorded_at = excluded.recorded_at,
-          original_timestamp = excluded.original_timestamp`
+          original_timestamp = excluded.original_timestamp
+        WHERE substr(participant_test_logs.participant_test_log_id, 1, 9) <> 'delivery:'`
       );
       database.exec("BEGIN");
       try {

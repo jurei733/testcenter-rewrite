@@ -3403,7 +3403,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
               log_content = EXCLUDED.log_content,
               timestamp = EXCLUDED.timestamp,
               recorded_at = EXCLUDED.recorded_at,
-              original_timestamp = EXCLUDED.original_timestamp`,
+              original_timestamp = EXCLUDED.original_timestamp
+            WHERE substr(participant_test_logs.participant_test_log_id, 1, 9) <> 'delivery:'`,
             [
               testLog.participantTestLogId,
               testLog.tenantId,

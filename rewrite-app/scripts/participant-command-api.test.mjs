@@ -1,4 +1,5 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
+import { participantDebugStateRoute } from "@testcenter-rewrite-app/contracts/participant-debug";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -73,7 +74,13 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
     await request("POST", resolveRoutePath(routes.workspace.createWorkspace, { tenantKey }), { workspaceKey, displayName: "Owned command test" }, operator, 201);
     const content = JSON.parse(localDemoSourcePackage.sourceDocument);
     const firstBooklet = content.bookletEntries[0].bookletKey;
+    const debugUnitKey = content.bookletEntries[0].unitEntries[0].unitKey;
+    content.bookletEntries[0].stateEntries = [{ stateKey: "owned-debug-state", displayLabel: "Owned debug state", options: [
+      { optionKey: "high", displayLabel: "High", conditions: [{ source: { type: "Score", unitKey: debugUnitKey, variableKey: "owned-score", defaultValue: "0" }, expression: { type: "greaterThan", value: "1" } }] },
+      { optionKey: "base", displayLabel: "Base", conditions: [] }
+    ] }];
     const second = { ...structuredClone(content.bookletEntries[0]), bookletKey: "owned-second" };
+    second.stateEntries = [];
     second.unitEntries = second.unitEntries.map(unit => ({ ...unit, unitKey: `second-${unit.unitKey}` }));
     content.bookletEntries.push(second);
     const uploaded = await request("POST", workspace + "/source-packages", { fileName: "commands.json", mediaType: "application/json", contentStructure: content }, operator, 201);
@@ -197,6 +204,67 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       assert.deepEqual(receipts.map(result => result.command.commandType), reversed ? ["resume", "pause"] : ["pause", "resume"]);
       assert.equal(receipts[1].command.executionSequence, receipts[0].command.executionSequence + 1);
       assert.equal((await (await readFreshRepository()).getTestRunById(run.testRunId)).status, reversed ? "paused" : "running");
+    });
+    await t.test("diagnostic HTTP endpoints require the participant credential and explicit selected Run", async () => {
+      const path = resolveRoutePath(participantDebugStateRoute, { participantSessionId: sessionId });
+      for (const method of ["GET", "POST"]) {
+        const body = method === "POST" ? {} : undefined;
+        await request(method, `${path}?testRunId=${run.testRunId}`, body, undefined, 401);
+        await request(method, `${path}?testRunId=${run.testRunId}`, body, other.sessionToken, 401);
+        await request(method, `${path}?testRunId=${foreign.testRunId}`, body, selected.sessionToken, 404);
+        await request(method, path, body, selected.sessionToken, 400);
+      }
+      const selectedSnapshot = (await request("GET", `${path}?testRunId=${run.testRunId}`, undefined, selected.sessionToken)).debugState;
+      assert.equal(selectedSnapshot.scope.testRunId, run.testRunId);
+      assert.equal(selectedSnapshot.scope.bookletKey, firstBooklet);
+      assert.ok(selectedSnapshot.booklet.unitEntries.every(unit => !unit.unitKey.startsWith("second-")));
+      const otherSnapshot = (await request("GET", `${path}?testRunId=${otherBookletRun.testRunId}`, undefined, selected.sessionToken)).debugState;
+      assert.equal(otherSnapshot.scope.testRunId, otherBookletRun.testRunId);
+      assert.ok(otherSnapshot.booklet.unitEntries.every(unit => unit.unitKey.startsWith("second-")));
+    });
+    await t.test("read-only diagnostic POST evaluates local captures and XML without changing durable state", async () => {
+      const repository = await readFreshRepository();
+      const durable = async () => ({ run: await repository.getTestRunById(run.testRunId),
+        session: await repository.getParticipantSessionById(sessionId),
+        logs: await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId),
+        activity: await repository.listWorkspaceActivityEventsByWorkspace(run.tenantId, run.workspaceId) });
+      const before = await durable();
+      const path = resolveRoutePath(participantDebugStateRoute, { participantSessionId: sessionId }) + `?testRunId=${run.testRunId}`;
+      const captured = JSON.stringify({ kind: "verona_unit_state", version: 1, unitState: { unitStateDataType: "iqb-standard@1.0", dataParts: {
+        one: JSON.stringify([{ id: "owned-score", status: "CODING_COMPLETE", value: "Exact local Ä/β\n\";", score: 2 }])
+      } } });
+      const snapshot = (await request("POST", path, { unitResponses: { [debugUnitKey]: captured },
+        conditionXml: `<If><Score of="owned-score" from="${debugUnitKey}"/><Is equal="2"/></If>` }, selected.sessionToken)).debugState;
+      assert.deepEqual(snapshot.conditionResults, [true]); assert.equal(snapshot.adaptiveStates[0].optionKey, "high");
+      assert.deepEqual(await durable(), before);
+      for (const body of [null, [], { unitResponses: { "second-foreign": "foreign" } },
+        { conditionXml: "<Else/>" }, { conditionXml: "<If><Value/></If>" }, { conditionXml: "<!DOCTYPE If><If/>" }]) {
+        await request("POST", path, body, selected.sessionToken, 400);
+        assert.deepEqual(await durable(), before);
+      }
+    });
+    await t.test("debug arguments survive monitor HTTP, selected ACK and idempotent execution after ERROR", async () => {
+      const repository = await readFreshRepository();
+      const before = await repository.getTestRunById(run.testRunId);
+      const parent = await repository.getParticipantSessionById(sessionId);
+      for (const debugArguments of [[], ["OFF"], ["on", "Exact Ä/β\n\";"]]) {
+        const result = (await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "debug", debugArguments }, operator)).command;
+        assert.deepEqual(result.debugArguments, debugArguments); assert.deepEqual(await repository.getTestRunById(run.testRunId), before);
+        const queued = (await list(run.testRunId)).commands.find(command => command.commandId === result.commandId);
+        assert.deepEqual(queued.debugArguments, debugArguments);
+        const receipt = (await request("PATCH", acknowledgement(result.commandId), { testRunId: run.testRunId }, selected.sessionToken)).command;
+        assert.deepEqual(receipt.debugArguments, debugArguments); assert.deepEqual(await repository.getTestRunById(run.testRunId), before);
+        const applied = (await request("POST", application(result.commandId), { testRunId: run.testRunId, controllerStatus: "ERROR", debugArguments: ["forged"] }, selected.sessionToken)).application;
+        assert.equal(applied.applied, true); assert.deepEqual(applied.command.debugArguments, debugArguments);
+        assert.deepEqual(await repository.getTestRunById(run.testRunId), before); assert.deepEqual(await repository.getParticipantSessionById(sessionId), parent);
+        const logs = await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId);
+        assert.equal(logs.filter(log => log.testRunId === run.testRunId && log.logKey === "command executed" && log.logContent === ["debug", ...debugArguments].join(" ")).length, 1);
+        const retry = (await apply(result.commandId, "PAUSED")).application;
+        assert.equal(retry.applied, false); assert.deepEqual(retry.command, applied.command);
+        assert.deepEqual(await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId), logs);
+      }
+      for (const debugArguments of [null, "off", [42]]) await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "debug", debugArguments }, operator, 400);
+      await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "resume", debugArguments: [] }, operator, 400);
     });
     await t.test("remote termination preserves the current Unit and answers and permits re-entry", async () => {
       const before = await (await readFreshRepository()).getTestRunById(run.testRunId);

@@ -216,7 +216,8 @@ export type MonitorRunCommandType =
   | "unlock_test"
   | "unlock_navigation"
   | "lock_navigation"
-  | "set_testlet_time";
+  | "set_testlet_time"
+  | "debug";
 export const monitorRunCommandTypes = [
   "pause",
   "resume",
@@ -227,7 +228,8 @@ export const monitorRunCommandTypes = [
   "unlock_test",
   "unlock_navigation",
   "lock_navigation",
-  "set_testlet_time"
+  "set_testlet_time",
+  "debug"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
@@ -1323,6 +1325,7 @@ export type OpenMonitorRun = {
 export type MonitorRunCommandResult = {
   commandId: string;
   commandType: MonitorRunCommandType;
+  debugArguments?: string[];
   actorId: string | null;
   issuedAt: string;
   previousStatus: TestRunStatus;
@@ -1341,6 +1344,8 @@ export type ParticipantRunCommandScope = {
 export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
   commandId: string;
   commandType: MonitorRunCommandType;
+  /** Original debug command arguments; the first argument "off" disables it. */
+  debugArguments?: string[];
   targetUnitKey: string | null;
   remainingSeconds: number | null;
   actorId: string | null;
@@ -1531,6 +1536,18 @@ export type ParticipantCurrentRunState = {
   availableActions: Array<
     "save_progress" | "resume" | "complete" | "review" | "change_state_options"
   >;
+};
+
+export type ParticipantDebugSnapshot = {
+  scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string };
+  booklet: ContentReleaseBookletEntry;
+  variables: Array<{ unitKey: string; baseVariableKeys: string[];
+    variables: Array<{ id: string; status: string; value: unknown; code?: number; score?: number }> }>;
+  states: Array<{ stateKey: string; defaultOptionKey: string | null;
+    options: Array<{ optionKey: string; firstUnsatisfiedCondition: number;
+      conditions: Array<{ condition: BookletStateCondition; satisfied: boolean }> }> }>;
+  adaptiveStates: ParticipantCurrentRunState["adaptiveStates"];
+  conditionResults: boolean[] | null;
 };
 
 export type WorkspaceOverview = {

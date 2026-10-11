@@ -54,7 +54,8 @@ export const createParticipantCommandReceiver = (options: {
       if (controller.signal.aborted) return;
       const receipt = parseParticipantRunCommand(value);
       if (!receipt?.acknowledgedAt || Object.keys(command).some(key => !["acknowledgedAt", "executedAt", "executionSequence"].includes(key) &&
-        receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand])) {
+        (key === "debugArguments" ? JSON.stringify(receipt.debugArguments ?? []) !== JSON.stringify(command.debugArguments) :
+          receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand]))) {
         throw new Error("The command receipt does not match the accepted command.");
       }
       executionQueue.push(receipt);

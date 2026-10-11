@@ -107,3 +107,18 @@ test("save drain failure cannot issue a command application request", async () =
   f.options.prepare = async () => { throw failure; };
   await assert.rejects(f.execute(), failure); assert.deepEqual(f.calls, []);
 });
+
+for (const substituted of [false, true]) test(`debug does not drain Player answers and ${substituted ? "rejects" : "accepts"} the argument receipt`, async () => {
+  const debug = parseParticipantRunCommand({ ...command(), commandType: "debug", debugArguments: ["OFF", "Exact Ä/β\n\";"] });
+  const reply = application();
+  reply.application.command = { ...debug, debugArguments: substituted ? ["on"] : [...debug.debugArguments],
+    executedAt: "2026-10-11T00:00:02.000Z", executionSequence: 1 };
+  let requests = 0, effects = 0;
+  const execute = load(parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath, () => "owned-credential", async () => {
+    requests++; return { ok: true, json: async () => structuredClone(reply) };
+  });
+  const pending = execute(debug, new AbortController().signal, { isCurrent: () => true, controllerStatus: () => "ERROR",
+    prepare: () => assert.fail("A read-only debug command cannot wait on the Player answer drain."), apply: () => { effects++; } });
+  if (substituted) await assert.rejects(pending, error => error.retryable === false); else await pending;
+  assert.equal(requests, 1); assert.equal(effects, substituted ? 0 : 1);
+});

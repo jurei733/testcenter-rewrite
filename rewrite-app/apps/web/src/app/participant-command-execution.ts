@@ -15,7 +15,7 @@ export const executeReceivedParticipantCommand = async (
   }
 ): Promise<void> => {
   if (signal.aborted || !options.isCurrent()) return;
-  await options.prepare();
+  if (command.commandType !== "debug") await options.prepare();
   if (signal.aborted || !options.isCurrent()) return;
   const token = readParticipantSessionCredential(command.participantSessionId);
   const response = await fetch(resolveRoutePath(participantCommandExecutionRoute, {
@@ -34,7 +34,8 @@ export const executeReceivedParticipantCommand = async (
   const application = payload?.application, receipt = parseParticipantRunCommand(application?.command);
   if (!receipt?.executedAt || !receipt.executionSequence || typeof application?.applied !== "boolean" ||
       Object.keys(command).some(key => !["executedAt", "executionSequence"].includes(key) &&
-        receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand]) ||
+        (key === "debugArguments" ? JSON.stringify(receipt.debugArguments ?? []) !== JSON.stringify(command.debugArguments) :
+          receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand])) ||
       !(["tenantId", "workspaceId", "participantSessionId", "testRunId"] as const).every(key =>
         application.testRun?.[key] === command[key]) ||
       !(["tenantId", "workspaceId", "participantSessionId"] as const).every(key =>

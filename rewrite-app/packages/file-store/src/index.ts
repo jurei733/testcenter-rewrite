@@ -1528,6 +1528,7 @@ export const createFileFirstSliceRepository = (
     async saveParticipantTestLogs(testLogs) {
       await mutate(state => {
         for (const testLog of testLogs) {
+          if (testLog.participantTestLogId.startsWith("delivery:") && Object.hasOwn(state.participantTestLogs, testLog.participantTestLogId)) continue;
           state.participantTestLogs[testLog.participantTestLogId] = testLog;
         }
       });

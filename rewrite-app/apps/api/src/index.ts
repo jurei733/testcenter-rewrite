@@ -1,4 +1,5 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
+import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -2476,6 +2477,7 @@ const runtimeStatePattern = createRoutePattern(
 const currentRunStatePattern = createRoutePattern(
   productionApiRoutes.participant.getCurrentRunState
 );
+const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
@@ -2527,6 +2529,7 @@ const completeRunPattern = createRoutePattern(
 const participantSignOutPattern = createRoutePattern(productionApiRoutes.participant.signOut);
 const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
+  ["GET", participantDebugStatePattern], ["POST", participantDebugStatePattern],
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
   ["POST", participantEventAcknowledgementPattern],
@@ -3745,6 +3748,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", systemCheckReportExportPattern, productionApiRoutes.workspace.exportSystemCheckReports],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["GET", participantDebugStatePattern, participantDebugStateRoute],
+    ["POST", participantDebugStatePattern, participantDebugStateRoute],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
     ["POST", participantEventAcknowledgementPattern, productionApiRoutes.participant.acknowledgeEventStream],
     ["GET", participantRunCommandsPattern, productionApiRoutes.participant.listPendingCommands],
@@ -8584,6 +8589,24 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantDebugStateMatch = participantDebugStatePattern.exec(pathname);
+      if ((request.method === "GET" || request.method === "POST") && participantDebugStateMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantDebugStateMatch.groups.participantSessionId);
+        const testRunId = url.searchParams.get("testRunId");
+        if (!participantSessionId || !testRunId?.trim()) {
+          sendError(response, 400, "participant_debug_scope_required", "An explicit participant session and selected Run are required.");
+          return;
+        }
+        const body = request.method === "POST" ? await readJsonBody<ParticipantDebugStateRequest>(request, runtime.config.maxJsonBodyBytes) : {};
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_debug_request_invalid", "A debug request must be an object.");
+          return;
+        }
+        const debugState = await services.participantRuntime.getDebugState({ participantSessionId, testRunId,
+          unitResponses: body.unitResponses, conditionXml: body.conditionXml });
+        sendJson<ParticipantDebugStateResponse>(response, 200, { debugState });
+        return;
+      }
       if (request.method === "GET" && currentRunStateMatch?.groups) {
         const participantSessionId = decodeRouteGroup(
           currentRunStateMatch.groups.participantSessionId
@@ -9386,6 +9409,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             workspaceKey,
             testRunIds: normalizedTestRunIds,
             commandType: body.commandType,
+            debugArguments: body.debugArguments,
             actorId:
               operatorAdminUserIdByRequest.get(request) ?? body.actorId,
             targetUnitKey: body.targetUnitKey,
@@ -9443,6 +9467,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey,
           testRunId,
           commandType: body.commandType,
+          debugArguments: body.debugArguments,
           actorId: operatorAdminUserIdByRequest.get(request) ?? body.actorId,
           targetUnitKey: body.targetUnitKey,
           remainingSeconds: body.remainingSeconds

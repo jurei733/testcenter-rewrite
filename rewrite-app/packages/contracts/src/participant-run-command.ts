@@ -12,6 +12,8 @@ export const parseParticipantRunCommand = (value: unknown): ParticipantRunComman
   const executionSequence = item.executionSequence ?? null;
   if (!["tenantId", "workspaceId", "participantSessionId", "testRunId", "commandId"].every(key => identifier(item[key])) ||
       !monitorRunCommandTypes.includes(item.commandType as ParticipantRunCommand["commandType"]) ||
+      !(item.debugArguments === undefined || item.commandType === "debug" && Array.isArray(item.debugArguments) &&
+        item.debugArguments.every(argument => typeof argument === "string")) ||
       !Number.isSafeInteger(item.sequence) || Number(item.sequence) < 1 || !timestamp(item.issuedAt) ||
       !(item.acknowledgedAt === null || timestamp(item.acknowledgedAt)) ||
       !(item.targetUnitKey === null || identifier(item.targetUnitKey)) ||
@@ -24,6 +26,7 @@ export const parseParticipantRunCommand = (value: unknown): ParticipantRunComman
     tenantId: item.tenantId as string, workspaceId: item.workspaceId as string,
     participantSessionId: item.participantSessionId as string, testRunId: item.testRunId as string,
     commandId: item.commandId as string, commandType: item.commandType as ParticipantRunCommand["commandType"],
+    ...(item.debugArguments === undefined ? {} : { debugArguments: [...item.debugArguments as string[]] }),
     sequence: item.sequence as number, targetUnitKey: item.targetUnitKey as string | null,
     remainingSeconds: item.remainingSeconds as number | null, actorId: item.actorId as string | null,
     issuedAt: item.issuedAt, acknowledgedAt: item.acknowledgedAt, executedAt, executionSequence: executionSequence as number | null,

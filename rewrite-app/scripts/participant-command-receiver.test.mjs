@@ -43,6 +43,13 @@ const fixture = (execute) => {
   return { receiver, started, effects, requests, advance, acknowledge };
 };
 
+for (const substituted of [false, true]) test(`debug ACK ${substituted ? "rejects substituted" : "accepts cloned"} argument arrays`, async () => {
+  const f = fixture();
+  f.receiver.accept([command(1, "debug", { debugArguments: ["OFF", "Exact Ä/β\n\";"] })]);
+  f.acknowledge(1, { debugArguments: substituted ? ["on"] : ["OFF", "Exact Ä/β\n\";"] });
+  await flush(); assert.equal(f.effects.length, substituted ? 0 : 1); f.receiver.stop();
+});
+
 for (const reversed of [false, true]) {
   test(`accepted commands execute in ${reversed ? "reversed" : "normal"} ACK completion order`, async () => {
     const f = fixture();

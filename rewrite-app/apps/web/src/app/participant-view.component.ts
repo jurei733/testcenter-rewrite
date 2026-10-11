@@ -29,6 +29,7 @@ import { OriginalReviewPanelComponent } from "./original-review-panel.component"
 import { OriginalToastContainerComponent } from "./original-toast-container.component";
 import { OriginalToastService } from "./original-toast.service";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
+import { ParticipantDebugLauncherComponent } from "./participant-debug-launcher.component";
 
 interface ParticipantVisibleCodeNotice {
   code: string;
@@ -39,10 +40,13 @@ interface ParticipantVisibleCodeNotice {
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, CdkTrapFocus, VeronaPlayerHostComponent, OriginalParticipantEntryComponent,
+  imports: [CommonModule, FormsModule, CdkTrapFocus, VeronaPlayerHostComponent, ParticipantDebugLauncherComponent, OriginalParticipantEntryComponent,
     OriginalPlayerToolbarComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent, OriginalParticipantErrorLauncherComponent],
   template: `
     <app-participant-status-styles />
+    @defer (when view.debugRunState !== null) {
+      <app-participant-debug-launcher [state]="view.debugRunState" />
+    }
     @defer (when interfaceMode.mode() === 'original') {
       @if (interfaceMode.mode() === 'original') {
         <app-original-toast-container />

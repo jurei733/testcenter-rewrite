@@ -856,6 +856,8 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveParticipantTestLogs(testLogs) {
       for (const testLog of testLogs) {
+        // A stable delivery identity keeps its first persisted content and receipt time.
+        if (testLog.participantTestLogId.startsWith("delivery:") && state.participantTestLogs.has(testLog.participantTestLogId)) continue;
         state.participantTestLogs.set(testLog.participantTestLogId, testLog);
       }
     },

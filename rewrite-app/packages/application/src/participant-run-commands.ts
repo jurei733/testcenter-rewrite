@@ -42,6 +42,8 @@ export const appendParticipantRunCommand = (
     }
   }
   if (!monitorRunCommandTypes.includes(input.commandType) ||
+    !(input.debugArguments === undefined || input.commandType === "debug" && Array.isArray(input.debugArguments) &&
+      input.debugArguments.every(argument => typeof argument === "string")) ||
     (input.targetUnitKey !== null && (typeof input.targetUnitKey !== "string" || !input.targetUnitKey.trim())) ||
     (input.remainingSeconds !== null && (!Number.isSafeInteger(input.remainingSeconds) || input.remainingSeconds <= 0)) ||
     (input.actorId !== null && typeof input.actorId !== "string")) {
@@ -51,6 +53,7 @@ export const appendParticipantRunCommand = (
     tenantId: input.tenantId, workspaceId: input.workspaceId,
     participantSessionId: input.participantSessionId, testRunId: input.testRunId,
     commandId: input.commandId, commandType: input.commandType,
+    ...(input.commandType === "debug" ? { debugArguments: [...input.debugArguments ?? []] } : {}),
     targetUnitKey: input.targetUnitKey, remainingSeconds: input.remainingSeconds,
     actorId: input.actorId, issuedAt: timestamp(input.issuedAt),
     ...(input.effectsDeferred === true ? { effectsDeferred: true as const } : {})
@@ -62,7 +65,7 @@ export const appendParticipantRunCommand = (
       throw new Error("Participant command identity cannot be reused for another command.");
     }
     for (const key of Object.keys(normalized) as Array<keyof ParticipantRunCommandInput>) {
-      if (existing[key] !== normalized[key]) {
+      if (key === "debugArguments" ? JSON.stringify(existing.debugArguments ?? []) !== JSON.stringify(normalized.debugArguments) : existing[key] !== normalized[key]) {
         throw new Error("Participant command identity cannot be reused for another command.");
       }
     }
