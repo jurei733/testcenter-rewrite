@@ -1,6 +1,58 @@
 # Optional Original UI
 
-### Deferred participant command dispatch (2026-10-11)
+### Command delivery after controller termination (2026-10-11)
+
+Local application checkpoint `876192634bf8` corrects the preceding checkpoint's
+redelivery of acknowledged deferred commands. Pinned Source
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d` filters `executed = false` in
+`TestDAO::getCommands`; its ACK sets that flag before browser dispatch. Memory,
+File, SQLite and PostgreSQL now deliver only commands with a null ACK. The
+receiver rejects previously acknowledged records. An application failure can
+still retry its accepted receipt within the current controller, and application
+receipts remain durable and idempotent. A new controller does not consume old
+ACKed intents or invent an execution timestamp for a discarded effect.
+SQLite schema 62 and PostgreSQL schema 56 restore the corresponding partial
+index without rewriting answers or command history. Both fresh stores and
+failed/retried upgrades from the preceding index versions are covered.
+
+Real browser verification also found and fixed two re-entry defects. A terminated
+controller now records `view=starter` in its synchronized Router address,
+so the retained error dialog's reload remains on the starter. Re-entering an
+existing Run activates the current participant session, allowing its SSE stream
+to reopen; launch rereads the parent before changing its status. The replacement
+error dialog now has an opaque white background when its optional surface
+variable is absent, with actual computed styles and a screenshot inspected.
+
+Eight actual Chromium cases pass with regular and replacement error dialogs:
+received pause/resume/terminate after ERROR, and an unreceived terminate that
+stays inert until explicit reload. Received termination logs ERROR → TERMINATED,
+retains the dialog over the starter, preserves the exact saved response and last
+unit, and permits explicit re-entry into the same Run with a live connection.
+A second resume whose ACK was held behind termination remains acknowledged but
+unapplied after re-entry; it is absent from delivery and command-executed logs.
+These browser cases are part of the required runtime-error smoke runner.
+
+All 1,298 local unit/state tests (80 + 177 + 473 + 568), the complete 797-case
+PostgreSQL integration and core/production web builds pass without skips.
+The initial web bundle is 469.88 kB below the unchanged 470 kB error budget.
+Five clean-image checks pass: PostgreSQL standard/demo/production boundaries,
+SQLite startup, and 11 command API tests within the read-only image, including
+the restored SSE connection. Image
+`testcenter-rewrite-app:completeness-876192634bf8` has USER node, schema 62/56
+and ID `sha256:6aa149bb68377a37c40501cc07b7268783eeb0e57faa90ce10372ac3eefa190c`.
+The tracked build archive is removed safely; the protected presentation, all
+24 original container IDs and 85 volume names are intact. About 10.07 GiB are
+free. The 450 kB warning and four style warnings remain.
+
+Full parity and production readiness remain open. Next verify ACK arrivals after
+a replacement controller is already open and multiple simultaneous command
+completions in real Source/Native browsers; protect session activation and
+progress/current-state writes across API servers; implement debug; complete the
+Original acceptance corpus and full-page/device checks. Remote CI, release,
+deployment and live production are unverified. This checkpoint is local and has
+not been pushed. The preceding sections document their historical revisions.
+
+### Historical deferred participant command dispatch (2026-10-11, db4ecc666bc8)
 
 Local application checkpoint `db4ecc666bc8` connects the atomic storage
 foundation to the authenticated participant application API and real browser.
