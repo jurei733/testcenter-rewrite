@@ -4,7 +4,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
   prepareParticipantControllerActivation,
   prepareParticipantRunMutation,
   appendParticipantRunCommand,
@@ -3133,7 +3133,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         mapTestRun
       );
     },
-    async getOrCreateTestRunForAssignment(candidate) {
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -3147,14 +3147,26 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           "SELECT * FROM test_runs WHERE participant_session_id = $1 OR test_run_id = $2",
           [candidate.participantSessionId, candidate.testRunId]
         )).rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const existing = selectParticipantAssignmentRun(candidate, session, runs);
-        if (existing) {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        if (!prepared.created) {
           await client.query("COMMIT");
-          return { testRun: existing, created: false };
+          return { testRun: prepared.testRun, created: false };
         }
-        if (!await persistTestRun(client, candidate, false)) {
+        if (!await persistTestRun(client, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
         }
+        const effect = prepared.effect!;
+        for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+          (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [log.participantTestLogId, log.tenantId,
+            log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+            log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+        for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+          (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`, [event.activityEventId, event.tenantId, event.workspaceId,
+            event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+        if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+          [effect.participantSession.status, candidate.participantSessionId]);
         const stored = mapTestRun((await client.query(
           "SELECT * FROM test_runs WHERE test_run_id = $1", [candidate.testRunId]
         )).rows[0]);

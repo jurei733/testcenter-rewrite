@@ -6,7 +6,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
   prepareParticipantControllerActivation,
   prepareParticipantRunMutation,
   appendParticipantRunCommand,
@@ -3306,7 +3306,7 @@ export const createSqliteFirstSliceRepository = (
         .all(tenantId, workspaceId) as Record<string, unknown>[];
       return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
     },
-    async getOrCreateTestRunForAssignment(candidate) {
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
       database.exec("BEGIN IMMEDIATE");
       try {
         const session = mapParticipantSession(database.prepare(
@@ -3316,14 +3316,26 @@ export const createSqliteFirstSliceRepository = (
           "SELECT * FROM test_runs WHERE participant_session_id = ? OR test_run_id = ?"
         ).all(candidate.participantSessionId, candidate.testRunId) as Record<string, unknown>[])
           .map(mapTestRun).filter((run): run is TestRun => run !== null);
-        const existing = selectParticipantAssignmentRun(candidate, session, runs);
-        if (existing) {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate, session, runs, initialize);
+        if (!prepared.created) {
           database.exec("COMMIT");
-          return { testRun: existing, created: false };
+          return { testRun: prepared.testRun, created: false };
         }
-        if (!persistTestRun(database, candidate, false)) {
+        if (!persistTestRun(database, prepared.testRun, false)) {
           throw new Error("Run ID already exists outside the participant assignment reservation.");
         }
+        const effect = prepared.effect!;
+        for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+          (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+            log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+            log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+        for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+          (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(event.activityEventId, event.tenantId, event.workspaceId,
+            event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+        if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+          .run(effect.participantSession.status, candidate.participantSessionId);
         const stored = mapTestRun(database.prepare(
           "SELECT * FROM test_runs WHERE test_run_id = ?"
         ).get(candidate.testRunId) as Record<string, unknown> | undefined);

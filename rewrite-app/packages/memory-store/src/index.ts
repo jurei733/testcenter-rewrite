@@ -2,7 +2,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
   prepareParticipantControllerActivation,
   prepareParticipantRunMutation,
   appendParticipantRunCommand,
@@ -723,14 +723,22 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
     },
-    async getOrCreateTestRunForAssignment(candidate) {
-      const existing = selectParticipantAssignmentRun(candidate,
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
+      const prepared = prepareParticipantAssignmentRunCreation(candidate,
         state.participantSessions.get(candidate.participantSessionId) ?? null,
-        Array.from(state.testRuns.values()));
-      if (existing) return { testRun: structuredClone(existing), created: false };
-      const testRun = structuredClone(candidate);
-      state.testRuns.set(testRun.testRunId, testRun);
-      return { testRun: structuredClone(testRun), created: true };
+        Array.from(state.testRuns.values()), initialize);
+      if (prepared.effect) {
+        const effect = prepared.effect;
+        if (effect.testLogs.some(log => state.participantTestLogs.has(log.participantTestLogId)) ||
+          effect.activityEvents.some(event => state.workspaceActivityEvents.has(event.activityEventId))) {
+          throw new Error("Initial participant artifacts cannot overwrite existing identities.");
+        }
+        state.testRuns.set(effect.testRun.testRunId, effect.testRun);
+        for (const log of effect.testLogs) state.participantTestLogs.set(log.participantTestLogId, log);
+        for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
+        if (effect.participantSession) state.participantSessions.set(candidate.participantSessionId, effect.participantSession);
+      }
+      return { testRun: prepared.testRun, created: prepared.created };
     },
     async saveTestRun(testRun) {
       state.testRuns.set(testRun.testRunId, testRun);

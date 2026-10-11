@@ -20,7 +20,9 @@ import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
-export { selectParticipantAssignmentRun } from "./participant-assignment-runs.js";
+import type { ParticipantAssignmentRunInitializer } from "./participant-assignment-runs.js";
+export { selectParticipantAssignmentRun, prepareParticipantAssignmentRunCreation } from "./participant-assignment-runs.js";
+export type { ParticipantAssignmentRunInitializer, ParticipantAssignmentRunCreationEffect } from "./participant-assignment-runs.js";
 export { prepareParticipantControllerActivation, ParticipantControllerActivationError,
   type ParticipantControllerActivationInput, type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
 export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
@@ -1493,9 +1495,10 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   applyParticipantRunCommand(input: ParticipantRunCommandApplicationInput,
     transform: (context: ParticipantRunCommandApplicationContext) => ParticipantRunCommandEffect
   ): Promise<ParticipantRunCommandApplicationResult | null>;
-  /** Reserve/reuse one exact assignment atomically; never reset an existing Run. */
+  /** Reserve/reuse one exact assignment; initialize a fresh Run and all its artifacts in that same write. */
   getOrCreateTestRunForAssignment(
-    candidate: TestRun
+    candidate: TestRun,
+    initialize?: ParticipantAssignmentRunInitializer
   ): Promise<{ testRun: TestRun; created: boolean }>;
   /** Activate the current parent under the same lock as Run eligibility; preserve its other fields. */
   activateParticipantController(input: ParticipantControllerActivationInput): Promise<ParticipantControllerActivationResult | null>;
@@ -25311,24 +25314,6 @@ export const createFirstSliceServices = (
     );
   };
 
-  const recordStartedTestletTimer = async (testRun: TestRun, testletKey: string): Promise<void> => {
-    const timer = testRun.testletTimers?.[testletKey];
-    await recordWorkspaceActivity({
-      tenantId: testRun.tenantId,
-      workspaceId: testRun.workspaceId,
-      eventType: "testlet_timer_started",
-      subjectType: "test_run",
-      subjectId: testRun.testRunId,
-      summary: `Timed block '${testletKey}' started for run '${testRun.testRunId}'.`,
-      details: {
-        testletKey,
-        durationSeconds: timer?.durationSeconds ?? null,
-        expiresAt: timer?.expiresAt ?? null,
-        currentUnitKey: testRun.currentUnitKey
-      }
-    });
-  };
-
   const prepareEffectiveTestletTimerState = (input: {
     contentRelease: ContentRelease;
     context: ParticipantRunMutationContext;
@@ -26982,71 +26967,60 @@ export const createFirstSliceServices = (
         ? null
         : firstUnit?.unitKey ?? null
     };
-    // Initialize the timer inside the candidate before reservation. A loser
-    // must never overwrite the winner's timer, answer or current Unit.
-    const activated = activateCurrentTestletTimer(contentRelease, testRun, timestamp);
-    const reservation = await repository.getOrCreateTestRunForAssignment(activated.testRun);
+    let reservation: Awaited<ReturnType<FirstSliceRepository["getOrCreateTestRunForAssignment"]>>;
+    try {
+      reservation = await repository.getOrCreateTestRunForAssignment(testRun, context => {
+        const currentParent = context.participantSession;
+        if (currentParent.participantCode !== participantSession.participantCode ||
+          resolveParticipantExecutionMode(currentParent.executionMode ?? rosterEntry?.executionMode).mode !== executionMode.mode) {
+          throw new FirstSliceError(409, "participant_entry_changed",
+            "Participant code or execution mode changed before the new Run could start.");
+        }
+        // Read eligibility and start the timer only after acquiring the parent's
+        // reservation lock. A losing candidate never initializes any artifacts.
+        const activatedAt = now();
+        const activation = prepareParticipantControllerActivation({ ...context.testRun, activatedAt }, currentParent, context.testRun);
+        if (!activation) throw new FirstSliceError(409, "participant_controller_scope_changed",
+          "The controller's parent scope changed during entry.");
+        const activated = activateCurrentTestletTimer(contentRelease, normalizeTestRun(context.testRun), activatedAt);
+        const freshRun = { ...activated.testRun, updatedAt: activatedAt };
+        const entries: ParticipantTestLogEntryInput[] = [];
+        const activityEvents: WorkspaceActivityEvent[] = [];
+        if (activated.startedTestletKey) {
+          if (executionMode.saveResponses) entries.push(buildTestletTimeLeftTestStateEntry(freshRun, activatedAt));
+          const testletKey = activated.startedTestletKey;
+          const timer = freshRun.testletTimers?.[testletKey];
+          activityEvents.push(buildWorkspaceActivity({ tenantId: freshRun.tenantId, workspaceId: freshRun.workspaceId,
+            eventType: "testlet_timer_started", subjectType: "test_run", subjectId: freshRun.testRunId,
+            summary: `Timed block '${testletKey}' started for run '${freshRun.testRunId}'.`,
+            details: { testletKey, durationSeconds: timer?.durationSeconds ?? null,
+              expiresAt: timer?.expiresAt ?? null, currentUnitKey: freshRun.currentUnitKey } }));
+        }
+        if (executionMode.saveResponses) {
+          entries.push({ key: "CONTROLLER", timeStamp: Date.parse(activatedAt), content: "RUNNING" });
+          if (freshRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: Date.parse(activatedAt), content: freshRun.currentUnitKey });
+          if (Object.keys(freshRun.bookletStates ?? {}).length) entries.push(buildBookletStatesTestStateEntry(freshRun, activatedAt));
+        }
+        activityEvents.push(buildWorkspaceActivity({ tenantId: freshRun.tenantId, workspaceId: freshRun.workspaceId,
+          eventType: "participant_session_resumed", subjectType: "test_run", subjectId: freshRun.testRunId,
+          summary: `Participant session '${currentParent.participantSessionId}' started a run.`,
+          details: { participantSessionId: currentParent.participantSessionId, bookletKey: freshRun.bookletKey,
+            bookletAssignmentKey: freshRun.bookletAssignmentKey, currentUnitKey: freshRun.currentUnitKey, bookletSource } }));
+        return { testRun: freshRun,
+          testLogs: executionMode.saveResponses ? buildParticipantTestLogs({ testRun: freshRun, batches: [{ entries }] }) : [],
+          activityEvents, ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
+      });
+    } catch (error) {
+      if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
+      throw error;
+    }
     const effectiveTestRun = normalizeTestRun(reservation.testRun);
     requireParticipantTestRunUnlocked(effectiveTestRun);
     if (effectiveTestRun.status === "completed") {
       throw new FirstSliceError(409, "booklet_already_completed",
         `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
     }
-    if (!reservation.created) {
-      if (!deferExistingActivation) await activateSession(effectiveTestRun);
-      return effectiveTestRun;
-    }
-    if (activated.startedTestletKey) {
-      if (executionMode.saveResponses) {
-        await repository.saveParticipantTestLogs(buildParticipantTestLogs({
-          testRun: effectiveTestRun,
-          batches: [{ entries: [buildTestletTimeLeftTestStateEntry(effectiveTestRun, timestamp)] }]
-        }));
-      }
-      await recordStartedTestletTimer(effectiveTestRun, activated.startedTestletKey);
-    }
-    if (executionMode.saveResponses) {
-      await repository.saveParticipantTestLogs(
-        buildParticipantTestLogs({
-        testRun: effectiveTestRun,
-        batches: [{
-          entries: [
-            {
-              key: "CONTROLLER",
-              timeStamp: Date.parse(timestamp),
-              content: "RUNNING"
-            },
-            ...(effectiveTestRun.currentUnitKey
-              ? [{
-                  key: "CURRENT_UNIT_ID",
-                  timeStamp: Date.parse(timestamp),
-                  content: effectiveTestRun.currentUnitKey
-                }]
-              : []),
-            ...(Object.keys(effectiveTestRun.bookletStates ?? {}).length > 0
-              ? [buildBookletStatesTestStateEntry(effectiveTestRun, timestamp)]
-              : [])
-          ]
-        }]
-        })
-      );
-    }
-    await activateSession(effectiveTestRun);
-    await recordWorkspaceActivity({
-      tenantId: effectiveTestRun.tenantId,
-      workspaceId: effectiveTestRun.workspaceId,
-      eventType: "participant_session_resumed",
-      subjectType: "test_run",
-      subjectId: effectiveTestRun.testRunId,
-      summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
-      details: {
-        participantSessionId: participantSession.participantSessionId,
-        bookletKey: effectiveTestRun.bookletKey,
-        bookletAssignmentKey: effectiveTestRun.bookletAssignmentKey,
-        currentUnitKey: effectiveTestRun.currentUnitKey,
-        bookletSource
-      }
-    });
+    if (!reservation.created && !deferExistingActivation) await activateSession(effectiveTestRun);
     return effectiveTestRun;
   };
 

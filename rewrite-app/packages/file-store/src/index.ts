@@ -14,7 +14,7 @@ import {
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
-  selectParticipantAssignmentRun,
+  prepareParticipantAssignmentRunCreation,
   prepareParticipantControllerActivation,
   prepareParticipantRunMutation,
   appendParticipantRunCommand,
@@ -1380,15 +1380,25 @@ export const createFileFirstSliceRepository = (
         testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
       );
     },
-    async getOrCreateTestRunForAssignment(candidate) {
-      return mutate(state => {
-        const existing = selectParticipantAssignmentRun(candidate,
+    async getOrCreateTestRunForAssignment(candidate, initialize) {
+      const result = await mutateParticipantRunApplication(state => {
+        const prepared = prepareParticipantAssignmentRunCreation(candidate,
           state.participantSessions[candidate.participantSessionId] ?? null,
-          Object.values(state.testRuns));
-        if (existing) return { testRun: structuredClone(existing), created: false };
-        state.testRuns[candidate.testRunId] = structuredClone(candidate);
-        return { testRun: structuredClone(candidate), created: true };
+          Object.values(state.testRuns), initialize);
+        if (prepared.effect) {
+          const effect = prepared.effect;
+          if (effect.testLogs.some(log => state.participantTestLogs[log.participantTestLogId]) ||
+            effect.activityEvents.some(event => state.workspaceActivityEvents[event.activityEventId])) {
+            throw new Error("Initial participant artifacts cannot overwrite existing identities.");
+          }
+          state.testRuns[candidate.testRunId] = effect.testRun;
+          for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+          for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+          if (effect.participantSession) state.participantSessions[candidate.participantSessionId] = effect.participantSession;
+        }
+        return { testRun: prepared.testRun, created: prepared.created, applied: prepared.created };
       });
+      return { testRun: result.testRun, created: result.created };
     },
     async saveTestRun(testRun) {
       await mutate(state => {
