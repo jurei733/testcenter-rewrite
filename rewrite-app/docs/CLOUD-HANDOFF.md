@@ -1,6 +1,67 @@
 # Cloud continuation: Testcenter Rewrite
 
-### Atomic application of acknowledged commands (2026-10-11)
+### Deferred participant command dispatch (2026-10-11)
+
+Local application checkpoint `db4ecc666bc8` connects the atomic storage
+foundation to the authenticated participant application API and real browser.
+Issuing or acknowledging pause, resume, goto, complete or complete_and_lock
+stores an intent/receipt without applying its Run, timer or controller effect.
+Successful dispatch uses the stored command and latest Run under the repository
+lock. The API ignores forged command type, target and execution timestamps.
+The deep contract route is
+`POST /api/v1/participant/sessions/:participantSessionId/commands/:commandId/application`.
+Legacy intents retain their already-applied effects; their application is a
+receipt-only operation. Direct Native lock/navigation/time extensions retain
+existing behavior. The Source debug command is still missing.
+
+New deferred commands remain pending after ACK until their execution receipt is
+stored. SQLite schema 61 and PostgreSQL schema 55 update that pending index.
+The receiver preserves ACK completion order through asynchronous application,
+retries transient failures before its successor, and aborts view projection on
+route cleanup. Application replies must match the exact accepted receipt and
+Run/session scope. A duplicate receipt can restore an interrupted local view
+without replaying its durable effect.
+
+Source termination is resumable: complete returns to the starter, preserves the
+last unit and saved answers, interrupts timers, and leaves the session signed_in;
+complete_and_lock additionally locks the Run. The explicit participant complete
+operation remains final. SSE refuses a session at the starter. Starter cleanup
+also clears the serialized state fallback so rendering cannot resurrect the old
+Run. Legacy optional assignment identities survive command normalization under
+the immutable parent guard. A terminated resumable Run still blocks release
+activation until explicitly completed.
+
+Current checks pass core compilation and the production web build (469.88 kB,
+unchanged 470 kB error limit), 1293 unit/state tests (80+177+469+567) and 791 full
+PostgreSQL integration tests, with no failures or skips. Eight actual Chromium
+cases pass with normal and fallback dialogs: received pause/resume after ERROR,
+and unreceived pause/terminate after ERROR followed by explicit reload. The
+received cases verify Source ERROR-to-PAUSED/RUNNING controller log order;
+unreceived intents stay inert. Terminal reload/re-entry resumes the same saved
+Run. All eight owned API processes stop and every stored browser receipt has a
+server execution timestamp and execution sequence 1. The receiver/API order
+checks do not substitute for a multi-command browser comparison.
+
+Five clean-image checks pass: PostgreSQL standard/demo/production-secret
+boundaries, SQLite startup, and 11 real command API tests inside the read-only
+image. Image `testcenter-rewrite-app:completeness-db4ecc666bc8` uses USER node,
+SQLite schema 61 and PostgreSQL schema 55; its ID is
+`sha256:83f2023bb2a8db2d1525b5301c1a5503d94b9f5a33a5de184eb29c67875cc4b9`.
+The tracked build archive is removed without following the host dependency
+symlink. All 24 pre-existing container IDs, 85 volumes and the protected
+presentation digest remain unchanged. The recovered host has about 10 GiB free.
+The 450 kB initial warning and four style warnings remain unresolved.
+
+Full parity and production acceptance remain open. Next, retire ACKed but
+unexecuted intents when the Source root terminates, including late ACK/re-entry
+races; prove queued terminate with its retained ERROR dialog and real browser
+multi-ACK order; protect stale progress/current-state writes across API servers;
+implement debug; finish the Original acceptance corpus, full-page/device and
+fallback visual checks. Remote CI, release, deployment and production proof are
+unverified. This checkpoint is local and has not been pushed.
+
+
+### Historical atomic application foundation (2026-10-11, 6ef2057f7fb5)
 
 Application checkpoint `6ef2057f7fb5` commits the storage infrastructure below.
 The repository now commits an acknowledged command's Run effect, execution
