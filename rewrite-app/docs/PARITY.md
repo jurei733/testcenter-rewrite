@@ -1,5 +1,60 @@
 # Testcenter parity checklist
 
+### Atomic runtime transitions and monitor intent persistence (2026-10-11)
+
+Local application checkpoint `225f0ff29ed7` extends the transaction used for
+progress and timers to adaptive choices, code gates, direct resume, existing-Run
+session reentry, starter preparation/return, completion and monitor commands.
+The remaining ten application runtime `saveTestRun` calls have been removed.
+Decisions use the current scoped Run and parent inside the store write boundary;
+Run changes, test logs, activity and completion/activation parent status commit
+together. Existing-Run reentry now activates its controller in that same write.
+
+Monitor command intent is part of the projection. Deferred Source commands queue
+the intent and issued-command audit together; native controls commit their Run
+effect, queued intent and audit together. Memory remains synchronous, File
+publishes detached maps only after persistence, SQLite uses BEGIN IMMEDIATE and
+PostgreSQL locks parent before Run on one client. Schema versions remain 62/56.
+File evidence covers one repository owner; SQL evidence also exercises independent
+writers. Mode behavior, monitor-pause protection, transient non-saving packets,
+starter confirmation ordering and the non-saving completion response are retained.
+
+The required mutation suite now has 114 tests across Memory/File/SQLite and 158
+when PostgreSQL is enabled. New cases interleave answers, locks, access expiry,
+current-unit/status changes and sibling completion after the initial read; fault
+injection verifies complete rollback after Run, log, command, audit and final
+parent writes. Local validation passed 1,431 unit/state tests, 982 full PostgreSQL
+tests and 166 HTTP tests per Memory/File/SQLite store (498 total), without skips.
+The production web build passes at 469.88 kB under the existing 470 kB hard gate;
+the 450 kB warning and four style warnings remain.
+
+A clean archive of the application commit passed PostgreSQL standard/demo/
+production-boundary and SQLite runtime checks, plus 125 tests inside the read-only
+image `testcenter-rewrite-app:completeness-225f0ff29ed7` as user node. Its image ID
+is `sha256:b8b059760d06158cb36beddd6dc2cdab6656a501859b0cddcb12b65851e80f09`.
+All 24 existing containers, 85 volumes and their mount configurations
+were preserved; the owned archive was removed after unlinking its node_modules
+symlink. The protected presentation still hashes to
+`7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+
+Chromium passed two received-termination/error/reentry variants, four real
+input/offline/retry/reload variants, 36 player-exit reference states and all 57
+completeness/pixel-reference cases, plus all 44 paused-exit reference states
+(143 browser state cases total).
+An initial mobile retry request timeout and a six-border-pixel, one-color-level
+capture difference were retained as failed-attempt evidence; the isolated reruns
+passed without changing application code or Source reference fixtures.
+
+Full parity and production readiness remain open. An owned Memory probe confirms
+that replaying a previously accepted older delivery overwrites a newer same-unit
+answer. Pinned Source `ee2ab9ab64bd91209ef8534bbe6005838024e46d` rejects older
+response timestamps in TestDAO; durable scoped delivery receipts and response
+version ordering are the next priority. Fresh Run creation/reservation plus its
+initial artifacts still needs a combined boundary. Other Source acceptance,
+command lifetime/debug and remote release/deployment proof remain outstanding.
+The live GitHub CI snapshot is green for older commit `143dc3e73ae8`; it does not
+cover this local application checkpoint.
+
 ### Atomic participant progress and timer persistence (2026-10-11)
 
 Local application checkpoint `7037c86870cc` adds `mutateParticipantRun` to all
