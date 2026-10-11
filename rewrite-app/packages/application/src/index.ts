@@ -1,4 +1,9 @@
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
+import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
+  ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
+export { prepareParticipantRunMutation } from "./participant-run-mutation.js";
+export type { ParticipantRunMutationInput, ParticipantRunMutationContext,
+  ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
 import { ParticipantControllerActivationError, type ParticipantControllerActivationInput,
   type ParticipantControllerActivationResult } from "./participant-controller-activation.js";
 import { bookletNavigationDeniedReasons, bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
@@ -1470,6 +1475,10 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
+  /** Read current parent/Run and commit the pure projection, logs and activity in one write boundary. */
+  mutateParticipantRun(input: ParticipantRunMutationInput,
+    transform: (context: ParticipantRunMutationContext) => ParticipantRunMutationEffect | null
+  ): Promise<ParticipantRunMutationResult | null>;
   appendParticipantRunCommand(command: ParticipantRunCommandInput): Promise<ParticipantRunCommand | null>;
   listPendingParticipantRunCommands(scope: ParticipantRunCommandScope): Promise<ParticipantRunCommand[]>;
   acknowledgeParticipantRunCommand(input: ParticipantRunCommandScope & {
@@ -24509,7 +24518,7 @@ export const createFirstSliceServices = (
     );
   }
 
-  const recordWorkspaceActivity = async (input: {
+  const buildWorkspaceActivity = (input: {
     activityEventId?: string;
     tenantId: string;
     workspaceId: string;
@@ -24519,8 +24528,7 @@ export const createFirstSliceServices = (
     subjectId: string;
     summary: string;
     details?: Record<string, unknown>;
-  }): Promise<void> => {
-    await repository.saveWorkspaceActivityEvent({
+  }): WorkspaceActivityEvent => ({
       activityEventId: input.activityEventId ?? idGenerator(),
       tenantId: input.tenantId,
       workspaceId: input.workspaceId,
@@ -24531,7 +24539,10 @@ export const createFirstSliceServices = (
       occurredAt: now(),
       summary: input.summary,
       details: input.details ?? {}
-    });
+  });
+
+  const recordWorkspaceActivity = async (input: Parameters<typeof buildWorkspaceActivity>[0]): Promise<void> => {
+    await repository.saveWorkspaceActivityEvent(buildWorkspaceActivity(input));
   };
 
   const assertTenantTesttakersIdentitiesAvailable = async (input: {
@@ -25324,107 +25335,75 @@ export const createFirstSliceServices = (
     });
   };
 
+  const prepareEffectiveTestletTimerState = (input: {
+    contentRelease: ContentRelease;
+    context: ParticipantRunMutationContext;
+    participantRosterEntry: ParticipantRosterEntry | null;
+    timestamp: string;
+  }): { effect: ParticipantRunMutationEffect; changed: boolean } => {
+    const { context, timestamp, contentRelease } = input;
+    const normalizedRun = normalizeTestRun(context.testRun);
+    const executionMode = resolveParticipantExecutionMode(normalizedRun.executionMode);
+    const reconciled = reconcileExpiredTestletTimers(contentRelease, normalizedRun, timestamp, executionMode.forceTimeRestrictions);
+    const activated = activateCurrentTestletTimer(contentRelease, reconciled.testRun, timestamp);
+    const changed = activated.testRun !== normalizedRun || reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey != null;
+    // Legacy identity defaults are projections, not changes to an existing Run's identity.
+    const effectiveRun = { ...activated.testRun, executionMode: context.testRun.executionMode,
+      bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+    const testLogs: ParticipantTestLog[] = [];
+    const activityEvents: WorkspaceActivityEvent[] = [];
+    if (executionMode.saveResponses && (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)) {
+      const entries: ParticipantTestLogEntryInput[] = [];
+      if (reconciled.expiredTestletKeys.length > 0) entries.push(buildTestletTimeLeftTestStateEntry(reconciled.testRun, timestamp));
+      if (activated.startedTestletKey) entries.push(buildTestletTimeLeftTestStateEntry(effectiveRun, timestamp));
+      testLogs.push(...buildParticipantTestLogs({ testRun: effectiveRun, batches: [{ entries }] }));
+    }
+    if (activated.startedTestletKey) {
+      const testletKey = activated.startedTestletKey;
+      const timer = effectiveRun.testletTimers?.[testletKey];
+      activityEvents.push(buildWorkspaceActivity({ tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId,
+        eventType: "testlet_timer_started", subjectType: "test_run", subjectId: effectiveRun.testRunId,
+        summary: `Timed block '${testletKey}' started for run '${effectiveRun.testRunId}'.`,
+        details: { testletKey, durationSeconds: timer?.durationSeconds ?? null, expiresAt: timer?.expiresAt ?? null, currentUnitKey: effectiveRun.currentUnitKey } }));
+    }
+    for (const testletKey of reconciled.expiredTestletKeys) activityEvents.push(buildWorkspaceActivity({
+      tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId, eventType: "testlet_timer_expired",
+      subjectType: "test_run", subjectId: effectiveRun.testRunId,
+      summary: `Timed block '${testletKey}' expired for run '${effectiveRun.testRunId}'.`,
+      details: { testletKey, currentUnitKey: effectiveRun.currentUnitKey, runStatus: effectiveRun.status }
+    }));
+    let participantSession: ParticipantSession | undefined;
+    if (context.testRun.status !== "completed" && effectiveRun.status === "completed") {
+      const parent = context.participantSession;
+      const testRuns = context.testRuns.map(run => normalizeTestRun(run.testRunId === effectiveRun.testRunId ? effectiveRun : run));
+      const hasUnfinishedBooklet = buildParticipantRuntimeBooklets({ contentRelease, participantRosterEntry: input.participantRosterEntry,
+        participantCode: parent.participantCode, testRuns }).some(booklet => booklet.status !== "completed");
+      participantSession = { ...parent, status: hasUnfinishedBooklet ? "signed_in" : "closed" };
+      activityEvents.push(buildWorkspaceActivity({ tenantId: effectiveRun.tenantId, workspaceId: effectiveRun.workspaceId,
+        eventType: "test_run_completed", subjectType: "test_run", subjectId: effectiveRun.testRunId,
+        summary: `Run '${effectiveRun.testRunId}' completed after its final timed block expired.`,
+        details: { completedAt: effectiveRun.completedAt, reason: "testlet_timer_expired" } }));
+    }
+    return { changed, effect: { testRun: effectiveRun, testLogs, activityEvents, ...(participantSession ? { participantSession } : {}) } };
+  };
+
   const persistEffectiveTestletTimerState = async (input: {
     contentRelease: ContentRelease;
     testRun: TestRun;
     timestamp: string;
+    ensureBookletStates?: boolean;
   }): Promise<TestRun> => {
-    const normalizedRun = normalizeTestRun(input.testRun);
-    const executionMode = resolveParticipantExecutionMode(
-      normalizedRun.executionMode
-    );
-    const reconciled = reconcileExpiredTestletTimers(
-      input.contentRelease,
-      normalizedRun,
-      input.timestamp,
-      executionMode.forceTimeRestrictions
-    );
-    const activated = activateCurrentTestletTimer(
-      input.contentRelease,
-      reconciled.testRun,
-      input.timestamp
-    );
-    const effectiveRun = activated.testRun;
-    const changed =
-      effectiveRun !== normalizedRun ||
-      reconciled.expiredTestletKeys.length > 0 ||
-      activated.startedTestletKey != null;
-    if (changed) {
-      await repository.saveTestRun(effectiveRun);
-    }
-    if (
-      executionMode.saveResponses &&
-      (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)
-    ) {
-      const timerStateEntries: ParticipantTestLogEntryInput[] = [];
-      if (reconciled.expiredTestletKeys.length > 0) {
-        timerStateEntries.push(
-          buildTestletTimeLeftTestStateEntry(
-            reconciled.testRun,
-            input.timestamp
-          )
-        );
-      }
-      if (activated.startedTestletKey) {
-        timerStateEntries.push(
-          buildTestletTimeLeftTestStateEntry(effectiveRun, input.timestamp)
-        );
-      }
-      await repository.saveParticipantTestLogs(
-        buildParticipantTestLogs({
-          testRun: effectiveRun,
-          batches: [{ entries: timerStateEntries }]
-        })
-      );
-    }
-    if (activated.startedTestletKey) {
-      await recordStartedTestletTimer(effectiveRun, activated.startedTestletKey);
-    }
-    for (const testletKey of reconciled.expiredTestletKeys) {
-      await recordWorkspaceActivity({
-        tenantId: effectiveRun.tenantId,
-        workspaceId: effectiveRun.workspaceId,
-        eventType: "testlet_timer_expired",
-        subjectType: "test_run",
-        subjectId: effectiveRun.testRunId,
-        summary: `Timed block '${testletKey}' expired for run '${effectiveRun.testRunId}'.`,
-        details: {
-          testletKey,
-          currentUnitKey: effectiveRun.currentUnitKey,
-          runStatus: effectiveRun.status
-        }
-      });
-    }
-    if (
-      input.testRun.status !== "completed" &&
-      effectiveRun.status === "completed"
-    ) {
-      const participantSession = await repository.getParticipantSessionById(
-        effectiveRun.participantSessionId
-      );
-      if (participantSession) {
-        await repository.saveParticipantSession({
-          ...participantSession,
-          status: await resolveParticipantSessionStatusAfterCompletion(
-            repository,
-            participantSession
-          )
-        });
-      }
-      await recordWorkspaceActivity({
-        tenantId: effectiveRun.tenantId,
-        workspaceId: effectiveRun.workspaceId,
-        eventType: "test_run_completed",
-        subjectType: "test_run",
-        subjectId: effectiveRun.testRunId,
-        summary: `Run '${effectiveRun.testRunId}' completed after its final timed block expired.`,
-        details: {
-          completedAt: effectiveRun.completedAt,
-          reason: "testlet_timer_expired"
-        }
-      });
-    }
-    return effectiveRun;
+    const parent = await requireParticipantSession(repository, input.testRun.participantSessionId);
+    const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
+    const result = await repository.mutateParticipantRun(input.testRun, context => {
+      const prepared = prepareEffectiveTestletTimerState({ ...input, context, participantRosterEntry });
+      const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(booklet => booklet.bookletKey === context.testRun.bookletKey);
+      const needsBookletStates = input.ensureBookletStates && !hasCompleteBookletStatesSnapshot(booklet, prepared.effect.testRun);
+      if (needsBookletStates) prepared.effect.testRun = withEvaluatedBookletStates(booklet, prepared.effect.testRun);
+      return prepared.changed || needsBookletStates ? prepared.effect : null;
+    });
+    if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+    return normalizeTestRun(result.testRun);
   };
 
   const importParticipantRosterDocumentsForWorkspace = async (input: {
@@ -32251,23 +32230,15 @@ export const createFirstSliceServices = (
           storedCurrentTestRun.contentReleaseId
         );
         const currentTimestamp = now();
-        const timerAdjustedTestRun = await persistEffectiveTestletTimerState({
+        const currentTestRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: storedCurrentTestRun,
-          timestamp: currentTimestamp
+          timestamp: currentTimestamp,
+          ensureBookletStates: true
         });
         const currentBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-          booklet => booklet.bookletKey === timerAdjustedTestRun.bookletKey
+          booklet => booklet.bookletKey === currentTestRun.bookletKey
         );
-        const currentTestRun = hasCompleteBookletStatesSnapshot(
-          currentBooklet,
-          timerAdjustedTestRun
-        )
-          ? timerAdjustedTestRun
-          : withEvaluatedBookletStates(currentBooklet, timerAdjustedTestRun);
-        if (currentTestRun !== timerAdjustedTestRun) {
-          await repository.saveTestRun(currentTestRun);
-        }
         const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
           repository,
           participantSession.tenantId,
@@ -33195,9 +33166,8 @@ export const createFirstSliceServices = (
           );
         }
 
-        await requireAccessibleParticipantSession(
-          storedTestRun.participantSessionId
-        );
+        const parent = await requireAccessibleParticipantSession(storedTestRun.participantSessionId);
+        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(repository, parent.tenantId, parent.workspaceId, parent.loginKey);
 
         const contentRelease = await requireContentRelease(
           repository,
@@ -33222,12 +33192,12 @@ export const createFirstSliceServices = (
             );
           }
         }
+        let timerCompletedBeforeProgress = false;
+        const result = await repository.mutateParticipantRun(storedTestRun, context => {
         const timestamp = now();
-        const testRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: normalizeTestRun(storedTestRun),
-          timestamp
-        });
+        assertParticipantAccessWindow(participantRosterEntry, timestamp, context.participantSession.validUntil);
+        const before = prepareEffectiveTestletTimerState({ contentRelease, context, participantRosterEntry, timestamp });
+        const testRun = normalizeTestRun(before.effect.testRun);
         requireParticipantTestRunUnlocked(testRun);
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
@@ -33236,11 +33206,8 @@ export const createFirstSliceServices = (
           candidate => candidate.bookletKey === testRun.bookletKey
         );
         if (testRun.status === "completed") {
-          throw new FirstSliceError(
-            409,
-            "test_run_already_completed",
-            `Test run '${testRunId}' is already completed.`
-          );
+          timerCompletedBeforeProgress = true;
+          return before.changed ? before.effect : null;
         }
 
         const hasCurrentUnitKeyInput = input.currentUnitKey !== undefined;
@@ -33494,16 +33461,12 @@ export const createFirstSliceServices = (
               batches: [...incomingLogBatches, ...runtimeLogBatches]
             })
           : [];
-        await repository.saveTestRun(updatedRun);
-        if (participantTestLogs.length > 0) {
-          await repository.saveParticipantTestLogs(participantTestLogs);
-        }
-        const effectiveRun = await persistEffectiveTestletTimerState({
-          contentRelease,
-          testRun: updatedRun,
-          timestamp
-        });
-        await recordWorkspaceActivity({
+        const after = prepareEffectiveTestletTimerState({ contentRelease, participantRosterEntry, timestamp,
+          context: { ...context, testRun: { ...updatedRun, executionMode: context.testRun.executionMode,
+            bookletAssignmentKey: context.testRun.bookletAssignmentKey } } });
+        const effectiveRun = after.effect.testRun;
+        const activityEvents = [...before.effect.activityEvents, ...after.effect.activityEvents];
+        activityEvents.push(buildWorkspaceActivity({
           ...(deliveryId
             ? {
                 activityEventId:
@@ -33523,9 +33486,9 @@ export const createFirstSliceServices = (
             executionMode: executionMode.mode,
             responsesPersisted: executionMode.saveResponses
           }
-        });
+        }));
         if (activatedLeaveLock) {
-          await recordWorkspaceActivity({
+          activityEvents.push(buildWorkspaceActivity({
             ...(deliveryId
               ? {
                   activityEventId:
@@ -33547,9 +33510,16 @@ export const createFirstSliceServices = (
               unitKey: activatedLeaveLock.unit.unitKey,
               nextUnitKey: effectiveRun.currentUnitKey
             }
-          });
+          }));
         }
-          return effectiveRun;
+        const participantSession = after.effect.participantSession ?? before.effect.participantSession;
+        return { testRun: effectiveRun,
+          testLogs: [...before.effect.testLogs, ...participantTestLogs, ...after.effect.testLogs], activityEvents,
+          ...(participantSession ? { participantSession } : {}) };
+        });
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run no longer belongs to its participant scope.");
+        if (timerCompletedBeforeProgress) throw new FirstSliceError(409, "test_run_already_completed", `Test run '${testRunId}' is already completed.`);
+        return normalizeTestRun(result.testRun);
         });
       },
       async saveTestLogs(input) {

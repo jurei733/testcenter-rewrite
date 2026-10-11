@@ -6,6 +6,7 @@ import {
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
   prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -3194,6 +3195,38 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           WHERE test_run_id = $3 AND command_id = $4`, [JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId]);
         await client.query("COMMIT");return command;
       } catch (error) { await client.query("ROLLBACK");throw error; }
+      finally { client.release(); }
+    },
+    async mutateParticipantRun(input, transform) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Parent first, matching assignment reservation and parent deletion.
+        const participantSession = mapParticipantSession((await client.query(
+          "SELECT * FROM participant_sessions WHERE participant_session_id = $1 FOR UPDATE", [input.participantSessionId])).rows[0]);
+        const testRun = mapTestRun((await client.query("SELECT * FROM test_runs WHERE test_run_id = $1 FOR UPDATE", [input.testRunId])).rows[0]);
+        const testRuns = (await client.query("SELECT * FROM test_runs WHERE participant_session_id = $1", [input.participantSessionId]))
+          .rows.map(mapTestRun).filter((run): run is TestRun => run !== null);
+        const prepared = prepareParticipantRunMutation(input,
+          testRun && participantSession ? { testRun, participantSession, testRuns } : null, transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          await persistTestRun(client, effect.testRun);
+          for (const log of effect.testLogs) await client.query(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, participant_session_id = EXCLUDED.participant_session_id, test_run_id = EXCLUDED.test_run_id, unit_key = EXCLUDED.unit_key, original_unit_id = EXCLUDED.original_unit_id, log_key = EXCLUDED.log_key, log_content = EXCLUDED.log_content, timestamp = EXCLUDED.timestamp, recorded_at = EXCLUDED.recorded_at, original_timestamp = EXCLUDED.original_timestamp`, [log.participantTestLogId, log.tenantId,
+              log.workspaceId, log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null]);
+          for (const event of effect.activityEvents) await client.query(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, workspace_id = EXCLUDED.workspace_id, event_type = EXCLUDED.event_type, actor_id = EXCLUDED.actor_id, subject_type = EXCLUDED.subject_type, subject_id = EXCLUDED.subject_id, occurred_at = EXCLUDED.occurred_at, summary = EXCLUDED.summary, details_json = EXCLUDED.details_json`, [event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details)]);
+          if (effect.participantSession) await client.query("UPDATE participant_sessions SET status = $1 WHERE participant_session_id = $2",
+            [effect.participantSession.status, input.participantSessionId]);
+        }
+        await client.query("COMMIT");
+        return prepared?.result ?? null;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
       finally { client.release(); }
     },
     async applyParticipantRunCommand(input, transform) {

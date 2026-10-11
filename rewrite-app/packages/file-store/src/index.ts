@@ -16,6 +16,7 @@ import {
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
   prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -614,7 +615,7 @@ export const createFileFirstSliceRepository = (
     return operation;
   };
 
-  const mutateCommandApplication = <Result extends { applied: boolean } | null>(
+  const mutateParticipantRunApplication = <Result extends { applied: boolean } | null>(
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
     const operation = writeQueue.then(async () => {
@@ -1417,8 +1418,24 @@ export const createFileFirstSliceRepository = (
         return command;
       });
     },
+    async mutateParticipantRun(input, transform) {
+      return mutateParticipantRunApplication(state => {
+      const testRun = state.testRuns[input.testRunId];
+      const participantSession = state.participantSessions[input.participantSessionId];
+      const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
+        testRuns: Object.values(state.testRuns).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
+      if (prepared?.effect) {
+        const effect = prepared.effect;
+        state.testRuns[input.testRunId] = effect.testRun;
+        for (const log of effect.testLogs) state.participantTestLogs[log.participantTestLogId] = log;
+        for (const event of effect.activityEvents) state.workspaceActivityEvents[event.activityEventId] = event;
+        if (effect.participantSession) state.participantSessions[input.participantSessionId] = effect.participantSession;
+      }
+      return prepared?.result ?? null;
+      });
+    },
     async applyParticipantRunCommand(input, transform) {
-      return mutateCommandApplication(state => {
+      return mutateParticipantRunApplication(state => {
         const key = JSON.stringify([input.testRunId, input.commandId]);
         const command = state.participantRunCommands[key];
         const testRun = state.testRuns[input.testRunId];

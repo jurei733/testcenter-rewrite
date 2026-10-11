@@ -4,6 +4,7 @@ import {
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
   prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -757,6 +758,20 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         state.participantRunCommands.get(key) ?? null);
       if (command) state.participantRunCommands.set(key, structuredClone(command));
       return command;
+    },
+    async mutateParticipantRun(input, transform) {
+      const testRun = state.testRuns.get(input.testRunId);
+      const participantSession = state.participantSessions.get(input.participantSessionId);
+      const prepared = prepareParticipantRunMutation(input, testRun && participantSession ? { testRun, participantSession,
+        testRuns: Array.from(state.testRuns.values()).filter(run => run.participantSessionId === input.participantSessionId) } : null, transform);
+      if (prepared?.effect) {
+        const effect = prepared.effect;
+        state.testRuns.set(input.testRunId, effect.testRun);
+        for (const log of effect.testLogs) state.participantTestLogs.set(log.participantTestLogId, log);
+        for (const event of effect.activityEvents) state.workspaceActivityEvents.set(event.activityEventId, event);
+        if (effect.participantSession) state.participantSessions.set(input.participantSessionId, effect.participantSession);
+      }
+      return prepared?.result ?? null;
     },
     async applyParticipantRunCommand(input, transform) {
       const key = JSON.stringify([input.testRunId, input.commandId]);

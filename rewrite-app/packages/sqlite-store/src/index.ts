@@ -8,6 +8,7 @@ import {
   transitionParticipantPresence,
   selectParticipantAssignmentRun,
   prepareParticipantControllerActivation,
+  prepareParticipantRunMutation,
   appendParticipantRunCommand,
   acknowledgeParticipantRunCommand,
   prepareParticipantRunCommandApplication,
@@ -3363,6 +3364,36 @@ export const createSqliteFirstSliceRepository = (
           WHERE test_run_id = ? AND command_id = ?`).run(JSON.stringify(command), command.acknowledgedAt, input.testRunId, input.commandId);
         database.exec("COMMIT");
         return command;
+      } catch (error) { rollbackAfterFailure(database, error); }
+    },
+    async mutateParticipantRun(input, transform) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const testRun = mapTestRun(database.prepare("SELECT * FROM test_runs WHERE test_run_id = ?")
+          .get(input.testRunId) as Record<string, unknown> | undefined);
+        const participantSession = mapParticipantSession(database.prepare("SELECT * FROM participant_sessions WHERE participant_session_id = ?")
+          .get(input.participantSessionId) as Record<string, unknown> | undefined);
+        const testRuns = database.prepare("SELECT * FROM test_runs WHERE participant_session_id = ?").all(input.participantSessionId)
+          .map(row => mapTestRun(row as Record<string, unknown>)).filter((run): run is TestRun => run !== null);
+        const prepared = prepareParticipantRunMutation(input,
+          testRun && participantSession ? { testRun, participantSession, testRuns } : null, transform);
+        if (prepared?.effect) {
+          const effect = prepared.effect;
+          persistTestRun(database, effect.testRun);
+          for (const log of effect.testLogs) database.prepare(`INSERT INTO participant_test_logs
+            (participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at, original_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(participant_test_log_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, participant_session_id = excluded.participant_session_id, test_run_id = excluded.test_run_id, unit_key = excluded.unit_key, original_unit_id = excluded.original_unit_id, log_key = excluded.log_key, log_content = excluded.log_content, timestamp = excluded.timestamp, recorded_at = excluded.recorded_at, original_timestamp = excluded.original_timestamp`).run(log.participantTestLogId, log.tenantId, log.workspaceId,
+              log.participantSessionId, log.testRunId, log.unitKey, log.originalUnitId, log.logKey, log.logContent,
+              log.timestamp, log.recordedAt, log.originalTimestamp ?? null);
+          for (const event of effect.activityEvents) database.prepare(`INSERT INTO workspace_activity_events
+            (activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(activity_event_id) DO UPDATE SET tenant_id = excluded.tenant_id, workspace_id = excluded.workspace_id, event_type = excluded.event_type, actor_id = excluded.actor_id, subject_type = excluded.subject_type, subject_id = excluded.subject_id, occurred_at = excluded.occurred_at, summary = excluded.summary, details_json = excluded.details_json`).run(event.activityEventId, event.tenantId, event.workspaceId,
+              event.eventType, event.actorId, event.subjectType, event.subjectId, event.occurredAt, event.summary, JSON.stringify(event.details));
+          if (effect.participantSession) database.prepare("UPDATE participant_sessions SET status = ? WHERE participant_session_id = ?")
+            .run(effect.participantSession.status, input.participantSessionId);
+        }
+        database.exec("COMMIT");
+        return prepared?.result ?? null;
       } catch (error) { rollbackAfterFailure(database, error); }
     },
     async applyParticipantRunCommand(input, transform) {
