@@ -22,6 +22,13 @@ visual/property/package and lifecycle acceptance, LOADING wire/log observation,
 old-backend compatibility, route/tab ownership, measured performance and production
 rollout remain open. See [the current contract and proof boundaries in PARITY](./PARITY.md#participant-console-before-the-first-unit-view-2026-10-12).
 
+Application checkpoint `7fdff889a3bd` also passed all three PostgreSQL container
+profiles, SQLite runtime and all 320 read-only image checks as `node`. Its clean
+archive's 888 tracked files were hash-verified and the archive removed. The 24
+existing containers, all mount fields, 85 volumes, protected presentation and host
+TypeScript package remain intact, with about 8.95 GB free. The local proof preserves
+307 verified evidence files; remote CI and production acceptance remain unverified.
+
 ### Native Resume accessibility (2026-10-12)
 
 Native Resume now applies the pinned UnitActivateGuard next-accessible-Unit

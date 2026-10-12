@@ -34,6 +34,16 @@ save/retry, Player exit, completeness and paused-exit browser cases also pass. A
 now includes both browser gates; YAML and command resolution were checked, but
 remote execution is not verified.
 
+Application checkpoint `7fdff889a3bd` additionally passed Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 320 transaction/API
+checks in the read-only image as `node`, with no skips or cancellations. Its clean
+Git archive contained 888 hash-verified tracked files and no host dependencies or
+protected presentation. All 24 existing containers, every mount field, 85 volumes
+and the protected presentation/host TypeScript hashes were preserved. Owned test
+resources and the archive were removed; about 8.95 GB of host space remains.
+The local proof contains 307 hash-verified evidence files. This is a local application
+checkpoint; no remote CI, publication, release, deployment or production proof follows.
+
 The native wire observation still has only RUNNING/PAUSED/ERROR: early LOADING log
 parity is separate. The new context route currently has no old-backend fallback.
 Actual route-destruction journal cancellation, cloned-tab owner identity, early
