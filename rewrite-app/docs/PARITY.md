@@ -43,8 +43,18 @@ Fresh local validation passed 1,839 unit/frontend tests, 1,231 PostgreSQL tests,
 typecheck and the production build (469.99 kB under the unchanged 470 kB limit),
 and all thirteen protected Chromium/SQLite Debug/native groups. Pinned Original
 root/restore methods and actual preparation/staging methods gate the arguments,
-timer balance rules and absence of fabricated answers. The existing complete
-browser matrix and clean-archive container evidence require their own receipts.
+timer balance rules and absence of fabricated answers. Application checkpoint
+`6253dd500773` also passed all 147 existing browser cases, 498 Memory/File/SQLite
+HTTP checks and 61 compatibility checks. Its hash-verified clean Git archive
+contained 886 tracked files; all three PostgreSQL container profiles, SQLite
+runtime and 310 transaction/API checks in the read-only image as `node` passed.
+All 24 existing containers, every mount field, 85 volumes, the protected
+presentation and host TypeScript package were preserved. Owned test resources
+and the archive were safely removed; about 10.36 GB of host space remains.
+
+An additional owned probe confirms a remaining Source gap: Native Resume still
+retains an inaccessible current Unit instead of applying UnitActivateGuard's
+next-accessible-Unit redirect. This guard must cover Resume as well as Goto.
 Full Source controller lifetime/late server effects, early-loading ERROR,
 complete property/visual/real-package acceptance, measured performance, mixed
 version rollout, remote CI, release, deployment and production confirmation

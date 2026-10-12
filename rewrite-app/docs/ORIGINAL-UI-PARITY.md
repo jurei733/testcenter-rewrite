@@ -16,7 +16,16 @@ creating an empty answer or response clock. Foreground/worker/reload preserve th
 marker, and older workers do not accept their version-2 message/entry as answers.
 Legacy answer packets retain their former version and identity. All 1,839 local
 tests, 1,231 PostgreSQL tests, typecheck, 469.99 kB production build and thirteen
-Chromium/SQLite groups passed. Full Original live/property/visual/package and
+Chromium/SQLite groups passed. Checkpoint `6253dd500773` additionally passed
+all 147 existing browser cases, 498 HTTP and 61 compatibility checks, three
+PostgreSQL container profiles, SQLite runtime and 310 read-only image checks as
+`node`. Its clean archive's 886 files were verified and the archive removed.
+All 24 existing containers, every mount field, 85 volumes and the protected
+presentation retain their identities/hashes; about 10.36 GB of host space remains.
+
+Native Resume's redirect from an inaccessible current Unit remains a confirmed
+gap, recorded by an owned probe against the pinned UnitActivateGuard.
+Full Original live/property/visual/package and
 controller-lifetime acceptance, performance and production rollout remain open.
 See [the current contract and evidence in PARITY](./PARITY.md#native-participant-console-commands-and-log-only-delivery-2026-10-12).
 
