@@ -1,5 +1,59 @@
 # Optional Original UI
 
+### Accepted commands while the next Unit view loads (2026-10-12)
+
+Application checkpoint `6b4ae9daa478` projects a verified remote application
+receipt before fetching its next full Unit view. An already accepted Pause,
+Resume or Goto therefore does not wait behind an older held view. The transport
+validates all six immutable Run scope fields and the actual returned status;
+local view generations fence superseded replies. A terminal runtime reply is
+re-read when a newer native entry arrived while it was pending, retaining that
+entry instead of closing it with the older receipt. Existing ERROR presentation
+and its scoped recovery behavior remain covered by the original regression gates.
+
+When the confirmed selection and loaded Unit metadata differ, the old Player is
+retired without remounting it. Its existing scoped listener can still process
+already queued reports; a new Player waits for the target metadata. Text drafts
+and Save remain disabled during that mismatch. Durable response-only delivery
+now finishes independently of its subsequent view refresh, so a held refresh
+cannot strand a later foreground answer drain or termination. The browser gate
+uses actual input in the authenticated former frame while the native Goto receipt
+is held, then verifies its final answer, termination and absence of any fabricated
+target-Unit answer. It does not claim post-unload message delivery.
+
+The pinned Original `ee2ab9ab64bd` dispatches acknowledged commands without
+awaiting the previous component handler. Its fresh LOADING state does not open
+reception, whereas an already open endpoint survives LOADING. This checkpoint
+addresses the accepted-receipt/view boundary; it does not infer permission to
+start a remote channel from a merely running canonical Run.
+
+All 1,952 unit/frontend tests, 1,266 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB initial hard limit. Twelve loading
+and command groups pass both headful and with CI=true; fourteen Debug, five
+route, ten copied-tab/crash and five context groups also pass. Five compatibility
+groups pass against the actual older API image `9b099ecc69ee`. All eighteen ERROR
+variants pass headful, including the native theme/viewport cases and accepted
+Pause with a held older answer. The preceding production frontend `1fd4aa257c28`
+fails the new held-view Pause projection assertion.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 337 transaction/API tests
+in the read-only container as node. Existing 24 containers, all mount fields,
+85 volumes, 235 preexisting image aliases and protected files are preserved;
+dependency installation layers are reused. The owned clean archive is removed
+after verification. API, schemas, manifests and workflow are unchanged here.
+The prior backend-first entry-capability rollout requirement still applies;
+older-API checks do not prove new startup-log semantics or full mixed-version rollout.
+
+This is a local checkpoint. Source-equivalent early reception, controller
+replacement activation, post-unload Player delivery, cross-document late effects
+and global Run ordering remain open. Terminal runtime reconciliation can still
+delay following received commands. Actual frontend upgrades, complete visual and
+real-package acceptance, measured performance, mixed-version rollout, remote CI,
+release, deployment and production proof remain separate work. Full Original
+parity and production readiness are not established.
+
 ### Initial controller lifecycle buffering (2026-10-12)
 
 Application checkpoint `1fd4aa257c28` records LOADING and the initial ready,
