@@ -1,5 +1,48 @@
 # Optional Original UI
 
+### Native LOADING observations and transition logs (2026-10-12)
+
+Native terminal packets now distinguish an authorized controller still in LOADING
+from a server Run that is already running. Debug and command observation use the
+same loading projection, retaining the existing ERROR and PAUSED precedence.
+The prepared packet keeps its exact status, timestamp and delivery identity across
+reload and retry. The API accepts LOADING and logs a real transition to RUNNING
+for early Resume even when the canonical Run was already running; an already
+committed server pause still controls the paused termination variant. Execution
+modes retain their response/log filtering. Answers, field clocks, immutable scope,
+sibling Runs and the remote queue remain protected by the existing transaction.
+
+A new protected browser case holds both the initial full view and the resumed view,
+observes LOADING on the actual HTTP request, checks the single RUNNING transition
+and command log, then releases the real Player. It fails against the preceding
+production bundle with actual RUNNING / expected LOADING. The final loading gate
+passes all seven groups headful and with CI=true, including the full observed
+LOADING/PAUSED/RUNNING/ERROR command sequence. The fourteen Debug, five route,
+ten copied-tab/crash and five context-fallback groups also pass. All 1,897 local
+unit/frontend tests, 1,252 PostgreSQL tests and 498 Memory/File/SQLite HTTP tests
+pass without skips or cancellations. Typecheck and the production build pass;
+the initial bundle remains 469.99 kB under the unchanged 470 kB hard limit.
+Five further browser groups pass with the actual older API image `9b099ecc69ee`,
+covering its authenticated context fallback and existing native status values.
+
+Application checkpoint `bfc07884cd23` additionally passes Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 326 transaction/API
+tests in the read-only image as `node`. Its clean archive contains 892 hash-verified
+tracked files without host dependencies or the protected presentation. The image
+build reuses both dependency installation layers. Existing 24 containers and all
+85 volumes are retained; the final preservation report verifies their mount fields,
+existing image tags and protected file hashes separately. This is local evidence;
+remote CI, publication, release, deployment and production remain unverified.
+
+Remaining Original controller lifecycle acceptance includes initial buffering,
+remote early-loading reception, replacement activation and late effects.
+New LOADING packets require
+the updated API; deploy the accepting backend before the frontend. Existing
+RUNNING/PAUSED/ERROR packets and their receipt fingerprints remain supported.
+The older-API context fallback does not prove support for new LOADING packets.
+Full visual/property/real-package acceptance, actual frontend upgrades, measured
+performance, remote CI, release, deployment and production acceptance remain open.
+
 ### Native commands after a browser-process crash (2026-10-12)
 
 The pinned Original `CommandService.commandFromTerminal` creates an ephemeral
