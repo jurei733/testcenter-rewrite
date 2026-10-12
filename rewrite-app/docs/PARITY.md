@@ -1,5 +1,47 @@
 # Testcenter parity checklist
 
+### Initial controller lifecycle buffering (2026-10-12)
+
+Application checkpoint `1fd4aa257c28` records LOADING and the initial ready,
+paused or failed state without requiring a loaded Unit, a response or the answer
+outbox. The pinned Original loader sets LOADING before awaiting test data and its
+root component subscribes controller changes to the independent test-state buffer.
+The new browser advertises `controllerLifecycle: browser-v1` on all three entry
+paths; the API suppresses only the synthetic entry RUNNING log for this client.
+Clients without this field retain their existing entry behavior. Timer, activation,
+audit, response and field-clock transactions are unchanged.
+
+The initial log journal binds all six authorized scope fields, retains exact event
+IDs and timestamps across retry/reload, uses fresh credentials without storing them,
+and leaves other scopes and unrelated storage untouched. Native receipts and the
+existing durable Player log path suppress duplicate status entries. After the first
+full view, those established paths own later transitions. Non-saving modes do not
+persist these logs. No INIT event is fabricated from the Original subscription,
+whose pre-test emissions are filtered by its test-state buffer.
+
+All 1,926 unit/frontend tests, 1,266 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass; the initial bundle remains 469.99 kB under the unchanged 470 kB hard limit.
+Eight loading groups pass both headful and with CI=true, including pre-Unit ERROR
+and lost-receipt replay across a real reload with one server entry per original ID.
+Fourteen Debug, five route, ten copied-tab/crash and five context-fallback groups
+also pass. The prior production frontend fails the new initial-loading assertion
+with actual RUNNING / expected LOADING. Five compatibility groups pass against
+the actual older API image `9b099ecc69ee`.
+
+A fresh image built from 892 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 337 transaction/API tests
+in the read-only container as node. Existing 24 containers, 85 volumes, image
+aliases and protected files are preserved; both dependency installation layers
+are reused. The owned clean archive is verified and removed after validation.
+Deploy the accepting API before the frontend: old-API compatibility checks cover
+existing context/native contracts, not the new startup-log semantics.
+
+This remains a local checkpoint. Remote early-loading reception, replacement
+activation and late effects, complete visual/real-package/performance acceptance,
+mixed-version rollout, remote CI, release, deployment and production proof remain
+open. Full Original parity and production readiness are not established.
+
 ### Native LOADING observations and transition logs (2026-10-12)
 
 Native terminal packets now distinguish an authorized controller still in LOADING
