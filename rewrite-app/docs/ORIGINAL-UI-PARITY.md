@@ -1,5 +1,60 @@
 # Optional Original UI
 
+### Scoped controller entry and sibling-independent reception (2026-10-12)
+
+Application checkpoint `23af86e57514`, following persistence checkpoint
+`ef01973312a5`, stores optional controller entry evidence on each Run. Entry
+and termination flips advance its validated revision inside the same atomic
+mutation as the selected Run and parent effects. Response-only projections and
+replayed receipts preserve the current evidence. The revision orders activity
+flips only; it does not establish a global order for every command or answer.
+Memory, File, SQLite and PostgreSQL preserve answers and response clocks;
+SQL migration failures roll back and can be retried. Legacy rows omit the field.
+
+An already loaded terminated controller can reopen after a fresh authorized
+RUNNING or PAUSED view proves a newer active entry for that same Run. Starting
+a sibling cannot reopen it. Conversely, ending a sibling cannot close the
+selected active Run even when the shared parent becomes signed_in. Server
+stream registration, polling and atomic lease renewal follow the selected
+entry; closed, expired, completed, foreign and terminated entries remain denied.
+Legacy streaming still requires a launched parent. Initial LOADING context
+alone still cannot open reception. Terminal reconciliation validates the exact
+selected context and rejects missing, malformed or contradictory evidence.
+Older replayed termination receipts cannot terminate a newer active entry.
+
+The browser gate holds a terminal read in one actual page, resumes or pauses
+through another, closes that page, then verifies the first page alone applies
+a new remote command. It also launches and terminates a sibling through its
+own accepted commands in the paused case. Its answers and clocks stay exact;
+only that owned sibling fixture is restored before later independent groups.
+The immutable preceding frontend image `03269a457d80` fails at the new paused
+reception assertion. An earlier followup exposed a real server rejection after
+a sibling exit; the final API, store and browser tests verify its correction.
+
+All 2,020 unit/frontend, 1,290 PostgreSQL and 498 Memory/File/SQLite HTTP tests
+were executed fresh and pass without skips or cancellations. Typecheck and
+production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+Sixteen loading/command groups pass headful and with CI=true; fourteen Debug,
+five route, ten copied-tab, five context and five actual older-API groups pass.
+All eighteen ERROR variants pass headful. Existing build warnings remain.
+
+A fresh image from 893 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 371 transaction/API tests
+in the read-only container as node. All 24 preexisting containers, immutable
+image IDs, states and every mount field, 85 volumes, 275 preexisting image
+aliases and protected files are preserved; ten image aliases were added.
+Owned runtime, database and archive resources are removed. Backend-first
+rollout is required for SQLite schema 64/PostgreSQL schema 58 and the entry
+semantics. Older-API tests cover context/native compatibility, not a complete
+mixed-version rollout of the new server behavior.
+
+Full Original parity and production readiness remain unproven. Source-equivalent
+initial loading and controller replacement, fully overlapping command application,
+global/cross-document ordering, post-unload Player effects, worker/mixed-version
+rollout, real-package and visual acceptance, measured performance, remote CI,
+release, deployment and production acceptance remain open. This checkpoint is
+local and not pushed.
+
 ### Reception after external controller reentry (2026-10-12)
 
 Application checkpoint `1e839d66419d` restores command reception when a fresh,
