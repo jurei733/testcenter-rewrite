@@ -10,7 +10,12 @@ All 1,852 local tests, 1,239 PostgreSQL tests, typecheck, the 469.99 kB producti
 build and fourteen protected Chromium/SQLite groups passed. The added browser
 case verifies the real paused Player, authenticated redirect, exact saved answers
 and clocks, retained Unit lock and reentry. Original resume/navigation/guard
-methods execute directly in pinned reference tests. Full controller lifetime,
+methods execute directly in pinned reference tests. Checkpoint `9b099ecc69ee`
+also passed all three PostgreSQL container profiles, SQLite runtime and 316
+checks in the read-only image as `node`; the clean archive's 886 file hashes
+were verified and the archive removed. All 24 existing containers, every mount
+field, 85 volumes and protected hashes remain intact, with about 9.52 GB free.
+Full controller lifetime,
 early ERROR, live visual/property/package acceptance, performance and production
 rollout remain open. See [the current contract and evidence in PARITY](./PARITY.md#native-resume-entry-guard-2026-10-12).
 

@@ -23,6 +23,17 @@ the participant HTTP route and verifies redirect, retained locks, exact answers
 and clocks, no remote command queue and successful reentry. Cross-store checks
 also verify repeat/restart receipts and expired/hidden countdown selection.
 
+Application checkpoint `9b099ecc69ee` additionally passed Standard, Demo and
+production PostgreSQL container profiles, SQLite runtime and all 316
+transaction/API checks in the read-only image as `node`. Its clean Git archive
+contained 886 hash-verified tracked files without host dependencies or the
+protected presentation. All 24 existing containers, every mount field, 85
+volumes and the presentation/host TypeScript hashes were preserved. Owned test
+resources and the archive were removed; approximately 9.52 GB of host space
+remains. The prior 147 browser, 498 HTTP and 61 compatibility checks remain
+predecessor evidence; all frontend source hashes match that checkpoint. Those
+three suites were not repeated for this backend guard follow-up.
+
 The remaining frontier includes early-loading command lifetime/ERROR, late
 server effects versus replacement-controller activation, complete Original
 property/visual/real-package acceptance, measured performance, mixed-version
