@@ -1,5 +1,48 @@
 # Optional Original UI
 
+### Terminal presentation and received-command lifecycle (2026-10-12)
+
+Application checkpoint `56cc13512b02` finishes verified native and remote
+terminal effects independently of the later Starter runtime read. New reception
+stops immediately while already accepted receipts survive. An accepted Pause,
+Resume or Goto of an already loaded controller can reopen reception before its
+next Unit view arrives. A lightweight initial LOADING context still cannot do so.
+Transient presentation failures retry independently; abort and scope replacement
+end recovery, and permanent access or scope failures remain closed.
+
+The backend now reactivates the parent session atomically with an accepted Pause,
+Resume or Goto, matching the native command path. Replaying an older application
+cannot reactivate it again. Exact answers, response clocks and sibling Runs remain
+unchanged. An identical ordinary Run refresh no longer fences a confirmed command;
+changed answers, selection or state still do. Terminal reconciliation leaves a
+newer local receipt in control of its own Unit refresh.
+
+All 1,975 unit/frontend tests, 1,269 PostgreSQL tests and 498 Memory/File/SQLite
+HTTP tests pass without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Fourteen loading/command
+groups pass headful and with CI=true; fourteen Debug, five route, ten copied-tab,
+five context and five actual older-API groups pass. All eighteen ERROR variants
+pass headful. The previous production frontend `6b4ae9daa478` fails the held
+terminal-presentation assertion; its backend fails the three new parent
+reactivation cases. A separate negative unit control reproduces the identical-view
+Goto failure before the fix.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and all 340 transaction/API tests
+in the read-only container as node. Existing 24 containers including image IDs,
+state and every mount field, 85 volumes, 245 preexisting image aliases and the
+protected files are preserved. Owned database, container and archive resources
+are removed. Contracts, schemas, manifests and workflow are unchanged; backend
+semantics changed. Backend-first rollout remains required. Older-API checks prove
+the existing context/native entry contracts, not the new remote parent behavior.
+
+Full Original parity and production readiness remain unproven. Open work includes
+initial loading and controller replacement activation, fully overlapping command
+application and global Run ordering, post-unload Player delivery and cross-document
+effects, complete mixed-version/worker rollout, real-package/visual acceptance and
+measured performance. Remote CI, release, deployment and production acceptance
+are outstanding. This checkpoint is local and has not been pushed.
+
 ### Accepted commands while the next Unit view loads (2026-10-12)
 
 Application checkpoint `6b4ae9daa478` projects a verified remote application
