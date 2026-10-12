@@ -1,5 +1,47 @@
 # Testcenter parity checklist
 
+### Participant console before the first Unit view (2026-10-12)
+
+The pinned Original command service binds its terminal methods before the root
+controller awaits `loadTest`. The participant route now binds all five methods
+at mount time. They cannot dispatch, open Debug or log without a server-authorized
+selected Run. A participant-owned, private/no-store controller-context GET supplies
+the actual Session and Run before the complete Unit view. Explicit selection keeps
+all six scope identities; legacy selection uses the existing authorized selector.
+The read returns no Unit definitions and changes no answers, clocks, logs, audit,
+command queue or receipts. It includes the saved Run answers and is not a
+constant-size payload.
+
+Early Debug shows LOADING, PAUSED or ERROR using verified Run data. Native receipts
+update reactive state immediately, while full-view refresh runs separately from
+the ordered command transport. Older loading/paused/Goto replies cannot revert a
+newer receipt or resurrect a terminated Player. Trusted reports tagged with the
+former Unit still drain; an untouched or stale shell cannot become a new Unit
+answer. Exact entry URLs synchronize before initial loading, so a failed first
+load and a document reload retain the selected Run. Native Resume clears the early
+error and loads that Run; termination can retain the Source lock and return to
+Starter before any Player was loaded. The Original surface styles load before
+the first Player, hiding technical summaries during loading; no Unit metadata is
+fabricated for the presentation.
+
+All 1,874 unit/frontend tests, 1,244 PostgreSQL tests, 498 Memory/File/SQLite HTTP
+checks and 61 compatibility checks passed. Typecheck and production build passed,
+with 469.99 kB under the unchanged 470 kB hard limit and existing warnings retained.
+Six protected Chromium/SQLite loading groups cover held replies, early pause/resume,
+trusted old-Unit drain, failed first load, reload context and locked termination.
+The fourteen existing Debug/native groups and all 147 existing termination,
+save/retry, Player exit, completeness and paused-exit browser cases also pass. A non-optional CI matrix job
+now includes both browser gates; YAML and command resolution were checked, but
+remote execution is not verified.
+
+The native wire observation still has only RUNNING/PAUSED/ERROR: early LOADING log
+parity is separate. The new context route currently has no old-backend fallback.
+Actual route-destruction journal cancellation, cloned-tab owner identity, early
+remote-command lifetime, replacement activation and late server effects remain
+open. Complete live Original visual/property/real-package acceptance, measured
+large-package performance, mixed-version rollout and external production acceptance
+remain required. No full parity, push, remote CI, release or deployment is claimed.
+
 ### Native Resume entry guard (2026-10-12)
 
 Native Resume now enters the same accessibility projection as Goto. An

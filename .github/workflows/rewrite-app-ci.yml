@@ -65,6 +65,9 @@ jobs:
           - check: ui-quick
             command: npm run ci:browser:quick
             playwright: true
+          - check: ui-participant-console
+            command: npm run build && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built
+            playwright: true
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness
             playwright: true

@@ -39,10 +39,11 @@ const fixture=()=>{
   bookletAssetLoadStartedAtMs:new Map(),loadedBookletAssets:()=>null,
   loadBookletAssets:()=>{calls.assets++;return assets.promise;},recordLoadedBookletAssets(){},
   shouldPreserveCurrentTextDraft:()=>false,syncCurrentRunState(value){calls.applied++;this.current=value;},
-  syncCurrentUnitResponse(){},reconcileOptimisticVeronaResponse(){},restorePersistentVeronaSave(){},
+  syncRun(){},syncCurrentUnitResponse(){},reconcileOptimisticVeronaResponse(){},restorePersistentVeronaSave(){},
   persistLoadCompleteLog(){},loadBookletAssetsInBackground(){},refreshParticipantReviewsInternal:async()=>{},
   persistState(){},refreshFromParticipantEvents(){}
  });
+ Object.defineProperty(host,"consoleRun",{get(){return this.current?.testRun ?? null;}});
  return {host,calls,request,assets};
 };
 const ownedError={testRunId:"selected-run",unitKey:"selected-unit",message:"Owned error"};

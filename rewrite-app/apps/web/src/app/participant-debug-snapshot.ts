@@ -4,14 +4,14 @@ import { participantDebugStateRoute } from "@testcenter-rewrite-app/contracts/pa
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 import { withSelectedParticipantRun } from "./participant-session-links";
 
-export const participantDebugScopeKey = (state: ParticipantCurrentRunState): string => JSON.stringify([
+export const participantDebugScopeKey = (state: Pick<ParticipantCurrentRunState, "testRun">): string => JSON.stringify([
   state.testRun.tenantId, state.testRun.workspaceId, state.testRun.participantSessionId,
   state.testRun.testRunId, state.testRun.contentReleaseId, state.testRun.bookletKey
 ]);
 
 /** Reject late/foreign data before exposing definitions, coding schemes or responses. */
 export const readParticipantDebugSnapshot = async (
-  state: ParticipantCurrentRunState, signal: AbortSignal
+  state: Pick<ParticipantCurrentRunState, "testRun">, signal: AbortSignal
 ): Promise<ParticipantDebugSnapshot> => {
   const run = state.testRun;
   const credential = readParticipantSessionCredential(run.participantSessionId);

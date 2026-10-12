@@ -1,5 +1,27 @@
 # Optional Original UI
 
+### Console and Debug during initial loading (2026-10-12)
+
+All five terminal methods now bind before the first complete Unit view, matching
+the pinned Original command/root initialization order. Dispatch and Debug still
+require a server-authorized selected Run. A read-only participant controller-context
+route supports a new document whose full Unit request fails, without inventing
+Unit data or responses. Native receipts update early LOADING/PAUSED/ERROR display;
+older full-view replies cannot restore a paused or terminated frame. Resume recovers
+the selected Run after an initial load error, and the exact entry URL is written
+before loading. Trusted old-Unit reports drain without creating a next-Unit answer.
+Original surface styles now load before the Player and hide technical summaries
+while the existing loading/paused views are displayed.
+
+All 1,874 local tests, 1,244 PostgreSQL tests, 498 HTTP and 61 compatibility checks,
+typecheck and the 469.99 kB production build pass under the unchanged hard limit.
+Six loading/error Chromium groups, fourteen existing Debug/native groups and
+all 147 existing browser regression cases pass;
+the CI matrix includes both gates, with remote execution unverified. Full Original
+visual/property/package and lifecycle acceptance, LOADING wire/log observation,
+old-backend compatibility, route/tab ownership, measured performance and production
+rollout remain open. See [the current contract and proof boundaries in PARITY](./PARITY.md#participant-console-before-the-first-unit-view-2026-10-12).
+
 ### Native Resume accessibility (2026-10-12)
 
 Native Resume now applies the pinned UnitActivateGuard next-accessible-Unit

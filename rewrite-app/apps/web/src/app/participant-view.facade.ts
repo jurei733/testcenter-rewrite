@@ -1,5 +1,5 @@
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
-import type { ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import type { ParticipantControllerContext, ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { Injectable, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -338,7 +338,7 @@ export class ParticipantViewFacade {
   }
 
   get isParticipantStarter(): boolean {
-    return !this.isParticipantLogin && !this.currentRunState && !this.hasControllerError;
+    return !this.isParticipantLogin && !this.consoleRun && !this.currentRunState && !this.hasControllerError;
   }
 
   get noAssignedBookletsLabel(): string {
@@ -489,15 +489,31 @@ export class ParticipantViewFacade {
   private readonly commandReloadSequence = signal(0);
   private remoteTerminalErrorRunId: string | null = null;
   private commandControllerState: { testRunId: string; status: string } | null = null;
+  private readonly consoleTestRun = signal<TestRun | null>(null);
+  get consoleRun(): TestRun | null {
+    const run = this.consoleTestRun();
+    return run?.participantSessionId === this.runtime.participantSessionId &&
+      run.testRunId === this.runtime.testRunId ? run : null;
+  }
   get consoleControllerGeneration(): number { return this.viewLifecycleSequence; }
+  get debugControllerStatus(): string {
+    const run = this.consoleRun;
+    const command = this.commandControllerState?.testRunId === run?.testRunId ? this.commandControllerState : null;
+    if (run?.status === "paused" && command?.status.startsWith("TERMINATED")) return command.status;
+    if (this.hasControllerError) return "ERROR";
+    if (run?.status === "paused") return "PAUSED";
+    if (run?.status === "completed") return "TERMINATED";
+    return command?.status === "RUNNING" || this.debugRunState && !this.eagerBookletLoading ? "RUNNING" : "LOADING";
+  }
   async prepareNativeConsoleCommand(isCurrent: () => boolean): Promise<void> {
+    if (!this.debugRunState) return;
     const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
-    const state = this.readCurrentRunState();
+    const state = this.debugRunState;
     const response = this.runtime.currentUnitResponse;
     const draftChanged = response !== (state?.testRun.unitResponses[state.currentUnit.unitKey ?? ""] ?? "");
     // Trusted pending Player reports were drained above. An untouched loading
     // shell is not an answer and must not be introduced by a console action.
-    if (isCurrent() && draftChanged && (!parseVeronaUnitResponse(response) || hasMeaningfulVeronaResponse(response))) {
+    if (state && state.currentUnit.unitKey === this.consoleRun?.currentUnitKey && isCurrent() && draftChanged && (!parseVeronaUnitResponse(response) || hasMeaningfulVeronaResponse(response))) {
       await this.saveCurrentDraftBeforeCompleteInternal(settled);
     }
   }
@@ -507,6 +523,7 @@ export class ParticipantViewFacade {
   }
   async applyNativeConsoleCommand(result: ParticipantNativeCommandResult, isCurrent: () => boolean): Promise<void> {
     if (!isCurrent()) return;
+    this.invalidateCurrentStateRefreshes();
     const terminal = result.keyword === "terminate" && result.participantSession.status === "signed_in" && result.testRun.status === "paused";
     this.syncRun(result.testRun);
     this.commandControllerState = { testRunId: result.testRun.testRunId,
@@ -519,14 +536,15 @@ export class ParticipantViewFacade {
       await this.replaceSelectedRunEntryLink();
       return;
     }
-    await this.refreshCurrentStateInternal(true, true);
-    if (!isCurrent()) return;
-    if ((result.keyword === "resume" || result.keyword === "goto") && this.readCurrentRunState()?.testRun.status === "running") {
-      this.participantErrorReceptionSuspended = false;
+    this.participantErrorReceptionSuspended = false;
+    if ((result.keyword === "resume" || result.keyword === "goto") && result.testRun.status === "running") {
       this.activeControllerError.set(null);
       this.remoteTerminalErrorRunId = null;
       this.commandReloadSequence.update(sequence => sequence + 1);
     }
+    void this.refreshCurrentStateInternal(true, true).catch(error => {
+      if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+    });
   }
   private readonly receiveParticipantCommand = (command: ParticipantRunCommand, signal: AbortSignal): Promise<void> =>
     this.applyReceivedParticipantCommand(command, signal);
@@ -600,6 +618,7 @@ export class ParticipantViewFacade {
 
   get isParticipantPlayerFocused(): boolean {
     const currentState = this.readCurrentRunState();
+    if (!currentState) return Boolean(this.consoleRun && this.consoleRun.status !== "completed");
     return Boolean(
       currentState &&
         currentState.testRun.status !== "completed" &&
@@ -627,6 +646,8 @@ export class ParticipantViewFacade {
 
   destroy(): void {
     this.viewLifecycleSequence += 1;
+    this.consoleTestRun.set(null);
+    this.commandControllerState = null;
     this.remoteTerminalErrorRunId = null;
     // Stopping event delivery does not cancel requests already in flight.
     // Their responses must not restore participant scope after a route change.
@@ -832,7 +853,9 @@ export class ParticipantViewFacade {
   }
 
   get debugRunState(): ParticipantCurrentRunStateResponse["currentRunState"] | null {
-    return this.readCurrentRunState();
+    const state = this.readCurrentRunState(), run = this.consoleRun;
+    return state && run && (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+      .every(key => state.testRun[key] === run[key]) ? state : null;
   }
 
   get debugResponseCaptures() {
@@ -843,6 +866,9 @@ export class ParticipantViewFacade {
     const currentState = this.readCurrentRunState();
     if (!currentState) {
       const hasParticipantSession = Boolean(this.runtime.participantSessionId.trim());
+      const controller = this.consoleRun;
+      const mode = controller ? participantExecutionModeDefinitions[controller.executionMode ?? defaultParticipantExecutionMode] : null;
+      const booklet = controller ? this.assignedBooklets.find(entry => entry.bookletKey === controller.bookletAssignmentKey || entry.sourceBookletKey === controller.bookletKey) : null;
       return {
         headline: hasParticipantSession
           ? "Session ready"
@@ -862,15 +888,15 @@ export class ParticipantViewFacade {
         groupLabel: this.participantGroupLabel || this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
         sessionEntryLink: this.createParticipantSessionEntryLink(),
-        bookletLabel: "No booklet loaded",
+        bookletLabel: booklet?.displayLabel ?? "No booklet loaded",
         unitLabel: "No unit loaded",
         unitDescription: "No unit description available yet.",
         unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
         unitNavigationLabel: "",
-        executionMode: "n/a",
-        executionModeLabel: "No execution mode loaded",
+        executionMode: mode?.mode ?? "n/a",
+        executionModeLabel: mode?.label ?? "No execution mode loaded",
         responsePersistenceLabel: "No run loaded",
         unitOverviewLabel: "No units loaded",
         unitItems: [],
@@ -885,7 +911,7 @@ export class ParticipantViewFacade {
         isComplete: false,
         previousUnitKey: null,
         nextUnitKey: null,
-        runStatus: hasParticipantSession ? "signed_in" : "idle",
+        runStatus: controller?.status ?? (hasParticipantSession ? "signed_in" : "idle"),
         runId: this.runtime.testRunId.trim() || "no run yet",
         nextStepLabel: hasParticipantSession ? "Start test" : "Sign in",
         nextStepDetail: hasParticipantSession
@@ -1396,7 +1422,7 @@ export class ParticipantViewFacade {
 
   get bookletLoadedUnitCount(): number {
     return this.readCurrentRunState()?.testRun.status === "completed" ||
-      this.hasControllerError
+      this.hasControllerError || this.loadedBookletAssets()?.testRunId !== this.consoleRun?.testRunId
       ? 0
       : (this.loadedBookletAssets()?.assets?.units.length ?? 0);
   }
@@ -1541,6 +1567,7 @@ export class ParticipantViewFacade {
 
   get eagerBookletLoading(): boolean {
     const currentState = this.readCurrentRunState();
+    if (!currentState && this.consoleRun) return true;
     return Boolean(
       currentState?.booklet.policy.player.loadingMode === "eager" &&
         this.loadedBookletAssets()?.testRunId !== currentState.testRun.testRunId
@@ -1548,7 +1575,7 @@ export class ParticipantViewFacade {
   }
 
   get isRunPaused(): boolean {
-    return this.readCurrentRunState()?.testRun.status === "paused";
+    return (this.readCurrentRunState()?.testRun ?? this.consoleRun)?.status === "paused";
   }
 
   get isMonitorPaused(): boolean {
@@ -1564,12 +1591,12 @@ export class ParticipantViewFacade {
   }
 
   get hasControllerError(): boolean {
-    const currentState = this.readCurrentRunState();
+    const testRun = this.consoleRun ?? this.readCurrentRunState()?.testRun;
     const controllerError = this.activeControllerError();
     return Boolean(
-      currentState &&
-        currentState.testRun.status !== "completed" &&
-        controllerError?.testRunId === currentState.testRun.testRunId &&
+      testRun &&
+        testRun.status !== "completed" &&
+        controllerError?.testRunId === testRun.testRunId &&
         this.participantErrorReceptionSuspended
     );
   }
@@ -1583,7 +1610,7 @@ export class ParticipantViewFacade {
   get controllerError(): VeronaControllerError | null {
     const currentState = this.readCurrentRunState();
     const error = this.activeControllerError();
-    return error && (error.testRunId === currentState?.testRun.testRunId || error.testRunId === this.remoteTerminalErrorRunId) ? error : null;
+    return error && (error.testRunId === (this.consoleRun ?? currentState?.testRun)?.testRunId || error.testRunId === this.remoteTerminalErrorRunId) ? error : null;
   }
 
   get controllerErrorText(): string {
@@ -3361,6 +3388,7 @@ export class ParticipantViewFacade {
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRun(payload.testRun);
+    this.commandControllerState = null;
     this.syncRuntimeBooklets(payload.booklets);
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
@@ -3369,11 +3397,9 @@ export class ParticipantViewFacade {
       this.runtime.runtimeMonitorView
     );
     this.persistState();
+    await this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence !== this.viewLifecycleSequence || this.runtime.testRunId !== payload.testRun.testRunId) return;
     await this.refreshCurrentStateInternal(true);
-    if (lifecycleSequence === this.viewLifecycleSequence &&
-        this.runtime.testRunId === payload.testRun.testRunId) {
-      await this.replaceSelectedRunEntryLink();
-    }
   }
 
   private async downloadParticipantReviewsInternal(): Promise<"empty" | "downloaded" | undefined> {
@@ -3429,16 +3455,15 @@ export class ParticipantViewFacade {
       this.runtime.currentUnitResponse = "";
     }
     this.syncRun(payload.testRun);
+    this.commandControllerState = null;
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView
     );
     this.persistState();
+    await this.replaceSelectedRunEntryLink();
+    if (lifecycleSequence !== this.viewLifecycleSequence || this.runtime.testRunId !== payload.testRun.testRunId) return;
     await this.refreshCurrentStateInternal(true);
-    if (lifecycleSequence === this.viewLifecycleSequence &&
-        this.runtime.testRunId === payload.testRun.testRunId) {
-      await this.replaceSelectedRunEntryLink();
-    }
   }
 
   private async saveProgressInternal(
@@ -4362,8 +4387,30 @@ export class ParticipantViewFacade {
     }
 
     const refreshSequence = ++this.currentStateRefreshSequence;
+    const expectedSessionId = this.runtime.participantSessionId.trim();
+    let expectedRunId = this.runtime.testRunId;
     const loadStartedAtMs = Date.now();
     try {
+      if (!this.consoleRun) {
+        const { participantControllerContextRoute } = await import("@testcenter-rewrite-app/contracts/participant-native-command");
+        const sessionId = this.runtime.participantSessionId.trim(), requestedRunId = this.runtime.testRunId;
+        const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
+          "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
+            { participantSessionId: sessionId }), requestedRunId), undefined, { quiet });
+        if (refreshSequence < this.currentStateAppliedRefreshSequence || sessionId !== this.runtime.participantSessionId.trim() || requestedRunId !== this.runtime.testRunId) return;
+        if (!controllerContext?.testRun ||
+            (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+              .some(key => typeof controllerContext.testRun[key] !== "string" || !controllerContext.testRun[key]) ||
+            !controllerContext.testRun.unitResponses || controllerContext?.participantSession?.participantSessionId !== sessionId ||
+            controllerContext.testRun.participantSessionId !== sessionId ||
+            controllerContext.testRun.tenantId !== controllerContext.participantSession.tenantId ||
+            controllerContext.testRun.workspaceId !== controllerContext.participantSession.workspaceId ||
+            requestedRunId && controllerContext.testRun.testRunId !== requestedRunId) {
+          throw new Error("The controller context does not belong to the selected participant Run.");
+        }
+        this.syncRun(controllerContext.testRun);
+        expectedRunId = controllerContext.testRun.testRunId;
+      }
       let payload =
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
           "Participant Current State",
@@ -4378,7 +4425,11 @@ export class ParticipantViewFacade {
         this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
+      if (payload.currentRunState.participantSession.participantSessionId !== this.runtime.participantSessionId.trim() ||
+          payload.currentRunState.testRun.testRunId !== this.runtime.testRunId) return;
       const testRunId = payload.currentRunState.testRun.testRunId;
+      // The authenticated response establishes scope before eager assets finish.
+      this.syncRun(payload.currentRunState.testRun);
       if (!this.bookletAssetLoadStartedAtMs.has(testRunId)) {
         this.bookletAssetLoadStartedAtMs.set(testRunId, loadStartedAtMs);
       }
@@ -4392,6 +4443,7 @@ export class ParticipantViewFacade {
         this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
+      if (payload.currentRunState.testRun.testRunId !== this.runtime.testRunId) return;
       this.currentStateAppliedRefreshSequence = refreshSequence;
       if (payload.currentRunState.bookletAssets) {
         this.recordLoadedBookletAssets(payload, testRunId);
@@ -4447,6 +4499,7 @@ export class ParticipantViewFacade {
       }
       this.persistState();
     } catch (error) {
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
       if (refreshSequence < this.currentStateAppliedRefreshSequence ||
         this.hasControllerError && !acceptedParticipantEvent) {
         return;
@@ -4456,6 +4509,7 @@ export class ParticipantViewFacade {
         error.error === "participant_session_has_no_current_run"
       ) {
         this.participantEvents.stop();
+        this.consoleTestRun.set(null);
         this.currentRunState = null;
         this.syncParticipantHeaderVisibility();
         this.runtime.currentRunStateView = prettyPrintJson(
@@ -4464,6 +4518,14 @@ export class ParticipantViewFacade {
         );
         this.persistState();
         return;
+      }
+      if (this.requestState.isApiError(error) && [401, 403, 404].includes(error.statusCode ?? 0)) this.consoleTestRun.set(null);
+      if (!this.readCurrentRunState() && this.consoleRun) {
+        const run = this.consoleRun;
+        this.activeControllerError.set({ testRunId: run.testRunId, unitKey: run.currentUnitKey ?? "",
+          message: this.veronaErrorText, timestamp: Date.now() });
+        this.participantErrorReceptionSuspended = true;
+        this.participantEvents.suspend();
       }
       throw error;
     }
@@ -4601,6 +4663,12 @@ export class ParticipantViewFacade {
     > &
       Partial<ParticipantCurrentRunStateResponse["currentRunState"]["testRun"]>
   ): void {
+    if (testRun.participantSessionId === this.runtime.participantSessionId &&
+        testRun.tenantId && testRun.workspaceId && testRun.contentReleaseId && testRun.bookletKey && testRun.unitResponses) {
+      this.consoleTestRun.set(testRun as TestRun);
+    } else if (this.consoleRun?.testRunId === testRun.testRunId) {
+      this.consoleTestRun.set({ ...this.consoleRun, ...testRun });
+    }
     this.captureTimerLifecycleTransitions(testRun);
     if (this.currentRunState?.testRun.testRunId === testRun.testRunId) {
       this.currentRunState = {
@@ -5163,7 +5231,9 @@ export class ParticipantViewFacade {
     | ParticipantCurrentRunStateResponse["currentRunState"]
     | null {
     if (this.currentRunState) {
-      return this.currentRunState;
+      const run = this.currentRunState.testRun;
+      return run.participantSessionId === this.runtime.participantSessionId &&
+        run.testRunId === this.runtime.testRunId ? this.currentRunState : null;
     }
     try {
       const payload = JSON.parse(this.runtime.currentRunStateView) as Partial<
@@ -5171,7 +5241,7 @@ export class ParticipantViewFacade {
       >;
       this.currentRunState = payload.currentRunState ?? null;
       this.syncParticipantHeaderVisibility();
-      return this.currentRunState;
+      return this.currentRunState ? this.readCurrentRunState() : null;
     } catch {
       return null;
     }

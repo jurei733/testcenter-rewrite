@@ -14,7 +14,7 @@ const validScope = (scope: unknown): scope is Scope => Boolean(scope && typeof s
 
 /** Ordered console intents: no remote ACK, durable identity and no credentials in storage. */
 export const createParticipantNativeCommands = (options: {
-  readState: () => ParticipantCurrentRunState | null;
+  readState: () => Pick<ParticipantCurrentRunState, "testRun"> | null;
   controllerStatus: () => ParticipantNativeCommandRequest["controllerStatus"];
   generation?: () => number;
   prepare: (isCurrent: () => boolean) => Promise<void>;

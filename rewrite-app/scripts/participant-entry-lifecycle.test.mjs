@@ -26,13 +26,13 @@ const EntryHost = createEntryHost(productionApiRoutes, resolveRoutePath, value =
 const parameters = testRunId => ({ bookletKey: "BOOKLET#level:beginner", testRunId });
 const state = (mode, overrides = {}) => ({
   executionMode: { mode, saveResponses: !["run-demo", "run-review", "run-simulation"].includes(mode) },
-  testRun: { testRunId: "selected/A", bookletKey: "BOOKLET", bookletAssignmentKey: "BOOKLET#level:advanced",
+  testRun: { participantSessionId: "own-session", testRunId: "selected/A", bookletKey: "BOOKLET", bookletAssignmentKey: "BOOKLET#level:advanced",
     status: "running", locked: false, currentUnitKey: "active-unit", ...overrides }
 });
 const host = currentState => {
   const entry = new EntryHost();
   entry.viewLifecycleSequence = 1;
-  entry.runtime = { testRunId: "selected/A", bookletKey: "stale-browser-assignment" };
+  entry.runtime = { participantSessionId: "own-session", testRunId: "selected/A", bookletKey: "stale-browser-assignment" };
   entry.currentRunState = null;
   const calls = { resumed: 0, applied: 0, refreshed: 0 };
   entry.refreshCurrentStateInternal = async quiet => {
@@ -184,7 +184,8 @@ const withRouter = async (ui, action) => {
   entry.persistState = () => { calls.persisted++; };
   entry.showReloadButton = true;
   entry.viewLifecycleSequence = 1;
-  entry.currentRunState = {testRun:{testRunId:"run/A",status:"running"},currentUnit:{unitKey:"active-unit"}};
+  entry.runtime = {participantSessionId:"session/ä",testRunId:"run/A"};
+  entry.currentRunState = {testRun:{participantSessionId:"session/ä",testRunId:"run/A",status:"running"},currentUnit:{unitKey:"active-unit"}};
   entry.activeControllerError = () => error;
   const error = {testRunId:"run/A",unitKey:"active-unit",message:"Owned error"};
   entry.settleVeronaAutoSaveBeforeForegroundAction = async () => { calls.settled++; };
@@ -325,7 +326,7 @@ const launchHost = () => {
 };
 
 for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
-  test(`${method} awaits the selected Run's Router update after current-state refresh`, async () => {
+  test(`${method} awaits the authorized Run's Router update before loading current-state`, async () => {
     const { entry, calls } = launchHost();
     let finishRoute;
     let enterRoute;
@@ -336,11 +337,12 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
     const result = entry[method]().then(() => { settled = true; });
     await startedRouting;
     assert.equal(settled, false);
-    assert.equal(calls.refreshed, 1);
+    assert.equal(calls.refreshed, 0);
     assert.equal(entry.runtime.testRunId, "selected-run");
     finishRoute();
     await result;
     assert.equal(calls.routed, 1);
+    assert.equal(calls.refreshed, 1);
   });
 
   test(`${method} does not apply a late response after leaving the participant view`, async () => {
@@ -354,7 +356,7 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
   });
 
   for (const change of ["view", "run"]) {
-    test(`${method} does not route a superseded ${change} after refresh`, async () => {
+    test(`${method} does not reroute a superseded ${change} after refresh`, async () => {
       const { entry, calls } = launchHost();
       entry.refreshCurrentStateInternal = async () => {
         calls.refreshed++;
@@ -363,7 +365,7 @@ for (const method of ["starterLaunchInternal", "resumeSessionInternal"]) {
       };
       await entry[method]();
       assert.equal(calls.refreshed, 1);
-      assert.equal(calls.routed, 0);
+      assert.equal(calls.routed, 1, "Only the early authorized URL update is allowed.");
     });
   }
 }

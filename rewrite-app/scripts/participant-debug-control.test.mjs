@@ -89,3 +89,9 @@ test('cleanup restores every prior native descriptor and preserves independently
  for(const key of ['pause','resume','terminate'])assert.deepEqual(Object.getOwnPropertyDescriptor(old,key),descriptors[key]);
  assert.equal(old.goto,replacement);assert.equal(Object.hasOwn(old,'debug'),false);
 });
+test('a new controller awaiting its scope cannot send Debug to the former controller',()=>{
+ const old=fixture(),loading=fixture({window:old.window});loading.select(null);
+ try{old.window.tc.debug();assert.equal(old.state().enabled,false);assert.deepEqual(old.logs,[]);assert.deepEqual(loading.logs,[]);
+  loading.control.stop();old.window.tc.debug();assert.equal(old.state().enabled,true);assert.deepEqual(old.logs,[[]]);
+ }finally{loading.control.stop();old.control.stop();}
+});

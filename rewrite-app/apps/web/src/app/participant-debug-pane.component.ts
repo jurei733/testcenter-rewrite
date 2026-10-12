@@ -5,7 +5,7 @@ import { FormsModule } from "@angular/forms";
 import { MatTooltip } from "@angular/material/tooltip";
 import { CodingSchemeTextFactory } from "@iqb/responses";
 import { CodingScheme } from "@iqbspecs/coding-scheme";
-import type { ContentReleaseTestletEntry, ContentReleaseUnitEntry, ParticipantCurrentRunState, ParticipantDebugSnapshot } from "@testcenter-rewrite-app/domain";
+import { defaultParticipantExecutionMode, participantExecutionModeDefinitions, type ContentReleaseTestletEntry, type ContentReleaseUnitEntry, type ParticipantCurrentRunState, type ParticipantDebugSnapshot, type TestRun } from "@testcenter-rewrite-app/domain";
 import { originalParticipantCustomTextDefaults, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { buildParticipantDebugSnapshot, participantDebugConditionText, participantDebugVariableValue } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
@@ -27,7 +27,8 @@ type DebugTree = { id: string; testlet: ContentReleaseTestletEntry | null; unit:
   templateUrl: "./participant-debug-pane.component.html", styleUrl: "./participant-debug-pane.component.css"
 })
 export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
-  @Input({ required: true }) state!: ParticipantCurrentRunState;
+  @Input() state: ParticipantCurrentRunState | null = null;
+  @Input({ required: true }) run!: TestRun;
   @Input({ required: true }) control!: ParticipantDebugControl;
   @Input() activeWindows: readonly string[] = [];
   readonly view = inject(ParticipantViewFacade);
@@ -73,7 +74,7 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
   }
 
   ngDoCheck(): void {
-    const next = participantDebugScopeKey(this.state);
+    const next = participantDebugScopeKey({ testRun: this.run });
     if (next !== this.scope) {
       this.scope = next; this.source = null; this.snapshot.set(null); this.error.set("");
       this.fingerprint = ""; this.openPanes.clear(); this.testingConditionResults = [];
@@ -98,25 +99,25 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     const controller = new AbortController(), generation = ++this.generation;
     this.request = controller;
     try {
-      const source = await readParticipantDebugSnapshot(this.state, controller.signal);
+      const source = await readParticipantDebugSnapshot({ testRun: this.run }, controller.signal);
       if (this.stopped || controller.signal.aborted || generation !== this.generation ||
-        scope !== participantDebugScopeKey(this.state)) return;
+        scope !== participantDebugScopeKey({ testRun: this.run })) return;
       this.source = source; this.projectSnapshot();
     } catch (error) {
       if (!this.stopped && !controller.signal.aborted && generation === this.generation &&
-        scope === participantDebugScopeKey(this.state)) this.error.set(String(error));
+        scope === participantDebugScopeKey({ testRun: this.run })) this.error.set(String(error));
     }
   }
 
   private projectSnapshot(): void {
-    if (!this.source || this.stopped || this.scope !== participantDebugScopeKey(this.state)) return;
+    if (!this.source || this.stopped || this.scope !== participantDebugScopeKey({ testRun: this.run })) return;
     const responses = this.localResponses;
-    const fingerprint = JSON.stringify([responses, this.state.testRun.presetBookletStates, this.state.testRun.bookletStateOverrides]);
+    const fingerprint = JSON.stringify([responses, this.run.presetBookletStates, this.run.bookletStateOverrides]);
     if (fingerprint === this.fingerprint) return;
     this.fingerprint = fingerprint;
     try {
-      this.snapshot.set(buildParticipantDebugSnapshot(this.source.booklet, { ...this.state.testRun,
-        unitResponses: { ...this.state.testRun.unitResponses, ...responses } }));
+      this.snapshot.set(buildParticipantDebugSnapshot(this.source.booklet, { ...this.run,
+        unitResponses: { ...this.run.unitResponses, ...responses } }));
       this.projectLocks();
       this.tree = this.buildTree(this.source.booklet);
     } catch (error) { this.snapshot.set(null); this.error.set(String(error)); }
@@ -124,7 +125,7 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
 
   private projectLocks(): void {
     const snapshot = this.snapshot();
-    if (!snapshot || this.scope !== participantDebugScopeKey(this.state)) return;
+    if (!snapshot || !this.state || this.scope !== participantDebugScopeKey(this.state)) return;
     const fingerprint = JSON.stringify([this.state.testRun.testletTimers, this.state.testRun.unlockedTestletKeys,
       this.state.testRun.lockedTestletKeys, this.state.booklet.testlets, snapshot.adaptiveStates, this.now()]);
     if (fingerprint === this.lockFingerprint) return;
@@ -133,24 +134,24 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
   }
 
   toggleWindow(id: ParticipantDebugWindow): void { this.control.toggleWindow(id); }
-  get localResponses(): Record<string, string> { return readParticipantDebugResponses(this.state, this.view.debugResponseCaptures); }
+  get localResponses(): Record<string, string> { return this.state ? readParticipantDebugResponses(this.state, this.view.debugResponseCaptures) : this.run.unitResponses; }
   closeWindow(id: ParticipantDebugWindow): void { this.control.closeWindow(id); }
   toggleMore(id: string): void { if (this.openPanes.has(id)) this.openPanes.delete(id); else this.openPanes.add(id); }
   properties(value: unknown): Array<[string, string]> {
     return value && typeof value === "object" ? Object.entries(value).map(([key, item]) => [key, this.text(item)]) : [];
   }
   text(value: unknown): string { return value && typeof value === "object" ? JSON.stringify(value) : String(value ?? ""); }
-  get status(): string { return this.view.hasControllerError ? "ERROR" : this.state.testRun.status === "paused" ? "PAUSED" :
-    this.state.testRun.status === "completed" ? "TERMINATED" : this.view.eagerBookletLoading ? "LOADING" : "RUNNING"; }
+  get status(): string { return this.view.debugControllerStatus; }
   get timers(): Array<[string, number]> {
-    return Object.entries(this.state.testRun.testletTimers ?? {}).map(([key, timer]) => [key,
+    return Object.entries(this.run.testletTimers ?? {}).map(([key, timer]) => [key,
       (timer.status === "running" && timer.expiresAt ? Math.min(timer.durationSeconds, Math.max(0, (Date.parse(timer.expiresAt) - this.now()) / 1000)) : timer.remainingSeconds) / 60]);
   }
-  get config(): Array<[string, string]> { return participantDebugConfigEntries(this.state.booklet.policy.sourceConfig); }
-  get mode(): Array<[string, string]> { return participantDebugModeEntries(this.state.executionMode); }
+  get config(): Array<[string, string]> { return this.state || this.source ? participantDebugConfigEntries(this.state?.booklet.policy.sourceConfig ?? this.source?.booklet.policy?.sourceConfig ?? {}) : []; }
+  get executionMode() { return participantExecutionModeDefinitions[this.run.executionMode ?? defaultParticipantExecutionMode]; }
+  get mode(): Array<[string, string]> { return participantDebugModeEntries(this.executionMode); }
   get customTexts(): Record<string, string> {
     return { ...originalParticipantCustomTextDefaults, ...this.settings.settings().customTexts,
-      ...this.state.participantRosterEntry?.customTexts, ...this.source?.booklet.customTexts };
+      ...this.state?.participantRosterEntry?.customTexts, ...this.source?.booklet.customTexts };
   }
   get customTextKeys(): string[] { return Object.keys(this.customTexts).sort(); }
   get selectedCustomText(): string {
@@ -180,7 +181,7 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     }
   }
   get currentUnit(): ContentReleaseUnitEntry | null {
-    return this.snapshot()?.booklet.unitEntries.find(unit => unit.unitKey === this.state.currentUnit.unitKey) ?? null;
+    return this.snapshot()?.booklet.unitEntries.find(unit => unit.unitKey === this.run.currentUnitKey) ?? null;
   }
   get connection(): string {
     const connection = this.view.participantConnectionState;
@@ -233,7 +234,7 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     return [...this.properties({ label: node.testlet?.displayLabel ?? "", blockLabel: details?.blockLabel ?? "", timerId: details?.timerId ?? null }),
       ...this.properties(details?.locks).map(([name, value]): [string, string] => [`locks.${name}`, value]),
       ...this.properties(restrictions).map(([name, value]): [string, string] => [`restrictions.${name}`, value]),
-      ["locked", details?.locked ? `BY ${details.locked.by} THROUGH ${details.locked.through}` : "NO"]];
+      ["locked", details ? details.locked ? `BY ${details.locked.by} THROUGH ${details.locked.through}` : "NO" : ""]];
   }
 
   unitProperties(unit: ContentReleaseUnitEntry): Array<[string, string]> {
@@ -246,11 +247,11 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     }
     return [["sequenceId", String(index + 1)], ["id", unit.originalUnitId ?? unit.unitKey], ["alias", unit.unitKey],
       ["label", unit.displayLabel], ["labelShort", unit.shortLabel ?? ""], ["player", unit.playerKey ?? ""],
-      ["locked", String(this.state.bookletUnits.find(entry => entry.unitKey === unit.unitKey)?.isLocked ?? false)],
-      ["lockedAfterLeaving", String(Boolean(this.state.testRun.lockedUnitKeys?.includes(unit.unitKey)))],
+      ["locked", this.state ? String(this.state.bookletUnits.find(entry => entry.unitKey === unit.unitKey)?.isLocked ?? false) : ""],
+      ["lockedAfterLeaving", String(Boolean(this.run.lockedUnitKeys?.includes(unit.unitKey)))],
       ["parent", unit.testletPath?.at(-1) ?? participantDebugRootTestletKey], ["definition", `${(unit.unitDefinition ?? "").slice(0, 20)} ...`],
       ...this.properties(response?.unitState).filter(([key]) => key !== "dataParts").map(([key, value]): [string, string] => [`state.${key}`, value]),
-      ["loadingProgress: bookletUnits", `${this.view.bookletLoadedUnitCount}/${this.state.bookletUnits.length}`], ["scheme", scheme]];
+      ["loadingProgress: bookletUnits", `${this.view.bookletLoadedUnitCount}/${this.source!.booklet.unitEntries.length}`], ["scheme", scheme]];
   }
   unitTitle(unit: ContentReleaseUnitEntry): string {
     const index = this.source!.booklet.unitEntries.findIndex(entry => entry.unitKey === unit.unitKey);
@@ -290,9 +291,9 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
       const response = await fetch("/healthz", { cache: "no-store", signal: controller.signal });
       const body: unknown = await response.json();
       if (!response.ok || (body as { status?: unknown } | null)?.status !== "ok") throw new Error(`HTTP ${response.status}`);
-      if (!this.stopped && !controller.signal.aborted && scope === participantDebugScopeKey(this.state)) this.apiStatus.set("ok");
+      if (!this.stopped && !controller.signal.aborted && scope === participantDebugScopeKey({ testRun: this.run })) this.apiStatus.set("ok");
     } catch (error) {
-      if (!this.stopped && !controller.signal.aborted && scope === participantDebugScopeKey(this.state)) {
+      if (!this.stopped && !controller.signal.aborted && scope === participantDebugScopeKey({ testRun: this.run })) {
         this.apiStatus.set("unavailable"); this.systemError.set(String(error));
       }
     }

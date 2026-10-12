@@ -4,7 +4,7 @@ import { readParticipantSessionCredential } from "./participant-access-credentia
 
 /** Console commands bypass the remote ACK; their log uses the existing log-only endpoint. */
 export const createParticipantDebugLog = (options: {
-  readState: () => ParticipantCurrentRunState | null;
+  readState: () => Pick<ParticipantCurrentRunState, "testRun" | "executionMode"> | null;
   window?: Window;
   storage?: Storage | null;
   fetch?: typeof fetch;

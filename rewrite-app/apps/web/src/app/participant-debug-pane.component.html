@@ -24,8 +24,8 @@
         @case ('main') {
           <div><b>STATUS:</b> {{ status }}</div>
           <div><b>TIMER:</b><ul>@for (timer of timers; track timer[0]) { <li><b>{{ timer[0] }}</b>: {{ timerText(timer[1]) }}</li> }</ul></div>
-          <div><b>MODE:</b> {{ state.executionMode.mode.toUpperCase() }}</div><div><b>FOCUS:</b> {{ focus() }}</div>
-          <div><b>BS:</b> {{ connection }}</div><div><b>USER:</b>{{ state.participantRosterEntry?.displayName ?? state.participantSession.loginKey }}</div>
+          <div><b>MODE:</b> {{ executionMode.mode.toUpperCase() }}</div><div><b>FOCUS:</b> {{ focus() }}</div>
+          <div><b>BS:</b> {{ connection }}</div>@if (state) { <div><b>USER:</b>{{ state.participantRosterEntry?.displayName ?? state.participantSession.loginKey }}</div> }
         }
         @case ('config') { @for (row of config; track row[0]) { <div><b>{{ row[0] }}: </b>{{ row[1] }}</div> } }
         @case ('testmode') { @for (row of mode; track row[0]) { <div><b>{{ row[0] }}: </b>{{ row[1] }}</div> } }
@@ -69,7 +69,7 @@
         }
         @case ('system') {
           <div><b>broadcastingService (SSE/HTTP): </b>{{ connection }}</div>
-          <div><b>cacheService (local booklet): </b>{{ view.bookletLoadedUnitCount }}/{{ state.bookletUnits.length }} Units</div>
+          <div><b>cacheService (local booklet): </b>{{ view.bookletLoadedUnitCount }}/{{ snapshot()?.booklet?.unitEntries?.length ?? 0 }} Units</div>
           <div><b>fileService (selected snapshot): </b>{{ snapshot() ? 'loaded' : 'not loaded' }}</div>
           <div><b>API: </b>{{ apiStatus() }}</div><div role="status">{{ systemError() }}</div>
           <button class="btn" type="button" (click)="refreshSystem()">Refresh</button>
@@ -104,7 +104,7 @@
   }
 </ng-template>
 <ng-template #unitTemplate let-unit="item" let-single="single">
-  <div class="unit" [class.current]="unit.unitKey === state.currentUnit.unitKey">
+  <div class="unit" [class.current]="unit.unitKey === run.currentUnitKey">
     <span class="title"><b>{{ unitTitle(unit) }}</b>
       @if (!single) { <button class="more-btn" type="button" [attr.aria-label]="'Toggle Unit ' + unit.unitKey" (click)="toggleMore(unit.unitKey)">{{ openPanes.has(unit.unitKey) ? '−' : '+' }}</button> }
     </span>

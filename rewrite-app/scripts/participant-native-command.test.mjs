@@ -52,6 +52,18 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
    commands:await repo.listPendingParticipantRunCommands(run),logs:await repo.listParticipantTestLogsByWorkspace(base.tenantId,base.workspaceId),events:await repo.listWorkspaceActivityEventsByWorkspace(base.tenantId,base.workspaceId),
    receipt:request?await receipt(request,repo):null});
   const preserve=(actual,expected)=>{for(const key of ['unitResponses','unitResponseFieldTimestamps','sharedParameters','sharedParameterTimestamps','createdAt','executionMode','bookletAssignmentKey'])assert.deepEqual(actual[key],expected[key],key);};
+  await t.test('controller context is an authorized read independent of current Unit loading and update chronology',async()=>{
+   const before=await snapshot();
+   for(const id of [run.testRunId,sibling.testRunId]){
+    const context=await services(repository).participantRuntime.getControllerContext({participantSessionId:parent.participantSessionId,testRunId:id});
+    assert.equal(context.testRun.testRunId,id);assert.equal(context.participantSession.participantSessionId,parent.participantSessionId);
+    preserve(context.testRun,id===run.testRunId?run:sibling);assert.equal(Object.hasOwn(context,'currentUnit'),false);
+   }
+   const legacy=await services(repository).participantRuntime.getControllerContext({participantSessionId:parent.participantSessionId});
+   assert.equal(legacy.testRun.participantSessionId,parent.participantSessionId);
+   for(const id of [foreign.testRunId,'missing',' '])await assert.rejects(services(repository).participantRuntime.getControllerContext({participantSessionId:parent.participantSessionId,testRunId:id}));
+   assert.deepEqual(await snapshot(),before);
+  });
   await t.test('all modes support local commands without a delivery queue, with mode-filtered logs and exact retry after restart',async()=>{
    for(const mode of ['run-hot-return','run-hot-restart','run-simulation','run-demo','run-review','run-trial']){
     await repository.saveTestRun({...run,executionMode:mode});const request=input('pause',['Exact Ä/β\n";']);const before=await snapshot(request);

@@ -1,6 +1,6 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
-import { participantNativeCommandRoute, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantNativeCommandRoute, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -2480,6 +2480,7 @@ const currentRunStatePattern = createRoutePattern(
 );
 const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
 const participantNativeCommandPattern = createRoutePattern(participantNativeCommandRoute);
+const participantControllerContextPattern = createRoutePattern(participantControllerContextRoute);
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
@@ -2531,6 +2532,7 @@ const completeRunPattern = createRoutePattern(
 const participantSignOutPattern = createRoutePattern(productionApiRoutes.participant.signOut);
 const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
+  ["GET", participantControllerContextPattern],
   ["POST", participantNativeCommandPattern],
   ["GET", participantDebugStatePattern], ["POST", participantDebugStatePattern],
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
@@ -3751,6 +3753,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", systemCheckReportExportPattern, productionApiRoutes.workspace.exportSystemCheckReports],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["GET", participantControllerContextPattern, participantControllerContextRoute],
     ["GET", participantDebugStatePattern, participantDebugStateRoute],
     ["POST", participantDebugStatePattern, participantDebugStateRoute],
     ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
@@ -8593,6 +8596,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantControllerContextMatch = participantControllerContextPattern.exec(pathname);
+      if (request.method === "GET" && participantControllerContextMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantControllerContextMatch.groups.participantSessionId);
+        if (!participantSessionId) { sendError(response, 400, "participant_session_invalid", "A participant session is required."); return; }
+        const controllerContext = await services.participantRuntime.getControllerContext({ participantSessionId,
+          testRunId: url.searchParams.get("testRunId") ?? undefined });
+        response.setHeader("cache-control", "private, no-store");
+        sendJson<{ controllerContext: ParticipantControllerContext }>(response, 200, { controllerContext });
+        return;
+      }
       const participantNativeCommandMatch = participantNativeCommandPattern.exec(pathname);
       if (request.method === "POST" && participantNativeCommandMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantNativeCommandMatch.groups.participantSessionId);

@@ -1,6 +1,6 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute } from "@testcenter-rewrite-app/contracts/participant-debug";
-import { participantNativeCommandRoute } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantNativeCommandRoute, participantControllerContextRoute } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -62,6 +62,7 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       const response = await fetch(base + path, { method,
         headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { "content-type": "application/json" } : {}) },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+      if (path.includes("/controller-context") && response.ok) assert.match(response.headers.get("cache-control"), /no-store/);
       const payload = response.status === 204 || response.status === 205 ? null : await response.json();
       assert.equal(response.status, expected, `${method} ${path}: ${JSON.stringify(payload)}`);
       return payload;
@@ -274,6 +275,28 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       }
       for (const debugArguments of [null, "off", [42]]) await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "debug", debugArguments }, operator, 400);
       await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "resume", debugArguments: [] }, operator, 400);
+    });
+    await t.test("controller context authorizes selected and legacy Runs without loading Units or writing artifacts", async () => {
+      const path = resolveRoutePath(participantControllerContextRoute, { participantSessionId: sessionId });
+      const repository = await readFreshRepository();
+      const snapshot = async () => ({ run: await repository.getTestRunById(run.testRunId), other: await repository.getTestRunById(otherBookletRun.testRunId),
+        foreign: await repository.getTestRunById(foreign.testRunId), parent: await repository.getParticipantSessionById(sessionId),
+        logs: await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId), events: await repository.listWorkspaceActivityEventsByWorkspace(run.tenantId, run.workspaceId),
+        commands: await list(run.testRunId) });
+      const before = await snapshot();
+      for (const token of [undefined, "invalid", other.sessionToken, operator]) await request("GET", path, undefined, token, 401);
+      for (const id of [foreign.testRunId, "missing"]) await request("GET", `${path}?testRunId=${id}`, undefined, selected.sessionToken, 404);
+      await request("GET", path + "?testRunId=", undefined, selected.sessionToken, 400);
+      for (const id of [run.testRunId, otherBookletRun.testRunId]) {
+        const { controllerContext } = await request("GET", `${path}?testRunId=${id}`, undefined, selected.sessionToken);
+        assert.equal(controllerContext.testRun.testRunId, id); assert.equal(controllerContext.testRun.participantSessionId, sessionId);
+        assert.deepEqual(controllerContext.testRun, JSON.parse(JSON.stringify(await repository.getTestRunById(id))));
+        assert.equal(controllerContext.participantSession.participantSessionId, sessionId);
+        assert.equal(Object.hasOwn(controllerContext, "currentUnit"), false);
+      }
+      const legacy = (await request("GET", path, undefined, selected.sessionToken)).controllerContext;
+      assert.equal(legacy.testRun.participantSessionId, sessionId);
+      assert.deepEqual(await snapshot(), before);
     });
     await t.test("native HTTP commands use participant ownership, immutable content and no remote ACK", async () => {
       const path = resolveRoutePath(participantNativeCommandRoute, { participantSessionId: sessionId });

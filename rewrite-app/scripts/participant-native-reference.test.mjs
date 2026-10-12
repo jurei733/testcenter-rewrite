@@ -66,14 +66,22 @@ for(const [name,player,response,saved,expected] of [
  ['changed meaningful Player response',{},'{"kind":"verona_unit_state","version":1,"unitState":{"responseProgress":"complete"}}',undefined,1],
  ['cleared manual text draft',null,'','prior text',1]
 ])test(`actual native preparation preserves answers for ${name}`,async()=>{
- const value=new Actual(),calls=[];value.runtime={currentUnitResponse:response};value.readCurrentRunState=()=>({currentUnit:{unitKey:'unit',player},testRun:{unitResponses:saved===undefined?{}:{unit:saved}}});
+ const value=new Actual(),calls=[];value.runtime={currentUnitResponse:response};value.readCurrentRunState=()=>({currentUnit:{unitKey:'unit',player},testRun:{currentUnitKey:'unit',unitResponses:saved===undefined?{}:{unit:saved}}});
+ Object.defineProperty(value,'debugRunState',{get:()=>value.readCurrentRunState()});value.consoleRun={currentUnitKey:'unit'};
  value.settleVeronaAutoSaveBeforeForegroundAction=async()=>{calls.push('drained');return {owned:true};};value.saveCurrentDraftBeforeCompleteInternal=async settled=>calls.push(settled);
  await value.prepareNativeConsoleCommand(()=>true);assert.equal(calls[0],'drained');assert.equal(calls.length,1+expected);
 });
 test('preparation cannot write a new controller draft after its pending drain returns late',async()=>{
  const value=new Actual(),writes=[];value.runtime={currentUnitResponse:'changed'};value.readCurrentRunState=()=>({currentUnit:{unitKey:'unit',player:null},testRun:{unitResponses:{unit:'old'}}});
+ Object.defineProperty(value,'debugRunState',{get:()=>value.readCurrentRunState()});value.consoleRun={currentUnitKey:'unit'};
  value.settleVeronaAutoSaveBeforeForegroundAction=async()=>null;value.saveCurrentDraftBeforeCompleteInternal=async value=>writes.push(value);
  await value.prepareNativeConsoleCommand(()=>false);assert.deepEqual(writes,[]);
+});
+test('native preparation before a verified current Unit exists never drains or stages a previous controller draft',async()=>{
+ const value=new Actual();value.debugRunState=null;value.runtime={currentUnitResponse:'Old controller text'};
+ value.settleVeronaAutoSaveBeforeForegroundAction=async()=>assert.fail('No selected Player exists');
+ value.saveCurrentDraftBeforeCompleteInternal=async()=>assert.fail('No draft can belong to the loading controller');
+ await value.prepareNativeConsoleCommand(()=>true);
 });
 const saveMethod=declaration.members.find(member=>member.name?.getText(ast)==='saveVeronaResponse');assert.ok(saveMethod);
 const {loadSaver}=await import(emit('export const loadSaver=(findParticipantSaveOutboxEntryForUnit,carriedParticipantTestLogBatches,createParticipantSaveOutboxEntry,persistParticipantSaveOutboxEntry)=>class Actual { '+saveMethod.getText(ast)+' };'));
@@ -88,4 +96,11 @@ test('actual log-only staging preserves the draft and omits a new optimistic ans
  value.pendingVeronaSave={testRunId:'run',unitKey:'unit',response:'Exact real capture Ω',logs:[]};value.saveVeronaResponse(logs);
  assert.equal(Object.hasOwn(value.pendingVeronaSave,'logOnly'),false);assert.equal(value.pendingVeronaSave.response,'Exact real capture Ω');
  value.saveVeronaResponse({...logs,response:'Latest real capture',unitDataChanged:true});assert.equal(value.pendingVeronaSave.response,'Latest real capture');assert.equal(value.runtime.currentUnitResponse,'Latest real capture');
+});
+test('native preparation drains tagged former-Unit reports without staging its stale draft for the newly selected Unit',async()=>{
+ const value=new Actual(),calls=[];value.runtime={currentUnitResponse:'Old Unit changed text'};
+ value.debugRunState={currentUnit:{unitKey:'old'},testRun:{unitResponses:{old:'Previously saved'}}};value.consoleRun={currentUnitKey:'new'};
+ value.settleVeronaAutoSaveBeforeForegroundAction=async()=>{calls.push('trusted old report drained');return null;};
+ value.saveCurrentDraftBeforeCompleteInternal=async()=>assert.fail('The old draft must not be assigned to the new Unit');
+ await value.prepareNativeConsoleCommand(()=>true);assert.deepEqual(calls,['trusted old report drained']);
 });

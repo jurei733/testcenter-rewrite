@@ -106,8 +106,8 @@ export const createParticipantDebugControl = (options: {
       const previous = new Map<string, PropertyDescriptor | undefined>(), methods = new Map<string, (args?: string[]) => void>();
       const debug = (args: string[] = []): void => {
         // A terminal debug command has no remote ACK, exactly like the Source console API.
-        const owner = [...controllers].reverse().find(item => owners.get(item)?.window === window && item.command(args));
-        if (owner) owners.get(owner)?.consoleCommand?.(args);
+        const owner = [...controllers].reverse().find(item => owners.get(item)?.window === window);
+        if (owner?.command(args)) owners.get(owner)?.consoleCommand?.(args);
       };
       methods.set("debug", debug);
       for (const keyword of ["pause", "resume", "terminate", "goto"] as const) methods.set(keyword, (args: string[] = []) => {

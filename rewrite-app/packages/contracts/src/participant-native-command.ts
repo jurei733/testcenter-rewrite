@@ -1,6 +1,8 @@
 import type { ParticipantRunCommandScope, ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
 
 export const participantNativeCommandRoute = "/api/v1/participant/sessions/:participantSessionId/native-commands";
+export const participantControllerContextRoute = "/api/v1/participant/sessions/:participantSessionId/controller-context";
+export type ParticipantControllerContext = { participantSession: ParticipantSession; testRun: TestRun };
 export const participantNativeCommandKeywords = ["pause", "resume", "terminate", "goto"] as const;
 export type ParticipantNativeCommandKeyword = typeof participantNativeCommandKeywords[number];
 export type ParticipantNativeCommandRequest = {

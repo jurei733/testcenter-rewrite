@@ -23,6 +23,7 @@ import { ParticipantStatusStylesComponent } from "./participant-status-styles.co
 import { InterfaceModeService } from "./interface-mode.service";
 import { OriginalParticipantEntryComponent } from "./original-participant-entry.component";
 import { OriginalPlayerToolbarComponent } from "./original-player-toolbar.component";
+import { OriginalPlayerSurfaceStylesComponent } from "./original-player-surface-styles.component";
 import { OriginalParticipantPausedComponent } from "./original-participant-paused.component";
 import { OriginalPlayerSidebarComponent } from "./original-player-sidebar.component";
 import { OriginalReviewPanelComponent } from "./original-review-panel.component";
@@ -41,11 +42,11 @@ interface ParticipantVisibleCodeNotice {
   selector: "app-participant-view",
   standalone: true,
   imports: [CommonModule, FormsModule, CdkTrapFocus, VeronaPlayerHostComponent, ParticipantDebugLauncherComponent, OriginalParticipantEntryComponent,
-    OriginalPlayerToolbarComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent, OriginalParticipantErrorLauncherComponent],
+    OriginalPlayerToolbarComponent, OriginalPlayerSurfaceStylesComponent, OriginalParticipantPausedComponent, OriginalPlayerSidebarComponent, OriginalReviewPanelComponent, OriginalToastContainerComponent, ParticipantStatusStylesComponent, OriginalParticipantConfirmationLauncherComponent, OriginalParticipantInformationLauncherComponent, OriginalParticipantErrorLauncherComponent],
   template: `
     <app-participant-status-styles />
-    @defer (when view.debugRunState !== null) {
-      <app-participant-debug-launcher [state]="view.debugRunState" />
+    @defer (on immediate) {
+      <app-participant-debug-launcher [state]="view.debugRunState" [run]="view.consoleRun" />
     }
     @defer (when interfaceMode.mode() === 'original') {
       @if (interfaceMode.mode() === 'original') {
@@ -53,6 +54,11 @@ interface ParticipantVisibleCodeNotice {
       }
     }
     <div class="stack" [class.is-original-player]="interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused">
+      @defer (when interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused) {
+        @if (interfaceMode.mode() === 'original' && view.isParticipantPlayerFocused) {
+          <app-original-player-surface-styles />
+        }
+      }
       @defer (when interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
         @if (interfaceMode.mode() === 'original' && (view.isParticipantStarter || view.isParticipantLogin && !view.participantCodeRequired)) {
           <app-original-participant-entry />

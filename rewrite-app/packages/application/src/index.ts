@@ -1,7 +1,7 @@
 import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
-import { participantNativeCommandKeywords, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
@@ -740,6 +740,7 @@ export type WorkspaceReviewPort = {
 };
 
 export type ParticipantRuntimePort = {
+  getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
   executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string }): Promise<ParticipantRunCommandApplicationResult>;
@@ -32387,6 +32388,15 @@ export const createFirstSliceServices = (
           navigation,
           availableActions
         };
+      },
+      async getControllerContext(input) {
+        const participantSession = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const testRun = await getSelectedParticipantSessionRun(repository, participantSession, input.testRunId);
+        if (!testRun) throw new FirstSliceError(409, "participant_session_has_no_current_run", "The participant session has no selected Run.");
+        if (testRun.tenantId !== participantSession.tenantId || testRun.workspaceId !== participantSession.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        }
+        return { participantSession, testRun: normalizeTestRun(testRun) };
       },
       async getDebugState(input) {
         const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
