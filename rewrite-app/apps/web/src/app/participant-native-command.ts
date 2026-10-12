@@ -120,6 +120,8 @@ export const createParticipantNativeCommands = (options: {
           application.controllerStatus !== entry.request.controllerStatus || application.timeStamp !== entry.request.timeStamp ||
           typeof application.applied !== "boolean" || !Number.isFinite(Date.parse(application.executedAt)) ||
           !validScope(application.testRun) || scopeKey(application.testRun) !== scopeKey(entry.scope) ||
+          application.testRun?.controllerEntry !== undefined && (!application.testRun.controllerEntry ||
+            typeof application.testRun.controllerEntry.active !== "boolean" || !Number.isSafeInteger(application.testRun.controllerEntry.revision) || application.testRun.controllerEntry.revision < 1) ||
           !["tenantId", "workspaceId", "participantSessionId"].every(key => application.participantSession?.[key as keyof typeof application.participantSession] === entry.scope[key as keyof Scope])) {
         throw Object.assign(new Error("The console receipt does not match its selected immutable Run and command."), { retryable: false });
       }

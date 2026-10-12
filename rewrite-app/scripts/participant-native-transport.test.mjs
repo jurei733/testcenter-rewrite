@@ -147,3 +147,8 @@ test('a legacy owner without a departing handoff is not authority to restore its
  const doc=documentFor({session:new Map([[ownerKey,'owned-tab']]),type:'reload'}),f=fixture({values:persisted,owner:null,browserWindow:doc.window});
  try{await f.advance();assert.deepEqual(f.calls,[]);assert.equal(f.values.size,1);f.native.stop();assert.equal(f.values.size,1);}finally{f.native.stop();}
 });
+
+for(const controllerEntry of [null,{active:'true',revision:1},{active:true,revision:0},{active:true,revision:1.5}])test(`a malformed controller entry cannot project a native receipt: ${JSON.stringify(controllerEntry)}`,async()=>{
+ const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);value.application.testRun.controllerEntry=controllerEntry;return {ok:true,json:async()=>value};}});
+ try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);assert.equal(f.values.size,0);}finally{f.native.stop();}
+});

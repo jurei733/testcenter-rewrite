@@ -1,4 +1,5 @@
 import type { ParticipantSession, TestRun } from "@testcenter-rewrite-app/domain";
+import { withParticipantControllerEntry } from "./participant-controller-entry.js";
 
 export type ParticipantControllerActivationInput = Pick<TestRun,
   "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & {
@@ -8,6 +9,8 @@ export type ParticipantControllerActivationInput = Pick<TestRun,
 export type ParticipantControllerActivationResult = {
   participantSession: ParticipantSession;
   activated: boolean;
+  testRun: TestRun;
+  entryChanged: boolean;
 };
 
 export class ParticipantControllerActivationError extends Error {
@@ -42,6 +45,8 @@ export const prepareParticipantControllerActivation = (
     423, "test_run_locked", "A locked Run cannot open a controller.");
   if (testRun.status === "completed") throw new ParticipantControllerActivationError(
     409, "booklet_already_completed", "A completed Run cannot open a controller.");
+  const enteredRun = withParticipantControllerEntry(testRun, testRun, true);
   return { participantSession: structuredClone({ ...participantSession, status: "launched" }),
-    activated: participantSession.status !== "launched" };
+    activated: participantSession.status !== "launched", testRun: structuredClone(enteredRun),
+    entryChanged: enteredRun.controllerEntry?.revision !== testRun.controllerEntry?.revision };
 };

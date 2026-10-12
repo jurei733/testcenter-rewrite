@@ -1,6 +1,7 @@
 import type { ParticipantSession, ParticipantRunCommandEffect, ParticipantRunCommandInput,
   ParticipantProgressDelivery, TestRun } from "@testcenter-rewrite-app/domain";
 import { matchesParticipantRunCommandScope } from "./participant-run-commands.js";
+import { withParticipantControllerEntry } from "./participant-controller-entry.js";
 
 export type ParticipantRunMutationInput = Pick<TestRun,
   "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & { deliveryId?: string };
@@ -61,6 +62,7 @@ export const prepareParticipantRunMutation = (
         receipt[key as keyof ParticipantProgressDelivery] !== context.progressDelivery![key as keyof ParticipantProgressDelivery]))) {
     throw new Error("A progress delivery cannot change its accepted identity or cross its immutable parent scope.");
   }
+  if (effect) effect.testRun = withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive);
   return { result: structuredClone({ testRun: effect?.testRun ?? testRun,
     participantSession: effect?.participantSession ?? participantSession, applied: effect !== null }), effect };
 };

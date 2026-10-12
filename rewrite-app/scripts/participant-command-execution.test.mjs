@@ -89,6 +89,7 @@ test("foreign, forged and incomplete execution replies permanently reject projec
     ...["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"].map(key => value => { value.application.testRun[key] = "foreign"; }),
     ...["tenantId", "workspaceId", "participantSessionId"].map(key => value => { value.application.participantSession[key] = "foreign"; }),
     value => { value.application.testRun.status="forged"; }, value => { value.application.testRun.unitResponses=[]; },
+    ...[null,{active:'true',revision:1},{active:true,revision:0},{active:true,revision:1.5}].map(entry=>value=>{value.application.testRun.controllerEntry=entry;}),
     value => { delete value.application.testRun.unitResponses; },
     value => { delete value.application.participantSession; }, value => { delete value.application.command; }
   ];

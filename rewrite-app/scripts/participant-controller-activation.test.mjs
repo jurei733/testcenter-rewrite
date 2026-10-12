@@ -10,8 +10,8 @@ import test from 'node:test';
 import {Pool} from 'pg';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceRepository} from '@testcenter-rewrite-app/file-store';
-import {createSqliteFirstSliceRepository} from '@testcenter-rewrite-app/sqlite-store';
-import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
+import {createSqliteFirstSliceRepository,migrateSqliteFirstSliceStorage,SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
+import {createPostgresFirstSliceStorage,migratePostgresFirstSliceStorage,POSTGRES_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/postgres-store';
 
 const timestamp='2026-10-11T00:00:00.000Z';
 const kinds=['memory','file','sqlite'];
@@ -41,13 +41,25 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
   if(url){const controlUrl=new URL(url);controlUrl.searchParams.set('application_name',applicationName+'_control');control=new Pool({connectionString:controlUrl.toString()});}
   const reset=async(sessionChanges={},runChanges={})=>{await repository.saveParticipantSession(structuredClone({...session,...sessionChanges}));await repository.saveTestRun(structuredClone({...run,...runChanges}));};
   const snapshot=async()=>({session:await repository.getParticipantSessionById(key),run:await repository.getTestRunById(key)});
-  await t.test('activation changes only status, is idempotent and returns detached current fields',async()=>{
+  await t.test('activation changes parent status and entry evidence, is idempotent and returns detached current fields',async()=>{
    await reset({participantCode:'owned new code',groupKey:'owned changed group'});const before=await snapshot();
    const result=await repository.activateParticipantController(input);assert.equal(result.activated,true);
-   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,before.run);
+   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:1}});
    result.participantSession.groupKey='caller mutation';
    const retry=await repository.activateParticipantController(input);assert.equal(retry.activated,false);assert.equal(retry.participantSession.groupKey,before.session.groupKey);
    if(kind!=='memory')assert.deepEqual(await (await create()).getParticipantSessionById(key),retry.participantSession);
+  });
+  await t.test('entry is scoped to the selected Run and survives restart without changing answers or their clocks',async()=>{
+   await reset({status:'launched'},{controllerEntry:{active:false,revision:3},unitResponseFieldTimestamps:{unit:{opaque:17}}});
+   const sibling={...(await snapshot()).run,testRunId:key+'-sibling',bookletAssignmentKey:'sibling',controllerEntry:{active:false,revision:9}};
+   await repository.saveTestRun(sibling);const before=await snapshot();
+   const result=await repository.activateParticipantController(input);assert.equal(result.entryChanged,true);assert.equal(result.activated,false);
+   assert.deepEqual(result.testRun.controllerEntry,{active:true,revision:4});
+   assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:4}});
+   assert.deepEqual(await repository.getTestRunById(sibling.testRunId),sibling);
+   result.testRun.controllerEntry.revision=900;
+   const retry=await repository.activateParticipantController(input);assert.equal(retry.entryChanged,false);assert.deepEqual(retry.testRun.controllerEntry,{active:true,revision:4});
+   if(kind!=='memory')assert.deepEqual((await (await create()).getTestRunById(key)).controllerEntry,{active:true,revision:4});
   });
   await t.test('every immutable scope and missing parent/Run denies activation without changes',async()=>{
    await reset();const before=await snapshot();
@@ -72,6 +84,24 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
   await t.test('invalid activation timestamps never mutate storage',async()=>{
    await reset();const before=await snapshot();await assert.rejects(repository.activateParticipantController({...input,activatedAt:'invalid'}),/server timestamp/);assert.deepEqual(await snapshot(),before);
   });
+  if(control)await t.test('upgrading entry evidence leaves legacy answers exact and a failed migration is retryable',async()=>{
+   await reset({}, {unitResponseFieldTimestamps:{unit:{opaque:18}}});const before=await snapshot();
+   const version=kind==='sqlite'?SQLITE_FIRST_SLICE_SCHEMA_VERSION:POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
+   assert.equal(version,kind==='sqlite'?64:58);
+   await execute(`ALTER TABLE test_runs DROP COLUMN controller_entry_json; DELETE FROM schema_migrations WHERE version=${version}`);
+   const install=kind==='sqlite'?`CREATE TRIGGER owned_entry_upgrade_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ROLLBACK,'owned entry upgrade failure'); END`:
+    `CREATE FUNCTION owned_entry_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned entry upgrade failure'; END $$; CREATE TRIGGER owned_entry_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_entry_upgrade_failure()`;
+   const remove=kind==='sqlite'?'DROP TRIGGER owned_entry_upgrade_failure':'DROP TRIGGER owned_entry_upgrade_failure ON schema_migrations; DROP FUNCTION owned_entry_upgrade_failure()';
+   const migrate=()=>kind==='sqlite'?migrateSqliteFirstSliceStorage(file):migratePostgresFirstSliceStorage(url.toString());
+   await execute(install);
+   try{await assert.rejects(migrate(),/owned entry upgrade failure/);
+    const count=kind==='sqlite'?control.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('test_runs') WHERE name='controller_entry_json'").get().n:
+      (await control.query("SELECT COUNT(*)::int AS n FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='test_runs' AND column_name='controller_entry_json'")).rows[0].n;
+    assert.equal(count,0);
+   }finally{await execute(remove);}
+   assert.equal((await migrate()).currentSchemaVersion,version);assert.deepEqual(await snapshot(),before);
+   const result=await repository.activateParticipantController(input);assert.deepEqual(result.testRun.controllerEntry,{active:true,revision:1});
+  });
   if(kind==='file')await t.test('failed persistence leaves the live parent inactive; retry and restart recover',async()=>{
    await reset();const before=await snapshot(),backup=join(directory,'backup.json');await rename(file,backup);await mkdir(file);
    try{await assert.rejects(repository.activateParticipantController(input));assert.deepEqual(await snapshot(),before);}
@@ -90,6 +120,16 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
    finally{await execute(remove);}
    assert.equal((await (await create()).activateParticipantController(input)).activated,true);
    await execute(install);try{assert.equal((await repository.activateParticipantController(input)).activated,false);}finally{await execute(remove);}
+  });
+  if(control)await t.test('entry persistence failure rolls back parent activation and its retry is idempotent',async()=>{
+   await reset();const before=await snapshot();
+   const install=kind==='sqlite'?`CREATE TRIGGER owned_entry_failure BEFORE UPDATE OF controller_entry_json ON test_runs BEGIN SELECT RAISE(ABORT,'owned entry persistence failure'); END`:
+    `CREATE FUNCTION owned_entry_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned entry persistence failure'; END $$; CREATE TRIGGER owned_entry_failure BEFORE UPDATE OF controller_entry_json ON test_runs FOR EACH ROW EXECUTE FUNCTION owned_entry_failure()`;
+   const remove=kind==='sqlite'?'DROP TRIGGER owned_entry_failure':'DROP TRIGGER owned_entry_failure ON test_runs; DROP FUNCTION owned_entry_failure()';
+   await execute(install);
+   try{await assert.rejects(repository.activateParticipantController(input),/owned entry persistence failure/);assert.deepEqual(await snapshot(),before);}finally{await execute(remove);}
+   const entered=await repository.activateParticipantController(input);assert.equal(entered.entryChanged,true);assert.equal(entered.activated,true);
+   await execute(install);try{const retry=await repository.activateParticipantController(input);assert.equal(retry.entryChanged,false);assert.equal(retry.activated,false);}finally{await execute(remove);}
   });
   if(kind==='postgres')for(const target of ['parent','run'])await t.test(`a separate SQL writer wins while activation waits on the ${target} row`,async()=>{
    await reset();const before=await snapshot(),writer=await control.connect();let pending,committed=false;

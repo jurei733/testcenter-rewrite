@@ -747,6 +747,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       const result = prepareParticipantControllerActivation(input,
         state.participantSessions.get(input.participantSessionId) ?? null, state.testRuns.get(input.testRunId) ?? null);
       if (result?.activated) state.participantSessions.set(input.participantSessionId, structuredClone(result.participantSession));
+      if (result?.entryChanged) state.testRuns.set(input.testRunId, structuredClone(result.testRun));
       return result;
     },
     async appendParticipantRunCommand(input) {

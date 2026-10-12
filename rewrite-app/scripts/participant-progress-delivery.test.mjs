@@ -75,10 +75,10 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       const f = await fixture();
       await repository.saveTestRun({ ...f.run, unitResponses: { unit: 'Exact legacy Ä/β\n\u0000  spaces' } });
       const before = await repository.getTestRunById(f.id);
-      const version = kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
-      assert.equal(version, kind === 'sqlite' ? 63 : 57);
-      await execute(`DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
-        ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json; DELETE FROM schema_migrations WHERE version=${version}`);
+      const currentVersion = kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
+      const version = kind === 'sqlite' ? 63 : 57;
+      await execute(`ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
+        ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json; DELETE FROM schema_migrations WHERE version>=${version}`);
       const migration = () => kind === 'sqlite' ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
       const value = async sql => kind === 'sqlite' ? control.prepare(sql).get().value : (await control.query(sql)).rows[0].value;
       const install = kind === 'sqlite' ? `CREATE TRIGGER owned_delivery_upgrade_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ABORT,'owned delivery upgrade failure'); END` :
@@ -96,7 +96,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
         await execute(kind === 'sqlite' ? 'DROP TRIGGER owned_delivery_upgrade_failure' :
           'DROP TRIGGER owned_delivery_upgrade_failure ON schema_migrations; DROP FUNCTION owned_delivery_upgrade_failure()');
       }
-      assert.equal((await migration()).currentSchemaVersion, version);
+      assert.equal((await migration()).currentSchemaVersion, currentVersion);
       repository = await create(); assert.deepEqual(await repository.getTestRunById(f.id), before);
     });
 

@@ -341,3 +341,39 @@ test('a running view captured before terminal application cannot restore recepti
  assert.equal(f.calls.started,0);assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.host.commandControllerState.status,'TERMINATED');
  runtime.resolve({runtimeState:{participantSession:{...run,status:'signed_in'}}});await tick();assert.equal(f.calls.starter,1);
 });
+
+for (const status of ['running','paused']) test(`a newer same-Run entry revision reopens a terminated ${status} controller`,async()=>{
+ const entered={...run,status,controllerEntry:{active:true,revision:4}},terminated={...run,status:'paused',controllerEntry:{active:false,revision:3}};
+ const f=fixture(async()=>({currentRunState:state(entered)}),applyRemote);f.host.syncRun(terminated);f.host.currentRunState=state(terminated);
+ f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED_PAUSED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);
+ assert.equal(f.calls.started,1,'A newer scoped entry must restore reception even when the selected Run is still paused.');
+ assert.equal(f.host.commandControllerState.status,status.toUpperCase());assert.equal(f.host.commandControllerState.entryRevision,4);
+ assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);assert.deepEqual(f.host.consoleRun.unitResponseFieldTimestamps,run.unitResponseFieldTimestamps);
+});
+test('a launched sibling parent cannot authorize a closed selected entry even when its canonical Run is running',async()=>{
+ const closed={...run,controllerEntry:{active:false,revision:3}},f=fixture(async()=>({currentRunState:state(closed)}),applyRemote);
+ f.host.syncRun(closed);f.host.currentRunState=state(closed);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.started,0);assert.equal(f.host.commandControllerState.status,'TERMINATED');
+});
+for(const entry of [{active:true,revision:2},{active:true,revision:3}])test(`an entry revision ${entry.revision} cannot reopen terminal revision 3`,async()=>{
+ const closed={...run,status:'paused',controllerEntry:{active:false,revision:3}},f=fixture(async()=>({currentRunState:state({...run,controllerEntry:entry})}),applyRemote);
+ f.host.syncRun(closed);f.host.currentRunState=state(closed);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.started,0);assert.equal(f.host.commandControllerState.status,'TERMINATED');
+});
+for(const entry of [null,{active:'true',revision:4},{active:true,revision:0},{active:true,revision:1.5},{active:true,revision:Number.MAX_SAFE_INTEGER+1}])test(`invalid server entry metadata cannot authorize a view: ${JSON.stringify(entry)}`,async()=>{
+ const f=fixture(async()=>({currentRunState:state({...run,controllerEntry:entry})}),applyRemote);f.host.syncRun(run);f.host.currentRunState=state(run);
+ await assert.rejects(f.host.refreshCurrentStateInternal(true,true),/controller entry/);assert.equal(f.calls.started,0);assert.equal(f.calls.applied,0);
+});
+
+test('a held native terminal receipt cannot replace a newer externally observed paused entry',async()=>{
+ const newer={...run,status:'paused',controllerEntry:{active:true,revision:5}},f=fixture(async()=>({currentRunState:state(newer)}),applyRemote);
+ f.host.syncRun(newer);f.host.currentRunState=state(newer);f.host.commandControllerState={testRunId:run.testRunId,status:'PAUSED',entryRevision:5};
+ await f.host.applyNativeConsoleCommand({keyword:'terminate',controllerStatus:'PAUSED',testRun:{...run,status:'paused',controllerEntry:{active:false,revision:4}},participantSession:{...session,status:'signed_in'}},()=>true);await tick();
+ assert.equal(f.calls.starter,0);assert.equal(f.calls.suspended,0);assert.equal(f.host.debugControllerStatus,'PAUSED');assert.deepEqual(f.host.consoleRun.controllerEntry,{active:true,revision:5});
+});
+test('a legacy view cannot erase already verified entry evidence',async()=>{
+ const selected={...run,status:'paused',controllerEntry:{active:false,revision:3}},f=fixture(async()=>({currentRunState:state(run)}),applyRemote);
+ f.host.syncRun(selected);f.host.currentRunState=state(selected);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.applied,0);assert.equal(f.calls.started,0);assert.deepEqual(f.host.consoleRun,selected);
+});

@@ -72,6 +72,8 @@ export const executeReceivedParticipantCommand = async (
       !(["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const).every(key =>
         application.testRun?.[key] === options.scope[key]) ||
       !["running", "paused", "completed"].includes(application.testRun?.status ?? "") ||
+          application.testRun?.controllerEntry !== undefined && (!application.testRun.controllerEntry ||
+            typeof application.testRun.controllerEntry.active !== "boolean" || !Number.isSafeInteger(application.testRun.controllerEntry.revision) || application.testRun.controllerEntry.revision < 1) ||
       !application.testRun?.unitResponses || typeof application.testRun.unitResponses !== "object" || Array.isArray(application.testRun.unitResponses) ||
       !(["tenantId", "workspaceId", "participantSessionId"] as const).every(key =>
         application.participantSession?.[key] === command[key])) {

@@ -644,9 +644,10 @@ export const createFileFirstSliceRepository = (
       const current = await getState();
       const result = prepareParticipantControllerActivation(input,
         current.participantSessions[input.participantSessionId] ?? null, current.testRuns[input.testRunId] ?? null);
-      if (!result?.activated) return result;
-      const next = { ...current, participantSessions: { ...current.participantSessions,
-        [input.participantSessionId]: structuredClone(result.participantSession) } };
+      if (!result || !result.activated && !result.entryChanged) return result;
+      const next = { ...current, participantSessions: result.activated ? { ...current.participantSessions,
+        [input.participantSessionId]: structuredClone(result.participantSession) } : current.participantSessions,
+        testRuns: result.entryChanged ? { ...current.testRuns, [input.testRunId]: structuredClone(result.testRun) } : current.testRuns };
       await persistState(next);
       cachePromise = Promise.resolve(next);
       return result;

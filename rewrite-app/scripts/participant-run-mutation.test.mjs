@@ -95,6 +95,37 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
     if (kind === 'sqlite') control = new DatabaseSync(file);
     if (url) { const controlUrl = new URL(url); controlUrl.searchParams.set('application_name', applicationName + '_control'); control = new Pool({ connectionString: controlUrl.toString() }); }
 
+    await t.test('entry revisions distinguish native and remote reentry from sibling activation and response-only writes',async()=>{
+      const f=await fixture();f.run={...f.run,bookletAssignmentKey:f.run.bookletKey};await repository.saveTestRun(f.run);const native=(keyword,id)=>f.services.participantRuntime.executeNativeCommand({participantSessionId:f.id,testRunId:f.id,
+        contentReleaseId:f.run.contentReleaseId,bookletKey:f.run.bookletKey,deliveryId:id,keyword,arguments:[],controllerStatus:'RUNNING',timeStamp:Date.parse(timestamp)});
+      const initial=await repository.activateParticipantController({...f.run,activatedAt:timestamp});assert.deepEqual(initial.testRun.controllerEntry,{active:true,revision:1});
+      const stopped=await native('terminate','owned-stop');assert.deepEqual(stopped.testRun.controllerEntry,{active:false,revision:2});
+      const sibling={...stopped.testRun,testRunId:f.id+'-sibling',bookletAssignmentKey:'sibling',controllerEntry:{active:false,revision:8}};
+      await repository.saveTestRun(sibling);await repository.activateParticipantController({...sibling,activatedAt:timestamp});
+      assert.deepEqual((await repository.getTestRunById(f.id)).controllerEntry,{active:false,revision:2});
+      const response=await repository.mutateParticipantRun(f.run,context=>({...effect(context),testRun:{...context.testRun,controllerEntry:{active:true,revision:999},unitResponses:{...context.testRun.unitResponses,second:'Owned later response'}}}));
+      assert.deepEqual(response.testRun.controllerEntry,{active:false,revision:2});assert.equal(response.testRun.unitResponses.second,'Owned later response');
+      const beforePause=await repository.getTestRunById(f.id),paused=await native('pause','owned-pause');
+      assert.deepEqual(paused.testRun.controllerEntry,{active:true,revision:3});assert.equal(paused.testRun.status,'paused');
+      assert.deepEqual(paused.testRun.unitResponses,beforePause.unitResponses);assert.deepEqual(paused.testRun.unitResponseFieldTimestamps,beforePause.unitResponseFieldTimestamps);
+      const replay=await native('terminate','owned-stop');assert.equal(replay.applied,false);assert.deepEqual(replay.testRun.controllerEntry,{active:true,revision:3});
+      const complete=await issue(f.services,f,'complete');await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:complete.commandId});
+      const terminal=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:complete.commandId,controllerStatus:'PAUSED'});
+      assert.deepEqual(terminal.testRun.controllerEntry,{active:false,revision:4});
+      const remotePause=await issue(f.services,f,'pause');await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remotePause.commandId});
+      const entered=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remotePause.commandId,controllerStatus:'PAUSED'});
+      assert.deepEqual(entered.testRun.controllerEntry,{active:true,revision:5});assert.equal(entered.testRun.status,'paused');
+      const repeated=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:complete.commandId});
+      assert.equal(repeated.applied,false);assert.deepEqual(repeated.testRun.controllerEntry,{active:true,revision:5});
+      if(kind!=='memory')assert.deepEqual((await (await create()).getTestRunById(f.id)).controllerEntry,{active:true,revision:5});
+    });
+    await t.test('invalid and exhausted entry revisions fail before committing any artifact',async()=>{
+      for(const controllerEntry of [{active:false,revision:Number.MAX_SAFE_INTEGER},{active:false,revision:0},{active:'true',revision:1}]){
+        const f=await fixture();await repository.saveTestRun({...f.run,controllerEntry});const before=await snapshot(f);
+        await assert.rejects(repository.activateParticipantController({...f.run,activatedAt:timestamp}),/entry.*(invalid|exhausted)/);
+        assert.deepEqual(await snapshot(f),before);
+      }
+    });
     await t.test('scope denials and throwing/invalid projections leave every artifact unchanged', async () => {
       const f = await fixture(), before = await snapshot(f);
       for (const key of ['testRunId', 'participantSessionId', 'tenantId', 'workspaceId', 'contentReleaseId']) {
@@ -220,7 +251,8 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
           expected = await snapshot(f);
         }));
         if (action === 'return') await assert.rejects(first.participantRuntime.returnToStarter({ testRunId: f.id, currentUnitKey: 'unit', expectedStatus: 'running' }), error => error.errorCode === 'starter_exit_state_changed');
-        else { const result = await first.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }); assert.equal(result.status, 'paused'); assert.equal(result.pauseSource, 'monitor'); }
+        else { const result = await first.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }); assert.equal(result.status, 'paused'); assert.equal(result.pauseSource, 'monitor');
+          expected={...expected,run:{...expected.run,controllerEntry:{active:true,revision:1}}}; }
         assert.deepEqual(await snapshot(f), expected);
       }
     });

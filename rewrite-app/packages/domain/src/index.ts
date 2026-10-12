@@ -1130,6 +1130,8 @@ export type TestRun = {
   /** Participant-selected state options that take precedence over automatic evaluation. */
   bookletStateOverrides?: Record<string, string>;
   status: TestRunStatus;
+  /** Server-owned entry/termination evidence for this exact Run, independent of its parent session. */
+  controllerEntry?: { active: boolean; revision: number };
   /** Identifies who may release a paused run; omitted for non-paused runs. */
   pauseSource?: TestRunPauseSource;
   /** Whole-test lock from the original monitor protocol; independent of progress status. */
@@ -1380,6 +1382,8 @@ export type ParticipantRunCommandApplicationContext = {
 
 export type ParticipantRunCommandEffect = {
   testRun: TestRun;
+  /** Applied under the Run lock; response-only mutations cannot replace entry evidence. */
+  controllerEntryActive?: boolean;
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   participantSession?: ParticipantSession;

@@ -1,3 +1,4 @@
+import { withParticipantControllerEntry } from "./participant-controller-entry.js";
 import {
   monitorRunCommandTypes,
   type ParticipantRunCommand,
@@ -130,6 +131,7 @@ export const prepareParticipantRunCommandApplication = (
           effect.participantSession![key as keyof typeof participantSession] !== participantSession[key as keyof typeof participantSession]))) {
     throw new Error("A participant command effect cannot cross its immutable parent scope.");
   }
+  effect.testRun = withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive);
   const appliedCommand = { ...command, executedAt, executionSequence };
   return { result: structuredClone({ command: appliedCommand, testRun: effect.testRun,
     participantSession: effect.participantSession ?? participantSession, applied: true }), effect };

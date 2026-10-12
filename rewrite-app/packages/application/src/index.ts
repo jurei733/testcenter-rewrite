@@ -25066,12 +25066,14 @@ export const createFirstSliceServices = (
           if (!before.changed || before.effect.testRun.status !== "completed") throw error;
           completionError = error; projected = null;
         }
-        if (!projected && !timerChanged && !activation?.activated) return null;
+        if (!projected && !timerChanged && !activation?.activated && !activation?.entryChanged) return null;
         const participantSession = [...timerEffects].reverse().find(effect => effect.participantSession)?.participantSession ??
           projected?.participantSession ?? (activation?.activated ? activation.participantSession : undefined);
-        return { testRun: compatibleRun(projected?.testRun ?? timerEffects.at(-1)!.testRun),
+        return { testRun: projected || timerChanged ? compatibleRun(projected?.testRun ?? timerEffects.at(-1)!.testRun) : context.testRun,
           testLogs: [...timerEffects.flatMap(effect => effect.testLogs), ...(projected?.testLogs ?? [])],
           activityEvents: [...timerEffects.flatMap(effect => effect.activityEvents), ...(projected?.activityEvents ?? [])],
+          ...(projected?.controllerEntryActive !== undefined ? { controllerEntryActive: projected.controllerEntryActive } :
+            activation ? { controllerEntryActive: true } : {}),
           ...(participantSession ? { participantSession } : {}), ...(projected?.commandInput ? { commandInput: projected.commandInput } : {}) };
       });
     } catch (error) {
@@ -26420,12 +26422,13 @@ export const createFirstSliceServices = (
     const participantSession = await requireAccessibleParticipantSession(
       participantSessionId
     );
-    const activateSession = async (testRun: TestRun): Promise<void> => {
+    const activateSession = async (testRun: TestRun): Promise<TestRun> => {
       try {
         const result = await repository.activateParticipantController({ testRunId: testRun.testRunId,
           participantSessionId, tenantId: testRun.tenantId, workspaceId: testRun.workspaceId,
           contentReleaseId: testRun.contentReleaseId, activatedAt: now() });
         if (!result) throw new FirstSliceError(409, "participant_controller_scope_changed", "The controller's parent scope changed during entry.");
+        return result.testRun;
       } catch (error) {
         if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
         throw error;
@@ -26532,8 +26535,7 @@ export const createFirstSliceServices = (
         throw new FirstSliceError(409, "booklet_already_completed",
           `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
       }
-      if (!deferExistingActivation) await activateSession(existingRun);
-      return existingRun;
+      return deferExistingActivation ? existingRun : activateSession(existingRun);
     }
 
     const timestamp = now();
@@ -26623,7 +26625,7 @@ export const createFirstSliceServices = (
             bookletAssignmentKey: freshRun.bookletAssignmentKey, currentUnitKey: freshRun.currentUnitKey, bookletSource } }));
         return { testRun: freshRun,
           testLogs: executionMode.saveResponses ? buildParticipantTestLogs({ testRun: freshRun, batches: [{ entries }] }) : [],
-          activityEvents, ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
+          activityEvents, controllerEntryActive: true, ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
       });
     } catch (error) {
       if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
@@ -26635,8 +26637,7 @@ export const createFirstSliceServices = (
       throw new FirstSliceError(409, "booklet_already_completed",
         `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`);
     }
-    if (!reservation.created && !deferExistingActivation) await activateSession(effectiveTestRun);
-    return effectiveTestRun;
+    return !reservation.created && !deferExistingActivation ? activateSession(effectiveTestRun) : effectiveTestRun;
   };
 
 
@@ -32115,7 +32116,7 @@ export const createFirstSliceServices = (
                 expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
             return { testRun: nextRun, testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
               activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
-                ? { participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
+                ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
           }));
           if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
           return result;
@@ -32203,7 +32204,7 @@ export const createFirstSliceServices = (
             if (nextRun.currentUnitKey !== context.testRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: request.timeStamp, content: nextRun.currentUnitKey ?? "" });
             if (terminal && request.arguments.includes("lock")) entries.push({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: request.timeStamp, content: "" });
             entries.push({ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") });
-            return { testRun: nextRun,
+            return { testRun: nextRun, controllerEntryActive: !terminal,
               participantSession: { ...context.participantSession, status: terminal ? "signed_in" : "launched" },
               testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: nextRun, deliveryId, batches: [{ entries }] }) : [],
               activityEvents: [{ activityEventId: `delivery:${nextRun.testRunId}:${deliveryId}:activity:native`, tenantId: nextRun.tenantId,
@@ -33585,7 +33586,8 @@ export const createFirstSliceServices = (
               currentUnitKey: effectiveRun.currentUnitKey
             }
           }));
-          return { testRun: effectiveRun, testLogs, activityEvents };
+          return { testRun: effectiveRun, testLogs, activityEvents, controllerEntryActive: true,
+            participantSession: { ...context.participantSession, status: "launched" } };
         });
         return result.testRun;
       },
@@ -33931,7 +33933,7 @@ export const createFirstSliceServices = (
             }));
           }
 
-          return { testRun: returnedRun, testLogs, activityEvents };
+          return { testRun: returnedRun, testLogs, activityEvents, controllerEntryActive: false };
         });
         return result.testRun;
       },
@@ -34196,9 +34198,9 @@ export const createFirstSliceServices = (
           }
 
           completionView = completedRun;
-          return { testRun: persistedRun, testLogs, activityEvents, ...(participantSession ? { participantSession } : {}) };
+          return { testRun: persistedRun, testLogs, activityEvents, controllerEntryActive: false, ...(participantSession ? { participantSession } : {}) };
         });
-        return completionView ?? result.testRun;
+        return completionView ? { ...completionView, controllerEntry: result.testRun.controllerEntry } : result.testRun;
       }
     },
     monitorRead: {
