@@ -22,8 +22,14 @@ the production build (469.96 kB under the unchanged 470 kB hard limit) and all
 nine Chromium/SQLite Debug groups. The expanded Booklet proves a hidden code's
 own and inherited lock origins. API/core and existing test sources retain their
 byte-identical hashes from the 1,199-test PostgreSQL proof at `02bce022a44a`;
-that PostgreSQL suite was not repeated for this frontend-only change. Fresh
-container evidence must identify this checkpoint's own image. Other native
+that PostgreSQL suite was not repeated for this frontend-only change.
+Checkpoint `fbb5f1ea4eed` also passed standard/demo/production PostgreSQL
+container profiles, SQLite runtime and 286 transaction/API checks inside its
+read-only image as `node`. All 879 tracked archive files were hash-verified;
+the image was built without host dependencies or untracked artifacts. All 24
+existing containers, every mount field, 85 volumes and the protected
+presentation remain unchanged. Owned test resources and the build archive
+were removed; about 11.6 GB of host space remains. Other native
 console commands, early-loading ERROR, complete Original visual/property and
 real-package/controller-transition acceptance, performance, remote CI and
 production rollout remain open. Previous sections preserve historical evidence.

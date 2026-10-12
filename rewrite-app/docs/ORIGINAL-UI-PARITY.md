@@ -13,7 +13,12 @@ All 1,773 local unit/frontend tests, typecheck, 469.96 kB production build and
 nine Chromium/SQLite Debug groups passed. Twenty-eight new checks execute the
 pinned Original lock methods, while the actual Booklet proves own and inherited
 code-lock origins. The unchanged core retains its prior 1,199-test PostgreSQL
-proof; this frontend-only change does not repeat that suite. Full visual and
+proof; this frontend-only change does not repeat that suite.
+Checkpoint `fbb5f1ea4eed` additionally passed all three PostgreSQL container
+profiles, SQLite runtime and 286 read-only image checks as `node`. Its clean
+archive's 879 tracked files were verified and the archive safely removed.
+All 24 existing containers, every mount field, 85 volumes and the protected
+presentation remain unchanged; about 11.6 GB of host space remains. Full visual and
 property parity, native console commands, early ERROR, real-package/controller
 transitions, performance and production acceptance remain open. See
 [the current scope and evidence in PARITY](./PARITY.md#effective-participant-debug-testlet-locks-2026-10-12).
