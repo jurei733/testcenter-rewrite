@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Reception after external controller reentry (2026-10-12)
+
+Application checkpoint `1e839d66419d` restores command reception when a fresh,
+authorized full view confirms that another controller resumed the same Run:
+the selected Run is running and its parent session is launched. A launched
+parent with a still-paused selected Run leaves that controller terminated.
+An older running view captured before termination cannot reopen reception.
+Answers, response clocks and sibling Runs remain unchanged.
+
+The browser gate uses two actual pages sharing the selected Run. It holds the
+first page's terminal runtime read, resumes through the second page, closes
+that page and verifies a new remote Pause is applied by the first page alone.
+The immutable preceding frontend image `0399c6ad4fda` fails exactly at the new
+reception assertion; the negative unit control also reproduces the defect.
+Released Goto view handlers now finish within a bounded wait before routes are
+removed, followed by two animation frames before checking late-view fencing.
+An earlier trial stalled before the new case and is not a negative control.
+
+All 1,978 unit/frontend tests pass without skips or cancellations, including
+96 focused context, execution and ERROR tests. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Fifteen loading/command
+groups pass headful and with CI=true; fourteen Debug, five route, ten copied-tab,
+five context and five actual older-API groups pass. All eighteen ERROR variants
+pass headful. Existing bundle and CommonJS warnings remain.
+
+A fresh image from 892 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 340 transaction/API tests
+in the read-only container as node. All 24 existing containers, their immutable
+image IDs, states and every mount field, 85 volumes, 255 preexisting image
+aliases and protected files are preserved. Owned runtime and archive resources
+are removed. Backend, contracts, schemas, manifests and workflow are unchanged
+from `56cc13512b02`: its 1,269 PostgreSQL and 498 HTTP tests are reused only after
+89 backend source hashes match; those suites were not rerun in this checkpoint.
+The prior backend-first rollout requirement still applies.
+
+Full Original parity and production readiness remain unproven. A paused Run
+with a launched parent cannot yet distinguish external same-Run Pause reentry
+from sibling activation. Per-Run controller state and ordering, source-equivalent
+initial loading and controller replacement, fully overlapping application,
+post-unload Player effects, mixed-version and worker rollout, real-package and
+visual acceptance, measured performance, remote CI, release, deployment and
+production acceptance remain open. This checkpoint is local and not pushed.
+
 ### Terminal presentation and received-command lifecycle (2026-10-12)
 
 Application checkpoint `56cc13512b02` finishes verified native and remote
