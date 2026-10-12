@@ -106,7 +106,7 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
     const listPath = resolveRoutePath(routes.participant.listPendingCommands, { participantSessionId: sessionId });
     const list = (testRunId, token = selected.sessionToken) => request("GET", `${listPath}?testRunId=${encodeURIComponent(testRunId)}`, undefined, token);
     const acknowledgement = commandId => resolveRoutePath(routes.participant.acknowledgeCommand, { participantSessionId: sessionId, commandId });
-    const issue = async (testRunId, commandType = "resume") => (await request("POST", workspace + `/monitor/open-runs/${testRunId}/commands`, { commandType }, operator)).command;
+    const issue = async (testRunId, commandType = "resume", extra = {}) => (await request("POST", workspace + `/monitor/open-runs/${testRunId}/commands`, { commandType, ...extra }, operator)).command;
     const application = commandId => resolveRoutePath(participantCommandExecutionRoute, { participantSessionId: sessionId, commandId });
     const apply = (commandId, controllerStatus = "RUNNING") => request("POST", application(commandId), { testRunId: run.testRunId, controllerStatus }, selected.sessionToken);
     await request("POST", resolveRoutePath(routes.participant.saveProgress, { testRunId: run.testRunId }),
@@ -343,6 +343,22 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
         assert.equal(stream.status, 200); assert.match(stream.headers.get("content-type"), /text\/event-stream/);
         reader = stream.body.getReader(); assert.equal((await reader.read()).done, false);
       } finally { clearTimeout(timeout); controller.abort(); reader?.releaseLock(); }
+    });
+    for (const commandType of ["pause", "resume", "goto"]) await t.test(`an already accepted ${commandType} reactivates its own parent after termination without replaying that effect`, async () => {
+      const repository=await readFreshRepository(),before=await repository.getTestRunById(run.testRunId),sibling=await repository.getTestRunById(otherBookletRun.testRunId);
+      const terminal=await issue(run.testRunId,"complete"),next=await issue(run.testRunId,commandType,commandType==="goto"?{targetUnitKey:before.currentUnitKey}:{});
+      for (const command of [terminal,next]) await request("PATCH",acknowledgement(command.commandId),{testRunId:run.testRunId},selected.sessionToken);
+      await apply(terminal.commandId,"RUNNING");assert.equal((await repository.getParticipantSessionById(sessionId)).status,"signed_in");
+      const accepted=(await apply(next.commandId,"PAUSED")).application;
+      assert.equal(accepted.participantSession.status,"launched");assert.equal((await repository.getParticipantSessionById(sessionId)).status,"launched");
+      assert.equal(accepted.testRun.status,commandType==="pause"?"paused":"running");
+      assert.deepEqual(accepted.testRun.unitResponses,before.unitResponses);assert.deepEqual(accepted.testRun.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+      assert.deepEqual(await repository.getTestRunById(otherBookletRun.testRunId),sibling);
+      const later=await issue(run.testRunId,"complete");await request("PATCH",acknowledgement(later.commandId),{testRunId:run.testRunId},selected.sessionToken);await apply(later.commandId);
+      const snapshot=async()=>({parent:await repository.getParticipantSessionById(sessionId),run:await repository.getTestRunById(run.testRunId),
+        logs:await repository.listParticipantTestLogsByWorkspace(run.tenantId,run.workspaceId),events:await repository.listWorkspaceActivityEventsByWorkspace(run.tenantId,run.workspaceId)});
+      const inactive=await snapshot(),replay=(await apply(next.commandId)).application;
+      assert.equal(replay.applied,false);assert.equal(replay.command.executedAt,accepted.command.executedAt);assert.deepEqual(await snapshot(),inactive);
     });
     await t.test("session revocation also closes command access", async () => {
       await request("DELETE", resolveRoutePath(routes.participant.signOut, { participantSessionId: sessionId }), undefined, selected.sessionToken, 205);

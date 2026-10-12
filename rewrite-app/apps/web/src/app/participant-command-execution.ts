@@ -3,6 +3,38 @@ import { parseParticipantRunCommand, participantCommandExecutionRoute } from "@t
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 
+/** Reconcile presentation after a committed effect without occupying its command lane. */
+export const reconcileAcceptedParticipantCommand = (options: {
+  signal?: AbortSignal;
+  isCurrent: () => boolean;
+  reconcile: () => Promise<void>;
+  failed: (error: Error) => void;
+  schedule?: (callback: () => void, milliseconds: number) => () => void;
+}): void => {
+  const schedule = options.schedule ?? ((callback, milliseconds) => {
+    const timer = globalThis.setTimeout(callback, milliseconds);
+    return () => globalThis.clearTimeout(timer);
+  });
+  let stopped = false, cancel: (() => void) | null = null;
+  const current = (): boolean => !stopped && !options.signal?.aborted && options.isCurrent();
+  const stop = (): void => {
+    stopped = true; cancel?.(); cancel = null;
+    options.signal?.removeEventListener("abort", stop);
+  };
+  const attempt = (): void => {
+    if (!current()) { stop(); return; }
+    void Promise.resolve().then(() => current() ? options.reconcile() : undefined).then(stop).catch(error => {
+      if (!current()) { stop(); return; }
+      if (error?.retryable === false || error?.statusCode >= 400 && error.statusCode < 500) {
+        stop(); options.failed(error instanceof Error ? error : new Error(String(error))); return;
+      }
+      cancel = schedule(() => { cancel = null; attempt(); }, 1_000);
+    });
+  };
+  options.signal?.addEventListener("abort", stop, { once: true });
+  attempt();
+};
+
 /** Apply an accepted receipt before projecting its effect into the current view. */
 export const executeReceivedParticipantCommand = async (
   command: ParticipantRunCommand,

@@ -188,17 +188,16 @@ try {
     checks.push("remote-resume-overtakes-held-view-and-fences-its-late-state");console.log("participant_console_loading=remote-resume-overtakes-held-view-and-fences-its-late-state:passed");
     await remotePage.route("**/application",captureApplication);
     const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
-    let terminalRuntimeReads=0,reconciledEntry=false;
+    let terminalRuntimeReads=0;
     const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
     await remotePage.route(url=>url.pathname===runtimePath,async route=>{
       const response=await route.fetch();terminalRuntimeReads++;
       if(terminalRuntimeReads===1){assert.equal((await response.json()).runtimeState.participantSession.status,'signed_in');await terminalRuntimeGate;}
       await route.fulfill({response});
     });
-    remotePage.on('request',request=>{if(terminalRuntimeReads>=2&&new URL(request.url()).pathname.endsWith('/current-state'))reconciledEntry=true;});
+    const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
     const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
     await poll(()=>Promise.resolve(terminalRuntimeReads===1),'Terminal command did not hold its inactive runtime snapshot');
-    const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
     await remotePage.evaluate(()=>window.tc.resume());
     await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';},'New native entry did not reactivate the terminated Run');
     await poll(()=>previousFrame.evaluate(frame=>!frame.isConnected),'New native receipt did not replace the prior Player');
@@ -206,7 +205,7 @@ try {
     await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The newer native entry did not restore its stored answer');
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'New native receipt did not project the active entry');
     releaseTerminalRuntime();
-    await poll(()=>Promise.resolve(terminalRuntimeReads>=2&&reconciledEntry),'Late terminal runtime snapshot was not re-read for the newer entry');
+    await poll(()=>Promise.resolve(terminalRuntimeReads>=2),'Late terminal runtime snapshot was not re-read for the newer entry');
     await remotePage.unrouteAll({behavior:'wait'});
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
@@ -252,6 +251,100 @@ try {
     assert.equal(acks.length,6);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
     loadingObservations.push({testRunId:runId,gotoApplications:applications.slice(3),answersAndClocksPreserved:true,siblingPreserved:true,formerUnitRetiredBeforeTargetView:true});
     checks.push('remote-goto-retires-the-former-unit-and-keeps-following-commands-live');console.log('participant_console_loading=remote-goto-retires-the-former-unit-and-keeps-following-commands-live:passed');
+
+    await remotePage.unrouteAll({behavior:'wait'});
+    const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
+    for(const origin of ['remote','native']) {
+      if((await loadingRepository.getTestRunById(runId)).status==='paused') {
+        await remotePage.evaluate(()=>window.tc.resume());
+        await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+      }
+      await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'Reception did not become live before the terminal case');
+      const baseline=await loadingRepository.getTestRunById(runId),start=applications.length;
+      const heldRuntime=terminalDeferred(),heldView=terminalDeferred(),completeAck=terminalDeferred(),resumeAck=terminalDeferred();
+      releases.push(heldRuntime.resolve,heldView.resolve,completeAck.resolve,resumeAck.resolve);
+      let runtimeReads=0,viewHeld=false,viewReleased=false,routeError;
+      const heldAcks=[],issued=[];
+      const routeFailure=(route,error)=>{
+        const failure=route.request().failure();
+        if(failure&&/abort|cancel/i.test(failure.errorText))loadingObservations.push({cancelledTerminalView:failure.errorText});
+        else routeError=error;
+      };
+      try {
+        await remotePage.route('**/application',captureApplication);
+        await remotePage.route(url=>url.pathname===runtimePath,async route=>{
+          try {
+            const response=await route.fetch();runtimeReads++;
+            if(runtimeReads===1){assert.equal((await response.json()).runtimeState.participantSession.status,'signed_in');await heldRuntime.promise;}
+            await route.fulfill({response});
+          } catch(error) {routeFailure(route,error);}
+        });
+        await remotePage.route('**/current-state?*',async route=>{
+          try {
+            const response=await route.fetch(),data=await response.json();
+            if(!viewReleased&&data.currentRunState.testRun.status==='running'){viewHeld=true;await heldView.promise;}
+            await route.fulfill({response});
+          } catch(error) {routeFailure(route,error);}
+        });
+        if(origin==='remote') {
+          await remotePage.route('**/commands/*/acknowledgement',async route=>{
+            if(route.request().method()!=='PATCH')return route.continue();
+            try {
+              const response=await route.fetch(),command=(await response.json()).command;
+              assert.ok(command.acknowledgedAt);heldAcks.push(command);
+              await (command.commandType==='complete'?completeAck.promise:resumeAck.promise);
+              await route.fulfill({response});
+            } catch(error) {routeFailure(route,error);}
+          });
+          for(const commandType of ['complete','resume'])issued.push((await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType},operator)).command);
+          await poll(()=>{if(routeError)throw routeError;return Promise.resolve(heldAcks.length===2);},'Both remote commands were not accepted before termination');
+          assert.deepEqual(heldAcks.map(command=>command.commandId),issued.map(command=>command.commandId));
+          completeAck.resolve();
+        } else await remotePage.evaluate(()=>window.tc.terminate());
+        await poll(()=>Promise.resolve(runtimeReads===1),`${origin} termination did not hold its Starter runtime`);
+        await poll(async()=>/STATUS:\s*TERMINATED/.test(await remotePane.innerText()),`${origin} terminal receipt waited for its held Starter runtime`);
+        await poll(async()=>!/BS:\s*live/.test(await remotePane.innerText()),`${origin} termination did not suspend new reception`);
+        assert.equal(await remotePage.locator('iframe:visible').count(),0);
+        if(origin==='remote')resumeAck.resolve();else await remotePage.evaluate(()=>window.tc.resume());
+        await poll(async()=>{
+          const run=await loadingRepository.getTestRunById(runId);
+          return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';
+        },`${origin} accepted Resume waited behind terminal presentation or left the parent inactive`);
+        await poll(()=>Promise.resolve(viewHeld),`${origin} Resume did not hold its following Unit view`);
+        await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),`${origin} Resume did not project before its Unit view`);
+        await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),`${origin} Resume did not reopen reception before its Unit view`);
+        // The held ACK routes are only needed for the two preaccepted receipts.
+        await remotePage.unroute('**/commands/*/acknowledgement');
+        const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;issued.push(following);
+        await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),`${origin} reopened reception did not apply a fresh Pause while views were held`);
+        heldRuntime.resolve();
+        await poll(()=>Promise.resolve(runtimeReads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
+        viewReleased=true;heldView.resolve();
+        await remotePage.unrouteAll({behavior:'wait'});
+        if(routeError)throw routeError;
+        assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
+        assert.match(await remotePane.innerText(),/STATUS:\s*PAUSED/);
+        assert.equal(new URL(remotePage.url()).searchParams.get('testRunId'),runId);
+        const finalRun=await loadingRepository.getTestRunById(runId);
+        assert.equal(finalRun.status,'paused');assert.equal(finalRun.currentUnitKey,baseline.currentUnitKey);
+        assert.deepEqual(finalRun.unitResponses,baseline.unitResponses);
+        assert.deepEqual(finalRun.unitResponseFieldTimestamps,baseline.unitResponseFieldTimestamps);
+        assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+        assert.equal((await loadingRepository.getParticipantSessionById(finalRun.participantSessionId)).status,'launched');
+        assert.deepEqual(applications.slice(start).map(value=>value.application.command.commandId),issued.map(command=>command.commandId));
+        assert.ok(applications.slice(start).every(value=>value.application.applied&&value.application.command.executedAt));
+        assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
+        for(const command of issued)assert.equal(acks.filter(ack=>ack.path.includes(command.commandId)).length,1);
+        loadingObservations.push({origin,testRunId:runId,applications:applications.slice(start),acceptedBeforeTermination:heldAcks,runtimeReads,
+          terminalReceptionSuspended:true,acceptedResumeIndependentOfStarter:true,receptionReopenedBeforeUnitView:true,freshPauseApplied:true,answersAndClocksPreserved:true,siblingPreserved:true});
+        await remotePage.screenshot({path:join(artifacts,`${origin}-terminal-presentation-independent.png`),fullPage:true});
+        const marker=`${origin}-terminal-presentation-keeps-accepted-resume-and-reception-independent`;
+        checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+      } finally {
+        heldRuntime.resolve();viewReleased=true;heldView.resolve();completeAck.resolve();resumeAck.resolve();
+        await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});
+      }
+    }
   }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePage.unrouteAll({behavior:"wait"}).catch(()=>{});await remoteContext.close();}
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();

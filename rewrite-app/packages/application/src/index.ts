@@ -32114,7 +32114,8 @@ export const createFirstSliceServices = (
               details: { testletKey: timerKey, durationSeconds: nextRun.testletTimers?.[timerKey]?.durationSeconds ?? command.remainingSeconds,
                 expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
             return { testRun: nextRun, testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
-              activityEvents, ...(terminal ? { participantSession: { ...participantSession, status: "signed_in" as const } } : {}) };
+              activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
+                ? { participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
           }));
           if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
           return result;

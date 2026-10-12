@@ -24,7 +24,7 @@ const application = () => ({ application: {
   testRun: { tenantId: "owned-tenant", workspaceId: "owned-workspace", participantSessionId: "owned-session", testRunId: "owned-run", contentReleaseId:"owned-release",bookletKey:"owned-booklet",status:"running",unitResponses:{unit:"Exact answer Ω"} },
   participantSession: { tenantId: "owned-tenant", workspaceId: "owned-workspace", participantSessionId: "owned-session" }
 } });
-const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+const deferred = () => { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; };
 const fixture = (respond = async () => ({ ok: true, json: async () => application() })) => {
   const controller = new AbortController(), calls = [], events = [];
   let current = true;
@@ -128,4 +128,45 @@ for (const substituted of [false, true]) test(`debug does not drain Player answe
 test("a verified full application reaches projection unchanged, including a replayed snapshot and exact scope",async()=>{
  const receipt=application().application;receipt.applied=false;const f=fixture(async()=>({ok:true,json:async()=>({application:structuredClone(receipt)})}));
  let received;f.options.apply=async value=>{received=value;};await f.execute();assert.deepEqual(received,receipt);
+});
+
+const reconciliationDeclaration=ast.statements.filter(ts.isVariableStatement).flatMap(item=>[...item.declarationList.declarations])
+  .find(item=>item.name.getText(ast)==='reconcileAcceptedParticipantCommand');assert.ok(reconciliationDeclaration?.initializer);
+const reconciliationCode=ts.transpileModule(`export const reconcile=${reconciliationDeclaration.initializer.getText(ast)}`,{
+  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {reconcile}=await import('data:text/javascript;base64,'+Buffer.from(reconciliationCode).toString('base64'));
+const flushReconciliation=()=>new Promise(done=>setImmediate(done));
+const reconciliationFixture=(operation=async()=>{})=>{
+ const controller=new AbortController(),timers=[],failures=[];let current=true,attempts=0;
+ const options={signal:controller.signal,isCurrent:()=>current,reconcile:()=>{attempts++;return operation(attempts);},failed:error=>failures.push(error),
+  schedule(callback,delay){const timer={callback,delay,canceled:false};timers.push(timer);return ()=>{timer.canceled=true;};}};
+ return {controller,timers,failures,options,attempts:()=>attempts,leave(){current=false;},start:()=>reconcile(options)};
+};
+test('a held presentation reconciliation returns immediately and leaves other committed commands free',async()=>{
+ const held=deferred(),f=reconciliationFixture(()=>held.promise);assert.equal(f.start(),undefined);await flushReconciliation();
+ const later=reconciliationFixture();later.start();await flushReconciliation();assert.equal(later.attempts(),1);assert.equal(f.attempts(),1);
+ assert.deepEqual(f.timers,[]);held.resolve();await flushReconciliation();assert.deepEqual(f.failures,[]);
+});
+for(const reason of [new Error('Owned transient request'),{statusCode:503},{retryable:true}])test(`presentation recovery retries independently after ${reason.message??JSON.stringify(reason)}`,async()=>{
+ const f=reconciliationFixture(attempt=>attempt===1?Promise.reject(reason):Promise.resolve());f.start();await flushReconciliation();
+ assert.equal(f.timers.length,1);assert.equal(f.timers[0].delay,1000);assert.deepEqual(f.failures,[]);
+ f.timers[0].callback();await flushReconciliation();assert.equal(f.attempts(),2);assert.equal(f.timers.length,1);
+});
+for(const reason of [{statusCode:401},{statusCode:403},{statusCode:404},{statusCode:409},Object.assign(new Error('Foreign scope'),{retryable:false})])test(`presentation recovery permanently rejects ${reason.message??JSON.stringify(reason)}`,async()=>{
+ const f=reconciliationFixture(()=>Promise.reject(reason));f.start();await flushReconciliation();
+ assert.equal(f.attempts(),1);assert.equal(f.failures.length,1);assert.ok(f.failures[0] instanceof Error);assert.deepEqual(f.timers,[]);
+});
+for(const interruption of ['abort','scope'])test(`presentation recovery cancels a retry after ${interruption}`,async()=>{
+ const f=reconciliationFixture(()=>Promise.reject(new Error('Owned transient request')));f.start();await flushReconciliation();
+ assert.equal(f.timers.length,1);if(interruption==='abort')f.controller.abort();else f.leave();
+ f.timers[0].callback();await flushReconciliation();assert.equal(f.attempts(),1);assert.deepEqual(f.failures,[]);
+ if(interruption==='abort')assert.equal(f.timers[0].canceled,true);
+});
+for(const interruption of ['abort','scope'])test(`a held presentation failure schedules no retry after ${interruption}`,async()=>{
+ const held=deferred(),f=reconciliationFixture(()=>held.promise);f.start();await flushReconciliation();
+ if(interruption==='abort')f.controller.abort();else f.leave();held.reject(new Error('Late failure'));await flushReconciliation();
+ assert.equal(f.attempts(),1);assert.deepEqual(f.timers,[]);assert.deepEqual(f.failures,[]);
+});
+test('an already invalid presentation starts no request',async()=>{
+ for(const interruption of ['abort','scope']){const f=reconciliationFixture();if(interruption==='abort')f.controller.abort();else f.leave();f.start();await flushReconciliation();assert.equal(f.attempts(),0);assert.deepEqual(f.timers,[]);}
 });

@@ -542,11 +542,13 @@ export class ParticipantViewFacade {
     this.commandControllerState = { testRunId: result.testRun.testRunId,
       status: terminal ? result.controllerStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : result.testRun.status.toUpperCase() };
     if (terminal) {
-      const payload = await this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
-        resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: result.scope.participantSessionId }), undefined, { quiet: true });
+      this.participantEvents.suspend();
+      const { reconcileAcceptedParticipantCommand } = await import("./participant-command-execution");
       if (!isCurrent()) return;
-      this.presentParticipantStarter(payload.runtimeState, result.scope.testRunId, true);
-      await this.replaceSelectedRunEntryLink();
+      reconcileAcceptedParticipantCommand({ isCurrent,
+        reconcile: () => this.reconcileParticipantTerminalState(result.testRun, false, isCurrent),
+        failed: error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+      });
       return;
     }
     this.participantErrorReceptionSuspended = false;
@@ -555,12 +557,56 @@ export class ParticipantViewFacade {
       this.remoteTerminalErrorRunId = null;
       this.commandReloadSequence.update(sequence => sequence + 1);
     }
+    this.startAcceptedParticipantReception();
     void this.refreshCurrentStateInternal(true, true).catch(error => {
       if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
     });
   }
   private readonly receiveParticipantCommand = (command: ParticipantRunCommand, signal: AbortSignal): Promise<void> =>
     this.applyReceivedParticipantCommand(command, signal);
+
+  private startAcceptedParticipantReception(): void {
+    const state = this.debugRunState;
+    // A lightweight context alone is still initial LOADING. A confirmed
+    // transition of an already loaded controller can reopen reception before
+    // its next Unit view arrives, as in the Original state subscription.
+    if (!state || this.eagerBookletLoading || this.hasControllerError || state.testRun.status === "completed" ||
+      this.commandControllerState?.status.startsWith("TERMINATED")) return;
+    this.participantEvents.start(state.participantSession.participantSessionId,
+      this.refreshFromParticipantEvents, null, state.testRun.testRunId,
+      state.executionMode?.receiveRemoteCommands ? this.receiveParticipantCommand : null);
+  }
+
+  private async reconcileParticipantTerminalState(run: TestRun, legacy: boolean, isCurrent: () => boolean): Promise<void> {
+    const readRuntime = () => this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
+      resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: run.participantSessionId }), undefined, { quiet: true });
+    let runtimeView = this.currentStateAppliedRefreshSequence;
+    let payload = await readRuntime();
+    if (!isCurrent()) return;
+    if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+      runtimeView = this.currentStateAppliedRefreshSequence;
+      payload = await readRuntime();
+      if (!isCurrent()) return;
+      if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+        throw Object.assign(new Error("The controller changed while reconciling its terminal receipt."), { retryable: true });
+      }
+    }
+    if (!(["tenantId", "workspaceId", "participantSessionId", "contentReleaseId"] as const)
+      .every(key => payload.runtimeState.participantSession[key] === run[key])) {
+      throw Object.assign(new Error("The terminal command runtime state does not match the selected Run."), { retryable: false });
+    }
+    if (legacy || payload.runtimeState.participantSession.status === "signed_in") {
+      this.presentParticipantStarter(payload.runtimeState, run.testRunId, true);
+      await this.replaceSelectedRunEntryLink();
+    } else if (this.commandControllerState?.testRunId === run.testRunId &&
+      this.commandControllerState.status.startsWith("TERMINATED")) {
+      // A confirmed newer local receipt already owns its own Unit refresh.
+      // Do not start an older terminal refresh across that accepted selection.
+      void this.refreshCurrentStateInternal(true, true).catch(error => {
+        if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+      });
+    }
+  }
 
   private async applyReceivedParticipantCommand(command: ParticipantRunCommand, signal: AbortSignal): Promise<void> {
     const run = this.consoleRun;
@@ -574,10 +620,13 @@ export class ParticipantViewFacade {
         .every(key => this.consoleRun?.[key] === run[key]);
     const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
     let observedView = this.currentStateAppliedRefreshSequence;
+    let observedRun = run;
     let observedStatus: "RUNNING" | "PAUSED" | "ERROR" = "RUNNING";
-    await (await import("./participant-command-execution")).executeReceivedParticipantCommand(command, signal, {
+    const execution = await import("./participant-command-execution");
+    await execution.executeReceivedParticipantCommand(command, signal, {
       scope: run, isCurrent, controllerStatus: () => {
         observedView = this.currentStateAppliedRefreshSequence;
+        observedRun = this.consoleRun ?? run;
         observedStatus = this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" : "RUNNING";
         return observedStatus;
       },
@@ -592,44 +641,28 @@ export class ParticipantViewFacade {
           (await import("./participant-debug-control")).applyParticipantDebugArguments(command.debugArguments ?? [], command);
           return;
         }
+        // An ordinary refresh of the identical Run is not a newer effect.
+        // Keep the conservative fence for changed answers, selection or state.
+        const superseded = observedView !== this.currentStateAppliedRefreshSequence &&
+          JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
         if (terminal) {
-          const readRuntime = () => this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
-            resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: command.participantSessionId }), undefined, { quiet: true });
-          let runtimeView = this.currentStateAppliedRefreshSequence;
-          let payload = await readRuntime();
-          if (!isCurrent()) return;
-          if (runtimeView !== this.currentStateAppliedRefreshSequence) {
-            runtimeView = this.currentStateAppliedRefreshSequence;
-            payload = await readRuntime();
-            if (!isCurrent()) return;
-            if (runtimeView !== this.currentStateAppliedRefreshSequence) {
-              throw Object.assign(new Error("The controller changed while reconciling its terminal receipt."), { retryable: true });
-            }
-          }
-          if (!(["tenantId", "workspaceId", "participantSessionId", "contentReleaseId"] as const)
-            .every(key => payload.runtimeState.participantSession[key] === run[key])) {
-            throw Object.assign(new Error("The terminal command runtime state does not match the selected Run."), { retryable: false });
-          }
-          // A later entry can reactivate this same Run while the old terminal
-          // receipt is travelling. Its current parent keeps the active view.
-          if (!command.effectsDeferred || payload.runtimeState.participantSession.status === "signed_in") {
+          if (!superseded) {
             this.invalidateCurrentStateRefreshes();
             this.syncRun(application.testRun);
             this.commandControllerState = { testRunId: command.testRunId,
               status: observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" };
-            this.presentParticipantStarter(payload.runtimeState, command.testRunId, true);
-            await this.replaceSelectedRunEntryLink();
-          } else {
-            void this.refreshCurrentStateInternal(true, true).catch(error => {
-              if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
-            });
+            this.participantEvents.suspend();
           }
+          execution.reconcileAcceptedParticipantCommand({ signal, isCurrent,
+            reconcile: () => this.reconcileParticipantTerminalState(run, !command.effectsDeferred, isCurrent),
+            failed: error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+          });
           return;
         }
         // Another accepted view or native receipt can supersede this snapshot
         // while its application request is in flight. Reconcile from the API
         // without projecting the older snapshot over that newer local state.
-        if (observedView !== this.currentStateAppliedRefreshSequence) {
+        if (superseded) {
           void this.refreshCurrentStateInternal(true, true).catch(error => {
             if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
           });
@@ -637,12 +670,16 @@ export class ParticipantViewFacade {
         }
         this.invalidateCurrentStateRefreshes();
         this.syncRun(application.testRun);
-        this.commandControllerState = { testRunId: command.testRunId,
-          status: application.testRun.status.toUpperCase() };
+        const changesControllerState = ["pause", "resume", "goto"].includes(command.commandType);
+        if (changesControllerState || !this.commandControllerState?.status.startsWith("TERMINATED")) {
+          this.commandControllerState = { testRunId: command.testRunId,
+            status: application.testRun.status.toUpperCase() };
+        }
         this.participantErrorReceptionSuspended = false;
         if ((command.commandType === "resume" || command.commandType === "goto") && application.testRun.status === "running") {
           this.commandReloadSequence.update(sequence => sequence + 1);
         }
+        if (changesControllerState) this.startAcceptedParticipantReception();
         void this.refreshCurrentStateInternal(true, true).catch(error => {
           if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
         });
@@ -4556,7 +4593,8 @@ export class ParticipantViewFacade {
       }
       if (payload.currentRunState.testRun.status === "completed") {
         this.participantEvents.stop();
-      } else if (this.hasControllerError) {
+      } else if (this.hasControllerError || this.commandControllerState?.testRunId === testRunId &&
+        this.commandControllerState.status.startsWith("TERMINATED")) {
         this.participantEvents.suspend();
       } else {
         this.participantEvents.start(

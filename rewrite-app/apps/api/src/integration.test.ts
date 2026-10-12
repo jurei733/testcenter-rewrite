@@ -46723,7 +46723,8 @@ test("participant session launch can target a specific booklet", async () => {
   }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`
   );
-  assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "signed_in");
+  assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "launched",
+    "An executed remote Resume reactivates the parent after another Booklet ended.");
   assert.equal(betweenBooklets.body.runtimeState.runtimeStatus, "in_progress");
   assert.equal(betweenBooklets.body.runtimeState.availableAction, "resume");
   assert.deepEqual(
