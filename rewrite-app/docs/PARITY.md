@@ -28,6 +28,16 @@ CI are not claimed.
 Backend application/API/store source hashes remain identical to checkpoint
 `7fdff889a3bd`; its 1,244 PostgreSQL, 498 HTTP and 61 compatibility checks remain
 applicable predecessor evidence, without rerunning those unchanged suites.
+Application checkpoint `94a7d5b42f1a` additionally passed all 147 existing
+termination, save/retry, Player-exit, completeness and paused-exit browser cases.
+Standard, Demo and production PostgreSQL profiles, SQLite runtime and all 320
+transaction/API checks in the read-only image as `node` passed without skips or
+cancellations. The clean Git archive's 889 tracked files were hash-verified and the
+archive removed. All 24 existing containers, every mount field, 85 volumes and the
+protected presentation/host TypeScript hashes remain intact. The proof preserves
+304 verified evidence files; about 8.01 GB of host space remains. This local
+checkpoint carries no push, remote CI, release, deployment or production claim.
+
 Full mixed-schema/worker/native-DTO/deployment rollout, Original controller
 lifecycle/log status, actual route/tab ownership, complete visual/property/real
 package acceptance, measured performance and production confirmation remain open.

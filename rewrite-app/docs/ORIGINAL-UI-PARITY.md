@@ -18,6 +18,13 @@ proof. Full Original lifecycle/visual/property/package acceptance, remaining rol
 versions and production acceptance remain open. See [the current scope and proof
 boundaries in PARITY](./PARITY.md#participant-reentry-with-an-older-api-2026-10-12).
 
+Application checkpoint `94a7d5b42f1a` also passed all 147 existing browser cases,
+all three PostgreSQL container profiles, SQLite runtime and all 320 read-only image
+checks as `node`. The archive's 889 file hashes were verified and the archive removed.
+All 24 existing containers, all mount fields, 85 volumes and protected hashes are
+preserved, with about 8.01 GB free. The proof contains 304 verified evidence files;
+remote CI and production confirmation remain unverified.
+
 ### Console and Debug during initial loading (2026-10-12)
 
 All five terminal methods now bind before the first complete Unit view, matching
