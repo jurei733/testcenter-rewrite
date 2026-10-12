@@ -63,9 +63,10 @@ try {
   content.bookletEntries = [{ bookletKey: "first", displayLabel: "First debug booklet", customTexts: { owned_token: "Booklet override Ω" },
     config: { toolbar_show_unit_list: "FALSE", toolbar_show_reload_button: "FALSE", toolbar_show_fullscreen_button: "FALSE", lock_test_on_termination: "OFF" },
     testletEntries: [{ testletKey: "timed", displayLabel: "Timed", parentTestletKey: null, restrictions: { timeMax: { minutes: 5, leave: "none" } } },
-      { testletKey: "private-gate", displayLabel: "Private gate", parentTestletKey: "timed", restrictions: { codeToEnter: { code: "OWNED_PRIVATE_CODE_Ω", prompt: "Owned prompt" } } }],
+      { testletKey: "private-gate", displayLabel: "Private gate", parentTestletKey: "timed", restrictions: { codeToEnter: { code: "OWNED_PRIVATE_CODE_Ω", prompt: "Owned prompt" } } },
+      { testletKey: "private-child", displayLabel: "Private child", parentTestletKey: "private-gate", restrictions: {} }],
     unitEntries: [{ ...unit, unitKey: "first-unit", originalUnitId: "original-first", displayLabel: "First unit", testletPath: ["timed"] },
-      { ...unit, unitKey: "next-unit", displayLabel: "Next unit", testletPath: ["timed", "private-gate"] }],
+      { ...unit, unitKey: "next-unit", displayLabel: "Next unit", testletPath: ["timed", "private-gate", "private-child"] }],
     stateEntries: [{ stateKey: "level", displayLabel: "Level", options: [
       { optionKey: "high", displayLabel: "High", conditions: [{ source: { type: "Score", unitKey: "first-unit", variableKey: "x", defaultValue: "0" }, expression: { type: "greaterThan", value: "1" } }] },
       { optionKey: "base", displayLabel: "Base", conditions: [] }] }] },
@@ -112,6 +113,10 @@ try {
       await poll(async () => /restrictions.timeMax/.test(await windowPane(key).innerText()), "Expanded Testlet did not render");
       await windowPane(key).getByRole("button", { name: "Toggle Testlet private-gate", exact: true }).click();
       await poll(async () => /Owned prompt/.test(await windowPane(key).innerText()), "Expanded code gate did not render");
+      await windowPane(key).getByRole("button", { name: "Toggle Testlet private-child", exact: true }).click();
+      await poll(async () => ((await windowPane(key).innerText()).match(/BY code THROUGH private-gate/g) ?? []).length === 2,
+        "Own and inherited code-lock origins did not render");
+      assert.match(await windowPane(key).innerText(), /locks.show/); assert.match(await windowPane(key).innerText(), /locks.afterLeave/);
       assert.ok(!(await windowPane(key).innerText()).includes("OWNED_PRIVATE_CODE_Ω"));
     }
     if (key === "unit") assert.match(await windowPane(key).innerText(), /original-first/);

@@ -1,5 +1,23 @@
 # Optional Original UI
 
+### Participant Debug lock origins (2026-10-12)
+
+Testlet details now match pinned Source own/ancestor lock priorities, show all
+four lock fields and their effective `BY ... THROUGH ...` cause, and activate
+code/time badges only at that cause's origin. The Source root `[0]`, inherited
+block label/timer ID and Unit leave-lock metadata are also shown. Hidden access
+codes remain redacted; the existing gate metadata keeps lock diagnostics
+accurate. Local projection and countdown updates perform no persistence.
+
+All 1,773 local unit/frontend tests, typecheck, 469.96 kB production build and
+nine Chromium/SQLite Debug groups passed. Twenty-eight new checks execute the
+pinned Original lock methods, while the actual Booklet proves own and inherited
+code-lock origins. The unchanged core retains its prior 1,199-test PostgreSQL
+proof; this frontend-only change does not repeat that suite. Full visual and
+property parity, native console commands, early ERROR, real-package/controller
+transitions, performance and production acceptance remain open. See
+[the current scope and evidence in PARITY](./PARITY.md#effective-participant-debug-testlet-locks-2026-10-12).
+
 ### Participant Debug and hidden codes (2026-10-12)
 
 The selected-run Debug pane now implements all ten Source windows, explicit

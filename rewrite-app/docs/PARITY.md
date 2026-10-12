@@ -1,5 +1,33 @@
 # Testcenter parity checklist
 
+### Effective participant Debug Testlet locks (2026-10-12)
+
+Debug Testlet details now report all four Source lock fields and the effective
+`BY ... THROUGH ...` cause. Root/ancestor locks take priority over a child's
+own locks; within a node, order is show, time, code, afterLeave. Code/time badges
+activate only on the Testlet causing the effective lock. Diagnostics use the
+existing `requiresCode` metadata, so an empty redacted code still has an active
+gate. They also show the Source root `[0]`, inherited block label/timer ID and
+Unit `lockedAfterLeaving`. Local adaptive choices, cleared codes, leave locks
+and the displayed countdown update the projection without changing stored
+answers, timers, Run state, content, logs or audit. The Booklet clock remains
+reactive with Main closed; invalid/cyclic parent references fail within the
+diagnostic projection.
+
+Twenty-eight checks execute pinned Original controller/loader methods and
+compare all overlapping lock combinations, ancestor/root precedence, metadata,
+cleared locks, local countdown purity, all six scope fields and actual pane
+properties. Fresh validation passed all 1,773 unit/frontend tests, typecheck,
+the production build (469.96 kB under the unchanged 470 kB hard limit) and all
+nine Chromium/SQLite Debug groups. The expanded Booklet proves a hidden code's
+own and inherited lock origins. API/core and existing test sources retain their
+byte-identical hashes from the 1,199-test PostgreSQL proof at `02bce022a44a`;
+that PostgreSQL suite was not repeated for this frontend-only change. Fresh
+container evidence must identify this checkpoint's own image. Other native
+console commands, early-loading ERROR, complete Original visual/property and
+real-package/controller-transition acceptance, performance, remote CI and
+production rollout remain open. Previous sections preserve historical evidence.
+
 ### Participant Debug and access-code visibility (2026-10-12)
 
 The selected-run Debug workflow is implemented under `236cec382fba`; its

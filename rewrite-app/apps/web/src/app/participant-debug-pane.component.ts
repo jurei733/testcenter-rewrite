@@ -16,6 +16,7 @@ import { participantDebugScopeKey, readParticipantDebugSnapshot } from "./partic
 import { ParticipantDebugDragDirective } from "./participant-debug-drag.directive";
 import { participantDebugConfigEntries, participantDebugModeEntries } from "./participant-debug-settings";
 import { readParticipantDebugResponses } from "./participant-debug-responses";
+import { participantDebugRootTestletKey, readParticipantDebugTestlets, type ParticipantDebugTestletState } from "./participant-debug-testlets";
 
 type DebugBadge = { label: string; title: string; active?: boolean };
 type DebugTree = { id: string; testlet: ContentReleaseTestletEntry | null; unit: ContentReleaseUnitEntry | null; children: DebugTree[] };
@@ -54,6 +55,8 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
   private source: ParticipantDebugSnapshot | null = null;
   private scope = "";
   private fingerprint = "";
+  private lockFingerprint = "";
+  private testletStates = new Map<string, ParticipantDebugTestletState>();
   private generation = 0;
   private stopped = false;
   private request: AbortController | null = null;
@@ -74,11 +77,13 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     if (next !== this.scope) {
       this.scope = next; this.source = null; this.snapshot.set(null); this.error.set("");
       this.fingerprint = ""; this.openPanes.clear(); this.testingConditionResults = [];
+      this.lockFingerprint = ""; this.testletStates.clear();
       this.tree = { id: "", testlet: null, unit: null, children: [] };
       this.systemRequest?.abort(); this.apiStatus.set("not checked"); this.systemError.set("");
       void this.loadSnapshot(next);
     }
     this.projectSnapshot();
+    this.projectLocks();
   }
 
   ngOnDestroy(): void {
@@ -112,8 +117,19 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     try {
       this.snapshot.set(buildParticipantDebugSnapshot(this.source.booklet, { ...this.state.testRun,
         unitResponses: { ...this.state.testRun.unitResponses, ...responses } }));
+      this.projectLocks();
       this.tree = this.buildTree(this.source.booklet);
     } catch (error) { this.snapshot.set(null); this.error.set(String(error)); }
+  }
+
+  private projectLocks(): void {
+    const snapshot = this.snapshot();
+    if (!snapshot || this.scope !== participantDebugScopeKey(this.state)) return;
+    const fingerprint = JSON.stringify([this.state.testRun.testletTimers, this.state.testRun.unlockedTestletKeys,
+      this.state.testRun.lockedTestletKeys, this.state.booklet.testlets, snapshot.adaptiveStates, this.now()]);
+    if (fingerprint === this.lockFingerprint) return;
+    this.testletStates = readParticipantDebugTestlets(this.state, snapshot, this.now());
+    this.lockFingerprint = fingerprint;
   }
 
   toggleWindow(id: ParticipantDebugWindow): void { this.control.toggleWindow(id); }
@@ -172,7 +188,7 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
   }
 
   private buildTree(booklet: ParticipantDebugSnapshot["booklet"]): DebugTree {
-    const root: DebugTree = { id: "", testlet: null, unit: null, children: [] };
+    const root: DebugTree = { id: participantDebugRootTestletKey, testlet: null, unit: null, children: [] };
     const testlets = new Map((booklet.testletEntries ?? []).map(testlet => [testlet.testletKey,
       { id: testlet.testletKey, testlet, unit: null, children: [] } as DebugTree]));
     for (const node of testlets.values()) (testlets.get(node.testlet?.parentTestletKey ?? "") ?? root).children.push(node);
@@ -187,13 +203,16 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
   }
 
   badges(testlet: ContentReleaseTestletEntry | null): DebugBadge[] {
+    // Booklet timer diagnostics also react when the Main window is closed.
+    this.now();
     const restrictions = testlet?.restrictions ?? this.source?.booklet.rootRestrictions;
     if (!restrictions) return [];
-    const key = testlet?.testletKey ?? "";
-    const timer = this.state.testRun.testletTimers?.[key];
+    const key = testlet?.testletKey ?? participantDebugRootTestletKey;
+    const details = this.testletStates.get(key);
+    const active = (by: "time" | "code"): boolean => details?.locked?.by === by && details.locked.through === key;
     const badges: DebugBadge[] = [];
-    if (restrictions.timeMax) badges.push({ label: "T", title: `${restrictions.timeMax.minutes}min`, active: timer?.status === "expired" });
-    if (testlet?.restrictions?.codeToEnter) badges.push({ label: "C", title: "codeToEnter", active: !this.state.testRun.unlockedTestletKeys?.includes(key) });
+    if (restrictions.timeMax) badges.push({ label: "T", title: `${restrictions.timeMax.minutes}min`, active: active("time") });
+    if (testlet?.restrictions?.codeToEnter) badges.push({ label: "C", title: "codeToEnter", active: active("code") });
     const completeness = restrictions.denyNavigationOnIncomplete;
     if (completeness?.presentation && completeness.presentation !== "off") badges.push({
       label: completeness.presentation === "always" ? "P" : "p", title: `denyNavigation on presentation ${completeness.presentation === "always" ? "ALWAYS" : "ON"}` });
@@ -203,19 +222,18 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
       label: testlet.restrictions.lockAfterLeaving.scope === "unit" ? "U" : "L", title: "lockAfterLeaving" });
     const show = testlet?.restrictions?.show;
     if (show) badges.push({ label: "I", title: `SHOW IF ${show.stateKey} IS ${show.optionKey}`,
-      active: this.snapshot()?.adaptiveStates.find(state => state.stateKey === show.stateKey)?.optionKey === show.optionKey });
+      active: details ? !details.locks.show : false });
     return badges;
   }
 
   testletProperties(node: DebugTree): Array<[string, string]> {
     const key = node.id;
     const restrictions = node.testlet?.restrictions ?? this.source?.booklet.rootRestrictions ?? {};
-    const locked = this.state.testRun.lockedTestletKeys?.includes(key);
-    return [...this.properties(node.testlet ? { label: node.testlet.displayLabel, parent: node.testlet.parentTestletKey } : {}),
+    const details = this.testletStates.get(key);
+    return [...this.properties({ label: node.testlet?.displayLabel ?? "", blockLabel: details?.blockLabel ?? "", timerId: details?.timerId ?? null }),
+      ...this.properties(details?.locks).map(([name, value]): [string, string] => [`locks.${name}`, value]),
       ...this.properties(restrictions).map(([name, value]): [string, string] => [`restrictions.${name}`, value]),
-      ["locks.code", String(Boolean(node.testlet?.restrictions?.codeToEnter && !this.state.testRun.unlockedTestletKeys?.includes(key)))],
-      ["locks.time", String(this.state.testRun.testletTimers?.[key]?.status === "expired")],
-      ["locks.leave", String(Boolean(locked))], ["locked", locked ? `THROUGH ${key}` : "NO"]];
+      ["locked", details?.locked ? `BY ${details.locked.by} THROUGH ${details.locked.through}` : "NO"]];
   }
 
   unitProperties(unit: ContentReleaseUnitEntry): Array<[string, string]> {
@@ -229,7 +247,8 @@ export class ParticipantDebugPaneComponent implements DoCheck, OnDestroy {
     return [["sequenceId", String(index + 1)], ["id", unit.originalUnitId ?? unit.unitKey], ["alias", unit.unitKey],
       ["label", unit.displayLabel], ["labelShort", unit.shortLabel ?? ""], ["player", unit.playerKey ?? ""],
       ["locked", String(this.state.bookletUnits.find(entry => entry.unitKey === unit.unitKey)?.isLocked ?? false)],
-      ["parent", unit.testletPath?.at(-1) ?? "<units>"], ["definition", `${(unit.unitDefinition ?? "").slice(0, 20)} ...`],
+      ["lockedAfterLeaving", String(Boolean(this.state.testRun.lockedUnitKeys?.includes(unit.unitKey)))],
+      ["parent", unit.testletPath?.at(-1) ?? participantDebugRootTestletKey], ["definition", `${(unit.unitDefinition ?? "").slice(0, 20)} ...`],
       ...this.properties(response?.unitState).filter(([key]) => key !== "dataParts").map(([key, value]): [string, string] => [`state.${key}`, value]),
       ["loadingProgress: bookletUnits", `${this.view.bookletLoadedUnitCount}/${this.state.bookletUnits.length}`], ["scheme", scheme]];
   }
