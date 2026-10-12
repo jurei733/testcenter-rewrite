@@ -509,6 +509,14 @@ export class ParticipantViewFacade {
     return this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" :
       this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING";
   }
+  get controllerLogState() {
+    const run = this.consoleRun;
+    if (!run || run.status === "completed") return null;
+    const command = this.commandControllerState?.testRunId === run.testRunId ? this.commandControllerState : null;
+    const status = (!this.debugRunState || this.eagerBookletLoading) && !command && !this.hasControllerError
+      ? "LOADING" : this.debugControllerStatus;
+    return { testRun: run, status, alreadyRecorded: command?.status === status, ready: Boolean(this.debugRunState && !this.eagerBookletLoading) };
+  }
   async prepareNativeConsoleCommand(isCurrent: () => boolean): Promise<void> {
     if (!this.debugRunState) return;
     const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
@@ -3372,6 +3380,7 @@ export class ParticipantViewFacade {
         productionApiRoutes.participant.launch,
         {
           ...credentials,
+          controllerLifecycle: "browser-v1",
           bookletKey: this.runtime.bookletKey.trim() || undefined,
         } satisfies ParticipantLaunchRequest
       );
@@ -3441,7 +3450,8 @@ export class ParticipantViewFacade {
         participantSessionId: this.runtime.participantSessionId.trim()
       }),
       {
-        bookletKey: this.runtime.bookletKey.trim() || undefined
+        bookletKey: this.runtime.bookletKey.trim() || undefined,
+        controllerLifecycle: "browser-v1"
       } satisfies ResumeParticipantSessionRequest,
       { quiet: options.quiet ?? false }
     );

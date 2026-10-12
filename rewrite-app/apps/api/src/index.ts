@@ -8793,6 +8793,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         pathname === productionApiRoutes.participant.launch
       ) {
         const body = await readRequestJsonBody<ParticipantLaunchRequest>();
+        if (body.controllerLifecycle !== undefined && body.controllerLifecycle !== "browser-v1") {
+          sendError(response, 400, "participant_controller_lifecycle_invalid", "Unsupported controller lifecycle.");
+          return;
+        }
         if (
           body.participantSessionId !== undefined &&
           body.participantSessionId !== null
@@ -8808,7 +8812,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
           const testRun = await services.participantRuntime.launch({
             participantSessionId: body.participantSessionId,
-            bookletKey: body.bookletKey
+            bookletKey: body.bookletKey,
+            controllerLifecycle: body.controllerLifecycle
           });
           const runtimeState = await services.participantRuntime.getRuntimeState({
             participantSessionId: testRun.participantSessionId
@@ -8845,7 +8850,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId: participantSession.participantSessionId,
-          bookletKey: body.bookletKey
+          bookletKey: body.bookletKey,
+          controllerLifecycle: body.controllerLifecycle
         });
         const runtimeState = await services.participantRuntime.getRuntimeState({
           participantSessionId: testRun.participantSessionId
@@ -8897,7 +8903,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<ResumeParticipantSessionRequest>();
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId,
-          bookletKey: body?.bookletKey
+          bookletKey: body?.bookletKey,
+          controllerLifecycle: body?.controllerLifecycle
         });
         sendJson<ResumeParticipantSessionResponse>(response, 200, { testRun });
         return;

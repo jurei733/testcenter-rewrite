@@ -6,7 +6,7 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningf
 import {participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','nativeControllerStatus','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
+const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
 const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
@@ -163,4 +163,17 @@ test('eager fallback assets cannot replace an owned controller with a foreign fu
  await assert.rejects(f.host.refreshCurrentStateInternal(true),/controller context/);
  assert.equal(f.calls.applied,0);assert.equal(f.host.debugRunState,null);assert.equal(f.host.consoleRun.workspaceId,'workspace');
  assert.equal(f.host.hasControllerError,true);assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);
+});
+
+test('controller lifecycle uses only an authorized Run and distinguishes initial loading, readiness, early failure and already-recorded native states',()=>{
+ const f=fixture();assert.equal(f.host.controllerLogState,null);
+ f.host.syncRun({...run,status:'paused'});assert.equal(f.host.controllerLogState.ready,false);assert.equal(f.host.controllerLogState.status,'LOADING');assert.equal(f.host.controllerLogState.alreadyRecorded,false);
+ f.host.currentRunState=state({...run,status:'paused'});assert.equal(f.host.controllerLogState.ready,true);assert.equal(f.host.controllerLogState.status,'PAUSED');
+ f.host.activeControllerError.set({testRunId:'selected',message:'Pre-Unit failure'});f.host.participantErrorReceptionSuspended=true;f.host.currentRunState=null;assert.equal(f.host.controllerLogState.status,'ERROR');
+ f.host.activeControllerError.set(null);f.host.participantErrorReceptionSuspended=false;f.host.syncRun(run);f.host.commandControllerState={testRunId:'selected',status:'RUNNING'};
+ assert.equal(f.host.controllerLogState.status,'RUNNING');assert.equal(f.host.controllerLogState.alreadyRecorded,true);
+ f.host.currentRunState=state(run);f.host.commandControllerState={testRunId:'selected',status:'PAUSED'};
+ assert.equal(f.host.controllerLogState.status,'RUNNING');assert.equal(f.host.controllerLogState.alreadyRecorded,false);
+ f.host.syncRun({...run,status:'completed'});assert.equal(f.host.controllerLogState,null);
+ f.host.runtime.testRunId='other';assert.equal(f.host.controllerLogState,null);
 });

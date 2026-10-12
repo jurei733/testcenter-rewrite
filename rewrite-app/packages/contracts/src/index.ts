@@ -947,6 +947,8 @@ export type UploadApplicationAssetRequest = {
 export type ApplicationAssetSummary = Omit<ApplicationAsset, "dataBase64">;
 
 export type ParticipantLaunchRequest = {
+  /** Browser reports actual controller loading and ready transitions. */
+  controllerLifecycle?: "browser-v1";
   participantSessionId?: string;
   tenantKey?: string | null;
   workspaceKey?: string;
@@ -963,6 +965,7 @@ export type ImportParticipantRosterRequest = {
 };
 
 export type ResumeParticipantSessionRequest = {
+  controllerLifecycle?: "browser-v1";
   bookletKey?: string;
 };
 

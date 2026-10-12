@@ -22,7 +22,8 @@ export class ParticipantDebugLauncherComponent implements OnInit, OnDestroy, DoC
   control: ParticipantDebugControl | null = null;
   ngOnInit(): void {
     this.log = createParticipantDebugLog({ readState: () => this.run ? { testRun: this.run,
-      executionMode: participantExecutionModeDefinitions[this.run.executionMode ?? defaultParticipantExecutionMode] } : null });
+      executionMode: participantExecutionModeDefinitions[this.run.executionMode ?? defaultParticipantExecutionMode] } : null,
+      readControllerState: () => this.view.controllerLogState });
     this.native = createParticipantNativeCommands({ readState: () => this.run ? { testRun: this.run } : null,
       controllerStatus: () => this.view.nativeControllerStatus,
       generation: () => this.view.consoleControllerGeneration,

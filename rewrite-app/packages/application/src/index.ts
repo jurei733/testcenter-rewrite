@@ -776,10 +776,11 @@ export type ParticipantRuntimePort = {
     participantSessionId: string;
     resourcePath: string;
   }): Promise<NonNullable<ContentReleaseRuntimeSnapshot["resourceEntries"]>[number]>;
-  launch(input: { participantSessionId: string; bookletKey?: string }): Promise<TestRun>;
+  launch(input: { participantSessionId: string; bookletKey?: string; controllerLifecycle?: "browser-v1" }): Promise<TestRun>;
   resumeSession(input: {
     participantSessionId: string;
     bookletKey?: string;
+    controllerLifecycle?: "browser-v1";
   }): Promise<TestRun>;
   saveProgress(input: {
     testRunId: string;
@@ -2178,6 +2179,13 @@ const participantProgressPayloadSha256 = (value: unknown): string => createHash(
   JSON.stringify(value, (_key, item) => item !== null && typeof item === "object" && !Array.isArray(item)
     ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)
 ).digest("hex");
+
+const usesBrowserControllerLifecycle = (value: unknown): boolean => {
+  if (value !== undefined && value !== "browser-v1") {
+    throw new FirstSliceError(400, "participant_controller_lifecycle_invalid", "Unsupported controller lifecycle.");
+  }
+  return value === "browser-v1";
+};
 
 const normalizeOptionalRuntimeBookletKey = (value: unknown): string | undefined => {
   if (value === undefined || value === null) {
@@ -26405,6 +26413,7 @@ export const createFirstSliceServices = (
     input: Parameters<FirstSliceServices["participantRuntime"]["launch"]>[0],
     deferExistingActivation = false
   ): Promise<TestRun> => {
+    const browserControllerLifecycle = usesBrowserControllerLifecycle(input.controllerLifecycle);
     const participantSessionId = normalizeParticipantSessionId(
       input.participantSessionId
     );
@@ -26603,7 +26612,7 @@ export const createFirstSliceServices = (
               expiresAt: timer?.expiresAt ?? null, currentUnitKey: freshRun.currentUnitKey } }));
         }
         if (executionMode.saveResponses) {
-          entries.push({ key: "CONTROLLER", timeStamp: Date.parse(activatedAt), content: "RUNNING" });
+          if (!browserControllerLifecycle) entries.push({ key: "CONTROLLER", timeStamp: Date.parse(activatedAt), content: "RUNNING" });
           if (freshRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: Date.parse(activatedAt), content: freshRun.currentUnitKey });
           if (Object.keys(freshRun.bookletStates ?? {}).length) entries.push(buildBookletStatesTestStateEntry(freshRun, activatedAt));
         }
@@ -32849,6 +32858,7 @@ export const createFirstSliceServices = (
       },
       async launch(input) { return launchParticipantRun(input); },
       async resumeSession(input) {
+        const browserControllerLifecycle = usesBrowserControllerLifecycle(input.controllerLifecycle);
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
@@ -32863,7 +32873,7 @@ export const createFirstSliceServices = (
         );
         // Use launch's exact assignment resolution and authorization for both
         // new and existing entries; never choose an arbitrary open sibling.
-        const selectedRun = await launchParticipantRun({ participantSessionId, bookletKey: requestedBookletKey }, true);
+        const selectedRun = await launchParticipantRun({ participantSessionId, bookletKey: requestedBookletKey, controllerLifecycle: input.controllerLifecycle }, true);
         if (!previousRuns.some(run => run.testRunId === selectedRun.testRunId)) return selectedRun;
         return serializeTestRunMutation(selectedRun.testRunId, async () => {
           const result = await mutateRuntimeRun(selectedRun, ({ context, testRun, contentRelease, timestamp, reconcileTimers }) => {
@@ -32881,7 +32891,7 @@ export const createFirstSliceServices = (
             }
             if (testRun.status !== "paused") return null;
             const resumedRun = transitionTestletTimersForRunStatus(testRun, "running", timestamp);
-            const entries: ParticipantTestLogEntryInput[] = [{ key: "CONTROLLER", timeStamp: Date.parse(timestamp), content: "RUNNING" }];
+            const entries: ParticipantTestLogEntryInput[] = browserControllerLifecycle ? [] : [{ key: "CONTROLLER", timeStamp: Date.parse(timestamp), content: "RUNNING" }];
             if (testletTimerStateChanged(testRun, resumedRun)) entries.unshift(buildTestletTimeLeftTestStateEntry(resumedRun, timestamp));
             const testLogs = buildParticipantTestLogs({ testRun: resumedRun, batches: [{ entries }] });
             const effectiveRun = reconcileTimers(resumedRun);

@@ -50,7 +50,7 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
     const source=await request('POST',workspace+'/source-packages',{fileName:'own-creation.json',mediaType:'application/json',contentStructure:content},operator,201);
     const imported=await request('POST',workspace+'/import-jobs',{sourcePackageId:source.sourcePackage.sourcePackageId},operator,201);
     await request('POST',workspace+`/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:'owned'},operator);
-    await request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify(['log','audit','activation','foreign','concurrent'].map(loginKey=>({
+    await request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify(['log','audit','activation','foreign','concurrent','browser-resume','browser-launch','browser-credentials','browser-invalid'].map(loginKey=>({
       loginKey,groupKey:'owned',executionMode:'run-hot-return',booklets:[{id:bookletKey}]})))},operator,201);
     const login=loginKey=>request('POST',routes.participant.signIn,{tenantKey,workspaceKey,loginKey});
     const snapshot=async identity=>{
@@ -62,6 +62,25 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
     const resume=(identity,expected=200)=>request('POST',resolveRoutePath(routes.participant.resumeSession,{participantSessionId:identity.participantSession.participantSessionId}),
       {bookletKey},identity.sessionToken,expected);
     const foreign=await login('foreign'),foreignBefore=await snapshot(foreign);
+    await t.test('all three authenticated entry paths negotiate actual browser lifecycle logs without a synthetic ready state',async()=>{
+      for(const path of ['resume','launch','credentials']){
+        const identity=await login('browser-'+path),id=identity.participantSession.participantSessionId;
+        const entered=path==='resume'?await request('POST',resolveRoutePath(routes.participant.resumeSession,{participantSessionId:id}),{bookletKey,controllerLifecycle:'browser-v1'},identity.sessionToken)
+          :await request('POST',routes.participant.launch,{bookletKey,controllerLifecycle:'browser-v1',...(path==='launch'?{participantSessionId:id}:{tenantKey,workspaceKey,loginKey:'browser-credentials'})},path==='launch'?identity.sessionToken:undefined);
+        const state=await snapshot(identity);assert.equal(entered.testRun.testRunId,state.runs[0].testRunId);assert.equal(state.parent.status,'launched');
+        assert.equal(state.logs.filter(log=>log.logKey==='CONTROLLER').length,0);assert.equal(state.logs.filter(log=>log.logKey==='CURRENT_UNIT_ID').length,1);
+        assert.equal(state.events.filter(event=>event.eventType==='participant_session_resumed').length,1);
+      }
+    });
+    await t.test('invalid lifecycle cannot create or activate a Run through any entry path',async()=>{
+      const identity=await login('browser-invalid'),id=identity.participantSession.participantSessionId,before=await snapshot(identity);
+      for(const path of ['resume','launch','credentials']){
+        const body={bookletKey,controllerLifecycle:'unsupported',...(path==='resume'?{}:path==='launch'?{participantSessionId:id}:{tenantKey,workspaceKey,loginKey:'browser-invalid'})};
+        const result=await request('POST',path==='resume'?resolveRoutePath(routes.participant.resumeSession,{participantSessionId:id}):routes.participant.launch,body,path==='credentials'?undefined:identity.sessionToken,400);
+        assert.equal(result.error,'participant_controller_lifecycle_invalid');assert.deepEqual(await snapshot(identity),before);
+      }
+    });
+
     for(const [name,table,operation] of [['log','participant_test_logs','INSERT'],['audit','workspace_activity_events','INSERT'],['activation','participant_sessions','UPDATE']]) {
       await t.test(`${name} failure returns 500 without partial initialization, then the same authenticated session starts exactly once`,async()=>{
         const identity=await login(name),before=await snapshot(identity),id=identity.participantSession.participantSessionId;

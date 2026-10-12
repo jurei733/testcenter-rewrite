@@ -56,10 +56,10 @@ for (const kind of kinds) test(`${kind}: fresh Run, activation and initial artif
     logs: (await repo.listParticipantTestLogsByWorkspace(f.base.tenantId, f.base.workspaceId)).sort((a,b) => a.participantTestLogId.localeCompare(b.participantTestLogId)),
     events: (await repo.listWorkspaceActivityEventsByWorkspace(f.base.tenantId, f.base.workspaceId)).sort((a,b) => a.activityEventId.localeCompare(b.activityEventId)) });
   const initial = (state, runId) => ({ logs: state.logs.filter(log => log.testRunId === runId), events: state.events.filter(event => event.subjectId === runId) });
-  const assertComplete = (state, run, save = true) => {
+  const assertComplete = (state, run, save = true, browser = false) => {
     assert.equal(state.runs.length, 1); assert.equal(state.parent.status, 'launched');
     const artifacts = initial(state, run.testRunId);
-    assert.equal(artifacts.logs.filter(log => log.logKey === 'CONTROLLER').length, save ? 1 : 0);
+    assert.equal(artifacts.logs.filter(log => log.logKey === 'CONTROLLER').length, save && !browser ? 1 : 0);
     assert.equal(artifacts.logs.filter(log => log.logKey === 'CURRENT_UNIT_ID').length, save ? 1 : 0);
     assert.equal(artifacts.logs.filter(log => log.logKey === 'TESTLETS_TIMELEFT').length, save ? 1 : 0);
     if (!save) assert.deepEqual(artifacts.logs, []);
@@ -82,6 +82,37 @@ for (const kind of kinds) test(`${kind}: fresh Run, activation and initial artif
       assert.deepEqual(state.parent, { ...f.parent, status: 'launched' });
       if (kind !== 'memory') assert.deepEqual(JSON.parse(JSON.stringify(await snapshot(f, await create()))), JSON.parse(JSON.stringify(state)));
       const before = await snapshot(f); await f.launch(); assert.deepEqual(await snapshot(f), before);
+    });
+    await t.test('browser lifecycle entry reserves the same atomic artifacts without a premature RUNNING; log-only deliveries preserve the Run and deduplicate by client entry', async () => {
+      const f = await fixture(), run = await f.service.participantRuntime.launch({ participantSessionId:f.id,bookletKey:'owned',controllerLifecycle:'browser-v1' });
+      assertComplete(await snapshot(f),run,true,true);
+      const before = await snapshot(f), logs = [{unitKey:null,originalUnitId:null,entries:[
+        {key:'CONTROLLER',timeStamp:f.clock.milliseconds,content:'LOADING',clientEntryId:'owned-loading'},
+        {key:'CONTROLLER',timeStamp:f.clock.milliseconds+1,content:'RUNNING',clientEntryId:'owned-ready'}]}];
+      await f.service.participantRuntime.saveTestLogs({testRunId:run.testRunId,logs});
+      const saved = await snapshot(f);assert.deepEqual(saved.runs,before.runs);assert.deepEqual(saved.parent,before.parent);assert.deepEqual(saved.events,before.events);
+      assert.deepEqual(saved.logs.filter(log=>log.logKey==='CONTROLLER').sort((a,b)=>a.timestamp-b.timestamp).map(log=>log.logContent),['LOADING','RUNNING']);
+      await f.service.participantRuntime.saveTestLogs({testRunId:run.testRunId,logs});assert.deepEqual(await snapshot(f),saved);
+      if(kind!=='memory')assert.deepEqual(JSON.parse(JSON.stringify(await snapshot(f,await create()))),JSON.parse(JSON.stringify(saved)));
+    });
+    await t.test('browser resume suppresses only its entry status log while preserving saved responses, clocks, timer and audit transitions', async () => {
+      const f = await fixture(), run = await f.launch();
+      const paused={...run,status:'paused',pauseSource:'participant',unitResponses:{unit:'Exact saved Ä/β'},unitResponseFieldTimestamps:{unit:{opaque:123}},
+        testletTimers:Object.fromEntries(Object.entries(run.testletTimers).map(([key,timer])=>[key,{...timer,status:'paused',remainingSeconds:240,expiresAt:null}]))};
+      await repository.saveTestRun(paused);f.clock.milliseconds+=5_000;
+      const before=await snapshot(f),resumed=await f.service.participantRuntime.resumeSession({participantSessionId:f.id,bookletKey:'owned',controllerLifecycle:'browser-v1'}),after=await snapshot(f);
+      assert.equal(resumed.testRunId,run.testRunId);assert.equal(resumed.status,'running');assert.deepEqual(resumed.unitResponses,paused.unitResponses);assert.deepEqual(resumed.unitResponseFieldTimestamps,paused.unitResponseFieldTimestamps);
+      assert.equal(resumed.testletTimers.outer.status,'running');assert.equal(resumed.testletTimers.outer.remainingSeconds,240);
+      assert.equal(after.logs.filter(log=>log.logKey==='CONTROLLER').length,before.logs.filter(log=>log.logKey==='CONTROLLER').length);
+      assert.equal(after.events.filter(event=>event.eventType==='participant_session_resumed').length,before.events.filter(event=>event.eventType==='participant_session_resumed').length+1);
+      assert.ok(after.logs.filter(log=>log.logKey==='TESTLETS_TIMELEFT').length>before.logs.filter(log=>log.logKey==='TESTLETS_TIMELEFT').length);
+    });
+    await t.test('unsupported lifecycle values reject launch and resume before any Run, activation, log or audit mutation', async () => {
+      const f=await fixture(),before=await snapshot(f);
+      for(const method of ['launch','resumeSession'])for(const controllerLifecycle of [null,false,'browser-v2',{}]){
+        await assert.rejects(f.service.participantRuntime[method]({participantSessionId:f.id,bookletKey:'owned',controllerLifecycle}),error=>error.statusCode===400&&error.errorCode==='participant_controller_lifecycle_invalid');
+        assert.deepEqual(await snapshot(f),before);
+      }
     });
     await t.test('a failed initial projection leaves no reserved Run, timer, parent activation, logs or audit; retry is complete', async () => {
       const f = await fixture(), before = await snapshot(f), original = repository.getOrCreateTestRunForAssignment;

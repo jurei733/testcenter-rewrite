@@ -102,6 +102,10 @@ try {
     await loadingPage.evaluate(() => window.tc.debug());
     const loadingPane = loadingPage.locator('[data-debug-window="main"]');
     await poll(async () => /STATUS:\s*LOADING/.test(await loadingPane.innerText()), "Initial controller is not LOADING");
+    const controllerLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
+      .filter(log => log.testRunId === initialRun.testRunId && log.logKey === "CONTROLLER").sort((a,b)=>a.timestamp-b.timestamp||a.participantTestLogId.localeCompare(b.participantTestLogId));
+    await poll(async () => (await controllerLogs()).length > 0, "Initial LOADING was not persisted before any Unit");
+    assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING"], "Entry fabricated RUNNING before the controller was ready");
     await loadingPage.evaluate(() => window.tc.resume());
     await poll(() => Promise.resolve(loadingRequests.length === 1), "Early Resume was not sent");
     assert.equal(loadingRequests[0].controllerStatus, "LOADING");
@@ -117,6 +121,8 @@ try {
     assert.deepEqual(run.unitResponseFieldTimestamps, initialRun.unitResponseFieldTimestamps);
     assert.equal((await executionLogs()).filter(log => log.logKey === "CONTROLLER").length, 1);
     assert.equal((await executionLogs()).filter(log => log.logKey === "command executed" && log.logContent === "resume").length, 1);
+    await poll(async () => (await controllerLogs()).length >= 2, "Ready transition was not persisted");
+    assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING", "RUNNING"], "Early Resume produced a duplicate lifecycle ready state");
     loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), answersAndClocksPreserved: true });
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume.png"), fullPage: true });
     checks.push("early-resume-observes-loading-and-persists-the-real-controller-transition");
@@ -201,22 +207,53 @@ try {
   await poll(()=>Promise.resolve(Boolean(secondRun)),'Second initial failure was not injected');await allMethods();await native('debug');await pane().waitFor();
   await poll(async()=>/STATUS:\s*ERROR/.test(await pane().innerText()),'Early ERROR lost its Debug/controller scope');
   assert.equal(await page.locator('iframe').count(),0);await page.screenshot({path:join(artifacts,'early-error.png'),fullPage:true});
+  const secondControllerLogs = async () => (await repository.listParticipantTestLogsByWorkspace(secondRun.tenantId,secondRun.workspaceId))
+    .filter(log=>log.testRunId===secondRun.testRunId&&log.logKey==='CONTROLLER').sort((a,b)=>a.timestamp-b.timestamp||a.participantTestLogId.localeCompare(b.participantTestLogId));
+  await poll(async()=>(await secondControllerLogs()).some(log=>log.logContent==='ERROR'),'Pre-Unit ERROR was not persisted');
+  assert.deepEqual((await secondControllerLogs()).map(log=>log.logContent),['LOADING','ERROR']);
+
   await native('resume');await page.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
   await poll(async()=>!await page.locator('mat-dialog-container, #participantRuntimeErrorFallback').count(),'Early Resume did not clear the error presentation');
   assert.deepEqual((await repository.getTestRunById(secondRun.testRunId)).unitResponses,secondRun.unitResponses);
   assert.deepEqual((await repository.getTestRunById(secondRun.testRunId)).unitResponseFieldTimestamps,secondRun.unitResponseFieldTimestamps);
+  assert.deepEqual((await secondControllerLogs()).map(log=>log.logContent),['LOADING','ERROR','RUNNING']);
   mark('native-resume-recovers-before-the-first-unit-was-loaded');
   await page.unrouteAll({behavior:'wait'});
   // A new document has no in-memory authorized Run: its lightweight context must
   // establish scope even when the following full-state request fails.
   await page.waitForURL(url=>url.searchParams.get('testRunId')===secondRun.testRunId);
   const reloadEntry=page.url();let reloadFailure=false,contexts=0;
+  let lostLogPacket=null,ackFailure=true,logReplayAllowed=false;const lostLogAttempts=[];
+  await page.route('**/test-logs',async route=>{
+    const packet=route.request().postDataJSON(),entry=packet.logs?.[0]?.entries?.[0];
+    if(lostLogPacket&&entry?.clientEntryId===lostLogPacket.logs[0].entries[0].clientEntryId)lostLogAttempts.push(packet);
+    if(ackFailure&&entry?.key==='CONTROLLER'&&entry.content==='LOADING'){
+      ackFailure=false;lostLogPacket=packet;lostLogAttempts.push(packet);const response=await route.fetch();assert.equal(response.status(),200);
+      await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_log_receipt'})});
+    }else if(!logReplayAllowed&&entry?.key==='CONTROLLER')await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_log_retry_held'})});
+    else await route.continue();
+  });
+
   page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('/controller-context'))contexts++;});
   await page.route('**/current-state?*',async route=>{
     reloadFailure=true;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_reload_load_failure',message:'Owned reload load failure'})});
   });
   await page.goto(reloadEntry,{waitUntil:'networkidle'});await allMethods();await native('debug');await pane().waitFor();
   await poll(async()=>/STATUS:\s*ERROR/.test(await pane().innerText()),'Reload ERROR had no authorized console');
+  await poll(()=>Promise.resolve(Boolean(lostLogPacket)),'Owned lifecycle receipt loss was not injected');
+  const lostEntry=lostLogPacket.logs[0].entries[0];
+  await page.waitForFunction(id=>Object.keys(localStorage).some(key=>key.startsWith('testcenter-rewrite:participant-controller-log:v1:')&&JSON.parse(localStorage.getItem(key)).id===id),lostEntry.clientEntryId);
+  logReplayAllowed=true;
+  await page.goto(reloadEntry,{waitUntil:'networkidle'});await allMethods();await native('debug');await pane().waitFor();
+  await poll(async()=>/STATUS:\s*ERROR/.test(await pane().innerText()),'Second reload lost the authorized error controller');
+  await poll(async()=>(await secondControllerLogs()).filter(log=>log.logContent==='ERROR').length===3,'Pending lifecycle packets did not finish after reload');
+  const replayed=(await secondControllerLogs()).filter(log=>log.participantTestLogId===`delivery:${secondRun.testRunId}:${lostEntry.clientEntryId}`);
+  assert.ok(lostLogAttempts.length>=2);assert.ok(lostLogAttempts.every(packet=>JSON.stringify(packet)===JSON.stringify(lostLogPacket)));
+  assert.equal(replayed.length,1);assert.equal(replayed[0].timestamp,lostEntry.timeStamp);assert.equal(replayed[0].logContent,'LOADING');
+  await page.waitForFunction(()=>!Object.keys(localStorage).some(key=>key.startsWith('testcenter-rewrite:participant-controller-log:v1:')));
+  mark('lost-lifecycle-receipt-reloads-with-the-same-timestamp-and-id-once');
+
+  assert.deepEqual((await secondControllerLogs()).map(log=>log.logContent),['LOADING','ERROR','RUNNING','LOADING','ERROR','LOADING','ERROR']);
   assert.equal(reloadFailure,true);assert.ok(contexts>0);await native('terminate',['lock']);
   await page.locator('#originalParticipantStarter mat-card').first().waitFor();
   const terminated=await repository.getTestRunById(secondRun.testRunId);
