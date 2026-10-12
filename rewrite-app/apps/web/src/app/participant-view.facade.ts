@@ -500,7 +500,7 @@ export class ParticipantViewFacade {
   get debugControllerStatus(): string {
     const run = this.consoleRun;
     const command = this.commandControllerState?.testRunId === run?.testRunId ? this.commandControllerState : null;
-    if (run?.status === "paused" && command?.status.startsWith("TERMINATED")) return command.status;
+    if (run?.status !== "completed" && command?.status.startsWith("TERMINATED")) return command.status;
     if (this.hasControllerError) return "ERROR";
     if (run?.status === "paused") return "PAUSED";
     if (run?.status === "completed") return "TERMINATED";
@@ -546,7 +546,8 @@ export class ParticipantViewFacade {
       return;
     }
     this.invalidateCurrentStateRefreshes();
-    const terminal = result.keyword === "terminate" && result.participantSession.status === "signed_in" && result.testRun.status === "paused";
+    const terminal = result.keyword === "terminate" && result.testRun.status === "paused" &&
+      (entry ? !entry.active : result.participantSession.status === "signed_in");
     this.syncRun(result.testRun);
     this.commandControllerState = { testRunId: result.testRun.testRunId, entryRevision: result.testRun.controllerEntry?.revision,
       status: terminal ? result.controllerStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : result.testRun.status.toUpperCase() };
@@ -604,6 +605,38 @@ export class ParticipantViewFacade {
       .every(key => payload.runtimeState.participantSession[key] === run[key])) {
       throw Object.assign(new Error("The terminal command runtime state does not match the selected Run."), { retryable: false });
     }
+    if (!legacy && run.controllerEntry) {
+      const { participantControllerContextRoute } = await import("@testcenter-rewrite-app/contracts/participant-native-command");
+      if (!isCurrent()) return;
+      const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
+        "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
+          { participantSessionId: run.participantSessionId }), run.testRunId), undefined, { quiet: true });
+      if (!isCurrent()) return;
+      if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+        throw Object.assign(new Error("The controller changed while reconciling its entry evidence."), { retryable: true });
+      }
+      const selected = this.validateParticipantControllerContext(controllerContext, run.participantSessionId, run.testRunId);
+      if (!(["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+        .every(key => selected[key] === run[key]) || !selected.controllerEntry) {
+        throw Object.assign(new Error("The terminal entry evidence does not match its immutable Run."), { retryable: false });
+      }
+      if (selected.controllerEntry.revision < run.controllerEntry.revision) {
+        throw Object.assign(new Error("The terminal entry evidence is older than its application receipt."), { retryable: true });
+      }
+      if (this.commandControllerState?.testRunId !== run.testRunId || !this.commandControllerState.status.startsWith("TERMINATED")) return;
+      if (selected.controllerEntry.active) {
+        if (selected.controllerEntry.revision === run.controllerEntry.revision) {
+          throw Object.assign(new Error("The terminal entry evidence contradicts its application receipt."), { retryable: false });
+        }
+        void this.refreshCurrentStateInternal(true, true).catch(error => {
+          if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+        });
+      } else {
+        this.presentParticipantStarter(payload.runtimeState, run.testRunId, true);
+        await this.replaceSelectedRunEntryLink();
+      }
+      return;
+    }
     if (legacy || payload.runtimeState.participantSession.status === "signed_in") {
       this.presentParticipantStarter(payload.runtimeState, run.testRunId, true);
       await this.replaceSelectedRunEntryLink();
@@ -652,9 +685,11 @@ export class ParticipantViewFacade {
         }
         // An ordinary refresh of the identical Run is not a newer effect.
         // Keep the conservative fence for changed answers, selection or state.
-        const superseded = observedView !== this.currentStateAppliedRefreshSequence &&
-          JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
-        if (terminal) {
+        const entry = this.consoleRun?.controllerEntry, appliedEntry = application.testRun.controllerEntry;
+        const superseded = Boolean(entry && (!appliedEntry || appliedEntry.revision < entry.revision ||
+          appliedEntry.revision === entry.revision && appliedEntry.active !== entry.active)) ||
+          observedView !== this.currentStateAppliedRefreshSequence && JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
+        if (terminal && appliedEntry?.active !== true) {
           if (!superseded) {
             this.invalidateCurrentStateRefreshes();
             this.syncRun(application.testRun);
@@ -663,7 +698,7 @@ export class ParticipantViewFacade {
             this.participantEvents.suspend();
           }
           execution.reconcileAcceptedParticipantCommand({ signal, isCurrent,
-            reconcile: () => this.reconcileParticipantTerminalState(run, !command.effectsDeferred, isCurrent),
+            reconcile: () => this.reconcileParticipantTerminalState(application.testRun, !command.effectsDeferred, isCurrent),
             failed: error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
           });
           return;
@@ -679,7 +714,7 @@ export class ParticipantViewFacade {
         }
         this.invalidateCurrentStateRefreshes();
         this.syncRun(application.testRun);
-        const changesControllerState = ["pause", "resume", "goto"].includes(command.commandType);
+        const changesControllerState = ["pause", "resume", "goto"].includes(command.commandType) || terminal && appliedEntry?.active === true;
         if (changesControllerState || !this.commandControllerState?.status.startsWith("TERMINATED")) {
           this.commandControllerState = { testRunId: command.testRunId, entryRevision: application.testRun.controllerEntry?.revision,
             status: application.testRun.status.toUpperCase() };
@@ -4596,9 +4631,9 @@ export class ParticipantViewFacade {
       this.syncCurrentRunState(payload.currentRunState);
       if (this.commandControllerState?.testRunId === testRunId &&
         this.commandControllerState.status.startsWith("TERMINATED") &&
-        payload.currentRunState.participantSession.status === "launched" &&
-        (readyRun.controllerEntry ? readyRun.controllerEntry.active &&
-          readyRun.controllerEntry.revision > (this.commandControllerState.entryRevision ?? 0) : readyRun.status === "running")) {
+        (readyRun.controllerEntry ? ["running", "paused"].includes(readyRun.status) && readyRun.controllerEntry.active &&
+          readyRun.controllerEntry.revision > (this.commandControllerState.entryRevision ?? 0) :
+          readyRun.status === "running" && payload.currentRunState.participantSession.status === "launched")) {
         // This Run's newer entry proves reentry even when it remains paused.
         // Legacy servers can only prove the former running/parent combination.
         this.commandControllerState = { testRunId, status: readyRun.status.toUpperCase(), entryRevision: readyRun.controllerEntry?.revision };
@@ -4668,7 +4703,7 @@ export class ParticipantViewFacade {
     const run = context?.testRun;
     const entry = run?.controllerEntry;
     if (entry !== undefined && (!entry || typeof entry.active !== "boolean" || !Number.isSafeInteger(entry.revision) || entry.revision < 1)) {
-      throw new Error("The controller entry evidence is invalid.");
+      throw Object.assign(new Error("The controller entry evidence is invalid."), { retryable: false });
     }
     if (!run ||
         (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
@@ -4677,7 +4712,7 @@ export class ParticipantViewFacade {
         context?.participantSession?.participantSessionId !== sessionId || run.participantSessionId !== sessionId ||
         run.tenantId !== context.participantSession.tenantId || run.workspaceId !== context.participantSession.workspaceId ||
         requestedRunId && run.testRunId !== requestedRunId) {
-      throw new Error("The controller context does not belong to the selected participant Run.");
+      throw Object.assign(new Error("The controller context does not belong to the selected participant Run."), { retryable: false });
     }
     return run;
   }

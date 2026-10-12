@@ -360,6 +360,49 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       const inactive=await snapshot(),replay=(await apply(next.commandId)).application;
       assert.equal(replay.applied,false);assert.equal(replay.command.executedAt,accepted.command.executedAt);assert.deepEqual(await snapshot(),inactive);
     });
+    await t.test("selected streaming survives sibling exits, while a sibling entry cannot revive a terminated receiver", async () => {
+      const repository=await readFreshRepository(),before=await repository.getTestRunById(run.testRunId);
+      const nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId});
+      const native=async(testRunId,keyword)=>{
+        const current=await repository.getTestRunById(testRunId);
+        return (await request("POST",nativePath,{testRunId,contentReleaseId:current.contentReleaseId,bookletKey:current.bookletKey,
+          deliveryId:randomUUID(),keyword,arguments:[],controllerStatus:"PAUSED",timeStamp:Date.now()},selected.sessionToken)).application;
+      };
+      await native(run.testRunId,"pause");await native(otherBookletRun.testRunId,"terminate");
+      assert.equal((await repository.getParticipantSessionById(sessionId)).status,"signed_in");
+      const active=await repository.getTestRunById(run.testRunId);assert.equal(active.controllerEntry.active,true);assert.equal(active.status,"paused");
+      const path=resolveRoutePath(routes.participant.eventStream,{participantSessionId:sessionId});
+      await request("GET",path+`?testRunId=${run.testRunId}`,undefined,other.sessionToken,401);
+      await request("GET",path+`?testRunId=${foreign.testRunId}`,undefined,selected.sessionToken,404);
+      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15_000);let reader;
+      try {
+        const stream=await fetch(base+path+`?testRunId=${run.testRunId}`,{headers:{authorization:`Bearer ${selected.sessionToken}`,accept:"text/event-stream"},signal:controller.signal});
+        assert.equal(stream.status,200);reader=stream.body.getReader();let buffer="";const decoder=new TextDecoder();
+        const readEvent=async()=>{
+          while(true){let boundary=buffer.indexOf("\n\n");
+            while(boundary>=0){const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);const data=frame.split("\n").find(line=>line.startsWith("data: "));
+              if(data)return JSON.parse(data.slice(6));boundary=buffer.indexOf("\n\n");}
+            const chunk=await reader.read();assert.equal(chunk.done,false,"The selected live stream closed after a sibling exit.");buffer+=decoder.decode(chunk.value,{stream:true});
+          }
+        };
+        const snapshot=await readEvent();assert.equal(snapshot.testRunId,run.testRunId);assert.equal(snapshot.eventType,"snapshot");
+        const acknowledgementPath=resolveRoutePath(routes.participant.acknowledgeEventStream,{participantSessionId:sessionId});
+        const acknowledgementBody={testRunId:run.testRunId,connectionId:snapshot.connectionId};
+        await request("POST",acknowledgementPath,acknowledgementBody,selected.sessionToken);
+        await native(otherBookletRun.testRunId,"resume");await native(otherBookletRun.testRunId,"terminate");
+        const debug=await issue(run.testRunId,"debug",{debugArguments:[]});
+        const change=await readEvent();assert.equal(change.eventType,"change");assert.equal(change.testRunId,run.testRunId);
+        assert.ok(change.commands.some(command=>command.commandId===debug.commandId));
+        await request("POST",acknowledgementPath,acknowledgementBody,selected.sessionToken);
+        const stopped=await native(run.testRunId,"terminate");assert.equal(stopped.testRun.controllerEntry.active,false);
+        assert.equal((await reader.read()).done,true,"Terminating the selected entry closes its own stream.");
+        await native(otherBookletRun.testRunId,"resume");
+        await request("GET",path+`?testRunId=${run.testRunId}`,undefined,selected.sessionToken,409);
+        await request("POST",acknowledgementPath,acknowledgementBody,selected.sessionToken,409);
+        const after=await repository.getTestRunById(run.testRunId);
+        assert.deepEqual(after.unitResponses,before.unitResponses);assert.deepEqual(after.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+      } finally {clearTimeout(timeout);controller.abort();reader?.releaseLock();}
+    });
     await t.test("session revocation also closes command access", async () => {
       await request("DELETE", resolveRoutePath(routes.participant.signOut, { participantSessionId: sessionId }), undefined, selected.sessionToken, 205);
       await request("GET", `${listPath}?testRunId=${otherBookletRun.testRunId}`, undefined, selected.sessionToken, 401);

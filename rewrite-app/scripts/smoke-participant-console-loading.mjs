@@ -255,24 +255,37 @@ try {
       await poll(async()=>{
         const run=await loadingRepository.getTestRunById(runId);return run.status===externalStatus&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';
       },'The second page did not reactivate the same Run');
+      let siblingAfter=siblingBefore;
+      if(externalKeyword==='pause') {
+        const siblingExit=await api(resolveRoutePath(productionApiRoutes.participant.getCurrentRunState,{participantSessionId:stopped.participantSessionId})+'?testRunId='+sibling.testRunId,undefined,currentCredential);
+        const siblingRun=siblingExit.currentRunState.testRun;
+        const result=await api(`/api/v1/participant/sessions/${stopped.participantSessionId}/native-commands`,{testRunId:siblingRun.testRunId,
+          contentReleaseId:siblingRun.contentReleaseId,bookletKey:siblingRun.bookletKey,deliveryId:'owned-sibling-exit',keyword:'terminate',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.now()},currentCredential);
+        assert.equal(result.application.applied,true);assert.equal(result.application.participantSession.status,'signed_in');
+        siblingAfter=await loadingRepository.getTestRunById(sibling.testRunId);assert.deepEqual(siblingAfter.unitResponses,siblingBefore.unitResponses);assert.deepEqual(siblingAfter.unitResponseFieldTimestamps,siblingBefore.unitResponseFieldTimestamps);
+        assert.deepEqual((await loadingRepository.getTestRunById(runId)).controllerEntry,externalApplication.testRun.controllerEntry);
+      }
       await externalPage.close();runtimeRequest.resolve();
-      await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),externalKeyword==='pause'?'A fresh externally paused Run did not restore command reception':'A fresh externally reactivated Run did not restore command reception');
+      await poll(async()=>await remotePane.count()>0&&/BS:\s*live/.test(await remotePane.innerText()),externalKeyword==='pause'?'A fresh externally paused Run did not restore command reception':'A fresh externally reactivated Run did not restore command reception');
       await poll(async()=>new RegExp('STATUS:\\s*'+externalStatus.toUpperCase()).test(await remotePane.innerText()),'The first controller did not render the fresh externally reactivated Run');
-      assert.equal(reactivatedRuntime.runtimeState.participantSession.status,'launched');
+      assert.equal(reactivatedRuntime.runtimeState.participantSession.status,externalKeyword==='pause'?'signed_in':'launched');
       const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:followingKeyword},operator)).command;
       await poll(async()=>new RegExp('STATUS:\\s*'+(followingKeyword==='pause'?'PAUSED':'RUNNING')).test(await remotePane.innerText()),'The reactivated first controller did not apply a new remote Pause');
       await remotePage.unrouteAll({behavior:'wait'});if(runtimeRouteError)throw runtimeRouteError;
       const finalRun=await loadingRepository.getTestRunById(runId);assert.equal(finalRun.status,followingKeyword==='pause'?'paused':'running');
       assert.deepEqual(finalRun.unitResponses,externalBaseline.unitResponses);assert.deepEqual(finalRun.unitResponseFieldTimestamps,externalBaseline.unitResponseFieldTimestamps);
-      assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+      assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingAfter);
+      if(externalKeyword==='pause')await loadingRepository.saveTestRun(siblingBefore);
       assert.deepEqual(applications.slice(applicationStart).map(value=>value.application.command.commandId),[following.commandId]);
       assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
       assert.equal(acks.filter(ack=>ack.path.includes(following.commandId)).length,1);
-      loadingObservations.push({externalKeyword,stoppedEntry:stopped.controllerEntry,externalApplication,reactivatedRuntime,application:applications.at(-1),externalDocumentClosedBeforeNewCommand:true,
-        sameRunReceptionRestored:true,answersAndClocksPreserved:true,siblingPreserved:true});
+      loadingObservations.push({externalKeyword,siblingAfter,siblingTransitionsVerified:externalKeyword==='pause',stoppedEntry:stopped.controllerEntry,externalApplication,reactivatedRuntime,application:applications.at(-1),externalDocumentClosedBeforeNewCommand:true,
+        sameRunReceptionRestored:true,answersAndClocksPreserved:true,siblingPreserved:externalKeyword!=='pause',
+        siblingAnswersAndClocksPreserved:true,siblingChangedOnlyByItsOwnAcceptedCommand:externalKeyword==='pause',ownedSiblingFixtureRestoredForLaterGroups:externalKeyword==='pause'});
       await remotePage.screenshot({path:join(artifacts,`external-${externalKeyword}-reception.png`),fullPage:true});
-      const marker=externalKeyword==='pause'?'a-newer-paused-entry-restores-reception-despite-sibling-parent-activation':'an-external-same-run-entry-restores-the-rendered-controller-reception';checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
-    }finally{runtimeRequest.resolve();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});if(!externalPage.isClosed())await externalPage.close();}
+      const marker=externalKeyword==='pause'?'a-newer-paused-entry-restores-reception-despite-sibling-parent-transitions':'an-external-same-run-entry-restores-the-rendered-controller-reception';checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+    }catch(error){await remotePage.screenshot({path:join(artifacts,`external-${externalKeyword}-failure.png`),fullPage:true}).catch(()=>{});throw error;}
+    finally{runtimeRequest.resolve();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});if(!externalPage.isClosed())await externalPage.close();}
     }
     await remotePage.evaluate(()=>window.tc.resume());
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();

@@ -32,7 +32,7 @@ export { prepareParticipantControllerActivation, ParticipantControllerActivation
 export { appendParticipantRunCommand, acknowledgeParticipantRunCommand,
   matchesParticipantRunCommandScope, prepareParticipantRunCommandApplication } from "./participant-run-commands.js";
 import type { ParticipantPresenceMutation, ParticipantPresenceTransition } from "./participant-presence.js";
-export { transitionParticipantPresence, PARTICIPANT_PRESENCE_LEASE_MS,
+export { transitionParticipantPresence, canStreamParticipantRun, PARTICIPANT_PRESENCE_LEASE_MS,
   PARTICIPANT_PRESENCE_MAX_CONNECTIONS } from "./participant-presence.js";
 export type { ParticipantPresence, ParticipantPresenceMutation,
   ParticipantPresenceTransition } from "./participant-presence.js";

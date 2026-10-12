@@ -377,3 +377,41 @@ test('a legacy view cannot erase already verified entry evidence',async()=>{
  f.host.syncRun(selected);f.host.currentRunState=state(selected);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED',entryRevision:3};
  await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.applied,0);assert.equal(f.calls.started,0);assert.deepEqual(f.host.consoleRun,selected);
 });
+
+test('a newer selected entry remains authoritative when another Run subsequently deactivates the shared parent',async()=>{
+ const entered={...run,status:'paused',controllerEntry:{active:true,revision:4}},stopped={...run,status:'paused',controllerEntry:{active:false,revision:3}};
+ const f=fixture(async()=>({currentRunState:{...state(entered),participantSession:{...session,status:'signed_in'}}}),applyRemote);
+ f.host.syncRun(stopped);f.host.currentRunState=state(stopped);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED_PAUSED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.started,1);assert.equal(f.host.debugControllerStatus,'PAUSED');assert.equal(f.host.commandControllerState.entryRevision,4);
+});
+
+for(const [active,revision,parentStatus] of [[false,3,'launched'],[true,4,'signed_in']])test(`terminal presentation follows the selected entry ${active}/${revision} with shared parent ${parentStatus}`,async()=>{
+ const stopped={...run,status:'paused',controllerEntry:{active:false,revision:3}},selected={...stopped,controllerEntry:{active,revision}},parent={...run,status:parentStatus};
+ const f=fixture(async label=>label==='Participant Starter'?{runtimeState:{participantSession:parent}}:label==='Participant Controller'?{controllerContext:{participantSession:parent,testRun:selected}}:{currentRunState:{...state(selected),participantSession:parent}},applyRemote);
+ f.host.syncRun(stopped);f.host.currentRunState=state(stopped);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED_PAUSED',entryRevision:3};
+ await f.host.reconcileParticipantTerminalState(stopped,false,()=>true);await tick();
+ assert.equal(f.calls.starter,active?0:1);assert.equal(f.calls.started,active?1:0);assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);
+});
+for(const change of [value=>{value.bookletKey='foreign';},value=>{delete value.controllerEntry;},value=>{value.controllerEntry={active:true,revision:3};},value=>{value.controllerEntry=null;}])test('contradictory terminal entry evidence cannot navigate or reopen reception',async()=>{
+ const stopped={...run,status:'paused',controllerEntry:{active:false,revision:3}},selected=structuredClone(stopped);change(selected);const parent={...run,status:'signed_in'};
+ const f=fixture(async label=>label==='Participant Starter'?{runtimeState:{participantSession:parent}}:{controllerContext:{participantSession:parent,testRun:selected}},applyRemote);
+ f.host.syncRun(stopped);f.host.currentRunState=state(stopped);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED_PAUSED',entryRevision:3};
+ await assert.rejects(f.host.reconcileParticipantTerminalState(stopped,false,()=>true),error=>error.retryable===false);assert.equal(f.calls.starter,0);assert.equal(f.calls.started,0);
+});
+
+for(const origin of ['native','remote'])test(`a replayed ${origin} termination receipt retains the current selected entry despite an inactive shared parent`,async()=>{
+ const entered={...run,status:'paused',controllerEntry:{active:true,revision:5}},parent={...session,status:'signed_in'};
+ const execute=async(command,_signal,options)=>{options.controllerStatus();await options.apply({...remoteApplication(command),testRun:entered,participantSession:parent,applied:false});};
+ const f=fixture(async()=>({currentRunState:{...state(entered),participantSession:parent}}),execute);
+ f.host.syncRun({...entered,controllerEntry:{active:false,revision:4}});f.host.currentRunState=state({...entered,controllerEntry:{active:false,revision:4}});
+ f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED_PAUSED',entryRevision:4};
+ if(origin==='native')await f.host.applyNativeConsoleCommand({keyword:'terminate',controllerStatus:'PAUSED',testRun:entered,participantSession:parent,applied:false},()=>true);
+ else await f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);
+ await tick();assert.equal(f.calls.starter,0);assert.equal(f.calls.suspended,0);assert.ok(f.calls.started>0);assert.equal(f.host.debugControllerStatus,'PAUSED');assert.deepEqual(f.host.consoleRun.controllerEntry,{active:true,revision:5});
+});
+
+test('entry evidence without a started Run status cannot reopen a terminated controller',async()=>{
+ const stopped={...run,status:'paused',controllerEntry:{active:false,revision:3}},created={...run,status:'created',controllerEntry:{active:true,revision:4}};
+ const f=fixture(async()=>({currentRunState:state(created)}),applyRemote);f.host.syncRun(stopped);f.host.currentRunState=state(stopped);f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED',entryRevision:3};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.started,0);assert.equal(f.host.debugControllerStatus,'TERMINATED');
+});

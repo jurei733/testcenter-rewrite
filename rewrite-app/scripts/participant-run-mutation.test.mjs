@@ -108,6 +108,10 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
       const beforePause=await repository.getTestRunById(f.id),paused=await native('pause','owned-pause');
       assert.deepEqual(paused.testRun.controllerEntry,{active:true,revision:3});assert.equal(paused.testRun.status,'paused');
       assert.deepEqual(paused.testRun.unitResponses,beforePause.unitResponses);assert.deepEqual(paused.testRun.unitResponseFieldTimestamps,beforePause.unitResponseFieldTimestamps);
+      await f.services.participantRuntime.executeNativeCommand({participantSessionId:f.id,testRunId:sibling.testRunId,
+        contentReleaseId:sibling.contentReleaseId,bookletKey:sibling.bookletKey,deliveryId:'owned-sibling-stop',keyword:'terminate',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.parse(timestamp)});
+      assert.equal((await repository.getParticipantSessionById(f.id)).status,'signed_in');
+      assert.deepEqual((await repository.getTestRunById(f.id)).controllerEntry,{active:true,revision:3},'A sibling exit must not erase the selected entry.');
       const replay=await native('terminate','owned-stop');assert.equal(replay.applied,false);assert.deepEqual(replay.testRun.controllerEntry,{active:true,revision:3});
       const complete=await issue(f.services,f,'complete');await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:complete.commandId});
       const terminal=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:complete.commandId,controllerStatus:'PAUSED'});

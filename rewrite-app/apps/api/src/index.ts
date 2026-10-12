@@ -23,7 +23,8 @@ import {
   type FirstSliceError,
   type FirstSliceRepository,
   type FirstSliceServices,
-  firstSliceUseCases
+  firstSliceUseCases,
+  canStreamParticipantRun
 } from "@testcenter-rewrite-app/application";
 import {
   BUG_REPORT_MAX_REPORT_LENGTH,
@@ -4276,7 +4277,7 @@ const streamParticipantEvents = async (input: {
   const register = () => input.participantRuntime.updateConnection({
     participantSessionId: input.participantSessionId, testRunId, action: "open", connectionId
   });
-  if (initialState.participantSession.status !== "launched" || !await register()) {
+  if (!canStreamParticipantRun(initialState.testRun, initialState.participantSession) || !await register()) {
     sendError(input.response, 409, "participant_connection_unavailable",
       "A live connection is unavailable for this run. Refresh the participant state.");
     return;
@@ -4346,7 +4347,7 @@ const streamParticipantEvents = async (input: {
         if (closed) {
           return;
         }
-        if (currentState.participantSession.status !== "launched") {
+        if (!canStreamParticipantRun(currentState.testRun, currentState.participantSession)) {
           stop();
           if (!input.response.writableEnded) input.response.end();
           return;
