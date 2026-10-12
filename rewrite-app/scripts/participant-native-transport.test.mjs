@@ -13,14 +13,14 @@ const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).t
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
 const deferred=()=>{let resolve;return {promise:new Promise(done=>resolve=done),get resolve(){return resolve;}};};
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
-function fixture({values=new Map(),owner='owned-tab',respond,prepare}={}){
+function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential);
  const receipt=body=>({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
- const options={ownerId:owner,readState:()=>state,controllerStatus:()=> 'RUNNING',generation:()=>generation,
+ const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus:()=> 'RUNNING',generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
-  window:{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
+  window:browserWindow??{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
   now:()=>1791763200123,id:()=>`owned-${++id}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
   fetch:async(url,request)=>{calls.push({url,request});const body=JSON.parse(request.body);return respond?respond(body,calls.length,receipt):{ok:true,json:async()=>receipt(body)};}};
  const native=create(options);
@@ -91,4 +91,49 @@ test('intents are ordered, permanent failures are surfaced and signed-out scopes
   f.native.command('pause',[]);f.native.command('resume',[]);await f.advance();await f.advance();assert.deepEqual(f.calls.map(call=>JSON.parse(call.request.body).keyword),['pause','resume']);assert.equal(f.failures.length,1);assert.equal(f.applied.length,1);
   f.credential(null);f.native.command('pause',[]);await f.advance();assert.equal(f.calls.length,2);f.select(null);assert.equal(f.values.size,0);
  }finally{f.native.stop();}
+});
+
+const ownerKey='testcenter-rewrite:participant-native-owner:v1',handoffKey='testcenter-rewrite:participant-native-reload:v1';
+const documentFor=({session=new Map(),type='navigate',denied=false}={})=>{
+ const events=new Map(),storage={getItem:key=>session.get(key)??null,setItem:(key,value)=>session.set(key,value),removeItem:key=>session.delete(key)};
+ const window={get sessionStorage(){if(denied)throw Error('Denied storage');return storage;},performance:{getEntriesByType:()=>[{type}]},
+  addEventListener:(name,callback)=>{if(!events.has(name))events.set(name,new Set());events.get(name).add(callback);},removeEventListener:(name,callback)=>events.get(name)?.delete(callback)};
+ return {window,session,events,event:name=>{for(const callback of events.get(name)??[])callback();}};
+};
+test('a cloned live document cannot replay or cancel the original tab even after an early reload',async()=>{
+ const first=documentFor(),f=fixture({owner:null,browserWindow:first.window,respond:async()=>{throw Error('Offline');}});
+ try{f.native.command('pause',[]);await f.advance();const packet=[...f.values.values()][0];
+  const clone=documentFor({session:new Map(first.session),type:'reload'}),other=fixture({values:f.values,owner:null,browserWindow:clone.window});
+  try{assert.notEqual(clone.session.get(ownerKey),first.session.get(ownerKey));await other.advance();assert.deepEqual(other.calls,[]);other.native.stop();assert.deepEqual([...f.values.values()],[packet]);}
+  finally{other.native.stop();}
+ }finally{f.native.stop();}
+});
+test('a genuine document reload consumes the departing handoff and retries the identical packet',async()=>{
+ const first=documentFor(),f=fixture({owner:null,browserWindow:first.window,respond:async()=>{throw Error('Offline');}});
+ f.native.command('resume',[]);await f.advance();const persisted=new Map(f.values);first.event('pagehide');assert.equal(first.session.get(handoffKey),first.session.get(ownerKey));
+ const reload=documentFor({session:new Map(first.session),type:'reload'});f.native.stop();const next=fixture({values:persisted,owner:null,browserWindow:reload.window});
+ try{assert.equal(reload.session.get(ownerKey),first.session.get(ownerKey));assert.equal(reload.session.has(handoffKey),false);await next.advance();assert.equal(next.prepared.length,0);assert.equal(next.calls[0].request.body,f.calls[0].request.body);}
+ finally{next.native.stop();}
+});
+for(const type of ['navigate','back_forward'])test(`${type} cannot consume another document's reload handoff`,()=>{
+ const doc=documentFor({session:new Map([[ownerKey,'old-tab'],[handoffKey,'old-tab']]),type}),f=fixture({owner:null,browserWindow:doc.window});
+ try{assert.notEqual(doc.session.get(ownerKey),'old-tab');assert.equal(doc.session.has(handoffKey),false);}finally{f.native.stop();}
+});
+test('route recreation keeps one document owner and cached-document reactivation revokes its handoff',()=>{
+ const doc=documentFor(),f=fixture({owner:null,browserWindow:doc.window}),owner=doc.session.get(ownerKey);f.native.stop();
+ const next=f.create({...f.options});try{assert.equal(doc.session.get(ownerKey),owner);assert.equal(doc.events.get('pagehide').size,1);assert.equal(doc.events.get('pageshow').size,1);
+  doc.event('pagehide');assert.equal(doc.session.get(handoffKey),owner);doc.event('pageshow');assert.equal(doc.session.has(handoffKey),false);
+ }finally{next.stop();}
+});
+test('denied session storage retains a usable document-local owner across route recreation',async()=>{
+ const doc=documentFor({denied:true}),f=fixture({owner:null,browserWindow:doc.window});try{
+  f.native.command('pause',[]);const owner=JSON.parse([...f.values.values()][0]).owner;await f.advance();assert.equal(f.calls.length,1);f.native.stop();
+  const next=f.create({...f.options});try{next.command('resume',[]);assert.equal(JSON.parse([...f.values.values()][0]).owner,owner);doc.event('pagehide');doc.event('pageshow');}
+  finally{next.stop();}
+ }finally{f.native.stop();}
+});
+test('a legacy owner without a departing handoff is not authority to restore its journal',async()=>{
+ const legacy=fixture({respond:async()=>{throw Error('Offline');}});legacy.native.command('terminate',['lock']);await legacy.advance();const persisted=new Map(legacy.values);legacy.native.stop();
+ const doc=documentFor({session:new Map([[ownerKey,'owned-tab']]),type:'reload'}),f=fixture({values:persisted,owner:null,browserWindow:doc.window});
+ try{await f.advance();assert.deepEqual(f.calls,[]);assert.equal(f.values.size,1);f.native.stop();assert.equal(f.values.size,1);}finally{f.native.stop();}
 });

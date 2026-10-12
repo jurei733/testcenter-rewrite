@@ -12,6 +12,34 @@ const validScope = (scope: unknown): scope is Scope => Boolean(scope && typeof s
   ["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"].every(key =>
     typeof (scope as Record<string, unknown>)[key] === "string" && Boolean((scope as Record<string, unknown>)[key])));
 
+const documentOwners = new WeakMap<Window, string>();
+const participantNativeOwner = (window: Window): string => {
+  const current = documentOwners.get(window); if (current) return current;
+  const key = "testcenter-rewrite:participant-native-owner:v1";
+  const handoffKey = "testcenter-rewrite:participant-native-reload:v1";
+  let owner: string = crypto.randomUUID();
+  try {
+    const previous = window.sessionStorage.getItem(key);
+    const navigation = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    // New tabs can copy sessionStorage. Only a departing document's reload
+    // handoff can restore its owner; the copied identity of a live tab cannot.
+    if (navigation?.type === "reload" && previous && /^[A-Za-z0-9_-]{1,160}$/.test(previous) &&
+        window.sessionStorage.getItem(handoffKey) === previous) owner = previous;
+    window.sessionStorage.setItem(key, owner);
+    window.sessionStorage.removeItem(handoffKey);
+  } catch { /* Denied storage still permits a document-local console. */ }
+  documentOwners.set(window, owner);
+  // These belong to the document, not an Angular route instance. A cached
+  // document becoming active again must revoke its departing handoff as well.
+  window.addEventListener("pagehide", () => { try {
+    if (window.sessionStorage.getItem(key) === owner) window.sessionStorage.setItem(handoffKey, owner);
+  } catch {} });
+  window.addEventListener("pageshow", () => { try {
+    if (window.sessionStorage.getItem(key) === owner) window.sessionStorage.removeItem(handoffKey);
+  } catch {} });
+  return owner;
+};
+
 /** Ordered console intents: no remote ACK, durable identity and no credentials in storage. */
 export const createParticipantNativeCommands = (options: {
   readState: () => Pick<ParticipantCurrentRunState, "testRun"> | null;
@@ -27,13 +55,7 @@ export const createParticipantNativeCommands = (options: {
 }) => {
   const window = options.window ?? globalThis.window, fetcher = options.fetch ?? globalThis.fetch;
   const prefix = "testcenter-rewrite:participant-native-command:v1:";
-  const owner = options.ownerId ?? (() => {
-    try {
-      const key = "testcenter-rewrite:participant-native-owner:v1", old = window.sessionStorage.getItem(key);
-      if (old && /^[A-Za-z0-9_-]{1,160}$/.test(old)) return old;
-      const id = crypto.randomUUID(); window.sessionStorage.setItem(key, id); return id;
-    } catch { return crypto.randomUUID(); }
-  })();
+  const owner = options.ownerId ?? participantNativeOwner(window);
   const storage = (() => { try { return options.storage === undefined ? window.localStorage : options.storage; } catch { return null; } })();
   const schedule = options.schedule ?? ((callback, milliseconds) => { const id = window.setTimeout(callback, milliseconds); return () => window.clearTimeout(id); });
   const selected = (): Scope | null => { const run = options.readState()?.testRun; return validScope(run) ? {
