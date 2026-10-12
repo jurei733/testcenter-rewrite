@@ -1,5 +1,29 @@
 # Optional Original UI
 
+### Native command ownership across copied tabs (2026-10-12)
+
+A copied active tab no longer adopts or removes the originating tab's native
+command journal. The document receives a fresh owner; a normal reload retains
+its own owner only through an exact departing handoff. Real opener copies,
+removed openers, clone destruction/reentry/close, source retry and a copied tab
+reloaded before app bootstrap pass six production-bundle groups. The first
+browser reproduction failed before the fix on the shared owner. Normal cases
+use the real service worker; the explicitly interrupted uncached-bootstrap case
+bypasses it for that download.
+
+Checkpoint `0e8538d10915` passes 1,890 local tests, typecheck, production build,
+41 console/browser groups, all three PostgreSQL container profiles, SQLite
+runtime and 320 read-only image checks as `node`. Backend integration and the
+broader 147 browser cases remain verified predecessor evidence. The 891-file
+archive was verified and removed, all existing containers/mounts/volumes and
+protected hashes remain intact, and about 4.6 GB is free. Remote CI and production
+remain unverified. See [the scope and remaining acceptance in PARITY](./PARITY.md#native-command-ownership-in-copied-browser-tabs-2026-10-12).
+Without a verified departing handoff, legacy/crash intents are retained without
+automatic execution; their complete recovery/upgrade policy is still open.
+Full Original lifecycle, remote/activation races, visual/property/package,
+performance and production acceptance remain required.
+
+
 ### Native commands after controller destruction (2026-10-12)
 
 An actual Angular route exit now cancels pending native effect intents, including

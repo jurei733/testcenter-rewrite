@@ -1,5 +1,51 @@
 # Testcenter parity checklist
 
+### Native command ownership in copied browser tabs (2026-10-12)
+
+A new document now receives a fresh native command owner. Only a real reload
+with an exact departing-document handoff restores the previous owner; an active
+tab's copied `sessionStorage` cannot establish ownership. One document retains
+its owner across Angular route recreation, without multiplying document listeners.
+`pagehide` records the handoff, and creation or `pageshow` consumes/revokes it.
+This addresses the browser's actual [opener storage copy behavior](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage),
+without relying on the continued presence of `opener` or fabricated tab IDs.
+
+The pre-fix production browser gate reproduced the shared owner. Six groups now
+pass with actual copied storage before app initialization: a fresh opener copy,
+removal of the opener plus its own exact reload, clone route destruction/reentry
+and close preserving the source journal, the source's idempotent reload, a copied
+document reloaded before bootstrap, and retained trusted answers/clocks on source
+retry. The real service worker runs for the ordinary cases. Only the deliberately
+interrupted uncached-bootstrap download bypasses it. Seven additional default-owner
+source tests cover handoff, navigation type, denied storage, cached-document
+reactivation and unproven legacy owners; no caller-supplied owner bypass is used
+for those identity cases.
+
+This is deliberately not a lossless crash/upgrade-recovery claim. Without the
+handoff, existing legacy/crash journal rows remain untouched and are not
+executed automatically. [`pagehide` is not guaranteed for every termination](https://developer.mozilla.org/en-US/docs/Web/API/Window/pagehide_event).
+Recovery policy and full deployment acceptance for those unproven intents remain
+open, along with broader remote/activation races, LOADING wire/log lifecycle,
+complete Original visual/property/real-package acceptance and measured performance.
+
+Application checkpoint `0e8538d10915` passes all 1,890 local tests, typecheck and
+the 469.99 kB production build under the unchanged 470 kB hard limit, with existing
+warnings. Its six tab, five actual route, fourteen Debug/native, six loading/error,
+five route-contract and five actual prior-API-image groups pass. The non-optional
+console CI job requires the tab gate; remote execution remains unverified.
+Backend sources are unchanged: 1,244 PostgreSQL, 498 HTTP, 61 compatibility and
+147 broad browser cases remain verified predecessor evidence, not fresh executions.
+
+The current image passes Standard, Demo and production PostgreSQL profiles,
+SQLite runtime and all 320 read-only transaction/API checks as `node`. All 891
+tracked archive files were hash-verified and the owned archive removed. Existing
+24 containers, every mount field, 85 volumes, the protected presentation and host
+TypeScript hashes are preserved. The proof contains 64 hash-verified files; about
+4.6 GB remains free. Sustained container cache/storage headroom needs attention
+before many further images. No push, remote CI, release, deployment, full parity
+or production confirmation is claimed.
+
+
 ### Native command lifetime on an actual route exit (2026-10-12)
 
 Destroying the Angular participant route now removes its own pending native
