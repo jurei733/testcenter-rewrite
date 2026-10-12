@@ -246,7 +246,8 @@
     "reference:ui:original-player-version-error:built": "node ./scripts/reference-original-player-version-error.mjs",
     "smoke:ui:original-player-version-error:built": "node ./scripts/run-original-player-version-error-smoke.mjs",
     "smoke:ui:original-runtime-error-contract:built": "node ./scripts/run-original-runtime-error-contract-smoke.mjs",
-    "reference:ui:original-runtime-error-contract:built": "ORIGINAL_RUNTIME_CONTRACT=true node ./scripts/reference-original-runtime-error.mjs"
+    "reference:ui:original-runtime-error-contract:built": "ORIGINAL_RUNTIME_CONTRACT=true node ./scripts/reference-original-runtime-error.mjs",
+    "smoke:ui:participant-native-route:built": "node ./scripts/smoke-participant-native-route.mjs"
   },
   "devDependencies": {
     "@angular/build": "21.2.26",

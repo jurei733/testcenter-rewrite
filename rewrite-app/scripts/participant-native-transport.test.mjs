@@ -44,18 +44,37 @@ test('a lost response retries the identical prepared packet without repeating th
  }finally{f.native.stop();}
 });
 test('prepared intents survive reload in their own tab without storing or reusing credentials',async()=>{
- const f=fixture({respond:async()=>{throw Error('offline');}});f.native.command('resume',[]);await f.advance();assert.ok(![...f.values.values()].join().includes('Owned credential'));f.native.stop();
- const next=fixture({values:f.values});try{await next.advance();assert.equal(next.calls.length,1);assert.equal(next.prepared.length,0);assert.equal(next.calls[0].request.body,f.calls[0].request.body);assert.equal(next.values.size,0);}finally{next.native.stop();}
+ const f=fixture({respond:async()=>{throw Error('offline');}});f.native.command('resume',[]);await f.advance();assert.ok(![...f.values.values()].join().includes('Owned credential'));
+ // Capture the document's persisted state before fixture cleanup. A real
+ // document reload does not destroy the Angular route (covered in the browser gate).
+ const persisted=new Map(f.values);f.native.stop();
+ const next=fixture({values:persisted});try{await next.advance();assert.equal(next.calls.length,1);assert.equal(next.prepared.length,0);assert.equal(next.calls[0].request.body,f.calls[0].request.body);assert.equal(next.values.size,0);}finally{next.native.stop();}
 });
 test('another tab does not restore this tab\'s pending controller intent',async()=>{
- const f=fixture({respond:async()=>{throw Error('offline');}});f.native.command('terminate',['lock']);await f.advance();f.native.stop();
- const other=fixture({values:f.values,owner:'other-tab'});try{await other.advance();assert.deepEqual(other.calls,[]);assert.equal(other.values.size,1);}finally{other.native.stop();}
+ const f=fixture({respond:async()=>{throw Error('offline');}});f.native.command('terminate',['lock']);await f.advance();const persisted=new Map(f.values);f.native.stop();
+ const other=fixture({values:persisted,owner:'other-tab'});try{await other.advance();assert.deepEqual(other.calls,[]);assert.equal(other.values.size,1);}finally{other.native.stop();}
 });
 test('controller replacement cancels same-Run intents and fences the late response',async()=>{
  const gate=deferred(),f=fixture({respond:async(body,_count,receipt)=>{await gate.promise;return {ok:true,json:async()=>receipt(body)};}});try{
   f.native.command('goto',['2']);await f.advance();f.replace();assert.equal(f.calls[0].request.signal.aborted,true);gate.resolve();await flush();await f.advance(1000);
   assert.deepEqual(f.applied,[]);assert.equal(f.calls.length,1);assert.equal(f.values.size,0);
  }finally{f.native.stop();}
+});
+test('route destruction cancels the pending journal without needing another scope observation',async()=>{
+ const gate=deferred(),f=fixture({respond:async(body,_count,receipt)=>{await gate.promise;return {ok:true,json:async()=>receipt(body)};}});
+ f.native.command('pause',[]);f.native.command('resume',[]);await f.advance();assert.equal(f.values.size,2);
+ f.values.set('unrelated','protected');const foreign=JSON.parse(f.values.get('testcenter-rewrite:participant-native-command:v1:owned-1'));
+ foreign.owner='another-tab';foreign.id='foreign';foreign.request.deliveryId='foreign';
+ const foreignKey='testcenter-rewrite:participant-native-command:v1:foreign';f.values.set(foreignKey,JSON.stringify(foreign));
+ f.native.stop();assert.equal(f.calls[0].request.signal.aborted,true);assert.equal(f.listeners.size,0);
+ assert.deepEqual([...f.values.keys()].sort(),[foreignKey,'unrelated'].sort());
+ gate.resolve();await flush();await f.advance(1000);assert.deepEqual(f.applied,[]);assert.equal(f.calls.length,1);
+ const next=fixture({values:f.values});try{await next.advance();assert.deepEqual(next.calls,[]);}finally{next.native.stop();}
+});
+test('route destruction while draining trusted answers cannot dispatch the waiting intent',async()=>{
+ const gate=deferred(),f=fixture({prepare:()=>gate.promise});f.native.command('goto',['2']);await f.advance();
+ assert.equal(f.prepared.length,1);f.native.stop();gate.resolve();await flush();await f.advance(1000);
+ assert.equal(f.values.size,0);assert.deepEqual(f.calls,[]);assert.deepEqual(f.applied,[]);
 });
 for(const field of Object.keys(scope))test(`a replaced ${field} cannot receive an old native intent`,async()=>{
  const gate=deferred(),f=fixture({respond:async(body,_count,receipt)=>{await gate.promise;return {ok:true,json:async()=>receipt(body)};}});try{

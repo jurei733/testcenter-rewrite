@@ -140,6 +140,14 @@ export const createParticipantNativeCommands = (options: {
         deliveryId: id, keyword, arguments: [...args], controllerStatus: options.controllerStatus(), timeStamp: (options.now ?? Date.now)() } };
       queue.set(entry.id, entry); persist(entry); observeScope();
     },
-    stop(): void { if (stopped) return; stopped = true; flight?.controller.abort(); flight = null; cancel?.(); cancel = null; window.removeEventListener("online", online); }
+    stop(): void {
+      if (stopped) return;
+      stopped = true; flight?.controller.abort(); flight = null; cancel?.(); cancel = null;
+      // Angular destroys this controller on route exit; it must not leave
+      // effectful intents for a later controller. A document reload does not
+      // call this hook, so its exact pending deliveries remain restorable.
+      for (const entry of queue.values()) remove(entry);
+      window.removeEventListener("online", online);
+    }
   };
 };
