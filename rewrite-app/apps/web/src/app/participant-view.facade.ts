@@ -1,5 +1,5 @@
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
-import type { ParticipantControllerContext, ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { Injectable, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -504,6 +504,10 @@ export class ParticipantViewFacade {
     if (run?.status === "paused") return "PAUSED";
     if (run?.status === "completed") return "TERMINATED";
     return command?.status === "RUNNING" || this.debugRunState && !this.eagerBookletLoading ? "RUNNING" : "LOADING";
+  }
+  get nativeControllerStatus(): ParticipantNativeCommandRequest["controllerStatus"] {
+    return this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" :
+      this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING";
   }
   async prepareNativeConsoleCommand(isCurrent: () => boolean): Promise<void> {
     if (!this.debugRunState) return;

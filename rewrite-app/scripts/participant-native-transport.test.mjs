@@ -13,12 +13,12 @@ const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).t
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
 const deferred=()=>{let resolve;return {promise:new Promise(done=>resolve=done),get resolve(){return resolve;}};};
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
-function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow}={}){
+function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING'}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential);
  const receipt=body=>({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
- const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus:()=> 'RUNNING',generation:()=>generation,
+ const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
   window:browserWindow??{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
   now:()=>1791763200123,id:()=>`owned-${++id}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
@@ -36,6 +36,16 @@ test('native commands clone exact arguments, drain before dispatch and use only 
   assert.deepEqual(JSON.parse(request.body),{testRunId:'run',contentReleaseId:'release',bookletKey:'booklet',deliveryId:'owned-1',keyword:'goto',arguments:['id','Alias Ω','give 2'],controllerStatus:'RUNNING',timeStamp:1791763200123});
   assert.equal(f.applied.length,1);assert.equal(f.values.size,0);
  }finally{f.native.stop();}
+});
+test('a LOADING observation survives answer drain, reload and exact retry without resampling RUNNING',async()=>{
+ const values=new Map(),f=fixture({values,controllerStatus:()=> 'LOADING',respond:async()=>({ok:false,status:503})});
+ f.native.command('resume',[]);await f.advance();
+ const packet=f.calls[0].request.body;assert.equal(JSON.parse(packet).controllerStatus,'LOADING');
+ // A document reload keeps its prepared journal; Angular route destruction
+ // deliberately removes it, so simulate replacement by constructing the transport.
+ const restored=fixture({values,controllerStatus:()=> 'RUNNING'});
+ try{await restored.advance();assert.equal(restored.calls[0].request.body,packet);assert.equal(restored.applied.length,1);assert.equal(values.size,0);}
+ finally{f.native.stop();restored.native.stop();}
 });
 test('a lost response retries the identical prepared packet without repeating the answer drain',async()=>{
  const f=fixture({respond:async(body,count,receipt)=>{if(count===1)throw Error('lost response');return {ok:true,json:async()=>({...receipt(body),application:{...receipt(body).application,applied:false}})};}});try{

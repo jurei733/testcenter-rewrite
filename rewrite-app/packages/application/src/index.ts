@@ -32117,7 +32117,7 @@ export const createFirstSliceServices = (
       async executeNativeCommand(input) {
         if (!participantNativeCommandKeywords.includes(input.keyword) || !Array.isArray(input.arguments) ||
             input.arguments.some(argument => typeof argument !== "string") ||
-            !["RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus) ||
+            !["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus) ||
             !Number.isSafeInteger(input.timeStamp) || input.timeStamp < 0 ||
             typeof input.contentReleaseId !== "string" || !input.contentReleaseId || typeof input.bookletKey !== "string" || !input.bookletKey ||
             typeof input.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(input.deliveryId)) {
@@ -32165,7 +32165,7 @@ export const createFirstSliceServices = (
                 afterLeave: Boolean(entry?.restrictions?.lockAfterLeaving && run.lockedTestletKeys?.includes(key)) };
             };
             const observedController = request.controllerStatus === "ERROR" ? "ERROR" :
-              request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : "RUNNING";
+              request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : request.controllerStatus;
             const projected = projectParticipantNativeCommand({ request: { ...request, controllerStatus: observedController }, booklet, testRun: context.testRun, timestamp,
               timedKey: unitKey => resolveTimedTestletForUnit(booklet, unitKey)?.testletKey ?? null,
               remaining: timer => getTestletTimerRemainingSeconds(timer, timestamp),

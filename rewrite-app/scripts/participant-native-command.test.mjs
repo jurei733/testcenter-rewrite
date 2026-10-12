@@ -75,6 +75,36 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
    }
    await repository.saveTestRun(run);
   });
+  await t.test('LOADING commands retain their observation, log real controller transitions and replay the exact receipt',async()=>{
+   for(const [keyword,controller] of [['resume','RUNNING'],['pause','PAUSED'],['terminate','TERMINATED']]){
+    await repository.saveTestRun(run);const request=input(keyword,[],{controllerStatus:'LOADING'}),before=await snapshot(request);
+    const result=await invoke(request);assert.equal(result.controllerStatus,'LOADING');preserve(result.testRun,run);
+    const after=await snapshot(request,await create()),logs=after.logs.filter(log=>log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${request.deliveryId}:`));
+    assert.deepEqual(logs.filter(log=>log.logKey==='CONTROLLER').map(log=>log.logContent),[controller]);
+    assert.equal(logs.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length,1);
+    for(const key of ['commands','sibling','foreign','release'])assert.deepEqual(after[key],before[key]);
+    const replay=await invoke(request,await create());assert.equal(replay.applied,false);assert.equal(replay.controllerStatus,'LOADING');assert.equal(replay.executedAt,result.executedAt);
+    await assert.rejects(invoke({...request,controllerStatus:'RUNNING'}),error=>error.errorCode==='participant_delivery_conflict');
+    assert.deepEqual(await snapshot(request,await create()),after);
+   }
+   // An obsolete loading observation cannot erase a pause already committed by
+   // another controller; termination must retain the paused terminal variant.
+   await repository.saveTestRun({...run,status:'paused',pauseSource:'monitor'});
+   const request=input('terminate',[],{controllerStatus:'LOADING'});await invoke(request);
+   const logs=(await snapshot(request)).logs.filter(log=>log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${request.deliveryId}:`));
+   assert.deepEqual(logs.filter(log=>log.logKey==='CONTROLLER').map(log=>log.logContent),['TERMINATED_PAUSED']);
+   await repository.saveTestRun(run);
+  });
+  await t.test('loading observations obey execution-mode logging without adding an answer',async()=>{
+   for(const mode of ['run-hot-return','run-hot-restart','run-simulation','run-demo','run-review','run-trial']){
+    const original={...run,executionMode:mode};await repository.saveTestRun(original);
+    const request=input('resume',[],{controllerStatus:'LOADING'}),before=await snapshot(request);const result=await invoke(request);
+    preserve(result.testRun,original);const after=await snapshot(request);
+    assert.equal(after.logs.length-before.logs.length,!['run-demo','run-review','run-simulation'].includes(mode)?2:0);
+    assert.deepEqual(after.commands,before.commands);
+   }
+   await repository.saveTestRun(run);
+  });
   await t.test('resume preserves inactive cached timers and restores only the current interrupted countdown',async()=>{
    const original={...run,currentUnitKey:'timed-a',testletTimers:{'time-a':{testletKey:'time-a',status:'running',durationSeconds:300,remainingSeconds:111,startedAt:timestamp,expiresAt:new Date(clock+111_000).toISOString(),updatedAt:timestamp,endedAt:null},
     'time-b':{testletKey:'time-b',status:'paused',durationSeconds:300,remainingSeconds:61,startedAt:timestamp,expiresAt:null,updatedAt:timestamp,endedAt:null}}};await repository.saveTestRun(original);

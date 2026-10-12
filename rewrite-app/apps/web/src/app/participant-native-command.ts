@@ -72,7 +72,7 @@ export const createParticipantNativeCommands = (options: {
       entry.request && (entry.prepared === undefined || entry.prepared === true) && entry.request.deliveryId === entry.id && entry.request.keyword === entry.keyword &&
         entry.request.testRunId === entry.scope.testRunId && entry.request.contentReleaseId === entry.scope.contentReleaseId &&
         entry.request.bookletKey === entry.scope.bookletKey && JSON.stringify(entry.request.arguments) === JSON.stringify(entry.args) &&
-        ["RUNNING", "PAUSED", "ERROR"].includes(entry.request.controllerStatus) && Number.isSafeInteger(entry.request.timeStamp) && entry.request.timeStamp >= 0);
+        ["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(entry.request.controllerStatus) && Number.isSafeInteger(entry.request.timeStamp) && entry.request.timeStamp >= 0);
   };
   const persist = (entry: Entry): void => { try { storage?.setItem(prefix + entry.id, JSON.stringify(entry)); } catch {} };
   const remove = (entry: Entry): void => { queue.delete(entry.id); try {

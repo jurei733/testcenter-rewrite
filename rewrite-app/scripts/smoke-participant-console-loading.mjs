@@ -29,7 +29,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" }, stdio: ["ignore", "pipe", "pipe", "ipc"] });
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
-const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [];
+const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [], loadingObservations = [];
 let browser, page, releaseSnapshot; const releases=[];
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
@@ -74,8 +74,57 @@ try {
   const source = await api(workspace + "/source-packages", { fileName: "debug.json", mediaType: "application/json", contentStructure: content }, operator);
   const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-debug-browser" }, operator);
-  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
+  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  // Resume is a real controller transition even if the server Run is already
+  // running: before the initial view arrives the controller itself is LOADING.
+  const loadingContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  const loadingPage = await loadingContext.newPage(); page = loadingPage;
+  const loadingRepository = createSqliteFirstSliceRepository(file);
+  let releaseLoading; const loadingGate = new Promise(done => { releaseLoading = done; });
+  releases.push(releaseLoading);
+  try {
+    loadingPage.on("pageerror", error => errors.push(String(error)));
+    const loadingRequests = []; let initialRun;
+    loadingPage.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) {
+      loadingRequests.push(request.postDataJSON()); loadingObservations.push({ request: request.postDataJSON() });
+    } });
+    await loadingPage.route("**/current-state?*", async route => {
+      const response = await route.fetch(); initialRun ??= (await response.json()).currentRunState.testRun;
+      await loadingGate; await route.fulfill({ response });
+    });
+    await loadingPage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+    await loadingPage.locator("#originalLoginName").fill("loading-person");
+    await loadingPage.getByRole("button", { name: "Weiter", exact: true }).click();
+    await loadingPage.locator('#originalParticipantStarter mat-card[data-booklet-key="first"] button').click();
+    await poll(() => Promise.resolve(Boolean(initialRun)), "Initial loading response was not held");
+    await loadingPage.waitForFunction(() => typeof window.tc?.resume === "function");
+    await loadingPage.evaluate(() => window.tc.debug());
+    const loadingPane = loadingPage.locator('[data-debug-window="main"]');
+    await poll(async () => /STATUS:\s*LOADING/.test(await loadingPane.innerText()), "Initial controller is not LOADING");
+    await loadingPage.evaluate(() => window.tc.resume());
+    await poll(() => Promise.resolve(loadingRequests.length === 1), "Early Resume was not sent");
+    assert.equal(loadingRequests[0].controllerStatus, "LOADING");
+    const executionLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
+      .filter(log => log.participantTestLogId.startsWith(`delivery:${initialRun.testRunId}:console:${loadingRequests[0].deliveryId}:`));
+    await poll(async () => (await executionLogs()).some(log => log.logKey === "CONTROLLER" && log.logContent === "RUNNING"), "Early Resume omitted the LOADING to RUNNING log");
+    await poll(async () => /STATUS:\s*RUNNING/.test(await loadingPane.innerText()), "Resume receipt did not advance the loading controller");
+    assert.equal(await loadingPage.locator("iframe").count(), 0);
+    releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" });
+    await loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    const run = await loadingRepository.getTestRunById(initialRun.testRunId);
+    assert.deepEqual(run.unitResponses, initialRun.unitResponses);
+    assert.deepEqual(run.unitResponseFieldTimestamps, initialRun.unitResponseFieldTimestamps);
+    assert.equal((await executionLogs()).filter(log => log.logKey === "CONTROLLER").length, 1);
+    assert.equal((await executionLogs()).filter(log => log.logKey === "command executed" && log.logContent === "resume").length, 1);
+    loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), answersAndClocksPreserved: true });
+    await loadingPage.screenshot({ path: join(artifacts, "loading-resume.png"), fullPage: true });
+    checks.push("early-resume-observes-loading-and-persists-the-real-controller-transition");
+    console.log("participant_console_loading=early-resume-observes-loading-and-persists-the-real-controller-transition:passed");
+  } catch (error) {
+    await loadingPage.screenshot({ path: join(artifacts, "loading-resume-failure.png"), fullPage: true }).catch(() => {});
+    throw error;
+  } finally { releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   page.on("pageerror", error => errors.push(String(error)));
@@ -175,15 +224,19 @@ try {
   assert.deepEqual(terminated.unitResponses,secondRun.unitResponses);assert.deepEqual(terminated.unitResponseFieldTimestamps,secondRun.unitResponseFieldTimestamps);
   assert.deepEqual((await repository.getTestRunById(first.testRunId)).unitResponses,first.unitResponses);
   assert.deepEqual(await repository.listPendingParticipantRunCommands(terminated),[]);mark('reload-context-and-early-error-lock-termination');
+  assert.deepEqual(nativeRequests.map(request => [request.keyword, request.controllerStatus]), [
+    ['pause', 'LOADING'], ['resume', 'PAUSED'], ['goto', 'RUNNING'],
+    ['terminate', 'RUNNING'], ['resume', 'ERROR'], ['terminate', 'ERROR']
+  ]);
   await page.unrouteAll({behavior:'wait'});assert.deepEqual(errors,[]);
 
 } catch (error) {
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
-  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
+  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, loadingObservations, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
-  releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"});
-  await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests }, null, 2));
+  releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});
+  await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests, loadingObservations }, null, 2));
   await browser?.close();
   if (server.exitCode === null) { server.kill("SIGTERM"); await Promise.race([closed, delay(5_000)]); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
   await closed; gate.assertHealthy(); console.log("owned_api=shutdown");

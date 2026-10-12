@@ -12,7 +12,7 @@ export type ParticipantNativeCommandRequest = {
   deliveryId: string;
   keyword: ParticipantNativeCommandKeyword;
   arguments: string[];
-  controllerStatus: "RUNNING" | "PAUSED" | "ERROR";
+  controllerStatus: "LOADING" | "RUNNING" | "PAUSED" | "ERROR";
   timeStamp: number;
 };
 export type ParticipantNativeCommandResult = {

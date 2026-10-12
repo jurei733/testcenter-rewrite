@@ -6,7 +6,7 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningf
 import {participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
+const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','nativeControllerStatus','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
 const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
@@ -85,12 +85,14 @@ test('an authorized resume synchronizes its exact non-Starter URL before a first
 
 test('accepted controller states are visible before their Unit loads and termination overrides the retained error presentation',async()=>{
  const loading=deferred(),f=fixture(()=>loading.promise);f.host.syncRun(run);
- assert.equal(f.host.debugControllerStatus,'LOADING');
+ assert.equal(f.host.debugControllerStatus,'LOADING');assert.equal(f.host.nativeControllerStatus,'LOADING');
  await f.host.applyNativeConsoleCommand({keyword:'resume',testRun:run,participantSession:session},()=>true);
- assert.equal(f.host.debugControllerStatus,'RUNNING');
+ assert.equal(f.host.debugControllerStatus,'RUNNING');assert.equal(f.host.nativeControllerStatus,'RUNNING');
  f.host.syncRun({...run,status:'paused'});f.host.commandControllerState={testRunId:'selected',status:'TERMINATED_PAUSED'};
+ assert.equal(f.host.nativeControllerStatus,'PAUSED');
  f.host.activeControllerError.set({testRunId:'selected',message:'Retained error'});f.host.participantErrorReceptionSuspended=true;
  assert.equal(f.host.debugControllerStatus,'TERMINATED_PAUSED');
+ assert.equal(f.host.nativeControllerStatus,'ERROR');
  f.host.runtime.testRunId='other';assert.equal(f.host.consoleRun,null);
  loading.resolve({currentRunState:state(run)});await tick();
 });
