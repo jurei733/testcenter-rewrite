@@ -250,7 +250,7 @@ test('an already accepted resume clears ERROR blocking while retaining its scope
 test('a terminal receipt cannot return a later same-Run entry to Starter',async()=>{
  const view=deferred(),f=fixture(label=>label==='Participant Starter'?{runtimeState:{participantSession:{...run,status:'launched'}}}:view.promise,applyRemote);f.host.syncRun(run);
  await f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);
- await tick();assert.equal(f.calls.starter,0);view.resolve({currentRunState:state(run)});await tick();assert.equal(f.host.consoleRun.status,'running');
+ await tick();assert.equal(f.calls.starter,0);view.resolve({currentRunState:state(run)});await tick();assert.equal(f.host.consoleRun.status,'running');assert.equal(f.calls.started,1,'An authorized fresh RUNNING view must restore reception after reentry from another controller.');
 });
 test('a scoped terminal receipt returns the controller to Starter without requiring a Unit or response',async()=>{
  const f=fixture(async()=>({runtimeState:{participantSession:{...run,status:'signed_in'}}}),applyRemote);f.host.syncRun({...run,status:'paused'});
@@ -325,4 +325,19 @@ test('an ordinary identical Run view cannot strand a confirmed Goto behind its t
  await f.host.refreshCurrentStateInternal(true);assert.equal(f.host.consoleRun.currentUnitKey,'unit');
  reply.resolve();await pending;assert.equal(f.host.consoleRun.currentUnitKey,'next-unit');assert.equal(f.host.unitViewPending,true);
  assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);targetView.resolve({currentRunState:{...state({...run,currentUnitKey:'next-unit'}),currentUnit:{...state(run).currentUnit,unitKey:'next-unit'}}});await tick();
+});
+
+for(const [name,status,parentStatus] of [['sibling parent activation','paused','launched'],['inactive parent','running','signed_in']])test(`a ${name} cannot reopen a terminated selected controller`,async()=>{
+ const selected={...run,status},f=fixture(async()=>({currentRunState:{...state(selected),participantSession:{...session,status:parentStatus}}}),applyRemote);
+ f.host.syncRun({...run,status:'paused'});f.host.currentRunState=state({...run,status:'paused'});
+ f.host.commandControllerState={testRunId:run.testRunId,status:'TERMINATED'};
+ await f.host.refreshCurrentStateInternal(true,true);assert.equal(f.calls.started,0);assert.equal(f.host.commandControllerState.status,'TERMINATED');
+});
+test('a running view captured before terminal application cannot restore reception after its verified effect',async()=>{
+ const ordinary=deferred(),runtime=deferred(),f=fixture(label=>label==='Participant Starter'?runtime.promise:ordinary.promise,applyRemote);
+ f.host.syncRun(run);f.host.currentRunState=state(run);const reading=f.host.refreshCurrentStateInternal(true);
+ await f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);await tick();
+ ordinary.resolve({currentRunState:state(run)});await reading;
+ assert.equal(f.calls.started,0);assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.host.commandControllerState.status,'TERMINATED');
+ runtime.resolve({runtimeState:{participantSession:{...run,status:'signed_in'}}});await tick();assert.equal(f.calls.starter,1);
 });

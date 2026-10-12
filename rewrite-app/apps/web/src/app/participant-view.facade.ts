@@ -4578,6 +4578,14 @@ export class ParticipantViewFacade {
         this.participantErrorReceptionSuspended = false;
       }
       this.syncCurrentRunState(payload.currentRunState);
+      if (this.commandControllerState?.testRunId === testRunId &&
+        this.commandControllerState.status.startsWith("TERMINATED") &&
+        payload.currentRunState.testRun.status === "running" &&
+        payload.currentRunState.participantSession.status === "launched") {
+        // A fresh authorized view can confirm reentry by another controller.
+        // A sibling's parent activation alone must leave this Run terminated.
+        this.commandControllerState = { testRunId, status: "RUNNING" };
+      }
       if (!preserveCurrentTextDraft) {
         this.syncCurrentUnitResponse(payload.currentRunState);
       }

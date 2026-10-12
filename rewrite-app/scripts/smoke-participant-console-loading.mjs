@@ -216,9 +216,55 @@ try {
     assert.deepEqual(applications.map(value=>value.application.command.commandId),[pause.commandId,resume.commandId,terminate.commandId]);
     loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads,answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
     checks.push('late-remote-termination-cannot-close-a-newer-native-entry');console.log('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
+    const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
+    const externalPage=await remoteContext.newPage();externalPage.on('pageerror',error=>errors.push(String(error)));
+    const runtimeRequest=terminalDeferred();releases.push(runtimeRequest.resolve);let runtimeRequested=false,runtimeRouteError,reactivatedRuntime;
+    const externalBaseline=await loadingRepository.getTestRunById(runId),applicationStart=applications.length;
+    try {
+      await externalPage.goto(remotePage.url(),{waitUntil:'networkidle'});
+      await externalPage.waitForFunction(()=>typeof window.tc?.resume==='function');
+      await externalPage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+      await remotePage.route('**/application',captureApplication);
+      await remotePage.route(url=>url.pathname===runtimePath,async route=>{
+        try {
+          runtimeRequested=true;await runtimeRequest.promise;
+          const response=await route.fetch();reactivatedRuntime=await response.json();await route.fulfill({response});
+        }catch(error){runtimeRouteError=error;}
+      });
+      await remotePage.evaluate(()=>window.tc.terminate());
+      await poll(()=>Promise.resolve(runtimeRequested),'The first controller did not hold its terminal runtime request');
+      await poll(async()=>/STATUS:\s*TERMINATED/.test(await remotePane.innerText()),'The first controller did not enter TERMINATED before external reentry');
+      const externalReceipt=externalPage.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/native-commands')&&response.request().postDataJSON().keyword==='resume');
+      await externalPage.evaluate(()=>window.tc.resume());const externalApplication=(await (await externalReceipt).json()).application;
+      assert.equal(externalApplication.applied,true);assert.equal(externalApplication.testRun.testRunId,runId);
+      await poll(async()=>{
+        const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';
+      },'The second page did not reactivate the same Run');
+      await externalPage.close();runtimeRequest.resolve();
+      await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'The first controller did not render the fresh externally reactivated Run');
+      await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'A fresh externally reactivated Run did not restore command reception');
+      assert.equal(reactivatedRuntime.runtimeState.participantSession.status,'launched');
+      const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;
+      await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'The reactivated first controller did not apply a new remote Pause');
+      await remotePage.unrouteAll({behavior:'wait'});if(runtimeRouteError)throw runtimeRouteError;
+      const finalRun=await loadingRepository.getTestRunById(runId);assert.equal(finalRun.status,'paused');
+      assert.deepEqual(finalRun.unitResponses,externalBaseline.unitResponses);assert.deepEqual(finalRun.unitResponseFieldTimestamps,externalBaseline.unitResponseFieldTimestamps);
+      assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+      assert.deepEqual(applications.slice(applicationStart).map(value=>value.application.command.commandId),[following.commandId]);
+      assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
+      assert.equal(acks.filter(ack=>ack.path.includes(following.commandId)).length,1);
+      loadingObservations.push({externalApplication,reactivatedRuntime,application:applications.at(-1),externalDocumentClosedBeforeNewCommand:true,
+        sameRunReceptionRestored:true,answersAndClocksPreserved:true,siblingPreserved:true});
+      await remotePage.screenshot({path:join(artifacts,'external-reactivation-reception.png'),fullPage:true});
+      const marker='an-external-same-run-entry-restores-the-rendered-controller-reception';checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+    }finally{runtimeRequest.resolve();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});if(!externalPage.isClosed())await externalPage.close();}
+    await remotePage.evaluate(()=>window.tc.resume());
+    await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    const gotoApplicationStart=applications.length;
     await remotePage.route('**/application',captureApplication);
-    let gotoHeld=false,gotoReleased=false,gotoRouteError;const gotoGate=new Promise(done=>{releaseGotoView=()=>{gotoReleased=true;done();};});releases.push(releaseGotoView);
+    const activeGotoViews=new Set();let gotoHeld=false,gotoReleased=false,gotoRouteError;const gotoGate=new Promise(done=>{releaseGotoView=()=>{gotoReleased=true;done();};});releases.push(releaseGotoView);
     await remotePage.route('**/current-state?*',async route=>{
+      activeGotoViews.add(route);
       try {
         const response=await route.fetch(),data=await response.json();
         if(!gotoReleased&&data.currentRunState.testRun.currentUnitKey==='next-unit'&&data.currentRunState.testRun.status==='running'){gotoHeld=true;await gotoGate;}
@@ -227,7 +273,7 @@ try {
         const failure=route.request().failure();
         if(failure&&/abort|cancel/i.test(failure.errorText))loadingObservations.push({cancelledGotoView:failure.errorText});
         else gotoRouteError=error;
-      }
+      } finally {activeGotoViews.delete(route);}
     });
     const goto=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'goto',targetUnitKey:'next-unit'},operator)).command;
     await poll(()=>Promise.resolve(gotoHeld),'Remote Goto did not request its target view');
@@ -236,7 +282,9 @@ try {
     await remotePage.screenshot({path:join(artifacts,'remote-goto-held-target.png'),fullPage:true});
     const gotoPause=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;
     await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'Remote Pause waited behind the held Goto target view');
-    releaseGotoView();await remotePage.unrouteAll({behavior:'wait'});
+    releaseGotoView();await poll(()=>Promise.resolve(activeGotoViews.size===0),'A released Goto view route did not settle');
+    await remotePage.unrouteAll({behavior:'ignoreErrors'});
+    await remotePage.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
     if(gotoRouteError)throw gotoRouteError;
     assert.match(await remotePane.innerText(),/STATUS:\s*PAUSED/,'Late Goto view reverted the following Pause');
     await remotePage.route('**/application',captureApplication);
@@ -246,14 +294,13 @@ try {
     const navigated=await loadingRepository.getTestRunById(runId);assert.equal(navigated.currentUnitKey,'next-unit');
     assert.deepEqual(navigated.unitResponses,before.unitResponses);assert.deepEqual(navigated.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
     assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
-    assert.deepEqual(applications.slice(3).map(value=>value.application.command.commandId),[goto.commandId,gotoPause.commandId,gotoResume.commandId]);
-    assert.deepEqual(applications.map(value=>value.application.command.executionSequence),[1,2,3,4,5,6]);
-    assert.equal(acks.length,6);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
-    loadingObservations.push({testRunId:runId,gotoApplications:applications.slice(3),answersAndClocksPreserved:true,siblingPreserved:true,formerUnitRetiredBeforeTargetView:true});
+    assert.deepEqual(applications.slice(gotoApplicationStart).map(value=>value.application.command.commandId),[goto.commandId,gotoPause.commandId,gotoResume.commandId]);
+    assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
+    assert.equal(acks.length,applications.length);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
+    loadingObservations.push({testRunId:runId,gotoApplications:applications.slice(gotoApplicationStart),answersAndClocksPreserved:true,siblingPreserved:true,formerUnitRetiredBeforeTargetView:true});
     checks.push('remote-goto-retires-the-former-unit-and-keeps-following-commands-live');console.log('participant_console_loading=remote-goto-retires-the-former-unit-and-keeps-following-commands-live:passed');
 
     await remotePage.unrouteAll({behavior:'wait'});
-    const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
     for(const origin of ['remote','native']) {
       if((await loadingRepository.getTestRunById(runId)).status==='paused') {
         await remotePage.evaluate(()=>window.tc.resume());
@@ -345,7 +392,8 @@ try {
         await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});
       }
     }
-  }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePage.unrouteAll({behavior:"wait"}).catch(()=>{});await remoteContext.close();}
+
+  }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePage.unrouteAll({behavior:"ignoreErrors"}).catch(()=>{});await remoteContext.close();}
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   page.on("pageerror", error => errors.push(String(error)));
