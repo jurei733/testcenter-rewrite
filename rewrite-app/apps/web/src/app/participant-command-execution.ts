@@ -1,4 +1,4 @@
-import type { ParticipantRunCommand, ParticipantRunCommandScope } from "@testcenter-rewrite-app/domain";
+import type { ParticipantRunCommand, ParticipantRunCommandScope, ParticipantRunCommandApplicationResult, TestRun, ParticipantSession } from "@testcenter-rewrite-app/domain";
 import { parseParticipantRunCommand, participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
@@ -8,10 +8,11 @@ export const executeReceivedParticipantCommand = async (
   command: ParticipantRunCommand,
   signal: AbortSignal,
   options: {
+    scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string };
     isCurrent: () => boolean;
     controllerStatus: () => "RUNNING" | "PAUSED" | "ERROR";
     prepare: () => Promise<void>;
-    apply: () => Promise<void>;
+    apply: (application: ParticipantRunCommandApplicationResult) => Promise<void>;
   }
 ): Promise<void> => {
   if (signal.aborted || !options.isCurrent()) return;
@@ -26,8 +27,8 @@ export const executeReceivedParticipantCommand = async (
   if (!response.ok) throw Object.assign(new Error(`Command application returned HTTP ${response.status}.`), { retryable: response.status >= 500 });
   const payload = await response.json() as { application?: {
     command?: unknown;
-    testRun?: Partial<ParticipantRunCommandScope>;
-    participantSession?: Partial<Omit<ParticipantRunCommandScope, "testRunId">>;
+    testRun?: Partial<TestRun>;
+    participantSession?: Partial<ParticipantSession>;
     applied?: unknown;
   } } | null;
   if (signal.aborted || !options.isCurrent()) return;
@@ -36,11 +37,13 @@ export const executeReceivedParticipantCommand = async (
       Object.keys(command).some(key => !["executedAt", "executionSequence"].includes(key) &&
         (key === "debugArguments" ? JSON.stringify(receipt.debugArguments ?? []) !== JSON.stringify(command.debugArguments) :
           receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand])) ||
-      !(["tenantId", "workspaceId", "participantSessionId", "testRunId"] as const).every(key =>
-        application.testRun?.[key] === command[key]) ||
+      !(["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const).every(key =>
+        application.testRun?.[key] === options.scope[key]) ||
+      !["running", "paused", "completed"].includes(application.testRun?.status ?? "") ||
+      !application.testRun?.unitResponses || typeof application.testRun.unitResponses !== "object" || Array.isArray(application.testRun.unitResponses) ||
       !(["tenantId", "workspaceId", "participantSessionId"] as const).every(key =>
         application.participantSession?.[key] === command[key])) {
     throw Object.assign(new Error("The command application does not match the accepted receipt."), { retryable: false });
   }
-  await options.apply();
+  await options.apply({ ...application, command: receipt } as ParticipantRunCommandApplicationResult);
 };

@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
-import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { productionApiRoutes, resolveRoutePath, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 
@@ -74,7 +74,7 @@ try {
   const source = await api(workspace + "/source-packages", { fileName: "debug.json", mediaType: "application/json", contentStructure: content }, operator);
   const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-debug-browser" }, operator);
-  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
+  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="remote-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   // Resume is a real controller transition even if the server Run is already
   // running: before the initial view arrives the controller itself is LOADING.
@@ -131,6 +131,128 @@ try {
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume-failure.png"), fullPage: true }).catch(() => {});
     throw error;
   } finally { releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
+  // An application receipt changes the controller before a following full
+  // view arrives. Holding that view must not block the next accepted command.
+  const remoteIdentity = await api(productionApiRoutes.participant.signIn, {tenantKey:"demo-tenant",workspaceKey,loginKey:"remote-person"});
+  const sibling = (await api(productionApiRoutes.participant.launch,{participantSessionId:remoteIdentity.participantSession.participantSessionId,bookletKey:"second"},remoteIdentity.sessionToken)).testRun;
+  await api(resolveRoutePath(productionApiRoutes.participant.saveProgress,{testRunId:sibling.testRunId}),{status:"running",currentUnitKey:sibling.currentUnitKey,unitResponse:"Exact sibling answer Ω"},remoteIdentity.sessionToken);
+  const siblingBefore = await loadingRepository.getTestRunById(sibling.testRunId);
+  const remoteContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  const remotePage = await remoteContext.newPage();page=remotePage;
+  let releasePausedView,releaseTerminalRuntime,releaseGotoView;const pausedGate=new Promise(done=>{releasePausedView=done;});releases.push(releasePausedView);
+  try {
+    remotePage.on("pageerror",error=>errors.push(String(error)));
+    await remotePage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`,{waitUntil:"networkidle"});
+    await remotePage.locator("#originalLoginName").fill("remote-person");await remotePage.getByRole("button",{name:"Weiter",exact:true}).click();
+    await remotePage.locator('#originalParticipantStarter mat-card[data-booklet-key="first"] button').click();
+    await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    const runId=new URL(remotePage.url()).searchParams.get("testRunId");assert.ok(runId);
+    await remotePage.waitForFunction(()=>typeof window.tc?.debug==="function");await remotePage.evaluate(()=>window.tc.debug());
+    const remotePane=remotePage.locator('[data-debug-window="main"]');
+    await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),"Remote command stream did not become live");
+    await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").fill("3");
+    await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);try{return JSON.parse(parseVeronaUnitResponse(run.unitResponses[run.currentUnitKey]).unitState.dataParts.answer)[0].value==='3';}catch{return false;}},"Trusted remote-case answer was not stored");
+    const before=await loadingRepository.getTestRunById(runId),applications=[],acks=[];let pausedHeld=false;
+    remotePage.on("request",request=>{if(request.method()==="PATCH"&&new URL(request.url()).pathname.includes("/commands/"))acks.push({path:new URL(request.url()).pathname,body:request.postDataJSON()});});
+    const captureApplication=async route=>{const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});};
+    await remotePage.route("**/application",captureApplication);
+    await remotePage.route("**/current-state?*",async route=>{
+      const response=await route.fetch(),data=await response.json();
+      if(!pausedHeld&&data.currentRunState.testRun.status==="paused"){pausedHeld=true;await pausedGate;}
+      await route.fulfill({response});
+    });
+    const pause=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:"pause"},operator)).command;
+    await poll(()=>Promise.resolve(pausedHeld),"Remote Pause did not request its following full view");
+    await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),"Remote Pause receipt did not project before its held full view");
+    await remotePage.locator("#participantRoutePausedState").waitFor();
+    checks.push("remote-pause-receipt-projects-before-the-following-unit-view");console.log("participant_console_loading=remote-pause-receipt-projects-before-the-following-unit-view:passed");
+    const resume=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:"resume"},operator)).command;
+    await poll(async()=>(await loadingRepository.getTestRunById(runId)).status==="running","Remote Resume was blocked behind the held Pause view");
+    await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),"Remote Resume receipt did not project RUNNING");
+    await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    await poll(async()=>(await remotePage.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue())==="3","The resumed Player did not restore its stored answer");
+    releasePausedView();await remotePage.unrouteAll({behavior:"wait"});
+    await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),"Late Pause view reverted the accepted Resume");
+    const after=await loadingRepository.getTestRunById(runId);
+    assert.deepEqual(after.unitResponses,before.unitResponses);assert.deepEqual(after.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+    assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+    assert.deepEqual(applications.map(value=>value.application.command.commandId),[pause.commandId,resume.commandId]);
+    assert.ok(applications.every(value=>value.application.command.executedAt&&value.application.testRun.testRunId===runId));
+    assert.deepEqual(applications.map(value=>value.application.command.executionSequence),[1,2]);
+    assert.equal(acks.length,2);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
+    assert.ok(acks.some(ack=>ack.path.includes(pause.commandId)));assert.ok(acks.some(ack=>ack.path.includes(resume.commandId)));
+    const logs=(await loadingRepository.listParticipantTestLogsByWorkspace(after.tenantId,after.workspaceId)).filter(log=>log.testRunId===runId);
+    for(const keyword of ['pause','resume'])assert.equal(logs.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length,1);
+
+    await remotePage.screenshot({path:join(artifacts,"remote-view-resume.png"),fullPage:true});
+    checks.push("remote-resume-overtakes-held-view-and-fences-its-late-state");console.log("participant_console_loading=remote-resume-overtakes-held-view-and-fences-its-late-state:passed");
+    await remotePage.route("**/application",captureApplication);
+    const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
+    let terminalRuntimeReads=0,reconciledEntry=false;
+    const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
+    await remotePage.route(url=>url.pathname===runtimePath,async route=>{
+      const response=await route.fetch();terminalRuntimeReads++;
+      if(terminalRuntimeReads===1){assert.equal((await response.json()).runtimeState.participantSession.status,'signed_in');await terminalRuntimeGate;}
+      await route.fulfill({response});
+    });
+    remotePage.on('request',request=>{if(terminalRuntimeReads>=2&&new URL(request.url()).pathname.endsWith('/current-state'))reconciledEntry=true;});
+    const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
+    await poll(()=>Promise.resolve(terminalRuntimeReads===1),'Terminal command did not hold its inactive runtime snapshot');
+    const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
+    await remotePage.evaluate(()=>window.tc.resume());
+    await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';},'New native entry did not reactivate the terminated Run');
+    await poll(()=>previousFrame.evaluate(frame=>!frame.isConnected),'New native receipt did not replace the prior Player');
+    await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The newer native entry did not restore its stored answer');
+    await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'New native receipt did not project the active entry');
+    releaseTerminalRuntime();
+    await poll(()=>Promise.resolve(terminalRuntimeReads>=2&&reconciledEntry),'Late terminal runtime snapshot was not re-read for the newer entry');
+    await remotePage.unrouteAll({behavior:'wait'});
+    await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
+    assert.equal(new URL(remotePage.url()).searchParams.get('testRunId'),runId);
+    const reentered=await loadingRepository.getTestRunById(runId);
+    assert.deepEqual(reentered.unitResponses,before.unitResponses);assert.deepEqual(reentered.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+    assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+    assert.deepEqual(applications.map(value=>value.application.command.commandId),[pause.commandId,resume.commandId,terminate.commandId]);
+    loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads,answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
+    checks.push('late-remote-termination-cannot-close-a-newer-native-entry');console.log('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
+    await remotePage.route('**/application',captureApplication);
+    let gotoHeld=false,gotoReleased=false,gotoRouteError;const gotoGate=new Promise(done=>{releaseGotoView=()=>{gotoReleased=true;done();};});releases.push(releaseGotoView);
+    await remotePage.route('**/current-state?*',async route=>{
+      try {
+        const response=await route.fetch(),data=await response.json();
+        if(!gotoReleased&&data.currentRunState.testRun.currentUnitKey==='next-unit'&&data.currentRunState.testRun.status==='running'){gotoHeld=true;await gotoGate;}
+        await route.fulfill({response});
+      } catch(error) {
+        const failure=route.request().failure();
+        if(failure&&/abort|cancel/i.test(failure.errorText))loadingObservations.push({cancelledGotoView:failure.errorText});
+        else gotoRouteError=error;
+      }
+    });
+    const goto=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'goto',targetUnitKey:'next-unit'},operator)).command;
+    await poll(()=>Promise.resolve(gotoHeld),'Remote Goto did not request its target view');
+    await poll(async()=>(await remotePage.locator('iframe:visible').count())===0,'Remote Goto kept the former Unit active while target metadata was held');
+    assert.deepEqual((await loadingRepository.getTestRunById(runId)).unitResponses,before.unitResponses);
+    await remotePage.screenshot({path:join(artifacts,'remote-goto-held-target.png'),fullPage:true});
+    const gotoPause=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;
+    await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'Remote Pause waited behind the held Goto target view');
+    releaseGotoView();await remotePage.unrouteAll({behavior:'wait'});
+    if(gotoRouteError)throw gotoRouteError;
+    assert.match(await remotePane.innerText(),/STATUS:\s*PAUSED/,'Late Goto view reverted the following Pause');
+    await remotePage.route('**/application',captureApplication);
+    const gotoResume=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator)).command;
+    await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    assert.equal(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue(),'');
+    const navigated=await loadingRepository.getTestRunById(runId);assert.equal(navigated.currentUnitKey,'next-unit');
+    assert.deepEqual(navigated.unitResponses,before.unitResponses);assert.deepEqual(navigated.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+    assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+    assert.deepEqual(applications.slice(3).map(value=>value.application.command.commandId),[goto.commandId,gotoPause.commandId,gotoResume.commandId]);
+    assert.deepEqual(applications.map(value=>value.application.command.executionSequence),[1,2,3,4,5,6]);
+    assert.equal(acks.length,6);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
+    loadingObservations.push({testRunId:runId,gotoApplications:applications.slice(3),answersAndClocksPreserved:true,siblingPreserved:true,formerUnitRetiredBeforeTargetView:true});
+    checks.push('remote-goto-retires-the-former-unit-and-keeps-following-commands-live');console.log('participant_console_loading=remote-goto-retires-the-former-unit-and-keeps-following-commands-live:passed');
+  }finally{releasePausedView();releaseTerminalRuntime?.();releaseGotoView?.();await remotePage.unrouteAll({behavior:"wait"}).catch(()=>{});await remoteContext.close();}
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   page.on("pageerror", error => errors.push(String(error)));
@@ -182,14 +304,30 @@ try {
   assert.deepEqual((await repository.getTestRunById(heldRun.testRunId)).unitResponseFieldTimestamps,heldRun.unitResponseFieldTimestamps);
   mark('early-pause-resume-order-and-late-view-fence');
   const gotoView=deferred(),gotoDone=deferred();releases.push(gotoView.resolve);let gotoHeld=false;
+  const gotoReceipt=deferred(),finalSaveReceipt=deferred();releases.push(gotoReceipt.resolve,finalSaveReceipt.resolve);let gotoReceiptHeld=false,finalSaveHeld=false;
+  await page.route('**/native-commands',async route=>{
+    if(route.request().postDataJSON().keyword!=='goto'){await route.continue();return;}
+    const response=await route.fetch();gotoReceiptHeld=true;await gotoReceipt.promise;await route.fulfill({response});
+  });
+  await page.route('**/save-progress',async route=>{
+    const body=route.request().postDataJSON();let final=false;
+    try{final=body.responseUnitKey==='first-unit'&&JSON.parse(parseVeronaUnitResponse(body.unitResponse).unitState.dataParts.answer)[0].value==='7';}catch{}
+    if(!final){await route.continue();return;}
+    const response=await route.fetch();finalSaveHeld=true;await finalSaveReceipt.promise;await route.fulfill({response});
+  });
   await page.route('**/current-state?*',async route=>{const response=await route.fetch();gotoHeld=true;await gotoView.promise;await route.fulfill({response});gotoDone.resolve();});
   await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('4');await native('goto',['2']);
-  await poll(()=>Promise.resolve(gotoHeld),'Goto did not hold its next Unit view');
+  await poll(()=>Promise.resolve(gotoReceiptHeld),'Goto did not hold its confirmed application reply');
+  // The server has changed selection, but the receipt has not yet reached this
+  // controller. Actual input still belongs to its authenticated former frame.
   await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('7');
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('testcenter-rewrite:participant-save-outbox:v1')||'{"entries":[]}').entries.some(entry=>{
     try{return entry.unitKey==='first-unit'&&!entry.logOnly&&JSON.parse(JSON.parse(entry.response).unitState.dataParts.answer)[0].value==='7';}catch{return false;}
   }));
-  await native('terminate');await page.locator('#originalParticipantStarter mat-card').first().waitFor();
+  await poll(()=>Promise.resolve(finalSaveHeld),'The trusted former-Unit answer receipt was not held');
+  gotoReceipt.resolve();await poll(()=>Promise.resolve(gotoHeld),'Goto did not hold its next Unit view');
+  await poll(async()=>(await page.locator('iframe').count())===0,'Goto must retire its former Unit while the target view is held');
+  await native('terminate');finalSaveReceipt.resolve();await page.locator('#originalParticipantStarter mat-card').first().waitFor();
   const first=await repository.getTestRunById(heldRun.testRunId);
   assert.equal(first.currentUnitKey,'next-unit');assert.equal(first.status,'paused');
   assert.equal(JSON.parse(parseVeronaUnitResponse(first.unitResponses['first-unit']).unitState.dataParts.answer)[0].value,'7');

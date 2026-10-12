@@ -475,7 +475,25 @@ test("an unchanged saved answer keeps new logs durable through refresh and an in
     assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
   });
 });
-test("an online retry during the final state refresh restores every newly durable Unit packet", async () => {
+test("a completed delivery releases its drain while a subsequent Unit view remains held", async () => {
+  await withHost(async ({host,calls,currentState}) => {
+    const refresh=deferred(),request=deferred();let viewStarted=false,settled=false;
+    host.refreshCurrentStateInternal=()=>{viewStarted=true;return refresh.promise;};
+    host.respond=()=>request.promise;
+    const packet=entry("2");outbox.persistParticipantSaveOutboxEntry(packet);
+    host.restorePersistentVeronaSave(currentState);
+    const drain=host.veronaSaveDrainPromise.then(()=>{settled=true;});
+    try {
+      await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,false);
+      assert.equal(outbox.listParticipantSaveOutboxEntriesForRun("selected-run").length,1);
+      request.resolve({testRun:currentState.testRun});await new Promise(resolve=>setImmediate(resolve));
+      assert.equal(viewStarted,true);assert.equal(settled,true);
+      assert.equal(host.veronaSaveDrainPromise,null);
+      assert.deepEqual(outbox.listParticipantSaveOutboxEntriesForRun("selected-run"),[]);
+    } finally {request.resolve({testRun:currentState.testRun});refresh.resolve();await drain;await Promise.all(calls.actions);}
+  });
+});
+test("an online retry while the final state refresh remains held restores every newly durable Unit packet", async () => {
   await withHost(async ({host,calls,currentState}) => {
     const refresh=deferred();
     host.refreshCurrentStateInternal=()=>refresh.promise;
@@ -488,12 +506,12 @@ test("an online retry during the final state refresh restores every newly durabl
     const packets=[entry("8"),entry("9"),entry("2",{response:"new exact visible answer\n ä🙂 "})];
     packets.forEach(packet=>outbox.persistParticipantSaveOutboxEntry(packet));
     host.retryVeronaSave();
-    assert.equal(host.pendingVeronaSave?.deliveryId,packets[2].deliveryId);
-    refresh.resolve();await drain;
+    await drain;
     await host.veronaSaveDrainPromise;
     assert.deepEqual(calls.requests.slice(1).map(call=>call.body.deliveryId),
       [packets[2].deliveryId,packets[0].deliveryId,packets[1].deliveryId]);
     assert.equal(outbox.listParticipantSaveOutboxEntriesForRun("selected-run").length,0);
+    refresh.resolve();await Promise.all(calls.actions);
   });
 });
 test("a focus log arriving during a delivery keeps the durable answer instead of a stale runtime draft", async () => {

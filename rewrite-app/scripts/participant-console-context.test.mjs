@@ -6,18 +6,19 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningf
 import {participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
+const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
-const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(emitted).toString('base64'));
-const Host=load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse);
+const hostClass=execute=>load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse,async()=>({executeReceivedParticipantCommand:execute}));
 const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const run={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',testRunId:'selected',contentReleaseId:'release',bookletKey:'booklet',bookletAssignmentKey:'booklet',status:'running',currentUnitKey:'unit',unitResponses:{unit:'Exact owned Ω'},unitResponseFieldTimestamps:{unit:{opaque:123}},testletTimers:{},createdAt:'2026-10-12T00:00:00Z',updatedAt:'2026-10-12T00:00:00Z'};
 const session={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',status:'launched'};
 const state=record=>({participantSession:session,testRun:record,currentUnit:{unitKey:'unit'},booklet:{policy:{player:{loadingMode:'lazy'}}}});
-const fixture=(request=async()=>({currentRunState:state(run)}))=>{
- let error=null,consoleRunValue=null;const calls={requests:[],applied:0,suspended:0,drained:0,saved:0},host=new Host();
+const fixture=(request=async()=>({currentRunState:state(run)}),execute=()=>assert.fail('Unexpected remote application'))=>{
+ const Host=hostClass(execute);
+ let error=null,consoleRunValue=null;const calls={requests:[],applied:0,suspended:0,drained:0,saved:0,reloads:0,starter:0},host=new Host();
  Object.assign(host,{runtime:{participantSessionId:'participant',testRunId:'selected',currentRunStateView:'',currentUnitResponse:'Old unowned controller draft',bookletKey:'booklet'},consoleTestRun:Object.assign(()=>consoleRunValue,{set:value=>{consoleRunValue=value;}}),currentRunState:null,
   currentStateRefreshSequence:0,currentStateAppliedRefreshSequence:0,bookletAssetLoadStartedAtMs:new Map(),loadedBookletAssets:()=>null,veronaErrorText:'Owned load error',
   requestState:{request:async(...args)=>{calls.requests.push(args[2]);return request(...args);},isApiError:error=>Boolean(error?.error)},
@@ -26,7 +27,7 @@ const fixture=(request=async()=>({currentRunState:state(run)}))=>{
   recordLoadedBookletAssets(){},shouldPreserveCurrentTextDraft:()=>false,syncCurrentRunState(value){this.currentRunState=value;calls.applied++;},syncCurrentUnitResponse(){},
   reconcileOptimisticVeronaResponse(){},restorePersistentVeronaSave(){},persistLoadCompleteLog(){},loadBookletAssetsInBackground(){},refreshParticipantReviewsInternal:async()=>{},persistState(){},
   settleVeronaAutoSaveBeforeForegroundAction:async()=>{calls.drained++;return null;},saveCurrentDraftBeforeCompleteInternal:async()=>{calls.saved++;},
-  ephemeralUnitResponses:new Map(),nativeConsoleCommandFailed(){},commandReloadSequence:{update(){}},commandControllerState:null,remoteTerminalErrorRunId:null});
+  ephemeralUnitResponses:new Map(),nativeConsoleCommandFailed(){},commandReloadSequence:{update(){calls.reloads++;}},presentParticipantStarter(){calls.starter++;},replaceSelectedRunEntryLink:async()=>{},commandControllerState:null,remoteTerminalErrorRunId:null});
  return {host,calls};
 };
 const tick=()=>new Promise(done=>setTimeout(done,0));
@@ -176,4 +177,105 @@ test('controller lifecycle uses only an authorized Run and distinguishes initial
  assert.equal(f.host.controllerLogState.status,'RUNNING');assert.equal(f.host.controllerLogState.alreadyRecorded,false);
  f.host.syncRun({...run,status:'completed'});assert.equal(f.host.controllerLogState,null);
  f.host.runtime.testRunId='other';assert.equal(f.host.controllerLogState,null);
+});
+
+const remoteCommand=(commandType,id='remote-'+commandType)=>({tenantId:run.tenantId,workspaceId:run.workspaceId,participantSessionId:run.participantSessionId,testRunId:run.testRunId,
+ commandId:id,commandType,acknowledgedAt:'2026-10-12T00:00:01Z',effectsDeferred:true});
+const remoteApplication=command=>({command,testRun:{...run,status:command.commandType==='pause'||command.commandType.startsWith('complete')?'paused':'running'},participantSession:{...session,status:command.commandType.startsWith('complete')?'signed_in':'launched'},applied:true});
+const applyRemote=async(command,signal,options)=>{
+ await options.prepare();if(signal.aborted||!options.isCurrent())return;options.controllerStatus();await options.apply(remoteApplication(command));
+};
+test('a held paused view cannot delay a receipt projection or the next accepted resume, and its late state cannot undo that resume',async()=>{
+ const old=deferred(),fresh=deferred();let reads=0;
+ const f=fixture(()=>++reads===1?old.promise:fresh.promise,applyRemote);f.host.syncRun(run);f.host.currentRunState=state(run);f.host.runtime.currentUnitResponse=run.unitResponses.unit;
+ await f.host.applyReceivedParticipantCommand(remoteCommand('pause'),new AbortController().signal);
+ assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.host.debugControllerStatus,'PAUSED');assert.equal(f.calls.applied,0);assert.equal(reads,1);
+ await f.host.applyReceivedParticipantCommand(remoteCommand('resume'),new AbortController().signal);
+ assert.equal(f.host.consoleRun.status,'running');assert.equal(f.host.debugControllerStatus,'RUNNING');assert.equal(reads,2);assert.equal(f.calls.reloads,1);
+ old.resolve({currentRunState:state({...run,status:'paused'})});await tick();assert.equal(f.host.consoleRun.status,'running');assert.equal(f.calls.applied,0);
+ fresh.resolve({currentRunState:state(run)});await tick();assert.equal(f.calls.applied,1);assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);assert.equal(f.calls.saved,0);
+});
+test('an accepted command projects the authorized controller before any full Unit view without inventing an answer',async()=>{
+ const view=deferred(),f=fixture(()=>view.promise,applyRemote);f.host.syncRun(run);assert.equal(f.host.debugRunState,null);
+ await f.host.applyReceivedParticipantCommand(remoteCommand('pause'),new AbortController().signal);
+ assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.host.debugRunState,null);assert.equal(f.calls.saved,0);assert.equal(f.calls.drained,0);
+ view.resolve({currentRunState:state({...run,status:'paused'})});await tick();
+});
+test('an accepted remote pause can advance while an older trusted answer receipt remains held',async()=>{
+ const oldSave=deferred(),view=deferred(),f=fixture(()=>view.promise,applyRemote);f.host.syncRun(run);f.host.currentRunState=state(run);
+ f.host.settleVeronaAutoSaveBeforeForegroundAction=async()=>{f.calls.drained++;return oldSave.promise;};
+ let applied=false;const pending=f.host.applyReceivedParticipantCommand(remoteCommand('pause'),new AbortController().signal).then(()=>{applied=true;});
+ try {await tick();assert.equal(applied,true);assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.calls.drained,0);assert.equal(f.calls.saved,0);}
+ finally {oldSave.resolve();await pending;view.resolve({currentRunState:state({...run,status:'paused'})});await tick();}
+});
+test('a confirmed goto retires the former Unit surface while its target metadata is held',async()=>{
+ const view=deferred(),target={...run,currentUnitKey:'next'},f=fixture(()=>view.promise,async(command,_signal,options)=>{await options.prepare();options.controllerStatus();await options.apply({...remoteApplication(command),testRun:target});});
+ f.host.syncRun(run);f.host.currentRunState=state(run);assert.equal(f.host.unitViewPending,false);
+ await f.host.applyReceivedParticipantCommand(remoteCommand('goto'),new AbortController().signal);
+ assert.equal(f.host.consoleRun.currentUnitKey,'next');assert.equal(f.host.unitViewPending,true);assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);
+ view.resolve({currentRunState:{...state(target),currentUnit:{unitKey:'next'}}});await tick();assert.equal(f.host.unitViewPending,false);
+});
+test('text input cannot create a target-Unit draft before its authenticated metadata arrives',()=>{
+ const f=fixture();f.host.syncRun({...run,currentUnitKey:'next'});f.host.currentRunState=state({...run,currentUnitKey:'next'});
+ f.host.runtime.currentUnitResponse='Exact former draft Ω';f.host.currentTextDraftIdentity='selected\u0000unit';
+ f.host.updateCurrentTextResponse('Unattributed input');assert.equal(f.host.runtime.currentUnitResponse,'Exact former draft Ω');
+ assert.equal(f.host.currentTextDraftIdentity,'selected\u0000unit');
+ f.host.currentRunState.currentUnit={unitKey:'next'};f.host.updateCurrentTextResponse('Exact target draft Ω');
+ assert.equal(f.host.runtime.currentUnitResponse,'Exact target draft Ω');assert.equal(f.host.currentTextDraftIdentity,'selected\u0000next');
+});
+for(const field of ['tenantId','workspaceId','participantSessionId','testRunId','contentReleaseId','bookletKey'])test(`a pending command cannot project into a replacement ${field} scope`,async()=>{
+ const reply=deferred(),entered=deferred(),f=fixture(undefined,async(command,_signal,options)=>{options.controllerStatus();entered.resolve();await reply.promise;await options.apply(remoteApplication(command));});
+ f.host.syncRun(run);const pending=f.host.applyReceivedParticipantCommand(remoteCommand('pause'),new AbortController().signal);await entered.promise;
+ const replacement={...run,[field]:'replacement'};Object.assign(f.host.runtime,{participantSessionId:replacement.participantSessionId,testRunId:replacement.testRunId});f.host.syncRun(replacement);
+ reply.resolve();await pending;assert.equal(f.host.consoleRun[field],'replacement');assert.equal(f.host.consoleRun.status,'running');assert.equal(f.calls.requests.length,0);
+});
+test('a later accepted native state and newer answer cannot be overwritten by an older remote application reply',async()=>{
+ const reply=deferred(),entered=deferred(),view=deferred(),f=fixture(()=>view.promise,async(command,_signal,options)=>{options.controllerStatus();entered.resolve();await reply.promise;await options.apply(remoteApplication(command));});
+ f.host.syncRun(run);const pending=f.host.applyReceivedParticipantCommand(remoteCommand('resume'),new AbortController().signal);await entered.promise;
+ const newer={...run,status:'paused',unitResponses:{unit:'Newer trusted answer Ω'}};f.host.invalidateCurrentStateRefreshes();f.host.syncRun(newer);
+ reply.resolve();await pending;assert.equal(f.host.consoleRun.status,'paused');assert.deepEqual(f.host.consoleRun.unitResponses,newer.unitResponses);assert.equal(f.calls.reloads,0);
+ view.resolve({currentRunState:state(newer)});await tick();assert.equal(f.host.consoleRun.status,'paused');
+});
+test('an already accepted resume clears ERROR blocking while retaining its scoped error dialog, before the next full view',async()=>{
+ const view=deferred(),f=fixture(()=>view.promise,applyRemote);f.host.syncRun(run);f.host.activeControllerError.set({testRunId:'selected',message:'Retained error'});f.host.participantErrorReceptionSuspended=true;
+ await f.host.applyReceivedParticipantCommand(remoteCommand('resume'),new AbortController().signal);
+ assert.equal(f.host.hasControllerError,false);assert.equal(f.host.controllerError.message,'Retained error');assert.equal(f.calls.reloads,1);assert.equal(f.calls.saved,0);
+ view.resolve({currentRunState:state(run)});await tick();
+});
+test('a terminal receipt cannot return a later same-Run entry to Starter',async()=>{
+ const view=deferred(),f=fixture(label=>label==='Participant Starter'?{runtimeState:{participantSession:{...run,status:'launched'}}}:view.promise,applyRemote);f.host.syncRun(run);
+ await f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);
+ assert.equal(f.calls.starter,0);assert.equal(f.host.consoleRun.status,'running');view.resolve({currentRunState:state(run)});await tick();
+});
+test('a scoped terminal receipt returns the controller to Starter without requiring a Unit or response',async()=>{
+ const f=fixture(async()=>({runtimeState:{participantSession:{...run,status:'signed_in'}}}),applyRemote);f.host.syncRun({...run,status:'paused'});
+ await f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);
+ assert.equal(f.calls.starter,1);assert.equal(f.host.commandControllerState.status,'TERMINATED_PAUSED');assert.equal(f.calls.saved,0);assert.equal(f.calls.drained,0);
+});
+test('a foreign terminal runtime state permanently rejects navigation',async()=>{
+ const f=fixture(async()=>({runtimeState:{participantSession:{...run,status:'signed_in',contentReleaseId:'foreign'}}}),applyRemote);f.host.syncRun(run);
+ await assert.rejects(f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal),error=>error.retryable===false);
+ assert.equal(f.calls.starter,0);assert.equal(f.host.consoleRun.status,'running');
+});
+
+test('a late terminal runtime reply is re-read after a newer native reentry instead of returning that entry to Starter',async()=>{
+ const old=deferred(),entered=deferred(),view=deferred();let reads=0;
+ const f=fixture(label=>{if(label!=='Participant Starter')return view.promise;if(++reads===1){entered.resolve();return old.promise;}return {runtimeState:{participantSession:{...run,status:'launched'}}};},applyRemote);
+ f.host.syncRun(run);const pending=f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal);await entered.promise;
+ const fresh={...run,unitResponses:{unit:'Later entry answer Ω'}};f.host.invalidateCurrentStateRefreshes();f.host.syncRun(fresh);
+ old.resolve({runtimeState:{participantSession:{...run,status:'signed_in'}}});await pending;
+ assert.equal(reads,2);assert.equal(f.calls.starter,0);assert.deepEqual(f.host.consoleRun.unitResponses,fresh.unitResponses);
+ view.resolve({currentRunState:state(fresh)});await tick();
+});
+test('repeated local controller changes make terminal reconciliation retryable without accepting either stale runtime reply',async()=>{
+ let f,reads=0;
+ f=fixture(async()=>{reads++;f.host.invalidateCurrentStateRefreshes();return {runtimeState:{participantSession:{...run,status:'signed_in'}}};},applyRemote);f.host.syncRun(run);
+ await assert.rejects(f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal),error=>error.retryable===true);
+ assert.equal(reads,2);assert.equal(f.calls.starter,0);assert.equal(f.host.consoleRun.status,'running');
+});
+for(const commandType of ['lock_test','unlock_test','unlock_navigation','lock_navigation','set_testlet_time'])test(`${commandType} uses the confirmed paused status without reloading the Player`,async()=>{
+ const view=deferred(),f=fixture(()=>view.promise,async(command,_signal,options)=>{options.controllerStatus();await options.apply({...remoteApplication(command),testRun:{...run,status:'paused'}});});f.host.syncRun({...run,status:'paused'});
+ await f.host.applyReceivedParticipantCommand(remoteCommand(commandType),new AbortController().signal);
+ assert.equal(f.host.consoleRun.status,'paused');assert.equal(f.host.commandControllerState.status,'PAUSED');assert.equal(f.calls.reloads,0);
+ view.resolve({currentRunState:state({...run,status:'paused'})});await tick();
 });

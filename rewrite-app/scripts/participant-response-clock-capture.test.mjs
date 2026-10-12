@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
 import { normalizeVeronaStateLogEntries, parseVeronaIncomingNotification, projectVeronaPageState,
-  projectVeronaUnitStateLogs, serializeVeronaUnitResponse } from '@testcenter-rewrite-app/contracts';
+  projectVeronaUnitStateLogs, serializeVeronaUnitResponse, parseVeronaUnitResponse } from '@testcenter-rewrite-app/contracts';
 import { mergeCapturedVeronaUnitResponse, parseCapturedVeronaUnitResponse } from '@testcenter-rewrite-app/contracts/participant-response-capture';
 
 // Execute the production message/lifecycle methods. The full iframe and the
@@ -12,7 +12,7 @@ const source = readFileSync(new URL('../apps/web/src/app/verona-player-host.comp
 const ast = ts.createSourceFile('verona-player-host.component.ts', source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === 'VeronaPlayerHostComponent');
 const printer = ts.createPrinter();
-const methods = ['readScopedResponseTimestamps', 'ngOnChanges', 'retireCurrentFrame', 'onWindowMessage', 'handleRetiredFrameNotification'].map(name => {
+const methods = ['readScopedResponseTimestamps', 'ngOnChanges', 'mountPlayer', 'retireCurrentFrame', 'onWindowMessage', 'handleRetiredFrameNotification'].map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `Production ${name} must exist.`);
   const undecorated = ts.factory.updateMethodDeclaration(method, method.modifiers?.filter(modifier => modifier.kind !== ts.SyntaxKind.Decorator),
@@ -20,11 +20,11 @@ const methods = ['readScopedResponseTimestamps', 'ngOnChanges', 'retireCurrentFr
   return printer.printNode(ts.EmitHint.Unspecified, undecorated, ast);
 });
 const { outputText } = ts.transpileModule(`export const createClockHost = (parseVeronaIncomingNotification, mergeCapturedVeronaUnitResponse,
-  projectVeronaPageState, projectVeronaUnitStateLogs, normalizeVeronaStateLogEntries) => class ClockHost { ${methods.join('\n')} };`,
+  projectVeronaPageState, projectVeronaUnitStateLogs, normalizeVeronaStateLogEntries, parseVeronaUnitResponse, serializeVeronaUnitResponse) => class ClockHost { ${methods.join('\n')} };`,
 { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
 const { createClockHost } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 const Host = createClockHost(parseVeronaIncomingNotification, mergeCapturedVeronaUnitResponse,
-  projectVeronaPageState, projectVeronaUnitStateLogs, normalizeVeronaStateLogEntries);
+  projectVeronaPageState, projectVeronaUnitStateLogs, normalizeVeronaStateLogEntries, parseVeronaUnitResponse, serializeVeronaUnitResponse);
 const fixture = () => {
   const responses = [], source = {}, host = new Host();
   const baseline = Date.now() + 60_000;
@@ -94,5 +94,28 @@ test('prototype-named Unit clocks require an own entry', () => {
     assert.deepEqual(selected, { opaque: f.baseline });
     selected.opaque = 1; assert.equal(f.host.responseClocks[unitKey].opaque, f.baseline);
     f.host.responseClocks = { unrelated: { opaque: f.baseline } };
+  }
+});
+
+test('a pending target view retires the former iframe while retaining already queued scoped reports and postponing a new mount', () => {
+  const f = fixture(), timers = []; let scheduled = 0, removed = 0;
+  const formerFrame = f.host.frame;
+  formerFrame.remove = () => { removed++; };
+  Object.assign(f.host, { unitViewPending: true, savedResponse: '', clearReadyTimeout() {}, clearScheduledFrames() {}, clearFocusLogTimeout() {} });
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout(callback, delay) { timers.push({ callback, delay }); }, requestAnimationFrame() { scheduled++; return 1; } } });
+  try {
+    f.host.ngOnChanges({ unitViewPending: {} });
+    assert.equal(f.host.frame, null); assert.equal(scheduled, 0); assert.equal(f.host.retiredFrames.has(f.source), true);
+    assert.equal(removed, 1);
+    notify(f.host, f.source, 'old-session', 'Final former-Unit answer Ω');
+    assert.equal(f.responses.length, 1); assert.equal(f.responses[0].unitKey, 'shared-unit');
+    assert.equal(parseCapturedVeronaUnitResponse(f.responses[0].response).fieldTimestamps.dataParts.answer, f.baseline + 1);
+    timers.find(timer => timer.delay === 1_500).callback(); assert.equal(f.host.retiredFrames.has(f.source), false);
+    f.host.unitKey = 'next-unit'; f.host.unitViewPending = false;
+    f.host.ngOnChanges({ unitViewPending: {}, unitKey: {} });
+    assert.equal(scheduled, 1); assert.equal(f.host.frameUnitKey, 'next-unit'); assert.equal(f.responses.length, 1);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow); else delete globalThis.window;
   }
 });

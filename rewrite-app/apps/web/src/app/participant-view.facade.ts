@@ -192,6 +192,7 @@ type ParticipantPlayerUnitItem = {
 };
 
 export type ParticipantVeronaPlayerState = {
+  unitViewPending: boolean;
   commandReloadSequence: number;
   playerKey: string;
   playerHtml: string;
@@ -562,43 +563,89 @@ export class ParticipantViewFacade {
     this.applyReceivedParticipantCommand(command, signal);
 
   private async applyReceivedParticipantCommand(command: ParticipantRunCommand, signal: AbortSignal): Promise<void> {
-    const state = this.readCurrentRunState();
-    if (!state || !command.acknowledgedAt || state.testRun.status === "completed" ||
-        command.participantSessionId !== state.participantSession.participantSessionId ||
-        command.testRunId !== state.testRun.testRunId || command.tenantId !== state.testRun.tenantId ||
-        command.workspaceId !== state.testRun.workspaceId) return;
+    const run = this.consoleRun;
+    if (!run || !command.acknowledgedAt || run.status === "completed" ||
+        command.participantSessionId !== run.participantSessionId ||
+        command.testRunId !== run.testRunId || command.tenantId !== run.tenantId ||
+        command.workspaceId !== run.workspaceId) return;
     const lifecycle = this.viewLifecycleSequence;
-    const isCurrent = (): boolean => lifecycle === this.viewLifecycleSequence && this.readCurrentRunState()?.testRun.testRunId === command.testRunId;
+    const isCurrent = (): boolean => !signal.aborted && lifecycle === this.viewLifecycleSequence &&
+      (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+        .every(key => this.consoleRun?.[key] === run[key]);
     const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
+    let observedView = this.currentStateAppliedRefreshSequence;
+    let observedStatus: "RUNNING" | "PAUSED" | "ERROR" = "RUNNING";
     await (await import("./participant-command-execution")).executeReceivedParticipantCommand(command, signal, {
-      isCurrent, controllerStatus: () => this.hasControllerError ? "ERROR" : this.readCurrentRunState()?.testRun.status === "paused" ? "PAUSED" : "RUNNING",
-      prepare: async () => {
-        if (terminal) await this.saveCurrentDraftBeforeCompleteInternal(await this.settleVeronaAutoSaveBeforeForegroundAction());
+      scope: run, isCurrent, controllerStatus: () => {
+        observedView = this.currentStateAppliedRefreshSequence;
+        observedStatus = this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" : "RUNNING";
+        return observedStatus;
       },
-      apply: async () => {
+      prepare: async () => {
+        // Accepted nonterminal commands must not wait for an older answer
+        // receipt. The response-only outbox keeps that answer independently.
+        if (terminal) await this.prepareNativeConsoleCommand(isCurrent);
+      },
+      apply: async application => {
         if (!isCurrent() || signal.aborted) return;
         if (command.commandType === "debug") {
           (await import("./participant-debug-control")).applyParticipantDebugArguments(command.debugArguments ?? [], command);
           return;
         }
-        if (command.effectsDeferred) this.commandControllerState = { testRunId: command.testRunId,
-          status: terminal ? "TERMINATED" : command.commandType === "pause" ? "PAUSED" : "RUNNING" };
         if (terminal) {
-          const payload = await this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
+          const readRuntime = () => this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
             resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: command.participantSessionId }), undefined, { quiet: true });
-          if (!isCurrent() || signal.aborted) return;
-          this.presentParticipantStarter(payload.runtimeState, command.testRunId, true);
-          await this.replaceSelectedRunEntryLink();
+          let runtimeView = this.currentStateAppliedRefreshSequence;
+          let payload = await readRuntime();
+          if (!isCurrent()) return;
+          if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+            runtimeView = this.currentStateAppliedRefreshSequence;
+            payload = await readRuntime();
+            if (!isCurrent()) return;
+            if (runtimeView !== this.currentStateAppliedRefreshSequence) {
+              throw Object.assign(new Error("The controller changed while reconciling its terminal receipt."), { retryable: true });
+            }
+          }
+          if (!(["tenantId", "workspaceId", "participantSessionId", "contentReleaseId"] as const)
+            .every(key => payload.runtimeState.participantSession[key] === run[key])) {
+            throw Object.assign(new Error("The terminal command runtime state does not match the selected Run."), { retryable: false });
+          }
+          // A later entry can reactivate this same Run while the old terminal
+          // receipt is travelling. Its current parent keeps the active view.
+          if (!command.effectsDeferred || payload.runtimeState.participantSession.status === "signed_in") {
+            this.invalidateCurrentStateRefreshes();
+            this.syncRun(application.testRun);
+            this.commandControllerState = { testRunId: command.testRunId,
+              status: observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" };
+            this.presentParticipantStarter(payload.runtimeState, command.testRunId, true);
+            await this.replaceSelectedRunEntryLink();
+          } else {
+            void this.refreshCurrentStateInternal(true, true).catch(error => {
+              if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+            });
+          }
           return;
         }
-        const replacesPlayer = command.commandType === "resume" || command.commandType === "goto";
-        await this.refreshCurrentStateInternal(true, true);
-        const current = this.readCurrentRunState();
-        if (!isCurrent() || signal.aborted) return;
-        if (replacesPlayer && current?.testRun.status === "running") {
-          this.participantErrorReceptionSuspended = false;
+        // Another accepted view or native receipt can supersede this snapshot
+        // while its application request is in flight. Reconcile from the API
+        // without projecting the older snapshot over that newer local state.
+        if (observedView !== this.currentStateAppliedRefreshSequence) {
+          void this.refreshCurrentStateInternal(true, true).catch(error => {
+            if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+          });
+          return;
+        }
+        this.invalidateCurrentStateRefreshes();
+        this.syncRun(application.testRun);
+        this.commandControllerState = { testRunId: command.testRunId,
+          status: application.testRun.status.toUpperCase() };
+        this.participantErrorReceptionSuspended = false;
+        if ((command.commandType === "resume" || command.commandType === "goto") && application.testRun.status === "running") {
           this.commandReloadSequence.update(sequence => sequence + 1);
         }
+        void this.refreshCurrentStateInternal(true, true).catch(error => {
+          if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
+        });
       }
     });
   }
@@ -691,6 +738,7 @@ export class ParticipantViewFacade {
   }
 
   updateCurrentTextResponse(response: string): void {
+    if (this.unitViewPending) return;
     this.runtime.currentUnitResponse = response;
     const currentState = this.readCurrentRunState();
     const unitKey = currentState?.currentUnit.unitKey;
@@ -1210,7 +1258,7 @@ export class ParticipantViewFacade {
           }),
       actions: hasControllerError ? [] : availableActions,
       canSaveProgress:
-        !hasControllerError && availableActions.includes("save_progress"),
+        !hasControllerError && !this.unitViewPending && availableActions.includes("save_progress"),
       showUnitMenu: !hasControllerError && policy.navigation.unitMenuEnabled,
       showUnitNavigationList:
         !hasControllerError && Boolean(policy.navigation.unitListEnabled),
@@ -1586,6 +1634,11 @@ export class ParticipantViewFacade {
     );
   }
 
+  get unitViewPending(): boolean {
+    const state = this.readCurrentRunState();
+    return Boolean(state && state.testRun.currentUnitKey !== state.currentUnit.unitKey);
+  }
+
   get isRunPaused(): boolean {
     return (this.readCurrentRunState()?.testRun ?? this.consoleRun)?.status === "paused";
   }
@@ -1679,6 +1732,7 @@ export class ParticipantViewFacade {
     );
     return {
       playerKey: player.playerKey,
+      unitViewPending: this.unitViewPending,
       commandReloadSequence: this.commandReloadSequence(),
       playerHtml: player.html,
       testRunId: currentState.testRun.testRunId,
@@ -3720,7 +3774,9 @@ export class ParticipantViewFacade {
       options.refreshCurrentState !== false &&
       !this.veronaForegroundSaveSettlement
     ) {
-      await this.refreshCurrentStateInternal(true);
+      // The durable delivery is settled. A slow Unit view must not keep this
+      // save in flight and block a later foreground command's answer drain.
+      this.viewState.onActionAsync(() => this.refreshCurrentStateInternal(true));
     }
   }
 

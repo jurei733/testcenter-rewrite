@@ -21,7 +21,7 @@ const command = () => parseParticipantRunCommand({
 });
 const application = () => ({ application: {
   command: { ...command(), executedAt: "2026-10-11T00:00:02.000Z", executionSequence: 1 }, applied: true,
-  testRun: { tenantId: "owned-tenant", workspaceId: "owned-workspace", participantSessionId: "owned-session", testRunId: "owned-run" },
+  testRun: { tenantId: "owned-tenant", workspaceId: "owned-workspace", participantSessionId: "owned-session", testRunId: "owned-run", contentReleaseId:"owned-release",bookletKey:"owned-booklet",status:"running",unitResponses:{unit:"Exact answer Ω"} },
   participantSession: { tenantId: "owned-tenant", workspaceId: "owned-workspace", participantSessionId: "owned-session" }
 } });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
@@ -31,7 +31,7 @@ const fixture = (respond = async () => ({ ok: true, json: async () => applicatio
   const execute = load(parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath,
     sessionId => { assert.equal(sessionId, "owned-session"); return "owned-credential"; },
     async (url, request) => { calls.push({ url, request }); events.push("request"); return respond(url, request); });
-  const options = { isCurrent: () => current, controllerStatus: () => "ERROR",
+  const options = { scope: application().application.testRun, isCurrent: () => current, controllerStatus: () => "ERROR",
     prepare: async () => { events.push("saved"); }, apply: async () => { events.push("projected"); } };
   return { calls, events, controller, options, execute: () => execute(command(), controller.signal, options), leave: () => { current = false; } };
 };
@@ -86,8 +86,10 @@ test("foreign, forged and incomplete execution replies permanently reject projec
     value => { value.application.command.executedAt = null; },
     value => { value.application.command.executionSequence = 0; },
     value => { value.application.applied = "true"; },
-    ...["tenantId", "workspaceId", "participantSessionId", "testRunId"].map(key => value => { value.application.testRun[key] = "foreign"; }),
+    ...["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"].map(key => value => { value.application.testRun[key] = "foreign"; }),
     ...["tenantId", "workspaceId", "participantSessionId"].map(key => value => { value.application.participantSession[key] = "foreign"; }),
+    value => { value.application.testRun.status="forged"; }, value => { value.application.testRun.unitResponses=[]; },
+    value => { delete value.application.testRun.unitResponses; },
     value => { delete value.application.participantSession; }, value => { delete value.application.command; }
   ];
   for (const change of changes) {
@@ -117,8 +119,13 @@ for (const substituted of [false, true]) test(`debug does not drain Player answe
   const execute = load(parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath, () => "owned-credential", async () => {
     requests++; return { ok: true, json: async () => structuredClone(reply) };
   });
-  const pending = execute(debug, new AbortController().signal, { isCurrent: () => true, controllerStatus: () => "ERROR",
+  const pending = execute(debug, new AbortController().signal, { scope: application().application.testRun, isCurrent: () => true, controllerStatus: () => "ERROR",
     prepare: () => assert.fail("A read-only debug command cannot wait on the Player answer drain."), apply: () => { effects++; } });
   if (substituted) await assert.rejects(pending, error => error.retryable === false); else await pending;
   assert.equal(requests, 1); assert.equal(effects, substituted ? 0 : 1);
+});
+
+test("a verified full application reaches projection unchanged, including a replayed snapshot and exact scope",async()=>{
+ const receipt=application().application;receipt.applied=false;const f=fixture(async()=>({ok:true,json:async()=>({application:structuredClone(receipt)})}));
+ let received;f.options.apply=async value=>{received=value;};await f.execute();assert.deepEqual(received,receipt);
 });

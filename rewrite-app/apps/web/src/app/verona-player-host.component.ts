@@ -268,6 +268,7 @@ export class VeronaPlayerHostComponent
   @Input({ required: true }) playerHtml = "";
   @Input({ required: true }) playerKey = "";
   @Input() commandReloadSequence = 0;
+  @Input() unitViewPending = false;
   @Input({ required: true }) testRunId = "";
   @Input({ required: true }) unitKey = "";
   @Input({ required: true }) unitTitle = "";
@@ -483,6 +484,7 @@ export class VeronaPlayerHostComponent
       changes["playerHtml"] ||
       changes["playerKey"] ||
       changes["commandReloadSequence"] ||
+      changes["unitViewPending"] ||
       changes["testRunId"] ||
       changes["unitKey"] ||
       changes["unitDefinition"] ||
@@ -645,6 +647,9 @@ export class VeronaPlayerHostComponent
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
       : serializeVeronaUnitResponse({});
+    // Retain the host's message listener for reports already queued by the retired frame,
+    // but do not start the former Unit while the selected Unit is still loading.
+    if (this.unitViewPending) return;
     this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
       this.mountFrameRequest = null;
       this.beginPlayerFrameLoad();

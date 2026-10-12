@@ -639,6 +639,7 @@ interface ParticipantVisibleCodeNotice {
               [playerHtml]="verona.playerHtml"
               [playerKey]="verona.playerKey"
               [commandReloadSequence]="verona.commandReloadSequence"
+              [unitViewPending]="verona.unitViewPending"
               [testRunId]="verona.testRunId"
               [unitKey]="verona.unitKey"
               [unitTitle]="verona.unitTitle"
