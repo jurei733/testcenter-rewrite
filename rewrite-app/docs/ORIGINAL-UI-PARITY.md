@@ -1,5 +1,29 @@
 # Optional Original UI
 
+### Native commands after controller destruction (2026-10-12)
+
+An actual Angular route exit now cancels pending native effect intents, including
+a retry and an intent waiting for trusted answers to drain. A full document reload
+still restores the exact prepared delivery, without repeating a server effect
+after a lost receipt. A native Pause committed to the former Run remains there;
+its late response cannot replace another Booklet's Player or saved answers.
+The five-group production-bundle browser gate checks real Back/Forward destruction
+and reentry with the same document, two saved Booklets, entry selection and clocks.
+It failed before the fix on the retained resume journal and now passes.
+
+Checkpoint `98b182dddcd4` passes 1,883 local tests, typecheck, production build and
+35 console/browser groups, including the actual prior API image. All three
+PostgreSQL container profiles, SQLite runtime and 320 read-only image checks as
+`node` pass. The existing containers/mounts/volumes and protected hashes remain
+unchanged. The 890-file archive was verified and removed; about 6.4 GB is free.
+Backend integration and the broader 147 browser cases are verified predecessor
+evidence, not fresh executions. The new gate is required by the console CI job;
+remote CI and production remain unverified. See [the scope and remaining
+acceptance in PARITY](./PARITY.md#native-command-lifetime-on-an-actual-route-exit-2026-10-12).
+Cloned-tab ownership, wider remote/activation races and full Original lifecycle,
+visual/property/package and production acceptance still remain open.
+
+
 ### Reentry across the controller-context API addition (2026-10-12)
 
 Only a missing-route 404 now uses the older authenticated current-state route.

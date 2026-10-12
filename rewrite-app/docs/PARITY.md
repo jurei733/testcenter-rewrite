@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Native command lifetime on an actual route exit (2026-10-12)
+
+Destroying the Angular participant route now removes its own pending native
+command journal as well as aborting requests, retry timers and online reception.
+This does not depend on another change-detection/scope observation after the
+parent's destroy hook. Foreign-owner entries and unrelated storage remain intact.
+A full document reload retains the exact prepared packet and owner, as verified
+in the actual production browser bundle rather than by calling the destroy hook
+in a reload fixture. A committed server transaction remains on its authorized
+old Run; canceling its client response cannot undo it or project its late result
+onto another Booklet.
+
+Two new transport regressions failed before the fix. The actual Angular
+Back/Forward gate also failed on the retained resume journal after its two reload
+checks had passed. All five groups now pass: exact reload, idempotent retry after
+a committed/lost receipt, cancellation across route reentry/online reception,
+destruction during trusted-answer drain before dispatch, and an already committed
+old-Run reply released after selection of a second saved Booklet. The document
+identity is checked across the actual route destruction; trusted answers/clocks,
+selected entry URL and the absence of remote command queues are asserted.
+
+Application checkpoint `98b182dddcd4` passes all 1,883 local tests, typecheck and
+the production build (469.99 kB under the unchanged 470 kB hard limit, with existing
+warnings). Fourteen Debug/native, six loading/error, five route-contract and five
+actual prior-API-image groups also pass. The console CI job now requires the new
+route gate; remote execution remains unverified. Backend sources are unchanged:
+1,244 PostgreSQL, 498 HTTP, 61 compatibility and 147 broad browser cases retain
+verified predecessor evidence, without fresh execution in this checkpoint.
+
+The current clean image passes Standard, Demo and production PostgreSQL profiles,
+SQLite runtime and all 320 transaction/API checks read-only as `node`. All 890
+tracked archive files were hash-verified and the owned archive removed. The
+24 pre-existing containers, every mount field, 85 volumes, protected presentation
+and host TypeScript hashes are preserved; about 6.4 GB remains free. The local
+proof contains 52 hash-verified files and references the predecessor's already
+durable broad evidence without duplicating its screenshots.
+
+Real cloned-tab owner identity, wider remote ACK/application/activation races,
+Original LOADING wire/log lifecycle, full visual/property/real-package acceptance,
+measured performance, remaining mixed-version rollout and production confirmation
+remain open. No push, remote CI, release, deployment or complete parity is claimed.
+
+
 ### Participant reentry with an older API (2026-10-12)
 
 A new frontend now tolerates an older API without `controller-context`: only
