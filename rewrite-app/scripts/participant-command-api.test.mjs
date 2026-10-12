@@ -1,5 +1,6 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute } from "@testcenter-rewrite-app/contracts/participant-debug";
+import { participantNativeCommandRoute } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -273,6 +274,28 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       }
       for (const debugArguments of [null, "off", [42]]) await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "debug", debugArguments }, operator, 400);
       await request("POST", workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: "resume", debugArguments: [] }, operator, 400);
+    });
+    await t.test("native HTTP commands use participant ownership, immutable content and no remote ACK", async () => {
+      const path = resolveRoutePath(participantNativeCommandRoute, { participantSessionId: sessionId });
+      const repository = await readFreshRepository(), beforeRun = await repository.getTestRunById(run.testRunId);
+      const beforeCommands = await list(run.testRunId);
+      const body = { testRunId: run.testRunId, contentReleaseId: beforeRun.contentReleaseId, bookletKey: beforeRun.bookletKey,
+        deliveryId: randomUUID(), keyword: "resume", arguments: [], controllerStatus: "ERROR", timeStamp: Date.now() };
+      for (const token of [undefined, "invalid", other.sessionToken, operator]) await request("POST", path, body, token, 401);
+      await request("POST", path, { ...body, testRunId: foreign.testRunId }, selected.sessionToken, 404);
+      for (const invalid of [null, [], {}, { ...body, arguments: [42] }, { ...body, contentReleaseId: "foreign" }]) {
+        await request("POST", path, invalid, selected.sessionToken, invalid?.contentReleaseId === "foreign" ? 409 : 400);
+        assert.deepEqual(await repository.getTestRunById(run.testRunId), beforeRun);
+      }
+      const first = (await request("POST", path, body, selected.sessionToken)).application;
+      assert.equal(first.applied, true); assert.equal(first.testRun.status, "running");
+      assert.deepEqual(first.testRun.unitResponses, beforeRun.unitResponses); assert.deepEqual(await list(run.testRunId), beforeCommands);
+      const snapshot = async () => ({ run: await repository.getTestRunById(run.testRunId), parent: await repository.getParticipantSessionById(sessionId),
+        logs: await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId), events: await repository.listWorkspaceActivityEventsByWorkspace(run.tenantId, run.workspaceId) });
+      const accepted = await snapshot(), retry = (await request("POST", path, body, selected.sessionToken)).application;
+      assert.equal(retry.applied, false); assert.equal(retry.executedAt, first.executedAt); assert.deepEqual(await snapshot(), accepted);
+      await request("POST", path, { ...body, arguments: ["forged"] }, selected.sessionToken, 409); assert.deepEqual(await snapshot(), accepted);
+      assert.equal(accepted.logs.filter(log => log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${body.deliveryId}:`) && log.logKey === "command executed").length, 1);
     });
     await t.test("remote termination preserves the current Unit and answers and permits re-entry", async () => {
       const before = await (await readFreshRepository()).getTestRunById(run.testRunId);

@@ -9,9 +9,9 @@ const scope={tenantId:'owned',workspaceId:'owned',participantSessionId:'owned-se
 function fixture({production=true,saved,tc,window:shared}={}){
  const values=new Map(saved===undefined?[]:[['tc-debug',saved]]);
  const window=shared??{tc,localStorage:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}};
- const changes=[],logs=[];let selected={...scope};
- const control=create({window,isProductionMode:production,readScope:()=>selected,changed:state=>changes.push(state),consoleCommand:args=>logs.push([...args])});
- return {window,values,changes,logs,control,select:next=>{selected=next;control.observeScope();},state:()=>changes.at(-1)};
+ const changes=[],logs=[],native=[];let selected={...scope};
+ const control=create({window,isProductionMode:production,readScope:()=>selected,changed:state=>changes.push(state),consoleCommand:args=>logs.push([...args]),nativeCommand:(keyword,args)=>native.push({keyword,args})});
+ return {window,values,changes,logs,native,control,select:next=>{selected=next;control.observeScope();},state:()=>changes.at(-1)};
 }
 for(const production of [false,true]) for(const saved of [undefined,'["tools","main"]','[]']){
  test(`${production?'production':'development'} restores ${saved??'no key'} only on controller creation`,()=>{
@@ -73,4 +73,19 @@ test('denied storage, malformed preferences and malformed arguments do not corru
   for(const args of [null,'off',[null],[42]]){f.window.tc.debug(args);assert.deepEqual(f.logs,[]);}
  }finally{f.control.stop();}}
  const window={get localStorage(){throw new Error('Denied storage');}},f=fixture({window});try{window.tc.debug();assert.equal(f.state().enabled,true);window.tc.debug(['off']);assert.equal(f.state().enabled,false);}finally{f.control.stop();}
+});
+test('all four native keywords dispatch only to the latest owner and do not toggle or log Debug',()=>{
+ const first=fixture(),second=fixture({window:first.window});try{
+  for(const keyword of ['pause','resume','terminate','goto']){const args=['Exact Ω'];first.window.tc[keyword](args);args[0]='mutated';}
+  assert.deepEqual(second.native,['pause','resume','terminate','goto'].map(keyword=>({keyword,args:['Exact Ω']})));
+  assert.deepEqual(first.native,[]);assert.deepEqual(first.logs,[]);assert.equal(first.state().enabled,false);
+  second.select(null);first.window.tc.pause();assert.equal(second.native.length,4);assert.deepEqual(first.native,[]);
+  second.control.stop();first.window.tc.resume();assert.deepEqual(first.native,[{keyword:'resume',args:[]}]);
+ }finally{first.control.stop();second.control.stop();}
+});
+test('cleanup restores every prior native descriptor and preserves independently replaced methods',()=>{
+ const old={pause:()=>{},resume:()=>{},terminate:()=>{},goto:()=>{}},descriptors=Object.getOwnPropertyDescriptors(old);
+ const f=fixture({tc:old}),replacement=()=>{};f.window.tc.goto=replacement;f.control.stop();
+ for(const key of ['pause','resume','terminate'])assert.deepEqual(Object.getOwnPropertyDescriptor(old,key),descriptors[key]);
+ assert.equal(old.goto,replacement);assert.equal(Object.hasOwn(old,'debug'),false);
 });

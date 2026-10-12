@@ -1,5 +1,25 @@
 # Optional Original UI
 
+### Native console workflow (2026-10-12)
+
+All five Source console methods are now provided in the selected participant
+controller. Pause, Resume, Terminate and Goto use their own authenticated
+participant endpoint and stable transaction receipt, without a monitor queue or
+ACK. The root handler's immediate-parent unlocks, exact aliases/sequence, minute
+restoration, positive balance retention and lowercase termination-lock arguments
+are preserved. The browser drains trusted captures, validates scope and receipt,
+orders tab-owned intents, restores them on reload and fences replaced controllers.
+ERROR recovery replaces the errored frame and clears its presentation.
+
+Controller/Player-only logs now travel as explicit log-only packets, without
+creating an empty answer or response clock. Foreground/worker/reload preserve the
+marker, and older workers do not accept their version-2 message/entry as answers.
+Legacy answer packets retain their former version and identity. All 1,839 local
+tests, 1,231 PostgreSQL tests, typecheck, 469.99 kB production build and thirteen
+Chromium/SQLite groups passed. Full Original live/property/visual/package and
+controller-lifetime acceptance, performance and production rollout remain open.
+See [the current contract and evidence in PARITY](./PARITY.md#native-participant-console-commands-and-log-only-delivery-2026-10-12).
+
 ### Participant Debug lock origins (2026-10-12)
 
 Testlet details now match pinned Source own/ancestor lock priorities, show all

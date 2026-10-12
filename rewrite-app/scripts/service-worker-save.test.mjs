@@ -25,6 +25,14 @@ const record = (suffix = "a") => ({
   }
 });
 const response = status => ({ status, ok: status >= 200 && status < 300 });
+test("log-only background packets omit answers and clocks and use the version rejected by old workers", async () => {
+  const value = record("logs"); value.entry.version = 2; value.entry.logOnly = true;
+  value.entry.logs = [{ unitKey: null, originalUnitId: null, entries: [{ key: "CONTROLLER", content: "ERROR", timeStamp: 1 }] }];
+  const f = fixture([value]); await f.run(async () => response(200));
+  assert.equal(f.sent.length, 1); const body = JSON.parse(f.sent[0].init.body);
+  assert.equal(Object.hasOwn(body, "unitResponse"), false); assert.equal(Object.hasOwn(body, "responseTimestamp"), false);
+  assert.equal(body.responseOnly, true); assert.deepEqual(body.logs, value.entry.logs);
+});
 const fixture = (records = [record()]) => {
   const pending = new Map(records.map(item => [item.key, structuredClone(item)]));
   const sent = [];

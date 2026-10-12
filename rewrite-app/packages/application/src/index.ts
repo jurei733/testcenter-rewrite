@@ -1,6 +1,8 @@
 import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
+import { participantNativeCommandKeywords, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
   ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
@@ -741,6 +743,7 @@ export type ParticipantRuntimePort = {
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
   executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string }): Promise<ParticipantRunCommandApplicationResult>;
+  executeNativeCommand(input: ParticipantNativeCommandRequest & { participantSessionId: string }): Promise<ParticipantNativeCommandResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
     action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
@@ -32107,6 +32110,106 @@ export const createFirstSliceServices = (
           return result;
         } catch (error) {
           if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, error.errorCode, error.message);
+          throw error;
+        }
+      },
+      async executeNativeCommand(input) {
+        if (!participantNativeCommandKeywords.includes(input.keyword) || !Array.isArray(input.arguments) ||
+            input.arguments.some(argument => typeof argument !== "string") ||
+            !["RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus) ||
+            !Number.isSafeInteger(input.timeStamp) || input.timeStamp < 0 ||
+            typeof input.contentReleaseId !== "string" || !input.contentReleaseId || typeof input.bookletKey !== "string" || !input.bookletKey ||
+            typeof input.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(input.deliveryId)) {
+          throw new FirstSliceError(400, "participant_native_command_invalid", "A native command requires its immutable identifier, keyword, string arguments, controller status and timestamp.");
+        }
+        const request = structuredClone(input);
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(request.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(request.testRunId));
+        if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The native command belongs to another immutable content snapshot.");
+        }
+        const release = await requireContentRelease(repository, selected.contentReleaseId);
+        if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
+        }
+        const booklet = release.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === selected.bookletKey);
+        if (!booklet) throw new FirstSliceError(404, "booklet_not_found", "The selected Run's booklet was not found.");
+        const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
+        const deliveryId = `console:${request.deliveryId}`;
+        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: request.keyword,
+          arguments: request.arguments, controllerStatus: request.controllerStatus, timeStamp: request.timeStamp });
+        let executedAt = "";
+        try {
+          const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+            if (context.progressDelivery) {
+              if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409,
+                "participant_delivery_conflict", "An accepted native command cannot change its arguments or observed identity.");
+              executedAt = context.progressDelivery.acceptedAt;
+              return null;
+            }
+            const timestamp = now(); executedAt = timestamp;
+            assertParticipantAccessWindow(roster, timestamp, context.participantSession.validUntil);
+            if (context.testRun.bookletKey !== selected.bookletKey || context.testRun.bookletAssignmentKey !== selected.bookletAssignmentKey) {
+              throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's immutable assignment changed.");
+            }
+            const adaptive = new Map(evaluateAdaptiveStates(booklet, context.testRun).map(state => [state.stateKey, state.optionKey]));
+            const locks = (run: TestRun, key: string) => {
+              const restrictions = key === originalBookletRootTestletKey ? booklet.rootRestrictions : booklet.testletEntries?.find(entry => entry.testletKey === key)?.restrictions;
+              const entry = booklet.testletEntries?.find(candidate => candidate.testletKey === key);
+              const timer = run.testletTimers?.[key];
+              return { show: Boolean(entry?.restrictions?.show && adaptive.get(entry.restrictions.show.stateKey) !== entry.restrictions.show.optionKey),
+                time: Boolean(restrictions?.timeMax?.minutes && timer && getTestletTimerRemainingSeconds(timer, timestamp) <= 0),
+                code: Boolean(entry?.restrictions?.codeToEnter?.code && !run.unlockedTestletKeys?.includes(key)),
+                afterLeave: Boolean(entry?.restrictions?.lockAfterLeaving && run.lockedTestletKeys?.includes(key)) };
+            };
+            const observedController = request.controllerStatus === "ERROR" ? "ERROR" :
+              request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : "RUNNING";
+            const projected = projectParticipantNativeCommand({ request: { ...request, controllerStatus: observedController }, booklet, testRun: context.testRun, timestamp,
+              timedKey: unitKey => resolveTimedTestletForUnit(booklet, unitKey)?.testletKey ?? null,
+              remaining: timer => getTestletTimerRemainingSeconds(timer, timestamp),
+              interrupt: (run, key) => interruptTestletTimerAfterLeave(run, key, timestamp),
+              cancel: (run, key) => cancelTestletTimerAfterLeave(run, key, timestamp),
+              activate: run => activateCurrentTestletTimer(release, run, timestamp).testRun,
+              accessible: (run, unit) => {
+                if (run.lockedUnitKeys?.includes(unit.unitKey)) return false;
+                const path = [originalBookletRootTestletKey, ...(unit.testletPath ?? [])];
+                const cause = path.flatMap(key => Object.entries(locks(run, key)).map(([by, active]) => ({ by, active }))).find(value => value.active);
+                if (!cause) return true;
+                const parentKey = unit.testletPath?.at(-1) ?? originalBookletRootTestletKey, own = locks(run, parentKey);
+                const first = booklet.unitEntries.find(candidate => (candidate.testletPath?.at(-1) ?? originalBookletRootTestletKey) === parentKey);
+                return cause.by === "code" && first?.unitKey === unit.unitKey && !own.show && !own.time && !own.afterLeave;
+              } });
+            const nextRun = { ...projected, executionMode: context.testRun.executionMode, bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+            const terminal = request.keyword === "terminate";
+            const controller = terminal ? observedController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
+            const entries: ParticipantTestLogEntryInput[] = [];
+            if (controller !== observedController) entries.push({ key: "CONTROLLER", timeStamp: request.timeStamp, content: controller });
+            if (testletTimerStateChanged(context.testRun, nextRun)) entries.push(buildTestletTimeLeftTestStateEntry(nextRun, timestamp));
+            for (const [field, key] of [["unlockedTestletKeys", "TESTLETS_CLEARED_CODE"], ["lockedTestletKeys", "TESTLETS_LOCKED_AFTER_LEAVE"], ["lockedUnitKeys", "UNITS_LOCKED_AFTER_LEAVE"]] as const) {
+              if (JSON.stringify(context.testRun[field] ?? []) !== JSON.stringify(nextRun[field] ?? [])) entries.push({ key, timeStamp: request.timeStamp, content: JSON.stringify(nextRun[field] ?? []) });
+            }
+            if (nextRun.currentUnitKey !== context.testRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: request.timeStamp, content: nextRun.currentUnitKey ?? "" });
+            if (terminal && request.arguments.includes("lock")) entries.push({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: request.timeStamp, content: "" });
+            entries.push({ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") });
+            return { testRun: nextRun,
+              participantSession: { ...context.participantSession, status: terminal ? "signed_in" : "launched" },
+              testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: nextRun, deliveryId, batches: [{ entries }] }) : [],
+              activityEvents: [{ activityEventId: `delivery:${nextRun.testRunId}:${deliveryId}:activity:native`, tenantId: nextRun.tenantId,
+                workspaceId: nextRun.workspaceId, eventType: "participant_command_executed", actorId: null, subjectType: "test_run", subjectId: nextRun.testRunId,
+                occurredAt: timestamp, summary: `Participant console command '${request.keyword}' executed.`,
+                details: { deliveryId: request.deliveryId, keyword: request.keyword, arguments: request.arguments,
+                  previousStatus: context.testRun.status, nextStatus: nextRun.status, currentUnitKey: nextRun.currentUnitKey } }],
+              progressDelivery: { testRunId: nextRun.testRunId, participantSessionId: nextRun.participantSessionId, tenantId: nextRun.tenantId,
+                workspaceId: nextRun.workspaceId, contentReleaseId: nextRun.contentReleaseId, deliveryId, payloadSha256, acceptedAt: timestamp } };
+          }));
+          if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's scope changed.");
+          return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
+            participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
+            contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey },
+            executedAt, applied: result.applied, testRun: result.testRun, participantSession: result.participantSession };
+        } catch (error) {
+          if (error instanceof ParticipantNativeCommandError) throw new FirstSliceError(400, error.errorCode, error.message);
           throw error;
         }
       },

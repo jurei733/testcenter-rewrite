@@ -12,6 +12,14 @@ const outbox = await import(moduleUrl(source.replace('from "./participant-save-b
 const log = {key:"CONTROLLER",content:"ERROR Ω",timeStamp:1_791_411_000_000};
 const batch = entries => ({unitKey:null,originalUnitId:null,entries});
 const packet = logs => ({version:1,deliveryId:"old-delivery",testRunId:"own-run",unitKey:"own-unit",response:"unchanged answer",status:"running",queuedAt:"2026-10-10T00:00:00Z",logs});
+test("log-only outbox packets retain their marker through persistence and reload without changing legacy answer versions", () => {
+  const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
+  const entry=outbox.createParticipantSaveOutboxEntry({testRunId:"own-run",unitKey:"own-unit",response:"",status:"running",logOnly:true,logs:[batch([{...log,clientEntryId:"owned-log"}])]});
+  assert.equal(entry.version,2);assert.equal(entry.logOnly,true);assert.equal(outbox.persistParticipantSaveOutboxEntry(entry,storage),true);
+  assert.deepEqual(outbox.findParticipantSaveOutboxEntryForUnit("own-run","own-unit",storage),entry);
+  const legacy=outbox.createParticipantSaveOutboxEntry({testRunId:"own-run",unitKey:"other-unit",response:"Exact answer",status:"running",logs:[]});
+  assert.equal(legacy.version,1);assert.equal(Object.hasOwn(legacy,"logOnly"),false);
+});
 
 test("two distinct events with identical timestamps and content receive different stable identities", () => {
   const events=[{...log},{...log}],before=structuredClone(events);

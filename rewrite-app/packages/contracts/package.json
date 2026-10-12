@@ -6,6 +6,10 @@
   "main": "dist/packages/contracts/src/index.js",
   "types": "dist/packages/contracts/src/index.d.ts",
   "exports": {
+    "./participant-native-command": {
+      "types": "./dist/packages/contracts/src/participant-native-command.d.ts",
+      "default": "./dist/packages/contracts/src/participant-native-command.js"
+    },
     "./participant-run-command": {
       "types": "./dist/packages/contracts/src/participant-run-command.d.ts",
       "default": "./dist/packages/contracts/src/participant-run-command.js"

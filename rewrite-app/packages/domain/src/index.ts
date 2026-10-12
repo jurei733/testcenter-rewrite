@@ -275,6 +275,7 @@ export type WorkspaceActivityEventType =
   | "test_run_completed"
   | "monitor_run_command_issued"
   | "monitor_run_command_executed"
+  | "participant_command_executed"
   | "group_results_deleted"
   | "review_created"
   | "review_updated"
@@ -309,6 +310,7 @@ export const workspaceActivityEventTypes = [
   "test_run_completed",
   "monitor_run_command_issued",
   "monitor_run_command_executed",
+  "participant_command_executed",
   "group_results_deleted",
   "review_created",
   "review_updated",

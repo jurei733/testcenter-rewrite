@@ -1,5 +1,6 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
+import { participantNativeCommandRoute, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -2478,6 +2479,7 @@ const currentRunStatePattern = createRoutePattern(
   productionApiRoutes.participant.getCurrentRunState
 );
 const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
+const participantNativeCommandPattern = createRoutePattern(participantNativeCommandRoute);
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
@@ -2529,6 +2531,7 @@ const completeRunPattern = createRoutePattern(
 const participantSignOutPattern = createRoutePattern(productionApiRoutes.participant.signOut);
 const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
+  ["POST", participantNativeCommandPattern],
   ["GET", participantDebugStatePattern], ["POST", participantDebugStatePattern],
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
@@ -3755,6 +3758,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", participantRunCommandsPattern, productionApiRoutes.participant.listPendingCommands],
     ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
     ["POST", participantRunCommandApplicationPattern, participantCommandExecutionRoute],
+    ["POST", participantNativeCommandPattern, participantNativeCommandRoute],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -8589,6 +8593,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const participantNativeCommandMatch = participantNativeCommandPattern.exec(pathname);
+      if (request.method === "POST" && participantNativeCommandMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantNativeCommandMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantNativeCommandRequest>(request, runtime.config.maxJsonBodyBytes);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body) || typeof body.testRunId !== "string" || !body.testRunId.trim()) {
+          sendError(response, 400, "participant_native_command_invalid", "An explicit participant session, selected Run and command are required.");
+          return;
+        }
+        const application = await services.participantRuntime.executeNativeCommand({ participantSessionId, testRunId: body.testRunId,
+          contentReleaseId: body.contentReleaseId, bookletKey: body.bookletKey,
+          deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp });
+        sendJson<ParticipantNativeCommandResponse>(response, 200, { application });
+        return;
+      }
       const participantDebugStateMatch = participantDebugStatePattern.exec(pathname);
       if ((request.method === "GET" || request.method === "POST") && participantDebugStateMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantDebugStateMatch.groups.participantSessionId);

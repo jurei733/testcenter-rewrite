@@ -1,4 +1,5 @@
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
+import type { ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { Injectable, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -488,6 +489,45 @@ export class ParticipantViewFacade {
   private readonly commandReloadSequence = signal(0);
   private remoteTerminalErrorRunId: string | null = null;
   private commandControllerState: { testRunId: string; status: string } | null = null;
+  get consoleControllerGeneration(): number { return this.viewLifecycleSequence; }
+  async prepareNativeConsoleCommand(isCurrent: () => boolean): Promise<void> {
+    const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
+    const state = this.readCurrentRunState();
+    const response = this.runtime.currentUnitResponse;
+    const draftChanged = response !== (state?.testRun.unitResponses[state.currentUnit.unitKey ?? ""] ?? "");
+    // Trusted pending Player reports were drained above. An untouched loading
+    // shell is not an answer and must not be introduced by a console action.
+    if (isCurrent() && draftChanged && (!parseVeronaUnitResponse(response) || hasMeaningfulVeronaResponse(response))) {
+      await this.saveCurrentDraftBeforeCompleteInternal(settled);
+    }
+  }
+  nativeConsoleCommandFailed(error: Error): void {
+    this.uiState.errorMessage.set(error.message);
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+  async applyNativeConsoleCommand(result: ParticipantNativeCommandResult, isCurrent: () => boolean): Promise<void> {
+    if (!isCurrent()) return;
+    const terminal = result.keyword === "terminate" && result.participantSession.status === "signed_in" && result.testRun.status === "paused";
+    this.syncRun(result.testRun);
+    this.commandControllerState = { testRunId: result.testRun.testRunId,
+      status: terminal ? result.controllerStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : result.testRun.status.toUpperCase() };
+    if (terminal) {
+      const payload = await this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
+        resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: result.scope.participantSessionId }), undefined, { quiet: true });
+      if (!isCurrent()) return;
+      this.presentParticipantStarter(payload.runtimeState, result.scope.testRunId, true);
+      await this.replaceSelectedRunEntryLink();
+      return;
+    }
+    await this.refreshCurrentStateInternal(true, true);
+    if (!isCurrent()) return;
+    if ((result.keyword === "resume" || result.keyword === "goto") && this.readCurrentRunState()?.testRun.status === "running") {
+      this.participantErrorReceptionSuspended = false;
+      this.activeControllerError.set(null);
+      this.remoteTerminalErrorRunId = null;
+      this.commandReloadSequence.update(sequence => sequence + 1);
+    }
+  }
   private readonly receiveParticipantCommand = (command: ParticipantRunCommand, signal: AbortSignal): Promise<void> =>
     this.applyReceivedParticipantCommand(command, signal);
 
@@ -2459,13 +2499,15 @@ export class ParticipantViewFacade {
       return;
     }
 
-    if (currentState.currentUnit.unitKey === unitKey) {
+    const logOnlyChange = change.unitDataChanged === false && change.unitStateChanged === false && change.playerStateChanged === false;
+    if (!logOnlyChange && currentState.currentUnit.unitKey === unitKey) {
       this.runtime.currentUnitResponse = change.response;
       if (currentState.executionMode.saveResponses) {
         this.persistState();
       }
     }
     if (!currentState.executionMode.saveResponses) {
+      if (logOnlyChange) return;
       this.rememberEphemeralUnitResponse(
         currentState.testRun.testRunId,
         unitKey,
@@ -2500,14 +2542,16 @@ export class ParticipantViewFacade {
       ...carriedParticipantTestLogBatches(carriedSave),
       ...queuedEntries
     ]);
+    const logOnly = logOnlyChange && (!carriedSave || carriedSave.logOnly === true);
     const save = createParticipantSaveOutboxEntry({
       testRunId: currentState.testRun.testRunId,
       unitKey,
-      response: change.response,
+      response: logOnly ? currentState.testRun.unitResponses[unitKey] ?? "" : logOnlyChange && carriedSave ? carriedSave.response : change.response,
+      ...(logOnly ? { logOnly: true as const } : {}),
       status: currentState.testRun.status === "paused" ? "paused" : "running",
       logs
     });
-    this.optimisticVeronaResponse = {
+    if (!logOnly) this.optimisticVeronaResponse = {
       testRunId: save.testRunId,
       unitKey: save.unitKey,
       response: save.response
@@ -3568,10 +3612,10 @@ export class ParticipantViewFacade {
           {
             deliveryId: save.deliveryId,
             responseOnly: true,
-            responseTimestamp: Date.parse(save.queuedAt),
+            responseTimestamp: save.logOnly ? undefined : Date.parse(save.queuedAt),
             responseUnitKey: save.unitKey,
             status: save.status,
-            unitResponse: save.response,
+            unitResponse: save.logOnly ? undefined : save.response,
             logs: save.logs
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
@@ -4847,13 +4891,13 @@ export class ParticipantViewFacade {
       return;
     }
     this.pendingVeronaSave = saved;
-    this.optimisticVeronaResponse = {
+    if (!saved.logOnly) this.optimisticVeronaResponse = {
       testRunId: saved.testRunId,
       unitKey: saved.unitKey,
       response: saved.response
     };
     this.veronaSaveStatus = "queued_offline";
-    if (currentState.currentUnit.unitKey === saved.unitKey) {
+    if (!saved.logOnly && currentState.currentUnit.unitKey === saved.unitKey) {
       this.runtime.currentUnitResponse = saved.response;
     }
     if (

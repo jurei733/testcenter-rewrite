@@ -11,6 +11,13 @@ const {readParticipantDebugResponses:read}=await import('data:text/javascript;ba
 const state={testRun:{testRunId:'selected',unitResponses:{a:'saved-a',b:'saved-b'}},bookletUnits:[{unitKey:'a'},{unitKey:'b'}]};
 const sources=()=>({pending:null,optimistic:null,ephemeral:new Map()});
 const none=()=>null;
+test('log-only queued packets cannot replace local or saved diagnostic answers',()=>{
+ const value=sources();value.pending={testRunId:'selected',unitKey:'a',response:'synthetic',logOnly:true};
+ const queued=()=>({response:'synthetic-outbox',logOnly:true});
+ assert.deepEqual(read(state,value,queued),{a:'saved-a',b:'saved-b'});
+ value.optimistic={testRunId:'selected',unitKey:'a',response:'actual-latest'};
+ assert.deepEqual(read(state,value,queued),{a:'actual-latest',b:'saved-b'});
+});
 test('local pending and optimistic Verona captures override stale saved data for their selected Unit only',()=>{
  const value=sources();value.pending={testRunId:'selected',unitKey:'a',response:'offline-a'};
  value.optimistic={testRunId:'selected',unitKey:'b',response:'optimistic-b'};

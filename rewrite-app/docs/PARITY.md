@@ -1,5 +1,56 @@
 # Testcenter parity checklist
 
+### Native participant console commands and log-only delivery (2026-10-12)
+
+The participant console now provides the remaining Source `pause`, `resume`,
+`terminate` and `goto` methods alongside Debug. Native calls use participant
+ownership and their exact selected Run/release/booklet, without operator
+credentials or a remote command queue/ACK. The existing parent/Run transaction
+commits effects, mode-filtered logs, audit and a stable delivery receipt together.
+An identical retry returns the current Run without repeating effects; changed
+arguments, controller observation or timestamp conflict. Faulted File/SQL writes
+leave no partial Run, parent, artifacts or receipt.
+
+Goto follows the actual root handler: exact aliases or a positive Unit sequence,
+immediate-parent code/leave unlocks, target Unit leave unlock, cross-timer
+cancellation and restoration of a recorded nonpositive parent balance from the
+third argument's final word in minutes. Positive target balances remain intact.
+Ancestor locks retain Source priority and inaccessible targets use the Source
+next-accessible-Unit fallback. Resume activates only the selected timer; pause
+interrupts it. Terminate returns to Starter, retains answers and uses exact
+lowercase `lock` matching. Native console actions are available in all six modes,
+including modes that do not receive remote commands. Invalid/malformed targets
+reject atomically instead of reproducing the Source's partial mutation and
+unchecked JavaScript errors.
+
+The deferred browser controller orders tab-owned intents, drains trusted pending
+Player reports before dispatch, and validates the complete receipt. Its journal
+retains immutable packet identity through a reload without storing credentials.
+Live scope/controller replacement cancels pending intents and fences late UI
+responses; global method cleanup restores prior descriptors individually.
+Resume/Goto clear the old error presentation and replace the Player. An untouched
+empty loading shell is not saved as a new answer by a console action.
+
+Actual browser testing also exposed existing controller/Player logs fabricating
+empty answer packets. Explicit log-only packets now omit answers and response
+clocks in foreground and worker delivery. They use outbox entry version 2 and a
+version-2 worker message; an old worker cannot treat them as answer packets.
+Legacy answer entries remain version 1 with their former identity. Real pending
+answers and their logs are merged without loss; log-only entries do not replace
+optimistic, ephemeral or saved diagnostic answers.
+
+Fresh local validation passed 1,839 unit/frontend tests, 1,231 PostgreSQL tests,
+typecheck and the production build (469.99 kB under the unchanged 470 kB limit),
+and all thirteen protected Chromium/SQLite Debug/native groups. Pinned Original
+root/restore methods and actual preparation/staging methods gate the arguments,
+timer balance rules and absence of fabricated answers. The existing complete
+browser matrix and clean-archive container evidence require their own receipts.
+Full Source controller lifetime/late server effects, early-loading ERROR,
+complete property/visual/real-package acceptance, measured performance, mixed
+version rollout, remote CI, release, deployment and production confirmation
+remain open. No push or deployment is implied. Previous sections preserve
+historical checkpoint evidence.
+
 ### Effective participant Debug Testlet locks (2026-10-12)
 
 Debug Testlet details now report all four Source lock fields and the effective

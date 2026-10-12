@@ -12,7 +12,7 @@ export function queueParticipantSaveForBackgroundDelivery(
   entry: ParticipantSaveOutboxEntry
 ): void {
   postParticipantSaveWorkerMessage({
-    type: PARTICIPANT_SAVE_UPSERT_MESSAGE,
+    type: entry.logOnly ? "testcenter-participant-save-outbox-upsert-v2" : PARTICIPANT_SAVE_UPSERT_MESSAGE,
     entry,
     sessionToken: readParticipantRunCredential(entry.testRunId)
   });

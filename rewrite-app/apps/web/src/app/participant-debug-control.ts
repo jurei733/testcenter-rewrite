@@ -1,4 +1,5 @@
 import type { ParticipantRunCommandScope } from "@testcenter-rewrite-app/domain";
+import type { ParticipantNativeCommandKeyword } from "@testcenter-rewrite-app/contracts/participant-native-command";
 
 export const participantDebugWindows = ["main", "config", "testmode", "booklet", "unit", "customtexts", "variables", "states", "system", "tools"] as const;
 export type ParticipantDebugWindow = typeof participantDebugWindows[number];
@@ -13,9 +14,10 @@ export type ParticipantDebugControl = {
 };
 
 const controllers = new Set<ParticipantDebugControl>();
-const owners = new Map<ParticipantDebugControl, { window: Window; consoleCommand?: (args: readonly string[]) => void }>();
+const owners = new Map<ParticipantDebugControl, { window: Window; readScope: () => ParticipantRunCommandScope | null;
+  consoleCommand?: (args: readonly string[]) => void; nativeCommand?: (keyword: ParticipantNativeCommandKeyword, args: readonly string[]) => void }>();
 const bindings = new Map<Window, { tc: Record<string, unknown>; previousTc: unknown;
-  previousDebug: PropertyDescriptor | undefined; method: (args?: string[]) => void; owners: number }>();
+  previous: Map<string, PropertyDescriptor | undefined>; methods: Map<string, (args?: string[]) => void>; owners: number }>();
 const validArguments = (args: unknown): args is string[] => Array.isArray(args) && args.every(value => typeof value === "string");
 const scopeKey = (scope: ParticipantRunCommandScope | null): string | null => scope
   ? JSON.stringify([scope.tenantId, scope.workspaceId, scope.participantSessionId, scope.testRunId]) : null;
@@ -26,6 +28,7 @@ export const createParticipantDebugControl = (options: {
   isProductionMode: boolean;
   changed: (state: ParticipantDebugControlState) => void;
   consoleCommand?: (args: readonly string[]) => void;
+  nativeCommand?: (keyword: ParticipantNativeCommandKeyword, args: readonly string[]) => void;
   window?: Window;
 }): ParticipantDebugControl => {
   const window = options.window ?? globalThis.window;
@@ -77,10 +80,13 @@ export const createParticipantDebugControl = (options: {
       const binding = bindings.get(window);
       if (binding && --binding.owners === 0) {
         const currentTc = (window as Window & { tc?: unknown }).tc;
-        if (currentTc === binding.tc && binding.tc["debug"] === binding.method) {
-          if (binding.previousDebug) Object.defineProperty(binding.tc, "debug", binding.previousDebug);
-          else delete binding.tc["debug"];
-          if (binding.previousTc !== binding.tc && Object.keys(binding.tc).length === 0) {
+        if (currentTc === binding.tc) {
+          for (const [keyword, method] of binding.methods) if (binding.tc[keyword] === method) {
+            const previous = binding.previous.get(keyword);
+            if (previous) Object.defineProperty(binding.tc, keyword, previous);
+            else delete binding.tc[keyword];
+          }
+          if (binding.previousTc !== binding.tc && Reflect.ownKeys(binding.tc).length === 0) {
             if (binding.previousTc === undefined) delete (window as Window & { tc?: unknown }).tc;
             else (window as Window & { tc?: unknown }).tc = binding.previousTc;
           }
@@ -90,24 +96,39 @@ export const createParticipantDebugControl = (options: {
     }
   };
   controllers.add(control);
-  owners.set(control, { window, consoleCommand: options.consoleCommand });
+  owners.set(control, { window, readScope: options.readScope, consoleCommand: options.consoleCommand, nativeCommand: options.nativeCommand });
   if (window) {
     const existing = bindings.get(window);
     if (existing) existing.owners++;
     else {
       const previousTc = (window as Window & { tc?: unknown }).tc;
       const tc = previousTc && typeof previousTc === "object" ? previousTc as Record<string, unknown> : {};
-      const previousDebug = Object.getOwnPropertyDescriptor(tc, "debug");
-      const method = (args: string[] = []): void => {
+      const previous = new Map<string, PropertyDescriptor | undefined>(), methods = new Map<string, (args?: string[]) => void>();
+      const debug = (args: string[] = []): void => {
         // A terminal debug command has no remote ACK, exactly like the Source console API.
         const owner = [...controllers].reverse().find(item => owners.get(item)?.window === window && item.command(args));
         if (owner) owners.get(owner)?.consoleCommand?.(args);
       };
+      methods.set("debug", debug);
+      for (const keyword of ["pause", "resume", "terminate", "goto"] as const) methods.set(keyword, (args: string[] = []) => {
+        if (!validArguments(args)) return;
+        const owner = [...controllers].reverse().find(item => owners.get(item)?.window === window);
+        const selected = owner ? owners.get(owner) : null;
+        if (selected?.readScope()) selected.nativeCommand?.(keyword, [...args]);
+      });
       try {
-        Object.defineProperty(tc, "debug", { configurable: true, enumerable: true, writable: true, value: method });
+        for (const [keyword, method] of methods) {
+          previous.set(keyword, Object.getOwnPropertyDescriptor(tc, keyword));
+          Object.defineProperty(tc, keyword, { configurable: true, enumerable: true, writable: true, value: method });
+        }
         (window as Window & { tc?: unknown }).tc = tc;
-        bindings.set(window, { tc, previousTc, previousDebug, method, owners: 1 });
-      } catch {}
+        bindings.set(window, { tc, previousTc, previous, methods, owners: 1 });
+      } catch {
+        for (const [keyword, method] of methods) if (tc[keyword] === method) {
+          const descriptor = previous.get(keyword);
+          if (descriptor) Object.defineProperty(tc, keyword, descriptor); else delete tc[keyword];
+        }
+      }
     }
   }
   control.observeScope();

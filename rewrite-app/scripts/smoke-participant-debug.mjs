@@ -29,7 +29,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" }, stdio: ["ignore", "pipe", "pipe", "ipc"] });
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
-const errors = [], checks = [], requests = [];
+const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [];
 let browser, page, releaseSnapshot;
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
@@ -80,6 +80,8 @@ try {
   page = await context.newPage();
   page.on("pageerror", error => errors.push(String(error)));
   page.on("request", request => { const url = new URL(request.url()); if (url.pathname.endsWith("/debug-state")) requests.push({ method: request.method(), run: url.searchParams.get("testRunId") }); });
+  page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push(JSON.parse(request.postData())); });
+  page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/save-progress")) progressRequests.push(JSON.parse(request.postData())); });
   await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
   await page.locator("#originalLoginName").fill("debug-person");
   const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
@@ -155,6 +157,23 @@ try {
   assert.equal(logs.length, prior.length + 1); assert.equal(logs.filter(log => log.logContent === "debug off Paused exact Ω").length, 1);
   assert.deepEqual(await durable(), paused); mark("paused-console-log-preserves-run-parent-and-timer");
   await issue("resume"); await poll(async () => (await durable()).run.status === "running", "Monitor resume missing");
+  const native = async (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").fill("4");
+  await native("pause"); await poll(async () => (await durable()).run.status === "paused", "Native pause missing");
+  await poll(async () => await storedValue() === "4", "Native pause did not drain the trusted Player capture");
+  await native("resume"); await poll(async () => (await durable()).run.status === "running", "Native resume missing");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  await native("goto", ["2"]); await poll(async () => (await durable()).run.currentUnitKey === "next-unit", "Native numeric goto missing");
+  await native("goto", ["id", "first-unit"]); await poll(async () => (await durable()).run.currentUnitKey === "first-unit", "Native alias goto missing");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  assert.equal(await storedValue(), "4");
+  assert.deepEqual(nativeRequests.slice(0, 4).map(request => request.keyword), ["pause", "resume", "goto", "goto"]);
+  assert.deepEqual(await repository.listPendingParticipantRunCommands(run), []);
+  mark("native-pause-resume-goto-drain-selected-player");
+  await native("terminate"); await page.locator("#originalParticipantStarter mat-card").first().waitFor();
+  const terminated = await durable(); assert.equal(terminated.run.locked, false); assert.equal(terminated.run.status, "paused"); assert.equal(terminated.run.completedAt, null);
+  await start("first"); assert.equal((await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun.testRunId, run.testRunId);
+  assert.equal(await storedValue(), "4"); mark("native-termination-starter-and-exact-reentry");
   await debug([]); await tabs.waitFor(); await page.reload({ waitUntil: "networkidle" });
   await page.waitForFunction(() => typeof window.tc?.debug === "function"); assert.equal(await tabs.count(), 0); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), '["main"]'); mark("production-reload-does-not-restore-window");
   // A late response from the former selected Run must not enter the new pane.
@@ -192,14 +211,23 @@ try {
   const errored = await errorDurable(); await debug(["off"]); await tabs.waitFor({ state: "detached" }); await debug([]); await tabs.waitFor();
   assert.deepEqual(await errorDurable(), errored); mark("console-debug-remains-pure-after-controller-error");
   await page.screenshot({ path: join(artifacts, "debug-error.png"), fullPage: true });
+  await page.locator("iframe").evaluate(frame => frame.setAttribute("data-owned-errored-frame", "true"));
+  await native("resume");
+  await poll(async () => !await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").count() &&
+    await page.locator("iframe").getAttribute("data-owned-errored-frame") !== "true", "Native resume did not replace the errored Player");
+  await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  assert.deepEqual((await errorDurable()).run.unitResponses, errored.run.unitResponses); mark("native-resume-after-controller-error");
+  await native("terminate", ["lock"]); await page.locator("#originalParticipantStarter mat-card").first().waitFor();
+  const locked = await errorDurable(); assert.equal(locked.run.locked, true); assert.equal(locked.run.completedAt, null); assert.deepEqual(locked.run.unitResponses, errored.run.unitResponses);
+  assert.deepEqual((await durable()).run.unitResponses, firstResponses); mark("native-lock-termination-preserves-other-booklet");
   assert.deepEqual(errors, []);
 } catch (error) {
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
-  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
+  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
   releaseSnapshot?.();
-  await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests }, null, 2));
+  await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests }, null, 2));
   await browser?.close();
   if (server.exitCode === null) { server.kill("SIGTERM"); await Promise.race([closed, delay(5_000)]); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
   await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
