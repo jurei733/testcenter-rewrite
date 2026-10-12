@@ -10,6 +10,7 @@ import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { verifyParticipantNativeCrashRecovery } from "./participant-native-crash-smoke.mjs";
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
@@ -60,12 +61,15 @@ try {
   const source = await api(workspace + "/source-packages", { fileName: "native-route.json", mediaType: "application/json", contentStructure: content }, operator);
   const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-native-tabs-browser" }, operator);
-  await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="tabs-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
-  browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
-  page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
+  await api(workspace + "/participant-roster", { rosterText: `<Testtakers><Group id="owned">${["tabs-person", "native-crash-queued", "native-crash-committed"].map(name => `<Login mode="run-hot-return" name="${name}"><Booklet>first</Booklet><Booklet>second</Booklet></Login>`).join("")}</Group></Testtakers>` }, operator);
+  const repository = createSqliteFirstSliceRepository(file);
+  const mark = name => { checks.push(name); console.log(`participant_native_tabs=${name}:passed`); };
   const track = (target, label) => { pages.push(target); target.on("request", request => {
     if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push({ label, request: request.postDataJSON() });
   }); target.on("pageerror", error => errors.push(String(error))); };
+  await verifyParticipantNativeCrashRecovery({ base, workspaceKey, api, repository, artifacts, track, mark, observations });
+  browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   track(page, "source");
   await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
   // Real RouterLinks establish a preceding route for actual browser Back/Forward.
@@ -76,13 +80,11 @@ try {
   await page.getByRole("button", { name: "Weiter", exact: true }).click(); const identity = await (await signedIn).json();
   const currentPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
   const read = async runId => (await api(currentPath + (runId ? `?testRunId=${runId}` : ""), undefined, identity.sessionToken)).currentRunState.testRun;
-  const repository = createSqliteFirstSliceRepository(file);
   const native = (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
   const methods = () => page.waitForFunction(() => ["debug", "pause", "resume", "terminate", "goto"].every(key => typeof window.tc?.[key] === "function"));
   const player = () => page.frameLocator("iframe").locator("#demoPlayerAnswer");
   const journal = () => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-native-command:v1:")).map(key => JSON.parse(localStorage.getItem(key))));
   const emptyJournal = () => poll(async () => (await journal()).length === 0, "The native journal was not drained");
-  const mark = name => { checks.push(name); console.log(`participant_native_tabs=${name}:passed`); };
   const start = async key => { await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click(); await player().waitFor(); await methods(); };
   await start("first"); const first = await read();
   await player().fill("First trusted Ω");

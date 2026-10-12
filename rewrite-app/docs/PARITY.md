@@ -1,5 +1,50 @@
 # Testcenter parity checklist
 
+### Native commands after a browser-process crash (2026-10-12)
+
+The pinned Original `CommandService.commandFromTerminal` creates an ephemeral
+command and publishes it directly; it does not persist or restore terminal
+commands. The Rewrite therefore does not automatically replay an unproven
+pre-crash native intent. Reentry reads the authenticated, explicitly selected
+Run. A command already committed on the server remains effective, even if its
+receipt was lost. Fresh commands use the new document owner and delivery ID;
+unowned journal rows are preserved without authority to execute or delete them.
+This policy is separate from recovery of participant answers through the outbox.
+
+The existing required tab gate now also crashes two complete Chromium processes
+with `Browser.crash`, relaunches each persistent profile and restores its real
+tab through the [browser session API](https://developer.chrome.com/docs/extensions/reference/api/sessions).
+One case leaves a prepared terminate-with-lock and an unprepared Goto queued;
+the other commits Pause while holding its response. Both verify no `pagehide`,
+no old native replay on reentry/online reception, exact selected Run, unchanged
+answers and nonempty captured field clocks, expected command log counts, retained
+unowned journal bytes, an empty remote command queue and working fresh commands.
+The Player must actually receive its restored answer after its asynchronous start.
+
+The browser must persist its open-session preference as well as its DOM store
+before the crash. An owned extension with only the `sessions` permission invokes
+Chromium's real restore operation; it never injects application storage. Its
+profile, including credentials, is removed after each case. In the observed
+Chromium path the restored tab does **not** retain the old `sessionStorage`.
+Restoration paths that retain that namespace, and interrupted actual frontend
+upgrades, remain separate acceptance work; they are not inferred from this gate.
+
+Four new crash groups and the six existing copied-tab groups pass locally both
+headful and with `CI=true`; 55 focused native transport/Original-reference tests
+also pass. The existing non-optional CI command already invokes the extended gate;
+remote CI remains unverified. Application sources, manifests, lockfile, build
+configuration and Dockerfile are unchanged from `0e8538d10915`, so its 1,890 tests,
+typecheck, production build and image validation are reused predecessor evidence,
+not fresh broad executions. Only the regression gate and these acceptance notes
+change. No push, release, deployment, full parity or production claim is made.
+
+The preceding storage cleanup removed 70 precisely selected obsolete Testcenter
+cache entries (Docker reports 4.29 GB). Existing 24 containers with all mount
+fields, 85 volumes, image tags and protected file hashes remain intact. The current
+install cache is retained; fresh SQLite/PostgreSQL startup, migration, preflight,
+readiness and write/read checks pass. About 10.4 GB was free after that cleanup.
+Sustained cache growth remains an operational concern for later changed manifests.
+
 ### Native command ownership in copied browser tabs (2026-10-12)
 
 A new document now receives a fresh native command owner. Only a real reload
