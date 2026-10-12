@@ -62,12 +62,15 @@ export const projectParticipantNativeCommand = (input: {
         ? [...new Set([...(next.unlockedTestletKeys ?? []), parentKey])] : next.unlockedTestletKeys,
       lockedTestletKeys: (next.lockedTestletKeys ?? []).filter(key => key !== parentKey),
       lockedUnitKeys: (next.lockedUnitKeys ?? []).filter(key => key !== target!.unitKey) };
-    // Original UnitActivateGuard redirects an inaccessible target to its next accessible Unit.
-    const requestedIndex = booklet.unitEntries.indexOf(target);
-    if (!input.accessible(next, target)) target = booklet.unitEntries.slice(requestedIndex + 1).find(unit => input.accessible(next, unit)) ?? target;
     next.currentUnitKey = target.unitKey;
-  } else {
-    next.currentUnitKey ??= booklet.unitEntries[0]?.unitKey ?? null;
+  }
+  // Both Goto and Resume enter through Original's UnitActivateGuard. A missing
+  // current Unit is not an instruction to select the first authored Unit.
+  const requestedIndex = booklet.unitEntries.findIndex(unit => unit.unitKey === next.currentUnitKey);
+  const requested = booklet.unitEntries[requestedIndex];
+  if (requested && !input.accessible(next, requested)) {
+    next.currentUnitKey = booklet.unitEntries.slice(requestedIndex + 1)
+      .find(unit => input.accessible(next, unit))?.unitKey ?? requested.unitKey;
   }
   if (currentTimedKey) next = input.interrupt(next, currentTimedKey);
   const timerKey = input.timedKey(next.currentUnitKey);

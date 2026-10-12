@@ -70,6 +70,35 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
    clock+=3_000;const resumed=await invoke(input('resume',[],{controllerStatus:'PAUSED'}));assert.equal(resumed.testRun.status,'running');assert.equal(resumed.testRun.testletTimers['time-a'].remainingSeconds,111);
    assert.deepEqual(resumed.testRun.testletTimers['time-b'],original.testletTimers['time-b']);preserve(resumed.testRun,original);await repository.saveTestRun(run);
   });
+  await t.test('resume applies the Original entry guard without clearing locks, inventing a Unit or changing answers',async()=>{
+   for(const [currentUnitKey,lockedUnitKeys,expected] of [
+    ['unit',['unit','alias-Ω'],'timed-a'],['alias-Ω',[],'timed-a'],
+    ['unit',[],'unit'],['timed-b',['timed-b'],'timed-b'],[null,[],null]
+   ]){
+    const original={...run,status:'paused',pauseSource:'participant',currentUnitKey,lockedUnitKeys};await repository.saveTestRun(original);
+    const request=input('resume',[],{controllerStatus:'PAUSED'}),before=await snapshot(request),result=await invoke(request);
+    assert.equal(result.testRun.currentUnitKey,expected);assert.equal(result.testRun.status,'running');preserve(result.testRun,original);
+    for(const key of ['lockedUnitKeys','lockedTestletKeys','unlockedTestletKeys'])assert.deepEqual(result.testRun[key],original[key],key);
+    if(expected===null)assert.deepEqual(result.testRun.testletTimers,{});
+    const after=await snapshot(request,await create());assert.deepEqual(after.commands,before.commands);assert.deepEqual(after.sibling,before.sibling);assert.deepEqual(after.foreign,before.foreign);
+    assert.equal((await invoke(request,await create())).applied,false);assert.deepEqual(await snapshot(request,await create()),after);
+   }
+   await repository.saveTestRun(run);
+  });
+  await t.test('resume skips an expired or hidden timed block and starts only the accessible target countdown',async()=>{
+   const release=await repository.getContentReleaseById(releaseId);
+   for(const hidden of [false,true]){
+    const timer={testletKey:'time-a',status:hidden?'paused':'expired',durationSeconds:300,remainingSeconds:hidden?71:0,startedAt:timestamp,expiresAt:null,updatedAt:timestamp,endedAt:hidden?null:timestamp};
+    const original={...run,status:'paused',pauseSource:'participant',currentUnitKey:'timed-a',testletTimers:{'time-a':timer}};
+    if(hidden){const changed=structuredClone(release);changed.runtimeSnapshot.bookletEntries[0].testletEntries.find(entry=>entry.testletKey==='time-a').restrictions.show={stateKey:'unselected',optionKey:'hidden'};await repository.saveContentRelease(changed);}
+    await repository.saveTestRun(original);const result=await invoke(input('resume',[],{controllerStatus:'PAUSED'}));
+    assert.equal(result.testRun.currentUnitKey,'timed-b');assert.equal(result.testRun.testletTimers['time-a'].status,timer.status);
+    assert.equal(result.testRun.testletTimers['time-a'].remainingSeconds,timer.remainingSeconds);assert.equal(result.testRun.testletTimers['time-a'].expiresAt,null);
+    assert.equal(result.testRun.testletTimers['time-b'].status,'running');assert.equal(result.testRun.testletTimers['time-b'].remainingSeconds,300);
+    preserve(result.testRun,original);await repository.saveContentRelease(release);
+   }
+   await repository.saveTestRun(run);
+  });
   await t.test('goto resolves exact aliases or sequences and clears only the immediate parent and target Unit locks',async()=>{
    for(const args of [['2'],['id','alias-Ω']]){await repository.saveTestRun(run);const result=await invoke(input('goto',args));assert.equal(result.testRun.currentUnitKey,'alias-Ω');
     assert.deepEqual(result.testRun.unlockedTestletKeys,['inner']);assert.deepEqual(result.testRun.lockedTestletKeys,[]);assert.deepEqual(result.testRun.lockedUnitKeys,[]);preserve(result.testRun,run);}

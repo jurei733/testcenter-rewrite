@@ -1,5 +1,34 @@
 # Testcenter parity checklist
 
+### Native Resume entry guard (2026-10-12)
+
+Native Resume now enters the same accessibility projection as Goto. An
+inaccessible current Unit redirects to the next accessible authored Unit;
+intermediate Unit, inherited code/leave, adaptive show and expired-time locks
+are considered without clearing them. A locked final Unit retains the Original
+no-alternative fallback. The first local Unit of a code-locked block remains
+accessible only under the Source's own show/time/leave exceptions. Resume
+interrupts the former countdown and activates only the selected target; answers,
+response clocks, shared parameters, sibling/foreign Runs and immutable content
+remain intact. A missing current Unit no longer fabricates an authored-first
+selection. Pinned `resume`, navigation, accessibility and activation-guard methods
+execute directly in the reference gate, including the Source's null FIRST target.
+
+All 1,852 local unit/frontend tests, 1,239 PostgreSQL tests, typecheck and the
+production build passed. The bundle remains 469.99 kB under the unchanged
+470 kB hard limit; existing warning budgets/CommonJS notices remain. All fourteen
+protected Chromium/SQLite groups passed without JavaScript errors. The new
+browser group pauses the real Player, applies an owned Unit lock, resumes through
+the participant HTTP route and verifies redirect, retained locks, exact answers
+and clocks, no remote command queue and successful reentry. Cross-store checks
+also verify repeat/restart receipts and expired/hidden countdown selection.
+
+The remaining frontier includes early-loading command lifetime/ERROR, late
+server effects versus replacement-controller activation, complete Original
+property/visual/real-package acceptance, measured performance, mixed-version
+rollout, remote CI, release, deployment and production confirmation. No full
+parity or production claim follows from this local guard fix.
+
 ### Native participant console commands and log-only delivery (2026-10-12)
 
 The participant console now provides the remaining Source `pause`, `resume`,
@@ -52,9 +81,9 @@ All 24 existing containers, every mount field, 85 volumes, the protected
 presentation and host TypeScript package were preserved. Owned test resources
 and the archive were safely removed; about 10.36 GB of host space remains.
 
-An additional owned probe confirms a remaining Source gap: Native Resume still
-retains an inaccessible current Unit instead of applying UnitActivateGuard's
-next-accessible-Unit redirect. This guard must cover Resume as well as Goto.
+The additional owned probe at checkpoint `6253dd500773` confirmed Native
+Resume retaining an inaccessible current Unit. The next-accessible-Unit guard
+gap is resolved by the newer Native Resume entry-guard checkpoint above.
 Full Source controller lifetime/late server effects, early-loading ERROR,
 complete property/visual/real-package acceptance, measured performance, mixed
 version rollout, remote CI, release, deployment and production confirmation

@@ -6,7 +6,32 @@ import {hasMeaningfulVeronaResponse,parseVeronaUnitResponse} from '@testcenter-r
 const emit=source=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText).toString('base64');
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/original-native-command-reference.json',import.meta.url),'utf8'));
 assert.equal(fixture.originalCommit,'ee2ab9ab64bd91209ef8534bbe6005838024e46d');
-const original=await import(emit(Object.values(fixture.sources).map(value=>value.extracted).join('\n')+'\nexport {TestControllerComponent,TestControllerService};'));
+const original=await import(emit(Object.values(fixture.sources).map(value=>value.extracted).join('\n')+'\nexport {TestControllerComponent,TestControllerService,UnitActivateGuard};'));
+const originalEntry=async({current=1,locked=[],codeFirst=false,ownTime=false,ownShow=false,ownLeave=false}={})=>{
+ const source=new original.TestControllerService(),calls=[];
+ const parent={locked:codeFirst?{by:'code'}:null,locks:{show:ownShow,time:ownTime,afterLeave:ownLeave}};
+ source.booklet={config:{}};source.testId=42;source.currentUnitSequenceId=current;
+ source.units=Object.fromEntries([1,2,3].map(sequenceId=>[sequenceId,{sequenceId,localIndex:sequenceId-1,
+  parent:sequenceId===3?{locked:null,locks:{}}:parent,lockedAfterLeaving:locked.includes(sequenceId)}]));
+ source.currentUnit=source.units[current];source.checkCompleteness=()=>[];source.state$={next:value=>calls.push(['state',value])};
+ source.getUnit=sequence=>{if(!source.units[sequence])throw Error('Unit missing');return source.units[sequence];};
+ source.shouldShowConfirmationUI=()=>false;source.closeAllBuffers=async()=>source.getNavigationState(current);
+ const guard=new original.UnitActivateGuard(source,{parseUrl:url=>({redirect:url})},{});
+ source.router={navigate:async([url],options)=>{calls.push(['navigate',url,options.state.force]);return guard.canActivate({params:{u:url.split('/').at(-1)}});}};
+ return {result:await source.resume(),calls,source};
+};
+for(const [name,input,expected] of [
+ ['a locked current Unit redirects past other locked Units',{locked:[1,2]},{redirect:'/t/42/u/3'}],
+ ['a locked last Unit stays when no later Unit is accessible',{current:3,locked:[3]},true],
+ ['the first local Unit of a code-locked block remains accessible',{codeFirst:true},true],
+ ['a code-first exception does not bypass its own timer lock',{codeFirst:true,ownTime:true},{redirect:'/t/42/u/3'}],
+ ['a code-first exception does not bypass its own show lock',{codeFirst:true,ownShow:true},{redirect:'/t/42/u/3'}],
+ ['a code-first exception does not bypass its own leave lock',{codeFirst:true,ownLeave:true},{redirect:'/t/42/u/3'}],
+ ['a missing current Unit has no authored-first fallback',{current:0},false]
+])test(`pinned Resume enters the actual activation guard: ${name}`,async()=>{
+ const {result,calls}=await originalEntry(input);assert.deepEqual(result,expected);
+ assert.deepEqual(calls,[['state','RUNNING'],['navigate',`/t/42/u/${input.current===0?'null':input.current??1}`,true]]);
+});
 for(const [keyword,args,expected] of [['pause',[],['pause']],['resume',['ignored'],['resume']],['terminate',['LOCK'],['terminate','BOOKLETLOCKEDbyOPERATOR',true,false]],['terminate',['lock','extra'],['terminate','BOOKLETLOCKEDbyOPERATOR',true,true]]])test(`pinned root dispatch establishes ${keyword} argument semantics`,async()=>{
  const root=new original.TestControllerComponent(),calls=[];
  root.tcs={pause:async()=>calls.push(['pause']),resume:async()=>calls.push(['resume']),terminateTest:async(...args)=>calls.push(['terminate',...args])};

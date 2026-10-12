@@ -1,5 +1,19 @@
 # Optional Original UI
 
+### Native Resume accessibility (2026-10-12)
+
+Native Resume now applies the pinned UnitActivateGuard next-accessible-Unit
+fallback, retains all code/leave/Unit locks and answers, and starts only the
+selected timer. The Source code-first exception and no-later-Unit fallback remain
+intact; a missing current Unit does not fabricate a first-Unit selection.
+All 1,852 local tests, 1,239 PostgreSQL tests, typecheck, the 469.99 kB production
+build and fourteen protected Chromium/SQLite groups passed. The added browser
+case verifies the real paused Player, authenticated redirect, exact saved answers
+and clocks, retained Unit lock and reentry. Original resume/navigation/guard
+methods execute directly in pinned reference tests. Full controller lifetime,
+early ERROR, live visual/property/package acceptance, performance and production
+rollout remain open. See [the current contract and evidence in PARITY](./PARITY.md#native-resume-entry-guard-2026-10-12).
+
 ### Native console workflow (2026-10-12)
 
 All five Source console methods are now provided in the selected participant
@@ -23,8 +37,8 @@ PostgreSQL container profiles, SQLite runtime and 310 read-only image checks as
 All 24 existing containers, every mount field, 85 volumes and the protected
 presentation retain their identities/hashes; about 10.36 GB of host space remains.
 
-Native Resume's redirect from an inaccessible current Unit remains a confirmed
-gap, recorded by an owned probe against the pinned UnitActivateGuard.
+The Native Resume redirect gap recorded at checkpoint `6253dd500773` is resolved
+by the newer Native Resume accessibility checkpoint above.
 Full Original live/property/visual/package and
 controller-lifetime acceptance, performance and production rollout remain open.
 See [the current contract and evidence in PARITY](./PARITY.md#native-participant-console-commands-and-log-only-delivery-2026-10-12).
