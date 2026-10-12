@@ -18,14 +18,15 @@ const moduleFrom=async source=>{
  return import("data:text/javascript;base64,"+Buffer.from(code).toString("base64"));
 };
 const facadeMethods=methods("../apps/web/src/app/participant-view.facade.ts","ParticipantViewFacade",
- ["hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","invalidateCurrentStateRefreshes"]);
+ ["hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","validateParticipantControllerContext","invalidateCurrentStateRefreshes"]);
 const {makeHost}=await moduleFrom(`export const makeHost=(productionApiRoutes,resolveRoutePath)=>class Host{
  ${facadeMethods}
  };`);
 const Host=makeHost(productionApiRoutes,resolveRoutePath);
 const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const state=(status="running",run="selected-run")=>({
- participantSession:{participantSessionId:"selected-session"},testRun:{testRunId:run,status},
+ participantSession:{participantSessionId:"selected-session",tenantId:"tenant",workspaceId:"workspace"},
+ testRun:{testRunId:run,status,participantSessionId:"selected-session",tenantId:"tenant",workspaceId:"workspace",contentReleaseId:"release",bookletKey:"booklet",unitResponses:{}},
  currentUnit:{unitKey:"selected-unit"},booklet:{policy:{player:{loadingMode:"lazy"}}}
 });
 const fixture=()=>{

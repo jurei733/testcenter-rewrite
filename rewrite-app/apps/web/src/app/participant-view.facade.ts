@@ -4394,30 +4394,28 @@ export class ParticipantViewFacade {
       if (!this.consoleRun) {
         const { participantControllerContextRoute } = await import("@testcenter-rewrite-app/contracts/participant-native-command");
         const sessionId = this.runtime.participantSessionId.trim(), requestedRunId = this.runtime.testRunId;
-        const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
-          "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
-            { participantSessionId: sessionId }), requestedRunId), undefined, { quiet });
-        if (refreshSequence < this.currentStateAppliedRefreshSequence || sessionId !== this.runtime.participantSessionId.trim() || requestedRunId !== this.runtime.testRunId) return;
-        if (!controllerContext?.testRun ||
-            (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
-              .some(key => typeof controllerContext.testRun[key] !== "string" || !controllerContext.testRun[key]) ||
-            !controllerContext.testRun.unitResponses || controllerContext?.participantSession?.participantSessionId !== sessionId ||
-            controllerContext.testRun.participantSessionId !== sessionId ||
-            controllerContext.testRun.tenantId !== controllerContext.participantSession.tenantId ||
-            controllerContext.testRun.workspaceId !== controllerContext.participantSession.workspaceId ||
-            requestedRunId && controllerContext.testRun.testRunId !== requestedRunId) {
-          throw new Error("The controller context does not belong to the selected participant Run.");
+        try {
+          const { controllerContext } = await this.requestState.request<{ controllerContext: ParticipantControllerContext }>(
+            "Participant Controller", "GET", withSelectedParticipantRun(resolveRoutePath(participantControllerContextRoute,
+              { participantSessionId: sessionId }), requestedRunId), undefined, { quiet });
+          if (refreshSequence < this.currentStateAppliedRefreshSequence || sessionId !== this.runtime.participantSessionId.trim() || requestedRunId !== this.runtime.testRunId) return;
+          const run = this.validateParticipantControllerContext(controllerContext, sessionId, requestedRunId);
+          this.syncRun(run);
+          expectedRunId = run.testRunId;
+        } catch (error) {
+          // An older API has the authorized current-state route. Ownership or
+          // missing-Run failures must never downgrade to another selection.
+          if (!this.requestState.isApiError(error) || error.statusCode !== 404 || error.error !== "route_not_found") throw error;
         }
-        this.syncRun(controllerContext.testRun);
-        expectedRunId = controllerContext.testRun.testRunId;
       }
+      if (refreshSequence < this.currentStateAppliedRefreshSequence || expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
       let payload =
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
           "Participant Current State",
           "GET",
           withSelectedParticipantRun(resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
-            participantSessionId: this.runtime.participantSessionId.trim()
-          }), this.runtime.testRunId),
+            participantSessionId: expectedSessionId
+          }), expectedRunId),
           undefined,
           { quiet }
         );
@@ -4425,11 +4423,12 @@ export class ParticipantViewFacade {
         this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
-      if (payload.currentRunState.participantSession.participantSessionId !== this.runtime.participantSessionId.trim() ||
-          payload.currentRunState.testRun.testRunId !== this.runtime.testRunId) return;
-      const testRunId = payload.currentRunState.testRun.testRunId;
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
+      const run = this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
+      const testRunId = run.testRunId;
       // The authenticated response establishes scope before eager assets finish.
-      this.syncRun(payload.currentRunState.testRun);
+      this.syncRun(run);
+      expectedRunId = testRunId;
       if (!this.bookletAssetLoadStartedAtMs.has(testRunId)) {
         this.bookletAssetLoadStartedAtMs.set(testRunId, loadStartedAtMs);
       }
@@ -4443,7 +4442,8 @@ export class ParticipantViewFacade {
         this.hasControllerError && !acceptedParticipantEvent) {
         return;
       }
-      if (payload.currentRunState.testRun.testRunId !== this.runtime.testRunId) return;
+      if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
+      this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
       this.currentStateAppliedRefreshSequence = refreshSequence;
       if (payload.currentRunState.bookletAssets) {
         this.recordLoadedBookletAssets(payload, testRunId);
@@ -4529,6 +4529,20 @@ export class ParticipantViewFacade {
       }
       throw error;
     }
+  }
+
+  private validateParticipantControllerContext(context: ParticipantControllerContext | null | undefined, sessionId: string, requestedRunId: string): TestRun {
+    const run = context?.testRun;
+    if (!run ||
+        (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
+          .some(key => typeof run[key] !== "string" || !run[key]) ||
+        !run.unitResponses || typeof run.unitResponses !== "object" || Array.isArray(run.unitResponses) ||
+        context?.participantSession?.participantSessionId !== sessionId || run.participantSessionId !== sessionId ||
+        run.tenantId !== context.participantSession.tenantId || run.workspaceId !== context.participantSession.workspaceId ||
+        requestedRunId && run.testRunId !== requestedRunId) {
+      throw new Error("The controller context does not belong to the selected participant Run.");
+    }
+    return run;
   }
 
   private invalidateCurrentStateRefreshes(): void {

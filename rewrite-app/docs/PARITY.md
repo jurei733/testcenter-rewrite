@@ -1,5 +1,37 @@
 # Testcenter parity checklist
 
+### Participant reentry with an older API (2026-10-12)
+
+A new frontend now tolerates an older API without `controller-context`: only
+HTTP 404 with `route_not_found` continues through the existing authenticated
+current-state route. The captured participant Session and explicit Run remain in
+that request. Access rejection, a missing selected Run, malformed success or another
+server error cannot downgrade to a different Run or an unselected read. Six scope
+fields, Session ownership and actual response data are validated before either
+controller context or the full Unit view is accepted, including eager assets.
+Replacement-controller and late legacy responses remain fenced. A session-only
+legacy link derives its selection from the authorized server response; an explicit
+link never falls back to the latest Run. The old API establishes console authority
+only after its real full-state response, without fabricated loading metadata.
+
+All 1,881 unit/frontend tests, typecheck and the production build pass, with
+469.99 kB under the unchanged 470 kB hard limit and existing warnings retained.
+The browser compatibility gate passes five groups for the owned unsupported-route
+contract and five more against actual prior API image `9b099ecc69ee`, serving the
+current frontend through a read-only mount. Two saved Booklets prove selected
+reentry, trusted response/clock retention, session-only selection, missing explicit
+Run rejection and closed credential rejection. All six current loading/error and
+fourteen existing Debug/native groups also pass. The non-optional console CI job
+includes the contract gate; remote execution and the old-image variant in remote
+CI are not claimed.
+
+Backend application/API/store source hashes remain identical to checkpoint
+`7fdff889a3bd`; its 1,244 PostgreSQL, 498 HTTP and 61 compatibility checks remain
+applicable predecessor evidence, without rerunning those unchanged suites.
+Full mixed-schema/worker/native-DTO/deployment rollout, Original controller
+lifecycle/log status, actual route/tab ownership, complete visual/property/real
+package acceptance, measured performance and production confirmation remain open.
+
 ### Participant console before the first Unit view (2026-10-12)
 
 The pinned Original command service binds its terminal methods before the root

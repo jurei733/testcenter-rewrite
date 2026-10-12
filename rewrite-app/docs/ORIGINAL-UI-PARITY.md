@@ -1,5 +1,23 @@
 # Optional Original UI
 
+### Reentry across the controller-context API addition (2026-10-12)
+
+Only a missing-route 404 now uses the older authenticated current-state route.
+Explicit Run and Session selection remain intact; access rejection, missing Runs
+and malformed responses stay closed. Both metadata and full/eager views validate
+all six scope fields, while session-only legacy links use the server's authorized
+selection. An older API supplies console authority only with the real full-state
+reply, without fabricated Unit data.
+
+All 1,881 local tests, typecheck and the 469.99 kB production build pass under the
+unchanged hard limit. Five contract groups and five actual prior-API-image groups
+verify two saved Booklets, exact reentry, retained answers/clocks, legacy selection
+and rejection boundaries. Six loading and fourteen Debug/native groups also pass.
+The unchanged backend retains checkpoint `7fdff889a3bd`'s PostgreSQL/HTTP/compatibility
+proof. Full Original lifecycle/visual/property/package acceptance, remaining rolling
+versions and production acceptance remain open. See [the current scope and proof
+boundaries in PARITY](./PARITY.md#participant-reentry-with-an-older-api-2026-10-12).
+
 ### Console and Debug during initial loading (2026-10-12)
 
 All five terminal methods now bind before the first complete Unit view, matching

@@ -6,7 +6,7 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningf
 import {participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
+const names=['consoleRun','isParticipantPlayerFocused','eagerBookletLoading','isRunPaused','debugControllerStatus','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
 const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
@@ -108,4 +108,57 @@ test('a verified loading controller uses the player surface and loading/paused v
  f.host.syncRun(run);assert.equal(f.host.isParticipantPlayerFocused,true);assert.equal(f.host.eagerBookletLoading,true);assert.equal(f.host.isParticipantStarter,false);
  assert.equal(f.host.debugRunState,null);assert.equal(f.host.isRunPaused,false);
  f.host.syncRun({...run,status:'paused'});assert.equal(f.host.isRunPaused,true);assert.equal(f.host.debugRunState,null);
+});
+
+const unsupportedContext={error:'route_not_found',statusCode:404};
+for(const selected of ['selected',''])test(`an older backend establishes an authorized ${selected?'explicit':'legacy'} Run through the existing state route`,async()=>{
+ const held=deferred(),f=fixture(label=>label==='Participant Controller'?Promise.reject(unsupportedContext):held.promise);
+ f.host.runtime.testRunId=selected;
+ const loading=f.host.refreshCurrentStateInternal(true);await tick();
+ assert.equal(f.host.consoleRun,null);assert.equal(f.calls.requests.length,2);
+ assert.equal(f.calls.requests[1],'/api/v1/participant/sessions/participant/current-state'+(selected?'?testRunId=selected':''));
+ held.resolve({currentRunState:state(run)});await loading;
+ assert.equal(f.host.consoleRun.testRunId,'selected');assert.equal(f.host.debugRunState.testRun.testRunId,'selected');
+ assert.equal(f.calls.applied,1);assert.equal(f.calls.saved,0);
+});
+
+test('only a 404 route-not-found permits the old-backend fallback; access, missing Run and malformed success stay closed',async()=>{
+ for(const error of [{error:'participant_session_access_required',statusCode:401},{error:'participant_session_access_denied',statusCode:403},
+  {error:'test_run_not_found',statusCode:404},{error:'route_not_found',statusCode:503},{error:'http_error',statusCode:404}]){
+  const f=fixture(()=>Promise.reject(error));await assert.rejects(f.host.refreshCurrentStateInternal(true),value=>value===error);
+  assert.equal(f.calls.requests.length,1);assert.equal(f.host.consoleRun,null);
+ }
+ const malformed=fixture(async()=>({}));await assert.rejects(malformed.host.refreshCurrentStateInternal(true),/controller context/);
+ assert.equal(malformed.calls.requests.length,1);assert.equal(malformed.host.consoleRun,null);
+});
+
+test('a fallback state must carry all authorized scope fields before establishing a console or Unit view',async()=>{
+ for(const field of ['testRunId','participantSessionId','tenantId','workspaceId','contentReleaseId','bookletKey']){
+  const value={...run,[field]:['testRunId','participantSessionId','tenantId','workspaceId'].includes(field)?'foreign':null};
+  const f=fixture(async label=>label==='Participant Controller'?Promise.reject(unsupportedContext):{currentRunState:state(value)});
+  await assert.rejects(f.host.refreshCurrentStateInternal(true),/controller context/);
+  assert.equal(f.host.consoleRun,null);assert.equal(f.host.debugRunState,null);assert.equal(f.calls.applied,0);
+ }
+});
+
+test('an unsupported context response cannot start a fallback for a replacement controller',async()=>{
+ for(const replace of [host=>{host.runtime.testRunId='other';},host=>{host.runtime.participantSessionId='other';},host=>host.invalidateCurrentStateRefreshes()]){
+  const held=deferred(),f=fixture(()=>held.promise);const loading=f.host.refreshCurrentStateInternal(true);await tick();replace(f.host);
+  held.reject(unsupportedContext);await loading;assert.equal(f.calls.requests.length,1);assert.equal(f.host.consoleRun,null);
+ }
+});
+
+test('a late legacy fallback state cannot establish scope after a participant selection changed',async()=>{
+ const held=deferred(),f=fixture(label=>label==='Participant Controller'?Promise.reject(unsupportedContext):held.promise);
+ f.host.runtime.testRunId='';const loading=f.host.refreshCurrentStateInternal(true);await tick();f.host.runtime.testRunId='other';
+ held.resolve({currentRunState:state(run)});await loading;assert.equal(f.host.consoleRun,null);assert.equal(f.calls.applied,0);
+});
+
+test('eager fallback assets cannot replace an owned controller with a foreign full view',async()=>{
+ const eager=state(run);eager.booklet.policy.player.loadingMode='eager';
+ const f=fixture(async label=>label==='Participant Controller'?Promise.reject(unsupportedContext):{currentRunState:eager});
+ f.host.loadBookletAssets=async()=>({currentRunState:{...eager,testRun:{...run,workspaceId:'foreign'}}});
+ await assert.rejects(f.host.refreshCurrentStateInternal(true),/controller context/);
+ assert.equal(f.calls.applied,0);assert.equal(f.host.debugRunState,null);assert.equal(f.host.consoleRun.workspaceId,'workspace');
+ assert.equal(f.host.hasControllerError,true);assert.deepEqual(f.host.consoleRun.unitResponses,run.unitResponses);
 });
