@@ -298,16 +298,19 @@ try {
       await remotePage.evaluate(()=>window.tc.resume());await reset;
       if(oldFrame)await poll(()=>oldFrame.evaluate(frame=>!frame.isConnected),'The terminal sampling fixture did not finish its preceding Resume');
       await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
-      let releaseAnswer,releaseRuntime,answerHeld=false,runtimeHeld=false;const packets=[];
+      await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The reset Player had not restored its preceding answer');
+      const answer=initialPaused?'4':'5';
+      let releaseAnswer,releaseRuntime,answerHeld=false,runtimeHeld=false;const packets=[],preparations=[];
+      const sampling={terminalSamplingTrial:initialPaused?'running':'paused',packets,preparations};loadingObservations.push(sampling);
       const answerGate=new Promise(done=>{releaseAnswer=done;}),runtimeGate=new Promise(done=>{releaseRuntime=done;});releases.push(releaseAnswer,releaseRuntime);
-      await remotePage.route('**/save-progress',async route=>{const response=await route.fetch();assert.equal(response.status(),200);answerHeld=true;await answerGate;await route.fulfill({response});});
+      await remotePage.route('**/save-progress',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);preparations.push({request,response:await response.json()});const state=parseVeronaUnitResponse(request.unitResponse);if(state&&JSON.parse(state.unitState.dataParts.answer??'[]')[0]?.value===answer){answerHeld=true;await answerGate;}await route.fulfill({response});});
       const samplingRuntimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
       await remotePage.route(url=>url.pathname===samplingRuntimePath,async route=>{const response=await route.fetch();runtimeHeld=true;await runtimeGate;await route.fulfill({response});});
       await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();packets.push({request,application:(await response.json()).application});await route.fulfill({response});});
       try{
-        const answer=initialPaused?'4':'5';await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill(answer);
+        await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill(answer);
         await poll(()=>Promise.resolve(answerHeld),'The terminal fixture did not hold a genuinely committed answer receipt');
-        const baseline=await loadingRepository.getTestRunById(runId);
+        const baseline=await loadingRepository.getTestRunById(runId);sampling.baseline=baseline;assert.equal(JSON.parse(parseVeronaUnitResponse(baseline.unitResponses['first-unit']).unitState.dataParts.answer)[0].value,answer,'The held receipt did not commit the intended trusted answer');sampling.playerAfterCommittedInput=await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue();
         if(initialPaused)await remotePage.evaluate(()=>window.tc.pause());
         await remotePage.evaluate(()=>window.tc.terminate());
         await remotePage.evaluate(paused=>paused?window.tc.resume():window.tc.pause(),initialPaused);
@@ -332,7 +335,7 @@ try {
         before=await loadingRepository.getTestRunById(runId);
         loadingObservations.push({terminalSampling:expectedObservation,packets,controller:expectedController,answersAndClocksPreserved:true,siblingPreserved:true});
         const marker=`native-termination-samples-${expectedObservation.toLowerCase()}-after-held-answer-preparation`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
-      }finally{releaseAnswer();releaseRuntime();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
+      }finally{sampling.finalRun=await loadingRepository.getTestRunById(runId);sampling.body=await remotePage.locator('body').innerText().catch(()=> '');sampling.player=await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue({timeout:1000}).catch(()=> null);releaseAnswer();releaseRuntime();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
     // The preceding owned phase/error routes remove their handlers on exit.
     await remotePage.route("**/application",captureApplication);
