@@ -1,5 +1,88 @@
 # Testcenter parity checklist
 
+### Zero-tick timer reentry and current code gates (2026-10-13)
+
+Application checkpoint `acb3e516db34` distinguishes an interrupted zero STEP from
+actual expiry. The pinned Original Blob Worker emits zero before ENDED; a Pause
+at that boundary prevents the time lock. Its real Resume, UnitActivateGuard and
+Unit host restart the full authored duration. By contrast, an enforced ENDED
+keeps its time lock and redirects to the next accessible Unit. Non-enforcing
+preview modes can explicitly reenter the expired block and restart its duration.
+The Rewrite preserves these distinctions without changing a wire or schema
+version, and resumes only the selected accessible timer rather than every paused
+block in the Run. Positive balances remain bounded by the authored duration;
+receipt replay after a store reconnect cannot restore an old timer or snapshot.
+
+Native and remote Resume, ordinary Run and saving-session reentry, and the
+legacy monitor issuance path share the entry projection. An already leave-locked
+current Unit is skipped through the Original guard rules. This exposed a second
+confirmed gap: a first Unit behind a code lock is an accessible code-entry route,
+but its Player and timer must wait for code release. Current-state now exposes
+that current gate, the frontend suppresses the locked Player, and a valid code
+starts the current Unit in place. Invalid codes leave the Run unchanged. Existing
+upcoming-gate behavior remains covered; timer preparation and state-command
+ordering retain their separate receipts and highwater semantics.
+
+The Source fixture now pins seven original files, including the actual route
+guard, Unit host, code submission and lock aggregation. Thirty-one unit oracle
+cases execute the extracted Original command/timer paths. Seven real Chromium
+Blob-Worker groups cover Pause, ordinary and ERROR forced termination, zero-tick
+Pause with/without enforced time, and actual expiry with/without enforced time.
+The Source browser harness stubs iframe presentation; it does not prove the full
+Original router or Player application. Sixty new Memory/File/SQLite cases and
+eighty cases with PostgreSQL cover all six execution modes, native/remote
+application where supported, explicit entry, sibling/answer/clock retention,
+code release, and receipt replay after reopening the store. PostgreSQL replay
+actually shuts down and reconnects its storage pool.
+
+Ten production-built Rewrite timer groups pass both headed and headless:
+native/remote Pause and Terminate with a held committed Player answer and a held
+application, a lost timer reply, four native/remote zero-Pause/Resume combinations,
+and native/remote Resume into a current code gate. The preceding immutable image
+`04b894492418` passes nine and fails 51 of the sixty current store cases. The
+preceding frontend fails the code-entry iframe-absence assertion while the new
+frontend passes it. These controls are local regression evidence, not a complete
+older-API behavioral matrix. The broader twenty-nine command/loading groups pass
+headed and headless, with fourteen Debug, five route, ten copied-tab/crash, five
+context, eighteen ERROR and five actual older-API groups: 135 Rewrite browser
+groups plus seven actual-Source Worker groups, 142 positive groups in total.
+
+All 2,240 unit/frontend tests, 1,432 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. Typecheck and
+the production build pass at 469.99 kB under the unchanged 470 kB hard limit;
+existing warnings remain. A clean archive of 906 tracked application files passes
+Standard, Demo and production PostgreSQL profiles, SQLite runtime and 511
+API/transaction tests inside the fresh read-only image as node. Image
+`37c36b6f1a43` matches all 169 tested and host frontend files. All 24 preexisting
+containers, their immutable image IDs/states/mounts, 85 volumes, 339 prior image
+aliases and protected files remain intact; ten checkpoint aliases are added.
+Owned profile/test containers, volumes and the clean archive are removed. The
+previous host frontend remains preserved separately. Preservation is checked
+again after the actual older-API run.
+
+The initial broader integration expectation retained the leave-locked introductory
+Unit on Resume. Actual Original guard execution proves the forward redirect; the
+test now explicitly checks both the leave lock and the resumed code-entry Unit.
+The resulting current-code-gate failure was fixed in runtime code, rather than
+removing the unlock assertion. A subsequent validation-only checkpoint updates
+the Debug browser case to assert no Player before inherited-code release, release
+in place, and retained Unit locks/answers; runtime and image stay at `acb3e516db34`. Final browser evidence uses the newly frozen
+frontend and unique logs; earlier predecessor-frontend qualification runs are not
+counted as final acceptance. Existing root CI timer/Worker gates execute the
+expanded ten/seven groups; the new store cases run in unit and PostgreSQL gates.
+Remote CI has not run for this local, unpushed checkpoint.
+
+Complete timer parity and production readiness remain unproven. Remaining work
+includes exact Worker scheduling and hidden-window behavior, restored/legacy
+concurrency, state-buffer/completion-log timing, late terminal lock/navigation
+completion, initial loading/controller replacement, global/cross-document and
+mixed-version ordering, worker/post-unload behavior, full visual/property/real-
+package acceptance and measured performance. Release, deployment and production
+acceptance remain separate outstanding gates. An extracted-transport audit
+confirms that a held unclocked legacy packet currently delays a newly captured
+timer-only receipt. Removing that delay while retaining legacy state-effect FIFO
+is a concrete next task; this checkpoint does not claim to fix it.
+
 ### Controller timer interruption before answer preparation (2026-10-13)
 
 Application checkpoint `e481e22720e1` captures an eligible native or accepted
