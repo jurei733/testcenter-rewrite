@@ -1,5 +1,94 @@
 # Testcenter parity checklist
 
+### Timer preparation while legacy commands wait (2026-10-13)
+
+Application checkpoint `ed351fc1c0e6` closes the confirmed transport gap where a
+restored unclocked legacy packet blocked a new timer interruption as well as new
+main commands. An eligible Pause/Terminate timer receipt can now finish while
+the legacy packet waits. Its exact acknowledgement is persisted before the new
+command prepares answers. New answer preparation and main state application
+remain behind the legacy FIFO; the legacy HTTP packet gains no dispatch or wire
+metadata. Lost timer replies retry their original packet, restoration retains
+an acknowledged interruption, and controller replacement aborts the preflight
+without applying a late receipt. No wire or storage schema version changes.
+
+The receipt changes the selected timer plus the Run's transaction metadata
+(`stateRevision` and `updatedAt`). It does not change Run status, command dispatch
+highwater, Unit, parent session, controller entry, answers or response clocks,
+and does not project a returned Run snapshot. This distinction is deliberate:
+timer preparation is independent of the older command's state ordering, while
+its own store mutation still participates in normal revision tracking.
+
+All seventy native-transport tests pass, including seven new cases for Pause and
+Terminate behind a held legacy reply, exact lost-reply retry, restoration,
+legacy settlement during an in-flight timer receipt, controller replacement,
+and an unprepared legacy packet still draining its answers. The immutable
+predecessor transport passes 63 and fails exactly those seven cases. All 2,247
+unit/frontend tests pass fresh, including the unchanged 31 actual-Source command/
+timer oracle cases. Typecheck and the production build pass at 469.99 kB under
+the unchanged 470 kB hard limit, retaining existing warnings. A comment-only
+clarification was rebuilt separately; all 169 production files match the earlier
+frozen frontend used by the wider browser regression.
+
+Twelve production Rewrite timer groups pass headed and headless. The two new
+cases restore an owned, seeded, prepared legacy Goto journal through a real
+browser reload, hold that Goto before server application, and hold a genuinely
+committed Player answer independently. New Pause and Terminate freeze the
+matching timer beyond its former deadline while both main effects still wait.
+The Pause case loses its first timer reply and proves the exact retry is already
+acknowledged before legacy release. The legacy packet is applied exactly once;
+its body, sibling Run, answers and response clocks retain their required identity.
+The previous immutable frontend fails with zero timer receipts at the expected
+early-interruption assertion and no unrelated page errors. This uses the current
+API with an old wire journal; it is not an actual older-client executable or a
+complete mixed-version timing matrix.
+
+The wider twenty-nine command/loading groups pass headed and headless, together
+with fourteen Debug, five route, ten copied-tab/crash, five context, eighteen
+ERROR and five actual older-API groups. That is 139 fresh Rewrite browser groups.
+Seven previously verified actual-Source Worker groups remain retained evidence:
+their fixture, extractor, unit oracle and Worker harness hashes are unchanged.
+The resulting 146 positive groups distinguish fresh Rewrite runs from retained
+Source runs. The root CI's existing timer gate executes all twelve groups, and
+the normal frontend-state gate executes the seven new transport cases. Remote CI
+has not run for this local, unpushed checkpoint.
+
+Every backend, store, contract, configuration and integration-test source hash
+is unchanged from `acb3e516db34`. Its 1,432 PostgreSQL and 498 Memory/File/SQLite
+HTTP tests are therefore retained predecessor evidence, not fresh executions.
+A clean archive of all 906 tracked application files produces a fresh image
+`620db5dfc4f8`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 511 API/transaction tests inside the read-only image as node pass fresh.
+Image, tested and host frontend match in all 169 files. The former host frontend
+is preserved separately. All 24 preexisting containers, their immutable image
+IDs/states/mounts, 85 volumes, 349 prior image aliases and protected files remain
+intact; ten checkpoint aliases are added. Owned containers, volumes and the clean
+source archive are removed, with preservation rechecked after the older-API run.
+
+Storage preparation removed exactly 65 private unused BuildKit cache records
+from three verified older dependency/build lineages of this repository,
+reclaiming 1.692 GB. The current dependency cache, every image alias, container
+and volume remain intact. Selection was checked read-only by explicit cache IDs
+and ancestry before removal; the observed cache delta contains only those IDs.
+This is a targeted own-cache cleanup, not a global Docker prune or disk reset.
+
+Browser qualification corrected the migration setup to run only in the replacement
+top-level document: injecting it into sandboxed Player frames produced unrelated
+storage-access errors. Failure cleanup now releases deliberately blocked routes
+without waiting indefinitely for canceled handlers. An earlier failed negative
+control required stopping only its verified owned browser/API; the final negative
+control exits with its original timer assertion. Earlier qualification failures
+are excluded from final acceptance. Final timer logs use the corrected setup and
+complete without page errors.
+
+Complete Original parity and production readiness remain unproven. Further work
+includes already-applied/lost legacy replies, broader restored and mixed-version
+concurrency, exact Worker scheduling and hidden-window behavior, state-buffer/
+completion-log timing, late terminal lock/navigation completion, initial loading/
+controller replacement, global/cross-document and post-unload ordering, full
+visual/property/real-package acceptance and measured performance. Release,
+deployment and production acceptance remain outstanding separate gates.
+
 ### Zero-tick timer reentry and current code gates (2026-10-13)
 
 Application checkpoint `acb3e516db34` distinguishes an interrupted zero STEP from
