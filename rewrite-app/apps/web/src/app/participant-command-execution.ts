@@ -3,6 +3,7 @@ import { parseParticipantRunCommand, participantCommandExecutionRoute } from "@t
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 import { receivedParticipantControllerDispatch } from "./participant-native-command";
+export { deliverParticipantControllerTimerInterruption } from "./participant-native-command";
 import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
 
 /** Reconcile presentation after a committed effect without occupying its command lane. */

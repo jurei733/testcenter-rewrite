@@ -1,5 +1,5 @@
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
-import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult, ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import type { ParticipantCommandExecution } from "./participant-command-receiver";
 import { Injectable, effect, inject, signal } from "@angular/core";
@@ -425,6 +425,8 @@ export class ParticipantViewFacade {
   private readonly presentedActiveTimers = new Set<string>();
   private readonly seenTimerWarnings = new Set<string>();
   private readonly timerRemainingSeconds = new Map<string, number>();
+  private readonly controllerTimerInterruption = signal<{ participantSessionId: string; request: ParticipantControllerTimerInterruptionRequest } | null>(null);
+  private readonly commandTimerInterruptions = new WeakMap<ParticipantRunCommand, ParticipantControllerTimerInterruptionRequest | undefined>();
   private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
     null;
   private readonly loadedBookletAssets = signal<{
@@ -504,6 +506,35 @@ export class ParticipantViewFacade {
       run.testRunId === this.runtime.testRunId ? run : null;
   }
   get consoleControllerGeneration(): number { return this.viewLifecycleSequence; }
+  captureControllerTimerInterruption(input: { testRunId: string; deliveryId: string; keyword: string; controllerStatus: ParticipantNativeCommandRequest["controllerStatus"] },
+    allocate: () => ParticipantControllerDispatch): ParticipantControllerTimerInterruptionRequest | undefined {
+    const state = this.debugRunState, run = this.consoleRun, timer = state?.activeTestletTimer;
+    if (!state || !run || run.testRunId !== input.testRunId || !timer || timer.status !== "running" || !timer.expiresAt ||
+        this.isControllerTimerInterrupted(state) || !["pause", "terminate", "complete", "complete_and_lock"].includes(input.keyword)) return;
+    const keyword = input.keyword === "pause" ? "pause" : "terminate";
+    if (keyword === "terminate" && (input.controllerStatus === "ERROR" || input.controllerStatus === "TERMINATED" ||
+        !state.currentUnit?.unitKey || state.currentUnit.parentLocked !== false)) return;
+    const unitKey = state.currentUnit?.unitKey;
+    if (!unitKey || unitKey !== run.currentUnitKey || !Number.isFinite(Date.parse(timer.expiresAt))) return;
+    const request: ParticipantControllerTimerInterruptionRequest = {
+      testRunId: run.testRunId, contentReleaseId: run.contentReleaseId, bookletKey: run.bookletKey,
+      deliveryId: input.deliveryId, controllerDispatch: allocate(), keyword, controllerStatus: input.controllerStatus,
+      unitKey, testletKey: timer.testletKey, startedAt: timer.startedAt, expiresAt: timer.expiresAt,
+      remainingSeconds: Math.max(0, Math.min(timer.durationSeconds, Math.floor((Date.parse(timer.expiresAt) - Date.now()) / 1_000)))
+    };
+    this.controllerTimerInterruption.set({ participantSessionId: run.participantSessionId, request });
+    return request;
+  }
+  private isControllerTimerInterrupted(state: ParticipantCurrentRunStateResponse["currentRunState"]): boolean {
+    const captured = this.controllerTimerInterruption?.(), timer = state.activeTestletTimer;
+    if (!captured || !timer || captured.participantSessionId !== state.testRun.participantSessionId ||
+        captured.request.testRunId !== state.testRun.testRunId || captured.request.contentReleaseId !== state.testRun.contentReleaseId ||
+        captured.request.bookletKey !== state.testRun.bookletKey || captured.request.unitKey !== state.currentUnit?.unitKey ||
+        captured.request.testletKey !== timer.testletKey || captured.request.startedAt !== timer.startedAt) return false;
+    if (timer.status === "running" && (timer.expiresAt !== captured.request.expiresAt ||
+        (state.testRun.controllerDispatches?.[captured.request.controllerDispatch.controllerId] ?? 0) > captured.request.controllerDispatch.sequence)) return false;
+    return true;
+  }
   private get pendingControllerStatus(): "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED" | undefined {
     const phase = this.controllerCommandPhase(), run = this.consoleRun;
     return phase && run && phase.pending && !phase.interrupted && phase.testRunId === run.testRunId && run.status !== "completed" ? phase.status : undefined;
@@ -707,7 +738,15 @@ export class ParticipantViewFacade {
     const initialStatus = readStatus();
     const invocationStatus = initialStatus === "TERMINATED" || initialStatus === "TERMINATED_PAUSED"
       ? run.status === "paused" ? "PAUSED" : "RUNNING" : initialStatus;
-    if (!terminal && allocate) this.beginControllerCommand(run.testRunId, command.commandType, allocate(run.controllerDispatches));
+    const nonterminalDispatch = !terminal && allocate ? allocate(run.controllerDispatches) : undefined;
+    if (nonterminalDispatch) this.beginControllerCommand(run.testRunId, command.commandType, nonterminalDispatch);
+    if (!this.commandTimerInterruptions.has(command)) {
+      const captured = allocate && (!terminal || initialStatus !== "TERMINATED") ? this.captureControllerTimerInterruption({
+        testRunId: run.testRunId, deliveryId: command.commandId, keyword: command.commandType, controllerStatus: initialStatus },
+        () => nonterminalDispatch ?? allocate(run.controllerDispatches)) : undefined;
+      this.commandTimerInterruptions.set(command, captured);
+    }
+    const timerInterruption = this.commandTimerInterruptions.get(command);
     let terminalPhase = terminal ? this.terminalCommandPhases.get(command) : undefined;
     if (terminal && !terminalPhase && allocate) {
       const terminationNoop = initialStatus === "TERMINATED";
@@ -721,6 +760,10 @@ export class ParticipantViewFacade {
     let observedRun = run;
     let observedStatus: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> = "RUNNING";
     const execution = await import("./participant-command-execution");
+    if (timerInterruption) {
+      await execution.deliverParticipantControllerTimerInterruption(timerInterruption, run, { signal, isCurrent });
+      if (!isCurrent()) return;
+    }
     await execution.executeReceivedParticipantCommand(command, signal, {
       scope: run, isCurrent, terminationNoop: terminalPhase ? Boolean(terminalPhase.terminationNoop) : undefined, controllerStatus: () => {
         observedView = this.currentStateAppliedRefreshSequence;
@@ -870,6 +913,7 @@ export class ParticipantViewFacade {
     this.consoleTestRun.set(null);
     this.commandControllerState = null;
     this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
     this.debugCommandDispatch = undefined;
     this.remoteTerminalErrorRunId = null;
     // Stopping event delivery does not cancel requests already in flight.
@@ -1276,7 +1320,7 @@ export class ParticipantViewFacade {
     const displayNameLabel =
       currentState.participantRosterEntry?.displayName?.trim() ||
       currentState.participantSession.loginKey;
-    const activeTestletTimer = currentState.activeTestletTimer;
+    const activeTestletTimer = this.isControllerTimerInterrupted(currentState) ? null : currentState.activeTestletTimer;
     const testletTimer = activeTestletTimer
       ? (() => {
           const expiresAtMs = activeTestletTimer.expiresAt
@@ -1289,7 +1333,7 @@ export class ParticipantViewFacade {
                   0,
                   Math.min(
                     activeTestletTimer.durationSeconds,
-                    Math.ceil((expiresAtMs - this.timerTick()) / 1_000)
+                    Math.floor((expiresAtMs - this.timerTick()) / 1_000)
                   )
                 )
               : activeTestletTimer.remainingSeconds;
@@ -2145,7 +2189,8 @@ export class ParticipantViewFacade {
     this.timerTickerHandle = globalThis.window.setInterval(() => {
       const currentTick = Date.now();
       this.timerTick.set(currentTick);
-      const activeTimer = this.readCurrentRunState()?.activeTestletTimer;
+      const state = this.readCurrentRunState();
+      const activeTimer = state && !this.isControllerTimerInterrupted(state) ? state.activeTestletTimer : null;
       const expiresAtMs = activeTimer?.expiresAt
         ? Date.parse(activeTimer.expiresAt)
         : Number.NaN;
@@ -2166,7 +2211,7 @@ export class ParticipantViewFacade {
       if (activeTimer?.status === "running" && Number.isFinite(expiresAtMs)) {
         const remainingSeconds = Math.max(
           0,
-          Math.ceil((expiresAtMs - currentTick) / 1_000)
+          Math.floor((expiresAtMs - currentTick) / 1_000)
         );
         const timerKey = `${activeTimer.testletKey}:${activeTimer.startedAt}`;
         const previousRemainingSeconds = this.timerRemainingSeconds.get(timerKey);
@@ -3625,6 +3670,7 @@ export class ParticipantViewFacade {
     this.syncRun(payload.testRun);
     this.commandControllerState = null;
     this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
     this.syncRuntimeBooklets(payload.booklets);
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
@@ -3694,6 +3740,7 @@ export class ParticipantViewFacade {
     this.syncRun(payload.testRun);
     this.commandControllerState = null;
     this.controllerCommandPhase.set(null);
+    this.controllerTimerInterruption.set(null);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView

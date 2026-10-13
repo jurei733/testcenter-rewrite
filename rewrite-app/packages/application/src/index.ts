@@ -2,6 +2,7 @@ import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcent
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
 import { participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
 import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
@@ -741,6 +742,7 @@ export type WorkspaceReviewPort = {
 };
 
 export type ParticipantRuntimePort = {
+  interruptControllerTimer(input: ParticipantControllerTimerInterruptionRequest & { participantSessionId: string }): Promise<ParticipantControllerTimerInterruptionResult>;
   getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
@@ -21105,6 +21107,21 @@ const getTestletTimerRemainingSeconds = (
   return Math.max(0, Math.ceil((expiresAtMs - timestampMs) / 1_000));
 };
 
+const participantCurrentUnitParentLocked = (booklet: ContentReleaseBookletEntry | undefined, run: TestRun): boolean => {
+  const unit = booklet?.unitEntries.find(entry => entry.unitKey === run.currentUnitKey);
+  if (!booklet || !unit) return false;
+  const states = new Map(evaluateAdaptiveStates(booklet, run).map(state => [state.stateKey, state.optionKey]));
+  return [originalBookletRootTestletKey, ...(unit.testletPath ?? [])].some(key => {
+    const restrictions = resolveBookletTestletEntry(booklet, key)?.restrictions;
+    const timer = run.testletTimers?.[key];
+    return Boolean(restrictions?.show && states.get(restrictions.show.stateKey) !== restrictions.show.optionKey ||
+      restrictions?.codeToEnter?.code && !run.unlockedTestletKeys?.includes(key) ||
+      restrictions?.lockAfterLeaving && run.lockedTestletKeys?.includes(key) ||
+      restrictions?.timeMax && timer && ["expired", "cancelled"].includes(timer.status) &&
+        resolveParticipantExecutionMode(run.executionMode).forceTimeRestrictions);
+  });
+};
+
 const buildTestletTimeLeftTestStateEntry = (
   testRun: TestRun,
   timestamp: string
@@ -32152,6 +32169,63 @@ export const createFirstSliceServices = (
           throw error;
         }
       },
+      async interruptControllerTimer(input) {
+        if (!isParticipantControllerTimerInterruptionRequest(input)) throw new FirstSliceError(400,
+          "participant_controller_timer_interruption_invalid", "A controller timer interruption requires its immutable timer identity, balance and dispatch.");
+        const request = structuredClone(input);
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(request.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(request.testRunId));
+        if (!selected) throw new FirstSliceError(404, "test_run_not_found", "The selected Run was not found.");
+        if (selected.contentReleaseId !== request.contentReleaseId || selected.bookletKey !== request.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The timer interruption belongs to another immutable content snapshot.");
+        }
+        const release = await requireContentRelease(repository, selected.contentReleaseId);
+        if (release.tenantId !== selected.tenantId || release.workspaceId !== selected.workspaceId) {
+          throw new FirstSliceError(404, "test_run_not_found", "The selected Run's content was not found.");
+        }
+        const booklet = release.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === selected.bookletKey);
+        const timed = booklet && resolveTimedTestletForUnit(booklet, request.unitKey);
+        if (!timed || timed.testletKey !== request.testletKey) throw new FirstSliceError(400,
+          "participant_controller_timer_interruption_invalid", "The interrupted timer must belong to the observed Unit.");
+        const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
+        const deliveryId = `controller-timer:${request.deliveryId}`;
+        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-controller-timer-interruption/v1", ...request });
+        let acceptedAt = "";
+        const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+          if (context.progressDelivery) {
+            if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409,
+              "participant_delivery_conflict", "An accepted timer interruption cannot change its timer, balance or dispatch.");
+            acceptedAt = context.progressDelivery.acceptedAt;
+            return null;
+          }
+          const timestamp = now(); acceptedAt = timestamp;
+          assertParticipantAccessWindow(roster, timestamp, context.participantSession.validUntil);
+          if (context.testRun.status === "completed") throw new FirstSliceError(400,
+            "participant_controller_timer_interruption_completed", "The selected Run is completed.");
+          if (context.testRun.bookletAssignmentKey !== selected.bookletAssignmentKey) throw new FirstSliceError(409,
+            "test_run_scope_changed", "The timer interruption belongs to another immutable assignment.");
+          const timer = context.testRun.testletTimers?.[request.testletKey];
+          if (timer && request.remainingSeconds > timer.durationSeconds) throw new FirstSliceError(400,
+            "participant_controller_timer_interruption_invalid", "The interrupted balance cannot exceed the timer's authored duration.");
+          // This receipt precedes the answer drain. It must not advance the
+          // command state highwater or alter Run/controller/parent state.
+          const current = !participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch) &&
+            context.testRun.currentUnitKey === request.unitKey && timer?.status === "running" &&
+            timer.startedAt === request.startedAt && timer.expiresAt === request.expiresAt;
+          const testRun = current ? normalizeTestRun({ ...context.testRun,
+            testletTimers: { ...context.testRun.testletTimers, [request.testletKey]: { ...timer,
+              status: "paused", remainingSeconds: Math.min(timer.remainingSeconds, request.remainingSeconds),
+              expiresAt: null, updatedAt: timestamp, endedAt: null, interruptedAtUnitKey: request.unitKey } }, updatedAt: timestamp }) : context.testRun;
+          return { testRun, testLogs: [], activityEvents: [],
+            progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+              tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+              deliveryId, payloadSha256, acceptedAt: timestamp } };
+        }));
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's scope changed.");
+        return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
+          participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
+          contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey }, acceptedAt, applied: result.applied };
+      },
       async executeNativeCommand(input) {
         if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
           throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
@@ -32405,6 +32479,7 @@ export const createFirstSliceServices = (
           booklet: participantBooklet,
           currentUnit: {
             ...resolveRuntimeUnit(contentRelease, currentTestRun.bookletKey, currentTestRun.currentUnitKey),
+            parentLocked: participantCurrentUnitParentLocked(currentBooklet, currentTestRun),
             completenessPolicy: isUnitLeaveLocked(currentBooklet, currentTestRun, currentTestRun.currentUnitKey)
               ? { requirePresentationComplete: "off", requireResponseComplete: "off" }
               : (() => {

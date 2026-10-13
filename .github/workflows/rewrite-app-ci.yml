@@ -66,7 +66,7 @@ jobs:
             command: npm run ci:browser:quick
             playwright: true
           - check: ui-participant-console
-            command: npm run build && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built && npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
+            command: npm run build && npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built && npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
             playwright: true
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness

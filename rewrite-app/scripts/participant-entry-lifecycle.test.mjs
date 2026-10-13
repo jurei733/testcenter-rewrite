@@ -17,7 +17,7 @@ const methods = methodNames.map(name => {
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
 });
-const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { controllerCommandPhase=Object.assign(()=>null,{set(){}}); ${methods.join("\n")} };`, {
+const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { controllerTimerInterruption=Object.assign(()=>null,{set(){}}); controllerCommandPhase=Object.assign(()=>null,{set(){}}); ${methods.join("\n")} };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 });
 const { createEntryHost } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);

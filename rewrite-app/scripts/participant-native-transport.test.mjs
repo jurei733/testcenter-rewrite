@@ -3,22 +3,23 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
 import {resolveRoutePath} from '@testcenter-rewrite-app/contracts';
-import {participantNativeCommandRoute,participantNativeCommandKeywords,isParticipantControllerDispatch,isParticipantControllerDispatches} from '@testcenter-rewrite-app/contracts/participant-native-command';
+import {participantNativeCommandRoute,participantNativeCommandKeywords,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-native-command.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('native.ts',source,ts.ScriptTarget.Latest,true);
+assert.equal(ast.parseDiagnostics.length,0,'The real native transport must parse before extracting it for execution.');
 const statements=ast.statements.filter(node=>!ts.isImportDeclaration(node)).map(node=>node.getText(ast).replace(/^export /,''));
-const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential,isParticipantControllerDispatch,isParticipantControllerDispatches)=>{'+statements.join('\n')+';return Object.assign(createParticipantNativeCommands,{next:nextParticipantControllerDispatch,received:receivedParticipantControllerDispatch});};',
+const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest)=>{'+statements.join('\n')+';return Object.assign(createParticipantNativeCommands,{next:nextParticipantControllerDispatch,received:receivedParticipantControllerDispatch});};',
  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
 const deferred=()=>{let resolve;return {promise:new Promise(done=>resolve=done),get resolve(){return resolve;}};};
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
-function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING',started}={}){
+function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING',started,captureTimer}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
- const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches);
- const receipt=body=>({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
- const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,started,generation:()=>generation,
+ const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest);
+ const receipt=body=>body.testletKey?{interruption:{...body,scope:{...scope},applied:true,acceptedAt:'2026-10-12T00:00:00.000Z'}}:({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
+ const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,started,captureTimer,generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
   window:browserWindow??{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
   now:()=>1791763200123,id:()=>`owned-${++id}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
@@ -280,4 +281,43 @@ test('an early return bypasses a held legacy packet while later state effects ke
 test('restoring an effectful TERMINATED observation does not reclassify its passed invocation guard',async()=>{
  const gate=deferred();let status='RUNNING';const f=fixture({controllerStatus:()=>status,started:()=>{status='TERMINATED';},prepare:()=>gate.promise});f.native.command('terminate',[]);f.native.command('terminate',['lock']);await flush();const values=new Map(f.values);f.native.stop();
  const restored=fixture({values,controllerStatus:()=> 'TERMINATED'});try{await restored.advance();assert.equal(restored.prepared.length,2);assert.ok(restored.calls.every(c=>JSON.parse(c.request.body).terminationNoop===undefined));assert.equal(JSON.parse(restored.calls[1].request.body).controllerStatus,'TERMINATED');}finally{gate.resolve();restored.native.stop();}
+});
+
+const capturedTimer=(request,allocate)=>({testRunId:request.testRunId,contentReleaseId:request.contentReleaseId,bookletKey:request.bookletKey,
+ deliveryId:request.deliveryId,keyword:request.keyword,controllerStatus:request.controllerStatus,controllerDispatch:allocate(),
+ unitKey:'unit',testletKey:'timed',startedAt:'2026-10-12T00:00:00.000Z',expiresAt:'2026-10-12T00:00:06.000Z',remainingSeconds:3});
+test('a timer interruption is captured immediately and acknowledged before answer drain; a lost main reply does not repeat it',async()=>{
+ const timerGate=deferred(),answerGate=deferred();let captures=0,mainCalls=0;
+ const f=fixture({captureTimer:(...args)=>{captures++;return capturedTimer(...args);},prepare:()=>answerGate.promise,
+  respond:async(body,_count,receipt)=>{if(body.testletKey){await timerGate.promise;return {ok:true,json:async()=>receipt(body)};}
+   mainCalls++;return mainCalls===1?{ok:false,status:503}:{ok:true,json:async()=>receipt(body)};}});
+ try{
+  f.native.command('pause',[]);assert.equal(captures,1);assert.equal(f.prepared.length,0);await f.advance();
+  assert.equal(f.calls.length,1);assert.match(f.calls[0].url,/controller-timer-interruptions$/);assert.equal(f.prepared.length,0);
+  const early=JSON.parse(f.calls[0].request.body);assert.equal(early.remainingSeconds,3);assert.equal(early.controllerDispatch.sequence,1);
+  timerGate.resolve();await flush();assert.equal(f.prepared.length,1);assert.equal(f.calls.length,1);
+  answerGate.resolve();await flush();assert.equal(mainCalls,1);await f.advance(1000);assert.equal(mainCalls,2);
+  assert.equal(f.calls.filter(c=>c.url.endsWith('controller-timer-interruptions')).length,1);assert.equal(f.applied.length,1);assert.equal(f.values.size,0);
+  assert.equal(f.calls[1].request.body,f.calls[2].request.body);
+ }finally{timerGate.resolve();answerGate.resolve();f.native.stop();}
+});
+test('an unacknowledged terminal timer packet restores exact identity without recapturing a phase or timer',async()=>{
+ const f=fixture({captureTimer:capturedTimer,respond:async()=>({ok:false,status:503})});
+ f.native.command('terminate',[]);await f.advance();assert.equal(f.calls.length,1);assert.equal(f.prepared.length,0);
+ const timerBody=f.calls[0].request.body,persisted=new Map(f.values);f.native.stop();
+ const next=fixture({values:persisted,captureTimer:()=>assert.fail('Restoration recaptured its timer'),started:()=>assert.fail('Restoration replayed its phase'),
+  respond:async(body,_count,receipt)=>({ok:true,json:async()=>body.testletKey?{interruption:{...receipt(body).interruption,applied:false}}:receipt(body)})});
+ try{await next.advance();assert.equal(next.calls[0].request.body,timerBody);assert.equal(next.calls.length,2);assert.equal(next.prepared.length,1);assert.equal(next.applied.length,1);assert.equal(next.values.size,0);
+  assert.equal(JSON.parse(next.calls[1].request.body).controllerDispatch.sequence,2);
+ }finally{next.native.stop();}
+});
+test('a mismatched timer receipt fails closed before answer drain or command application',async()=>{
+ const f=fixture({captureTimer:capturedTimer,respond:async(body,_count,receipt)=>({ok:true,json:async()=>({interruption:{...receipt(body).interruption,scope:{...scope,testRunId:'foreign'}}})})});
+ try{f.native.command('pause',[]);await f.advance();assert.equal(f.calls.length,1);assert.equal(f.prepared.length,0);assert.equal(f.applied.length,0);assert.equal(f.values.size,0);assert.match(f.failures[0],/timer receipt/);}
+ finally{f.native.stop();}
+});
+test('an exact terminal no-op never captures, prepares or dispatches a timer interruption',async()=>{
+ const f=fixture({controllerStatus:()=> 'TERMINATED',captureTimer:()=>assert.fail('A no-op interrupted its timer')});
+ try{f.native.command('terminate',['lock']);await f.advance();assert.equal(f.calls.length,1);assert.match(f.calls[0].url,/native-commands$/);assert.equal(f.prepared.length,0);assert.equal(JSON.parse(f.calls[0].request.body).terminationNoop,true);}
+ finally{f.native.stop();}
 });

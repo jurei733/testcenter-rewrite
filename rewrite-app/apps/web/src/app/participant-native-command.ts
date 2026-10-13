@@ -1,17 +1,39 @@
 import type { ParticipantCurrentRunState } from "@testcenter-rewrite-app/domain";
 import { participantNativeCommandRoute, participantNativeCommandKeywords, isParticipantControllerDispatch, isParticipantControllerDispatches, type ParticipantNativeCommandKeyword,
-  type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+  type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult, participantControllerTimerInterruptionRoute,
+  isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
 import type { ParticipantControllerDispatch, ParticipantRunCommand } from "@testcenter-rewrite-app/domain";
 
 type Scope = ParticipantNativeCommandResult["scope"];
-type Entry = { scope: Scope; owner: string; id: string; keyword: ParticipantNativeCommandKeyword; args: string[]; request: ParticipantNativeCommandRequest; prepared?: true; version?: 2 };
+type Entry = { scope: Scope; owner: string; id: string; keyword: ParticipantNativeCommandKeyword; args: string[]; request: ParticipantNativeCommandRequest; prepared?: true; version?: 2;
+  timerInterruption?: ParticipantControllerTimerInterruptionRequest; timerInterrupted?: true };
 const scopeKey = (scope: Scope): string => JSON.stringify([scope.tenantId, scope.workspaceId, scope.participantSessionId,
   scope.testRunId, scope.contentReleaseId, scope.bookletKey]);
 const validScope = (scope: unknown): scope is Scope => Boolean(scope && typeof scope === "object" &&
   ["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"].every(key =>
     typeof (scope as Record<string, unknown>)[key] === "string" && Boolean((scope as Record<string, unknown>)[key])));
+
+/** A timer receipt never projects a Run snapshot over a newer command/view. */
+export const deliverParticipantControllerTimerInterruption = async (request: ParticipantControllerTimerInterruptionRequest,
+  scope: Scope, options: { signal: AbortSignal; isCurrent: () => boolean; fetch?: typeof fetch }): Promise<void> => {
+  if (!options.isCurrent() || options.signal.aborted) return;
+  const credential = readParticipantSessionCredential(scope.participantSessionId);
+  if (!credential) throw new Error("The timer interruption is waiting for its participant credential.");
+  const response = await (options.fetch ?? globalThis.fetch)(resolveRoutePath(participantControllerTimerInterruptionRoute,
+    { participantSessionId: scope.participantSessionId }), { method: "POST", cache: "no-store", signal: options.signal,
+    headers: { "content-type": "application/json", authorization: `Bearer ${credential}` }, body: JSON.stringify(request) });
+  if (!options.isCurrent() || options.signal.aborted) return;
+  if (!response.ok) throw Object.assign(new Error(`Timer interruption returned HTTP ${response.status}.`), { retryable: response.status >= 500 });
+  const body = await response.json() as { interruption?: ParticipantControllerTimerInterruptionRequest & { scope?: Scope; acceptedAt?: string; applied?: boolean } } | null;
+  const receipt = body?.interruption;
+  if (!receipt || !validScope(receipt.scope) || scopeKey(receipt.scope) !== scopeKey(scope) ||
+      !Object.keys(request).every(key => JSON.stringify(receipt[key as keyof typeof receipt]) === JSON.stringify(request[key as keyof typeof request])) ||
+      typeof receipt.applied !== "boolean" || typeof receipt.acceptedAt !== "string" || !Number.isFinite(Date.parse(receipt.acceptedAt))) {
+    throw Object.assign(new Error("The timer receipt does not match its immutable timer, dispatch and Run."), { retryable: false });
+  }
+};
 
 const documentOwners = new WeakMap<Window, string>();
 const participantNativeOwner = (window: Window): string => {
@@ -76,6 +98,7 @@ export const createParticipantNativeCommands = (options: {
   generation?: () => number;
   prepare: (isCurrent: () => boolean) => Promise<void>;
   started?: (request: ParticipantNativeCommandRequest) => void;
+  captureTimer?: (request: ParticipantNativeCommandRequest, allocate: () => ParticipantControllerDispatch) => ParticipantControllerTimerInterruptionRequest | undefined;
   applied: (result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch) => Promise<void>;
   failed: (error: Error) => void;
   window?: Window; storage?: Storage | null; fetch?: typeof fetch;
@@ -102,6 +125,12 @@ export const createParticipantNativeCommands = (options: {
     return Boolean(entry && entry.owner === owner && validScope(entry.scope) && /^[A-Za-z0-9_-]{1,160}$/.test(entry.id) &&
       (entry.version === undefined || entry.version === 2) &&
       (entry.version !== 2 || entry.prepared !== true || isParticipantControllerDispatch(entry.request?.controllerDispatch)) &&
+      (entry.timerInterrupted === undefined || entry.timerInterrupted === true && entry.timerInterruption !== undefined) &&
+      (entry.timerInterruption === undefined || entry.version === 2 && isParticipantControllerTimerInterruptionRequest(entry.timerInterruption) &&
+        entry.timerInterruption.deliveryId === entry.id && entry.timerInterruption.keyword === entry.keyword && entry.request?.terminationNoop !== true &&
+        entry.timerInterruption.controllerDispatch.controllerId === owner &&
+        ["testRunId", "contentReleaseId", "bookletKey"].every(key => entry.timerInterruption![key as "testRunId"] === entry.scope[key as "testRunId"]) &&
+        (entry.prepared !== true || entry.timerInterrupted === true)) &&
       participantNativeCommandKeywords.includes(entry.keyword) && Array.isArray(entry.args) && entry.args.every(value => typeof value === "string") &&
       entry.request && (entry.prepared === undefined || entry.prepared === true) && entry.request.deliveryId === entry.id && entry.request.keyword === entry.keyword &&
         (entry.request.controllerDispatch === undefined || isParticipantControllerDispatch(entry.request.controllerDispatch) && entry.request.controllerDispatch.controllerId === owner) &&
@@ -155,6 +184,12 @@ export const createParticipantNativeCommands = (options: {
       const start = starting.get(entry);
       if (start) await start;
       if (!isCurrent() || !queue.has(entry.id)) return;
+      if (entry.timerInterruption && !entry.timerInterrupted) {
+        await deliverParticipantControllerTimerInterruption(entry.timerInterruption, entry.scope,
+          { signal: request.controller.signal, isCurrent, fetch: fetcher });
+        if (!isCurrent()) return;
+        entry.timerInterrupted = true; persist(entry);
+      }
       if (!entry.prepared) {
         await options.prepare(isCurrent); if (!isCurrent()) return;
         if (entry.version === 2) entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
@@ -243,6 +278,11 @@ export const createParticipantNativeCommands = (options: {
         entry.request.terminationNoop = true;
         entry.request.controllerDispatch = nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
         entry.prepared = true;
+      }
+      if (!entry.request.terminationNoop && (keyword === "pause" || keyword === "terminate")) {
+        entry.timerInterruption = options.captureTimer?.(entry.request, () => entry.request.controllerDispatch ??
+          nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches));
+        if (entry.timerInterruption === undefined) delete entry.timerInterruption;
       }
       queue.set(entry.id, entry); persist(entry);
       if (keyword === "terminate" && !entry.prepared) {

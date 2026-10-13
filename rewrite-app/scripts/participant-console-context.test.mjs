@@ -6,7 +6,7 @@ import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningf
 import {isParticipantControllerDispatches,participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['handleVeronaControllerError','pendingControllerStatus','beginControllerCommand','isOlderControllerPhase','finishControllerPhase','isOlderRunState','consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand','reconcileParticipantTerminalState','startAcceptedParticipantReception'];
+const names=['captureControllerTimerInterruption','isControllerTimerInterrupted','handleVeronaControllerError','pendingControllerStatus','beginControllerCommand','isOlderControllerPhase','finishControllerPhase','isOlderRunState','consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand','reconcileParticipantTerminalState','startAcceptedParticipantReception'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
 const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution,isParticipantControllerDispatches)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
@@ -16,15 +16,15 @@ const executionAst=ts.createSourceFile('execution.ts',executionSource,ts.ScriptT
 const reconciliation=executionAst.statements.filter(ts.isVariableStatement).flatMap(item=>[...item.declarationList.declarations]).find(item=>item.name.getText(executionAst)==='reconcileAcceptedParticipantCommand');assert.ok(reconciliation?.initializer);
 const reconciliationCode=ts.transpileModule(`export const reconcileAcceptedParticipantCommand=${reconciliation.initializer.getText(executionAst)}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {reconcileAcceptedParticipantCommand}=await import('data:text/javascript;base64,'+Buffer.from(reconciliationCode).toString('base64'));
-const hostClass=execute=>load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse,async()=>({executeReceivedParticipantCommand:execute,reconcileAcceptedParticipantCommand}),isParticipantControllerDispatches);
+const hostClass=(execute,interruptTimer)=>load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse,async()=>({executeReceivedParticipantCommand:execute,deliverParticipantControllerTimerInterruption:interruptTimer,reconcileAcceptedParticipantCommand}),isParticipantControllerDispatches);
 const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const run={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',testRunId:'selected',contentReleaseId:'release',bookletKey:'booklet',bookletAssignmentKey:'booklet',status:'running',currentUnitKey:'unit',unitResponses:{unit:'Exact owned Ω'},unitResponseFieldTimestamps:{unit:{opaque:123}},testletTimers:{},createdAt:'2026-10-12T00:00:00Z',updatedAt:'2026-10-12T00:00:00Z'};
 const session={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',status:'launched'};
 const state=record=>({participantSession:session,testRun:record,currentUnit:{unitKey:'unit'},executionMode:{receiveRemoteCommands:true},booklet:{policy:{player:{loadingMode:'lazy'}}}});
-const fixture=(request=async()=>({currentRunState:state(run)}),execute=()=>assert.fail('Unexpected remote application'))=>{
- const Host=hostClass(execute);
- let error=null,consoleRunValue=null,phase=null;const calls={requests:[],applied:0,suspended:0,started:0,failures:[],drained:0,saved:0,reloads:0,starter:0},host=new Host();
- Object.assign(host,{terminalCommandPhases:new WeakMap(),controllerCommandPhase:Object.assign(()=>phase,{set:value=>{phase=value;}}),runtime:{participantSessionId:'participant',testRunId:'selected',currentRunStateView:'',currentUnitResponse:'Old unowned controller draft',bookletKey:'booklet'},consoleTestRun:Object.assign(()=>consoleRunValue,{set:value=>{consoleRunValue=value;}}),currentRunState:null,
+const fixture=(request=async()=>({currentRunState:state(run)}),execute=()=>assert.fail('Unexpected remote application'),interruptTimer=()=>assert.fail('Unexpected timer interruption'))=>{
+ const Host=hostClass(execute,interruptTimer);
+ let error=null,consoleRunValue=null,phase=null,timerCapture=null;const calls={requests:[],applied:0,suspended:0,started:0,failures:[],drained:0,saved:0,reloads:0,starter:0},host=new Host();
+ Object.assign(host,{controllerTimerInterruption:Object.assign(()=>timerCapture,{set:value=>{timerCapture=value;}}),terminalCommandPhases:new WeakMap(),commandTimerInterruptions:new WeakMap(),controllerCommandPhase:Object.assign(()=>phase,{set:value=>{phase=value;}}),runtime:{participantSessionId:'participant',testRunId:'selected',currentRunStateView:'',currentUnitResponse:'Old unowned controller draft',bookletKey:'booklet'},consoleTestRun:Object.assign(()=>consoleRunValue,{set:value=>{consoleRunValue=value;}}),currentRunState:null,
   currentStateRefreshSequence:0,currentStateAppliedRefreshSequence:0,bookletAssetLoadStartedAtMs:new Map(),loadedBookletAssets:()=>null,veronaErrorText:'Owned load error',
   requestState:{request:async(...args)=>{calls.requests.push(args[2]);return request(...args);},isApiError:error=>Boolean(error?.error)},
   activeControllerError:Object.assign(()=>error,{set:value=>{error=value;}}),participantErrorReceptionSuspended:false,
@@ -543,4 +543,49 @@ test('same-turn accepted terminal handlers both pass their invocation guard befo
  const gate=deferred(),observed=[],f=fixture(undefined,async(_cmd,_signal,options)=>{observed.push({status:options.controllerStatus(),terminationNoop:options.terminationNoop});await gate.promise;});f.host.syncRun(run);f.host.currentRunState=state(run);let sequence=0;const allocate=()=>phaseDispatch(++sequence);
  const first=f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal,allocate),second=f.host.applyReceivedParticipantCommand({...remoteCommand('complete_and_lock'),commandId:'second'},new AbortController().signal,allocate);
  await tick();assert.deepEqual(observed,[{status:'RUNNING',terminationNoop:false},{status:'TERMINATED',terminationNoop:false}]);assert.equal(f.host.debugControllerStatus,'TERMINATED');gate.resolve();await Promise.all([first,second]);
+});
+
+const timedContext=(f,extra={})=>{
+ const current={...state(run),currentUnit:{unitKey:'unit',parentLocked:false},activeTestletTimer:{testletKey:'timed',startedAt:'2026-10-13T00:00:00.000Z',expiresAt:'2026-10-13T00:00:06.000Z',status:'running',durationSeconds:6,remainingSeconds:6},...extra};
+ f.host.syncRun(run);f.host.currentRunState=current;return current;
+};
+test('actual timer capture hides the interrupted timer immediately without forging its canonical Run or command phase',t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-13T00:00:02.500Z'));
+ const f=fixture(),current=timedContext(f),before=structuredClone(current);let sequence=0;
+ const request=f.host.captureControllerTimerInterruption({testRunId:'selected',deliveryId:'owned',keyword:'pause',controllerStatus:'RUNNING'},()=>({controllerId:'owned',sequence:++sequence}));
+ assert.equal(request.remainingSeconds,3);assert.equal(request.keyword,'pause');assert.equal(sequence,1);assert.equal(f.host.isControllerTimerInterrupted(current),true);
+ assert.deepEqual(current,before);assert.equal(f.host.pendingControllerStatus,undefined);
+ assert.equal(f.host.captureControllerTimerInterruption({testRunId:'selected',deliveryId:'second',keyword:'pause',controllerStatus:'PAUSED'},()=>assert.fail('Already interrupted timer allocated again')),undefined);
+ assert.equal(f.host.isControllerTimerInterrupted({...current,testRun:{...run,controllerDispatches:{owned:2}}}),false);
+ assert.equal(f.host.isControllerTimerInterrupted({...current,activeTestletTimer:{...current.activeTestletTimer,expiresAt:'2026-10-13T00:00:07.000Z'}}),false);
+ assert.equal(f.host.isControllerTimerInterrupted({...current,testRun:{...run,testRunId:'foreign'}}),false);
+});
+for(const [name,context,status] of [['ERROR',{},'ERROR'],['TERMINATED',{},'TERMINATED'],['missing Unit',{currentUnit:{unitKey:null,parentLocked:false}},'RUNNING'],['locked parent',{currentUnit:{unitKey:'unit',parentLocked:true}},'RUNNING'],['unknown legacy parent',{currentUnit:{unitKey:'unit'}},'RUNNING']])
+test(`actual forced terminal timer capture preserves the Source ${name} early return`,()=>{
+ const f=fixture();timedContext(f,context);
+ assert.equal(f.host.captureControllerTimerInterruption({testRunId:'selected',deliveryId:'owned',keyword:'terminate',controllerStatus:status},()=>assert.fail('An early return allocated its timer dispatch')),undefined);
+});
+for(const status of ['ERROR','TERMINATED'])test(`actual Pause still interrupts its active timer from ${status}`,t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-13T00:00:02.500Z'));
+ const f=fixture();timedContext(f);const request=f.host.captureControllerTimerInterruption({testRunId:'selected',deliveryId:'owned',keyword:'pause',controllerStatus:status},()=>({controllerId:'owned',sequence:1}));
+ assert.equal(request.remainingSeconds,3);assert.equal(request.keyword,'pause');
+});
+test('accepted remote Pause captures synchronously and awaits its timer receipt before executing its command',async t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-13T00:00:02.500Z'));
+ const gate=deferred(),order=[];let sequence=0;
+ const f=fixture(undefined,async(_command,_signal,options)=>{order.push('execution');await options.prepare();},async request=>{order.push(['timer',request]);await gate.promise;});
+ const current=timedContext(f),pending=f.host.applyReceivedParticipantCommand(remoteCommand('pause'),new AbortController().signal,()=>({controllerId:'owned',sequence:++sequence}));
+ assert.equal(f.host.pendingControllerStatus,'PAUSED');assert.equal(f.host.isControllerTimerInterrupted(current),true);await tick();
+ assert.equal(order.length,1);assert.equal(order[0][1].remainingSeconds,3);assert.equal(f.calls.drained,0);
+ gate.resolve();await pending;assert.equal(order[1],'execution');assert.equal(f.calls.drained,0);
+});
+test('a lost remote terminal timer reply retries its original interruption without turning the pending command into a no-op',async t=>{
+ t.mock.method(Date,'now',()=>Date.parse('2026-10-13T00:00:02.500Z'));
+ const packets=[];let sequence=0,attempt=0,executions=0;
+ const f=fixture(undefined,async(_command,_signal,options)=>{executions++;assert.equal(options.terminationNoop,false);await options.prepare();},async request=>{packets.push(structuredClone(request));if(++attempt===1)throw Error('Lost owned timer reply');});
+ timedContext(f);const command=remoteCommand('complete'),allocate=()=>({controllerId:'owned',sequence:++sequence});
+ await assert.rejects(f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate),/Lost owned timer/);
+ assert.equal(f.host.pendingControllerStatus,'TERMINATED');assert.equal(f.calls.drained,0);
+ await f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);
+ assert.deepEqual(packets[1],packets[0]);assert.equal(sequence,2);assert.equal(executions,1);assert.equal(f.calls.drained,1);
 });

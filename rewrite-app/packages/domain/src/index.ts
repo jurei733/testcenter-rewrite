@@ -1469,6 +1469,8 @@ export type ParticipantCurrentRunState = {
   };
   currentUnit: {
     unitKey: string | null;
+    /** Aggregate parent locks used by Original's forced deactivation guard. */
+    parentLocked?: boolean;
     // Resolved nearest testlet/root restrictions for decisions using a newer
     // local Player report than the last API state. Optional for older servers.
     completenessPolicy?: Pick<BookletRuntimePolicy["navigation"],

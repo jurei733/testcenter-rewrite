@@ -240,6 +240,8 @@
     "reference:ui:original-exit-completeness:built": "REFERENCE_COMPLETENESS=true node ./scripts/reference-original-player-exit.mjs",
     "smoke:ui:original-paused-exit:built": "node ./scripts/smoke-original-paused-exit.mjs",
     "smoke:ui:participant-console-loading:built": "node ./scripts/smoke-participant-console-loading.mjs",
+    "smoke:ui:participant-controller-timer:built": "node ./scripts/smoke-participant-controller-timer-interruption.mjs",
+    "reference:ui:original-controller-timer:built": "node ./scripts/reference-original-controller-timer-worker.mjs",
     "smoke:ui:participant-console-context-compat:built": "node ./scripts/smoke-participant-console-context-compat.mjs",
     "smoke:ui:participant-debug:built": "node ./scripts/smoke-participant-debug.mjs",
     "smoke:ui:original-runtime-error:built": "node ./scripts/run-original-runtime-error-smoke.mjs",

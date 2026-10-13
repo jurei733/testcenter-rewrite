@@ -1,6 +1,7 @@
 import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
 import { participantNativeCommandRoute, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantControllerTimerInterruptionRoute, type ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -2482,6 +2483,7 @@ const currentRunStatePattern = createRoutePattern(
 const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
 const participantNativeCommandPattern = createRoutePattern(participantNativeCommandRoute);
 const participantControllerContextPattern = createRoutePattern(participantControllerContextRoute);
+const participantControllerTimerInterruptionPattern = createRoutePattern(participantControllerTimerInterruptionRoute);
 const participantEventStreamPattern = createRoutePattern(
   productionApiRoutes.participant.eventStream
 );
@@ -2540,6 +2542,7 @@ const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
   ["POST", participantEventAcknowledgementPattern],
   ["GET", participantRunCommandsPattern], ["PATCH", participantRunCommandAcknowledgementPattern], ["POST", participantRunCommandApplicationPattern],
+  ["POST", participantControllerTimerInterruptionPattern],
   ["GET", participantReviewCsvExportPattern], ["GET", participantReviewExportPattern],
   ["POST", resumeSessionPattern], ["DELETE", participantSignOutPattern],
   ["POST", saveProgressPattern], ["POST", saveTestLogsPattern],
@@ -3763,6 +3766,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
     ["POST", participantRunCommandApplicationPattern, participantCommandExecutionRoute],
     ["POST", participantNativeCommandPattern, participantNativeCommandRoute],
+    ["POST", participantControllerTimerInterruptionPattern, participantControllerTimerInterruptionRoute],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -8609,6 +8613,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           testRunId: url.searchParams.get("testRunId") ?? undefined });
         response.setHeader("cache-control", "private, no-store");
         sendJson<{ controllerContext: ParticipantControllerContext }>(response, 200, { controllerContext });
+        return;
+      }
+      const participantControllerTimerInterruptionMatch = participantControllerTimerInterruptionPattern.exec(pathname);
+      if (request.method === "POST" && participantControllerTimerInterruptionMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantControllerTimerInterruptionMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantControllerTimerInterruptionRequest>(request, runtime.config.maxJsonBodyBytes);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_controller_timer_interruption_invalid", "An explicit participant session and timer interruption are required.");
+          return;
+        }
+        const interruption = await services.participantRuntime.interruptControllerTimer({ ...body, participantSessionId });
+        sendJson(response, 200, { interruption });
         return;
       }
       const participantNativeCommandMatch = participantNativeCommandPattern.exec(pathname);

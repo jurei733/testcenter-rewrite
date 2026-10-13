@@ -299,8 +299,8 @@ try {
       if(oldFrame)await poll(()=>oldFrame.evaluate(frame=>!frame.isConnected),'The terminal phase fixture did not retire its preceding Player');
       await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The terminal phase fixture did not restore its preceding trusted answer');
       if(scenario.origin==='remote'||scenario.noop==='remote')await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'The terminal phase fixture did not reopen remote reception');
-      const answer=scenario.initialPaused?'4':'5',packets=[],preparations=[];
-      const observation={forcedTerminalPhase:scenario,packets,preparations};loadingObservations.push(observation);
+      const answer=scenario.initialPaused?'4':'5',packets=[],preparations=[],timerInterruptions=[];
+      const observation={forcedTerminalPhase:scenario,packets,preparations,timerInterruptions};loadingObservations.push(observation);
       let releaseAnswer,releaseRuntime,releaseAck,answerHeld=false,runtimeHeld=false,ackHeld=false,loseNoop=scenario.noop==='native';
       const answerGate=new Promise(done=>{releaseAnswer=done;}),runtimeGate=new Promise(done=>{releaseRuntime=done;}),ackGate=new Promise(done=>{releaseAck=done;});releases.push(releaseAnswer,releaseRuntime,releaseAck);
       await remotePage.route('**/save-progress',async route=>{
@@ -312,10 +312,21 @@ try {
       const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
       await remotePage.route(url=>url.pathname===runtimePath,async route=>{const response=await route.fetch();if(!scenario.later){runtimeHeld=true;await runtimeGate;}await route.fulfill({response});});
       await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();packets.push({request,application:(await response.json()).application});if(loseNoop&&request.terminationNoop){loseNoop=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_noop_receipt'})});}else await route.fulfill({response});});
+      await remotePage.route('**/controller-timer-interruptions',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);timerInterruptions.push({request,receipt:(await response.json()).interruption});await route.fulfill({response});});
       await remotePage.route('**/application',async route=>{const request=route.request().postDataJSON(),response=await route.fetch(),application=(await response.json()).application;packets.push({request,application});applications.push({application});await route.fulfill({response});});
       try{
         await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill(answer);await poll(()=>Promise.resolve(answerHeld),'The terminal phase fixture did not hold its exact committed answer');
         const baseline=await loadingRepository.getTestRunById(runId);observation.baseline=baseline;
+        const assertOnlyPreparedTimer=async()=>{
+          const current=await loadingRepository.getTestRunById(runId);
+          if(current.stateRevision===baseline.stateRevision){assert.deepEqual(current,baseline);return;}
+          await poll(()=>Promise.resolve(timerInterruptions.length===1),'An early Run change had no exact timer receipt');
+          const {request,receipt}=timerInterruptions[0],timer=baseline.testletTimers[request.testletKey];
+          assert.equal(receipt.applied,true);assert.equal(receipt.scope.testRunId,runId);assert.equal(request.unitKey,baseline.currentUnitKey);
+          assert.equal(request.startedAt,timer.startedAt);assert.equal(request.expiresAt,timer.expiresAt);
+          assert.deepEqual(current,{...baseline,stateRevision:baseline.stateRevision+1,updatedAt:receipt.acceptedAt,
+            testletTimers:{...baseline.testletTimers,[request.testletKey]:{...timer,status:'paused',remainingSeconds:Math.min(timer.remainingSeconds,request.remainingSeconds),expiresAt:null,updatedAt:receipt.acceptedAt,endedAt:null,interruptedAtUnitKey:request.unitKey}}});
+        };
         assert.equal(JSON.parse(parseVeronaUnitResponse(baseline.unitResponses['first-unit']).unitState.dataParts.answer)[0].value,answer);
         if(scenario.noop==='remote'){
           await remotePage.route('**/commands/*/acknowledgement',async route=>{if(route.request().method()!=='PATCH'){await route.continue();return;}const response=await route.fetch();assert.equal(response.status(),200);ackHeld=true;await ackGate;await route.fulfill({response});});
@@ -325,7 +336,7 @@ try {
         if(scenario.origin==='native')await remotePage.evaluate(()=>window.tc.terminate());else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator);
         const terminalStatus=scenario.initialPaused?'TERMINATED_PAUSED':'TERMINATED';
         await poll(async()=>new RegExp(`STATUS:\\s*${terminalStatus}(?:\\s|$)`).test(await remotePane.innerText()),'Forced termination did not enter its terminal phase before the held answer buffer');
-        assert.equal(packets.length,0,'Termination bypassed its held answer buffer');assert.deepEqual(await loadingRepository.getTestRunById(runId),baseline);
+        assert.equal(packets.length,0,'Termination bypassed its held answer buffer');await assertOnlyPreparedTimer();
         if(scenario.noop){
           const parent=await loadingRepository.getParticipantSessionById(baseline.participantSessionId),logsBefore=(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length;
           if(scenario.noop==='native')await remotePage.evaluate(()=>window.tc.terminate(['lock']));else releaseAck();
@@ -333,7 +344,7 @@ try {
           const ignored=packets.filter(value=>value.request.terminationNoop);observation.ignored=ignored;
           if(scenario.noop==='native'){assert.deepEqual(ignored[0].request,ignored[1].request);assert.equal(ignored[1].application.applied,false);await remotePage.waitForFunction(id=>!localStorage.getItem('testcenter-rewrite:participant-native-command:v1:'+id),ignored[0].request.deliveryId);}
           else assert.equal(ignored[0].application.command.terminationNoop,true);
-          assert.equal(ignored[0].request.controllerStatus,'TERMINATED');assert.deepEqual(await loadingRepository.getTestRunById(runId),baseline);assert.deepEqual(await loadingRepository.getParticipantSessionById(baseline.participantSessionId),parent);
+          assert.equal(ignored[0].request.controllerStatus,'TERMINATED');await assertOnlyPreparedTimer();assert.deepEqual(await loadingRepository.getParticipantSessionById(baseline.participantSessionId),parent);
           assert.equal((await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length,logsBefore+1);
           assert.match(await remotePane.innerText(),/STATUS:\s*TERMINATED(?:\s|$)/);assert.equal(packets.filter(value=>value.request.keyword==='terminate'&&!value.request.terminationNoop).length,0);
         }

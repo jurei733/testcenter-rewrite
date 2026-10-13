@@ -1,6 +1,6 @@
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute } from "@testcenter-rewrite-app/contracts/participant-debug";
-import { participantNativeCommandRoute, participantControllerContextRoute } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantNativeCommandRoute, participantControllerContextRoute, participantControllerTimerInterruptionRoute } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -441,10 +441,38 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
         assert.deepEqual(after.unitResponses,before.unitResponses);assert.deepEqual(after.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
       } finally {clearTimeout(timeout);controller.abort();reader?.releaseLock();}
     });
+    await t.test("authenticated timer preparation freezes only its selected timer and replays the exact receipt", async () => {
+      const repository=await readFreshRepository(),originalRelease=await repository.getContentReleaseById(run.contentReleaseId),release=structuredClone(originalRelease);
+      const booklet=release.runtimeSnapshot.bookletEntries.find(entry=>entry.bookletKey===run.bookletKey),unit=booklet.unitEntries[0];
+      booklet.testletEntries=[...(booklet.testletEntries??[]),{testletKey:'owned-timer-api',displayLabel:'Owned timer',parentTestletKey:null,restrictions:{timeMax:{minutes:1,leave:'confirm'}}}];
+      unit.testletPath=['owned-timer-api'];await repository.saveContentRelease(release);
+      try{
+        const time=new Date().toISOString(),timer={testletKey:'owned-timer-api',status:'running',durationSeconds:60,remainingSeconds:60,startedAt:time,expiresAt:new Date(Date.now()+60_000).toISOString(),updatedAt:time,endedAt:null};
+        const owned={...run,testRunId:randomUUID(),status:'running',currentUnitKey:unit.unitKey,controllerEntry:{active:true,revision:1},testletTimers:{'owned-timer-api':timer},unitResponses:{[unit.unitKey]:'Exact timer answer Ω'},unitResponseFieldTimestamps:{[unit.unitKey]:{opaque:123}}};
+        await repository.saveTestRun(owned);
+        const path=resolveRoutePath(participantControllerTimerInterruptionRoute,{participantSessionId:sessionId});
+        const body={testRunId:owned.testRunId,contentReleaseId:owned.contentReleaseId,bookletKey:owned.bookletKey,deliveryId:randomUUID(),controllerDispatch:{controllerId:'owned-timer-api',sequence:1},
+          keyword:'pause',controllerStatus:'RUNNING',unitKey:unit.unitKey,testletKey:'owned-timer-api',startedAt:timer.startedAt,expiresAt:timer.expiresAt,remainingSeconds:57};
+        const before=await repository.getParticipantSessionById(sessionId),sibling=await repository.getTestRunById(otherBookletRun.testRunId);
+        for(const token of [undefined,'invalid-token',other.sessionToken,operator])await request('POST',path,body,token,401);
+        await request('POST',path,{...body,testRunId:foreign.testRunId},selected.sessionToken,404);
+        await request('POST',path,{...body,remainingSeconds:61},selected.sessionToken,400);
+        const receipt=(await request('POST',path,body,selected.sessionToken)).interruption;assert.equal(receipt.applied,true);
+        const prepared=await repository.getTestRunById(owned.testRunId);assert.equal(prepared.status,'running');assert.equal(prepared.testletTimers['owned-timer-api'].status,'paused');assert.equal(prepared.testletTimers['owned-timer-api'].remainingSeconds,57);assert.equal(prepared.controllerDispatches,undefined);
+        assert.deepEqual(prepared.unitResponses,owned.unitResponses);assert.deepEqual(prepared.unitResponseFieldTimestamps,owned.unitResponseFieldTimestamps);
+        assert.deepEqual(await repository.getParticipantSessionById(sessionId),before);assert.deepEqual(await repository.getTestRunById(otherBookletRun.testRunId),sibling);
+        const replay=(await request('POST',path,body,selected.sessionToken)).interruption;assert.equal(replay.applied,false);assert.equal(replay.acceptedAt,receipt.acceptedAt);
+        await request('POST',path,{...body,remainingSeconds:56},selected.sessionToken,409);assert.deepEqual(await repository.getTestRunById(owned.testRunId),prepared);
+        const nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId});
+        const applied=(await request('POST',nativePath,{testRunId:owned.testRunId,contentReleaseId:owned.contentReleaseId,bookletKey:owned.bookletKey,deliveryId:randomUUID(),keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.now(),controllerDispatch:body.controllerDispatch},selected.sessionToken)).application;
+        assert.equal(applied.testRun.status,'paused');assert.equal(applied.testRun.testletTimers['owned-timer-api'].remainingSeconds,57);assert.equal(applied.testRun.controllerDispatches['owned-timer-api'],1);
+      }finally{await repository.saveContentRelease(originalRelease);}
+    });
     await t.test("session revocation also closes command access", async () => {
       await request("DELETE", resolveRoutePath(routes.participant.signOut, { participantSessionId: sessionId }), undefined, selected.sessionToken, 205);
       await request("GET", `${listPath}?testRunId=${otherBookletRun.testRunId}`, undefined, selected.sessionToken, 401);
       await request("PATCH", acknowledgement(retained.commandId), { testRunId: otherBookletRun.testRunId }, selected.sessionToken, 401);
+      await request("POST",resolveRoutePath(participantControllerTimerInterruptionRoute,{participantSessionId:sessionId}),{testRunId:run.testRunId},selected.sessionToken,401);
     });
   } finally {
     try { await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }

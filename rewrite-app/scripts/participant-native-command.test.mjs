@@ -45,6 +45,7 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
   const foreign={...run,testRunId:randomUUID(),participantSessionId:foreignParent.participantSessionId};await repository.saveTestRun(foreign);
   const input=(keyword,args=[],extra={})=>({participantSessionId:parent.participantSessionId,testRunId:run.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword,arguments:args,controllerStatus:'RUNNING',timeStamp:clock,...extra});
   const invoke=(request,repo=repository)=>services(repo).participantRuntime.executeNativeCommand(request);
+  const interrupt=(request,repo=repository)=>services(repo).participantRuntime.interruptControllerTimer(request);
   const receipt=async(request,repo)=>{let value;const current=await repo.getTestRunById(run.testRunId);
    await repo.mutateParticipantRun({...current,deliveryId:'console:'+request.deliveryId},context=>{value=context.progressDelivery;return null;});return value??null;};
   const snapshot=async(request,repo=repository)=>({run:await repo.getTestRunById(run.testRunId),parent:await repo.getParticipantSessionById(parent.participantSessionId),
@@ -111,6 +112,64 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
    const paused=await invoke(input('pause'));assert.equal(paused.testRun.testletTimers['time-a'].remainingSeconds,111);
    clock+=3_000;const resumed=await invoke(input('resume',[],{controllerStatus:'PAUSED'}));assert.equal(resumed.testRun.status,'running');assert.equal(resumed.testRun.testletTimers['time-a'].remainingSeconds,111);
    assert.deepEqual(resumed.testRun.testletTimers['time-b'],original.testletTimers['time-b']);preserve(resumed.testRun,original);await repository.saveTestRun(run);
+  });
+  await t.test('an early timer receipt retains its observed balance beyond answer drain without pausing the Run or advancing command highwater',async()=>{
+   const original={...run,currentUnitKey:'timed-a',stateRevision:4,controllerEntry:{active:true,revision:3},controllerDispatches:{'owned-timer':1},testletTimers:{
+    'time-a':{testletKey:'time-a',status:'running',durationSeconds:300,remainingSeconds:111,startedAt:timestamp,expiresAt:new Date(clock+111_000).toISOString(),updatedAt:timestamp,endedAt:null}}};
+   await repository.saveTestRun(original);await repository.saveParticipantSession(parent);
+   const request={participantSessionId:parent.participantSessionId,testRunId:run.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),
+    controllerDispatch:{controllerId:'owned-timer',sequence:2},keyword:'pause',controllerStatus:'RUNNING',unitKey:'timed-a',testletKey:'time-a',startedAt:timestamp,
+    expiresAt:original.testletTimers['time-a'].expiresAt,remainingSeconds:109};
+   const before=await snapshot(),result=await interrupt(request);assert.equal(result.applied,true);assert.deepEqual(result.controllerDispatch,request.controllerDispatch);
+   const prepared=await repository.getTestRunById(run.testRunId);assert.equal(prepared.status,'running');assert.equal(prepared.currentUnitKey,'timed-a');
+   assert.deepEqual(prepared.controllerDispatches,original.controllerDispatches);assert.deepEqual(prepared.controllerEntry,original.controllerEntry);assert.equal(prepared.stateRevision,5);
+   assert.equal(prepared.testletTimers['time-a'].status,'paused');assert.equal(prepared.testletTimers['time-a'].remainingSeconds,109);assert.equal(prepared.testletTimers['time-a'].expiresAt,null);assert.equal(prepared.testletTimers['time-a'].interruptedAtUnitKey,'timed-a');preserve(prepared,original);
+   const after=await snapshot();for(const key of ['parent','sibling','foreign','release','commands','logs','events'])assert.deepEqual(after[key],before[key],key);
+   clock+=120_000;
+   const current=await services(repository).participantRuntime.getCurrentRunState({participantSessionId:parent.participantSessionId,testRunId:run.testRunId});
+   assert.equal(current.testRun.currentUnitKey,'timed-a');assert.equal(current.testRun.testletTimers['time-a'].remainingSeconds,109);assert.equal(current.testRun.testletTimers['time-a'].status,'paused');
+   const completed=await invoke(input('pause',[],{controllerDispatch:request.controllerDispatch}));assert.equal(completed.testRun.status,'paused');assert.equal(completed.testRun.testletTimers['time-a'].remainingSeconds,109);assert.equal(completed.testRun.controllerDispatches['owned-timer'],2);preserve(completed.testRun,original);
+   const resumed=await invoke(input('resume',[],{controllerStatus:'PAUSED',controllerDispatch:{controllerId:'owned-timer',sequence:3}}));assert.equal(resumed.testRun.testletTimers['time-a'].status,'running');assert.equal(resumed.testRun.testletTimers['time-a'].remainingSeconds,109);
+   const resumedSnapshot=await snapshot();const replay=await interrupt(request,await create());assert.equal(replay.applied,false);assert.equal(replay.acceptedAt,result.acceptedAt);assert.deepEqual(await snapshot(),resumedSnapshot);
+   await assert.rejects(interrupt({...request,remainingSeconds:108}),error=>error.errorCode==='participant_delivery_conflict');assert.deepEqual(await snapshot(),resumedSnapshot);
+   await repository.saveTestRun(run);await repository.saveParticipantSession(parent);
+  });
+  await t.test('late timer preparations cannot interrupt a newer command, replacement timer or another Unit',async()=>{
+   const baseTimer={testletKey:'time-a',status:'running',durationSeconds:300,remainingSeconds:111,startedAt:timestamp,expiresAt:new Date(clock+111_000).toISOString(),updatedAt:timestamp,endedAt:null};
+   for(const change of [{controllerDispatches:{'owned-timer':3}},{currentUnitKey:'timed-b'},{testletTimers:{'time-a':{...baseTimer,expiresAt:new Date(clock+112_000).toISOString()}}}]){
+    const original={...run,currentUnitKey:'timed-a',testletTimers:{'time-a':baseTimer},...change};await repository.saveTestRun(original);
+    const before=await snapshot(),request={participantSessionId:parent.participantSessionId,testRunId:run.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),
+     controllerDispatch:{controllerId:'owned-timer',sequence:2},keyword:'terminate',controllerStatus:'RUNNING',unitKey:'timed-a',testletKey:'time-a',startedAt:timestamp,expiresAt:baseTimer.expiresAt,remainingSeconds:109};
+    assert.equal((await interrupt(request)).applied,true);assert.deepEqual(await snapshot(),before);
+   }
+   await repository.saveTestRun(run);
+  });
+  await t.test('timer preparations reject foreign scope, invalid balance and terminal early-return paths without partial artifacts',async()=>{
+   const timer={testletKey:'time-a',status:'running',durationSeconds:300,remainingSeconds:111,startedAt:timestamp,expiresAt:new Date(clock+111_000).toISOString(),updatedAt:timestamp,endedAt:null};
+   await repository.saveTestRun({...run,currentUnitKey:'timed-a',testletTimers:{'time-a':timer}});
+   const request={participantSessionId:parent.participantSessionId,testRunId:run.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),
+    controllerDispatch:{controllerId:'owned-timer',sequence:1},keyword:'pause',controllerStatus:'RUNNING',unitKey:'timed-a',testletKey:'time-a',startedAt:timestamp,expiresAt:timer.expiresAt,remainingSeconds:109};
+   for(const extra of [{remainingSeconds:-1},{remainingSeconds:1.5},{remainingSeconds:301},{controllerDispatch:null},{keyword:'resume'},{keyword:'terminate',controllerStatus:'ERROR'},{keyword:'terminate',controllerStatus:'TERMINATED'},
+    {testRunId:foreign.testRunId},{contentReleaseId:'foreign'},{bookletKey:'foreign'},{testletKey:'time-b'},{unitKey:'missing'}]){
+    const before=await snapshot();await assert.rejects(interrupt({...request,...extra}));assert.deepEqual(await snapshot(),before);
+   }
+   await repository.saveTestRun({...run,status:'completed',completedAt:timestamp});const closed=await snapshot();await assert.rejects(interrupt(request),error=>error.errorCode==='participant_controller_timer_interruption_completed');assert.deepEqual(await snapshot(),closed);
+   await repository.saveTestRun(run);
+  });
+  await t.test('current-state distinguishes parent locks from Unit leave locks and non-enforced timer expiry',async()=>{
+   const expired={testletKey:'time-a',status:'expired',durationSeconds:300,remainingSeconds:0,startedAt:timestamp,expiresAt:null,updatedAt:timestamp,endedAt:timestamp};
+   for(const [change,expected] of [
+    [{currentUnitKey:'unit',unlockedTestletKeys:[]},true],
+    [{currentUnitKey:'unit',unlockedTestletKeys:['outer'],lockedUnitKeys:['unit']},false],
+    [{currentUnitKey:'alias-Ω',unlockedTestletKeys:['outer','inner'],lockedTestletKeys:['inner']},true],
+    [{currentUnitKey:'timed-a',testletTimers:{'time-a':expired}},true],
+    [{currentUnitKey:'timed-a',testletTimers:{'time-a':expired},executionMode:'run-demo'},false]
+   ]){
+    await repository.saveTestRun({...run,status:'paused',...change});
+    const current=await services(repository).participantRuntime.getCurrentRunState({participantSessionId:parent.participantSessionId,testRunId:run.testRunId});
+    assert.equal(current.currentUnit.parentLocked,expected,JSON.stringify(change));
+   }
+   await repository.saveTestRun(run);
   });
   await t.test('resume applies the Original entry guard without clearing locks, inventing a Unit or changing answers',async()=>{
    for(const [currentUnitKey,lockedUnitKeys,expected] of [

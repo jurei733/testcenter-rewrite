@@ -27,6 +27,7 @@ export class ParticipantDebugLauncherComponent implements OnInit, OnDestroy, DoC
     this.native = createParticipantNativeCommands({ readState: () => this.run ? { testRun: this.run } : null,
       controllerStatus: () => this.view.nativeControllerStatus,
       generation: () => this.view.consoleControllerGeneration,
+      captureTimer: (request, allocate) => this.view.captureControllerTimerInterruption(request, allocate),
       started: request => this.view.beginControllerCommand(request.testRunId, request.keyword, request.controllerDispatch, request.controllerStatus),
       prepare: isCurrent => this.view.prepareNativeConsoleCommand(isCurrent),
       applied: (result, isCurrent, dispatch) => this.view.applyNativeConsoleCommand(result, isCurrent, dispatch),
