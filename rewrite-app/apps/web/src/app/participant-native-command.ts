@@ -166,13 +166,17 @@ export const createParticipantNativeCommands = (options: {
       // legacy state effect because it never changes Run or dispatch state.
       for (const entry of queue.values()) if (scopeKey(entry.scope) === current && entry.request.terminationNoop &&
         !flights.has(entry.id) && !retries.has(entry.id)) void dispatch(entry);
+      // Timer receipts freeze an observed timer without changing command status
+      // or dispatch highwater. Keep legacy main commands in FIFO order.
+      for (const entry of queue.values()) if (scopeKey(entry.scope) === current && entry.timerInterruption &&
+        !entry.timerInterrupted && !flights.has(entry.id) && !retries.has(entry.id)) void dispatch(entry, true);
       return;
     }
     for (const entry of queue.values()) {
       if (scopeKey(entry.scope) === current && !flights.has(entry.id) && !retries.has(entry.id)) void dispatch(entry);
     }
   };
-  const dispatch = async (entry: Entry): Promise<void> => {
+  const dispatch = async (entry: Entry, timerOnly = false): Promise<void> => {
     const credential = readParticipantSessionCredential(entry.scope.participantSessionId);
     if (!credential) return;
     const request = { entry, controller: new AbortController() }; flights.set(entry.id, request);
@@ -190,6 +194,7 @@ export const createParticipantNativeCommands = (options: {
         if (!isCurrent()) return;
         entry.timerInterrupted = true; persist(entry);
       }
+      if (timerOnly) return;
       if (!entry.prepared) {
         await options.prepare(isCurrent); if (!isCurrent()) return;
         if (entry.version === 2) entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);

@@ -59,16 +59,18 @@ try{
  await api(workspace+`/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:'owned-timer-browser'},operator);
  const scenarios=[{origin:'native',keyword:'pause',lostTimerReply:true},{origin:'native',keyword:'terminate'},{origin:'remote',keyword:'pause'},{origin:'remote',keyword:'terminate'},
   ...['native','remote'].flatMap(origin=>['native','remote'].map(resume=>({origin,keyword:'pause',zero:true,resume}))),
-  ...['native','remote'].map(origin=>({origin,keyword:'resume',code:true}))].filter(scenario=>process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
+  ...['native','remote'].map(origin=>({origin,keyword:'resume',code:true})),
+  ...['pause','terminate'].map(keyword=>({origin:'native',keyword,legacy:true,lostTimerReply:keyword==='pause'}))].filter(scenario=>process.env.UI_SMOKE_TIMER_LEGACY_ONLY==='true'?scenario.legacy:process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
  await api(workspace+'/participant-roster',{rosterText:'<Testtakers><Group id="owned">'+scenarios.map((scenario,i)=>`<Login mode="run-hot-return" name="timer-${i}"><Booklet>${scenario.code?'code-entry':'first'}</Booklet><Booklet>second</Booklet></Login>`).join('')+'</Group></Testtakers>'},operator);
  const repository=createSqliteFirstSliceRepository(file);
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
  for(const [index,scenario] of scenarios.entries()){
   const context=await browser.newContext({viewport:{width:1280,height:800},locale:'de-DE'}),page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
-  let releaseAnswer,releaseApplication,releaseAck,heldAnswer=false,heldApplication=false,heldAck=false,loseReply=Boolean(scenario.lostTimerReply);
-  const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;});releases.push(releaseAnswer,releaseApplication,releaseAck);
-  const timerPackets=[],applications=[];
+  let releaseAnswer,releaseApplication,releaseAck,releaseLegacy,holdLegacyRoute,caseFailure,disposing=false,heldAnswer=false,heldApplication=false,heldAck=false,heldLegacy=false,loseReply=Boolean(scenario.lostTimerReply);
+  const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;}),legacyGate=new Promise(done=>{releaseLegacy=done;});releases.push(releaseAnswer,releaseApplication,releaseAck,releaseLegacy);
+  const timerPackets=[],applications=[],legacyApplications=[];
+  let legacyPacket;
   try{
    await page.goto(base+`/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`,{waitUntil:'networkidle'});
    await page.locator('#originalLoginName').fill('timer-'+index);await page.getByRole('button',{name:'Weiter',exact:true}).click();
@@ -77,7 +79,33 @@ try{
    const runId=new URL(page.url()).searchParams.get('testRunId');assert.ok(runId);
    await page.waitForFunction(()=>typeof window.tc?.pause==='function');await page.evaluate(()=>window.tc.debug());
    const pane=page.locator('[data-debug-window="main"]');await poll(async()=>/BS:\s*live/.test(await pane.innerText()),'Timer fixture reception did not become live');
-   const initial=await repository.getTestRunById(runId);
+   let initial=await repository.getTestRunById(runId);
+   if(scenario.legacy){
+    const id='owned-legacy-timer-'+index;
+    legacyPacket={testRunId:initial.testRunId,contentReleaseId:initial.contentReleaseId,bookletKey:initial.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','first-unit','give 0'],controllerStatus:'RUNNING',timeStamp:Date.now()};
+    holdLegacyRoute=async route=>{
+     const packet=route.request().postDataJSON();assert.deepEqual(packet,legacyPacket);heldLegacy=true;await legacyGate;
+     const response=await route.fetch(),body=await response.json();legacyApplications.push(body);
+     await writeFile(join(artifacts,'legacy-replies-'+index+'.json'),JSON.stringify({packet,status:response.status(),responses:legacyApplications},null,2)+'\n');
+     assert.equal(response.status(),200,JSON.stringify(body));await route.fulfill({response}).catch(error=>{
+      if(!disposing||!/Route is already handled|Target.*closed|Request.*aborted/i.test(error.message))throw error;
+     });
+    };
+    await page.route('**/native-commands',holdLegacyRoute);
+    // Seed only the replacement document: the departing live controller must
+    // not discover and start this migration fixture before the real reload.
+    await page.addInitScript(({run,packet})=>{
+     if(window.top!==window)return;
+     const owner=sessionStorage.getItem('testcenter-rewrite:participant-native-owner:v1');if(!owner)throw Error('The owned controller has no reload identity');
+     const scope=Object.fromEntries(['tenantId','workspaceId','participantSessionId','testRunId','contentReleaseId','bookletKey'].map(key=>[key,run[key]]));
+     localStorage.setItem('testcenter-rewrite:participant-native-command:v1:'+packet.deliveryId,JSON.stringify({scope,owner,id:packet.deliveryId,keyword:packet.keyword,args:packet.arguments,request:packet,prepared:true}));
+    },{run:initial,packet:legacyPacket});
+    await page.reload({waitUntil:'domcontentloaded'});await page.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    await page.waitForFunction(()=>typeof window.tc?.pause==='function');await page.evaluate(()=>window.tc.debug());
+    await poll(()=>Promise.resolve(heldLegacy),'The real reload did not restore its unclocked legacy packet');
+    await poll(async()=>/BS:\s*live/.test(await pane.innerText()),'Legacy fixture reception did not become live');
+    initial=await repository.getTestRunById(runId);
+   }
    if(scenario.code){
     assert.equal(initial.currentUnitKey,'intro-unit');assert.equal(initial.testletTimers.timed,undefined);
     await page.evaluate(()=>window.tc.pause());await poll(async()=>(await repository.getTestRunById(runId)).status==='paused','The code-entry fixture did not pause');await page.locator('#participantRoutePausedState').waitFor();
@@ -109,6 +137,7 @@ try{
     else await route.fulfill({response});
    });
    const captureApplication=async route=>{
+    if(scenario.legacy&&route.request().postDataJSON().deliveryId===legacyPacket.deliveryId)return holdLegacyRoute(route);
     heldApplication=true;await applicationGate;const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});
    };
    await page.route('**/native-commands',captureApplication);await page.route('**/commands/*/application',captureApplication);
@@ -132,6 +161,12 @@ try{
    assert.equal(frozen.controllerDispatches?.[first.packet.controllerDispatch.controllerId]??0,0);assert.deepEqual(frozen.unitResponses,before.unitResponses);assert.deepEqual(frozen.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(frozen.controllerEntry,before.controllerEntry);
    assert.deepEqual(await repository.getParticipantSessionById(initial.participantSessionId),parentBefore);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
    assert.equal(applications.length,0);if(scenario.keyword==='terminate'||scenario.origin==='native')assert.equal(heldApplication,false,'An answer-draining command reached application before its answer receipt');
+   if(scenario.legacy){
+    assert.equal(legacyApplications.length,0,'The legacy state effect settled before its deliberate release');
+    const queued=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-rewrite:participant-native-command:v1:')).map(key=>JSON.parse(localStorage.getItem(key))));
+    const modern=queued.find(entry=>entry.version===2&&entry.keyword===scenario.keyword);assert.equal(modern.timerInterrupted,true);assert.equal(modern.prepared,undefined);assert.deepEqual(queued.find(entry=>entry.request.deliveryId===legacyPacket.deliveryId).request,legacyPacket);
+    releaseLegacy();await poll(()=>Promise.resolve(legacyApplications.length>=1),'The original unclocked packet did not settle after release');
+   }
    releaseAnswer();await poll(()=>Promise.resolve(heldApplication),'The timer command did not reach application after its buffer release');releaseApplication();
    await poll(()=>Promise.resolve(applications.length===1),'The timer command application did not complete');
    const final=await repository.getTestRunById(runId);assert.equal(final.status,'paused');assert.equal(final.testletTimers.timed.remainingSeconds,first.packet.remainingSeconds);assert.deepEqual(final.unitResponses,before.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
@@ -146,9 +181,11 @@ try{
     assert.deepEqual(resumed.unitResponses,before.unitResponses);assert.deepEqual(resumed.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
     await poll(async()=>await page.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue()==='Owned timer answer '+index,'The restarted timed Unit did not restore its exact answer');
    }
-   checks.push({scenario,timerPackets,before,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}:passed`);
-  }finally{releaseAnswer();releaseApplication();releaseAck();await page.unrouteAll({behavior:'wait'}).catch(()=>{});await context.close();}
+   checks.push({scenario,timerPackets,legacyPacket,legacyApplications,before,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}${scenario.legacy?'-legacy-wait':''}:passed`);
+  }catch(error){caseFailure=error;await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(error),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw error;
+  }finally{disposing=true;releaseAnswer();releaseApplication();releaseAck();releaseLegacy();await page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}).catch(()=>{});await context.close();}
  }
+ for(const check of checks.filter(check=>check.scenario.legacy))assert.equal(check.legacyApplications.filter(reply=>reply.application.applied).length,1,'The repeated legacy wire packet must have exactly one state effect');
  assert.deepEqual(errors,[]);gate.assertHealthy();await writeFile(join(artifacts,'timer-interruptions.json'),JSON.stringify({checks,errors},null,2)+'\n');
 }finally{
  for(const release of releases)release();await browser?.close();server.kill('SIGTERM');await closed;gate.assertHealthy();console.log('owned_api=shutdown');

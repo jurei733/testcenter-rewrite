@@ -321,3 +321,64 @@ test('an exact terminal no-op never captures, prepares or dispatches a timer int
  try{f.native.command('terminate',['lock']);await f.advance();assert.equal(f.calls.length,1);assert.match(f.calls[0].url,/native-commands$/);assert.equal(f.prepared.length,0);assert.equal(JSON.parse(f.calls[0].request.body).terminationNoop,true);}
  finally{f.native.stop();}
 });
+
+const legacyTimerFixture=(extra={})=>{
+ const id='owned-legacy-timer',legacy=deferred();
+ const request={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','unit'],controllerStatus:'RUNNING',timeStamp:1791763200123};
+ const values=extra.values??new Map([['testcenter-rewrite:participant-native-command:v1:'+id,JSON.stringify({scope,owner:'owned-tab',id,keyword:'goto',args:['id','unit'],request,prepared:true})]]);
+ const f=fixture({...extra,values,captureTimer:extra.captureTimer??((request,allocate)=>({testRunId:request.testRunId,contentReleaseId:request.contentReleaseId,bookletKey:request.bookletKey,deliveryId:request.deliveryId,keyword:request.keyword,controllerStatus:request.controllerStatus,controllerDispatch:allocate(),unitKey:'unit',testletKey:'timed',startedAt:'2026-10-12T00:00:00.000Z',expiresAt:'2026-10-12T00:00:06.000Z',remainingSeconds:3})),respond:async(body,count,receipt)=>{
+  if(body.deliveryId===id)await legacy.promise;
+  return extra.respond?extra.respond(body,count,receipt):{ok:true,json:async()=>receipt(body)};
+ }});
+ return {...f,legacy};
+};
+for(const keyword of ['pause','terminate'])test(`a new ${keyword} timer-only receipt bypasses a held legacy reply while answer and state effects retain FIFO`,async()=>{
+ const f=legacyTimerFixture();try{
+  await f.advance();f.native.command(keyword,[]);await f.advance();
+  assert.equal(f.calls.length,2);assert.match(f.calls[1].url,/controller-timer-interruptions$/);assert.equal(f.prepared.length,0);
+  const saved=JSON.parse([...f.values.values()].find(v=>JSON.parse(v).keyword===keyword));assert.equal(saved.timerInterrupted,true);assert.equal(saved.prepared,undefined);assert.equal(saved.timerInterruption.controllerDispatch.sequence,1);assert.equal(saved.request.controllerDispatch.sequence,keyword==='terminate'?2:1);
+  f.legacy.resolve();await flush();await f.advance();assert.equal(f.prepared.length,1);assert.deepEqual(f.calls.map(c=>JSON.parse(c.request.body).keyword),['goto',keyword,keyword]);assert.equal(f.values.size,0);
+ }finally{f.legacy.resolve();f.native.stop();}
+});
+test('a lost timer reply retries its exact packet while the legacy state reply remains held',async()=>{
+ let attempts=0;const f=legacyTimerFixture({respond:async(body,_count,receipt)=>body.testletKey&&++attempts===1?{ok:false,status:503}:{ok:true,json:async()=>receipt(body)}});try{
+  await f.advance();f.native.command('pause',[]);await f.advance();assert.equal(attempts,1);assert.equal(f.prepared.length,0);
+  await f.advance(1000);assert.equal(attempts,2);assert.equal(f.calls[1].request.body,f.calls[2].request.body);assert.equal(f.prepared.length,0);
+  f.legacy.resolve();await flush();await f.advance();assert.equal(f.prepared.length,1);assert.equal(attempts,2);assert.equal(f.values.size,0);
+ }finally{f.legacy.resolve();f.native.stop();}
+});
+test('restoration retains the timer acknowledgement and legacy FIFO without recapturing a phase or timer',async()=>{
+ const f=legacyTimerFixture();let restored;try{
+  await f.advance();f.native.command('pause',[]);await f.advance();const values=new Map(f.values);f.native.stop();
+  restored=legacyTimerFixture({values,captureTimer:()=>assert.fail('Restoration recaptured a timer'),started:()=>assert.fail('Restoration replayed a phase')});
+  await restored.advance();assert.equal(restored.calls.length,1);assert.equal(restored.prepared.length,0);
+  restored.legacy.resolve();await flush();await restored.advance();assert.equal(restored.prepared.length,1);assert.ok(restored.calls.every(c=>!c.url.endsWith('/controller-timer-interruptions')));assert.equal(restored.values.size,0);
+ }finally{f.legacy.resolve();restored?.legacy.resolve();f.native.stop();restored?.native.stop();}
+});
+test('legacy settlement cannot bypass an in-flight timer acknowledgement',async()=>{
+ const timer=deferred(),f=legacyTimerFixture({respond:async(body,_count,receipt)=>{if(body.testletKey)await timer.promise;return{ok:true,json:async()=>receipt(body)};}});try{
+  await f.advance();f.native.command('pause',[]);await f.advance();assert.equal(f.calls.length,2);
+  f.legacy.resolve();await flush();await f.advance();assert.equal(f.calls.length,2);assert.equal(f.prepared.length,0);
+  timer.resolve();await flush();await f.advance();assert.equal(f.calls.length,3);assert.equal(f.prepared.length,1);assert.equal(f.values.size,0);
+ }finally{timer.resolve();f.legacy.resolve();f.native.stop();}
+});
+test('replacing the selected controller aborts a pending preflight and prevents late receipt effects',async()=>{
+ const timer=deferred(),f=legacyTimerFixture({respond:async(body,_count,receipt)=>{if(body.testletKey)await timer.promise;return{ok:true,json:async()=>receipt(body)};}});try{
+  await f.advance();f.native.command('pause',[]);await f.advance();assert.equal(f.calls.length,2);assert.equal(f.calls[1].request.signal.aborted,false);
+  f.select({testRun:{...scope,testRunId:'replacement'}});assert.equal(f.calls[1].request.signal.aborted,true);assert.equal(f.values.size,0);
+  timer.resolve();f.legacy.resolve();await flush();await f.advance();assert.equal(f.prepared.length,0);assert.equal(f.applied.length,0);assert.equal(f.failures.length,0);
+ }finally{timer.resolve();f.legacy.resolve();f.native.stop();}
+});
+
+test('a new timer-only receipt also bypasses legacy answer preparation without preparing the new state effect',async()=>{
+ const answer=deferred(),id='owned-legacy-timer';
+ const request={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','unit'],controllerStatus:'RUNNING',timeStamp:1791763200123};
+ const values=new Map([['testcenter-rewrite:participant-native-command:v1:'+id,JSON.stringify({scope,owner:'owned-tab',id,keyword:'goto',args:request.arguments,request})]]);
+ const f=legacyTimerFixture({values,prepare:()=>answer.promise});try{
+  await f.advance();assert.equal(f.prepared.length,1);assert.equal(f.calls.length,0);
+  f.native.command('pause',[]);await f.advance();assert.equal(f.calls.length,1);assert.match(f.calls[0].url,/controller-timer-interruptions$/);assert.equal(f.prepared.length,1);
+  const modern=JSON.parse([...f.values.values()].find(value=>JSON.parse(value).keyword==='pause'));assert.equal(modern.timerInterrupted,true);assert.equal(modern.prepared,undefined);
+  answer.resolve();await flush();await f.advance();assert.equal(f.calls.length,2);assert.equal(JSON.parse(f.calls[1].request.body).deliveryId,id);assert.equal(f.prepared.length,1);
+  f.legacy.resolve();await flush();await f.advance();assert.equal(f.prepared.length,2);assert.equal(f.calls.length,3);assert.equal(f.values.size,0);
+ }finally{answer.resolve();f.legacy.resolve();f.native.stop();}
+});
