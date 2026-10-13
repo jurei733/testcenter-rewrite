@@ -1,5 +1,36 @@
 # Testcenter parity checklist
 
+### Timer interruption Source audit and confirmed buffer gap (2026-10-13)
+
+A new pinned actual-Source fixture executes the complete timer start/finish/
+interrupt methods, root timer-event handler, native command handler, forced
+deactivation guard, and navigation helper from `ee2ab9ab64bd`. Seven reference
+cases prove that Pause interrupts immediately and ordinary forced Terminate
+interrupts before its awaited continuation and answer buffers. Their timers
+retain the last STEP balance beyond the former expiry deadline. INTERRUPTED
+clears the visible timer without setting its balance to zero or emitting a new
+TESTLETS_TIMELEFT snapshot. ERROR, missing-current-Unit, locked-immediate-parent
+and exact TERMINATED early returns skip that interruption. The actual ticker's
+interval fallback runs under a virtual RxJS scheduler; this is not a Worker
+execution or full browser lifecycle proof.
+
+A deterministic actual-Source/application-service comparison confirms the next
+runtime gap: a five-second timer paused at 2.5 seconds retains three seconds in
+the Original while buffers wait until ten seconds. The current Rewrite applies
+the delayed native command with zero seconds remaining, although its exact
+answer and response clocks survive and the receipt remains idempotent. The audit
+therefore does not claim a timer fix. Interruption must reach local countdown and
+canonical expiry/navigation before answer drain, retain timer identity and Source
+balance, and preserve early-return, overlapping-command, retry and legacy rules.
+
+The seven new reference cases run in the normal frontend-state gate; all 2,148
+unit/frontend tests pass fresh without skips or cancellations. Runtime code and
+frontend output remain unchanged from verified application `32b73d7b490d`; its
+build, 1,335 PostgreSQL, 498 HTTP, 115 browser and 438 inside-image results remain
+that checkpoint's evidence and were not rerun for this reference-only audit.
+Full timer/Worker timing, visual acceptance, CI, deployment and production proof
+remain open. No push occurred.
+
 ### Exact terminal early returns and pending commands (2026-10-13)
 
 Application checkpoint `32b73d7b490d` captures the pinned Original's exact
