@@ -1,5 +1,64 @@
 # Testcenter parity checklist
 
+### Ordered overlapping controller applications (2026-10-13)
+
+Application checkpoint `bc7b1ad5b6fc` lets independent native requests and
+successfully acknowledged remote commands apply concurrently. ACK pacing
+remains unchanged. Per-controller dispatch highwaters within each Run reject
+late older state effects; changed committed Run snapshots receive a separate
+revision under the store lock. Late views and receipts cannot replace a newer
+snapshot. Superseded commands retain execution receipts without replaying the
+old reload or Starter effect. Debug replies have their own presentation fence.
+This establishes overlap and final-state ordering within a controller, not a
+global intent order across independent controllers.
+
+Memory, File, SQLite and PostgreSQL persist the optional ordering metadata.
+SQLite schema 65 and PostgreSQL schema 59 migrate legacy rows without changing
+answers or clocks, with rollback and retry coverage. Forged projections cannot
+advance stored revisions or dispatch positions. PostgreSQL Run reads preserve
+the distinction between SQL NULL and explicit JSON null so corrupt entry or
+dispatch metadata fails atomically. Legacy prepared native packets retain their
+exact bytes and FIFO; new version-2 packets share the controller dispatch clock
+with remote applications. Backend-first rollout remains required. The older
+API gate proves selected context/native compatibility, not a full mixed-version
+concurrency rollout.
+
+The pinned Original oracle executes the actual ACK pipeline, component
+subscription and Pause/Resume methods for normal and reversed ACK completion.
+It proves independent handler starts and completion-order logs. Five additional
+browser groups hold real application requests or committed receipts and verify
+a later Resume applies, stale state is fenced, and trusted answers, clocks and
+siblings stay exact. The immutable preceding frontend image `8d7a246f3cf9`
+fails at the held-application assertion. The crash fixture now holds a real
+answer receipt to keep an intent unprepared and observes its owned Chromium
+storage marker on disk before crashing the browser process. Both crash cases
+retain old journals without replay and accept independent fresh commands.
+
+All 2,067 unit/frontend, 1,313 PostgreSQL and 498 Memory/File/SQLite HTTP tests
+pass fresh without skips or cancellations. Typecheck and production build
+pass at 469.99 kB under the unchanged 470 kB hard limit. Twenty-one loading
+and command groups pass headful and with CI=true, alongside fourteen Debug,
+five route, ten copied-tab/crash, five context, five actual older-API and all
+eighteen ERROR groups. Existing bundle and CommonJS warnings remain.
+
+A fresh image from 900 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 transaction/API tests
+in the read-only container as node. All 24 preexisting containers, their
+immutable image IDs, states and every mount field, 85 volumes, 285 existing
+image aliases and protected files are preserved; ten image aliases are added.
+Owned container, HTTP-integration, browser-profile and clean archive resources
+are removed.
+
+Full Original parity and production readiness remain unproven. In particular,
+the Original changes controller status synchronously when a handler starts,
+while this checkpoint still waits for application receipts; exact status,
+navigation completion and command-executed log phases remain open. Initial
+LOADING/controller replacement, global/cross-document intent order, complete
+legacy mixed-version concurrency, post-unload Player effects, worker upgrades,
+full visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance also remain open. This is a
+local checkpoint and is not pushed.
+
 ### Scoped controller entry and sibling-independent reception (2026-10-12)
 
 Application checkpoint `23af86e57514`, following persistence checkpoint
