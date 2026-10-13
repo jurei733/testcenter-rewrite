@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -1750,13 +1750,32 @@ export const migrateSqliteFirstSliceStorage = async (
 export const checkSqliteFirstSliceReadiness = async (
   filePath: string
 ): Promise<void> => {
-  mkdirSync(dirname(filePath), { recursive: true });
+  // Readiness must not create an empty replacement for a missing live database.
+  if (!statSync(filePath, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error("The SQLite storage file is missing or is not a regular file.");
+  }
   const database = openSqliteDatabase(filePath);
 
   try {
-    database.prepare("SELECT 1").get();
+    checkSqliteDatabaseReadiness(database);
   } finally {
     database.close();
+  }
+};
+
+const checkSqliteDatabaseReadiness = (database: DatabaseSync): void => {
+  if (getCurrentSchemaVersion(database) !== SQLITE_FIRST_SLICE_SCHEMA_VERSION) {
+    throw new Error("The SQLite storage schema is not current.");
+  }
+  // BEGIN alone can succeed while SQLite cannot create its rollback journal.
+  // Exercise a real main-database write, then discard the probe and its schema.
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    database.exec(`CREATE TABLE __testcenter_readiness_probe (probe INTEGER NOT NULL);
+      INSERT INTO __testcenter_readiness_probe (probe) VALUES (1);`);
+    database.exec("ROLLBACK");
+  } catch (error) {
+    rollbackAfterFailure(database, error);
   }
 };
 
@@ -1832,14 +1851,21 @@ const persistTestRun = (database: DatabaseSync, testRun: TestRun, updateExisting
   return Number(result.changes) === 1;
 };
 
-export const createSqliteFirstSliceRepository = (
+export type SqliteFirstSliceStorage = {
+  repository: FirstSliceRepository;
+  readinessCheck: () => Promise<void>;
+  shutdown: () => Promise<void>;
+};
+
+export const createSqliteFirstSliceStorage = (
   filePath: string
-): FirstSliceRepository => {
+): SqliteFirstSliceStorage => {
   mkdirSync(dirname(filePath), { recursive: true });
   const database = openSqliteDatabase(filePath);
-  applyMigrations(database);
+  try { applyMigrations(database); }
+  catch (error) { database.close(); throw error; }
 
-  return {
+  const repository: FirstSliceRepository = {
     async getApplicationSettings() {
       const row = database
         .prepare(
@@ -3766,4 +3792,18 @@ export const createSqliteFirstSliceRepository = (
       return Number(result.changes);
     }
   };
+  let closed = false;
+  return {
+    repository,
+    readinessCheck: async () => { checkSqliteDatabaseReadiness(database); },
+    shutdown: async () => {
+      if (closed) return;
+      database.close();
+      closed = true;
+    }
+  };
 };
+
+/** Compatibility factory for callers that own their process lifetime. */
+export const createSqliteFirstSliceRepository = (filePath: string): FirstSliceRepository =>
+  createSqliteFirstSliceStorage(filePath).repository;

@@ -246,12 +246,12 @@ import {
   POSTGRES_FIRST_SLICE_SCHEMA_VERSION
 } from "@testcenter-rewrite-app/postgres-store";
 import {
-  checkSqliteFirstSliceReadiness,
-  createSqliteFirstSliceRepository,
+  createSqliteFirstSliceStorage,
   SQLITE_FIRST_SLICE_SCHEMA_VERSION
 } from "@testcenter-rewrite-app/sqlite-store";
 
 import { createAttachmentPagesPdf } from "./attachment-pages-pdf.js";
+import { runtimeErrorDetails } from "./runtime-error-details.js";
 
 type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 
@@ -571,13 +571,14 @@ const createRepositoryFromEnvironment = async () => {
       fileURLToPath(
         new URL("../../../../.data/first-slice.sqlite", import.meta.url)
       );
+    const storage = createSqliteFirstSliceStorage(filePath);
     return {
       kind: "sqlite" as const,
-      repository: createSqliteFirstSliceRepository(filePath),
+      repository: storage.repository,
       location: filePath,
       schemaVersion: SQLITE_FIRST_SLICE_SCHEMA_VERSION,
-      readinessCheck: () => checkSqliteFirstSliceReadiness(filePath),
-      shutdown: async () => undefined
+      readinessCheck: storage.readinessCheck,
+      shutdown: storage.shutdown
     };
   }
 
@@ -4738,7 +4739,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             route: routeLabel,
             path: request.url ?? null,
             storageKind: runtime.repositoryConfig.kind,
-            cause: error instanceof Error ? error.message : String(error)
+            cause: error instanceof Error ? error.message : String(error),
+            error: runtimeErrorDetails(error)
           });
           sendError(
             response,
@@ -9631,13 +9633,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         route: routeLabel,
         path: request.url ?? null,
         storageKind: runtime.repositoryConfig.kind,
-        error:
-          error instanceof Error
-            ? {
-                name: error.name,
-                message: error.message
-              }
-            : { message: String(error) }
+        error: runtimeErrorDetails(error)
       });
       sendError(
         response,
