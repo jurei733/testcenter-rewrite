@@ -176,8 +176,18 @@ try {
   await repository.saveTestRun({ ...guardPaused, lockedUnitKeys: ["first-unit"] });
   await native("resume");
   await poll(async () => (await durable()).run.currentUnitKey === "next-unit", "Native resume did not redirect the locked current Unit");
+  // The first Unit below the inherited code lock is accessible to the guard,
+  // but Original's Unit host cannot mount its Player before code release.
+  await page.locator("#participantRouteTestletUnlockCode").waitFor();
+  assert.equal(await page.locator("iframe").count(), 0);
+  const codeEntry = (await durable()).run;
+  assert.equal(codeEntry.unlockedTestletKeys?.includes("private-gate") ?? false, false);
+  await page.locator("#participantRouteTestletUnlockCode").fill("OWNED_PRIVATE_CODE_Ω");
+  await page.locator("#participantRouteTestletUnlockButton").click();
   await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
   const guardResumed = (await durable()).run;
+  assert.equal(guardResumed.currentUnitKey, "next-unit");
+  assert.ok(guardResumed.unlockedTestletKeys?.includes("private-gate"));
   assert.deepEqual(guardResumed.lockedUnitKeys, ["first-unit"]);
   assert.deepEqual(guardResumed.unitResponses, guardPaused.unitResponses);
   assert.deepEqual(guardResumed.unitResponseFieldTimestamps, guardPaused.unitResponseFieldTimestamps);
