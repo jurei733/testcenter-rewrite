@@ -1,5 +1,40 @@
 # Optional Original UI
 
+### Forced terminal Source audit (2026-10-13)
+
+Reference checkpoint `bac6840d74b9` executes the pinned Original's real
+`canDeactivateUnit` together with the native root handler and `terminateTest`.
+For the native force=true path, deactivation completes immediately and the
+terminal phase is entered before `closeAllBuffers` waits. A Pause or Resume
+arriving during that buffer wait changes the controller state; buffer completion
+does not set the former terminal state again. Two new actual-source cases prove
+both orders with held buffers, locking and navigation.
+
+The preceding candidate `4a082496e30e` sampled native terminal state after answer
+preparation. Its reference work was incomplete at that point:
+the injected held deactivation Subject covered the generic method, not the real
+forced native path. Green candidate browser/container checks therefore did not
+prove Original parity. Its runtime change and the two unsupported browser
+expectations are withdrawn. Candidate source, frontend and diagnostic results
+are retained separately; the fixture receipt refinement `bd4f91bcf366` is also
+withdrawn with that scenario. No candidate production-readiness claim is made.
+
+The current runtime and browser harness again match accepted application
+`438d1cebf5fd` byte for byte. The reference oracle now has fifteen cases, including
+the two actual forced-guard cases; two additional native transport cases protect
+prepared retry/restoration and unprepared legacy observations. All 2,093
+unit/frontend tests pass fresh without skips or cancellations. The unchanged
+runtime reuses the accepted build, browser and image evidence after source-hash
+verification; those suites were not rerun for the current reference-only change.
+All 169 host frontend files are restored to the accepted image's exact bytes.
+
+All 24 existing containers, immutable IDs, states and mount fields, 85 volumes,
+305 image aliases and protected files remain intact. Owned candidate container
+and source-archive resources are removed; only its ten newly created image
+aliases are deleted. Complete local terminal phase timing, the already-TERMINATED
+guard, timer/navigation/buffer/log ordering and the other full-parity, CI, rollout,
+performance and production acceptance requirements remain open. No push occurred.
+
 ### Immediate participant controller phases (2026-10-13)
 
 Application checkpoint `438d1cebf5fd` enters PAUSED for Pause and RUNNING for
