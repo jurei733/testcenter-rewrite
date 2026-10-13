@@ -4263,6 +4263,7 @@ const writeParticipantEvent = (
 
 const streamParticipantEvents = async (input: {
   request: IncomingMessage;
+  requestLifecycle: ReturnType<typeof createRequestLifecycle>;
   response: ServerResponse;
   participantRuntime: FirstSliceServices["participantRuntime"];
   participantSessionId: string;
@@ -4294,7 +4295,7 @@ const streamParticipantEvents = async (input: {
   let closed = false;
   let pollHandle: NodeJS.Timeout | null = null;
 
-  const stop = (): void => {
+  const stop = input.requestLifecycle.wrap(async (): Promise<void> => {
     if (closed) {
       return;
     }
@@ -4303,10 +4304,10 @@ const streamParticipantEvents = async (input: {
       clearInterval(pollHandle);
       pollHandle = null;
     }
-    void input.participantRuntime.updateConnection({
+    await input.participantRuntime.updateConnection({
       participantSessionId: input.participantSessionId, testRunId, action: "close", connectionId
     }).catch(() => undefined);
-  };
+  });
   const publish = (
     eventType: ParticipantEventStreamEvent["eventType"]
   ): void => {
@@ -4325,6 +4326,10 @@ const streamParticipantEvents = async (input: {
     });
   };
 
+  if (input.response.destroyed || input.response.writableEnded || input.request.aborted) {
+    await stop();
+    return;
+  }
   input.request.once("close", stop);
   input.response.once("close", stop);
   input.response.writeHead(200, {
@@ -4338,12 +4343,12 @@ const streamParticipantEvents = async (input: {
   input.response.write("retry: 3000\n\n");
   publish("snapshot");
 
-  pollHandle = setInterval(() => {
+  pollHandle = setInterval(input.requestLifecycle.wrap(async () => {
     if (closed || polling) {
       return;
     }
     polling = true;
-    void input.validateAccess()
+    await input.validateAccess()
       .then(() => input.participantRuntime.getCurrentRunState({
         participantSessionId: input.participantSessionId,
         testRunId: input.testRunId
@@ -4397,7 +4402,7 @@ const streamParticipantEvents = async (input: {
       .finally(() => {
         polling = false;
       });
-  }, PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS);
+  }), PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS);
   pollHandle.unref();
 };
 
@@ -4424,6 +4429,7 @@ const writeMonitorEvent = (
 
 const streamMonitorEvents = async (input: {
   request: IncomingMessage;
+  requestLifecycle: ReturnType<typeof createRequestLifecycle>;
   response: ServerResponse;
   monitorRead: FirstSliceServices["monitorRead"];
   tenantKey: string;
@@ -4473,6 +4479,10 @@ const streamMonitorEvents = async (input: {
     });
   };
 
+  if (input.response.destroyed || input.response.writableEnded || input.request.aborted) {
+    stop();
+    return;
+  }
   input.request.once("close", stop);
   input.response.once("close", stop);
   input.response.writeHead(200, {
@@ -4486,12 +4496,12 @@ const streamMonitorEvents = async (input: {
   input.response.write("retry: 3000\n\n");
   publish("snapshot");
 
-  pollHandle = setInterval(() => {
+  pollHandle = setInterval(input.requestLifecycle.wrap(async () => {
     if (closed || polling) {
       return;
     }
     polling = true;
-    void (async () => {
+    await (async () => {
       await input.validateAccess?.();
       return input.monitorRead.listOpenRuns({
         tenantKey: input.tenantKey,
@@ -4527,7 +4537,7 @@ const streamMonitorEvents = async (input: {
       .finally(() => {
         polling = false;
       });
-  }, MONITOR_EVENT_STREAM_POLL_INTERVAL_MS);
+  }), MONITOR_EVENT_STREAM_POLL_INTERVAL_MS);
   pollHandle.unref();
 };
 
@@ -8597,6 +8607,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         await streamParticipantEvents({
           request,
           response,
+          requestLifecycle: runtime.requestLifecycle,
           participantRuntime: services.participantRuntime,
           participantSessionId,
           testRunId: url.searchParams.get("testRunId") ?? undefined,
@@ -9273,6 +9284,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         await streamMonitorEvents({
           request,
           response,
+          requestLifecycle: runtime.requestLifecycle,
           monitorRead: services.monitorRead,
           tenantKey,
           workspaceKey,
