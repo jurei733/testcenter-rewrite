@@ -26,7 +26,7 @@ function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWind
  const native=create(options);
  const advance=async(next=time)=>{time=next;for(const t of timers.slice())if(!t.canceled&&t.at<=time){t.canceled=true;t.callback();}await flush();};
  return {native,options,create,values,calls,applied,failures,prepared,listeners,advance,receipt,
-  select:next=>{state=next;native.observeScope();},replace:()=>{generation++;native.observeScope();},credential:value=>credential=value};
+  select:next=>{state=next;native.observeScope();},replace:(observe=true)=>{generation++;if(observe)native.observeScope();},credential:value=>credential=value};
 }
 test('native commands clone exact arguments, drain before dispatch and use only the owned participant endpoint',async()=>{
  const gate=deferred(),f=fixture({prepare:()=>gate.promise}),args=['id','Alias Ω','give 2'];try{
@@ -217,4 +217,31 @@ test('an unprepared legacy termination retains its original observation and uncl
  const gate=deferred(),f=fixture({prepare:()=>gate.promise,controllerStatus:()=> 'PAUSED'});f.native.command('terminate',['lock']);const values=new Map(f.values);f.native.stop();
  for(const [key,raw]of values){const entry=JSON.parse(raw);delete entry.version;values.set(key,JSON.stringify(entry));}
  const restored=fixture({values,controllerStatus:()=> 'RUNNING'});try{await restored.advance();const request=JSON.parse(restored.calls[0].request.body);assert.equal(request.controllerStatus,'PAUSED');assert.equal(request.controllerDispatch,undefined);}finally{gate.resolve();restored.native.stop();}
+});
+
+test('native forced termination enters its phase before held buffers and keeps later Pause ordering',async()=>{
+ const gate=deferred(),starts=[];let status='RUNNING';const f=fixture({prepare:()=>gate.promise,controllerStatus:()=>status,started:request=>{starts.push(structuredClone(request));if(request.keyword==='pause')status='PAUSED';}});
+ try{
+  f.native.command('terminate',[]);assert.deepEqual(starts,[]);await flush();assert.equal(starts[0].keyword,'terminate');assert.equal(starts[0].controllerStatus,'RUNNING');assert.equal(starts[0].controllerDispatch.sequence,1);
+  await f.advance();assert.equal(f.calls.length,0);f.native.command('pause',[]);assert.equal(starts[1].controllerDispatch.sequence,2);await f.advance();assert.equal(f.calls.length,0);
+  gate.resolve();await flush();assert.deepEqual(f.calls.map(call=>JSON.parse(call.request.body)).map(packet=>[packet.keyword,packet.controllerStatus,packet.controllerDispatch.sequence]),[['terminate','RUNNING',1],['pause','RUNNING',2]]);
+ }finally{gate.resolve();f.native.stop();}
+});
+test('a same-turn native Pause precedes the forced-deactivation continuation and changes terminal sampling',async()=>{
+ const starts=[];let status='RUNNING';const f=fixture({controllerStatus:()=>status,started:request=>{starts.push(structuredClone(request));if(request.keyword==='pause')status='PAUSED';}});
+ try{f.native.command('terminate',[]);f.native.command('pause',[]);assert.equal(starts.length,1);await flush();assert.deepEqual(starts.map(request=>[request.keyword,request.controllerStatus,request.controllerDispatch.sequence]),[['pause','RUNNING',1],['terminate','PAUSED',2]]);}
+ finally{f.native.stop();}
+});
+test('route destruction before the forced-deactivation continuation prevents a terminal phase and delivery',async()=>{
+ const starts=[],f=fixture({started:request=>starts.push(request)});f.native.command('terminate',[]);f.native.stop();await flush();await f.advance();assert.deepEqual(starts,[]);assert.deepEqual(f.calls,[]);assert.equal(f.values.size,0);
+});
+
+test('replacement before the terminal continuation cannot dispatch even before the next scope observation',async()=>{
+ const starts=[],f=fixture({started:request=>starts.push(request)});try{f.native.command('terminate',[]);f.replace(false);await flush();await f.advance();assert.deepEqual(starts,[]);assert.deepEqual(f.calls,[]);assert.equal(f.values.size,0);}finally{f.native.stop();}
+});
+test('restoring an unprepared modern terminal packet does not replay or resample its former local phase',async()=>{
+ const f=fixture();f.native.command('terminate',[]);await flush();const values=new Map(f.values),packet=JSON.parse([...values.values()][0]).request;assert.equal(packet.controllerDispatch.sequence,1);f.native.stop();
+ const starts=[],restored=fixture({values,controllerStatus:()=> 'PAUSED',started:request=>starts.push(request)});
+ try{await restored.advance();assert.deepEqual(starts,[]);assert.equal(restored.calls[0].request.body,JSON.stringify(packet));}
+ finally{restored.native.stop();}
 });

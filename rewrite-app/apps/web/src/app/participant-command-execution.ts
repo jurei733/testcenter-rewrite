@@ -53,7 +53,13 @@ export const executeReceivedParticipantCommand = async (
   if (signal.aborted || !options.isCurrent()) return;
   const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
   let dispatch = terminal ? undefined : receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
-  const controllerStatus = terminal ? undefined : options.controllerStatus();
+  let controllerStatus = terminal ? undefined : options.controllerStatus();
+  if (terminal) {
+    await Promise.resolve();
+    if (signal.aborted || !options.isCurrent()) return;
+    controllerStatus = options.controllerStatus();
+    dispatch = receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
+  }
   if (dispatch) options.started?.(dispatch);
   if (command.commandType !== "debug") await options.prepare();
   if (signal.aborted || !options.isCurrent()) return;

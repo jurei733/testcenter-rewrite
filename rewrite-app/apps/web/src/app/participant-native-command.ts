@@ -92,6 +92,7 @@ export const createParticipantNativeCommands = (options: {
     tenantId: run.tenantId, workspaceId: run.workspaceId, participantSessionId: run.participantSessionId,
     testRunId: run.testRunId, contentReleaseId: run.contentReleaseId, bookletKey: run.bookletKey } : null; };
   const queue = new Map<string, Entry>();
+  const starting = new WeakMap<Entry, Promise<void>>();
   let stopped = false, current: string | null = null, cancel: (() => void) | null = null;
   let currentGeneration = options.generation?.();
   const flights = new Map<string, { entry: Entry; controller: AbortController }>();
@@ -142,6 +143,9 @@ export const createParticipantNativeCommands = (options: {
       Boolean(selected() && scopeKey(selected()!) === scopeKey(entry.scope));
     let retry = false;
     try {
+      const start = starting.get(entry);
+      if (start) await start;
+      if (!isCurrent() || !queue.has(entry.id)) return;
       if (!entry.prepared) {
         await options.prepare(isCurrent); if (!isCurrent()) return;
         if (entry.version === 2) entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
@@ -222,7 +226,21 @@ export const createParticipantNativeCommands = (options: {
         testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId, bookletKey: scope.bookletKey,
         deliveryId: id, keyword, arguments: [...args], controllerStatus: options.controllerStatus(), timeStamp: (options.now ?? Date.now)(),
         ...(keyword === "terminate" ? {} : { controllerDispatch: nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches) }) } };
-      queue.set(entry.id, entry); persist(entry); options.started?.(entry.request); observeScope();
+      queue.set(entry.id, entry); persist(entry);
+      if (keyword === "terminate") {
+        const generation = options.generation?.();
+        // Native force=true deactivation resolves immediately. Its awaited
+        // continuation enters the terminal phase before closeAllBuffers waits.
+        starting.set(entry, Promise.resolve().then(() => {
+          const selectedScope = selected();
+          if (stopped || !queue.has(entry.id) || generation !== options.generation?.() ||
+              !selectedScope || scopeKey(selectedScope) !== scopeKey(scope)) { remove(entry); return; }
+          entry.request.controllerStatus = options.controllerStatus();
+          entry.request.controllerDispatch = nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
+          persist(entry); options.started?.(entry.request);
+        }).catch(error => { if (queue.has(entry.id)) { remove(entry); options.failed(error instanceof Error ? error : new Error(String(error))); } }));
+      } else options.started?.(entry.request);
+      observeScope();
     },
     stop(): void {
       if (stopped) return;

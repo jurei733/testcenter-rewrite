@@ -24,7 +24,7 @@ const state=record=>({participantSession:session,testRun:record,currentUnit:{uni
 const fixture=(request=async()=>({currentRunState:state(run)}),execute=()=>assert.fail('Unexpected remote application'))=>{
  const Host=hostClass(execute);
  let error=null,consoleRunValue=null,phase=null;const calls={requests:[],applied:0,suspended:0,started:0,failures:[],drained:0,saved:0,reloads:0,starter:0},host=new Host();
- Object.assign(host,{controllerCommandPhase:Object.assign(()=>phase,{set:value=>{phase=value;}}),runtime:{participantSessionId:'participant',testRunId:'selected',currentRunStateView:'',currentUnitResponse:'Old unowned controller draft',bookletKey:'booklet'},consoleTestRun:Object.assign(()=>consoleRunValue,{set:value=>{consoleRunValue=value;}}),currentRunState:null,
+ Object.assign(host,{terminalCommandPhases:new WeakMap(),controllerCommandPhase:Object.assign(()=>phase,{set:value=>{phase=value;}}),runtime:{participantSessionId:'participant',testRunId:'selected',currentRunStateView:'',currentUnitResponse:'Old unowned controller draft',bookletKey:'booklet'},consoleTestRun:Object.assign(()=>consoleRunValue,{set:value=>{consoleRunValue=value;}}),currentRunState:null,
   currentStateRefreshSequence:0,currentStateAppliedRefreshSequence:0,bookletAssetLoadStartedAtMs:new Map(),loadedBookletAssets:()=>null,veronaErrorText:'Owned load error',
   requestState:{request:async(...args)=>{calls.requests.push(args[2]);return request(...args);},isApiError:error=>Boolean(error?.error)},
   activeControllerError:Object.assign(()=>error,{set:value=>{error=value;}}),participantErrorReceptionSuspended:false,
@@ -484,4 +484,31 @@ test('remote phase starts before its lazy execution module resolves and observes
  gate.resolve();await pending;
  const canceled=new AbortController();canceled.abort();await f.host.applyReceivedParticipantCommand(remoteCommand('resume'),canceled.signal,()=>assert.fail('Canceled receipt allocated a phase'));
  assert.equal(f.host.debugControllerStatus,'PAUSED');
+});
+
+for(const initial of ['RUNNING','PAUSED'])test(`the ${initial} controller enters its terminal phase without forging the Run or navigating before buffers`,()=>{
+ const original={...run,status:initial.toLowerCase()},f=fixture();f.host.syncRun(original);f.host.currentRunState=state(original);
+ f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),initial);
+ assert.equal(f.host.debugControllerStatus,initial==='PAUSED'?'TERMINATED_PAUSED':'TERMINATED');assert.deepEqual(f.host.consoleRun,original);
+ assert.equal(f.calls.suspended,1);assert.equal(f.calls.starter,0);assert.equal(f.calls.requests.length,0);assert.equal(f.calls.saved,0);
+});
+for(const keyword of ['pause','resume'])test(`a later ${keyword} during terminal buffers survives the older terminal receipt`,async()=>{
+ const gate=deferred(),f=fixture(()=>gate.promise);f.host.syncRun(run);f.host.currentRunState=state(run);
+ f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');f.host.beginControllerCommand('selected',keyword,phaseDispatch(2));
+ await f.host.applyNativeConsoleCommand({keyword:'terminate',testRun:{...run,status:'paused',controllerEntry:{active:false,revision:1}},participantSession:{...session,status:'signed_in'},controllerStatus:'RUNNING'},()=>true,phaseDispatch(1));
+ assert.equal(f.host.debugControllerStatus,keyword==='pause'?'PAUSED':'RUNNING');assert.equal(f.calls.starter,0);assert.deepEqual(f.host.consoleRun,run);
+ gate.resolve({currentRunState:state({...run,status:keyword==='pause'?'paused':'running',controllerEntry:{active:true,revision:2}})});await tick();assert.equal(f.host.debugControllerStatus,keyword==='pause'?'PAUSED':'RUNNING');
+});
+test('a trusted Player ERROR after terminal phase entry survives the old termination receipt',async()=>{
+ const f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');
+ f.host.handleVeronaControllerError({testRunId:'selected',unitKey:'unit',message:'Newer error'});assert.equal(f.host.debugControllerStatus,'ERROR');
+ await f.host.applyNativeConsoleCommand({keyword:'terminate',testRun:{...run,status:'paused'},participantSession:session,controllerStatus:'RUNNING'},()=>true,phaseDispatch(1));
+ assert.equal(f.host.debugControllerStatus,'ERROR');assert.equal(f.calls.requests.length,0);assert.equal(f.calls.starter,0);
+});
+test('remote forced termination starts before its lazy execution module and retains its first observation on retry',async()=>{
+ let attempt=0;const observations=[],command=remoteCommand('complete'),f=fixture(undefined,async(_command,_signal,options)=>{observations.push(options.controllerStatus());if(++attempt===1)throw Error('Owned lost receipt');});
+ f.host.syncRun(run);f.host.currentRunState=state(run);let allocations=0;const allocate=()=>{allocations++;return phaseDispatch(1);};
+ const pending=f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);assert.equal(f.host.debugControllerStatus,'RUNNING');await Promise.resolve();assert.equal(f.host.debugControllerStatus,'TERMINATED');await assert.rejects(pending,/Owned lost receipt/);
+ f.host.beginControllerCommand('selected','pause',phaseDispatch(2));await f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);
+ assert.equal(f.host.debugControllerStatus,'PAUSED');assert.deepEqual(observations,['RUNNING','RUNNING']);assert.equal(allocations,1);
 });

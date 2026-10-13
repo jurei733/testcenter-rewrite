@@ -495,7 +495,8 @@ export class ParticipantViewFacade {
   private remoteTerminalErrorRunId: string | null = null;
   private commandControllerState: { testRunId: string; status: string; entryRevision?: number } | null = null;
   private debugCommandDispatch: ParticipantRunCommandApplicationResult["controllerDispatch"];
-  private readonly controllerCommandPhase = signal<{ testRunId: string; dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED"; pending: boolean; interrupted?: true } | null>(null);
+  private readonly controllerCommandPhase = signal<{ testRunId: string; dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED"; pending: boolean; interrupted?: true } | null>(null);
+  private readonly terminalCommandPhases = new WeakMap<ParticipantRunCommand, { dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED" | "ERROR" }>();
   private readonly consoleTestRun = signal<TestRun | null>(null);
   get consoleRun(): TestRun | null {
     const run = this.consoleTestRun();
@@ -503,16 +504,18 @@ export class ParticipantViewFacade {
       run.testRunId === this.runtime.testRunId ? run : null;
   }
   get consoleControllerGeneration(): number { return this.viewLifecycleSequence; }
-  private get pendingControllerStatus(): "RUNNING" | "PAUSED" | undefined {
+  private get pendingControllerStatus(): "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED" | undefined {
     const phase = this.controllerCommandPhase(), run = this.consoleRun;
     return phase && run && phase.pending && !phase.interrupted && phase.testRunId === run.testRunId && run.status !== "completed" ? phase.status : undefined;
   }
-  beginControllerCommand(testRunId: string, keyword: string, dispatch?: ParticipantControllerDispatch): void {
+  beginControllerCommand(testRunId: string, keyword: string, dispatch?: ParticipantControllerDispatch, observedStatus?: ParticipantNativeCommandRequest["controllerStatus"]): void {
     const run = this.consoleRun, previous = this.controllerCommandPhase();
-    if (!run || run.testRunId !== testRunId || run.status === "completed" || !dispatch || !["pause", "resume", "goto"].includes(keyword) ||
+    const terminal = ["terminate", "complete", "complete_and_lock"].includes(keyword);
+    if (!run || run.testRunId !== testRunId || run.status === "completed" || !dispatch || !terminal && !["pause", "resume", "goto"].includes(keyword) ||
       previous?.testRunId === testRunId && previous.dispatch.controllerId === dispatch.controllerId && previous.dispatch.sequence >= dispatch.sequence) return;
-    this.controllerCommandPhase.set({ testRunId, dispatch, status: keyword === "pause" ? "PAUSED" : "RUNNING", pending: true });
-    this.startAcceptedParticipantReception();
+    this.controllerCommandPhase.set({ testRunId, dispatch, status: terminal ? observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : keyword === "pause" ? "PAUSED" : "RUNNING", pending: true });
+    if (terminal) this.participantEvents.suspend();
+    else this.startAcceptedParticipantReception();
   }
   private isOlderControllerPhase(dispatch?: ParticipantControllerDispatch): boolean {
     const phase = this.controllerCommandPhase();
@@ -536,7 +539,8 @@ export class ParticipantViewFacade {
     return command?.status === "RUNNING" || this.debugRunState && !this.eagerBookletLoading ? "RUNNING" : "LOADING";
   }
   get nativeControllerStatus(): ParticipantNativeCommandRequest["controllerStatus"] {
-    return this.pendingControllerStatus ?? (this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" :
+    const pending = this.pendingControllerStatus;
+    return pending === "RUNNING" || pending === "PAUSED" ? pending : (this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" :
       this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING");
   }
   get controllerLogState() {
@@ -610,7 +614,7 @@ export class ParticipantViewFacade {
     // transition of an already loaded controller can reopen reception before
     // its next Unit view arrives, as in the Original state subscription.
     if (!state || this.eagerBookletLoading || this.hasControllerError || state.testRun.status === "completed" ||
-      this.commandControllerState?.status.startsWith("TERMINATED")) return;
+      this.pendingControllerStatus?.startsWith("TERMINATED") || !this.pendingControllerStatus && this.commandControllerState?.status.startsWith("TERMINATED")) return;
     this.participantEvents.start(state.participantSession.participantSessionId,
       this.refreshFromParticipantEvents, null, state.testRun.testRunId,
       state.executionMode?.receiveRemoteCommands ? this.receiveParticipantCommand : null);
@@ -690,8 +694,17 @@ export class ParticipantViewFacade {
       (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
         .every(key => this.consoleRun?.[key] === run[key]);
     const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
-    const invocationStatus = this.hasControllerError ? "ERROR" : this.pendingControllerStatus ?? (run.status === "paused" ? "PAUSED" : "RUNNING");
+    const readStatus = (): "RUNNING" | "PAUSED" | "ERROR" => this.hasControllerError ? "ERROR" : this.nativeControllerStatus === "PAUSED" ? "PAUSED" : "RUNNING";
+    const invocationStatus = readStatus();
     if (!terminal && allocate) this.beginControllerCommand(run.testRunId, command.commandType, allocate(run.controllerDispatches));
+    let terminalPhase = terminal ? this.terminalCommandPhases.get(command) : undefined;
+    if (terminal && !terminalPhase && allocate) {
+      await Promise.resolve();
+      if (!isCurrent()) return;
+      terminalPhase = { dispatch: allocate(this.consoleRun?.controllerDispatches), status: readStatus() };
+      this.terminalCommandPhases.set(command, terminalPhase);
+      this.beginControllerCommand(run.testRunId, command.commandType, terminalPhase.dispatch, terminalPhase.status);
+    }
     let observedView = this.currentStateAppliedRefreshSequence;
     let observedRun = run;
     let observedStatus: "RUNNING" | "PAUSED" | "ERROR" = "RUNNING";
@@ -700,7 +713,7 @@ export class ParticipantViewFacade {
       scope: run, isCurrent, controllerStatus: () => {
         observedView = this.currentStateAppliedRefreshSequence;
         observedRun = this.consoleRun ?? run;
-        observedStatus = terminal ? this.hasControllerError ? "ERROR" : this.pendingControllerStatus ?? (this.consoleRun?.status === "paused" ? "PAUSED" : "RUNNING") : invocationStatus;
+        observedStatus = terminal ? terminalPhase?.status ?? readStatus() : invocationStatus;
         return observedStatus;
       },
       prepare: async () => {
@@ -708,7 +721,13 @@ export class ParticipantViewFacade {
         // receipt. The response-only outbox keeps that answer independently.
         if (terminal) await this.prepareNativeConsoleCommand(isCurrent);
       },
-      started: dispatch => this.beginControllerCommand(run.testRunId, command.commandType, dispatch),
+      started: dispatch => {
+        if (terminal && !terminalPhase) {
+          terminalPhase = { dispatch, status: observedStatus };
+          this.terminalCommandPhases.set(command, terminalPhase);
+        }
+        this.beginControllerCommand(run.testRunId, command.commandType, dispatch, observedStatus);
+      },
       apply: async (application, acceptedDispatch) => {
         if (!isCurrent() || signal.aborted) return;
         if (command.commandType === "debug") {

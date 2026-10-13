@@ -34,7 +34,7 @@ const fixture = (respond = async () => ({ ok: true, json: async () => applicatio
     async (url, request) => { calls.push({ url, request }); events.push("request"); return respond(url, request); }, () => ({controllerId:"owned-document",sequence:1}), isParticipantControllerDispatches);
   const options = { scope: application().application.testRun, isCurrent: () => current, controllerStatus: () => "ERROR",
     prepare: async () => { events.push("saved"); }, apply: async () => { events.push("projected"); } };
-  return { calls, events, controller, options, execute: () => execute(command(), controller.signal, options), leave: () => { current = false; } };
+  return { calls, events, controller, options, execute: (selected = command()) => execute(selected, controller.signal, options), leave: () => { current = false; } };
 };
 
 test("accepted command application drains first and authenticates the exact selected Run", async () => {
@@ -192,4 +192,12 @@ test('an accepted nonterminal phase starts before preparation and retains its pr
  f.options.started=dispatch=>{assert.equal(dispatch.sequence,1);status='RUNNING';f.events.push('started');};
  const pending=f.execute();assert.deepEqual(f.events,['started']);assert.equal(f.calls.length,0);gate.resolve();await pending;
  assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,'ERROR');assert.deepEqual(f.events,['started','request','projected']);
+});
+
+test('an accepted terminal phase samples at the forced-deactivation continuation before held buffers',async()=>{
+ const gate=deferred(),terminal={...command(),commandType:'complete'};
+ const f=fixture(async()=>({ok:true,json:async()=>({application:{...application().application,command:{...terminal,executedAt:'2026-10-11T00:00:02.000Z',executionSequence:1},testRun:{...application().application.testRun,status:'paused'}}})}));
+ let status='RUNNING';f.options.controllerStatus=()=>status;f.options.prepare=()=>gate.promise;f.options.started=()=>f.events.push('terminal');
+ const pending=f.execute(terminal);assert.deepEqual(f.events,[]);await Promise.resolve();assert.deepEqual(f.events,['terminal']);assert.equal(f.calls.length,0);
+ status='PAUSED';gate.resolve();await pending;assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,'RUNNING');assert.deepEqual(f.events,['terminal','request','projected']);
 });
