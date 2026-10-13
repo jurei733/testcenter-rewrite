@@ -44,7 +44,9 @@ export const executeReceivedParticipantCommand = async (
   options: {
     scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string; controllerDispatches?: TestRun["controllerDispatches"] };
     isCurrent: () => boolean;
-    controllerStatus: () => "RUNNING" | "PAUSED" | "ERROR";
+    controllerStatus: () => "RUNNING" | "PAUSED" | "ERROR" | "TERMINATED" | "TERMINATED_PAUSED";
+    terminationNoop?: boolean;
+    observed?: (dispatch: ParticipantControllerDispatch, status: "RUNNING" | "PAUSED" | "ERROR" | "TERMINATED" | "TERMINATED_PAUSED", terminationNoop?: true) => void;
     prepare: () => Promise<void>;
     started?: (dispatch: ParticipantControllerDispatch) => void;
     apply: (application: ParticipantRunCommandApplicationResult, dispatch: ParticipantControllerDispatch) => Promise<void>;
@@ -54,14 +56,18 @@ export const executeReceivedParticipantCommand = async (
   const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
   let dispatch = terminal ? undefined : receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
   let controllerStatus = terminal ? undefined : options.controllerStatus();
+  let terminationNoop = false;
   if (terminal) {
-    await Promise.resolve();
+    const initial = options.controllerStatus();
+    terminationNoop = options.terminationNoop ?? initial === "TERMINATED";
+    if (!terminationNoop) await Promise.resolve();
     if (signal.aborted || !options.isCurrent()) return;
-    controllerStatus = options.controllerStatus();
+    controllerStatus = terminationNoop ? initial : options.controllerStatus();
     dispatch = receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
+    options.observed?.(dispatch, controllerStatus, terminationNoop ? true : undefined);
   }
-  if (dispatch) options.started?.(dispatch);
-  if (command.commandType !== "debug") await options.prepare();
+  if (dispatch && !terminationNoop) options.started?.(dispatch);
+  if (command.commandType !== "debug" && !terminationNoop) await options.prepare();
   if (signal.aborted || !options.isCurrent()) return;
   dispatch ??= receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
   const token = readParticipantSessionCredential(command.participantSessionId);
@@ -69,7 +75,8 @@ export const executeReceivedParticipantCommand = async (
     participantSessionId: command.participantSessionId, commandId: command.commandId
   }), { method: "POST", cache: "no-store", signal, headers: {
     "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {})
-  }, body: JSON.stringify({ testRunId: command.testRunId, controllerStatus: controllerStatus ?? options.controllerStatus(), controllerDispatch: dispatch }) });
+  }, body: JSON.stringify({ testRunId: command.testRunId, controllerStatus: controllerStatus ?? options.controllerStatus(), controllerDispatch: dispatch,
+    ...(terminationNoop ? { terminationNoop: true } : {}) }) });
   if (!response.ok) throw Object.assign(new Error(`Command application returned HTTP ${response.status}.`), { retryable: response.status >= 500 });
   const payload = await response.json() as { application?: {
     command?: unknown;
@@ -81,7 +88,7 @@ export const executeReceivedParticipantCommand = async (
   } } | null;
   if (signal.aborted || !options.isCurrent()) return;
   const application = payload?.application, receipt = parseParticipantRunCommand(application?.command);
-  if (!receipt?.executedAt || !receipt.executionSequence || typeof application?.applied !== "boolean" ||
+  if (!receipt?.executedAt || !receipt.executionSequence || Boolean(receipt.terminationNoop) !== terminationNoop || typeof application?.applied !== "boolean" ||
       application.superseded !== undefined && application.superseded !== true ||
       (application.controllerDispatch !== undefined || application.testRun?.stateRevision !== undefined) && JSON.stringify(application.controllerDispatch) !== JSON.stringify(dispatch) ||
       Object.keys(command).some(key => !["executedAt", "executionSequence"].includes(key) &&

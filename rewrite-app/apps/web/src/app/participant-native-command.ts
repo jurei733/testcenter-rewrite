@@ -107,7 +107,9 @@ export const createParticipantNativeCommands = (options: {
         (entry.request.controllerDispatch === undefined || isParticipantControllerDispatch(entry.request.controllerDispatch) && entry.request.controllerDispatch.controllerId === owner) &&
         entry.request.testRunId === entry.scope.testRunId && entry.request.contentReleaseId === entry.scope.contentReleaseId &&
         entry.request.bookletKey === entry.scope.bookletKey && JSON.stringify(entry.request.arguments) === JSON.stringify(entry.args) &&
-        ["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(entry.request.controllerStatus) && Number.isSafeInteger(entry.request.timeStamp) && entry.request.timeStamp >= 0);
+        (entry.version === 2 ? ["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"] : ["LOADING", "RUNNING", "PAUSED", "ERROR"]).includes(entry.request.controllerStatus) &&
+        (entry.request.terminationNoop === undefined || entry.version === 2 && entry.prepared === true && entry.request.terminationNoop === true && entry.keyword === "terminate" && entry.request.controllerStatus === "TERMINATED") &&
+        Number.isSafeInteger(entry.request.timeStamp) && entry.request.timeStamp >= 0);
   };
   const persist = (entry: Entry): void => { try { storage?.setItem(prefix + entry.id, JSON.stringify(entry)); } catch {} };
   const remove = (entry: Entry): void => { queue.delete(entry.id); try {
@@ -129,7 +131,14 @@ export const createParticipantNativeCommands = (options: {
     // A legacy packet has no recoverable dispatch position. Preserve its old
     // native FIFO until it settles; every new v2 packet can overlap normally.
     const legacy = [...queue.values()].find(entry => scopeKey(entry.scope) === current && entry.version === undefined && !entry.request.controllerDispatch);
-    if (legacy) { if (!flights.has(legacy.id) && !retries.has(legacy.id)) void dispatch(legacy); return; }
+    if (legacy) {
+      if (!flights.has(legacy.id) && !retries.has(legacy.id)) void dispatch(legacy);
+      // An early return only records its receipt/log; it cannot overtake a
+      // legacy state effect because it never changes Run or dispatch state.
+      for (const entry of queue.values()) if (scopeKey(entry.scope) === current && entry.request.terminationNoop &&
+        !flights.has(entry.id) && !retries.has(entry.id)) void dispatch(entry);
+      return;
+    }
     for (const entry of queue.values()) {
       if (scopeKey(entry.scope) === current && !flights.has(entry.id) && !retries.has(entry.id)) void dispatch(entry);
     }
@@ -167,6 +176,7 @@ export const createParticipantNativeCommands = (options: {
       if (!application || !validScope(application.scope) || scopeKey(application.scope) !== scopeKey(entry.scope) ||
           application.deliveryId !== entry.id || application.keyword !== entry.keyword || JSON.stringify(application.arguments) !== JSON.stringify(entry.args) ||
           application.controllerStatus !== entry.request.controllerStatus || application.timeStamp !== entry.request.timeStamp ||
+          application.terminationNoop !== entry.request.terminationNoop ||
           application.superseded !== undefined && application.superseded !== true ||
           (application.controllerDispatch !== undefined || application.testRun?.stateRevision !== undefined) &&
             JSON.stringify(application.controllerDispatch) !== JSON.stringify(entry.request.controllerDispatch) ||
@@ -221,13 +231,21 @@ export const createParticipantNativeCommands = (options: {
       if (stopped || !participantNativeCommandKeywords.includes(keyword) || !Array.isArray(args) || !args.every(arg => typeof arg === "string")) return;
       observeScope();
       const scope = selected(); if (!scope) return;
+      const observedStatus = options.controllerStatus();
+      const controllerStatus = keyword !== "terminate" && observedStatus.startsWith("TERMINATED")
+        ? options.readState()?.testRun.status === "paused" ? "PAUSED" : "RUNNING" : observedStatus;
       const id = (options.id ?? (() => crypto.randomUUID()))();
       const entry: Entry = { scope, owner, id, version: 2, keyword, args: [...args], request: {
         testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId, bookletKey: scope.bookletKey,
-        deliveryId: id, keyword, arguments: [...args], controllerStatus: options.controllerStatus(), timeStamp: (options.now ?? Date.now)(),
+        deliveryId: id, keyword, arguments: [...args], controllerStatus, timeStamp: (options.now ?? Date.now)(),
         ...(keyword === "terminate" ? {} : { controllerDispatch: nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches) }) } };
+      if (keyword === "terminate" && observedStatus === "TERMINATED") {
+        entry.request.terminationNoop = true;
+        entry.request.controllerDispatch = nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
+        entry.prepared = true;
+      }
       queue.set(entry.id, entry); persist(entry);
-      if (keyword === "terminate") {
+      if (keyword === "terminate" && !entry.prepared) {
         const generation = options.generation?.();
         // Native force=true deactivation resolves immediately. Its awaited
         // continuation enters the terminal phase before closeAllBuffers waits.
@@ -239,7 +257,7 @@ export const createParticipantNativeCommands = (options: {
           entry.request.controllerDispatch = nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
           persist(entry); options.started?.(entry.request);
         }).catch(error => { if (queue.has(entry.id)) { remove(entry); options.failed(error instanceof Error ? error : new Error(String(error))); } }));
-      } else options.started?.(entry.request);
+      } else if (keyword !== "terminate") options.started?.(entry.request);
       observeScope();
     },
     stop(): void {

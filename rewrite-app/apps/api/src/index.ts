@@ -8534,7 +8534,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (request.method === "POST" && participantRunCommandApplicationMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.participantSessionId);
         const commandId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.commandId);
-        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"] }>();
+        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"]; terminationNoop?: unknown }>();
         if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
           sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
           return;
@@ -8543,8 +8543,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           sendError(response, 400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
           return;
         }
+        if (body.terminationNoop !== undefined && body.terminationNoop !== true) {
+          sendError(response, 400, "participant_command_controller_status_invalid", "The terminal early-return flag is invalid.");
+          return;
+        }
         const application = await services.participantRuntime.executeCommand({ participantSessionId, commandId,
-          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch });
+          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop });
         sendJson(response, 200, { application });
         return;
       }
@@ -8618,7 +8622,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const application = await services.participantRuntime.executeNativeCommand({ participantSessionId, testRunId: body.testRunId,
           contentReleaseId: body.contentReleaseId, bookletKey: body.bookletKey,
           deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp,
-          controllerDispatch: body.controllerDispatch });
+          controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop });
         sendJson<ParticipantNativeCommandResponse>(response, 200, { application });
         return;
       }

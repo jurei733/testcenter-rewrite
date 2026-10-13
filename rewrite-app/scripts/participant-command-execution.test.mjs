@@ -201,3 +201,23 @@ test('an accepted terminal phase samples at the forced-deactivation continuation
  const pending=f.execute(terminal);assert.deepEqual(f.events,[]);await Promise.resolve();assert.deepEqual(f.events,['terminal']);assert.equal(f.calls.length,0);
  status='PAUSED';gate.resolve();await pending;assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,'RUNNING');assert.deepEqual(f.events,['terminal','request','projected']);
 });
+
+test('an accepted terminal early return skips preparation and phase start and validates its durable decision',async()=>{
+ const terminal={...command(),commandType:'complete_and_lock'},f=fixture(async()=>({ok:true,json:async()=>({application:{...application().application,command:{...terminal,executedAt:'2026-10-11T00:00:02.000Z',executionSequence:1,terminationNoop:true}}})}));
+ f.options.controllerStatus=()=> 'TERMINATED';f.options.prepare=()=>assert.fail('An early return drained answers');f.options.started=()=>assert.fail('An early return started a phase');let observation;f.options.observed=(dispatch,status,flag)=>{observation={dispatch,status,flag};};
+ await f.execute(terminal);assert.equal(JSON.parse(f.calls[0].request.body).terminationNoop,true);assert.equal(observation.status,'TERMINATED');assert.equal(observation.flag,true);assert.deepEqual(f.events,['request','projected']);
+});
+test('an effectful terminal continuation observing TERMINATED retains its passed invocation decision',async()=>{
+ const terminal={...command(),commandType:'complete'},f=fixture(async()=>({ok:true,json:async()=>({application:{...application().application,command:{...terminal,executedAt:'2026-10-11T00:00:02.000Z',executionSequence:1}}})}));
+ f.options.controllerStatus=()=> 'TERMINATED';f.options.terminationNoop=false;f.options.started=()=>f.events.push('started');await f.execute(terminal);
+ assert.equal(JSON.parse(f.calls[0].request.body).terminationNoop,undefined);assert.deepEqual(f.events,['started','saved','request','projected']);
+});
+test('a dropped early-return receipt flag is a permanent mismatch rather than an effect projection',async()=>{
+ const terminal={...command(),commandType:'complete'},f=fixture(async()=>({ok:true,json:async()=>({application:{...application().application,command:{...terminal,executedAt:'2026-10-11T00:00:02.000Z',executionSequence:1}}})}));f.options.controllerStatus=()=> 'TERMINATED';
+ await assert.rejects(f.execute(terminal),error=>error.retryable===false);assert.deepEqual(f.events,['request']);
+});
+
+test('the durable early-return marker is accepted only on executed deferred terminal commands',()=>{
+ const receipt={...application().application.command,commandType:'complete',terminationNoop:true};assert.equal(parseParticipantRunCommand(receipt).terminationNoop,true);
+ for(const changed of [{terminationNoop:false},{terminationNoop:'true'},{commandType:'resume'},{effectsDeferred:undefined},{executedAt:null,executionSequence:null}])assert.equal(parseParticipantRunCommand({...receipt,...changed}),null);
+});

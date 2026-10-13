@@ -383,6 +383,21 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       await request('POST',nativePath,{...body,controllerDispatch:clock(3)},selected.sessionToken,409);
       assert.deepEqual(await snapshot(),accepted);assert.deepEqual(await repository.getTestRunById(otherBookletRun.testRunId),sibling);
     });
+    for(const origin of ['native','remote'])await t.test(`authenticated ${origin} terminal early returns preserve the first pending native effect and immutable receipt`,async()=>{
+      const repository=await readFreshRepository(),current=await repository.getTestRunById(run.testRunId),nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId}),actor='owned-'+origin+'-noop-http',clock=sequence=>({controllerId:actor,sequence});
+      const first={testRunId:run.testRunId,contentReleaseId:current.contentReleaseId,bookletKey:current.bookletKey,deliveryId:randomUUID(),keyword:'terminate',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.now(),controllerDispatch:clock(1)};
+      let path=nativePath,noop={...first,deliveryId:randomUUID(),arguments:['lock'],controllerStatus:'TERMINATED',terminationNoop:true,controllerDispatch:clock(2)};
+      if(origin==='remote'){const command=await issue(run.testRunId,'complete_and_lock');await request('PATCH',acknowledgement(command.commandId),{testRunId:run.testRunId},selected.sessionToken);path=application(command.commandId);noop={testRunId:run.testRunId,controllerStatus:'TERMINATED',terminationNoop:true,controllerDispatch:clock(2)};}
+      const snapshot=async()=>({run:await repository.getTestRunById(run.testRunId),parent:await repository.getParticipantSessionById(sessionId),sibling:await repository.getTestRunById(otherBookletRun.testRunId),logs:await repository.listParticipantTestLogsByWorkspace(run.tenantId,run.workspaceId),events:await repository.listWorkspaceActivityEventsByWorkspace(run.tenantId,run.workspaceId)}),before=await snapshot();
+      const result=(await request('POST',path,noop,selected.sessionToken)).application;assert.equal(origin==='native'?result.terminationNoop:result.command.terminationNoop,true);assert.deepEqual(result.testRun,JSON.parse(JSON.stringify(before.run)));assert.deepEqual(result.participantSession,JSON.parse(JSON.stringify(before.parent)));
+      const after=await snapshot();for(const key of ['run','parent','sibling','events'])assert.deepEqual(after[key],before[key]);assert.equal(after.logs.length-before.logs.length,1);assert.equal(after.logs.filter(log=>!before.logs.some(old=>old.participantTestLogId===log.participantTestLogId))[0].logKey,'command executed');
+      const replay=(await request('POST',path,noop,selected.sessionToken)).application;assert.equal(replay.applied,false);assert.equal(origin==='native'?replay.terminationNoop:replay.command.terminationNoop,true);assert.deepEqual(await snapshot(),after);
+      await request('POST',path,{...noop,terminationNoop:undefined},selected.sessionToken,409);
+      for(const flag of [false,'true',{}])await request('POST',path,{...noop,terminationNoop:flag},selected.sessionToken,400);
+      for(const token of [undefined,other.sessionToken])await request('POST',path,noop,token,401);await request('POST',path,{...noop,testRunId:foreign.testRunId},selected.sessionToken,404);assert.deepEqual(await snapshot(),after);
+      const completed=(await request('POST',nativePath,first,selected.sessionToken)).application;assert.equal(completed.superseded,undefined);assert.equal(completed.testRun.status,'paused');assert.equal(completed.testRun.locked,false);assert.equal(completed.testRun.controllerDispatches[actor],1);assert.deepEqual(completed.testRun.unitResponses,before.run.unitResponses);assert.deepEqual(completed.testRun.unitResponseFieldTimestamps,before.run.unitResponseFieldTimestamps);
+      await request('POST',nativePath,{...first,deliveryId:randomUUID(),keyword:'resume',controllerStatus:'PAUSED',controllerDispatch:clock(3)},selected.sessionToken);
+    });
     await t.test("selected streaming survives sibling exits, while a sibling entry cannot revive a terminated receiver", async () => {
       const repository=await readFreshRepository(),before=await repository.getTestRunById(run.testRunId);
       const nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId});

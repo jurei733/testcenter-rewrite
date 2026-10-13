@@ -744,7 +744,7 @@ export type ParticipantRuntimePort = {
   getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
-  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"] }): Promise<ParticipantRunCommandApplicationResult>;
+  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"]; terminationNoop?: true }): Promise<ParticipantRunCommandApplicationResult>;
   executeNativeCommand(input: ParticipantNativeCommandRequest & { participantSessionId: string }): Promise<ParticipantNativeCommandResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
@@ -32049,7 +32049,8 @@ export const createFirstSliceServices = (
         }
         const commandId = input.commandId?.trim();
         if (!commandId || commandId.length > 160) throw new FirstSliceError(400, "invalid_participant_command_id", "A command identifier is required.");
-        if (input.controllerStatus !== undefined && !["RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus)) {
+        if (input.controllerStatus !== undefined && !["RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(input.controllerStatus) ||
+            input.terminationNoop !== undefined && (input.terminationNoop !== true || input.controllerStatus !== "TERMINATED")) {
           throw new FirstSliceError(400, "participant_command_controller_status_invalid", "The observed controller status is invalid.");
         }
         const contentRelease = await requireContentRelease(repository, selected.contentReleaseId);
@@ -32059,12 +32060,22 @@ export const createFirstSliceServices = (
             tenantId: session.tenantId, workspaceId: session.workspaceId, participantSessionId: session.participantSessionId,
             testRunId: selected.testRunId, commandId, executedAt
           }, context => {
+            if (input.terminationNoop && (!context.command.effectsDeferred || !["complete", "complete_and_lock"].includes(context.command.commandType))) {
+              throw new FirstSliceError(400, "participant_command_controller_status_invalid", "Only a deferred terminal command can take the terminal early return.");
+            }
             // Legacy records already changed the Run at issuance. Do not repeat their effects.
             if (!context.command.effectsDeferred) return { testRun: context.testRun, testLogs: [], activityEvents: [] };
             const { command, participantSession } = context;
             const testRun = normalizeTestRun(context.testRun);
             const mode = resolveParticipantExecutionMode(testRun.executionMode);
             if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+            if (input.terminationNoop) {
+              const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+                reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
+              return { terminationNoop: true, testRun: context.testRun,
+                testLogs: mode.saveResponses && content ? buildParticipantTestLogs({ testRun: context.testRun,
+                  batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [], activityEvents: [] };
+            }
             if (command.commandType !== "debug" && participantControllerDispatchSuperseded(context.testRun, input.controllerDispatch)) {
               const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
                 reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
@@ -32131,6 +32142,9 @@ export const createFirstSliceServices = (
                 ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
           }));
           if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
+          if (Boolean(result.command.terminationNoop) !== Boolean(input.terminationNoop)) {
+            throw new FirstSliceError(409, "participant_command_application_conflict", "An executed terminal command cannot change its early-return decision.");
+          }
           return { ...result, ...(input.controllerDispatch ? { controllerDispatch: input.controllerDispatch,
             ...(input.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[input.controllerDispatch.controllerId] ?? 0) ? { superseded: true as const } : {}) } : {}) };
         } catch (error) {
@@ -32144,7 +32158,8 @@ export const createFirstSliceServices = (
         }
         if (!participantNativeCommandKeywords.includes(input.keyword) || !Array.isArray(input.arguments) ||
             input.arguments.some(argument => typeof argument !== "string") ||
-            !["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus) ||
+            !["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(input.controllerStatus) ||
+            input.terminationNoop !== undefined && (input.terminationNoop !== true || input.keyword !== "terminate" || input.controllerStatus !== "TERMINATED") ||
             !Number.isSafeInteger(input.timeStamp) || input.timeStamp < 0 ||
             typeof input.contentReleaseId !== "string" || !input.contentReleaseId || typeof input.bookletKey !== "string" || !input.bookletKey ||
             typeof input.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(input.deliveryId)) {
@@ -32167,7 +32182,8 @@ export const createFirstSliceServices = (
         const deliveryId = `console:${request.deliveryId}`;
         const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: request.keyword,
           arguments: request.arguments, controllerStatus: request.controllerStatus, timeStamp: request.timeStamp,
-          ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}) });
+          ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}),
+          ...(request.terminationNoop ? { terminationNoop: true } : {}) });
         let executedAt = "";
         try {
           const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
@@ -32182,6 +32198,17 @@ export const createFirstSliceServices = (
             if (context.testRun.bookletKey !== selected.bookletKey || context.testRun.bookletAssignmentKey !== selected.bookletAssignmentKey) {
               throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's immutable assignment changed.");
             }
+            if (request.terminationNoop) {
+              if (context.testRun.status === "completed") throw new FirstSliceError(400, "participant_native_run_completed", "The selected Run is completed.");
+              // Log the accepted early return without advancing the state-effect
+              // highwater: an earlier real Terminate may still await its buffers.
+              return { terminationNoop: true, testRun: context.testRun,
+                testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
+                  deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }] }] }) : [],
+                activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                  tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                  deliveryId, payloadSha256, acceptedAt: timestamp } };
+            }
             const adaptive = new Map(evaluateAdaptiveStates(booklet, context.testRun).map(state => [state.stateKey, state.optionKey]));
             const locks = (run: TestRun, key: string) => {
               const restrictions = key === originalBookletRootTestletKey ? booklet.rootRestrictions : booklet.testletEntries?.find(entry => entry.testletKey === key)?.restrictions;
@@ -32192,7 +32219,7 @@ export const createFirstSliceServices = (
                 code: Boolean(entry?.restrictions?.codeToEnter?.code && !run.unlockedTestletKeys?.includes(key)),
                 afterLeave: Boolean(entry?.restrictions?.lockAfterLeaving && run.lockedTestletKeys?.includes(key)) };
             };
-            const observedController = request.controllerStatus === "ERROR" ? "ERROR" :
+            const observedController = request.controllerDispatch || request.controllerStatus === "TERMINATED" || request.controllerStatus === "TERMINATED_PAUSED" ? request.controllerStatus : request.controllerStatus === "ERROR" ? "ERROR" :
               request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : request.controllerStatus;
             const projected = projectParticipantNativeCommand({ request: { ...request, controllerStatus: observedController }, booklet, testRun: context.testRun, timestamp,
               timedKey: unitKey => resolveTimedTestletForUnit(booklet, unitKey)?.testletKey ?? null,

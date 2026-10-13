@@ -95,10 +95,10 @@ test('accepted controller states are visible before their Unit loads and termina
  await f.host.applyNativeConsoleCommand({keyword:'resume',testRun:run,participantSession:session},()=>true);
  assert.equal(f.host.debugControllerStatus,'RUNNING');assert.equal(f.host.nativeControllerStatus,'RUNNING');
  f.host.syncRun({...run,status:'paused'});f.host.commandControllerState={testRunId:'selected',status:'TERMINATED_PAUSED'};
- assert.equal(f.host.nativeControllerStatus,'PAUSED');
+ assert.equal(f.host.nativeControllerStatus,'TERMINATED_PAUSED');
  f.host.activeControllerError.set({testRunId:'selected',message:'Retained error'});f.host.participantErrorReceptionSuspended=true;
  assert.equal(f.host.debugControllerStatus,'TERMINATED_PAUSED');
- assert.equal(f.host.nativeControllerStatus,'ERROR');
+ assert.equal(f.host.nativeControllerStatus,'TERMINATED_PAUSED');
  f.host.runtime.testRunId='other';assert.equal(f.host.consoleRun,null);
  loading.resolve({currentRunState:state(run)});await tick();
 });
@@ -511,4 +511,36 @@ test('remote forced termination starts before its lazy execution module and reta
  const pending=f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);assert.equal(f.host.debugControllerStatus,'RUNNING');await Promise.resolve();assert.equal(f.host.debugControllerStatus,'TERMINATED');await assert.rejects(pending,/Owned lost receipt/);
  f.host.beginControllerCommand('selected','pause',phaseDispatch(2));await f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);
  assert.equal(f.host.debugControllerStatus,'PAUSED');assert.deepEqual(observations,['RUNNING','RUNNING']);assert.equal(allocations,1);
+});
+
+test('a native no-op receipt cannot finish the first pending terminal phase or navigate',async()=>{
+ const gate=deferred(),f=fixture(()=>gate.promise);f.host.syncRun(run);f.host.currentRunState=state(run);f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');
+ assert.equal(f.host.nativeControllerStatus,'TERMINATED');const before=structuredClone(f.host.consoleRun),suspended=f.calls.suspended;
+ await f.host.applyNativeConsoleCommand({keyword:'terminate',terminationNoop:true,controllerStatus:'TERMINATED',testRun:run,participantSession:session},()=>true,phaseDispatch(2));
+ assert.equal(f.host.debugControllerStatus,'TERMINATED');assert.deepEqual(f.host.consoleRun,before);assert.equal(f.calls.suspended,suspended);assert.equal(f.calls.requests.length,0);assert.equal(f.calls.starter,0);
+ gate.resolve({runtimeState:{participantSession:session}});
+});
+
+test('a completed terminal phase is actual TERMINATED despite an older retained error dialog',async()=>{
+ const gate=deferred(),ended={...run,status:'paused',controllerEntry:{active:false,revision:1}},parent={...session,status:'signed_in'};
+ const f=fixture(label=>label==='Participant Starter'?gate.promise:Promise.resolve({controllerContext:{participantSession:parent,testRun:ended}}));f.host.syncRun(run);f.host.currentRunState=state(run);f.host.activeControllerError.set({testRunId:'selected',unitKey:'unit',message:'Older retained dialog'});f.host.participantErrorReceptionSuspended=true;
+ f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'ERROR');await f.host.applyNativeConsoleCommand({keyword:'terminate',testRun:ended,participantSession:parent,controllerStatus:'ERROR'},()=>true,phaseDispatch(1));
+ assert.equal(f.host.nativeControllerStatus,'TERMINATED');assert.equal(f.host.controllerError.message,'Older retained dialog');const requests=f.calls.requests.length;
+ await f.host.applyNativeConsoleCommand({keyword:'terminate',terminationNoop:true,testRun:ended,participantSession:parent,controllerStatus:'TERMINATED'},()=>true,phaseDispatch(2));assert.equal(f.host.nativeControllerStatus,'TERMINATED');assert.equal(f.calls.requests.length,requests);
+ gate.resolve({runtimeState:{participantSession:parent}});await tick();
+});
+
+test('a remote no-op receipt retains the first phase and its original decision across a later Resume',async()=>{
+ const observations=[],command=remoteCommand('complete_and_lock'),f=fixture(undefined,async(cmd,_signal,options)=>{
+  observations.push({status:options.controllerStatus(),terminationNoop:options.terminationNoop});const application=remoteApplication(cmd);await options.apply({...application,command:{...application.command,terminationNoop:true}});
+ });f.host.syncRun(run);f.host.currentRunState=state(run);f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');
+ const allocate=()=>phaseDispatch(2),suspended=f.calls.suspended;await f.host.applyReceivedParticipantCommand(command,new AbortController().signal,allocate);
+ assert.equal(f.host.debugControllerStatus,'TERMINATED');assert.equal(f.host.controllerCommandPhase().dispatch.sequence,1);assert.equal(f.calls.suspended,suspended);assert.equal(f.calls.starter,0);assert.equal(f.calls.saved,0);assert.equal(f.calls.requests.length,0);
+ f.host.beginControllerCommand('selected','resume',phaseDispatch(3));await f.host.applyReceivedParticipantCommand(command,new AbortController().signal,()=>assert.fail('A retry cannot get a new decision or dispatch'));
+ assert.equal(f.host.debugControllerStatus,'RUNNING');assert.deepEqual(observations,[{status:'TERMINATED',terminationNoop:true},{status:'TERMINATED',terminationNoop:true}]);assert.deepEqual(f.host.consoleRun,run);
+});
+test('same-turn accepted terminal handlers both pass their invocation guard before either continuation',async()=>{
+ const gate=deferred(),observed=[],f=fixture(undefined,async(_cmd,_signal,options)=>{observed.push({status:options.controllerStatus(),terminationNoop:options.terminationNoop});await gate.promise;});f.host.syncRun(run);f.host.currentRunState=state(run);let sequence=0;const allocate=()=>phaseDispatch(++sequence);
+ const first=f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal,allocate),second=f.host.applyReceivedParticipantCommand({...remoteCommand('complete_and_lock'),commandId:'second'},new AbortController().signal,allocate);
+ await tick();assert.deepEqual(observed,[{status:'RUNNING',terminationNoop:false},{status:'TERMINATED',terminationNoop:false}]);assert.equal(f.host.debugControllerStatus,'TERMINATED');gate.resolve();await Promise.all([first,second]);
 });

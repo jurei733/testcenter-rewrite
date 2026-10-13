@@ -123,7 +123,7 @@ for (const kind of kinds) {
     };
     const repository = await create();
     const tenantId = randomUUID(), workspaceId = randomUUID();
-    const seed = async (type = "pause", extra = {}) => {
+    const seed = async (type = "pause", extra = {}, commandExtra = {}) => {
       const session = { tenantId, workspaceId, participantSessionId: randomUUID(), contentReleaseId: randomUUID(),
         loginKey: "owned", groupKey: "owned", status: "launched", createdAt: issuedAt };
       const run = { ...session, testRunId: randomUUID(), bookletKey: "owned", executionMode: "run-hot-return",
@@ -131,7 +131,7 @@ for (const kind of kinds) {
         createdAt: issuedAt, updatedAt: issuedAt, completedAt: null, ...extra };
       await repository.saveParticipantSession(session); await repository.saveTestRun(run);
       const scope = { tenantId, workspaceId, participantSessionId: session.participantSessionId, testRunId: run.testRunId };
-      const input = { ...scope, commandId: randomUUID(), commandType: type, targetUnitKey: null, remainingSeconds: null, actorId: null, issuedAt };
+      const input = { ...scope, commandId: randomUUID(), commandType: type, targetUnitKey: null, remainingSeconds: null, actorId: null, issuedAt, ...commandExtra };
       const queued = await repository.appendParticipantRunCommand(input);
       return { session: await repository.getParticipantSessionById(session.participantSessionId), run: await repository.getTestRunById(run.testRunId), scope, input, queued };
     };
@@ -176,6 +176,20 @@ for (const kind of kinds) {
         assert.equal(duplicate.applied, false); assert.equal(duplicate.command.executedAt, executedAt);
         assert.equal(duplicate.testRun.unitResponses.unit, "Newer delivered answer");
         assert.equal((await snapshot(f, replica)).logs.length, 1);
+      });
+      await t.test("a terminal no-op decision survives restart without advancing the waiting first command highwater",async()=>{
+        const f=await seed('complete',{stateRevision:3,controllerEntry:{active:true,revision:7},controllerDispatches:{'owned-controller':5}},{effectsDeferred:true});
+        const later={...f.input,commandId:randomUUID(),commandType:'complete_and_lock'};await repository.appendParticipantRunCommand(later);await ack(f);await repository.acknowledgeParticipantRunCommand({...f.scope,commandId:later.commandId,acknowledgedAt});
+        const before=await snapshot(f);const applied=await repository.applyParticipantRunCommand({...application(f),commandId:later.commandId},context=>({terminationNoop:true,testRun:context.testRun,testLogs:[{...effect(context).testLogs[0],logKey:'command executed',logContent:'terminate lock'}],activityEvents:[]}));
+        assert.equal(applied.command.terminationNoop,true);assert.deepEqual(applied.testRun,before.run);assert.deepEqual(applied.participantSession,before.session);const after=await snapshot(f);assert.deepEqual(after.run,before.run);assert.deepEqual(after.session,before.session);assert.deepEqual(after.activity,before.activity);assert.equal(after.logs.length-before.logs.length,1);
+        const replica=kind==='memory'?repository:await create();const replay=await replica.applyParticipantRunCommand({...application(f),commandId:later.commandId},()=>assert.fail('A persisted no-op cannot execute again'));assert.equal(replay.applied,false);assert.equal(replay.command.terminationNoop,true);assert.equal(replay.command.executionSequence,applied.command.executionSequence);assert.deepEqual(await snapshot(f,replica),after);
+        const first=await replica.applyParticipantRunCommand(application(f),context=>({...effect(context),controllerDispatch:{controllerId:'owned-controller',sequence:6}}));assert.equal(first.superseded,undefined);assert.equal(first.testRun.status,'paused');assert.equal(first.testRun.controllerDispatches['owned-controller'],6);assert.equal(first.testRun.stateRevision,4);
+      });
+      await t.test("a no-op projection cannot mutate Run, parent, entry, highwater, state logs or activity",async()=>{
+        const f=await seed('complete',{}, {effectsDeferred:true});await ack(f);const before=await snapshot(f);
+        for(const change of [e=>e.testRun.status='paused',e=>e.participantSession=f.session,e=>e.controllerEntryActive=false,e=>e.controllerDispatch={controllerId:'owned-controller',sequence:2},e=>e.testLogs=effect({testRun:f.run,command:f.input}).testLogs,e=>e.activityEvents=effect({testRun:f.run,command:f.input}).activityEvents,e=>e.terminationNoop=false]){
+          await assert.rejects(repository.applyParticipantRunCommand(application(f),context=>{const e={terminationNoop:true,testRun:context.testRun,testLogs:[],activityEvents:[]};change(e);return e;}),/early return/);assert.deepEqual(await snapshot(f),before);
+        }
       });
       for (const reversed of [false, true]) await t.test(`actual application order follows ${reversed ? "reversed" : "normal"} ACK dispatch`, async () => {
         const f = await seed("pause");

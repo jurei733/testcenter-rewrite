@@ -105,6 +105,8 @@ export const prepareParticipantRunCommandApplication = (
       context.participantSession.participantSessionId !== input.participantSessionId ||
       context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId) return null;
   const { command, testRun, participantSession } = context;
+  if (command.terminationNoop !== undefined && (command.terminationNoop !== true || !command.effectsDeferred || !command.executedAt ||
+      !["complete", "complete_and_lock"].includes(command.commandType))) throw new Error("The persisted terminal early-return receipt is invalid.");
   if (!command.acknowledgedAt) throw new ParticipantRunCommandApplicationError("participant_command_not_acknowledged", "Only an acknowledged participant command may be applied.");
   if (command.executedAt) {
     if (!Number.isSafeInteger(command.executionSequence) || Number(command.executionSequence) < 1) {
@@ -117,6 +119,13 @@ export const prepareParticipantRunCommandApplication = (
   const executionSequence = lastExecutionSequence + 1;
   if (!Number.isSafeInteger(executionSequence) || executionSequence < 1) throw new Error("Participant command application sequence is exhausted.");
   const effect = structuredClone(transform(structuredClone(context)));
+  if (effect.terminationNoop !== undefined && (effect.terminationNoop !== true || !command.effectsDeferred ||
+      !["complete", "complete_and_lock"].includes(command.commandType) || effect.controllerDispatch !== undefined ||
+      effect.controllerEntryActive !== undefined || effect.participantSession !== undefined ||
+      JSON.stringify(effect.testRun) !== JSON.stringify(testRun) || effect.activityEvents.length > 0 ||
+      effect.testLogs.some(log => log.logKey !== "command executed"))) {
+    throw new Error("A terminal early return cannot change its Run, parent, entry, dispatch highwater or state artifacts.");
+  }
   if (new Set(effect.testLogs.map(log => log.participantTestLogId)).size !== effect.testLogs.length ||
       new Set(effect.activityEvents.map(event => event.activityEventId)).size !== effect.activityEvents.length) {
     throw new Error("A participant command effect contains duplicate artifact identities.");
@@ -139,7 +148,7 @@ export const prepareParticipantRunCommandApplication = (
   }
   effect.testRun = withParticipantRunRevision(testRun,
     withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
-  const appliedCommand = { ...command, executedAt, executionSequence };
+  const appliedCommand = { ...command, executedAt, executionSequence, ...(effect.terminationNoop ? { terminationNoop: true as const } : {}) };
   return { result: structuredClone({ command: appliedCommand, testRun: effect.testRun,
     participantSession: effect.participantSession ?? participantSession, applied: true,
     ...(effect.superseded ? { superseded: true as const } : {}) }), effect };

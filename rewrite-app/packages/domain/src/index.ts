@@ -1364,6 +1364,8 @@ export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
 
 /** Durable delivery intent. ACK ends delivery without mutating answers or Run state. */
 export type ParticipantRunCommand = ParticipantRunCommandInput & {
+  /** Durable result of the Original's already-TERMINATED early return. */
+  terminationNoop?: true;
   sequence: number;
   acknowledgedAt: string | null;
   /** Absent on legacy records; ACK and application are separate operations. */
@@ -1387,6 +1389,7 @@ export type ParticipantRunCommandApplicationContext = {
 export type ParticipantControllerDispatch = { controllerId: string; sequence: number };
 
 export type ParticipantRunCommandEffect = {
+  terminationNoop?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   superseded?: true;
   testRun: TestRun;

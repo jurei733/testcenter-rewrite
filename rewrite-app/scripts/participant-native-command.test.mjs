@@ -159,8 +159,39 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
     const logs=await repository.listParticipantTestLogsByWorkspace(base.tenantId,base.workspaceId);assert.equal(logs.filter(log=>log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${request.deliveryId}:`)&&log.logKey==='command executed')[0].logContent,['terminate',...args].join(' '));}
    await repository.saveTestRun(run);await repository.saveParticipantSession(parent);
   });
+  await t.test('a terminal early return logs once without advancing the first waiting termination highwater',async()=>{
+   const original={...run,stateRevision:3,controllerEntry:{active:true,revision:7},controllerDispatches:{'owned-controller':5}};
+   await repository.saveTestRun(original);await repository.saveParticipantSession(parent);
+   const first=input('terminate',[],{controllerDispatch:{controllerId:'owned-controller',sequence:6}});
+   const noop=input('terminate',['lock'],{controllerStatus:'TERMINATED',terminationNoop:true,controllerDispatch:{controllerId:'owned-controller',sequence:7}}),before=await snapshot(noop);
+   const result=await invoke(noop);assert.equal(result.terminationNoop,true);assert.equal(result.applied,true);assert.deepEqual(result.testRun,before.run);assert.deepEqual(result.participantSession,before.parent);
+   const after=await snapshot(noop,await create());for(const key of ['run','parent','sibling','foreign','release','commands','events'])assert.deepEqual(after[key],before[key],key);
+   const logs=after.logs.filter(log=>log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${noop.deliveryId}:`));assert.deepEqual(logs.map(log=>[log.logKey,log.logContent]),[['command executed','terminate lock']]);assert.ok(after.receipt);
+   const replay=await invoke(noop,await create());assert.equal(replay.applied,false);assert.equal(replay.terminationNoop,true);assert.equal(replay.executedAt,result.executedAt);assert.deepEqual(await snapshot(noop,await create()),after);
+   await assert.rejects(invoke({...noop,terminationNoop:undefined}),error=>error.errorCode==='participant_delivery_conflict');assert.deepEqual(await snapshot(noop),after);
+   const completed=await invoke(first);assert.equal(completed.superseded,undefined);assert.equal(completed.testRun.status,'paused');assert.equal(completed.testRun.locked===true,false);assert.equal(completed.testRun.controllerDispatches['owned-controller'],6);assert.equal(completed.testRun.stateRevision,4);assert.deepEqual(completed.testRun.controllerEntry,{active:false,revision:8});preserve(completed.testRun,original);
+   await repository.saveTestRun(run);await repository.saveParticipantSession(parent);
+  });
+  await t.test('a passed invocation guard still executes TERMINATED_PAUSED and same-turn TERMINATED observations',async()=>{
+   for(const observed of ['TERMINATED_PAUSED','TERMINATED']){
+    const original={...run,status:'paused',controllerEntry:{active:false,revision:4}};await repository.saveTestRun(original);
+    const request=input('terminate',['lock'],{controllerStatus:observed,controllerDispatch:{controllerId:'owned-controller',sequence:1}}),result=await invoke(request);
+    assert.equal(result.terminationNoop,undefined);assert.equal(result.testRun.locked,true);assert.equal(result.testRun.status,'paused');preserve(result.testRun,original);
+    const logs=(await snapshot(request)).logs.filter(log=>log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${request.deliveryId}:`));assert.deepEqual(logs.filter(log=>log.logKey==='CONTROLLER').map(log=>log.logContent),observed==='TERMINATED_PAUSED'?['TERMINATED']:[]);
+   }
+   await repository.saveTestRun(run);await repository.saveParticipantSession(parent);
+  });
+  await t.test('terminal early-return flags retain validation, completed-run rejection and mode-filtered logging',async()=>{
+   const before=await snapshot();for(const extra of [{terminationNoop:false},{terminationNoop:'true'},{terminationNoop:true},{terminationNoop:true,controllerStatus:'TERMINATED',keyword:'pause'},{terminationNoop:true,controllerStatus:'TERMINATED',testRunId:foreign.testRunId}]){await assert.rejects(invoke(input('terminate',[],extra)));assert.deepEqual(await snapshot(),before);}
+   await repository.saveTestRun({...run,status:'completed',completedAt:timestamp});const closed=await snapshot();await assert.rejects(invoke(input('terminate',[],{controllerStatus:'TERMINATED',terminationNoop:true})),error=>error.errorCode==='participant_native_run_completed');assert.deepEqual(await snapshot(),closed);
+   for(const mode of ['run-hot-return','run-hot-restart','run-simulation','run-demo','run-review','run-trial']){
+    const original={...run,executionMode:mode};await repository.saveTestRun(original);const request=input('terminate',['lock'],{controllerStatus:'TERMINATED',terminationNoop:true}),prior=await snapshot(request);await invoke(request);const after=await snapshot(request);
+    assert.deepEqual(after.run,prior.run);assert.deepEqual(after.parent,prior.parent);assert.deepEqual(after.events,prior.events);assert.equal(after.logs.length-prior.logs.length,['run-demo','run-review','run-simulation'].includes(mode)?0:1);
+   }
+   await repository.saveTestRun(run);
+  });
   await t.test('foreign scope, corrupted release, malformed arguments and immutable receipt substitutions make no writes',async()=>{
-   const before=await snapshot();for(const extra of [{testRunId:foreign.testRunId},{contentReleaseId:'foreign'},{bookletKey:'foreign'},{keyword:'debug'},{arguments:[42]},{arguments:null},{timeStamp:NaN},{controllerStatus:'TERMINATED'},{deliveryId:'bad/id'}]){
+   const before=await snapshot();for(const extra of [{testRunId:foreign.testRunId},{contentReleaseId:'foreign'},{bookletKey:'foreign'},{keyword:'debug'},{arguments:[42]},{arguments:null},{timeStamp:NaN},{controllerStatus:'BAD_STATUS'},{deliveryId:'bad/id'}]){
     await assert.rejects(invoke(input('pause',[],extra)));assert.deepEqual(await snapshot(),before);}
    for(const args of [[],['0'],['id','original-not-alias'],['id','missing'],['3']]){await assert.rejects(invoke(input('goto',args)));assert.deepEqual(await snapshot(),before);}
    const request=input('pause'),accepted=await invoke(request),after=await snapshot(request);assert.equal(accepted.applied,true);
@@ -169,13 +200,15 @@ for(const kind of kinds)test(`${kind}: native console commands bind immutable sc
    await repository.saveTestRun(run);
   });
   if(kind!=='memory')await t.test('failed native command log rolls back Run, parent, audit and receipt; a restarted retry commits once',async()=>{
-   await repository.saveTestRun(run);await repository.saveParticipantSession(parent);const request=input('terminate',['lock']),before=await snapshot(request),backup=join(directory,'backup.json');
+   for(const request of [input('terminate',['lock']),input('terminate',['lock'],{controllerStatus:'TERMINATED',terminationNoop:true})]){
+   await repository.saveTestRun(run);await repository.saveParticipantSession(parent);const before=await snapshot(request),backup=join(directory,'backup.json');
    if(kind==='file'){await rename(file,backup);await mkdir(file);}else if(kind==='sqlite')control.exec("CREATE TRIGGER owned_native_failure BEFORE INSERT ON participant_test_logs WHEN NEW.log_key='command executed' BEGIN SELECT RAISE(ABORT,'owned native failure'); END");
    else await control.query("CREATE FUNCTION owned_native_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned native failure'; END $$; CREATE TRIGGER owned_native_failure BEFORE INSERT ON participant_test_logs FOR EACH ROW WHEN (NEW.log_key='command executed') EXECUTE FUNCTION owned_native_failure()");
    try{await assert.rejects(invoke(request));if(kind!=='file')assert.deepEqual(await snapshot(request),before);}
    finally{if(kind==='file'){await rm(file,{recursive:true});await rename(backup,file);}else if(kind==='sqlite')control.exec('DROP TRIGGER owned_native_failure');else await control.query('DROP TRIGGER owned_native_failure ON participant_test_logs; DROP FUNCTION owned_native_failure()');}
    assert.deepEqual(await snapshot(request),before);assert.equal((await invoke(request,await create())).applied,true);const after=await snapshot(request,await create());
    assert.equal((await invoke(request,await create())).applied,false);assert.deepEqual(await snapshot(request,await create()),after);
+   }
   });
  }finally{for(const storage of storages)await storage.shutdown();if(kind==='sqlite')control?.close();else await control?.end();try{if(created)await root.query(`DROP SCHEMA "${schema}" CASCADE`);}finally{await root?.end();await rm(directory,{recursive:true,force:true});}}
 });

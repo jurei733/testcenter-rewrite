@@ -245,3 +245,39 @@ test('restoring an unprepared modern terminal packet does not replay or resample
  try{await restored.advance();assert.deepEqual(starts,[]);assert.equal(restored.calls[0].request.body,JSON.stringify(packet));}
  finally{restored.native.stop();}
 });
+
+test('an already-TERMINATED invocation skips buffers and phase while the first termination still waits',async()=>{
+ const gate=deferred(),starts=[];let status='RUNNING';const f=fixture({controllerStatus:()=>status,prepare:()=>gate.promise,started:request=>{starts.push(structuredClone(request));if(request.keyword==='terminate')status=request.controllerStatus==='PAUSED'?'TERMINATED_PAUSED':'TERMINATED';}});
+ try{f.native.command('terminate',[]);await f.advance();assert.equal(f.calls.length,0);assert.equal(starts.length,1);f.native.command('terminate',['lock']);await f.advance();assert.equal(starts.length,1);assert.equal(f.prepared.length,1);
+  const noop=JSON.parse(f.calls[0].request.body);assert.equal(noop.terminationNoop,true);assert.equal(noop.controllerStatus,'TERMINATED');assert.equal(noop.controllerDispatch.sequence,2);
+  gate.resolve();await flush();const first=JSON.parse(f.calls[1].request.body);assert.equal(first.terminationNoop,undefined);assert.equal(first.controllerDispatch.sequence,1);assert.equal(first.controllerStatus,'RUNNING');assert.equal(f.values.size,0);
+ }finally{gate.resolve();f.native.stop();}
+});
+test('same-turn termination invocations both pass the guard even if the second continuation observes TERMINATED',async()=>{
+ const gate=deferred(),starts=[];let status='RUNNING';const f=fixture({controllerStatus:()=>status,prepare:()=>gate.promise,started:request=>{starts.push(structuredClone(request));status='TERMINATED';}});
+ try{f.native.command('terminate',[]);f.native.command('terminate',['lock']);await f.advance();assert.equal(starts.length,2);assert.equal(f.prepared.length,2);assert.equal(f.calls.length,0);assert.deepEqual(starts.map(r=>[r.controllerStatus,r.terminationNoop]),[['RUNNING',undefined],['TERMINATED',undefined]]);gate.resolve();await flush();assert.ok(f.calls.every(c=>JSON.parse(c.request.body).terminationNoop===undefined));}
+ finally{gate.resolve();f.native.stop();}
+});
+test('TERMINATED_PAUSED is not the already-TERMINATED guard and prepared no-op retries retain their decision',async()=>{
+ const gate=deferred(),starts=[];let status='TERMINATED_PAUSED';const f=fixture({controllerStatus:()=>status,prepare:()=>gate.promise,started:r=>{starts.push(r);status='TERMINATED';},respond:async()=>({ok:false,status:503})});
+ try{f.native.command('terminate',[]);await f.advance();assert.equal(starts.length,1);assert.equal(f.prepared.length,1);f.native.command('terminate',['lock']);await f.advance();const packet=f.calls[0].request.body;assert.equal(JSON.parse(packet).terminationNoop,true);
+  status='RUNNING';await f.advance(1000);assert.equal(f.calls[1].request.body,packet);assert.equal(f.prepared.length,1);
+  const values=new Map(f.values),restored=fixture({values,controllerStatus:()=> 'PAUSED'});try{await restored.advance();assert.ok(restored.calls.some(c=>c.request.body===packet));}finally{restored.native.stop();}
+ }finally{gate.resolve();f.native.stop();}
+});
+for(const forged of [true,false])test(`a forged terminal early-return receipt cannot change projection (${forged})`,async()=>{
+ const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);value.application.terminationNoop=forged;return{ok:true,json:async()=>value};}});try{f.native.command('pause',[]);await f.advance();assert.equal(f.applied.length,0);assert.equal(f.failures.length,1);}finally{f.native.stop();}
+});
+
+test('an early return bypasses a held legacy packet while later state effects keep legacy FIFO',async()=>{
+ const gate=deferred(),id='owned-legacy',request={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,deliveryId:id,keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:1791763200123};
+ const values=new Map([['testcenter-rewrite:participant-native-command:v1:'+id,JSON.stringify({scope,owner:'owned-tab',id,keyword:'pause',args:[],request,prepared:true})]]);
+ const f=fixture({values,controllerStatus:()=> 'TERMINATED',respond:async(body,_count,receipt)=>{if(body.deliveryId===id)await gate.promise;return{ok:true,json:async()=>receipt(body)};}});
+ try{await f.advance();f.native.command('terminate',['lock']);f.native.command('resume',[]);await f.advance();assert.equal(f.calls.length,2);assert.equal(JSON.parse(f.calls[1].request.body).terminationNoop,true);assert.equal(f.prepared.length,0);
+  gate.resolve();await flush();await f.advance();assert.deepEqual(f.calls.map(c=>JSON.parse(c.request.body).keyword),['pause','terminate','resume']);assert.equal(f.prepared.length,1);
+ }finally{gate.resolve();f.native.stop();}
+});
+test('restoring an effectful TERMINATED observation does not reclassify its passed invocation guard',async()=>{
+ const gate=deferred();let status='RUNNING';const f=fixture({controllerStatus:()=>status,started:()=>{status='TERMINATED';},prepare:()=>gate.promise});f.native.command('terminate',[]);f.native.command('terminate',['lock']);await flush();const values=new Map(f.values);f.native.stop();
+ const restored=fixture({values,controllerStatus:()=> 'TERMINATED'});try{await restored.advance();assert.equal(restored.prepared.length,2);assert.ok(restored.calls.every(c=>JSON.parse(c.request.body).terminationNoop===undefined));assert.equal(JSON.parse(restored.calls[1].request.body).controllerStatus,'TERMINATED');}finally{gate.resolve();restored.native.stop();}
+});

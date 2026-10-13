@@ -496,7 +496,7 @@ export class ParticipantViewFacade {
   private commandControllerState: { testRunId: string; status: string; entryRevision?: number } | null = null;
   private debugCommandDispatch: ParticipantRunCommandApplicationResult["controllerDispatch"];
   private readonly controllerCommandPhase = signal<{ testRunId: string; dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED" | "TERMINATED" | "TERMINATED_PAUSED"; pending: boolean; interrupted?: true } | null>(null);
-  private readonly terminalCommandPhases = new WeakMap<ParticipantRunCommand, { dispatch: ParticipantControllerDispatch; status: "RUNNING" | "PAUSED" | "ERROR" }>();
+  private readonly terminalCommandPhases = new WeakMap<ParticipantRunCommand, { dispatch: ParticipantControllerDispatch; status: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING">; terminationNoop?: true }>();
   private readonly consoleTestRun = signal<TestRun | null>(null);
   get consoleRun(): TestRun | null {
     const run = this.consoleTestRun();
@@ -540,8 +540,13 @@ export class ParticipantViewFacade {
   }
   get nativeControllerStatus(): ParticipantNativeCommandRequest["controllerStatus"] {
     const pending = this.pendingControllerStatus;
-    return pending === "RUNNING" || pending === "PAUSED" ? pending : (this.hasControllerError ? "ERROR" : this.consoleRun?.status === "paused" ? "PAUSED" :
-      this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING");
+    const command = this.commandControllerState?.testRunId === this.consoleRun?.testRunId ? this.commandControllerState : null;
+    if (pending) return pending;
+    if (!this.controllerCommandPhase()?.interrupted && (command?.status === "TERMINATED" || command?.status === "TERMINATED_PAUSED")) return command.status;
+    if (this.hasControllerError) return "ERROR";
+    if (command?.status === "TERMINATED" || command?.status === "TERMINATED_PAUSED") return command.status;
+    return this.consoleRun?.status === "paused" ? "PAUSED" :
+      this.debugControllerStatus === "LOADING" ? "LOADING" : "RUNNING";
   }
   get controllerLogState() {
     const run = this.consoleRun;
@@ -569,6 +574,7 @@ export class ParticipantViewFacade {
   }
   async applyNativeConsoleCommand(result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch): Promise<void> {
     if (!isCurrent()) return;
+    if (result.terminationNoop) return;
     const entry = result.testRun.controllerEntry;
     if (result.superseded || this.isOlderRunState(result.testRun) || this.isOlderControllerPhase(dispatch)) {
       if (this.hasControllerError) return;
@@ -694,27 +700,39 @@ export class ParticipantViewFacade {
       (["tenantId", "workspaceId", "participantSessionId", "testRunId", "contentReleaseId", "bookletKey"] as const)
         .every(key => this.consoleRun?.[key] === run[key]);
     const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
-    const readStatus = (): "RUNNING" | "PAUSED" | "ERROR" => this.hasControllerError ? "ERROR" : this.nativeControllerStatus === "PAUSED" ? "PAUSED" : "RUNNING";
-    const invocationStatus = readStatus();
+    const readStatus = (): Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> => {
+      const status = this.nativeControllerStatus;
+      return status === "LOADING" ? "RUNNING" : status;
+    };
+    const initialStatus = readStatus();
+    const invocationStatus = initialStatus === "TERMINATED" || initialStatus === "TERMINATED_PAUSED"
+      ? run.status === "paused" ? "PAUSED" : "RUNNING" : initialStatus;
     if (!terminal && allocate) this.beginControllerCommand(run.testRunId, command.commandType, allocate(run.controllerDispatches));
     let terminalPhase = terminal ? this.terminalCommandPhases.get(command) : undefined;
     if (terminal && !terminalPhase && allocate) {
-      await Promise.resolve();
+      const terminationNoop = initialStatus === "TERMINATED";
+      if (!terminationNoop) await Promise.resolve();
       if (!isCurrent()) return;
-      terminalPhase = { dispatch: allocate(this.consoleRun?.controllerDispatches), status: readStatus() };
+      terminalPhase = { dispatch: allocate(this.consoleRun?.controllerDispatches), status: readStatus(), ...(terminationNoop ? { terminationNoop: true } : {}) };
       this.terminalCommandPhases.set(command, terminalPhase);
-      this.beginControllerCommand(run.testRunId, command.commandType, terminalPhase.dispatch, terminalPhase.status);
+      if (!terminationNoop) this.beginControllerCommand(run.testRunId, command.commandType, terminalPhase.dispatch, terminalPhase.status);
     }
     let observedView = this.currentStateAppliedRefreshSequence;
     let observedRun = run;
-    let observedStatus: "RUNNING" | "PAUSED" | "ERROR" = "RUNNING";
+    let observedStatus: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> = "RUNNING";
     const execution = await import("./participant-command-execution");
     await execution.executeReceivedParticipantCommand(command, signal, {
-      scope: run, isCurrent, controllerStatus: () => {
+      scope: run, isCurrent, terminationNoop: terminalPhase ? Boolean(terminalPhase.terminationNoop) : undefined, controllerStatus: () => {
         observedView = this.currentStateAppliedRefreshSequence;
         observedRun = this.consoleRun ?? run;
         observedStatus = terminal ? terminalPhase?.status ?? readStatus() : invocationStatus;
         return observedStatus;
+      },
+      observed: (dispatch, status, terminationNoop) => {
+        if (!terminalPhase) {
+          terminalPhase = { dispatch, status, ...(terminationNoop ? { terminationNoop } : {}) };
+          this.terminalCommandPhases.set(command, terminalPhase);
+        }
       },
       prepare: async () => {
         // Accepted nonterminal commands must not wait for an older answer
@@ -730,6 +748,7 @@ export class ParticipantViewFacade {
       },
       apply: async (application, acceptedDispatch) => {
         if (!isCurrent() || signal.aborted) return;
+        if (application.command.terminationNoop) return;
         if (command.commandType === "debug") {
           const dispatch = application.controllerDispatch;
           if (dispatch && this.debugCommandDispatch?.controllerId === dispatch.controllerId && dispatch.sequence <= this.debugCommandDispatch.sequence) return;

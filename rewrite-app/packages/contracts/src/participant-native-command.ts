@@ -15,6 +15,7 @@ export type ParticipantControllerContext = { participantSession: ParticipantSess
 export const participantNativeCommandKeywords = ["pause", "resume", "terminate", "goto"] as const;
 export type ParticipantNativeCommandKeyword = typeof participantNativeCommandKeywords[number];
 export type ParticipantNativeCommandRequest = {
+  terminationNoop?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   testRunId: string;
   contentReleaseId: string;
@@ -22,10 +23,11 @@ export type ParticipantNativeCommandRequest = {
   deliveryId: string;
   keyword: ParticipantNativeCommandKeyword;
   arguments: string[];
-  controllerStatus: "LOADING" | "RUNNING" | "PAUSED" | "ERROR";
+  controllerStatus: "LOADING" | "RUNNING" | "PAUSED" | "ERROR" | "TERMINATED" | "TERMINATED_PAUSED";
   timeStamp: number;
 };
 export type ParticipantNativeCommandResult = {
+  terminationNoop?: true;
   superseded?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string };

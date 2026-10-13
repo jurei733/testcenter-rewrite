@@ -47,6 +47,12 @@ export const prepareParticipantRunMutation = (
       context.progressDelivery.contentReleaseId !== input.contentReleaseId || context.progressDelivery.deliveryId !== input.deliveryId)) return null;
   const { testRun, participantSession } = context;
   const effect = structuredClone(transform(structuredClone(context)));
+  if (effect?.terminationNoop !== undefined && (effect.terminationNoop !== true || effect.controllerDispatch !== undefined ||
+      effect.controllerEntryActive !== undefined || effect.participantSession !== undefined || effect.commandInput !== undefined ||
+      JSON.stringify(effect.testRun) !== JSON.stringify(testRun) || effect.activityEvents.length > 0 ||
+      effect.testLogs.some(log => log.logKey !== "command executed"))) {
+    throw new Error("A terminal early return cannot change its Run, parent, entry, dispatch highwater or state artifacts.");
+  }
   if (effect && (!matchesParticipantRunCommandScope(effect.testRun, input) ||
     effect.testRun.contentReleaseId !== testRun.contentReleaseId || effect.testRun.bookletKey !== testRun.bookletKey ||
     effect.testRun.bookletAssignmentKey !== testRun.bookletAssignmentKey || effect.testRun.executionMode !== testRun.executionMode ||

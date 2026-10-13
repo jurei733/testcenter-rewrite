@@ -21,7 +21,9 @@ export const parseParticipantRunCommand = (value: unknown): ParticipantRunComman
       !(item.actorId === null || typeof item.actorId === "string") ||
       !(item.effectsDeferred === undefined || item.effectsDeferred === true) ||
       !(executedAt === null && executionSequence === null || timestamp(executedAt) && timestamp(item.acknowledgedAt) &&
-        Number.isSafeInteger(executionSequence) && Number(executionSequence) > 0)) return null;
+        Number.isSafeInteger(executionSequence) && Number(executionSequence) > 0) ||
+      item.terminationNoop !== undefined && (item.terminationNoop !== true || item.effectsDeferred !== true || executedAt === null ||
+        !["complete", "complete_and_lock"].includes(item.commandType as string))) return null;
   return {
     tenantId: item.tenantId as string, workspaceId: item.workspaceId as string,
     participantSessionId: item.participantSessionId as string, testRunId: item.testRunId as string,
@@ -30,12 +32,13 @@ export const parseParticipantRunCommand = (value: unknown): ParticipantRunComman
     sequence: item.sequence as number, targetUnitKey: item.targetUnitKey as string | null,
     remainingSeconds: item.remainingSeconds as number | null, actorId: item.actorId as string | null,
     issuedAt: item.issuedAt, acknowledgedAt: item.acknowledgedAt, executedAt, executionSequence: executionSequence as number | null,
-    ...(item.effectsDeferred === true ? { effectsDeferred: true } : {})
+    ...(item.effectsDeferred === true ? { effectsDeferred: true } : {}),
+    ...(item.terminationNoop === true ? { terminationNoop: true } : {})
   };
 };
 
 export type ListParticipantRunCommandsResponse = { commands: ParticipantRunCommand[] };
 export type AcknowledgeParticipantRunCommandRequest = { testRunId: string };
 export type AcknowledgeParticipantRunCommandResponse = { command: ParticipantRunCommand };
-export type ExecuteParticipantRunCommandRequest = { testRunId: string; controllerStatus?: "RUNNING" | "PAUSED" | "ERROR"; controllerDispatch?: ParticipantControllerDispatch };
+export type ExecuteParticipantRunCommandRequest = { testRunId: string; controllerStatus?: "RUNNING" | "PAUSED" | "ERROR" | "TERMINATED" | "TERMINATED_PAUSED"; controllerDispatch?: ParticipantControllerDispatch; terminationNoop?: true };
 export type ExecuteParticipantRunCommandResponse = { application: ParticipantRunCommandApplicationResult };

@@ -79,3 +79,27 @@ for(const [initial,later]of [['RUNNING','PAUSED'],['PAUSED','RUNNING']])test(`ac
  await service[later==='PAUSED'?'pause':'resume']();assert.equal(service.state$.getValue(),later);
  release();await pending;assert.equal(service.state$.getValue(),later);assert.deepEqual(events.slice(-2),[['lock',later],['navigate',later]]);
 });
+
+function forcedTerminalReference(initial='RUNNING'){
+ const events=[],logs=[];let release;const buffers=new Promise(done=>{release=done;});
+ const service=new original.TestControllerService();service.testId=42;service.currentUnit={parent:{locked:false}};service.state$=new BehaviorSubject(initial);service.interruptTimer=()=>events.push('interrupt');service.closeAllBuffers=()=>{events.push('buffers');return buffers;};
+ service.bs={lockTest:()=>{events.push('lock');return of(true);},addTestLog:(_id,entries)=>logs.push(...entries)};service.router={navigate:()=>{events.push('navigate');return Promise.resolve(true);}};
+ const root=new original.TestControllerComponent();root.tcs=service;root.bs=service.bs;const receive=original.subscribe.call(root);
+ return{service,events,logs,release:()=>release(),receive:(args=[])=>receive({keyword:'terminate',arguments:args})};
+}
+const settleReference=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+for(const initial of ['RUNNING','ERROR'])test(`actual Original repeated termination after ${initial} logs before held buffers without a late lock`,async()=>{
+ const f=forcedTerminalReference(initial),prefix=initial==='ERROR'?['buffers']:['interrupt','buffers'];try{f.receive();await settleReference();assert.equal(f.service.state$.getValue(),'TERMINATED');f.receive(['lock']);await settleReference();
+  assert.deepEqual(f.events,prefix);assert.deepEqual(f.logs.map(log=>log.content),['terminate lock']);f.release();await settleReference();assert.deepEqual(f.events,[...prefix,'navigate']);assert.deepEqual(f.logs.map(log=>log.content),['terminate lock','terminate']);
+ }finally{f.release();}
+});
+test('actual Original same-turn terminations both pass the invocation guard and the second still locks',async()=>{
+ const f=forcedTerminalReference();try{f.receive();f.receive(['lock']);await settleReference();assert.equal(f.service.state$.getValue(),'TERMINATED');assert.equal(f.events.filter(e=>e==='buffers').length,2);assert.deepEqual(f.logs,[]);
+  f.release();await settleReference();assert.equal(f.events.filter(e=>e==='lock').length,1);assert.equal(f.events.filter(e=>e==='navigate').length,2);assert.equal(f.logs.length,2);
+ }finally{f.release();}
+});
+test('actual Original TERMINATED_PAUSED is not the early-return guard and becomes TERMINATED',async()=>{
+ const f=forcedTerminalReference('PAUSED');try{f.receive();await settleReference();assert.equal(f.service.state$.getValue(),'TERMINATED_PAUSED');f.receive(['lock']);await settleReference();assert.equal(f.service.state$.getValue(),'TERMINATED');assert.equal(f.events.filter(e=>e==='buffers').length,2);assert.deepEqual(f.logs,[]);
+  f.release();await settleReference();assert.equal(f.events.filter(e=>e==='lock').length,1);assert.equal(f.logs.length,2);
+ }finally{f.release();}
+});

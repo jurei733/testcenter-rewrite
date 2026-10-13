@@ -292,17 +292,17 @@ try {
         const marker=`immediate-${origin}-phase-yields-to-newer-error-and-fresh-native-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
       }finally{releasePause();releaseResume();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
-    for(const scenario of [{origin:'native',later:'pause'},{origin:'native',later:'resume',initialPaused:true},{origin:'native'},{origin:'remote'}]){
+    for(const scenario of [{origin:'native',later:'pause'},{origin:'native',later:'resume',initialPaused:true},{origin:'native'},{origin:'remote'},{origin:'native',noop:'native'},{origin:'native',noop:'remote'}]){
       const oldFrame=await remotePage.locator('iframe').elementHandle();
       const reset=remotePage.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/native-commands')&&response.request().postDataJSON().keyword==='resume');
       await remotePage.evaluate(()=>window.tc.resume());await reset;
       if(oldFrame)await poll(()=>oldFrame.evaluate(frame=>!frame.isConnected),'The terminal phase fixture did not retire its preceding Player');
       await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The terminal phase fixture did not restore its preceding trusted answer');
-      if(scenario.origin==='remote')await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'The terminal phase fixture did not reopen remote reception');
+      if(scenario.origin==='remote'||scenario.noop==='remote')await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'The terminal phase fixture did not reopen remote reception');
       const answer=scenario.initialPaused?'4':'5',packets=[],preparations=[];
       const observation={forcedTerminalPhase:scenario,packets,preparations};loadingObservations.push(observation);
-      let releaseAnswer,releaseRuntime,answerHeld=false,runtimeHeld=false;
-      const answerGate=new Promise(done=>{releaseAnswer=done;}),runtimeGate=new Promise(done=>{releaseRuntime=done;});releases.push(releaseAnswer,releaseRuntime);
+      let releaseAnswer,releaseRuntime,releaseAck,answerHeld=false,runtimeHeld=false,ackHeld=false,loseNoop=scenario.noop==='native';
+      const answerGate=new Promise(done=>{releaseAnswer=done;}),runtimeGate=new Promise(done=>{releaseRuntime=done;}),ackGate=new Promise(done=>{releaseAck=done;});releases.push(releaseAnswer,releaseRuntime,releaseAck);
       await remotePage.route('**/save-progress',async route=>{
         const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);preparations.push(request);
         const state=parseVeronaUnitResponse(request.unitResponse);
@@ -311,17 +311,32 @@ try {
       });
       const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
       await remotePage.route(url=>url.pathname===runtimePath,async route=>{const response=await route.fetch();if(!scenario.later){runtimeHeld=true;await runtimeGate;}await route.fulfill({response});});
-      await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();packets.push({request,application:(await response.json()).application});await route.fulfill({response});});
+      await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();packets.push({request,application:(await response.json()).application});if(loseNoop&&request.terminationNoop){loseNoop=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_noop_receipt'})});}else await route.fulfill({response});});
       await remotePage.route('**/application',async route=>{const request=route.request().postDataJSON(),response=await route.fetch(),application=(await response.json()).application;packets.push({request,application});applications.push({application});await route.fulfill({response});});
       try{
         await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill(answer);await poll(()=>Promise.resolve(answerHeld),'The terminal phase fixture did not hold its exact committed answer');
         const baseline=await loadingRepository.getTestRunById(runId);observation.baseline=baseline;
         assert.equal(JSON.parse(parseVeronaUnitResponse(baseline.unitResponses['first-unit']).unitState.dataParts.answer)[0].value,answer);
+        if(scenario.noop==='remote'){
+          await remotePage.route('**/commands/*/acknowledgement',async route=>{if(route.request().method()!=='PATCH'){await route.continue();return;}const response=await route.fetch();assert.equal(response.status(),200);ackHeld=true;await ackGate;await route.fulfill({response});});
+          await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete_and_lock'},operator);await poll(()=>Promise.resolve(ackHeld),'The no-op fixture did not retain its accepted remote ACK');
+        }
         if(scenario.initialPaused)await remotePage.evaluate(()=>window.tc.pause());
         if(scenario.origin==='native')await remotePage.evaluate(()=>window.tc.terminate());else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator);
         const terminalStatus=scenario.initialPaused?'TERMINATED_PAUSED':'TERMINATED';
         await poll(async()=>new RegExp(`STATUS:\\s*${terminalStatus}(?:\\s|$)`).test(await remotePane.innerText()),'Forced termination did not enter its terminal phase before the held answer buffer');
         assert.equal(packets.length,0,'Termination bypassed its held answer buffer');assert.deepEqual(await loadingRepository.getTestRunById(runId),baseline);
+        if(scenario.noop){
+          const parent=await loadingRepository.getParticipantSessionById(baseline.participantSessionId),logsBefore=(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length;
+          if(scenario.noop==='native')await remotePage.evaluate(()=>window.tc.terminate(['lock']));else releaseAck();
+          await poll(()=>Promise.resolve(packets.filter(value=>value.request.terminationNoop).length===(scenario.noop==='native'?2:1)),'An already-TERMINATED command waited for the first answer buffer or changed its guard decision');
+          const ignored=packets.filter(value=>value.request.terminationNoop);observation.ignored=ignored;
+          if(scenario.noop==='native'){assert.deepEqual(ignored[0].request,ignored[1].request);assert.equal(ignored[1].application.applied,false);await remotePage.waitForFunction(id=>!localStorage.getItem('testcenter-rewrite:participant-native-command:v1:'+id),ignored[0].request.deliveryId);}
+          else assert.equal(ignored[0].application.command.terminationNoop,true);
+          assert.equal(ignored[0].request.controllerStatus,'TERMINATED');assert.deepEqual(await loadingRepository.getTestRunById(runId),baseline);assert.deepEqual(await loadingRepository.getParticipantSessionById(baseline.participantSessionId),parent);
+          assert.equal((await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length,logsBefore+1);
+          assert.match(await remotePane.innerText(),/STATUS:\s*TERMINATED(?:\s|$)/);assert.equal(packets.filter(value=>value.request.keyword==='terminate'&&!value.request.terminationNoop).length,0);
+        }
         if(scenario.later){await remotePage.evaluate(keyword=>window.tc[keyword](),scenario.later);await poll(async()=>new RegExp(`STATUS:\\s*${scenario.later==='pause'?'PAUSED':'RUNNING'}(?:\\s|$)`).test(await remotePane.innerText()),'A command arriving during terminal buffers did not enter its later phase');}
         releaseAnswer();
         if(scenario.later){
@@ -332,6 +347,7 @@ try {
         }else{
           await poll(()=>Promise.resolve(runtimeHeld),'The terminal receipt did not reach its Starter reconciliation');
           const ended=await loadingRepository.getTestRunById(runId);assert.equal(ended.status,'paused');assert.equal(ended.controllerEntry.active,false);
+          if(scenario.noop){const first=packets.find(value=>value.request.keyword==='terminate'&&!value.request.terminationNoop);assert.ok(first);assert.equal(first.application.superseded,undefined);assert.equal(ended.locked,false);const actor=first.request.controllerDispatch.controllerId;assert.equal(ended.controllerDispatches[actor],first.request.controllerDispatch.sequence);assert.ok(first.request.controllerDispatch.sequence<observation.ignored[0].request.controllerDispatch.sequence);observation.firstWaitingTerminationStillApplied=true;}
           await remotePage.evaluate(()=>window.tc.resume());await poll(async()=>(await loadingRepository.getTestRunById(runId)).status==='running','A fresh Resume did not reenter the terminated controller');
         }
         const saved=await loadingRepository.getTestRunById(runId);assert.deepEqual(saved.unitResponses,baseline.unitResponses);assert.deepEqual(saved.unitResponseFieldTimestamps,baseline.unitResponseFieldTimestamps);assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
@@ -340,8 +356,8 @@ try {
         await Promise.all([remotePage.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/native-commands')&&response.request().postDataJSON().keyword==='resume'),remotePage.evaluate(()=>window.tc.resume())]);if(previous)await poll(()=>previous.evaluate(frame=>!frame.isConnected),'The terminal fixture did not finish its cleanup Resume');
         await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())===answer,'The renewed Player did not restore the exact trusted answer');
         await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill('3');await poll(async()=>JSON.parse(parseVeronaUnitResponse((await loadingRepository.getTestRunById(runId)).unitResponses['first-unit']).unitState.dataParts.answer)[0].value==='3','The terminal phase fixture did not settle its answer reset');before=await loadingRepository.getTestRunById(runId);
-        const label=`forced-${scenario.origin}-terminal-before-buffers-${scenario.later?'later-'+scenario.later:'fresh-resume'}`;checks.push(label);console.log(`participant_console_loading=${label}:passed`);
-      }finally{observation.finalRun=await loadingRepository.getTestRunById(runId);observation.body=await remotePage.locator('body').innerText().catch(()=> '');releaseAnswer();releaseRuntime();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
+        const label=`forced-${scenario.origin}-terminal-before-buffers-${scenario.noop?'noop-'+scenario.noop:scenario.later?'later-'+scenario.later:'fresh-resume'}`;checks.push(label);console.log(`participant_console_loading=${label}:passed`);
+      }finally{observation.finalRun=await loadingRepository.getTestRunById(runId);observation.body=await remotePage.locator('body').innerText().catch(()=> '');releaseAnswer();releaseRuntime();releaseAck();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
     // The preceding owned phase/error routes remove their handlers on exit.
     await remotePage.route("**/application",captureApplication);
