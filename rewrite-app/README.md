@@ -710,8 +710,26 @@ releases live in `first-slice.json.objects/`, so participant and monitor writes
 do not repeatedly serialize every imported Player, definition, and resource.
 Include both paths in backups or moves. `db:migrate:file` externalizes legacy
 single-file state explicitly; the first normal write performs the same migration
-automatically. Core and entity files are replaced atomically, and readiness
-fails when a manifest-referenced sidecar is missing.
+automatically. It also promotes the older version-one sidecar manifest to version
+two. Package and release files now have content-hash names and are never
+overwritten; one atomic main-manifest replacement publishes the entire mutation.
+Failed writes preserve the committed manifest, selected entity files and live
+cache. Reopening rejects missing or changed selected files rather than treating
+them as an empty store. Readiness checks actual write-and-rename capability in
+the manifest and collection directories and fails when a selected sidecar is
+missing.
+
+The File adapter remains a single-process writer for local development. Keep
+prior versions of live entities in backups: they remain available to readers of
+an earlier manifest. Guarded aggregate deletion drops the manifest references
+and prunes every stored version of the deleted entities; cleanup failures are
+retried by the next successful mutation. Retention/compaction and power-loss behavior
+still require operating qualification. Before upgrading an existing File store,
+stop its writer and back up the manifest together with its objects directory.
+Older binaries cannot read the version-two sidecar manifest; rollback requires
+restoring the complete pre-upgrade backup with the old binary. The public
+migration result's `formatVersion: 1` describes the enclosing state document;
+the nested sidecar manifest version is now 2.
 
 For relational local persistence, run:
 

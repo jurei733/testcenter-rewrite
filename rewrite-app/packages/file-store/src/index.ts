@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   access,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
   rm,
+  stat,
   writeFile
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -92,11 +94,19 @@ type PersistedFirstSliceState = {
   participantPresence: Record<string, ParticipantPresence>;
 };
 
-type ExternalizedCollectionManifest = {
+type LegacyExternalizedCollectionManifest = {
   version: 1;
   sourcePackageIds: string[];
   contentReleaseIds: string[];
 };
+type VersionedExternalizedCollectionManifest = {
+  version: 2;
+  sourcePackageIds: string[];
+  contentReleaseIds: string[];
+  sourcePackageHashes: Record<string, string>;
+  contentReleaseHashes: Record<string, string>;
+};
+type ExternalizedCollectionManifest = LegacyExternalizedCollectionManifest | VersionedExternalizedCollectionManifest;
 
 type PersistedFirstSliceDocument = Partial<PersistedFirstSliceState> & {
   externalizedCollections?: unknown;
@@ -104,7 +114,7 @@ type PersistedFirstSliceDocument = Partial<PersistedFirstSliceState> & {
 
 type LoadedFirstSliceState = {
   state: PersistedFirstSliceState;
-  externalizedCollections: boolean;
+  externalizedCollections: ExternalizedCollectionManifest | null;
 };
 
 const createInitialState = (): PersistedFirstSliceState => ({
@@ -157,12 +167,18 @@ const externalCollectionDirectory = (
 const externalEntityFilePath = (
   filePath: string,
   collectionName: "source-packages" | "content-releases",
-  entityId: string
+  entityId: string,
+  hash?: string
 ): string =>
   join(
     externalCollectionDirectory(filePath, collectionName),
-    `${encodeURIComponent(entityId)}.json`
+    `${encodeURIComponent(entityId)}${hash ? `.${hash}` : ""}.json`
   );
+
+const isHashIndex = (value: unknown, ids: string[]): value is Record<string, string> =>
+  typeof value === "object" && value !== null && !Array.isArray(value) &&
+  Object.keys(value).length === ids.length &&
+  ids.every(id => Object.hasOwn(value, id) && typeof (value as Record<string, unknown>)[id] === "string" && /^[a-f0-9]{64}$/.test((value as Record<string, string>)[id]!));
 
 const isExternalizedCollectionManifest = (
   value: unknown
@@ -170,27 +186,31 @@ const isExternalizedCollectionManifest = (
   typeof value === "object" &&
   value !== null &&
   "version" in value &&
-  value.version === 1 &&
+  (value.version === 1 || value.version === 2) &&
   "sourcePackageIds" in value &&
   Array.isArray(value.sourcePackageIds) &&
   value.sourcePackageIds.every(entityId => typeof entityId === "string") &&
   "contentReleaseIds" in value &&
   Array.isArray(value.contentReleaseIds) &&
-  value.contentReleaseIds.every(entityId => typeof entityId === "string");
+  value.contentReleaseIds.every(entityId => typeof entityId === "string") &&
+  new Set(value.sourcePackageIds).size === value.sourcePackageIds.length &&
+  new Set(value.contentReleaseIds).size === value.contentReleaseIds.length &&
+  (value.version === 1 || ("sourcePackageHashes" in value && "contentReleaseHashes" in value &&
+    isHashIndex(value.sourcePackageHashes, value.sourcePackageIds) && isHashIndex(value.contentReleaseHashes, value.contentReleaseIds)));
 
 const writeJsonAtomically = async (
   targetPath: string,
   value: unknown,
   pretty = false
 ): Promise<void> => {
+  await writeRawAtomically(targetPath, JSON.stringify(value, null, pretty ? 2 : undefined));
+};
+
+const writeRawAtomically = async (targetPath: string, raw: string): Promise<void> => {
   await mkdir(dirname(targetPath), { recursive: true });
   const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(
-      temporaryPath,
-      JSON.stringify(value, null, pretty ? 2 : undefined),
-      "utf8"
-    );
+    await writeFile(temporaryPath, raw, { encoding: "utf8", flag: "wx", flush: true });
     await rename(temporaryPath, targetPath);
   } finally {
     await rm(temporaryPath, { force: true }).catch(() => undefined);
@@ -201,6 +221,7 @@ const readExternalizedCollection = async <Value>(input: {
   filePath: string;
   collectionName: "source-packages" | "content-releases";
   entityIds: string[];
+  hashes?: Record<string, string>;
   resolveEntityId: (value: Value) => string;
 }): Promise<Record<string, Value>> => {
   const values: Record<string, Value> = {};
@@ -213,9 +234,12 @@ const readExternalizedCollection = async <Value>(input: {
     }
     seenEntityIds.add(entityId);
     const raw = await readFile(
-      externalEntityFilePath(input.filePath, input.collectionName, entityId),
+      externalEntityFilePath(input.filePath, input.collectionName, entityId, input.hashes?.[entityId]),
       "utf8"
     );
+    if (input.hashes && createHash("sha256").update(raw).digest("hex") !== input.hashes[entityId]) {
+      throw new Error(`Externalized ${input.collectionName} entry '${entityId}' has a hash mismatch.`);
+    }
     const value = JSON.parse(raw) as Value;
     if (input.resolveEntityId(value) !== entityId) {
       throw new Error(
@@ -237,13 +261,14 @@ const removeUnreferencedExternalFiles = async (input: {
     input.collectionName
   );
   const expectedFileNames = new Set(
-    input.entityIds.map(entityId => `${encodeURIComponent(entityId)}.json`)
+    input.entityIds.map(entityId => encodeURIComponent(entityId))
   );
   try {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (
         entry.isFile() &&
-        !expectedFileNames.has(entry.name) &&
+        !expectedFileNames.has(entry.name.replace(/\.json$/, "")) &&
+        !expectedFileNames.has(entry.name.replace(/\.[a-f0-9]{64}\.json$/, "")) &&
         (entry.name.endsWith(".json") || entry.name.endsWith(".tmp"))
       ) {
         await rm(join(directory, entry.name), { force: true });
@@ -266,78 +291,77 @@ const removeUnreferencedExternalFiles = async (input: {
 const persistExternalizedState = async (input: {
   filePath: string;
   state: PersistedFirstSliceState;
-  externalizedCollections: boolean;
+  externalizedCollections: ExternalizedCollectionManifest | null;
   dirtySourcePackageIds: Set<string>;
   dirtyContentReleaseIds: Set<string>;
-}): Promise<void> => {
+}): Promise<VersionedExternalizedCollectionManifest> => {
+  const previous = input.externalizedCollections?.version === 2 ? input.externalizedCollections : null;
   const sourcePackageIds = Object.keys(input.state.sourcePackages).sort();
   const contentReleaseIds = Object.keys(input.state.contentReleases).sort();
-  const sourcePackageIdsToWrite = input.externalizedCollections
-    ? [...input.dirtySourcePackageIds].filter(
-        entityId => input.state.sourcePackages[entityId]
-      )
-    : sourcePackageIds;
-  const contentReleaseIdsToWrite = input.externalizedCollections
-    ? [...input.dirtyContentReleaseIds].filter(
-        entityId => input.state.contentReleases[entityId]
-      )
-    : contentReleaseIds;
-
-  for (const sourcePackageId of sourcePackageIdsToWrite) {
-    await writeJsonAtomically(
-      externalEntityFilePath(
-        input.filePath,
-        "source-packages",
-        sourcePackageId
-      ),
-      input.state.sourcePackages[sourcePackageId]
-    );
-  }
-  for (const contentReleaseId of contentReleaseIdsToWrite) {
-    await writeJsonAtomically(
-      externalEntityFilePath(
-        input.filePath,
-        "content-releases",
-        contentReleaseId
-      ),
-      input.state.contentReleases[contentReleaseId]
-    );
-  }
-
-  const manifest: ExternalizedCollectionManifest = {
-    version: 1,
-    sourcePackageIds,
-    contentReleaseIds
+  const sourcePackageHashes: Record<string, string> = Object.create(null);
+  const contentReleaseHashes: Record<string, string> = Object.create(null);
+  const createdPaths: string[] = [];
+  const persistCollection = async (collectionName: "source-packages" | "content-releases", ids: string[],
+    values: Record<string, unknown>, dirtyIds: Set<string>, previousHashes: Record<string, string> | undefined,
+    hashes: Record<string, string>): Promise<void> => {
+    for (const id of ids) {
+      if (previousHashes && Object.hasOwn(previousHashes, id) && !dirtyIds.has(id)) {
+        hashes[id] = previousHashes[id]!;
+        continue;
+      }
+      const raw = JSON.stringify(values[id]);
+      const hash = createHash("sha256").update(raw).digest("hex");
+      const path = externalEntityFilePath(input.filePath, collectionName, id, hash);
+      let exists = true;
+      try {
+        const existing = await readFile(path, "utf8");
+        if (createHash("sha256").update(existing).digest("hex") !== hash) {
+          throw new Error(`Externalized ${collectionName} entry '${id}' has a hash mismatch.`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        exists = false;
+      }
+      if (!exists) {
+        await writeRawAtomically(path, raw);
+        createdPaths.push(path);
+      }
+      hashes[id] = hash;
+    }
   };
-  await writeJsonAtomically(
-    input.filePath,
-    {
-      ...input.state,
-      sourcePackages: {},
-      contentReleases: {},
-      externalizedCollections: manifest
-    },
-    true
-  );
+  const manifest: VersionedExternalizedCollectionManifest = {
+    version: 2, sourcePackageIds, contentReleaseIds, sourcePackageHashes, contentReleaseHashes
+  };
+  try {
+    await persistCollection("source-packages", sourcePackageIds, input.state.sourcePackages,
+      input.dirtySourcePackageIds, previous?.sourcePackageHashes, sourcePackageHashes);
+    await persistCollection("content-releases", contentReleaseIds, input.state.contentReleases,
+      input.dirtyContentReleaseIds, previous?.contentReleaseHashes, contentReleaseHashes);
+    // The atomic manifest rename is the publication point for the whole mutation.
+    // Existing sidecars are never overwritten before or after that point.
+    await writeJsonAtomically(input.filePath, {
+      ...input.state, sourcePackages: {}, contentReleases: {}, externalizedCollections: manifest
+    }, true);
+  } catch (error) {
+    await Promise.all(createdPaths.map(path => rm(path, { force: true }).catch(() => undefined)));
+    throw error;
+  }
+  // Keep prior versions of live entities for readers of an earlier manifest.
+  // Deletion prunes all versions of removed entities; cleanup failures retry on the next mutation.
   await Promise.all([
-    removeUnreferencedExternalFiles({
-      filePath: input.filePath,
-      collectionName: "source-packages",
-      entityIds: sourcePackageIds
-    }),
-    removeUnreferencedExternalFiles({
-      filePath: input.filePath,
-      collectionName: "content-releases",
-      entityIds: contentReleaseIds
-    })
+    removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "source-packages", entityIds: sourcePackageIds }),
+    removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "content-releases", entityIds: contentReleaseIds })
   ]);
+  return manifest;
 };
 
 const readStateFromFile = async (
   filePath: string
 ): Promise<LoadedFirstSliceState> => {
+  let manifestRead = false;
   try {
     const raw = await readFile(filePath, "utf8");
+    manifestRead = true;
     const document = JSON.parse(raw) as PersistedFirstSliceDocument;
     const { externalizedCollections, ...inlineState } = document;
     const state: PersistedFirstSliceState = {
@@ -352,12 +376,14 @@ const readStateFromFile = async (
         filePath,
         collectionName: "source-packages",
         entityIds: externalizedCollections.sourcePackageIds,
+        hashes: externalizedCollections.version === 2 ? externalizedCollections.sourcePackageHashes : undefined,
         resolveEntityId: sourcePackage => sourcePackage.sourcePackageId
       });
       state.contentReleases = await readExternalizedCollection<ContentRelease>({
         filePath,
         collectionName: "content-releases",
         entityIds: externalizedCollections.contentReleaseIds,
+        hashes: externalizedCollections.version === 2 ? externalizedCollections.contentReleaseHashes : undefined,
         resolveEntityId: contentRelease => contentRelease.contentReleaseId
       });
     }
@@ -468,23 +494,49 @@ const readStateFromFile = async (
     );
     return {
       state,
-      externalizedCollections: externalizedCollections !== undefined
+      externalizedCollections: (externalizedCollections as ExternalizedCollectionManifest | undefined) ?? null
     };
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return {
-        state: createInitialState(),
-        externalizedCollections: false
-      };
+    // Only an absent main manifest initializes a store, never an absent sidecar.
+    if (!manifestRead && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { state: createInitialState(), externalizedCollections: null };
     }
-
     throw error;
   }
+};
+
+const nearestExistingDirectory = async (directory: string): Promise<string> => {
+  try {
+    const info = await stat(directory);
+    if (!info.isDirectory()) throw new Error(`File-store directory '${directory}' is not a directory.`);
+    return directory;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || dirname(directory) === directory) throw error;
+    return nearestExistingDirectory(dirname(directory));
+  }
+};
+
+const probeAtomicFileWrite = async (directory: string): Promise<void> => {
+  // Collection cleanup only considers .json/.tmp; it cannot delete an active probe.
+  const from = join(directory, `.readiness-${randomUUID()}.probe`), to = from + ".renamed";
+  let created = false, renamed = false;
+  try {
+    const handle = await open(from, "wx"); created = true;
+    try { await handle.writeFile("ready\n", "utf8"); await handle.sync(); }
+    finally { await handle.close(); }
+    await rename(from, to); renamed = true;
+  } finally {
+    if (created && !renamed) await rm(from, { force: true });
+    if (renamed) await rm(to, { force: true });
+  }
+};
+
+const checkFileWriterDirectories = async (filePath: string): Promise<void> => {
+  const directories = new Set([dirname(filePath)]);
+  for (const collection of ["source-packages", "content-releases"] as const) {
+    directories.add(await nearestExistingDirectory(externalCollectionDirectory(filePath, collection)));
+  }
+  for (const directory of directories) await probeAtomicFileWrite(directory);
 };
 
 export const checkFileFirstSliceReadiness = async (
@@ -502,6 +554,7 @@ export const checkFileFirstSliceReadiness = async (
       "code" in error &&
       error.code === "ENOENT"
     ) {
+      await checkFileWriterDirectories(filePath);
       return;
     }
 
@@ -515,16 +568,19 @@ export const checkFileFirstSliceReadiness = async (
     for (const sourcePackageId of document.externalizedCollections
       .sourcePackageIds) {
       await access(
-        externalEntityFilePath(filePath, "source-packages", sourcePackageId)
+        externalEntityFilePath(filePath, "source-packages", sourcePackageId,
+          document.externalizedCollections.version === 2 ? document.externalizedCollections.sourcePackageHashes[sourcePackageId] : undefined)
       );
     }
     for (const contentReleaseId of document.externalizedCollections
       .contentReleaseIds) {
       await access(
-        externalEntityFilePath(filePath, "content-releases", contentReleaseId)
+        externalEntityFilePath(filePath, "content-releases", contentReleaseId,
+          document.externalizedCollections.version === 2 ? document.externalizedCollections.contentReleaseHashes[contentReleaseId] : undefined)
       );
     }
   }
+  await checkFileWriterDirectories(filePath);
 };
 
 export const migrateFileFirstSliceStorage = async (
@@ -538,17 +594,17 @@ export const migrateFileFirstSliceStorage = async (
   const loaded = await readStateFromFile(filePath);
   const sourcePackageCount = Object.keys(loaded.state.sourcePackages).length;
   const contentReleaseCount = Object.keys(loaded.state.contentReleases).length;
-  if (!loaded.externalizedCollections) {
+  if (loaded.externalizedCollections?.version !== 2) {
     await persistExternalizedState({
       filePath,
       state: loaded.state,
-      externalizedCollections: false,
+      externalizedCollections: loaded.externalizedCollections,
       dirtySourcePackageIds: new Set(),
       dirtyContentReleaseIds: new Set()
     });
   }
   return {
-    migrated: !loaded.externalizedCollections,
+    migrated: loaded.externalizedCollections?.version !== 2,
     formatVersion: 1,
     sourcePackageCount,
     contentReleaseCount
@@ -560,7 +616,7 @@ export const createFileFirstSliceRepository = (
 ): FirstSliceRepository => {
   let cachePromise: Promise<PersistedFirstSliceState> | null = null;
   let writeQueue: Promise<void> = Promise.resolve();
-  let externalizedCollections = false;
+  let externalizedCollections: ExternalizedCollectionManifest | null = null;
   const dirtySourcePackageIds = new Set<string>();
   const dirtyContentReleaseIds = new Set<string>();
 
@@ -573,14 +629,13 @@ export const createFileFirstSliceRepository = (
   };
 
   const persistState = async (state: PersistedFirstSliceState): Promise<void> => {
-    await persistExternalizedState({
+    externalizedCollections = await persistExternalizedState({
       filePath,
       state,
       externalizedCollections,
       dirtySourcePackageIds,
       dirtyContentReleaseIds
     });
-    externalizedCollections = true;
     dirtySourcePackageIds.clear();
     dirtyContentReleaseIds.clear();
   };
@@ -589,10 +644,23 @@ export const createFileFirstSliceRepository = (
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
     const operation = writeQueue.then(async () => {
-      const state = await getState();
-      const result = updater(state);
-      await persistState(state);
-      return result;
+      const current = await getState();
+      // Mutators replace rows or edit collection membership; share immutable row payloads,
+      // but isolate every collection map until the manifest has committed.
+      const next = Object.fromEntries(Object.entries(current).map(([key, value]) =>
+        [key, value && typeof value === "object" ? { ...value } : value])) as PersistedFirstSliceState;
+      const sourceDirtyBefore = new Set(dirtySourcePackageIds), releaseDirtyBefore = new Set(dirtyContentReleaseIds);
+      try {
+        const result = updater(next);
+        await persistState(next);
+        cachePromise = Promise.resolve(next);
+        return result;
+      } catch (error) {
+        dirtySourcePackageIds.clear(); dirtyContentReleaseIds.clear();
+        for (const id of sourceDirtyBefore) dirtySourcePackageIds.add(id);
+        for (const id of releaseDirtyBefore) dirtyContentReleaseIds.add(id);
+        throw error;
+      }
     });
     writeQueue = operation.then(
       () => undefined,
