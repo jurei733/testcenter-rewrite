@@ -27,23 +27,19 @@ export const createParticipantCommandReceiver = (options: {
   const seen = new Set<string>();
   const outstanding = new Set<string>();
   const timers = new Set<() => void>();
-  const executionQueue: ParticipantRunCommand[] = [];
-  let executing = false;
-  const executeNext = (): void => {
-    if (controller.signal.aborted || executing || !executionQueue.length) return;
-    executing = true;
-    const command = executionQueue[0]!;
+  const execute = (command: ParticipantRunCommand): void => {
+    if (controller.signal.aborted) return;
     void Promise.resolve().then(() => options.execute(command, controller.signal)).then(() => {
       if (controller.signal.aborted) return;
-      executionQueue.shift(); outstanding.delete(command.commandId); executing = false; executeNext();
+      outstanding.delete(command.commandId);
     }).catch(error => {
       if (controller.signal.aborted) return;
       if (error?.retryable === false) {
-        executionQueue.shift(); outstanding.delete(command.commandId); executing = false; executeNext();
+        outstanding.delete(command.commandId);
         return;
       }
       let cancel: () => void;
-      cancel = schedule(() => { timers.delete(cancel); executing = false; executeNext(); }, 1_000);
+      cancel = schedule(() => { timers.delete(cancel); execute(command); }, 1_000);
       timers.add(cancel);
     });
   };
@@ -58,8 +54,7 @@ export const createParticipantCommandReceiver = (options: {
           receipt[key as keyof ParticipantRunCommand] !== command[key as keyof ParticipantRunCommand]))) {
         throw new Error("The command receipt does not match the accepted command.");
       }
-      executionQueue.push(receipt);
-      executeNext();
+      execute(receipt);
     }).catch(() => {
       // A failed acknowledgement never authorizes an effect. A subsequent
       // server delivery may retry it; the server retains the first receipt.
@@ -100,7 +95,6 @@ export const createParticipantCommandReceiver = (options: {
       controller.abort();
       for (const cancel of timers) cancel();
       timers.clear();
-      executionQueue.length = 0;
       outstanding.clear();
     }
   };

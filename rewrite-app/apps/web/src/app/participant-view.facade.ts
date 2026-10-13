@@ -1,5 +1,6 @@
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { Injectable, effect, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -49,6 +50,7 @@ import {
   participantCodeInputTypes,
   type ParticipantExecutionMode,
   type ParticipantRunCommand,
+  type ParticipantRunCommandApplicationResult,
   type ParticipantCodeInputType,
   type ParticipantRosterEntry,
   type ParticipantViewSettings,
@@ -490,6 +492,7 @@ export class ParticipantViewFacade {
   private readonly commandReloadSequence = signal(0);
   private remoteTerminalErrorRunId: string | null = null;
   private commandControllerState: { testRunId: string; status: string; entryRevision?: number } | null = null;
+  private debugCommandDispatch: ParticipantRunCommandApplicationResult["controllerDispatch"];
   private readonly consoleTestRun = signal<TestRun | null>(null);
   get consoleRun(): TestRun | null {
     const run = this.consoleTestRun();
@@ -536,10 +539,8 @@ export class ParticipantViewFacade {
   }
   async applyNativeConsoleCommand(result: ParticipantNativeCommandResult, isCurrent: () => boolean): Promise<void> {
     if (!isCurrent()) return;
-    const knownEntry = this.consoleRun?.controllerEntry;
     const entry = result.testRun.controllerEntry;
-    if (knownEntry && (!entry || entry.revision < knownEntry.revision ||
-      entry.revision === knownEntry.revision && entry.active !== knownEntry.active)) {
+    if (result.superseded || this.isOlderRunState(result.testRun)) {
       void this.refreshCurrentStateInternal(true, true).catch(error => {
         if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
       });
@@ -680,15 +681,24 @@ export class ParticipantViewFacade {
       apply: async application => {
         if (!isCurrent() || signal.aborted) return;
         if (command.commandType === "debug") {
-          (await import("./participant-debug-control")).applyParticipantDebugArguments(command.debugArguments ?? [], command);
+          const dispatch = application.controllerDispatch;
+          if (dispatch && this.debugCommandDispatch?.controllerId === dispatch.controllerId && dispatch.sequence <= this.debugCommandDispatch.sequence) return;
+          if (dispatch) this.debugCommandDispatch = dispatch;
+          const debug = await import("./participant-debug-control");
+          if (isCurrent() && (!dispatch || this.debugCommandDispatch === dispatch)) debug.applyParticipantDebugArguments(command.debugArguments ?? [], command);
           return;
         }
         // An ordinary refresh of the identical Run is not a newer effect.
         // Keep the conservative fence for changed answers, selection or state.
-        const entry = this.consoleRun?.controllerEntry, appliedEntry = application.testRun.controllerEntry;
-        const superseded = Boolean(entry && (!appliedEntry || appliedEntry.revision < entry.revision ||
-          appliedEntry.revision === entry.revision && appliedEntry.active !== entry.active)) ||
+        const appliedEntry = application.testRun.controllerEntry;
+        const currentRevision = this.consoleRun?.stateRevision;
+        const newer = currentRevision !== undefined && application.testRun.stateRevision !== undefined && application.testRun.stateRevision > currentRevision;
+        const superseded = application.superseded || this.isOlderRunState(application.testRun) || !newer &&
           observedView !== this.currentStateAppliedRefreshSequence && JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
+        if (application.superseded) {
+          void this.refreshCurrentStateInternal(true, true).catch(error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); });
+          return;
+        }
         if (terminal && appliedEntry?.active !== true) {
           if (!superseded) {
             this.invalidateCurrentStateRefreshes();
@@ -788,6 +798,7 @@ export class ParticipantViewFacade {
     this.viewLifecycleSequence += 1;
     this.consoleTestRun.set(null);
     this.commandControllerState = null;
+    this.debugCommandDispatch = undefined;
     this.remoteTerminalErrorRunId = null;
     // Stopping event delivery does not cancel requests already in flight.
     // Their responses must not restore participant scope after a route change.
@@ -4578,9 +4589,7 @@ export class ParticipantViewFacade {
       if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
       const run = this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
       const testRunId = run.testRunId;
-      const knownEntry = this.consoleRun?.controllerEntry;
-      if (knownEntry && (!run.controllerEntry || run.controllerEntry.revision < knownEntry.revision ||
-        run.controllerEntry.revision === knownEntry.revision && run.controllerEntry.active !== knownEntry.active)) return;
+      if (this.isOlderRunState(run)) return;
       // The authenticated response establishes scope before eager assets finish.
       this.syncRun(run);
       expectedRunId = testRunId;
@@ -4599,9 +4608,7 @@ export class ParticipantViewFacade {
       }
       if (expectedSessionId !== this.runtime.participantSessionId.trim() || expectedRunId !== this.runtime.testRunId) return;
       const readyRun = this.validateParticipantControllerContext(payload.currentRunState, expectedSessionId, expectedRunId);
-      const readyEntry = this.consoleRun?.controllerEntry;
-      if (readyEntry && (!readyRun.controllerEntry || readyRun.controllerEntry.revision < readyEntry.revision ||
-        readyRun.controllerEntry.revision === readyEntry.revision && readyRun.controllerEntry.active !== readyEntry.active)) return;
+      if (this.isOlderRunState(readyRun)) return;
       this.currentStateAppliedRefreshSequence = refreshSequence;
       if (payload.currentRunState.bookletAssets) {
         this.recordLoadedBookletAssets(payload, testRunId);
@@ -4699,9 +4706,22 @@ export class ParticipantViewFacade {
     }
   }
 
+  private isOlderRunState(run: TestRun): boolean {
+    const current = this.consoleRun, entry = current?.controllerEntry;
+    return Boolean(current?.stateRevision !== undefined && (run.stateRevision === undefined || run.stateRevision < current.stateRevision) ||
+      entry && (!run.controllerEntry || run.controllerEntry.revision < entry.revision ||
+        run.controllerEntry.revision === entry.revision && run.controllerEntry.active !== entry.active));
+  }
+
   private validateParticipantControllerContext(context: ParticipantControllerContext | null | undefined, sessionId: string, requestedRunId: string): TestRun {
     const run = context?.testRun;
     const entry = run?.controllerEntry;
+    if (run?.controllerDispatches !== undefined && !isParticipantControllerDispatches(run.controllerDispatches)) {
+      throw Object.assign(new Error("The controller dispatches are invalid."), { retryable: false });
+    }
+    if (run?.stateRevision !== undefined && (!Number.isSafeInteger(run.stateRevision) || run.stateRevision < 1)) {
+      throw Object.assign(new Error("The controller Run revision is invalid."), { retryable: false });
+    }
     if (entry !== undefined && (!entry || typeof entry.active !== "boolean" || !Number.isSafeInteger(entry.revision) || entry.revision < 1)) {
       throw Object.assign(new Error("The controller entry evidence is invalid."), { retryable: false });
     }

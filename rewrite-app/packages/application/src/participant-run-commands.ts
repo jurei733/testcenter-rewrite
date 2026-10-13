@@ -1,4 +1,6 @@
 import { withParticipantControllerEntry } from "./participant-controller-entry.js";
+import { withParticipantRunRevision } from "./participant-run-revision.js";
+import { withParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 import {
   monitorRunCommandTypes,
   type ParticipantRunCommand,
@@ -131,8 +133,14 @@ export const prepareParticipantRunCommandApplication = (
           effect.participantSession![key as keyof typeof participantSession] !== participantSession[key as keyof typeof participantSession]))) {
     throw new Error("A participant command effect cannot cross its immutable parent scope.");
   }
-  effect.testRun = withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive);
+  if (participantControllerDispatchSuperseded(testRun, effect.controllerDispatch)) {
+    effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive;
+    effect.testLogs = effect.testLogs.filter(log => log.logKey === "command executed"); effect.activityEvents = []; effect.superseded = true;
+  }
+  effect.testRun = withParticipantRunRevision(testRun,
+    withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
   const appliedCommand = { ...command, executedAt, executionSequence };
   return { result: structuredClone({ command: appliedCommand, testRun: effect.testRun,
-    participantSession: effect.participantSession ?? participantSession, applied: true }), effect };
+    participantSession: effect.participantSession ?? participantSession, applied: true,
+    ...(effect.superseded ? { superseded: true as const } : {}) }), effect };
 };

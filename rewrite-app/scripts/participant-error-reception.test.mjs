@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import {productionApiRoutes,resolveRoutePath,parseParticipantEventStreamEvent} from "@testcenter-rewrite-app/contracts";
+import {isParticipantControllerDispatches} from "@testcenter-rewrite-app/contracts/participant-native-command";
 
 const methods=(path,className,names)=>{
  const source=readFileSync(new URL(path,import.meta.url),"utf8");
@@ -18,11 +19,11 @@ const moduleFrom=async source=>{
  return import("data:text/javascript;base64,"+Buffer.from(code).toString("base64"));
 };
 const facadeMethods=methods("../apps/web/src/app/participant-view.facade.ts","ParticipantViewFacade",
- ["hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","validateParticipantControllerContext","invalidateCurrentStateRefreshes"]);
-const {makeHost}=await moduleFrom(`export const makeHost=(productionApiRoutes,resolveRoutePath)=>class Host{
+ ["hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","validateParticipantControllerContext","invalidateCurrentStateRefreshes","isOlderRunState"]);
+const {makeHost}=await moduleFrom(`export const makeHost=(productionApiRoutes,resolveRoutePath,isParticipantControllerDispatches)=>class Host{
  ${facadeMethods}
  };`);
-const Host=makeHost(productionApiRoutes,resolveRoutePath);
+const Host=makeHost(productionApiRoutes,resolveRoutePath,isParticipantControllerDispatches);
 const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const state=(status="running",run="selected-run")=>({
  participantSession:{participantSessionId:"selected-session",tenantId:"tenant",workspaceId:"workspace"},

@@ -186,6 +186,61 @@ try {
 
     await remotePage.screenshot({path:join(artifacts,"remote-view-resume.png"),fullPage:true});
     checks.push("remote-resume-overtakes-held-view-and-fences-its-late-state");console.log("participant_console_loading=remote-resume-overtakes-held-view-and-fences-its-late-state:passed");
+    for(const [origin,phase,successor] of [['remote','response','remote'],['remote','request','remote'],
+      ['native','response','native'],['native','request','native'],['native','request','remote']]){
+      const oldResetFrame=await remotePage.locator('iframe').elementHandle();
+      const reset=remotePage.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/native-commands')&&response.request().postDataJSON().keyword==='resume');
+      await remotePage.evaluate(()=>window.tc.resume());await reset;
+      if(oldResetFrame)await poll(()=>oldResetFrame.evaluate(frame=>!frame.isConnected),'The overlap fixture did not finish its preceding native Resume');
+      await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+      const baseline=await loadingRepository.getTestRunById(runId),formerFrame=await remotePage.locator('iframe').elementHandle();assert.ok(formerFrame);
+      const label=`${origin}-${phase}-${successor}`,nativeApplications=[];
+      let releaseFirst,firstHeld=false,firstCommitted=false,firstRequest,firstApplication;
+      const firstGate=new Promise(done=>{releaseFirst=done;});releases.push(releaseFirst);
+      await remotePage.route('**/application',captureApplication);
+      await remotePage.route(origin==='native'?'**/native-commands':'**/application',async route=>{
+        const body=route.request().postDataJSON(),hold=!firstHeld&&(origin==='remote'||body.keyword==='pause');
+        if(hold){firstHeld=true;firstRequest=body;if(phase==='request')await firstGate;}
+        const response=await route.fetch(),application=(await response.json()).application;
+        if(origin==='remote')applications.push({application});else nativeApplications.push({request:body,application});
+        if(hold){firstApplication=application;firstCommitted=true;if(phase==='response')await firstGate;}
+        await route.fulfill({response});
+      });
+      try {
+        if(origin==='remote')await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);
+        else await remotePage.evaluate(()=>window.tc.pause());
+        await poll(()=>Promise.resolve(phase==='response'?firstCommitted:firstHeld),'The earlier application did not reach its held boundary');
+        let next;
+        if(successor==='remote'){
+          const command=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator)).command;
+          await poll(()=>Promise.resolve(applications.some(value=>value.application.command.commandId===command.commandId)),'A later Resume was blocked by a held application');
+          next=applications.find(value=>value.application.command.commandId===command.commandId).application;
+          assert.equal(acks.filter(ack=>ack.path.includes(command.commandId)).length,1);
+        }else{
+          await remotePage.evaluate(()=>window.tc.resume());
+          await poll(()=>Promise.resolve(nativeApplications.some(value=>value.request.keyword==='resume')),'A later native Resume was blocked by a held application');
+          next=nativeApplications.find(value=>value.request.keyword==='resume').application;
+        }
+        assert.equal(next.controllerDispatch.controllerId,firstRequest.controllerDispatch.controllerId);
+        assert.equal(next.controllerDispatch.sequence,firstRequest.controllerDispatch.sequence+1);
+        await poll(()=>formerFrame.evaluate(frame=>!frame.isConnected),'The later Resume did not retire the Player while the earlier application was held');
+        await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+        await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'The later Resume did not project RUNNING before the earlier reply');
+        releaseFirst();await remotePage.unrouteAll({behavior:'wait'});
+        await poll(()=>Promise.resolve(Boolean(firstApplication)),'The earlier application did not finish after release');
+        assert.equal(firstApplication.superseded,phase==='request'?true:undefined);
+        await remotePage.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+        assert.match(await remotePane.innerText(),/STATUS:\s*RUNNING/);
+        await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The overlapping commands changed the stored Player response');
+        const final=await loadingRepository.getTestRunById(runId);assert.equal(final.status,'running');
+        assert.deepEqual(final.unitResponses,baseline.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,baseline.unitResponseFieldTimestamps);
+        assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+        loadingObservations.push({overlap:label,firstRequest,firstApplication,laterApplication:next,earlierApplicationHeldBeforeLaterReceipt:true,
+          answersAndClocksPreserved:true,siblingPreserved:true});
+        await remotePage.screenshot({path:join(artifacts,`overlap-${label}.png`),fullPage:true});
+        const marker=`overlapping-${label}-keeps-later-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+      }finally{releaseFirst();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
+    }
     await remotePage.route("**/application",captureApplication);
     const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
     let terminalRuntimeReads=0;
@@ -196,6 +251,7 @@ try {
       await route.fulfill({response});
     });
     const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
+    const terminalApplicationStart=applications.length;
     const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
     await poll(()=>Promise.resolve(terminalRuntimeReads===1),'Terminal command did not hold its inactive runtime snapshot');
     await remotePage.evaluate(()=>window.tc.resume());
@@ -213,7 +269,7 @@ try {
     const reentered=await loadingRepository.getTestRunById(runId);
     assert.deepEqual(reentered.unitResponses,before.unitResponses);assert.deepEqual(reentered.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
     assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
-    assert.deepEqual(applications.map(value=>value.application.command.commandId),[pause.commandId,resume.commandId,terminate.commandId]);
+    assert.deepEqual(applications.slice(terminalApplicationStart).map(value=>value.application.command.commandId),[terminate.commandId]);
     loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads,answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
     checks.push('late-remote-termination-cannot-close-a-newer-native-entry');console.log('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
     const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};

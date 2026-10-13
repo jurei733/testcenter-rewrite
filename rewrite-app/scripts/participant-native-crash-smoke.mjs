@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
@@ -19,8 +19,8 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
     .every(key => typeof window.tc?.[key] === "function"));
   const player = page => page.frameLocator("iframe").locator("#demoPlayerAnswer");
   const command = (page, keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
-  const poll = async (predicate, message) => {
-    const deadline = Date.now() + 20_000;
+  const poll = async (predicate, message, timeoutMs = 20_000) => {
+    const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) { if (await predicate()) return; await delay(50); }
     throw Error(message);
   };
@@ -40,7 +40,7 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       name: "Owned browser session recovery probe", version: "1.0", permissions: ["sessions"],
       background: { service_worker: "background.js" } }));
     await writeFile(join(extension, "background.js"), "chrome.runtime.onInstalled.addListener(() => {});\nchrome.sessions.onChanged.addListener(() => {});\n");
-    let initial, recovered, activePage, crashed = false, releaseReceipt, journalEnumerationChanged = false;
+    let initial, recovered, activePage, crashed = false, releaseReceipt, journalEnumerationChanged = false,domStorageProbe;
     const requests = [], replies = [];
     const receiptGate = new Promise(done => { releaseReceipt = done; });
     const observe = (page, phase) => {
@@ -61,10 +61,10 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       const read = async runId => (await api(path + (runId ? `?testRunId=${encodeURIComponent(runId)}` : ""), undefined, identity.sessionToken)).currentRunState.testRun;
       await page.locator('#originalParticipantStarter mat-card[data-booklet-key="first"] button').click();
       await player(page).waitFor(); await methods(page);
-      const run = await read(), answer = `Trusted ${kind} crash answer Ω`;
+      const run = await read();let answer = `Trusted ${kind} crash answer Ω`;
       await player(page).fill(answer);
       await poll(async () => parseVeronaUnitResponse((await read(run.testRunId)).unitResponses["first-1"])?.unitState.dataParts.answer === answer, "Trusted pre-crash answer was not saved");
-      const saved = answers(await read(run.testRunId)), entryUrl = page.url();
+      let saved = answers(await read(run.testRunId));const entryUrl = page.url();
       assert.ok(saved.responses["first-1"]);
       assert.ok(saved.clocks?.["first-1"], "The trusted pre-crash response has no captured field clocks");
       assert.equal(run.currentUnitKey, "first-1");
@@ -72,7 +72,20 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
 
       if (kind === "queued") {
         await initial.route("**/native-commands", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"owned_temporarily_unavailable"}' }));
-        await command(page, "terminate", ["lock"]); await command(page, "goto", ["2"]);
+        await command(page, "terminate", ["lock"]);
+        await poll(async () => Object.values(await journal(page)).some(raw => JSON.parse(raw).prepared), "The first offline native packet was not prepared");
+        // Overlapping commands can both prepare now. Hold a real, already
+        // committed answer receipt to retain the unprepared-intent crash case.
+        let answerCommitted=false;
+        await initial.route("**/save-progress",async route=>{
+          const response=await route.fetch();assert.equal(response.status(),200);answerCommitted=true;
+          await receiptGate;await route.fulfill({response}).catch(()=>{});
+        });
+        answer += " | drain gate";await player(page).fill(answer);
+        await poll(()=>Promise.resolve(answerCommitted),"The trusted preparation receipt was not committed and held");
+        saved=answers(await read(run.testRunId));
+        assert.equal(parseVeronaUnitResponse(saved.responses['first-1'])?.unitState.dataParts.answer,answer);
+        await command(page, "goto", ["2"]);
       } else {
         await initial.route("**/native-commands", async route => {
           const response = await route.fetch(), body = await response.json(); replies.push(body);
@@ -108,6 +121,22 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
         try { return JSON.parse(await readFile(join(profile, "Default", "Preferences"), "utf8")).profile?.exit_type === "Crashed"; }
         catch { return false; }
       }, "Chromium did not persist its open session before the crash");
+      // Chromium rate-limits later localStorage commits to 60 per hour.
+      // Observe the later marker on disk instead of assuming a six-second
+      // delay flushes a batch created after the profile's first commit.
+      await poll(async()=>{
+        const directory=join(profile,'Default','Local Storage','leveldb');
+        domStorageProbe={directory,files:[],liveMarkerRetained:await page.evaluate(key=>localStorage.getItem(key)==='armed-without-pagehide',markerKey)};
+        assert.equal(domStorageProbe.liveMarkerRetained,true,'The live participant document lost its marker before the crash');
+        try{for(const name of await readdir(directory)){
+          if(!/\.(?:log|ldb|sst)$/.test(name))continue;
+          const bytes=await readFile(join(directory,name));
+          domStorageProbe.files.push({name,bytes:bytes.length,applicationPrefixSeen:bytes.includes(Buffer.from('testcenter-rewrite')),
+            ownerKeySeen:bytes.includes(Buffer.from(ownerKey)),markerKeySeen:bytes.includes(Buffer.from(markerKey))});
+          if(bytes.includes(Buffer.from('armed-without-pagehide'))||bytes.includes(Buffer.from('armed-without-pagehide','utf16le')))return true;
+        }}catch{}
+        return false;
+      },'The crash marker did not reach the owned DOM-storage files',90_000);
       const browser = initial.browser(); assert.ok(browser);
       const disconnected = new Promise((done, reject) => {
         const timer = setTimeout(() => reject(Error("Owned browser did not crash")), 15_000);
@@ -178,13 +207,14 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
         originalTabSessionStorageRetained: restoredSessionMarker === "original-tab-session",
         restoreMethod: "chrome.sessions.restore",
         browserOpenSessionPersistedBeforeCrash: true,
+        domStorageCrashMarkerObservedOnDiskBeforeCrash: true,
         journalEnumerationChanged,
         oldJournalEntries: entries.length, oldCommandExecutionLogs: oldLogs.length, oldJournalPreserved: true, freshRequests: fresh });
       mark(`browser-process-crash-${kind}-fresh-commands-retain-trusted-answers-and-clocks`);
     } catch (error) {
       await activePage?.screenshot({ path: join(artifacts, `native-crash-${kind}-failure.png`), fullPage: true }).catch(() => {});
       await writeFile(join(artifacts, `native-crash-${kind}-failure.json`), JSON.stringify({ error: String(error), stack: error.stack, requests,
-        journal: await journal(activePage).catch(() => null) }, null, 2));
+        journal: await journal(activePage).catch(() => null),domStorageProbe }, null, 2));
       throw error;
     } finally {
       releaseReceipt(); await recovered?.close().catch(() => {});

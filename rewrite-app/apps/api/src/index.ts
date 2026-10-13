@@ -1,4 +1,4 @@
-import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
+import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
 import { participantNativeCommandRoute, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
@@ -8534,7 +8534,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (request.method === "POST" && participantRunCommandApplicationMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.participantSessionId);
         const commandId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.commandId);
-        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown }>();
+        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"] }>();
         if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
           sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
           return;
@@ -8544,7 +8544,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
         const application = await services.participantRuntime.executeCommand({ participantSessionId, commandId,
-          testRunId: body.testRunId, controllerStatus: body.controllerStatus });
+          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch });
         sendJson(response, 200, { application });
         return;
       }
@@ -8617,7 +8617,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const application = await services.participantRuntime.executeNativeCommand({ participantSessionId, testRunId: body.testRunId,
           contentReleaseId: body.contentReleaseId, bookletKey: body.bookletKey,
-          deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp });
+          deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp,
+          controllerDispatch: body.controllerDispatch });
         sendJson<ParticipantNativeCommandResponse>(response, 200, { application });
         return;
       }

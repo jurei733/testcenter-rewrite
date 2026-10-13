@@ -137,19 +137,19 @@ for (const interruption of ["stopReception", "stop", "generation"]) {
   });
 }
 
-test("ACK completion order survives a held application and suppresses opaque refreshes", async () => {
+test("a held application does not block a later successful ACK from starting its own handler", async () => {
   const held = deferred(), calls = [];
   const f = fixture((record, signal) => { calls.push({ record, signal }); return calls.length === 1 ? held.promise : undefined; });
   f.receiver.accept([command(1, "pause"), command(2)]);
   f.acknowledge(1); await flush(); f.advance(1000); f.acknowledge(2); await flush();
-  assert.deepEqual(calls.map(item => item.record.commandType), ["pause"]);
+  assert.deepEqual(calls.map(item => item.record.commandType), ["pause", "resume"]);
   assert.equal(f.receiver.hasOutstanding(), true);
   held.resolve(); await flush(); await flush();
   assert.deepEqual(calls.map(item => item.record.commandType), ["pause", "resume"]);
   assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
 });
 
-test("transient application failure retries the same receipt before the next command", async () => {
+test("a transient application failure retries independently of later accepted commands", async () => {
   const calls = [];
   const f = fixture(record => { calls.push(record.commandId); if (calls.length === 1) throw new Error("Owned HTTP 503"); });
   f.receiver.accept([command(1, "pause"), command(2)]);
@@ -158,6 +158,16 @@ test("transient application failure retries the same receipt before the next com
   f.advance(1000); f.acknowledge(2); await flush(); await flush();
   assert.deepEqual(calls, ["command-1", "command-1", "command-2"]);
   assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
+});
+test("a late failed application retries its original receipt without holding a later success",async()=>{
+  const first=deferred(),calls=[];
+  const f=fixture(record=>{calls.push(record);return calls.length===1?first.promise:undefined;});
+  f.receiver.accept([command(1,'pause'),command(2,'resume')]);f.acknowledge(1);await flush();
+  f.advance(1000);f.acknowledge(2);await flush();await flush();assert.deepEqual(calls.map(record=>record.commandId),['command-1','command-2']);
+  first.reject(new Error('Owned delayed 503'));await flush();await flush();assert.equal(f.receiver.hasOutstanding(),true);
+  f.advance(1999);assert.equal(calls.length,2);f.advance(2000);await flush();await flush();
+  assert.equal(calls[2],calls[0],'Retry must retain the dispatch identity attached to the accepted receipt.');
+  assert.equal(f.started.length,2);assert.equal(f.receiver.hasOutstanding(),false);f.receiver.stop();
 });
 
 test("permanent rejection allows the next accepted command without repeating a forged response", async () => {
@@ -171,14 +181,14 @@ test("permanent rejection allows the next accepted command without repeating a f
   assert.equal(f.started.length, 2); assert.equal(f.receiver.hasOutstanding(), false); f.receiver.stop();
 });
 
-test("route cleanup aborts an active application and cancels its queued successor", async () => {
+test("route cleanup aborts every overlapping application and clears their outstanding receipts", async () => {
   const held = deferred(), calls = [];
   const f = fixture((record, signal) => { calls.push({ record, signal }); return held.promise; });
   f.receiver.accept([command(1, "pause"), command(2)]); f.acknowledge(1); await flush();
   f.advance(1000); f.acknowledge(2); await flush();
-  f.receiver.stop(); assert.equal(calls[0].signal.aborted, true);
+  assert.equal(calls.length,2);f.receiver.stop(); assert.ok(calls.every(call=>call.signal.aborted));
   held.resolve(); await flush(); await flush();
-  assert.equal(calls.length, 1); assert.equal(f.receiver.hasOutstanding(), false);
+  assert.equal(calls.length, 2); assert.equal(f.receiver.hasOutstanding(), false);
 });
 
 test("a new controller never redelivers acknowledged receipts, including deferred unapplied commands", async () => {

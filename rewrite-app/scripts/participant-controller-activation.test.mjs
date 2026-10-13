@@ -44,7 +44,7 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
   await t.test('activation changes parent status and entry evidence, is idempotent and returns detached current fields',async()=>{
    await reset({participantCode:'owned new code',groupKey:'owned changed group'});const before=await snapshot();
    const result=await repository.activateParticipantController(input);assert.equal(result.activated,true);
-   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:1}});
+   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:1},stateRevision:1});
    result.participantSession.groupKey='caller mutation';
    const retry=await repository.activateParticipantController(input);assert.equal(retry.activated,false);assert.equal(retry.participantSession.groupKey,before.session.groupKey);
    if(kind!=='memory')assert.deepEqual(await (await create()).getParticipantSessionById(key),retry.participantSession);
@@ -55,7 +55,7 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
    await repository.saveTestRun(sibling);const before=await snapshot();
    const result=await repository.activateParticipantController(input);assert.equal(result.entryChanged,true);assert.equal(result.activated,false);
    assert.deepEqual(result.testRun.controllerEntry,{active:true,revision:4});
-   assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:4}});
+   assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:4},stateRevision:(before.run.stateRevision??0)+1});
    assert.deepEqual(await repository.getTestRunById(sibling.testRunId),sibling);
    result.testRun.controllerEntry.revision=900;
    const retry=await repository.activateParticipantController(input);assert.equal(retry.entryChanged,false);assert.deepEqual(retry.testRun.controllerEntry,{active:true,revision:4});
@@ -84,11 +84,16 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
   await t.test('invalid activation timestamps never mutate storage',async()=>{
    await reset();const before=await snapshot();await assert.rejects(repository.activateParticipantController({...input,activatedAt:'invalid'}),/server timestamp/);assert.deepEqual(await snapshot(),before);
   });
+  await t.test('invalid stored ordering evidence cannot reactivate a parent even when its Run entry is unchanged',async()=>{
+   for(const invalid of [{stateRevision:0},{controllerDispatches:null},{controllerDispatches:{owned:0}}]){
+    await reset({status:'signed_in'},{controllerEntry:{active:true,revision:1},...invalid});const before=await snapshot();
+    await assert.rejects(repository.activateParticipantController(input),/invalid/);assert.deepEqual(await snapshot(),before);
+   }
+  });
   if(control)await t.test('upgrading entry evidence leaves legacy answers exact and a failed migration is retryable',async()=>{
    await reset({}, {unitResponseFieldTimestamps:{unit:{opaque:18}}});const before=await snapshot();
-   const version=kind==='sqlite'?SQLITE_FIRST_SLICE_SCHEMA_VERSION:POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
-   assert.equal(version,kind==='sqlite'?64:58);
-   await execute(`ALTER TABLE test_runs DROP COLUMN controller_entry_json; DELETE FROM schema_migrations WHERE version=${version}`);
+   const latest=kind==='sqlite'?SQLITE_FIRST_SLICE_SCHEMA_VERSION:POSTGRES_FIRST_SLICE_SCHEMA_VERSION,version=kind==='sqlite'?64:58;
+   await execute(`ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DELETE FROM schema_migrations WHERE version>=${version}`);
    const install=kind==='sqlite'?`CREATE TRIGGER owned_entry_upgrade_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ROLLBACK,'owned entry upgrade failure'); END`:
     `CREATE FUNCTION owned_entry_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned entry upgrade failure'; END $$; CREATE TRIGGER owned_entry_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_entry_upgrade_failure()`;
    const remove=kind==='sqlite'?'DROP TRIGGER owned_entry_upgrade_failure':'DROP TRIGGER owned_entry_upgrade_failure ON schema_migrations; DROP FUNCTION owned_entry_upgrade_failure()';
@@ -99,8 +104,28 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
       (await control.query("SELECT COUNT(*)::int AS n FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='test_runs' AND column_name='controller_entry_json'")).rows[0].n;
     assert.equal(count,0);
    }finally{await execute(remove);}
-   assert.equal((await migrate()).currentSchemaVersion,version);assert.deepEqual(await snapshot(),before);
+   assert.equal((await migrate()).currentSchemaVersion,latest);assert.deepEqual(await snapshot(),before);
    const result=await repository.activateParticipantController(input);assert.deepEqual(result.testRun.controllerEntry,{active:true,revision:1});
+  });
+  if(control)await t.test('revision and dispatch migration rolls back together and retains exact legacy answers on retry',async()=>{
+   // The preceding migration changed the schema through another connection.
+   if(kind==='sqlite'){control.close();control=new DatabaseSync(file);}
+   await reset({}, {unitResponseFieldTimestamps:{unit:{opaque:19}},controllerEntry:{active:false,revision:7}});const before=await snapshot();
+   const version=kind==='sqlite'?SQLITE_FIRST_SLICE_SCHEMA_VERSION:POSTGRES_FIRST_SLICE_SCHEMA_VERSION;assert.equal(version,kind==='sqlite'?65:59);
+   await execute(`ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; DELETE FROM schema_migrations WHERE version=${version}`);
+   const install=kind==='sqlite'?`CREATE TRIGGER owned_revision_upgrade_failure BEFORE INSERT ON schema_migrations WHEN NEW.version=${version} BEGIN SELECT RAISE(ROLLBACK,'owned revision upgrade failure'); END`:
+    `CREATE FUNCTION owned_revision_upgrade_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned revision upgrade failure'; END $$; CREATE TRIGGER owned_revision_upgrade_failure BEFORE INSERT ON schema_migrations FOR EACH ROW WHEN (NEW.version=${version}) EXECUTE FUNCTION owned_revision_upgrade_failure()`;
+   const remove=kind==='sqlite'?'DROP TRIGGER owned_revision_upgrade_failure':'DROP TRIGGER owned_revision_upgrade_failure ON schema_migrations; DROP FUNCTION owned_revision_upgrade_failure()';
+   const migrate=()=>kind==='sqlite'?migrateSqliteFirstSliceStorage(file):migratePostgresFirstSliceStorage(url.toString());
+   await execute(install);
+   try{await assert.rejects(migrate(),/owned revision upgrade failure/);
+    const count=kind==='sqlite'?control.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('test_runs') WHERE name IN ('state_revision','controller_dispatches_json')").get().n:
+      (await control.query("SELECT COUNT(*)::int AS n FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='test_runs' AND column_name IN ('state_revision','controller_dispatches_json')")).rows[0].n;
+    assert.equal(count,0);
+   }finally{await execute(remove);}
+   assert.equal((await migrate()).currentSchemaVersion,version);assert.deepEqual(await snapshot(),before);
+   const activated=await repository.activateParticipantController(input);assert.equal(activated.testRun.stateRevision,1);
+   assert.deepEqual(activated.testRun.unitResponses,before.run.unitResponses);assert.deepEqual(activated.testRun.unitResponseFieldTimestamps,before.run.unitResponseFieldTimestamps);
   });
   if(kind==='file')await t.test('failed persistence leaves the live parent inactive; retry and restart recover',async()=>{
    await reset();const before=await snapshot(),backup=join(directory,'backup.json');await rename(file,backup);await mkdir(file);

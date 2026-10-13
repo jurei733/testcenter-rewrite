@@ -123,6 +123,66 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
       assert.equal(repeated.applied,false);assert.deepEqual(repeated.testRun.controllerEntry,{active:true,revision:5});
       if(kind!=='memory')assert.deepEqual((await (await create()).getTestRunById(f.id)).controllerEntry,{active:true,revision:5});
     });
+    await t.test('one Run revision orders native, remote and response projections without replaying old effects',async()=>{
+      const f=await fixture();f.run={...f.run,bookletAssignmentKey:f.run.bookletKey};await repository.saveTestRun(f.run);
+      const canonical=await f.services.participantRuntime.getCurrentRunState({participantSessionId:f.id,testRunId:f.id});
+      await repository.saveTestRun(canonical.testRun);
+      const baseRevision=(await repository.getTestRunById(f.id)).stateRevision??0;
+      const native=()=>f.services.participantRuntime.executeNativeCommand({participantSessionId:f.id,testRunId:f.id,
+        contentReleaseId:f.run.contentReleaseId,bookletKey:f.run.bookletKey,deliveryId:'owned-global-pause',keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.parse(timestamp)});
+      const paused=await native();assert.equal(paused.testRun.stateRevision,baseRevision+1);
+      const remote=await issue(f.services,f,'resume');await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId});
+      assert.equal((await repository.getTestRunById(f.id)).stateRevision,baseRevision+1,'Issuing and acknowledging an intent do not change its Run snapshot.');
+      const resumed=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId,controllerStatus:'PAUSED'});
+      assert.equal(resumed.testRun.stateRevision,baseRevision+2);
+      const saved=await repository.mutateParticipantRun(f.run,context=>({testRun:{...context.testRun,stateRevision:999,unitResponses:{...context.testRun.unitResponses,second:'Exact later answer Ω'}},testLogs:[],activityEvents:[]}));
+      assert.equal(saved.testRun.stateRevision,baseRevision+3);assert.deepEqual(saved.testRun.unitResponses,{...f.run.unitResponses,second:'Exact later answer Ω'});
+      const unchanged=await repository.mutateParticipantRun(f.run,context=>({testRun:{...context.testRun,stateRevision:999},testLogs:[],activityEvents:[]}));
+      assert.equal(unchanged.testRun.stateRevision,baseRevision+3,'A caller cannot forge a revision or advance an unchanged snapshot.');
+      const nativeReplay=await native();assert.equal(nativeReplay.applied,false);assert.equal(nativeReplay.testRun.stateRevision,baseRevision+3);
+      const remoteReplay=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId});
+      assert.equal(remoteReplay.applied,false);assert.equal(remoteReplay.testRun.stateRevision,baseRevision+3);
+      const snapshot=await repository.getTestRunById(f.id),sibling={...snapshot,testRunId:f.id+'-revision-sibling',bookletAssignmentKey:'revision-sibling',controllerEntry:{active:false,revision:8}};
+      await repository.saveTestRun(sibling);await repository.activateParticipantController({...sibling,activatedAt:timestamp});
+      assert.deepEqual(await repository.getTestRunById(f.id),snapshot);
+      if(kind!=='memory')assert.deepEqual(JSON.parse(JSON.stringify(await (await create()).getTestRunById(f.id))),JSON.parse(JSON.stringify(snapshot)));
+      await repository.saveTestRun({...snapshot,stateRevision:Number.MAX_SAFE_INTEGER});const before=await snapshotForRevision();
+      async function snapshotForRevision(){return {run:await repository.getTestRunById(f.id),parent:await repository.getParticipantSessionById(f.id),logs:await repository.listParticipantTestLogsByWorkspace(f.base.tenantId,f.base.workspaceId)};}
+      await assert.rejects(repository.mutateParticipantRun(f.run,context=>({testRun:{...context.testRun,status:'paused'},testLogs:[],activityEvents:[]})),/revision.*exhausted/);
+      assert.deepEqual(await snapshotForRevision(),before);
+    });
+    for(const reversed of [false,true])await t.test(`controller dispatch order survives reversed HTTP arrival after ${reversed?'reversed':'normal'} ACK completion`,async()=>{
+      const f=await fixture();f.run={...f.run,bookletAssignmentKey:f.run.bookletKey};await repository.saveTestRun(f.run);
+      const pause=await issue(f.services,f,'pause'),resume=await issue(f.services,f,'resume');
+      for(const command of [pause,resume])await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:command.commandId});
+      const logical=reversed?[resume,pause]:[pause,resume],apply=(command,sequence)=>f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:command.commandId,controllerStatus:'RUNNING',controllerDispatch:{controllerId:'owned-document',sequence}});
+      const latest=await apply(logical[1],2),before=await snapshot(f),late=await apply(logical[0],1);
+      assert.equal(late.superseded,true);assert.deepEqual(JSON.parse(JSON.stringify(late.testRun)),JSON.parse(JSON.stringify(latest.testRun)));assert.deepEqual(late.participantSession,latest.participantSession);
+      assert.equal(late.testRun.status,reversed?'paused':'running');assert.deepEqual(late.testRun.controllerDispatches,{'owned-document':2});
+      const after=await snapshot(f);assert.deepEqual(JSON.parse(JSON.stringify(after.run)),JSON.parse(JSON.stringify(before.run)));assert.deepEqual(after.parent,before.parent);
+      for(const keyword of ['pause','resume'])assert.equal(after.logs.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length,1);
+      const replay=await apply(logical[0],1);assert.equal(replay.applied,false);assert.equal(replay.superseded,true);assert.deepEqual(await snapshot(f),after);
+      if(kind!=='memory')assert.deepEqual(JSON.parse(JSON.stringify(await (await create()).getTestRunById(f.id))),JSON.parse(JSON.stringify(after.run)));
+    });
+    await t.test('native and remote effects share a controller order while different controllers and response-only writes stay independent',async()=>{
+      const f=await fixture();f.run={...f.run,bookletAssignmentKey:f.run.bookletKey};await repository.saveTestRun(f.run);
+      const native=(keyword,id,sequence,controllerId='owned-document')=>f.services.participantRuntime.executeNativeCommand({participantSessionId:f.id,testRunId:f.id,
+        contentReleaseId:f.run.contentReleaseId,bookletKey:f.run.bookletKey,deliveryId:id,keyword,arguments:[],controllerStatus:'RUNNING',timeStamp:Date.parse(timestamp),controllerDispatch:{controllerId,sequence}});
+      const remote=await issue(f.services,f,'resume');await f.services.participantRuntime.acknowledgeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId});
+      const resumed=await f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId,controllerDispatch:{controllerId:'owned-document',sequence:2}});
+      const late=await native('pause','owned-late-pause',1);assert.equal(late.superseded,true);assert.deepEqual(late.testRun,resumed.testRun);
+      const beforeReplay=await snapshot(f),replay=await native('pause','owned-late-pause',1);assert.equal(replay.applied,false);assert.equal(replay.superseded,true);assert.deepEqual(await snapshot(f),beforeReplay);
+      await assert.rejects(native('pause','owned-late-pause',3),error=>error.errorCode==='participant_delivery_conflict');
+      const saved=await repository.mutateParticipantRun(f.run,context=>({testRun:{...context.testRun,controllerDispatches:{forged:999},unitResponses:{...context.testRun.unitResponses,second:'Exact newer response Ω'}},testLogs:[],activityEvents:[]}));
+      assert.deepEqual(saved.testRun.controllerDispatches,{'owned-document':2});assert.equal(saved.testRun.stateRevision,resumed.testRun.stateRevision+1);
+      const other=await native('pause','owned-other-controller',1,'another-document');assert.equal(other.testRun.status,'paused');assert.deepEqual(other.testRun.controllerDispatches,{'owned-document':2,'another-document':1});
+      const current=await native('resume','owned-next-resume',3);assert.equal(current.testRun.status,'running');assert.deepEqual(current.testRun.unitResponses,saved.testRun.unitResponses);
+      const before=await snapshot(f);
+      for(const controllerDispatch of [null,{},[],{controllerId:'owned-document',sequence:0},{controllerId:'owned-document',sequence:Number.MAX_SAFE_INTEGER+1}]){
+        await assert.rejects(f.services.participantRuntime.executeCommand({participantSessionId:f.id,testRunId:f.id,commandId:remote.commandId,controllerDispatch}),error=>error.errorCode==='participant_controller_dispatch_invalid');
+      }
+      assert.deepEqual(await snapshot(f),before);
+    });
     await t.test('invalid and exhausted entry revisions fail before committing any artifact',async()=>{
       for(const controllerEntry of [{active:false,revision:Number.MAX_SAFE_INTEGER},{active:false,revision:0},{active:'true',revision:1}]){
         const f=await fixture();await repository.saveTestRun({...f.run,controllerEntry});const before=await snapshot(f);
@@ -256,7 +316,7 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
         }));
         if (action === 'return') await assert.rejects(first.participantRuntime.returnToStarter({ testRunId: f.id, currentUnitKey: 'unit', expectedStatus: 'running' }), error => error.errorCode === 'starter_exit_state_changed');
         else { const result = await first.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }); assert.equal(result.status, 'paused'); assert.equal(result.pauseSource, 'monitor');
-          expected={...expected,run:{...expected.run,controllerEntry:{active:true,revision:1}}}; }
+          expected={...expected,run:{...expected.run,controllerEntry:{active:true,revision:1},stateRevision:expected.run.stateRevision+1}}; }
         assert.deepEqual(await snapshot(f), expected);
       }
     });

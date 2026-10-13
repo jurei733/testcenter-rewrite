@@ -315,7 +315,7 @@ if (kinds.includes("postgres")) {
       const before = await storage.repository.getTestRunById(run.testRunId);
       await storage.shutdown();
       storage = undefined;
-      await control.query(`ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries;
+      await control.query(`ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries;
         ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
         ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json;
         DROP TABLE participant_run_commands;

@@ -2,6 +2,8 @@ import type { ParticipantSession, ParticipantRunCommandEffect, ParticipantRunCom
   ParticipantProgressDelivery, TestRun } from "@testcenter-rewrite-app/domain";
 import { matchesParticipantRunCommandScope } from "./participant-run-commands.js";
 import { withParticipantControllerEntry } from "./participant-controller-entry.js";
+import { withParticipantRunRevision } from "./participant-run-revision.js";
+import { withParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 
 export type ParticipantRunMutationInput = Pick<TestRun,
   "testRunId" | "participantSessionId" | "tenantId" | "workspaceId" | "contentReleaseId"> & { deliveryId?: string };
@@ -17,6 +19,7 @@ export type ParticipantRunMutationEffect = ParticipantRunCommandEffect & {
   progressDelivery?: ParticipantProgressDelivery;
 };
 export type ParticipantRunMutationResult = {
+  superseded?: true;
   testRun: TestRun;
   participantSession: ParticipantSession;
   applied: boolean;
@@ -62,7 +65,13 @@ export const prepareParticipantRunMutation = (
         receipt[key as keyof ParticipantProgressDelivery] !== context.progressDelivery![key as keyof ParticipantProgressDelivery]))) {
     throw new Error("A progress delivery cannot change its accepted identity or cross its immutable parent scope.");
   }
-  if (effect) effect.testRun = withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive);
+  if (effect && participantControllerDispatchSuperseded(testRun, effect.controllerDispatch)) {
+    effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive;
+    effect.testLogs = effect.testLogs.filter(log => log.logKey === "command executed"); effect.activityEvents = []; effect.superseded = true;
+  }
+  if (effect) effect.testRun = withParticipantRunRevision(testRun,
+    withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
   return { result: structuredClone({ testRun: effect?.testRun ?? testRun,
-    participantSession: effect?.participantSession ?? participantSession, applied: effect !== null }), effect };
+    participantSession: effect?.participantSession ?? participantSession, applied: effect !== null,
+    ...(effect?.superseded ? { superseded: true as const } : {}) }), effect };
 };

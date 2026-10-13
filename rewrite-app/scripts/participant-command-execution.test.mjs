@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { parseParticipantRunCommand, participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 
@@ -10,7 +11,7 @@ const ast = ts.createSourceFile("execution.ts", source, ts.ScriptTarget.Latest, 
 const declaration = ast.statements.filter(ts.isVariableStatement).flatMap(item => [...item.declarationList.declarations])
   .find(item => item.name.getText(ast) === "executeReceivedParticipantCommand");
 assert.ok(declaration?.initializer);
-const compiled = ts.transpileModule(`export const load = (parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath, readParticipantSessionCredential, fetch) => (${declaration.initializer.getText(ast)});`, {
+const compiled = ts.transpileModule(`export const load = (parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath, readParticipantSessionCredential, fetch, receivedParticipantControllerDispatch, isParticipantControllerDispatches) => (${declaration.initializer.getText(ast)});`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 const { load } = await import("data:text/javascript;base64," + Buffer.from(compiled).toString("base64"));
@@ -30,7 +31,7 @@ const fixture = (respond = async () => ({ ok: true, json: async () => applicatio
   let current = true;
   const execute = load(parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath,
     sessionId => { assert.equal(sessionId, "owned-session"); return "owned-credential"; },
-    async (url, request) => { calls.push({ url, request }); events.push("request"); return respond(url, request); });
+    async (url, request) => { calls.push({ url, request }); events.push("request"); return respond(url, request); }, () => ({controllerId:"owned-document",sequence:1}), isParticipantControllerDispatches);
   const options = { scope: application().application.testRun, isCurrent: () => current, controllerStatus: () => "ERROR",
     prepare: async () => { events.push("saved"); }, apply: async () => { events.push("projected"); } };
   return { calls, events, controller, options, execute: () => execute(command(), controller.signal, options), leave: () => { current = false; } };
@@ -44,12 +45,26 @@ test("accepted command application drains first and authenticates the exact sele
   assert.equal(request.method, "POST"); assert.equal(request.cache, "no-store");
   assert.equal(request.headers.authorization, "Bearer owned-credential");
   assert.equal(request.signal, f.controller.signal);
-  assert.deepEqual(JSON.parse(request.body), { testRunId: "owned-run", controllerStatus: "ERROR" });
+  assert.deepEqual(JSON.parse(request.body), { testRunId: "owned-run", controllerStatus: "ERROR", controllerDispatch:{controllerId:"owned-document",sequence:1} });
 });
 
 test("a durable duplicate receipt still restores an interrupted local projection", async () => {
   const f = fixture(async () => ({ ok: true, json: async () => ({ application: { ...application().application, applied: false } }) }));
   await f.execute(); assert.deepEqual(f.events, ["saved", "request", "projected"]);
+});
+for(const change of [value=>{value.testRun.stateRevision=0;},value=>{value.testRun.controllerDispatches=null;},
+ value=>{value.testRun.controllerDispatches={owned:0};},value=>{value.controllerDispatch={controllerId:'foreign',sequence:1};},
+ value=>{value.superseded=false;}])test('malformed execution ordering evidence cannot authorize projection',async()=>{
+ const f=fixture(async()=>{const value=application();change(value.application);return {ok:true,json:async()=>value};});
+ await assert.rejects(f.execute(),error=>error.retryable===false);assert.deepEqual(f.events,['saved','request']);
+});
+test('a modern revision requires the exact dispatch echo, while an older API can omit both',async()=>{
+ const denied=fixture(async()=>{const value=application();value.application.testRun.stateRevision=1;return {ok:true,json:async()=>value};});
+ await assert.rejects(denied.execute(),error=>error.retryable===false);
+ const accepted=fixture(async(_url,request)=>{const value=application();value.application.testRun.stateRevision=1;
+  value.application.controllerDispatch=JSON.parse(request.body).controllerDispatch;return {ok:true,json:async()=>value};});
+ await accepted.execute();assert.deepEqual(accepted.events,['saved','request','projected']);
+ const older=fixture();await older.execute();assert.deepEqual(older.events,['saved','request','projected']);
 });
 
 for (const interruption of ["abort", "scope"]) {
@@ -119,7 +134,7 @@ for (const substituted of [false, true]) test(`debug does not drain Player answe
   let requests = 0, effects = 0;
   const execute = load(parseParticipantRunCommand, participantCommandExecutionRoute, resolveRoutePath, () => "owned-credential", async () => {
     requests++; return { ok: true, json: async () => structuredClone(reply) };
-  });
+  }, () => ({controllerId:"owned-document",sequence:1}), isParticipantControllerDispatches);
   const pending = execute(debug, new AbortController().signal, { scope: application().application.testRun, isCurrent: () => true, controllerStatus: () => "ERROR",
     prepare: () => assert.fail("A read-only debug command cannot wait on the Player answer drain."), apply: () => { effects++; } });
   if (substituted) await assert.rejects(pending, error => error.retryable === false); else await pending;

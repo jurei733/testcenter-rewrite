@@ -1132,6 +1132,10 @@ export type TestRun = {
   status: TestRunStatus;
   /** Server-owned entry/termination evidence for this exact Run, independent of its parent session. */
   controllerEntry?: { active: boolean; revision: number };
+  /** Optional for legacy rows; orders committed projections of this Run. */
+  stateRevision?: number;
+  /** Server-owned high-water marks for state effects from each controller document. */
+  controllerDispatches?: Record<string, number>;
   /** Identifies who may release a paused run; omitted for non-paused runs. */
   pauseSource?: TestRunPauseSource;
   /** Whole-test lock from the original monitor protocol; independent of progress status. */
@@ -1380,7 +1384,11 @@ export type ParticipantRunCommandApplicationContext = {
   testRuns: TestRun[];
 };
 
+export type ParticipantControllerDispatch = { controllerId: string; sequence: number };
+
 export type ParticipantRunCommandEffect = {
+  controllerDispatch?: ParticipantControllerDispatch;
+  superseded?: true;
   testRun: TestRun;
   /** Applied under the Run lock; response-only mutations cannot replace entry evidence. */
   controllerEntryActive?: boolean;
@@ -1390,6 +1398,8 @@ export type ParticipantRunCommandEffect = {
 };
 
 export type ParticipantRunCommandApplicationResult = {
+  controllerDispatch?: ParticipantControllerDispatch;
+  superseded?: true;
   command: ParticipantRunCommand;
   testRun: TestRun;
   participantSession: ParticipantSession;

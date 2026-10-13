@@ -77,7 +77,7 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
       const before = await repository.getTestRunById(f.id);
       const currentVersion = kind === 'sqlite' ? SQLITE_FIRST_SLICE_SCHEMA_VERSION : POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
       const version = kind === 'sqlite' ? 63 : 57;
-      await execute(`ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
+      await execute(`ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json;
         ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json; DELETE FROM schema_migrations WHERE version>=${version}`);
       const migration = () => kind === 'sqlite' ? migrateSqliteFirstSliceStorage(file) : migratePostgresFirstSliceStorage(url.toString());
       const value = async sql => kind === 'sqlite' ? control.prepare(sql).get().value : (await control.query(sql)).rows[0].value;

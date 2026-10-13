@@ -3,11 +3,11 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
 import {resolveRoutePath} from '@testcenter-rewrite-app/contracts';
-import {participantNativeCommandRoute,participantNativeCommandKeywords} from '@testcenter-rewrite-app/contracts/participant-native-command';
+import {participantNativeCommandRoute,participantNativeCommandKeywords,isParticipantControllerDispatch,isParticipantControllerDispatches} from '@testcenter-rewrite-app/contracts/participant-native-command';
 const source=readFileSync(new URL('../apps/web/src/app/participant-native-command.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('native.ts',source,ts.ScriptTarget.Latest,true);
 const statements=ast.statements.filter(node=>!ts.isImportDeclaration(node)).map(node=>node.getText(ast).replace(/^export /,''));
-const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential)=>{'+statements.join('\n')+';return createParticipantNativeCommands;};',
+const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential,isParticipantControllerDispatch,isParticipantControllerDispatches)=>{'+statements.join('\n')+';return Object.assign(createParticipantNativeCommands,{next:nextParticipantControllerDispatch,received:receivedParticipantControllerDispatch});};',
  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
@@ -16,7 +16,7 @@ const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
 function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING'}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
- const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential);
+ const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches);
  const receipt=body=>({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
  const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
@@ -33,7 +33,7 @@ test('native commands clone exact arguments, drain before dispatch and use only 
   f.native.command('goto',args);args[1]='mutated';await f.advance();assert.equal(f.calls.length,0);gate.resolve();await flush();
   assert.equal(f.calls.length,1);assert.equal(f.calls[0].url,'/api/v1/participant/sessions/participant/native-commands');
   const request=f.calls[0].request;assert.equal(request.headers.authorization,'Bearer Owned credential');assert.equal(request.cache,'no-store');
-  assert.deepEqual(JSON.parse(request.body),{testRunId:'run',contentReleaseId:'release',bookletKey:'booklet',deliveryId:'owned-1',keyword:'goto',arguments:['id','Alias Ω','give 2'],controllerStatus:'RUNNING',timeStamp:1791763200123});
+  assert.deepEqual(JSON.parse(request.body),{testRunId:'run',contentReleaseId:'release',bookletKey:'booklet',deliveryId:'owned-1',keyword:'goto',arguments:['id','Alias Ω','give 2'],controllerStatus:'RUNNING',timeStamp:1791763200123,controllerDispatch:{controllerId:'owned-tab',sequence:1}});
   assert.equal(f.applied.length,1);assert.equal(f.values.size,0);
  }finally{f.native.stop();}
 });
@@ -46,6 +46,15 @@ test('a LOADING observation survives answer drain, reload and exact retry withou
  const restored=fixture({values,controllerStatus:()=> 'RUNNING'});
  try{await restored.advance();assert.equal(restored.calls[0].request.body,packet);assert.equal(restored.applied.length,1);assert.equal(values.size,0);}
  finally{f.native.stop();restored.native.stop();}
+});
+test('a held native application does not block another intent, and route replacement aborts both',async()=>{
+ const held=deferred(),f=fixture({respond:async(body,_count,receipt)=>{await held.promise;return {ok:true,json:async()=>receipt(body)};}});
+ try {
+  f.native.command('pause',[]);await f.advance();f.native.command('resume',[]);await f.advance();
+  assert.deepEqual(f.calls.map(call=>JSON.parse(call.request.body).keyword),['pause','resume']);
+  assert.equal(f.values.size,2);f.replace();assert.ok(f.calls.every(call=>call.request.signal.aborted));
+  held.resolve();await flush();assert.deepEqual(f.applied,[]);assert.equal(f.values.size,0);
+ }finally{held.resolve();f.native.stop();}
 });
 test('a lost response retries the identical prepared packet without repeating the answer drain',async()=>{
  const f=fixture({respond:async(body,count,receipt)=>{if(count===1)throw Error('lost response');return {ok:true,json:async()=>({...receipt(body),application:{...receipt(body).application,applied:false}})};}});try{
@@ -78,7 +87,7 @@ test('route destruction cancels the pending journal without needing another scop
  const foreignKey='testcenter-rewrite:participant-native-command:v1:foreign';f.values.set(foreignKey,JSON.stringify(foreign));
  f.native.stop();assert.equal(f.calls[0].request.signal.aborted,true);assert.equal(f.listeners.size,0);
  assert.deepEqual([...f.values.keys()].sort(),[foreignKey,'unrelated'].sort());
- gate.resolve();await flush();await f.advance(1000);assert.deepEqual(f.applied,[]);assert.equal(f.calls.length,1);
+ gate.resolve();await flush();await f.advance(1000);assert.deepEqual(f.applied,[]);assert.equal(f.calls.length,2);
  const next=fixture({values:f.values});try{await next.advance();assert.deepEqual(next.calls,[]);}finally{next.native.stop();}
 });
 test('route destruction while draining trusted answers cannot dispatch the waiting intent',async()=>{
@@ -150,5 +159,40 @@ test('a legacy owner without a departing handoff is not authority to restore its
 
 for(const controllerEntry of [null,{active:'true',revision:1},{active:true,revision:0},{active:true,revision:1.5}])test(`a malformed controller entry cannot project a native receipt: ${JSON.stringify(controllerEntry)}`,async()=>{
  const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);value.application.testRun.controllerEntry=controllerEntry;return {ok:true,json:async()=>value};}});
+ try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);assert.equal(f.values.size,0);}finally{f.native.stop();}
+});
+test('native and received commands share one document counter, preserve retries and continue after a genuine reload',async()=>{
+ const doc=documentFor(),f=fixture({owner:null,browserWindow:doc.window}),previousWindow=globalThis.window;
+ globalThis.window=doc.window;
+ try{
+  f.native.command('pause',[]);await f.advance();const first=JSON.parse(f.calls[0].request.body).controllerDispatch;
+  assert.equal(first.sequence,1);const accepted={testRunId:scope.testRunId,commandId:'owned-remote'};
+  const remote=f.create.received(accepted);assert.deepEqual(remote,{controllerId:first.controllerId,sequence:2});
+  f.native.command('resume',[]);await f.advance();assert.equal(JSON.parse(f.calls[1].request.body).controllerDispatch.sequence,3);
+  assert.deepEqual(f.create.received(accepted),remote,'Retrying a received command cannot become a newer state effect.');
+  assert.equal(f.create.next('another-run',doc.window).sequence,1);
+  doc.event('pagehide');const reload=documentFor({session:new Map(doc.session),type:'reload'}),next=fixture({owner:null,browserWindow:reload.window});
+  try{next.native.command('pause',[]);await next.advance();assert.deepEqual(JSON.parse(next.calls[0].request.body).controllerDispatch,{controllerId:first.controllerId,sequence:4});}
+  finally{next.native.stop();}
+  assert.ok(![...doc.session.values()].join().includes('Owned credential'));
+ }finally{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;f.native.stop();}
+});
+test('a prepared legacy journal retries its original packet without introducing dispatch metadata',async()=>{
+ const old=fixture({respond:async()=>{throw Error('Offline');}});old.native.command('pause',[]);await old.advance();
+ const values=new Map(old.values),key=[...values.keys()][0],entry=JSON.parse(values.get(key));delete entry.request.controllerDispatch;delete entry.version;values.set(key,JSON.stringify(entry));const packet=JSON.stringify(entry.request);old.native.stop();
+ const restored=fixture({values});try{await restored.advance();assert.equal(restored.calls[0].request.body,packet);assert.equal(restored.prepared.length,0);assert.equal(restored.applied.length,1);}finally{restored.native.stop();}
+});
+test('a restored unclocked native packet retains its former FIFO before new v2 intents',async()=>{
+ const held=deferred(),id='owned-legacy',request={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,
+  deliveryId:id,keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:1791763200123};
+ const values=new Map([['testcenter-rewrite:participant-native-command:v1:'+id,JSON.stringify({scope,owner:'owned-tab',id,keyword:'pause',args:[],request,prepared:true})]]);
+ const f=fixture({values,respond:async(body,_count,receipt)=>{if(body.deliveryId===id)await held.promise;return {ok:true,json:async()=>receipt(body)};}});
+ try{await f.advance();f.native.command('resume',[]);await f.advance();assert.equal(f.calls.length,1);
+  assert.equal(f.calls[0].request.body,JSON.stringify(request));held.resolve();await flush();await f.advance();
+  assert.deepEqual(f.calls.map(call=>JSON.parse(call.request.body).keyword),['pause','resume']);assert.equal(f.values.size,0);
+ }finally{held.resolve();f.native.stop();}
+});
+for(const change of [value=>{value.stateRevision=0;},value=>{value.stateRevision=Number.MAX_SAFE_INTEGER+1;},value=>{value.controllerDispatches=null;},value=>{value.controllerDispatches={owned:0};}])test('malformed Run ordering evidence cannot project a native effect',async()=>{
+ const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);change(value.application.testRun);return {ok:true,json:async()=>value};}});
  try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);assert.equal(f.values.size,0);}finally{f.native.stop();}
 });

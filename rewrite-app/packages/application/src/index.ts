@@ -3,6 +3,7 @@ import { evaluateParticipantDebugConditions, parseParticipantDebugConditionEleme
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
 import { participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
+import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
   ParticipantRunMutationEffect, ParticipantRunMutationResult } from "./participant-run-mutation.js";
@@ -743,7 +744,7 @@ export type ParticipantRuntimePort = {
   getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
-  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string }): Promise<ParticipantRunCommandApplicationResult>;
+  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"] }): Promise<ParticipantRunCommandApplicationResult>;
   executeNativeCommand(input: ParticipantNativeCommandRequest & { participantSessionId: string }): Promise<ParticipantNativeCommandResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
@@ -32038,6 +32039,9 @@ export const createFirstSliceServices = (
         return command;
       },
       async executeCommand(input) {
+        if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
+          throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
+        }
         const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
         const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
         if (!selected || !resolveParticipantExecutionMode(selected.executionMode).receiveRemoteCommands) {
@@ -32061,6 +32065,13 @@ export const createFirstSliceServices = (
             const testRun = normalizeTestRun(context.testRun);
             const mode = resolveParticipantExecutionMode(testRun.executionMode);
             if (!mode.receiveRemoteCommands) throw new FirstSliceError(409, "participant_commands_disabled", "This Run does not receive remote commands.");
+            if (command.commandType !== "debug" && participantControllerDispatchSuperseded(context.testRun, input.controllerDispatch)) {
+              const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
+                reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
+              return { testRun: context.testRun, superseded: true, controllerDispatch: input.controllerDispatch,
+                testLogs: mode.saveResponses && content ? buildParticipantTestLogs({ testRun: context.testRun,
+                  batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [], activityEvents: [] };
+            }
             if (command.commandType === "debug") {
               // Debug changes the browser pane only. It must not resume an
               // ERROR/paused controller, restart timers or rewrite Run data.
@@ -32114,18 +32125,23 @@ export const createFirstSliceServices = (
               occurredAt: executedAt, summary: `Timed block '${timerKey}' started for run '${testRun.testRunId}'.`,
               details: { testletKey: timerKey, durationSeconds: nextRun.testletTimers?.[timerKey]?.durationSeconds ?? command.remainingSeconds,
                 expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
-            return { testRun: nextRun, testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
+            return { testRun: nextRun, controllerDispatch: input.controllerDispatch,
+              testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
               activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
                 ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
           }));
           if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
-          return result;
+          return { ...result, ...(input.controllerDispatch ? { controllerDispatch: input.controllerDispatch,
+            ...(input.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[input.controllerDispatch.controllerId] ?? 0) ? { superseded: true as const } : {}) } : {}) };
         } catch (error) {
           if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, error.errorCode, error.message);
           throw error;
         }
       },
       async executeNativeCommand(input) {
+        if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
+          throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
+        }
         if (!participantNativeCommandKeywords.includes(input.keyword) || !Array.isArray(input.arguments) ||
             input.arguments.some(argument => typeof argument !== "string") ||
             !["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(input.controllerStatus) ||
@@ -32150,7 +32166,8 @@ export const createFirstSliceServices = (
         const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
         const deliveryId = `console:${request.deliveryId}`;
         const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: request.keyword,
-          arguments: request.arguments, controllerStatus: request.controllerStatus, timeStamp: request.timeStamp });
+          arguments: request.arguments, controllerStatus: request.controllerStatus, timeStamp: request.timeStamp,
+          ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}) });
         let executedAt = "";
         try {
           const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
@@ -32192,6 +32209,14 @@ export const createFirstSliceServices = (
                 const first = booklet.unitEntries.find(candidate => (candidate.testletPath?.at(-1) ?? originalBookletRootTestletKey) === parentKey);
                 return cause.by === "code" && first?.unitKey === unit.unitKey && !own.show && !own.time && !own.afterLeave;
               } });
+            if (participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch)) {
+              return { testRun: context.testRun, superseded: true, controllerDispatch: request.controllerDispatch,
+                testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
+                  deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }] }] }) : [],
+                activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                  tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                  deliveryId, payloadSha256, acceptedAt: timestamp } };
+            }
             const nextRun = { ...projected, executionMode: context.testRun.executionMode, bookletAssignmentKey: context.testRun.bookletAssignmentKey };
             const terminal = request.keyword === "terminate";
             const controller = terminal ? observedController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
@@ -32204,7 +32229,7 @@ export const createFirstSliceServices = (
             if (nextRun.currentUnitKey !== context.testRun.currentUnitKey) entries.push({ key: "CURRENT_UNIT_ID", timeStamp: request.timeStamp, content: nextRun.currentUnitKey ?? "" });
             if (terminal && request.arguments.includes("lock")) entries.push({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: request.timeStamp, content: "" });
             entries.push({ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") });
-            return { testRun: nextRun, controllerEntryActive: !terminal,
+            return { testRun: nextRun, controllerEntryActive: !terminal, controllerDispatch: request.controllerDispatch,
               participantSession: { ...context.participantSession, status: terminal ? "signed_in" : "launched" },
               testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: nextRun, deliveryId, batches: [{ entries }] }) : [],
               activityEvents: [{ activityEventId: `delivery:${nextRun.testRunId}:${deliveryId}:activity:native`, tenantId: nextRun.tenantId,
@@ -32219,7 +32244,9 @@ export const createFirstSliceServices = (
           return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
             participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
             contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey },
-            executedAt, applied: result.applied, testRun: result.testRun, participantSession: result.participantSession };
+            executedAt, applied: result.applied,
+            ...(result.superseded || request.controllerDispatch && request.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[request.controllerDispatch.controllerId] ?? 0)
+              ? { superseded: true as const } : {}), testRun: result.testRun, participantSession: result.participantSession };
         } catch (error) {
           if (error instanceof ParticipantNativeCommandError) throw new FirstSliceError(400, error.errorCode, error.message);
           throw error;
@@ -34200,7 +34227,7 @@ export const createFirstSliceServices = (
           completionView = completedRun;
           return { testRun: persistedRun, testLogs, activityEvents, controllerEntryActive: false, ...(participantSession ? { participantSession } : {}) };
         });
-        return completionView ? { ...completionView, controllerEntry: result.testRun.controllerEntry } : result.testRun;
+        return completionView ? { ...completionView, controllerEntry: result.testRun.controllerEntry, stateRevision: result.testRun.stateRevision } : result.testRun;
       }
     },
     monitorRead: {

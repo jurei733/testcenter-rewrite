@@ -360,6 +360,29 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant command API authori
       const inactive=await snapshot(),replay=(await apply(next.commandId)).application;
       assert.equal(replay.applied,false);assert.equal(replay.command.executedAt,accepted.command.executedAt);assert.deepEqual(await snapshot(),inactive);
     });
+    await t.test("authenticated HTTP dispatches preserve later effects across native and remote arrival inversion", async () => {
+      const repository=await readFreshRepository(),nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId});
+      const before=await repository.getTestRunById(run.testRunId),sibling=await repository.getTestRunById(otherBookletRun.testRunId);
+      const clock=sequence=>({controllerId:'owned-http-controller',sequence});
+      const body={testRunId:run.testRunId,contentReleaseId:before.contentReleaseId,bookletKey:before.bookletKey,deliveryId:'owned-http-late',keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:Date.now(),controllerDispatch:clock(1)};
+      const resume=await issue(run.testRunId,'resume');await request('PATCH',acknowledgement(resume.commandId),{testRunId:run.testRunId},selected.sessionToken);
+      const latest=(await request('POST',application(resume.commandId),{testRunId:run.testRunId,controllerStatus:'PAUSED',controllerDispatch:clock(2)},selected.sessionToken)).application;
+      assert.deepEqual(latest.controllerDispatch,clock(2));assert.equal(latest.testRun.status,'running');
+      const late=(await request('POST',nativePath,body,selected.sessionToken)).application;
+      assert.equal(late.superseded,true);assert.deepEqual(late.controllerDispatch,clock(1));assert.deepEqual(late.testRun,latest.testRun);
+      const snapshot=async()=>({run:await repository.getTestRunById(run.testRunId),parent:await repository.getParticipantSessionById(sessionId),
+        logs:await repository.listParticipantTestLogsByWorkspace(run.tenantId,run.workspaceId)}),accepted=await snapshot();
+      const replay=(await request('POST',nativePath,body,selected.sessionToken)).application;
+      assert.equal(replay.applied,false);assert.equal(replay.superseded,true);assert.deepEqual(await snapshot(),accepted);
+      for(const token of [undefined,other.sessionToken])await request('POST',nativePath,{...body,deliveryId:'owned-http-other',controllerDispatch:clock(3)},token,401);
+      await request('POST',nativePath,{...body,testRunId:foreign.testRunId,deliveryId:'owned-http-foreign',controllerDispatch:clock(3)},selected.sessionToken,404);
+      for(const controllerDispatch of [null,{},[],{controllerId:'owned-http-controller',sequence:0}]){
+        const rejected=await request('POST',nativePath,{...body,deliveryId:'owned-http-invalid',controllerDispatch},selected.sessionToken,400);assert.equal(rejected.error,'participant_controller_dispatch_invalid');
+        await request('POST',application(resume.commandId),{testRunId:run.testRunId,controllerDispatch},selected.sessionToken,400);
+      }
+      await request('POST',nativePath,{...body,controllerDispatch:clock(3)},selected.sessionToken,409);
+      assert.deepEqual(await snapshot(),accepted);assert.deepEqual(await repository.getTestRunById(otherBookletRun.testRunId),sibling);
+    });
     await t.test("selected streaming survives sibling exits, while a sibling entry cannot revive a terminated receiver", async () => {
       const repository=await readFreshRepository(),before=await repository.getTestRunById(run.testRunId);
       const nativePath=resolveRoutePath(participantNativeCommandRoute,{participantSessionId:sessionId});

@@ -1,4 +1,4 @@
-import { monitorRunCommandTypes, type ParticipantRunCommand, type ParticipantRunCommandApplicationResult } from "@testcenter-rewrite-app/domain";
+import { monitorRunCommandTypes, type ParticipantControllerDispatch, type ParticipantRunCommand, type ParticipantRunCommandApplicationResult } from "@testcenter-rewrite-app/domain";
 
 export const participantCommandExecutionRoute = "/api/v1/participant/sessions/:participantSessionId/commands/:commandId/application";
 
@@ -37,5 +37,5 @@ export const parseParticipantRunCommand = (value: unknown): ParticipantRunComman
 export type ListParticipantRunCommandsResponse = { commands: ParticipantRunCommand[] };
 export type AcknowledgeParticipantRunCommandRequest = { testRunId: string };
 export type AcknowledgeParticipantRunCommandResponse = { command: ParticipantRunCommand };
-export type ExecuteParticipantRunCommandRequest = { testRunId: string; controllerStatus?: "RUNNING" | "PAUSED" | "ERROR" };
+export type ExecuteParticipantRunCommandRequest = { testRunId: string; controllerStatus?: "RUNNING" | "PAUSED" | "ERROR"; controllerDispatch?: ParticipantControllerDispatch };
 export type ExecuteParticipantRunCommandResponse = { application: ParticipantRunCommandApplicationResult };
