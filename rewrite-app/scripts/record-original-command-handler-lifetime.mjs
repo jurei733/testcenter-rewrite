@@ -8,7 +8,7 @@ import ts from 'typescript';
 const repository=resolve(process.argv[2]??'../../testcenter'),revision='ee2ab9ab64bd91209ef8534bbe6005838024e46d';
 const definitions={
  command:{path:'frontend/src/app/test-controller/services/command.service.ts',className:'CommandService',methods:['commandToString','subscribeReceivedCommands']},
- service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','errorOut']},
+ service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','errorOut','terminateTest']},
  controller:{path:'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',className:'TestControllerComponent',methods:['handleCommand','goto']}
 };
 const sources={};let callback;
@@ -24,4 +24,4 @@ for(const [key,definition] of Object.entries(definitions)){
 }
 const native=JSON.parse(readFileSync(new URL('./fixtures/original-native-command-reference.json',import.meta.url),'utf8'));assert.equal(native.originalCommit,revision);
 writeFileSync(new URL('./fixtures/original-command-handler-lifetime.json',import.meta.url),JSON.stringify({originalCommit:revision,sources,callback,interfaces:native.sources.interfaces.extracted},null,2)+'\n');
-console.log('Recorded actual Original ACK pipeline, handler subscription and synchronous Pause/Resume state transitions.');
+console.log('Recorded actual Original ACK pipeline, handler subscription and controller phase methods.');

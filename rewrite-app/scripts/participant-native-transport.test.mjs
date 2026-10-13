@@ -204,3 +204,23 @@ for(const keyword of ['pause','resume','goto'])test(`${keyword} starts synchrono
   await f.advance();assert.equal(f.calls.length,0);gate.resolve();await flush();await f.advance(1000);assert.equal(f.calls.length,2);assert.equal(starts.length,1);
  }finally{gate.resolve();f.native.stop();}
 });
+
+for(const [initial,later]of [['RUNNING','PAUSED'],['PAUSED','RUNNING'],['LOADING','PAUSED'],['ERROR','RUNNING']])test(`fresh native termination samples ${later} after preparation, not its former ${initial}`,async()=>{
+ const gate=deferred();let status=initial;const f=fixture({prepare:()=>gate.promise,controllerStatus:()=>status});
+ try{f.native.command('terminate',['lock']);await f.advance();assert.equal(f.calls.length,0);status=later;gate.resolve();await flush();assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,later);}
+ finally{gate.resolve();f.native.stop();}
+});
+
+test('prepared terminal status remains byte-exact across retry and same-owner restoration',async()=>{
+ const gate=deferred();let status='PAUSED';const f=fixture({prepare:()=>gate.promise,controllerStatus:()=>status,respond:async()=>({ok:false,status:503})});
+ try{
+  f.native.command('terminate',['lock']);await f.advance();status='RUNNING';gate.resolve();await flush();const packet=f.calls[0].request.body;assert.equal(JSON.parse(packet).controllerStatus,'RUNNING');
+  status='ERROR';await f.advance(1000);assert.equal(f.calls[1].request.body,packet);
+  const restored=fixture({values:new Map(f.values),controllerStatus:()=> 'PAUSED'});try{await restored.advance();assert.equal(restored.calls[0].request.body,packet);}finally{restored.native.stop();}
+ }finally{gate.resolve();f.native.stop();}
+});
+test('an unprepared legacy termination retains its original observation and unclocked packet',async()=>{
+ const gate=deferred(),f=fixture({prepare:()=>gate.promise,controllerStatus:()=> 'PAUSED'});f.native.command('terminate',['lock']);const values=new Map(f.values);f.native.stop();
+ for(const [key,raw]of values){const entry=JSON.parse(raw);delete entry.version;values.set(key,JSON.stringify(entry));}
+ const restored=fixture({values,controllerStatus:()=> 'RUNNING'});try{await restored.advance();const request=JSON.parse(restored.calls[0].request.body);assert.equal(request.controllerStatus,'PAUSED');assert.equal(request.controllerDispatch,undefined);}finally{gate.resolve();restored.native.stop();}
+});
