@@ -1,5 +1,77 @@
 # Optional Original UI
 
+### File mutation publication and real writer readiness (2026-10-14)
+
+Application checkpoint `c4a82157fc98` fixes the three reproduced File-store
+failures from the preceding SQLite checkpoint. A readable but non-writable
+manifest or package directory now fails readiness through a real exclusive
+write, flush and rename probe. Probes leave committed bytes unchanged and no
+probe files behind. The real API retains health while readiness returns 503;
+write errors expose a generic public response and safe EACCES diagnostics, then
+normal readiness and sign-in recover when permissions are restored.
+
+Generic mutations isolate collection maps and publish the live cache only after
+persistence succeeds. Failed mutations restore their pending dirty-entity sets,
+remain absent from live reads and cannot leak into a later independent commit.
+The File adapter additionally writes new package/release contents to immutable
+hash-named files. One atomic main-manifest replacement publishes all selected
+versions. Failure before that replacement preserves the previous manifest and
+selected sidecars and removes newly created candidate files when cleanup is
+possible. Reopen therefore retains the committed package/release, rather than
+observing an overwritten rejected version. A missing selected sidecar now
+rejects loading instead of silently initializing an empty repository; the new
+version-two sidecar manifest also detects content-hash mismatches.
+
+Legacy inline and version-one sidecar stores remain readable and migrate on an
+explicit migration or the first successful write. Owned failure fixtures prove
+that a rejected migration/replacement retains version-one manifest and sidecar
+bytes and can be retried after recovery. The enclosing state document and public
+migration result keep formatVersion 1; the nested sidecar manifest is version 2.
+Older binaries cannot read it, so the documented rollback restores the complete
+pre-upgrade manifest/objects backup while the single writer is stopped. Prior
+versions of live entities remain available to readers of an earlier manifest.
+Guarded deletion drops the references and prunes all versions; failed cleanup
+retries on the next mutation. Retention/compaction, broader failure injection
+and power-loss behavior still need operating qualification.
+
+All 2,359 unit/frontend tests and 166 fresh File HTTP integration tests pass
+without skips or cancellations. The focused 29 tests include existing File
+behavior, eleven new storage failure/migration/integrity cases and two real API
+cases. The previous immutable image `f386eaa7dc6b` passes one and fails ten of
+the eleven current storage cases, and fails both new API cases; the same scripts
+pass against the current code/image. Migration, doctor, metadata-required
+preflight, startup and shutdown CLI checks pass on an owned File fixture.
+
+A clean archive of all 913 tracked application files builds fresh image
+`99695362f806`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 629 tests inside the read-only image as node pass. All 169 production
+frontend files match the frozen tested frontend and host byte for byte; all 206
+frontend source files are unchanged. The bounded Node/Angular build options
+remain absent from runtime configuration. The earlier 1,536 PostgreSQL tests,
+332 Memory/SQLite HTTP tests and 168 browser/reference groups remain explicitly
+retained evidence for unchanged non-File runtime paths, not fresh current runs.
+
+A fresh headed File/Angular browser flow passes through the requested
+participant-verona-loading boundary. It covers administrator settings/accounts,
+workspace/content authoring, source intake and dependency assembly, import,
+activation, prompt read models, participant login/code/reentry, navigation,
+response autosave, completion and Player loading. This is one bounded flow,
+not the complete Original player/visual/operating acceptance matrix. The first
+attempt mistakenly enabled Demo bootstrap although the harness creates its own
+administrator: bootstrap returned 409 and sign-in 401. Its failure log/report
+and screenshot remain retained. The corrected attempt disables only that fixture
+option and passes without an application change.
+
+All 24 preexisting containers, their image IDs/states/mounts, all 86 volumes and
+383 prior image aliases at this checkpoint's start, and the three protected
+artifacts remain intact. Owned test resources are removed. The current work is
+local; nothing was pushed, released or deployed and remote CI is unverified.
+Complete Original functional parity and production readiness remain unproven,
+including broader legacy/native concurrency and timer scheduling, full
+real-package/property/visual and camera/QR acceptance, measured performance,
+retention/power-loss qualification and production acceptance. The earlier
+intermittent SQLite CANTOPEN still has no proven original cause.
+
 ### Live SQLite readiness, safe storage shutdown and bounded builds (2026-10-14)
 
 Application checkpoint `ca72428d7d39` strengthens the operational boundary
