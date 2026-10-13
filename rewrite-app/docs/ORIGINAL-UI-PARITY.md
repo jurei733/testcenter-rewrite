@@ -1,5 +1,90 @@
 # Optional Original UI
 
+### Live SQLite readiness, safe storage shutdown and bounded builds (2026-10-14)
+
+Application checkpoint `ca72428d7d39` strengthens the operational boundary
+without changing the participant protocol or frontend. SQLite readiness now
+uses the persistent writer owned by the API instead of opening another
+connection. It checks the existing schema and performs real writes in a rolled
+back transaction. Missing files are not created by standalone readiness checks,
+and empty databases are not silently migrated. Healthy probes retain database
+bytes, schema and application data; a read-only writer, replaced database path
+or obstructed journal causes readiness failure. API health remains available
+while readiness returns 503. Safe driver codes are retained in operational logs;
+public write failures keep their generic response and do not expose credentials.
+Rejected startup migrations close their connection and shutdown closes the
+successful live writer exactly once.
+
+Closing a socket does not imply that its asynchronous database work finished.
+The API now includes participant and monitor SSE polls and participant lease
+closure in its request lifecycle. Shutdown drains that work before closing
+storage. A disconnect during initial stream registration closes the participant
+lease and starts no poller; the corresponding monitor path also starts no
+poller. Eight lifecycle tests execute the actual extracted stream/shutdown
+methods with controlled scheduling and services. The previous source passes
+three and fails the five newly added stream cases. Two separate real
+SQLite/HTTP stream tests pass; the controlled cases do not replace complete
+application shutdown/load qualification.
+
+The application code at `6d0f84e7e6c1` passes 2,346 unit/frontend tests, 1,536
+PostgreSQL tests and 498 HTTP tests across Memory, File and SQLite, without skips
+or cancellations. Startup and shutdown CLI checks also pass. The only subsequent
+application change is the Dockerfile: build processes use a 1,536 MiB Node heap
+limit and two Angular workers. Those options are absent from the final runtime
+environment. A clean archive of all 911 tracked application files builds image
+`f386eaa7dc6b`; Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 600 tests as node inside the read-only image pass. Its 169 production
+frontend files match the frozen tested frontend and the host byte for byte.
+Three actual SQLite API tests fail against the preceding `1e819f1c4ad6` image
+and pass in the new image, including shutdown lifetime and live-writer failure
+with generic public errors.
+
+The current backend additionally passes 159 fresh Rewrite browser groups:
+context selection headed/headless, timer interruption headed/headless, loading
+and commands headed/headless, Debug, native routes, copied tabs/crash recovery
+and runtime errors. Nine fresh groups execute the pinned Original's extracted
+timer/controller/guard/Unit-host methods and real Blob Worker. Router wiring and
+iframe presentation in that reference harness remain controlled. These 168
+groups do not establish full Original application, visual or package acceptance.
+The prior five actual older-API groups remain predecessor evidence; no fresh
+complete mixed-version rollout is claimed.
+
+The initial concurrent HTTP/PostgreSQL qualification exhausted host storage,
+producing SQLite FULL/CANTOPEN and Docker overlay failures. Those trials and a
+browser ENOSPC failure remain retained. A normal Docker Desktop restart restored
+the daemon; only verified owned failed resources were removed. Integration runs
+were repeated sequentially. A subsequent guarded container run also stopped at
+low storage and its residual owned container was removed. The final bounded
+build and all profiles pass under a storage guard. The earlier intermittent
+CANTOPEN in the causal-context checkpoint still has no proven original cause;
+these new live-writer checks and later disk exhaustion do not establish that
+cause. Build resource bounds do not guarantee host headroom under every workload.
+
+All 24 preexisting containers, their image IDs/states/mounts, 85 preexisting
+volumes, 369 prior image aliases and protected artifacts are verified intact.
+Observed unrelated inventory additions are recorded separately. Four closed
+owned historical SQLite fixtures were losslessly compressed, reclaiming
+197,197,670 bytes with verified round-trip hashes and a retained restore script;
+the protected legacy tryout database is unchanged. Only verified private owned
+BuildKit records were pruned; no broad image/volume prune or Docker reset occurred.
+
+Full functional parity and production readiness remain unproven. Further work
+includes exact Original Player/navigation/timer/concurrency and completion-lock
+behavior, complete real-package/property/visual and camera/QR acceptance,
+measured performance and broader storage/operating failure qualification.
+An owned permission fixture independently reproduces a remaining File-store
+readiness gap: a readable but non-writable directory passes readiness while an
+actual repository write fails with EACCES and leaves persisted bytes unchanged.
+The failed change nevertheless becomes visible in the live repository and an
+independent later successful write persists it. The fixture was removed; this
+SQLite checkpoint fixes neither File readiness nor that failed-write cache leak.
+A separate owned SourcePackage replacement also fails at the manifest write
+after overwriting its existing sidecar: an independently reopened repository
+then observes the rejected replacement despite unchanged manifest bytes.
+That on-disk partial commit requires a persistence correction as well.
+Remote CI, release, deployment and production acceptance are separate outstanding
+gates. This is a local checkpoint; nothing was pushed or deployed.
+
 ### Causal timer interruption after a legacy retime (2026-10-13)
 
 Application checkpoint `0572ff28aa89` corrects an observed same-Unit race: a
