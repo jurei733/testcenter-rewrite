@@ -144,12 +144,7 @@ export const createParticipantNativeCommands = (options: {
     try {
       if (!entry.prepared) {
         await options.prepare(isCurrent); if (!isCurrent()) return;
-        if (entry.version === 2) {
-          // Source terminateTest observes state after canDeactivateUnit, at
-          // the terminal transition. Prepared and legacy packets stay exact.
-          if (entry.keyword === "terminate") entry.request.controllerStatus = options.controllerStatus();
-          entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
-        }
+        if (entry.version === 2) entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
         entry.prepared = true;
         persist(entry);
       }

@@ -205,16 +205,10 @@ for(const keyword of ['pause','resume','goto'])test(`${keyword} starts synchrono
  }finally{gate.resolve();f.native.stop();}
 });
 
-for(const [initial,later]of [['RUNNING','PAUSED'],['PAUSED','RUNNING'],['LOADING','PAUSED'],['ERROR','RUNNING']])test(`fresh native termination samples ${later} after preparation, not its former ${initial}`,async()=>{
- const gate=deferred();let status=initial;const f=fixture({prepare:()=>gate.promise,controllerStatus:()=>status});
- try{f.native.command('terminate',['lock']);await f.advance();assert.equal(f.calls.length,0);status=later;gate.resolve();await flush();assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,later);}
- finally{gate.resolve();f.native.stop();}
-});
-
 test('prepared terminal status remains byte-exact across retry and same-owner restoration',async()=>{
  const gate=deferred();let status='PAUSED';const f=fixture({prepare:()=>gate.promise,controllerStatus:()=>status,respond:async()=>({ok:false,status:503})});
  try{
-  f.native.command('terminate',['lock']);await f.advance();status='RUNNING';gate.resolve();await flush();const packet=f.calls[0].request.body;assert.equal(JSON.parse(packet).controllerStatus,'RUNNING');
+  f.native.command('terminate',['lock']);await f.advance();status='RUNNING';gate.resolve();await flush();const packet=f.calls[0].request.body;assert.equal(JSON.parse(packet).controllerStatus,'PAUSED');
   status='ERROR';await f.advance(1000);assert.equal(f.calls[1].request.body,packet);
   const restored=fixture({values:new Map(f.values),controllerStatus:()=> 'PAUSED'});try{await restored.advance();assert.equal(restored.calls[0].request.body,packet);}finally{restored.native.stop();}
  }finally{gate.resolve();f.native.stop();}

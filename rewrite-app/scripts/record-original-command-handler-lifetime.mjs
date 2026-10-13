@@ -8,7 +8,7 @@ import ts from 'typescript';
 const repository=resolve(process.argv[2]??'../../testcenter'),revision='ee2ab9ab64bd91209ef8534bbe6005838024e46d';
 const definitions={
  command:{path:'frontend/src/app/test-controller/services/command.service.ts',className:'CommandService',methods:['commandToString','subscribeReceivedCommands']},
- service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','errorOut','terminateTest']},
+ service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','errorOut','terminateTest','canDeactivateUnit']},
  controller:{path:'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',className:'TestControllerComponent',methods:['handleCommand','goto']}
 };
 const sources={};let callback;

@@ -8,9 +8,9 @@ import {filter,concatMap,ignoreElements,startWith,mergeMap,map,tap} from 'rxjs/o
 
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/original-command-handler-lifetime.json',import.meta.url),'utf8'));
 assert.equal(fixture.originalCommit,'ee2ab9ab64bd91209ef8534bbe6005838024e46d');
-const code=ts.transpileModule(`export const load=(timer,filter,concatMap,ignoreElements,startWith,mergeMap,map,tap,lastValueFrom)=>{${fixture.interfaces}\n${Object.values(fixture.sources).map(value=>value.extracted).join('\n')}\nreturn {CommandService,TestControllerService,TestControllerComponent,subscribe:function(){return ${fixture.callback};}};};`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const code=ts.transpileModule(`export const load=(timer,filter,concatMap,ignoreElements,startWith,mergeMap,map,tap,lastValueFrom,of)=>{${fixture.interfaces}\n${Object.values(fixture.sources).map(value=>value.extracted).join('\n')}\nreturn {CommandService,TestControllerService,TestControllerComponent,subscribe:function(){return ${fixture.callback};}};};`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
-const original=load(timer,filter,concatMap,ignoreElements,startWith,mergeMap,map,tap,lastValueFrom);
+const original=load(timer,filter,concatMap,ignoreElements,startWith,mergeMap,map,tap,lastValueFrom,of);
 for(const reversed of [false,true])test(`actual Original handlers overlap after ${reversed?'reversed':'normal'} successful ACK completion`,async()=>{
  const started=[],states=[],completed=[],acks=new Map(),scheduler=new TestScheduler(assert.deepEqual);
  let release;const held=new Promise(done=>{release=done;});const logical=reversed?['resume','pause']:['pause','resume'];
@@ -65,4 +65,17 @@ test('actual Original already-TERMINATED guard returns before deactivation, lock
 test('actual Original denied unforced termination retains the running controller',async()=>{
  const service=new original.TestControllerService();service.state$=new BehaviorSubject('RUNNING');service.canDeactivateUnit=()=>of(false);service.closeAllBuffers=()=>assert.fail('Denied deactivation flushed');
  assert.equal(await service.terminateTest('source',false,true),true);assert.equal(service.state$.getValue(),'RUNNING');
+});
+
+for(const [initial,later]of [['RUNNING','PAUSED'],['PAUSED','RUNNING']])test(`actual forced Original termination enters its terminal phase before held buffers, preserving later ${later}`,async()=>{
+ const events=[];let release;const buffers=new Promise(done=>{release=done;});
+ const service=new original.TestControllerService();service.testId=42;service.currentUnitSequenceId=1;service.currentUnit={parent:{locked:false}};service.state$=new BehaviorSubject(initial);
+ service.interruptTimer=()=>events.push(['interrupt',service.state$.getValue()]);service.setUnitNavigationRequest=()=>Promise.resolve(true);
+ service.closeAllBuffers=()=>{events.push(['buffers',service.state$.getValue()]);return buffers;};
+ service.bs={lockTest:()=>{events.push(['lock',service.state$.getValue()]);return of(true);}};service.router={navigate:()=>{events.push(['navigate',service.state$.getValue()]);return Promise.resolve(true);}};
+ const root=new original.TestControllerComponent();root.tcs=service;
+ const pending=root.handleCommand('terminate',['lock']);await Promise.resolve();await Promise.resolve();
+ const terminal=initial==='PAUSED'?'TERMINATED_PAUSED':'TERMINATED';assert.equal(service.state$.getValue(),terminal);assert.deepEqual(events,[['interrupt',initial],['buffers',terminal]]);
+ await service[later==='PAUSED'?'pause':'resume']();assert.equal(service.state$.getValue(),later);
+ release();await pending;assert.equal(service.state$.getValue(),later);assert.deepEqual(events.slice(-2),[['lock',later],['navigate',later]]);
 });
