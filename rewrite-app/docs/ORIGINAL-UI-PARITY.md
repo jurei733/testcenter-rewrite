@@ -1,5 +1,79 @@
 # Optional Original UI
 
+### Controller timer interruption before answer preparation (2026-10-13)
+
+Application checkpoint `e481e22720e1` captures an eligible native or accepted
+remote Pause/Terminate timer interruption before answer preparation. Its scoped,
+authenticated receipt freezes the exact observed timer and balance without
+changing Run status, Unit, answers, response clocks, parent session, controller
+entry or command highwater. The explicit interruption marker prevents current-
+state reads from restarting the timer while its original command still waits.
+A later application retains the prepared balance; an explicit Resume restarts
+it. Receipt replays never project an old Run snapshot into the current view.
+Timer identity, Unit and dispatch checks prevent stale preparations from
+interrupting a replacement timer or a newer completed command. No schema version
+change is needed because the existing atomic progress-delivery receipt is reused.
+
+Native journals retain the separate timer packet and acknowledgement across
+lost replies and restoration; prepared main packets and legacy packets preserve
+their prior wire identity. Remote retries retain their first interruption packet.
+Pause interrupts even from ERROR or TERMINATED. Forced terminal interruption
+preserves the Original ERROR, missing-Unit, locked-parent and exact TERMINATED
+early returns; the authenticated current-state projection now distinguishes
+aggregate parent locks from a Unit's own leave lock and non-enforced expiry.
+The local interrupted timer is hidden and stops generating new warnings or
+expiry refreshes while its main command is pending. Its displayed/captured
+seconds use the immediate Worker-tick boundary rather than rounding up.
+The server accepts the authenticated controller's bounded observation; it does
+not independently prove that a local Original guard ran.
+
+The real pinned Original Blob Worker passes Pause, ordinary forced Terminate and
+ERROR-bypass browser references, including worker termination and URL revocation.
+It emits an immediate first STEP; on normal expiry the zero STEP and ENDED each
+write a zero TESTLETS_TIMELEFT snapshot. Four production-built Rewrite cases pass
+both headless and headed: native/remote Pause and Terminate, a genuinely held
+committed Player answer, an independently held application, passage beyond the
+original deadline, exact sibling/answer-clock retention, and a lost timer reply.
+The preceding immutable frontend `32b73d7b490d` fails at the missing early timer
+receipt. Its backend control fails sixteen of 99 current tests, including the
+missing timer route export at API-module load; this is not an old-API behavioral
+matrix. The existing twenty-nine command/loading groups pass headed and headless,
+with fourteen Debug, five route, ten copied-tab/crash, five context, eighteen ERROR
+and five actual older-API groups. In total, 123 Rewrite browser groups and three
+actual-Source Worker groups pass. New timer and Worker gates are wired into the
+root CI workflow; remote CI has not run for this local commit.
+
+All 2,175 unit/frontend tests, 1,352 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. Typecheck and
+the production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+The fresh image from 905 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 451 API/transaction tests as
+node in a read-only container. All 169 image, tested and host frontend files match.
+Existing build warnings remain. Earlier qualification failures caught a missing
+owned-route registration, an incomplete test-host signal and a transport syntax
+error before the final checks; all were repaired. The older buffer browser gate
+now permits only the exact separately receipted timer mutation and continues to
+compare every other Run field unchanged.
+
+Docker stopped during a subsequent PostgreSQL preparation with an invalid storage
+attachment. A normal Desktop restart recovered the daemon; the failed test volume
+was absent. All 24 original containers, immutable image IDs, states and mount
+fields, 85 volumes, 329 image aliases and protected files were verified unchanged
+before resuming. Ten checkpoint image aliases are added. Owned profile/test
+containers, volumes and the clean source archive are removed, and preservation
+is rechecked after the actual older-API run.
+
+Backend-first rollout is required for the new timer endpoint. The five older-API
+groups prove their bounded existing sequential flows, not timed new-command or
+complete mixed-version concurrency. Full timer parity remains unproven: zero-tick
+interruption/resume, exact Worker scheduling and hidden-window behavior, restored
+and legacy concurrency, state-buffer/completion-log timing, and late terminal
+lock/navigation completion need further acceptance. Initial loading/controller
+replacement, global/cross-document ordering, worker/post-unload behavior, full
+visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance also remain open. This checkpoint
+is local and unpushed.
+
 ### Timer interruption Source audit and confirmed buffer gap (2026-10-13)
 
 A new pinned actual-Source fixture executes the complete timer start/finish/
