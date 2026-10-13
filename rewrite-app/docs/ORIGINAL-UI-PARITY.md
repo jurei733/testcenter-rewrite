@@ -1,5 +1,59 @@
 # Optional Original UI
 
+### Terminal controller phases before answer buffers (2026-10-13)
+
+Application checkpoint `87be5c23dda1` enters TERMINATED or TERMINATED_PAUSED
+after the awaited forced-deactivation continuation and before answer-buffer
+preparation. Native Terminate starts in that microtask, not synchronously and
+not after answer preparation. A same-turn Pause can therefore precede the
+terminal continuation; a command arriving later during the buffer wait gets a
+newer dispatch position and controller phase. Remote terminal handlers enter
+their phase before the lazy execution import, and memoize their first scoped
+observation and dispatch across retries.
+
+The phase does not forge the committed Run, answer clocks, controller entry or
+navigation. It suspends new remote reception while already accepted handlers
+finish. A later Pause, Resume or trusted Player ERROR survives an old terminal
+receipt. Prepared native packets remain exact across retries/restoration;
+restored modern or legacy packets do not replay a local phase. Scope replacement
+before the native terminal continuation removes that intent before delivery.
+
+The fifteen-case actual-source oracle includes the real forced guard and held
+buffers. Four new browser groups prove early native/remote termination, later
+Pause/Resume during a genuinely held committed Player answer, exact response
+clocks and sibling isolation, and fresh reentry. The preceding immutable frontend
+`b3ddb94b9432` fails the early terminal-phase assertion after ten passing groups.
+The immutable pre-fix unit control fails nine of 186 cases; all 187 final focused
+cases and all 2,105 unit/frontend tests pass without skips or cancellations.
+
+Typecheck and production build pass at 469.99 kB under the unchanged 470 kB
+hard limit. Twenty-seven command/loading groups pass headed and headless;
+fourteen Debug, five route, ten copied-tab/crash, five context, five actual
+older-API and eighteen ERROR groups pass. The first headed fixture cleanup
+incorrectly waited for an iframe absent in Pause; the final fixture checks its
+presence and awaits action/response together. Existing bundle and CommonJS
+warnings remain.
+
+The fresh image from 900 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 API/transaction tests
+as node in a read-only container. All 169 image, tested and restored host
+frontend files match. Backend contracts, stores and schemas are unchanged;
+previous PostgreSQL (1,313) and HTTP (498) results are reused only after all
+90 backend source hashes match. Those two suites were not rerun. The existing
+backend-first rollout boundary remains. All 24 existing containers, immutable
+image IDs, states and mount fields, 85 volumes, 305 image aliases and protected
+files are preserved; ten aliases are added. Owned containers and the clean
+source archive are removed.
+
+Full Original parity and production readiness remain unproven. Exact
+already-TERMINATED no-op behavior, timer interruption, buffer/completion-log
+timing and terminal lock/navigation completion after later commands remain open.
+Initial loading/controller replacement, global/cross-document order, complete
+legacy mixed-version concurrency, worker/post-unload behavior, full
+visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance are also still required.
+This checkpoint is local and unpushed.
+
 ### Forced terminal Source audit (2026-10-13)
 
 Reference checkpoint `bac6840d74b9` executes the pinned Original's real
