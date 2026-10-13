@@ -1,5 +1,65 @@
 # Testcenter parity checklist
 
+### Immediate participant controller phases (2026-10-13)
+
+Application checkpoint `438d1cebf5fd` enters PAUSED for Pause and RUNNING for
+Resume/Goto within native invocation or successful remote ACK handling, before
+asynchronous preparation, lazy execution imports or application replies. The
+remote handler now starts in the ACK callback itself: an extra Promise
+microtask previously allowed a later native invocation to overtake it. Shared
+dispatch allocation observes the authenticated Run's existing highwater before
+lazy execution. Native requests retain their pre-invocation controller
+observation; remote terminal commands still sample state after preparation.
+
+The local phase is independent of committed Run and navigation state. A held
+application request leaves the server Run and trusted Player unchanged while
+the console reports the Source-equivalent phase. Older receipts cannot restore
+an earlier local phase. A later trusted Player ERROR interrupts the pending
+phase and remains active after that command's late reply; a fresh Resume exits
+ERROR immediately while retaining its existing dialog before the application.
+Fresh entry and route destruction clear the phase. Restored legacy native
+packets retain their prior delivery semantics and do not replay a new local
+phase merely because their journal was restored. Startup transition logs stay
+deduplicated; exact state-buffer and command-completion log timing remains open.
+
+The pinned Original oracle now executes actual Pause, Resume, errorOut, Goto,
+ACK-pipeline and handler-subscription bodies in seven cases. It proves normal
+and reversed ACK overlap, Goto's RUNNING phase before invalid-target rejection,
+and ERROR remaining after an earlier navigation promise resolves. The preceding
+immutable frontend image `8a6110a0b7bc` fails at the held-request PAUSED gate.
+A separate negative unit control reproduces remote/native start inversion.
+Two additional real-browser groups cover both native and remote Pause followed
+by trusted ERROR, the late receipt and a fresh native Resume. Answers, response
+clocks and the sibling Run remain exact.
+
+All 2,083 unit/frontend tests pass fresh without skips or cancellations.
+Typecheck and production build pass at 469.99 kB under the unchanged 470 kB
+hard limit. Twenty-three loading/command groups pass headful and with CI=true;
+fourteen Debug, five route, ten copied-tab/crash, five context, five actual
+older-API and eighteen ERROR groups also pass. The final isolated production
+frontend's 169 files match the fresh image byte for byte. Its build preserves
+all 169 frontend files used by the earlier running comparison. Existing bundle
+and CommonJS warnings remain.
+
+A fresh image from 900 hash-verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 388 transaction/API tests
+in the read-only container as node. The previous 1,313 PostgreSQL and 498 HTTP
+results are reused only after all 90 backend source hashes match; those suites
+were not rerun here. Backend contracts, stores and schemas are unchanged, so
+the previous backend-first rollout requirement still applies. All 24 existing
+containers, immutable image IDs, states and mount fields, 85 volumes, 295 image
+aliases and protected files remain intact; ten image aliases are added. Owned
+container and clean archive resources are removed.
+
+Full Original parity and production readiness remain unproven. Exact timer
+interruption, asynchronous navigation, native terminal-state sampling after
+preparation, state-buffer and command-completion log phases still need Source
+comparison. Initial LOADING/controller replacement,
+global/cross-document intent order, complete legacy mixed-version concurrency,
+post-unload Player effects, worker upgrades, full visual/property/real-package
+acceptance, measured performance, remote CI, release, deployment and production
+acceptance also remain open. This is a local checkpoint and is not pushed.
+
 ### Ordered overlapping controller applications (2026-10-13)
 
 Application checkpoint `bc7b1ad5b6fc` lets independent native requests and
