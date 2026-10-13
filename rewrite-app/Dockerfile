@@ -27,7 +27,8 @@ COPY packages ./packages
 COPY scripts ./scripts
 
 ENV FIRST_SLICE_XML_SCHEMA_CACHE=/app/xml-schemas
-RUN npm run build
+# Bound build-time memory and workers without changing runtime Node options.
+RUN NODE_OPTIONS="--max-old-space-size=1536" NG_BUILD_MAX_WORKERS=2 npm run build
 
 FROM workspace-manifests AS runtime
 
