@@ -16,7 +16,7 @@ const { load } = await import("data:text/javascript;base64," + Buffer.from(compi
 const createReceiver = load(parseParticipantRunCommand);
 const channelFactory = declarations.find(declaration => declaration.name.getText(ast) === "createParticipantCommandChannel");
 assert.ok(channelFactory?.initializer);
-const channelModule = ts.transpileModule(`export const load = (createParticipantCommandReceiver, productionApiRoutes, resolveRoutePath, withSelectedParticipantRun, fetch) => (${channelFactory.initializer.getText(ast)});`, {
+const channelModule = ts.transpileModule(`export const load = (createParticipantCommandReceiver, productionApiRoutes, resolveRoutePath, withSelectedParticipantRun, fetch, receivedParticipantControllerDispatch) => (${channelFactory.initializer.getText(ast)});`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 const { load: loadChannel } = await import("data:text/javascript;base64," + Buffer.from(channelModule).toString("base64"));
@@ -24,7 +24,7 @@ const linksModule = ts.transpileModule(readFileSync(new URL("../apps/web/src/app
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 const { withSelectedParticipantRun } = await import("data:text/javascript;base64," + Buffer.from(linksModule).toString("base64"));
-const createChannel = fetch => loadChannel(createReceiver, productionApiRoutes, resolveRoutePath, withSelectedParticipantRun, fetch);
+const createChannel = (fetch,allocate=()=>({controllerId:"owned-document",sequence:1})) => loadChannel(createReceiver, productionApiRoutes, resolveRoutePath, withSelectedParticipantRun, fetch, allocate);
 const deferred = () => { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; };
 const command = (sequence, type = "resume", extra = {}) => ({ tenantId: "owned", workspaceId: "owned",
   participantSessionId: "owned-session", testRunId: "owned-run", commandId: `command-${sequence}`, commandType: type,
@@ -250,4 +250,17 @@ test("the parser strips unknown fields and rejects invalid server timestamps", (
   const parsed = parseParticipantRunCommand(input); assert.ok(parsed); assert.equal("untrusted" in parsed, false);
   assert.equal(parseParticipantRunCommand({ ...input, issuedAt: "invalid" }), null);
   assert.equal(parseParticipantRunCommand({ ...input, acknowledgedAt: "invalid" }), null);
+});
+
+test('the channel forwards a synchronous allocator so the controller can supply its authenticated highwater before lazy work',async()=>{
+ let observation,allocation,record;const channel=createChannel(async()=>({ok:true,json:async()=>({command:{...command(1),acknowledgedAt:'2026-10-11T00:00:01.000Z'}})}),(receipt,observed)=>{record=receipt;observation=observed;return {controllerId:'owned-controller',sequence:observed['owned-controller']+1};})({
+  participantSessionId:'owned-session',testRunId:'owned-run',readCredential:()=> 'owned',execute:(receipt,signal,allocate)=>{assert.equal(signal.aborted,false);allocation=allocate({'owned-controller':8});assert.equal(record,receipt);}
+ });
+ try{channel.accept([command(1)]);await flush();await flush();assert.deepEqual(observation,{'owned-controller':8});assert.deepEqual(allocation,{controllerId:'owned-controller',sequence:9});}finally{channel.stop();}
+});
+
+test('successful ACK completion starts its handler before a later queued native microtask',async()=>{
+ const order=[],receipt={...command(1,'pause'),acknowledgedAt:'2026-10-11T00:00:01.000Z'};
+ const receiver=createReceiver({participantSessionId:'owned-session',testRunId:'owned-run',acknowledge:()=>Promise.resolve(receipt),execute:()=>{order.push('remote-pause');}});
+ try{receiver.accept([command(1,'pause')]);queueMicrotask(()=>order.push('native-resume'));await flush();await flush();assert.deepEqual(order,['remote-pause','native-resume']);}finally{receiver.stop();}
 });

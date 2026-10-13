@@ -75,7 +75,8 @@ export const createParticipantNativeCommands = (options: {
   controllerStatus: () => ParticipantNativeCommandRequest["controllerStatus"];
   generation?: () => number;
   prepare: (isCurrent: () => boolean) => Promise<void>;
-  applied: (result: ParticipantNativeCommandResult, isCurrent: () => boolean) => Promise<void>;
+  started?: (request: ParticipantNativeCommandRequest) => void;
+  applied: (result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch) => Promise<void>;
   failed: (error: Error) => void;
   window?: Window; storage?: Storage | null; fetch?: typeof fetch;
   now?: () => number; id?: () => string;
@@ -175,7 +176,7 @@ export const createParticipantNativeCommands = (options: {
         throw Object.assign(new Error("The console receipt does not match its selected immutable Run and command."), { retryable: false });
       }
       remove(entry);
-      await options.applied(application, isCurrent);
+      await options.applied(application, isCurrent, entry.request.controllerDispatch);
     } catch (error) {
       if (!isCurrent()) return;
       if (!queue.has(entry.id)) { options.failed(error instanceof Error ? error : new Error(String(error))); return; }
@@ -221,7 +222,7 @@ export const createParticipantNativeCommands = (options: {
         testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId, bookletKey: scope.bookletKey,
         deliveryId: id, keyword, arguments: [...args], controllerStatus: options.controllerStatus(), timeStamp: (options.now ?? Date.now)(),
         ...(keyword === "terminate" ? {} : { controllerDispatch: nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches) }) } };
-      queue.set(entry.id, entry); persist(entry); observeScope();
+      queue.set(entry.id, entry); persist(entry); options.started?.(entry.request); observeScope();
     },
     stop(): void {
       if (stopped) return;

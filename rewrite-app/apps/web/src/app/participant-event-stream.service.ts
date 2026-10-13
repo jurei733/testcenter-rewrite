@@ -1,6 +1,5 @@
 import { Injectable, inject, signal } from "@angular/core";
-import type { ParticipantRunCommand } from "@testcenter-rewrite-app/domain";
-import type { ParticipantCommandChannel } from "./participant-command-receiver";
+import type { ParticipantCommandChannel, ParticipantCommandExecution } from "./participant-command-receiver";
 
 import {
   parseParticipantEventStreamEvent,
@@ -48,7 +47,7 @@ export class ParticipantEventStreamService {
   private commandReceiver: ParticipantCommandChannel | null = null;
   private commandReceiverReady: Promise<ParticipantCommandChannel | null> | null = null;
   private commandLifecycle = 0;
-  private executeCommand: ((command: ParticipantRunCommand, signal: AbortSignal) => void | Promise<void>) | null = null;
+  private executeCommand: ParticipantCommandExecution | null = null;
   private readonly connectionStateValue =
     signal<ParticipantEventStreamConnectionState>({
       status: "idle",
@@ -62,7 +61,7 @@ export class ParticipantEventStreamService {
     refresh: ParticipantRefresh,
     connectionModeChange: ParticipantConnectionModeChange | null = null,
     testRunId = "",
-    executeCommand: ((command: ParticipantRunCommand, signal: AbortSignal) => void | Promise<void>) | null = null
+    executeCommand: ParticipantCommandExecution | null = null
   ): void {
     const normalizedParticipantSessionId = participantSessionId.trim();
     const normalizedTestRunId = testRunId.trim();
@@ -309,7 +308,7 @@ export class ParticipantEventStreamService {
     this.commandReceiverReady = import("./participant-command-receiver").then(module => {
       if (lifecycle !== this.commandLifecycle) return null;
       this.commandReceiver = module.createParticipantCommandChannel({ participantSessionId, testRunId,
-        execute: (command, signal) => this.executeCommand?.(command, signal),
+        execute: (command, signal, allocate) => this.executeCommand?.(command, signal, allocate),
         readCredential: () => readParticipantSessionCredential(participantSessionId)
       });
       return this.commandReceiver;

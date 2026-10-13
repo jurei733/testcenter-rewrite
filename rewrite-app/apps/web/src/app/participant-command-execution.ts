@@ -1,4 +1,4 @@
-import type { ParticipantRunCommand, ParticipantRunCommandScope, ParticipantRunCommandApplicationResult, TestRun, ParticipantSession } from "@testcenter-rewrite-app/domain";
+import type { ParticipantRunCommand, ParticipantRunCommandScope, ParticipantRunCommandApplicationResult, TestRun, ParticipantSession, ParticipantControllerDispatch } from "@testcenter-rewrite-app/domain";
 import { parseParticipantRunCommand, participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { readParticipantSessionCredential } from "./participant-access-credentials";
@@ -46,12 +46,15 @@ export const executeReceivedParticipantCommand = async (
     isCurrent: () => boolean;
     controllerStatus: () => "RUNNING" | "PAUSED" | "ERROR";
     prepare: () => Promise<void>;
-    apply: (application: ParticipantRunCommandApplicationResult) => Promise<void>;
+    started?: (dispatch: ParticipantControllerDispatch) => void;
+    apply: (application: ParticipantRunCommandApplicationResult, dispatch: ParticipantControllerDispatch) => Promise<void>;
   }
 ): Promise<void> => {
   if (signal.aborted || !options.isCurrent()) return;
   const terminal = command.commandType === "complete" || command.commandType === "complete_and_lock";
   let dispatch = terminal ? undefined : receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
+  const controllerStatus = terminal ? undefined : options.controllerStatus();
+  if (dispatch) options.started?.(dispatch);
   if (command.commandType !== "debug") await options.prepare();
   if (signal.aborted || !options.isCurrent()) return;
   dispatch ??= receivedParticipantControllerDispatch(command, options.scope.controllerDispatches);
@@ -60,7 +63,7 @@ export const executeReceivedParticipantCommand = async (
     participantSessionId: command.participantSessionId, commandId: command.commandId
   }), { method: "POST", cache: "no-store", signal, headers: {
     "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {})
-  }, body: JSON.stringify({ testRunId: command.testRunId, controllerStatus: options.controllerStatus(), controllerDispatch: dispatch }) });
+  }, body: JSON.stringify({ testRunId: command.testRunId, controllerStatus: controllerStatus ?? options.controllerStatus(), controllerDispatch: dispatch }) });
   if (!response.ok) throw Object.assign(new Error(`Command application returned HTTP ${response.status}.`), { retryable: response.status >= 500 });
   const payload = await response.json() as { application?: {
     command?: unknown;
@@ -90,5 +93,5 @@ export const executeReceivedParticipantCommand = async (
         application.participantSession?.[key] === command[key])) {
     throw Object.assign(new Error("The command application does not match the accepted receipt."), { retryable: false });
   }
-  await options.apply({ ...application, command: receipt } as ParticipantRunCommandApplicationResult);
+  await options.apply({ ...application, command: receipt } as ParticipantRunCommandApplicationResult, dispatch);
 };

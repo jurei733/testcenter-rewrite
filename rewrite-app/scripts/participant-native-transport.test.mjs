@@ -13,12 +13,12 @@ const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).t
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
 const deferred=()=>{let resolve;return {promise:new Promise(done=>resolve=done),get resolve(){return resolve;}};};
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
-function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING'}={}){
+function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING',started}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches);
  const receipt=body=>({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
- const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,generation:()=>generation,
+ const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,started,generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
   window:browserWindow??{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
   now:()=>1791763200123,id:()=>`owned-${++id}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
@@ -195,4 +195,12 @@ test('a restored unclocked native packet retains its former FIFO before new v2 i
 for(const change of [value=>{value.stateRevision=0;},value=>{value.stateRevision=Number.MAX_SAFE_INTEGER+1;},value=>{value.controllerDispatches=null;},value=>{value.controllerDispatches={owned:0};}])test('malformed Run ordering evidence cannot project a native effect',async()=>{
  const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);change(value.application.testRun);return {ok:true,json:async()=>value};}});
  try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);assert.equal(f.values.size,0);}finally{f.native.stop();}
+});
+
+for(const keyword of ['pause','resume','goto'])test(`${keyword} starts synchronously before its own held preparation without repeating on retry`,async()=>{
+ const gate=deferred(),starts=[],f=fixture({prepare:()=>gate.promise,started:request=>starts.push(structuredClone(request)),respond:async()=>({ok:false,status:503})});
+ try{
+  f.native.command(keyword,keyword==='goto'?['0']:[]);assert.equal(starts.length,1);assert.equal(starts[0].keyword,keyword);assert.equal(starts[0].controllerDispatch.sequence,1);assert.equal(f.calls.length,0);
+  await f.advance();assert.equal(f.calls.length,0);gate.resolve();await flush();await f.advance(1000);assert.equal(f.calls.length,2);assert.equal(starts.length,1);
+ }finally{gate.resolve();f.native.stop();}
 });

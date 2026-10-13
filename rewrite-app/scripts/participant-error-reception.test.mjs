@@ -19,7 +19,7 @@ const moduleFrom=async source=>{
  return import("data:text/javascript;base64,"+Buffer.from(code).toString("base64"));
 };
 const facadeMethods=methods("../apps/web/src/app/participant-view.facade.ts","ParticipantViewFacade",
- ["hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","validateParticipantControllerContext","invalidateCurrentStateRefreshes","isOlderRunState"]);
+ ["pendingControllerStatus","hasControllerError","controllerError","handleVeronaControllerError","refreshCurrentStateInternal","validateParticipantControllerContext","invalidateCurrentStateRefreshes","isOlderRunState"]);
 const {makeHost}=await moduleFrom(`export const makeHost=(productionApiRoutes,resolveRoutePath,isParticipantControllerDispatches)=>class Host{
  ${facadeMethods}
  };`);
@@ -33,7 +33,7 @@ const state=(status="running",run="selected-run")=>({
 const fixture=()=>{
  let error=null;const request=deferred(),assets=deferred(),calls={request:0,applied:0,suspend:0,start:0,stop:0,assets:0};
  const host=Object.assign(new Host(),{
-  runtime:{participantSessionId:"selected-session",testRunId:"selected-run"},current:state(),
+  controllerCommandPhase:Object.assign(()=>null,{set(){}}),runtime:{participantSessionId:"selected-session",testRunId:"selected-run"},current:state(),
   activeControllerError:Object.assign(()=>error,{set:value=>{error=value;}}),
   readCurrentRunState(){return this.current;},currentStateRefreshSequence:0,currentStateAppliedRefreshSequence:0,
   requestState:{request:()=>{calls.request++;return request.promise;},isApiError:()=>false},

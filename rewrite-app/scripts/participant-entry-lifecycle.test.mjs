@@ -10,14 +10,14 @@ import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/c
 const source = readFileSync(new URL("../apps/web/src/app/participant-view.facade.ts", import.meta.url), "utf8");
 const ast = ts.createSourceFile("participant-view.facade.ts", source, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
-const methodNames = ["resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
+const methodNames = ["pendingControllerStatus","resumeEntrySessionInternal", "replaceSelectedRunEntryLink", "reloadPage", "reloadAfterControllerError",
   "starterLaunchInternal", "resumeSessionInternal", "readCurrentRunState", "hasControllerError", "controllerError"];
 const methods = methodNames.map(name => {
   const method = declaration?.members.find(node => (ts.isMethodDeclaration(node) || ts.isGetAccessor(node)) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
 });
-const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { ${methods.join("\n")} };`, {
+const { outputText } = ts.transpileModule(`export const createEntryHost = (productionApiRoutes, resolveRoutePath, prettyPrintJson) => class EntryHost { controllerCommandPhase=Object.assign(()=>null,{set(){}}); ${methods.join("\n")} };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 });
 const { createEntryHost } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);

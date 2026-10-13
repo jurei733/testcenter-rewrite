@@ -210,6 +210,11 @@ try {
         if(origin==='remote')await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);
         else await remotePage.evaluate(()=>window.tc.pause());
         await poll(()=>Promise.resolve(phase==='response'?firstCommitted:firstHeld),'The earlier application did not reach its held boundary');
+        if(phase==='request'){
+          await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'The accepted Pause did not enter PAUSED before its application request');
+          assert.equal((await loadingRepository.getTestRunById(runId)).status,'running','A local controller phase must not forge a committed Run state');
+          assert.equal(await formerFrame.evaluate(frame=>frame.isConnected),true,'The pending controller phase completed navigation before its held application');
+        }
         let next;
         if(successor==='remote'){
           const command=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator)).command;
@@ -241,6 +246,53 @@ try {
         const marker=`overlapping-${label}-keeps-later-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
       }finally{releaseFirst();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
+    await remotePage.route("**/application",captureApplication);
+    for(const origin of ['native','remote']){
+      const priorFrame=await remotePage.locator('iframe').elementHandle();
+      const reset=remotePage.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/native-commands')&&response.request().postDataJSON().keyword==='resume');
+      await remotePage.evaluate(()=>window.tc.resume());await reset;
+      if(priorFrame)await poll(()=>priorFrame.evaluate(frame=>!frame.isConnected),'The phase/error fixture did not finish its preceding Resume');
+      await remotePage.frameLocator('iframe').locator('#ownedDebugError').waitFor();
+      const baseline=await loadingRepository.getTestRunById(runId);
+      let releasePause,releaseResume,heldPause=false,heldResume=false,pauseDone=false,pauseRequest,resumeRequest;
+      const pauseGate=new Promise(done=>{releasePause=done;}),resumeGate=new Promise(done=>{releaseResume=done;});releases.push(releasePause,releaseResume);
+      const pausePattern=origin==='native'?'**/native-commands':'**/application';
+      await remotePage.route(pausePattern,async route=>{
+        const body=route.request().postDataJSON();pauseRequest=body;heldPause=true;await pauseGate;
+        const response=await route.fetch();if(origin==='remote')applications.push(await response.json());await route.fulfill({response});pauseDone=true;
+      });
+      try{
+        if(origin==='native')await remotePage.evaluate(()=>window.tc.pause());
+        else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);
+        await poll(()=>Promise.resolve(heldPause),'The accepted Pause did not reach its held request');
+        await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'The held Pause did not enter its immediate phase');
+        await remotePage.frameLocator('iframe').locator('#ownedDebugError').click();
+        await poll(async()=>/STATUS:\s*ERROR/.test(await remotePane.innerText()),'A later trusted Player error did not interrupt the pending phase');
+        await remotePage.locator('mat-dialog-container').waitFor();
+        releasePause();await poll(()=>Promise.resolve(pauseDone),'The interrupted Pause did not finish after release');
+        await remotePage.unroute(pausePattern);await remotePage.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+        assert.match(await remotePane.innerText(),/STATUS:\s*ERROR/,'The late command receipt overwrote the newer ERROR');
+        assert.equal((await loadingRepository.getTestRunById(runId)).status,'paused');
+        await remotePage.route('**/native-commands',async route=>{
+          resumeRequest=route.request().postDataJSON();heldResume=true;await resumeGate;
+          const response=await route.fetch();await route.fulfill({response});
+        });
+        await remotePage.evaluate(()=>window.tc.resume());await poll(()=>Promise.resolve(heldResume),'The fresh Resume did not reach its held request');
+        await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'Resume did not leave ERROR before its application');
+        assert.equal(await remotePage.locator('mat-dialog-container').count(),1,'An immediate status phase removed the existing error dialog');
+        assert.equal((await loadingRepository.getTestRunById(runId)).status,'paused');
+        assert.equal(resumeRequest.controllerStatus,'ERROR');assert.equal(resumeRequest.controllerDispatch.controllerId,pauseRequest.controllerDispatch.controllerId);
+        assert.equal(resumeRequest.controllerDispatch.sequence,pauseRequest.controllerDispatch.sequence+1);
+        releaseResume();await remotePage.unrouteAll({behavior:'wait'});
+        await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+        await poll(async()=>(await loadingRepository.getTestRunById(runId)).status==='running','The fresh Resume did not commit');
+        const final=await loadingRepository.getTestRunById(runId);assert.deepEqual(final.unitResponses,baseline.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,baseline.unitResponseFieldTimestamps);
+        assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
+        loadingObservations.push({phaseErrorOrigin:origin,pauseRequest,resumeRequest,newerErrorPreserved:true,immediateResumeRetainedDialog:true,answersAndClocksPreserved:true});
+        const marker=`immediate-${origin}-phase-yields-to-newer-error-and-fresh-native-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+      }finally{releasePause();releaseResume();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
+    }
+    // The preceding owned phase/error routes remove their handlers on exit.
     await remotePage.route("**/application",captureApplication);
     const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
     let terminalRuntimeReads=0;

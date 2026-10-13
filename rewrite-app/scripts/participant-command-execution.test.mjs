@@ -186,3 +186,10 @@ for(const interruption of ['abort','scope'])test(`a held presentation failure sc
 test('an already invalid presentation starts no request',async()=>{
  for(const interruption of ['abort','scope']){const f=reconciliationFixture();if(interruption==='abort')f.controller.abort();else f.leave();f.start();await flushReconciliation();assert.equal(f.attempts(),0);assert.deepEqual(f.timers,[]);}
 });
+
+test('an accepted nonterminal phase starts before preparation and retains its pre-invocation controller observation',async()=>{
+ const gate=deferred(),f=fixture();let status='ERROR';f.options.controllerStatus=()=>status;f.options.prepare=()=>gate.promise;
+ f.options.started=dispatch=>{assert.equal(dispatch.sequence,1);status='RUNNING';f.events.push('started');};
+ const pending=f.execute();assert.deepEqual(f.events,['started']);assert.equal(f.calls.length,0);gate.resolve();await pending;
+ assert.equal(JSON.parse(f.calls[0].request.body).controllerStatus,'ERROR');assert.deepEqual(f.events,['started','request','projected']);
+});

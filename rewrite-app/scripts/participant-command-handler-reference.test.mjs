@@ -33,3 +33,16 @@ for(const reversed of [false,true])test(`actual Original handlers overlap after 
   release(true);await Promise.resolve();await Promise.resolve();assert.deepEqual(completed,[logical[1],logical[0]]);
  }finally{release(true);receiving?.unsubscribe();subscription.unsubscribe();}
 });
+
+for(const args of [[],['0'],['id','missing']])test(`actual Original Goto enters RUNNING even when its arguments reject: ${JSON.stringify(args)}`,async()=>{
+ const service=new original.TestControllerService();service.state$=new BehaviorSubject('PAUSED');service.unitAliasMap={};
+ const root=new original.TestControllerComponent();root.tcs=service;
+ await assert.rejects(async()=>root.handleCommand('goto',args));assert.equal(service.state$.getValue(),'RUNNING');
+});
+for(const keyword of ['pause','resume'])test(`actual Original ${keyword} completion does not overwrite a newer ERROR`,async()=>{
+ let release;const held=new Promise(done=>{release=done;}),service=new original.TestControllerService();service.state$=new BehaviorSubject('RUNNING');service.currentUnitSequenceId=1;service.interruptTimer=()=>{};
+ let calls=0;service.setUnitNavigationRequest=()=>++calls===1?held:Promise.resolve(false);
+ const root=new original.TestControllerComponent();root.tcs=service;
+ const navigation=root.handleCommand(keyword,[]);assert.equal(service.state$.getValue(),keyword==='pause'?'PAUSED':'RUNNING');
+ service.errorOut();assert.equal(service.state$.getValue(),'ERROR');release(true);await navigation;assert.equal(service.state$.getValue(),'ERROR');
+});
