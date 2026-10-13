@@ -44837,6 +44837,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       status: string;
       currentUnitKey: string | null;
       completedAt: string | null;
+      lockedUnitKeys?: string[];
     };
     runtimeState: {
       runtimeStatus: string;
@@ -44858,6 +44859,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     hotReturnRun.body.testRun.currentUnitKey
   );
   assert.equal(hotReturnStarter.body.testRun.completedAt, null);
+  assert.ok(hotReturnStarter.body.testRun.lockedUnitKeys?.includes("UNIT.INTRO"));
   assert.equal(hotReturnStarter.body.runtimeState.runtimeStatus, "in_progress");
   assert.equal(hotReturnStarter.body.runtimeState.availableAction, "resume");
   assert.deepEqual(
@@ -44878,7 +44880,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(resumedHotReturn.body.testRun.status, "running");
   assert.equal(
     resumedHotReturn.body.testRun.currentUnitKey,
-    hotReturnRun.body.testRun.currentUnitKey
+    "UNIT.PROTECTED"
   );
   const unlockedHotReturn = await requestJson<{
     testRun: { currentUnitKey: string | null };
@@ -44887,7 +44889,11 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     { method: "POST", body: { code: "mode-code" } }
   );
   assert.equal(unlockedHotReturn.status, 200);
-  assert.equal(unlockedHotReturn.body.testRun.currentUnitKey, "UNIT.INTRO");
+  // Returning to Starter left the introductory leave-once Unit locked.
+  // Original's UnitActivateGuard resumes at the next accessible code-entry Unit;
+  // unlocking that block must retain the resumed position.
+  assert.equal(hotReturnRun.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.equal(unlockedHotReturn.body.testRun.currentUnitKey, resumedHotReturn.body.testRun.currentUnitKey);
   const hotReturnAtProtected = await requestJson<{
     testRun: { currentUnitKey: string | null };
   }>(

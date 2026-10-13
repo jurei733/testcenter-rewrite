@@ -7,7 +7,7 @@ export class ParticipantNativeCommandError extends Error {
 
 /** Original root handler: exact aliases, immediate-parent unlocks and restored minutes. */
 export const projectParticipantNativeCommand = (input: {
-  request: ParticipantNativeCommandRequest;
+  request: Pick<ParticipantNativeCommandRequest, "keyword" | "arguments" | "controllerStatus">;
   booklet: ContentReleaseBookletEntry;
   testRun: TestRun;
   timestamp: string;
@@ -73,10 +73,7 @@ export const projectParticipantNativeCommand = (input: {
       .find(unit => input.accessible(next, unit))?.unitKey ?? requested.unitKey;
   }
   if (currentTimedKey) next = input.interrupt(next, currentTimedKey);
-  const timerKey = input.timedKey(next.currentUnitKey);
-  if (timerKey && next.testletTimers?.[timerKey]?.interruptedAtUnitKey) {
-    const timer = next.testletTimers[timerKey]!;
-    next.testletTimers = { ...next.testletTimers, [timerKey]: { ...timer, interruptedAtUnitKey: undefined } };
-  }
+  // Actual Unit-host activation clears an interruption only when it can start
+  // the timer. A code-first route can be accessible while its parent is locked.
   return input.activate({ ...next, status: "running", pauseSource: undefined, updatedAt: timestamp });
 };

@@ -8,11 +8,13 @@ import ts from 'typescript';
 const repository=resolve(process.argv[2]??'../../testcenter');
 const originalCommit='ee2ab9ab64bd91209ef8534bbe6005838024e46d';
 const definitions={
- service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','terminateTest','canDeactivateUnit','setUnitNavigationRequest','startTimer','finishTimer','interruptTimer','cancelTimer']},
+ service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','terminateTest','canDeactivateUnit','setUnitNavigationRequest','startTimer','finishTimer','interruptTimer','cancelTimer','getUnit','unitIsInaccessible','getNavigationState','checkCompleteness','updateSingleLock','updateAllLocks','updateNavigationState','clearCodeLock']},
  controller:{path:'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',className:'TestControllerComponent',methods:['handleCommand','handleTimer']},
  timer:{path:'frontend/src/app/test-controller/classes/test-controller.classes.ts',declarations:['TimerData']},
- interfaces:{path:'frontend/src/app/test-controller/interfaces/test-controller.interfaces.ts',declarations:['UnitNavigationTarget','MaxTimerEvent']},
- ticker:{path:'frontend/src/app/test-controller/util/worker.util.ts',declarations:['createTicker']}
+ interfaces:{path:'frontend/src/app/test-controller/interfaces/test-controller.interfaces.ts',declarations:['UnitNavigationTarget','MaxTimerEvent','TestletLockTypes','isUnit','isTestlet']},
+ ticker:{path:'frontend/src/app/test-controller/util/worker.util.ts',declarations:['createTicker']},
+ guard:{path:'frontend/src/app/test-controller/routing/unit-activate.guard.ts',className:'UnitActivateGuard',methods:['canActivate']},
+ unitHost:{path:'frontend/src/app/test-controller/components/unithost/unithost.component.ts',className:'UnithostComponent',methods:['runUnit','startTimerIfNecessary','onSubmitCode','isValidCode']}
 };
 const sources={};
 for(const [key,definition] of Object.entries(definitions)){
@@ -27,7 +29,7 @@ for(const [key,definition] of Object.entries(definitions)){
   extracted=`class ${definition.className} {\n${methods.join('\n')}\n}`;
  }else{
   extracted=definition.declarations.map(name=>{
-   const node=ast.statements.find(node=>node.name?.text===name);assert.ok(node,name);return node.getText(ast).replace(/^export /,'');
+   const node=ast.statements.find(node=>node.name?.text===name || ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>item.name.getText(ast)===name));assert.ok(node,name);return node.getText(ast).replace(/^export /,'');
   }).join('\n');
  }
  sources[key]={path:definition.path,fileSha256:createHash('sha256').update(source).digest('hex'),extracted};

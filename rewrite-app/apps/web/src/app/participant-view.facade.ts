@@ -1926,6 +1926,7 @@ export class ParticipantViewFacade {
     if (
       !currentState ||
       currentState.testRun.status !== "running" ||
+      currentState.currentUnit.parentLocked === true ||
       (!retainErroredPlayer && this.hasControllerError) ||
       this.eagerBookletLoading ||
       !player?.html.trim() ||

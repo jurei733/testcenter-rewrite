@@ -37,6 +37,7 @@ try{
   server.once('message',({port})=>{clearTimeout(timeout);done(port);});server.once('error',reject);server.once('exit',()=>reject(Error('Owned timer API exited before startup')));
  });
  const base='http://127.0.0.1:'+port;
+ await poll(async()=>{if(server.exitCode!==null)throw Error('Owned timer API exited before readiness');try{return (await fetch(base+'/readyz')).ok;}catch{return false;}},'Owned timer API readiness timed out');
  const api=async(path,body,token,method=body===undefined?'GET':'POST')=>{
   const response=await fetch(base+path,{method,headers:{...(token?{authorization:'Bearer '+token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});
   assert.ok(response.ok,`${method} ${path}: ${response.status} ${await response.clone().text()}`);return response.json();
@@ -48,29 +49,52 @@ try{
  content.bookletEntries=[{bookletKey:'first',displayLabel:'Timed commands',config:{unit_show_time_left:'ON'},
   testletEntries:[{testletKey:'timed',displayLabel:'Timed',parentTestletKey:null,restrictions:{timeMax:{minutes:1/6,leave:'confirm'}}}],
   unitEntries:[{...unit,unitKey:'first-unit',testletPath:['timed']},{...unit,unitKey:'after-timer',testletPath:[]}]},
-  {bookletKey:'second',displayLabel:'Sibling',unitEntries:[{...unit,unitKey:'sibling-unit',testletPath:[]}]}];
+  {bookletKey:'second',displayLabel:'Sibling',unitEntries:[{...unit,unitKey:'sibling-unit',testletPath:[]}]},
+  {bookletKey:'code-entry',displayLabel:'Resume into code entry',
+   testletEntries:[{testletKey:'intro',displayLabel:'Intro',parentTestletKey:null,restrictions:{lockAfterLeaving:{scope:'unit',confirm:false}}},
+    {testletKey:'timed',displayLabel:'Protected timer',parentTestletKey:null,restrictions:{codeToEnter:{code:'OWNED',prompt:'Owned code'},timeMax:{minutes:1/6}}}],
+   unitEntries:[{...unit,unitKey:'intro-unit',testletPath:['intro']},{...unit,unitKey:'first-unit',testletPath:['timed']},{...unit,unitKey:'after-timer',testletPath:[]}]}];
  const source=await api(workspace+'/source-packages',{fileName:'timer.json',mediaType:'application/json',contentStructure:content},operator);
  const imported=await api(workspace+'/import-jobs',{sourcePackageId:source.sourcePackage.sourcePackageId},operator);
  await api(workspace+`/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:'owned-timer-browser'},operator);
- const scenarios=[{origin:'native',keyword:'pause',lostTimerReply:true},{origin:'native',keyword:'terminate'},{origin:'remote',keyword:'pause'},{origin:'remote',keyword:'terminate'}];
- await api(workspace+'/participant-roster',{rosterText:'<Testtakers><Group id="owned">'+scenarios.map((_,i)=>`<Login mode="run-hot-return" name="timer-${i}"><Booklet>first</Booklet><Booklet>second</Booklet></Login>`).join('')+'</Group></Testtakers>'},operator);
+ const scenarios=[{origin:'native',keyword:'pause',lostTimerReply:true},{origin:'native',keyword:'terminate'},{origin:'remote',keyword:'pause'},{origin:'remote',keyword:'terminate'},
+  ...['native','remote'].flatMap(origin=>['native','remote'].map(resume=>({origin,keyword:'pause',zero:true,resume}))),
+  ...['native','remote'].map(origin=>({origin,keyword:'resume',code:true}))].filter(scenario=>process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
+ await api(workspace+'/participant-roster',{rosterText:'<Testtakers><Group id="owned">'+scenarios.map((scenario,i)=>`<Login mode="run-hot-return" name="timer-${i}"><Booklet>${scenario.code?'code-entry':'first'}</Booklet><Booklet>second</Booklet></Login>`).join('')+'</Group></Testtakers>'},operator);
  const repository=createSqliteFirstSliceRepository(file);
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
  for(const [index,scenario] of scenarios.entries()){
   const context=await browser.newContext({viewport:{width:1280,height:800},locale:'de-DE'}),page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
-  let releaseAnswer,releaseApplication,heldAnswer=false,heldApplication=false,loseReply=Boolean(scenario.lostTimerReply);
-  const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;});releases.push(releaseAnswer,releaseApplication);
+  let releaseAnswer,releaseApplication,releaseAck,heldAnswer=false,heldApplication=false,heldAck=false,loseReply=Boolean(scenario.lostTimerReply);
+  const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;});releases.push(releaseAnswer,releaseApplication,releaseAck);
   const timerPackets=[],applications=[];
   try{
    await page.goto(base+`/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`,{waitUntil:'networkidle'});
    await page.locator('#originalLoginName').fill('timer-'+index);await page.getByRole('button',{name:'Weiter',exact:true}).click();
-   await page.locator('#originalParticipantStarter mat-card[data-booklet-key="first"] button').click();
+   await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${scenario.code?'code-entry':'first'}"] button`).click();
    await page.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
    const runId=new URL(page.url()).searchParams.get('testRunId');assert.ok(runId);
    await page.waitForFunction(()=>typeof window.tc?.pause==='function');await page.evaluate(()=>window.tc.debug());
    const pane=page.locator('[data-debug-window="main"]');await poll(async()=>/BS:\s*live/.test(await pane.innerText()),'Timer fixture reception did not become live');
-   const initial=await repository.getTestRunById(runId);assert.equal(initial.testletTimers.timed.status,'running');
+   const initial=await repository.getTestRunById(runId);
+   if(scenario.code){
+    assert.equal(initial.currentUnitKey,'intro-unit');assert.equal(initial.testletTimers.timed,undefined);
+    await page.evaluate(()=>window.tc.pause());await poll(async()=>(await repository.getTestRunById(runId)).status==='paused','The code-entry fixture did not pause');await page.locator('#participantRoutePausedState').waitFor();
+    const paused=await repository.getTestRunById(runId),zero={testletKey:'timed',status:'paused',durationSeconds:10,remainingSeconds:0,startedAt:paused.createdAt,expiresAt:null,updatedAt:paused.updatedAt,endedAt:null,interruptedAtUnitKey:'first-unit'};
+    await repository.saveTestRun({...paused,lockedUnitKeys:['intro-unit'],testletTimers:{...paused.testletTimers,timed:zero}});
+    if(scenario.origin==='native')await page.evaluate(()=>window.tc.resume());else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator);
+    await page.locator('#participantRouteTestletUnlockCode').waitFor();await page.waitForFunction(()=>!document.querySelector('iframe'));
+    const waiting=await repository.getTestRunById(runId);assert.equal(waiting.currentUnitKey,'first-unit');assert.deepEqual(waiting.testletTimers.timed,zero);
+    const responseBefore=structuredClone(waiting.unitResponses),clocksBefore=structuredClone(waiting.unitResponseFieldTimestamps);
+    await page.locator('#participantRouteTestletUnlockCode').fill('wrong');
+    const denied=page.waitForResponse(response=>response.url().endsWith('/testlets/timed/unlock'));await page.locator('#participantRouteTestletUnlockButton').click();assert.equal((await denied).status(),403);
+    assert.deepEqual(await repository.getTestRunById(runId),waiting);assert.equal(await page.locator('iframe').count(),0);
+    await page.locator('#participantRouteTestletUnlockCode').fill('oWnEd');await page.locator('#participantRouteTestletUnlockButton').click();await page.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
+    const unlocked=await repository.getTestRunById(runId);assert.equal(unlocked.currentUnitKey,'first-unit');assert.equal(unlocked.testletTimers.timed.status,'running');assert.equal(unlocked.testletTimers.timed.remainingSeconds,10);assert.equal(unlocked.testletTimers.timed.interruptedAtUnitKey,undefined);assert.deepEqual(unlocked.unitResponses,responseBefore);assert.deepEqual(unlocked.unitResponseFieldTimestamps,clocksBefore);
+    checks.push({scenario,paused,waiting,unlocked});console.log(`participant_controller_timer=${scenario.origin}-resume-code-entry:passed`);continue;
+   }
+   assert.equal(initial.testletTimers.timed.status,'running');
    const sibling={...structuredClone(initial),testRunId:crypto.randomUUID(),bookletKey:'second',bookletAssignmentKey:'second',currentUnitKey:'sibling-unit',testletTimers:{},unitResponses:{'sibling-unit':'Protected sibling'},unitResponseFieldTimestamps:{'sibling-unit':{opaque:99}}};await repository.saveTestRun(sibling);
    const siblingBefore=await repository.getTestRunById(sibling.testRunId),parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
    await page.route('**/save-progress',async route=>{
@@ -91,10 +115,16 @@ try{
    await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('Owned timer answer '+index);
    await poll(()=>Promise.resolve(heldAnswer),'The timer fixture did not hold its committed Player answer');
    const before=await repository.getTestRunById(runId);
+   if(scenario.zero&&scenario.origin==='remote'){
+    await page.route('**/commands/*/acknowledgement',async route=>{const response=await route.fetch();assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
+    await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);await poll(()=>Promise.resolve(heldAck),'The zero-tick remote Pause did not reach its held ACK');
+   }
+   if(scenario.zero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-950-Date.now()));
    if(scenario.origin==='native')await page.evaluate(keyword=>window.tc[keyword](),scenario.keyword);
+   else if(scenario.zero)releaseAck();
    else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:scenario.keyword==='terminate'?'complete':'pause'},operator);
    await poll(()=>Promise.resolve(timerPackets.length>=(scenario.lostTimerReply?2:1)),'Timer interruption was blocked behind the answer buffer');
-   const first=timerPackets[0];assert.ok(first.packet.remainingSeconds>0);assert.equal(first.receipt.applied,true);
+   const first=timerPackets[0];if(scenario.zero)assert.equal(first.packet.remainingSeconds,0);else assert.ok(first.packet.remainingSeconds>0);assert.equal(first.receipt.applied,true);
    if(scenario.lostTimerReply){assert.deepEqual(timerPackets[1].packet,first.packet);assert.equal(timerPackets[1].receipt.applied,false);}
    await poll(async()=>new RegExp('STATUS:\\s*'+(scenario.keyword==='pause'?'PAUSED':'TERMINATED')).test(await pane.innerText()),'The controller phase did not enter before its held command');
    const wait=Math.max(0,Date.parse(first.packet.expiresAt)+500-Date.now());await delay(wait);
@@ -106,8 +136,18 @@ try{
    await poll(()=>Promise.resolve(applications.length===1),'The timer command application did not complete');
    const final=await repository.getTestRunById(runId);assert.equal(final.status,'paused');assert.equal(final.testletTimers.timed.remainingSeconds,first.packet.remainingSeconds);assert.deepEqual(final.unitResponses,before.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
    assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
-   checks.push({scenario,timerPackets,before,frozen,final});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}:passed`);
-  }finally{releaseAnswer();releaseApplication();await page.unrouteAll({behavior:'wait'}).catch(()=>{});await context.close();}
+   let resumed;
+   if(scenario.zero){
+    await page.locator('#participantRoutePausedState').waitFor();
+    if(scenario.resume==='native')await page.evaluate(()=>window.tc.resume());else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator);
+    await poll(()=>Promise.resolve(applications.length===2),'The zero-tick Resume application did not complete');
+    resumed=await repository.getTestRunById(runId);assert.equal(resumed.currentUnitKey,'first-unit','Zero STEP was treated as an expired block');assert.equal(resumed.testletTimers.timed.status,'running');assert.equal(resumed.testletTimers.timed.remainingSeconds,10);
+    const receipt=applications[1].application,executedAt=receipt.executedAt??receipt.command.executedAt;assert.equal(resumed.testletTimers.timed.expiresAt,new Date(Date.parse(executedAt)+10_000).toISOString());
+    assert.deepEqual(resumed.unitResponses,before.unitResponses);assert.deepEqual(resumed.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
+    await poll(async()=>await page.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue()==='Owned timer answer '+index,'The restarted timed Unit did not restore its exact answer');
+   }
+   checks.push({scenario,timerPackets,before,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}:passed`);
+  }finally{releaseAnswer();releaseApplication();releaseAck();await page.unrouteAll({behavior:'wait'}).catch(()=>{});await context.close();}
  }
  assert.deepEqual(errors,[]);gate.assertHealthy();await writeFile(join(artifacts,'timer-interruptions.json'),JSON.stringify({checks,errors},null,2)+'\n');
 }finally{
