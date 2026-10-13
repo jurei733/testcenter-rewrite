@@ -1,5 +1,60 @@
 # Testcenter parity checklist
 
+### Exact terminal early returns and pending commands (2026-10-13)
+
+Application checkpoint `32b73d7b490d` captures the pinned Original's exact
+TERMINATED guard at invocation. A later Terminate while an earlier effective
+Terminate waits for answer buffers logs once and returns without another buffer
+wait, lock, navigation, controller-entry change or Run state effect. Its receipt
+does not advance the Run dispatch highwater or finish the earlier pending phase,
+so the first effective command still applies. Two calls in the same JavaScript
+turn both pass the guard; TERMINATED_PAUSED also passes it and becomes TERMINATED.
+The decision is not inferred from the state observed after deactivation.
+
+Native packets preserve that decision across lost replies, retries and journal
+restoration. Accepted remote terminal commands persist it with their executed
+command JSON; retries with a different decision fail closed. Store invariants
+allow only command-log/receipt effects for a no-op. Existing authorization,
+immutable scope, access windows, completed-Run rejection and execution-mode log
+filtering remain active. A retained older ERROR dialog is presentation after
+successful termination; a newer trusted ERROR still interrupts the pending phase.
+Pure-log no-ops can bypass a held legacy packet, while state effects preserve
+legacy FIFO and prepared packets keep their original bytes. The guard decision
+is reported by the authenticated controller; the server does not independently
+observe the local controller phase.
+
+All nineteen actual-Source oracle cases and 2,141 unit/frontend tests pass fresh
+without skips or cancellations. Fresh PostgreSQL validation passes 1,335 tests;
+the Memory/File/SQLite HTTP matrix passes 498. Typecheck and the production build
+pass at 469.99 kB under the unchanged 470 kB hard limit, retaining existing warnings.
+Twenty-nine command/loading groups pass headed and headless; fourteen Debug,
+five route, ten copied-tab/crash, five context, eighteen ERROR and five actual
+older-API groups also pass, for 115 positive groups. The preceding immutable
+frontend `87be5c23dda1` fails the no-op gate after fourteen groups. Its backend
+image fails 26 of 109 current contract/application tests as a negative control.
+The first headed trial held an incorrect remote ACK URL; the final fixture holds
+the exact acknowledgement route and passes the native lost-reply and remote
+held-ACK scenarios. Every final browser run shuts down its owned API.
+
+The fresh image from 900 verified tracked files passes Standard, Demo and
+production PostgreSQL profiles, SQLite runtime and 438 API/transaction tests as
+node in a read-only container. Its 169 frontend files match the tested frontend
+and aligned host output. No schema version changes. The existing backend-first
+rollout remains required; the five actual older-API groups prove their bounded
+sequential compatibility, not full no-op mixed-version concurrency. All 24 prior
+containers, immutable image IDs, states and mount fields, 85 volumes, 315 image
+aliases and protected files remain intact. Ten checkpoint image aliases are added;
+four other new aliases are retained separately. Owned containers, volumes and
+the clean source archive are removed.
+
+Full Original parity and production readiness remain unproven. Timer interruption,
+buffer/completion-log timing and terminal lock/navigation completion after later
+commands remain open. Initial loading/controller replacement, global/cross-document
+ordering, complete legacy mixed-version concurrency, worker/post-unload behavior,
+full visual/property/real-package acceptance, measured performance, remote CI,
+release, deployment and production acceptance are still required. This checkpoint
+is local and unpushed.
+
 ### Terminal controller phases before answer buffers (2026-10-13)
 
 Application checkpoint `87be5c23dda1` enters TERMINATED or TERMINATED_PAUSED
