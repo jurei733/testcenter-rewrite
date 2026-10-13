@@ -287,6 +287,14 @@ export const createParticipantNativeCommands = (options: {
       if (!entry.request.terminationNoop && (keyword === "pause" || keyword === "terminate")) {
         entry.timerInterruption = options.captureTimer?.(entry.request, () => entry.request.controllerDispatch ??
           nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches));
+        const legacy = [...queue.values()].find(value => scopeKey(value.scope) === scopeKey(scope) && value.version === undefined && !value.request.controllerDispatch);
+        if (entry.timerInterruption && legacy && ["goto", "resume"].includes(legacy.keyword)) {
+          const prior = legacy.request;
+          entry.timerInterruption.legacyCommand = { testRunId: prior.testRunId, contentReleaseId: prior.contentReleaseId,
+            bookletKey: prior.bookletKey, deliveryId: prior.deliveryId, keyword: prior.keyword, arguments: [...prior.arguments],
+            controllerStatus: prior.controllerStatus, timeStamp: prior.timeStamp };
+          entry.timerInterruption.observedAt = entry.request.timeStamp;
+        }
         if (entry.timerInterruption === undefined) delete entry.timerInterruption;
       }
       queue.set(entry.id, entry); persist(entry);

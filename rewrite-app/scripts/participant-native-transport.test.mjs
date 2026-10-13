@@ -382,3 +382,20 @@ test('a new timer-only receipt also bypasses legacy answer preparation without p
   f.legacy.resolve();await flush();await f.advance();assert.equal(f.prepared.length,2);assert.equal(f.calls.length,3);assert.equal(f.values.size,0);
  }finally{answer.resolve();f.legacy.resolve();f.native.stop();}
 });
+
+test('a timer preparation copies only the exact legacy contract fields while its old HTTP packet stays untouched',async()=>{
+ const id='owned-legacy-timer',legacy={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','unit'],controllerStatus:'RUNNING',timeStamp:1791763200123,fixtureOnly:'retain only in the old packet'};
+ const values=new Map([['testcenter-rewrite:participant-native-command:v1:'+id,JSON.stringify({scope,owner:'owned-tab',id,keyword:'goto',args:legacy.arguments,request:legacy,prepared:true})]]),f=legacyTimerFixture({values});try{
+  await f.advance();const oldBody=f.calls[0].request.body;f.native.command('pause',[]);await f.advance();
+  const timer=JSON.parse(f.calls[1].request.body),{fixtureOnly,...canonical}=legacy;
+  assert.equal(timer.observedAt,1791763200123);assert.deepEqual(timer.legacyCommand,canonical);assert.equal(timer.legacyCommand.fixtureOnly,undefined);assert.equal(f.calls[0].request.body,oldBody);assert.deepEqual(JSON.parse(oldBody),legacy);
+  f.legacy.resolve();await flush();await f.advance();assert.equal(f.values.size,0);
+ }finally{f.legacy.resolve();f.native.stop();}
+});
+test('the retiming dependency cannot skip an older non-retiming legacy head',async()=>{
+ const head='owned-legacy-timer',next='owned-legacy-next',pause={testRunId:scope.testRunId,contentReleaseId:scope.contentReleaseId,bookletKey:scope.bookletKey,deliveryId:head,keyword:'pause',arguments:[],controllerStatus:'RUNNING',timeStamp:1791763200123},goto={...pause,deliveryId:next,keyword:'goto',arguments:['id','unit']};
+ const values=new Map([['testcenter-rewrite:participant-native-command:v1:'+head,JSON.stringify({scope,owner:'owned-tab',id:head,keyword:'pause',args:[],request:pause,prepared:true})],['testcenter-rewrite:participant-native-command:v1:'+next,JSON.stringify({scope,owner:'owned-tab',id:next,keyword:'goto',args:goto.arguments,request:goto,prepared:true})]]),f=legacyTimerFixture({values});try{
+  await f.advance();f.native.command('pause',[]);await f.advance();const timer=JSON.parse(f.calls[1].request.body);assert.equal(timer.legacyCommand,undefined);assert.equal(timer.observedAt,undefined);
+  f.legacy.resolve();await flush();await f.advance();await f.advance();assert.equal(f.values.size,0);
+ }finally{f.legacy.resolve();f.native.stop();}
+});

@@ -27,7 +27,7 @@ await new Promise(done=>server.listen(0,'127.0.0.1',done));
 let browser;
 try{
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
- for(const keyword of ['pause','terminate','terminate-error','zero-pause-enforced','zero-pause-preview','expired-enforced','expired-preview']){
+ for(const keyword of ['pause','terminate','terminate-error','zero-pause-enforced','zero-pause-preview','expired-enforced','expired-preview','goto-reentry','goto-zero-reentry']){
   const page=await browser.newPage();page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:'+server.address().port);
   await page.evaluate(keyword=>{
@@ -51,11 +51,12 @@ try{
    let resolveBuffers,preparedIframes=0;const held=new Promise(done=>{resolveBuffers=done;});
    const release=()=>resolveBuffers(service.getNavigationState(service.currentUnitSequenceId));
    Object.assign(service,{testId:42,booklet:{config:{},units:{id:'root'}},state$:new BehaviorSubject('RUNNING'),timers$:new Subject(),navigation$:new Subject(),timers:{},currentTimerId:'',timerIntervalSubscription:null,
-    units:{1:first,2:second},testlets:{root:top,timed,after},currentUnit:first,currentUnitSequenceId:1,
-    testMode:{forceTimeRestrictions:keyword.endsWith('-enforced'),showCode:false},timerWarningPoints:[],shouldShowConfirmationUI:()=>false,
+    units:{1:first,2:second},unitAliasMap:{'timed-unit':1,'after-unit':2},testlets:{root:top,timed,after},currentUnit:first,currentUnitSequenceId:1,
+    testMode:{forceTimeRestrictions:keyword.endsWith('-enforced')||keyword.startsWith('goto-'),showCode:false},timerWarningPoints:[],shouldShowConfirmationUI:()=>false,
     addToTestStateBuffer:(key,value)=>writes.push([key,JSON.parse(value)]),closeAllBuffers:()=>{buffers.push(Date.now());return held;},
-    router:{navigate:async([url])=>{
+    router:{navigate:async([url],options)=>{
      navigation.push({url,time:Date.now()});const match=url.match(/\/u\/(\d+)$/);if(!match)return true;
+     if(keyword.startsWith('goto-'))await new Promise((done,fail)=>service.canDeactivateUnit(url,options?.state?.force).subscribe({next:done,error:fail}));
      const sequence=Number(match[1]),result=await guard.canActivate({params:{u:String(sequence)}});guardResults.push(result);
      if(result===true){service.currentUnit=service.units[sequence];service.currentUnitSequenceId=sequence;host.runUnit();}
      return result===true;
@@ -94,7 +95,17 @@ try{
    }
    console.log('original_controller_timer_worker='+keyword+':passed');await page.close();continue;
   }
-  await page.waitForFunction(()=>globalThis.ownedTimer.events.some(e=>e.type==='STEP'&&e.seconds===3));
+  await page.waitForFunction(keyword=>globalThis.ownedTimer.events.some(e=>e.type==='STEP'&&e.seconds===(keyword==='goto-zero-reentry'?0:3)),keyword);
+  if(keyword.startsWith('goto-')){
+   await page.evaluate(()=>globalThis.ownedTimer.root.handleCommand('goto',['id','timed-unit']));
+   await page.waitForFunction(keyword=>globalThis.ownedTimer.events.filter(e=>e.type==='STARTED').length===2&&globalThis.ownedTimer.events.at(-1).type==='STEP'&&globalThis.ownedTimer.events.at(-1).seconds===(keyword==='goto-zero-reentry'?4:1),keyword);
+   const before=await page.evaluate(()=>{const f=globalThis.ownedTimer;f.pending=f.root.handleCommand('pause',[]);return {starts:f.events.filter(e=>e.type==='STARTED').map(e=>e.seconds),balance:f.service.timers.timed*60};});
+   const balance=keyword==='goto-zero-reentry'?4:1;assert.deepEqual(before.starts,[6,keyword==='goto-zero-reentry'?6:3]);assert.equal(before.balance,balance);
+   await page.waitForFunction(()=>Date.now()>globalThis.ownedTimer.events[0].time+6500);
+   const after=await page.evaluate(async()=>{const f=globalThis.ownedTimer;const held={balance:f.service.timers.timed*60,buffers:f.buffers.length,navigation:f.navigation.length,ended:f.events.some(e=>e.type==='ENDED'),lifecycle:[...f.lifecycle]};f.release();await f.pending;f.subscription.unsubscribe();return held;});
+   assert.equal(after.balance,balance);assert.equal(after.buffers,1);assert.equal(after.navigation,1);assert.equal(after.ended,false);assert.equal(after.lifecycle.filter(e=>e==='created').length,2);assert.equal(after.lifecycle.filter(e=>e==='terminated').length,2);
+   checks.push({keyword,before,after});console.log('original_controller_timer_worker='+keyword+':passed');await page.close();continue;
+  }
   const before=await page.evaluate(keyword=>{
    const f=globalThis.ownedTimer;if(keyword==='terminate-error')f.service.state$.next('ERROR');
    f.pending=f.root.handleCommand(keyword==='pause'?'pause':'terminate',[]);

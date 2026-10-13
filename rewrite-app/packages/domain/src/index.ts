@@ -1233,6 +1233,14 @@ export type TestletTimerState = {
   // Advisory exit preparation stops the timer while this unit stays loaded.
   // A later unit load or explicit Run resume may start it again.
   interruptedAtUnitKey?: string;
+  legacyPreparation?: {
+    scope: { testRunId: string; participantSessionId: string; tenantId: string; workspaceId: string; contentReleaseId: string; bookletKey: string; assignmentKey: string };
+    deliveryId: string;
+    payloadSha256: string;
+    unitKey: string;
+    before: { startedAt: string; expiresAt: string };
+    after: { startedAt: string; expiresAt: string; updatedAt: string; remainingSeconds: number; durationSeconds: number };
+  };
 };
 
 export type MonitorTestletTimer = TestletTimerState & {

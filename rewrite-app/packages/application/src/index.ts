@@ -4,6 +4,7 @@ import { ParticipantRunCommandApplicationError } from "./participant-run-command
 import { participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
+import { retainedLegacyTimerPreparation, withLegacyTimerPreparation, legacyTimerInterruptionBalance } from "./participant-legacy-timer.js";
 import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
 import type { ParticipantRunMutationInput, ParticipantRunMutationContext,
@@ -6984,6 +6985,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       ) {
         return [];
       }
+      const legacyPreparation = retainedLegacyTimerPreparation(testRun, timer);
       return [
         [
           normalizedTestletKey,
@@ -6999,7 +7001,8 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
             updatedAt: timer.updatedAt || testRun.updatedAt,
             endedAt: timer.endedAt ?? null,
             ...(status === "paused" && timer.interruptedAtUnitKey
-              ? {interruptedAtUnitKey: timer.interruptedAtUnitKey} : {})
+              ? {interruptedAtUnitKey: timer.interruptedAtUnitKey} : {}),
+            ...(legacyPreparation ? { legacyPreparation } : {})
           }
         ]
       ];
@@ -21518,12 +21521,14 @@ const cancelTestletTimerAfterLeave = (
 const interruptTestletTimerAfterLeave = (
   testRun: TestRun,
   testletKey: string,
-  timestamp: string
+  timestamp: string,
+  workerStep = false
 ): TestRun => {
   const timer = testRun.testletTimers?.[testletKey];
   if (!timer || (timer.status !== "running" && timer.status !== "paused")) {
     return testRun;
   }
+  const remainingSeconds = Math.max(0, getTestletTimerRemainingSeconds(timer, timestamp) - (workerStep && timer.status === "running" ? 1 : 0));
   return normalizeTestRun({
     ...testRun,
     testletTimers: {
@@ -21531,10 +21536,12 @@ const interruptTestletTimerAfterLeave = (
       [testletKey]: {
         ...timer,
         status: "paused",
-        remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
+        remainingSeconds,
         expiresAt: null,
         updatedAt: timestamp,
-        endedAt: null
+        endedAt: null,
+        ...(workerStep && timer.status === "running" && testRun.currentUnitKey
+          ? { interruptedAtUnitKey: testRun.currentUnitKey } : {})
       }
     },
     updatedAt: timestamp
@@ -21544,6 +21551,7 @@ const interruptTestletTimerAfterLeave = (
 const projectParticipantControllerCommand = (input: {
   contentRelease: ContentRelease; testRun: TestRun; timestamp: string;
   request: Pick<ParticipantNativeCommandRequest, "keyword" | "arguments" | "controllerStatus">;
+  workerStep?: boolean;
 }): { testRun: TestRun; startedTestletKey: string | null } => {
   const { contentRelease, testRun, timestamp, request } = input;
   const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === testRun.bookletKey);
@@ -21553,7 +21561,7 @@ const projectParticipantControllerCommand = (input: {
   const nextRun = projectParticipantNativeCommand({ request, booklet, testRun, timestamp,
     timedKey: unitKey => resolveTimedTestletForUnit(booklet, unitKey)?.testletKey ?? null,
     remaining: timer => getTestletTimerRemainingSeconds(timer, timestamp),
-    interrupt: (run, key) => interruptTestletTimerAfterLeave(run, key, timestamp),
+    interrupt: (run, key) => interruptTestletTimerAfterLeave(run, key, timestamp, input.workerStep),
     cancel: (run, key) => cancelTestletTimerAfterLeave(run, key, timestamp),
     activate: run => {
       const activated = activateCurrentTestletTimer(contentRelease, run, timestamp, true);
@@ -32273,12 +32281,16 @@ export const createFirstSliceServices = (
             "participant_controller_timer_interruption_invalid", "The interrupted balance cannot exceed the timer's authored duration.");
           // This receipt precedes the answer drain. It must not advance the
           // command state highwater or alter Run/controller/parent state.
+          const legacy = request.legacyCommand;
+          const legacyHash = legacy ? participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: legacy.keyword,
+            arguments: legacy.arguments, controllerStatus: legacy.controllerStatus, timeStamp: legacy.timeStamp }) : undefined;
+          const legacyBalance = timer ? legacyTimerInterruptionBalance({ run: context.testRun, timer, request, payloadSha256: legacyHash, timestamp }) : undefined;
           const current = !participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch) &&
             context.testRun.currentUnitKey === request.unitKey && timer?.status === "running" &&
-            timer.startedAt === request.startedAt && timer.expiresAt === request.expiresAt;
+            (timer.startedAt === request.startedAt && timer.expiresAt === request.expiresAt || legacyBalance !== undefined);
           const testRun = current ? normalizeTestRun({ ...context.testRun,
             testletTimers: { ...context.testRun.testletTimers, [request.testletKey]: { ...timer,
-              status: "paused", remainingSeconds: Math.min(timer.remainingSeconds, request.remainingSeconds),
+              status: "paused", remainingSeconds: legacyBalance ?? Math.min(timer.remainingSeconds, request.remainingSeconds),
               expiresAt: null, updatedAt: timestamp, endedAt: null, interruptedAtUnitKey: request.unitKey } }, updatedAt: timestamp }) : context.testRun;
           return { testRun, testLogs: [], activityEvents: [],
             progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
@@ -32350,7 +32362,7 @@ export const createFirstSliceServices = (
             const observedController = request.controllerDispatch || request.controllerStatus === "TERMINATED" || request.controllerStatus === "TERMINATED_PAUSED" ? request.controllerStatus : request.controllerStatus === "ERROR" ? "ERROR" :
               request.controllerStatus === "PAUSED" || context.testRun.status === "paused" ? "PAUSED" : request.controllerStatus;
             const projected = projectParticipantControllerCommand({ contentRelease: release, testRun: context.testRun, timestamp,
-              request: { ...request, controllerStatus: observedController } }).testRun;
+              request: { ...request, controllerStatus: observedController }, workerStep: ["goto", "resume"].includes(request.keyword) }).testRun;
             if (participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch)) {
               return { testRun: context.testRun, superseded: true, controllerDispatch: request.controllerDispatch,
                 testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
@@ -32359,7 +32371,9 @@ export const createFirstSliceServices = (
                   tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
                   deliveryId, payloadSha256, acceptedAt: timestamp } };
             }
-            const nextRun = { ...projected, executionMode: context.testRun.executionMode, bookletAssignmentKey: context.testRun.bookletAssignmentKey };
+            const nextRun = withLegacyTimerPreparation({ before: context.testRun,
+              after: { ...projected, executionMode: context.testRun.executionMode, bookletAssignmentKey: context.testRun.bookletAssignmentKey },
+              request, payloadSha256, testletKey: resolveTimedTestletForUnit(booklet, context.testRun.currentUnitKey)?.testletKey ?? null });
             const terminal = request.keyword === "terminate";
             const controller = terminal ? observedController === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : nextRun.status.toUpperCase();
             const entries: ParticipantTestLogEntryInput[] = [];

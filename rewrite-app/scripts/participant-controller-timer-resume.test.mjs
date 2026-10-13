@@ -88,6 +88,56 @@ for(const kind of kinds)test(`${kind}: controller timer reentry distinguishes in
     });
    }
   }
+  for(const mode of Object.keys(participantExecutionModeDefinitions))for(const keyword of ['pause','terminate'])for(const elapsed of [2500,5500]){
+   await t.test(`${mode}/${keyword}/${elapsed}: a proven earlier legacy retime can be interrupted from a stale same-Unit snapshot`,async()=>{
+    const original={...base,executionMode:mode,testletTimers:{timed:timer('running',6),other}};await repository.saveTestRun(original);await repository.saveParticipantSession(parent);clock+=elapsed;
+    const legacy={testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword:'goto',arguments:['id','first','give 0'],controllerStatus:'RUNNING',timeStamp:clock};
+    await service().participantRuntime.executeNativeCommand({...legacy,participantSessionId:parent.participantSessionId});
+    const committed=await repository.getTestRunById(base.testRunId);assert.ok(committed.testletTimers.timed.legacyPreparation);assert.notEqual(committed.testletTimers.timed.expiresAt,original.testletTimers.timed.expiresAt);clock+=1250;
+    if(kind==='postgres'){await storage.shutdown();storage=undefined;}repository=await fresh();
+    const request={participantSessionId:parent.participantSessionId,testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword,controllerStatus:'RUNNING',controllerDispatch:{controllerId:'owned-legacy-rebase',sequence:1},unitKey:'first',testletKey:'timed',startedAt:original.testletTimers.timed.startedAt,expiresAt:original.testletTimers.timed.expiresAt,remainingSeconds:Math.max(0,Math.floor((Date.parse(original.testletTimers.timed.expiresAt)-clock)/1000)),legacyCommand:legacy,observedAt:clock};
+    const expected=Math.max(0,Math.ceil((Date.parse(committed.testletTimers.timed.expiresAt)-clock)/1000)-1);assert.equal(expected,elapsed===2500?1:4);
+    await service().participantRuntime.interruptControllerTimer(request);
+    const paused=await repository.getTestRunById(base.testRunId);assert.equal(paused.status,'running');assert.equal(paused.currentUnitKey,'first');assert.equal(paused.testletTimers.timed.status,'paused');assert.equal(paused.testletTimers.timed.remainingSeconds,expected);assert.equal(paused.testletTimers.timed.legacyPreparation,undefined);assert.equal(paused.controllerDispatches?.['owned-legacy-rebase']??0,0);await preserve(paused);
+    clock+=7000;const held=await service().participantRuntime.getCurrentRunState({participantSessionId:parent.participantSessionId,testRunId:base.testRunId});assert.equal(held.testRun.currentUnitKey,'first');assert.equal(held.testRun.testletTimers.timed.remainingSeconds,expected);
+    if(kind==='postgres'){await storage.shutdown();storage=undefined;}repository=await fresh();const beforeReplay=await repository.getTestRunById(base.testRunId);
+    assert.equal((await service().participantRuntime.interruptControllerTimer(request)).applied,false);assert.deepEqual(await repository.getTestRunById(base.testRunId),beforeReplay);
+    assert.equal((await service().participantRuntime.executeNativeCommand({...legacy,participantSessionId:parent.participantSessionId})).applied,false);assert.deepEqual(await repository.getTestRunById(base.testRunId),beforeReplay);
+    const final=await service().participantRuntime.executeNativeCommand({participantSessionId:parent.participantSessionId,testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:request.deliveryId,keyword,arguments:[],controllerStatus:'RUNNING',timeStamp:request.observedAt,controllerDispatch:{controllerId:'owned-legacy-rebase',sequence:keyword==='terminate'?2:1}});
+    assert.equal(final.testRun.status,'paused');assert.equal(final.testRun.testletTimers.timed.remainingSeconds,expected);await preserve(final.testRun);
+   });
+  }
+  await t.test('legacy causality cannot freeze a later timer, another Unit, a forged packet or an ambiguous clock',async()=>{
+   for(const change of ['missing-context','wrong-id','wrong-payload','wrong-before','future-observation','earlier-observation','ended-observation','later-timer','later-unit','later-dispatch','wrong-scope','newer-legacy']){
+    const original={...base,testletTimers:{timed:timer('running',6),other}};await repository.saveTestRun(original);await repository.saveParticipantSession(parent);clock+=2500;
+    const legacy={testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword:'goto',arguments:['id','first','give 0'],controllerStatus:'RUNNING',timeStamp:clock};
+    await service().participantRuntime.executeNativeCommand({...legacy,participantSessionId:parent.participantSessionId});clock+=750;
+    let current=await repository.getTestRunById(base.testRunId);
+    const request={participantSessionId:parent.participantSessionId,testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword:'pause',controllerStatus:'RUNNING',controllerDispatch:{controllerId:'owned-legacy-rebase',sequence:1},unitKey:'first',testletKey:'timed',startedAt:original.testletTimers.timed.startedAt,expiresAt:original.testletTimers.timed.expiresAt,remainingSeconds:2,legacyCommand:structuredClone(legacy),observedAt:clock};
+    if(change==='missing-context'){delete request.legacyCommand;delete request.observedAt;}
+    if(change==='wrong-id')request.legacyCommand.deliveryId=randomUUID();
+    if(change==='wrong-payload')request.legacyCommand.arguments.push('different');
+    if(change==='wrong-before')request.expiresAt=new Date(Date.parse(request.expiresAt)-1000).toISOString();
+    if(change==='future-observation')request.observedAt=clock+1000;
+    if(change==='earlier-observation')request.observedAt=Date.parse(current.testletTimers.timed.updatedAt)-1;
+    if(change==='ended-observation'){request.observedAt=Date.parse(current.testletTimers.timed.expiresAt);clock=request.observedAt+100;}
+    if(change==='later-timer')current.testletTimers.timed.expiresAt=new Date(Date.parse(current.testletTimers.timed.expiresAt)+1000).toISOString();
+    if(change==='later-unit')current.currentUnitKey='after';
+    if(change==='later-dispatch')current.controllerDispatches={'owned-legacy-rebase':2};
+    if(change==='wrong-scope')current.testletTimers.timed.legacyPreparation.scope.workspaceId='other';
+    if(change==='newer-legacy'){await service().participantRuntime.executeNativeCommand({...legacy,deliveryId:randomUUID(),timeStamp:clock,participantSessionId:parent.participantSessionId});current=await repository.getTestRunById(base.testRunId);}
+    await repository.saveTestRun(current);await service().participantRuntime.interruptControllerTimer(request);
+    const after=await repository.getTestRunById(base.testRunId);assert.deepEqual(after.testletTimers,current.testletTimers,change);assert.equal(after.currentUnitKey,current.currentUnitKey);await preserve(after);
+   }
+  });
+  await t.test('malformed legacy preparation context is rejected without changing its Run',async()=>{
+   const original={...base,testletTimers:{timed:timer('running',6),other}};await repository.saveTestRun(original);await repository.saveParticipantSession(parent);
+   const legacy={testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword:'goto',arguments:['id','first'],controllerStatus:'RUNNING',timeStamp:clock};
+   const request={participantSessionId:parent.participantSessionId,testRunId:base.testRunId,contentReleaseId:releaseId,bookletKey:'owned',deliveryId:randomUUID(),keyword:'pause',controllerStatus:'RUNNING',controllerDispatch:{controllerId:'owned-legacy-rebase',sequence:1},unitKey:'first',testletKey:'timed',startedAt:createdAt,expiresAt:original.testletTimers.timed.expiresAt,remainingSeconds:3,legacyCommand:legacy,observedAt:clock};
+   for(const invalid of [{...request,observedAt:undefined},{...request,legacyCommand:undefined},{...request,legacyCommand:{...legacy,testRunId:'other'}},{...request,legacyCommand:{...legacy,controllerDispatch:{controllerId:'other',sequence:1}}}]){
+    const before=await repository.getTestRunById(base.testRunId);await assert.rejects(service().participantRuntime.interruptControllerTimer(invalid),error=>error.errorCode==='participant_controller_timer_interruption_invalid');assert.deepEqual(await repository.getTestRunById(base.testRunId),before);
+   }
+  });
   await t.test('ordinary Run and saving-session resume also restore an interrupted zero timer without touching a sibling',async()=>{
    for(const entry of ['run','session']){
     const original={...base,status:'paused',pauseSource:'participant',testletTimers:{timed:{...timer('paused',0),interruptedAtUnitKey:'first'},other}};await repository.saveTestRun(original);await repository.saveParticipantSession(parent);

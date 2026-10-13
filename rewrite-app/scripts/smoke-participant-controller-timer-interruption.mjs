@@ -60,15 +60,22 @@ try{
  const scenarios=[{origin:'native',keyword:'pause',lostTimerReply:true},{origin:'native',keyword:'terminate'},{origin:'remote',keyword:'pause'},{origin:'remote',keyword:'terminate'},
   ...['native','remote'].flatMap(origin=>['native','remote'].map(resume=>({origin,keyword:'pause',zero:true,resume}))),
   ...['native','remote'].map(origin=>({origin,keyword:'resume',code:true})),
-  ...['pause','terminate'].map(keyword=>({origin:'native',keyword,legacy:true,lostTimerReply:keyword==='pause'}))].filter(scenario=>process.env.UI_SMOKE_TIMER_LEGACY_ONLY==='true'?scenario.legacy:process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
+  ...['pause','terminate'].map(keyword=>({origin:'native',keyword,legacy:true,lostTimerReply:keyword==='pause'})),
+  ...['pause','terminate'].flatMap(keyword=>[
+   ...[false,true].flatMap(stale=>[false,true].map(lostLegacyReply=>({origin:'native',keyword,legacy:true,appliedLegacy:true,stale,lostLegacyReply}))),
+   {origin:'native',keyword,legacy:true,appliedLegacy:true,stale:true,legacyZero:true}
+  ])].filter(scenario=>process.env.UI_SMOKE_TIMER_CAUSAL_ONLY==='true'?scenario.appliedLegacy&&scenario.stale:
+   process.env.UI_SMOKE_TIMER_APPLIED_ONLY==='true'?scenario.appliedLegacy:
+   process.env.UI_SMOKE_TIMER_LEGACY_ONLY==='true'?scenario.legacy:process.env.UI_SMOKE_TIMER_CODE_ONLY==='true'?scenario.code:process.env.UI_SMOKE_TIMER_ZERO_ONLY!=='true'||scenario.zero);
  await api(workspace+'/participant-roster',{rosterText:'<Testtakers><Group id="owned">'+scenarios.map((scenario,i)=>`<Login mode="run-hot-return" name="timer-${i}"><Booklet>${scenario.code?'code-entry':'first'}</Booklet><Booklet>second</Booklet></Login>`).join('')+'</Group></Testtakers>'},operator);
  const repository=createSqliteFirstSliceRepository(file);
  browser=await chromium.launch({headless:process.env.UI_SMOKE_HEADFUL!=='true'});
  for(const [index,scenario] of scenarios.entries()){
   const context=await browser.newContext({viewport:{width:1280,height:800},locale:'de-DE'}),page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
-  let releaseAnswer,releaseApplication,releaseAck,releaseLegacy,holdLegacyRoute,caseFailure,disposing=false,heldAnswer=false,heldApplication=false,heldAck=false,heldLegacy=false,loseReply=Boolean(scenario.lostTimerReply);
+  let releaseFreshState,releaseApply,releaseAnswer,releaseApplication,releaseAck,releaseLegacy,holdLegacyRoute,caseFailure,disposing=false,heldAnswer=false,heldApplication=false,heldAck=false,heldLegacy=false,loseReply=Boolean(scenario.lostTimerReply);
   const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;}),legacyGate=new Promise(done=>{releaseLegacy=done;});releases.push(releaseAnswer,releaseApplication,releaseAck,releaseLegacy);
+  const applyGate=new Promise(done=>{releaseApply=done;}),freshStateGate=new Promise(done=>{releaseFreshState=done;});releases.push(releaseApply,releaseFreshState);
   const timerPackets=[],applications=[],legacyApplications=[];
   let legacyPacket;
   try{
@@ -84,8 +91,14 @@ try{
     const id='owned-legacy-timer-'+index;
     legacyPacket={testRunId:initial.testRunId,contentReleaseId:initial.contentReleaseId,bookletKey:initial.bookletKey,deliveryId:id,keyword:'goto',arguments:['id','first-unit','give 0'],controllerStatus:'RUNNING',timeStamp:Date.now()};
     holdLegacyRoute=async route=>{
-     const packet=route.request().postDataJSON();assert.deepEqual(packet,legacyPacket);heldLegacy=true;await legacyGate;
+     const packet=route.request().postDataJSON();assert.deepEqual(packet,legacyPacket);heldLegacy=true;await (scenario.appliedLegacy?applyGate:legacyGate);
      const response=await route.fetch(),body=await response.json();legacyApplications.push(body);
+     if(scenario.appliedLegacy){
+      if(scenario.lostLegacyReply&&legacyApplications.length===1){
+       await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_legacy_reply'})});return;
+      }
+      await legacyGate;
+     }
      await writeFile(join(artifacts,'legacy-replies-'+index+'.json'),JSON.stringify({packet,status:response.status(),responses:legacyApplications},null,2)+'\n');
      assert.equal(response.status(),200,JSON.stringify(body));await route.fulfill({response}).catch(error=>{
       if(!disposing||!/Route is already handled|Target.*closed|Request.*aborted/i.test(error.message))throw error;
@@ -124,7 +137,7 @@ try{
    }
    assert.equal(initial.testletTimers.timed.status,'running');
    const sibling={...structuredClone(initial),testRunId:crypto.randomUUID(),bookletKey:'second',bookletAssignmentKey:'second',currentUnitKey:'sibling-unit',testletTimers:{},unitResponses:{'sibling-unit':'Protected sibling'},unitResponseFieldTimestamps:{'sibling-unit':{opaque:99}}};await repository.saveTestRun(sibling);
-   const siblingBefore=await repository.getTestRunById(sibling.testRunId),parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
+   const siblingBefore=await repository.getTestRunById(sibling.testRunId);let parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
    await page.route('**/save-progress',async route=>{
     const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);
     if(parseVeronaUnitResponse(request.unitResponse)?.unitState.dataParts?.answer==='Owned timer answer '+index){heldAnswer=true;await answerGate;}
@@ -143,7 +156,15 @@ try{
    await page.route('**/native-commands',captureApplication);await page.route('**/commands/*/application',captureApplication);
    await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('Owned timer answer '+index);
    await poll(()=>Promise.resolve(heldAnswer),'The timer fixture did not hold its committed Player answer');
-   const before=await repository.getTestRunById(runId);
+   let before=await repository.getTestRunById(runId);
+   if(scenario.appliedLegacy){
+    if(scenario.stale)await page.route('**/current-state**',async route=>{await freshStateGate;const response=await route.fetch();await route.fulfill({response});});
+    await delay(scenario.legacyZero?Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-650-Date.now()):333);
+    releaseApply();await poll(()=>Promise.resolve(legacyApplications.length>=(scenario.lostLegacyReply?2:1)),'The old command did not commit before its held reply');
+    before=await repository.getTestRunById(runId);parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
+    assert.equal(before.testletTimers.timed.status,'running');assert.notEqual(before.testletTimers.timed.expiresAt,initial.testletTimers.timed.expiresAt,'Legacy Goto did not retime the current timer');
+    if(scenario.legacyZero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)+150-Date.now()));
+   }
    if(scenario.zero&&scenario.origin==='remote'){
     await page.route('**/commands/*/acknowledgement',async route=>{const response=await route.fetch();assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
     await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);await poll(()=>Promise.resolve(heldAck),'The zero-tick remote Pause did not reach its held ACK');
@@ -153,23 +174,31 @@ try{
    else if(scenario.zero)releaseAck();
    else await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:scenario.keyword==='terminate'?'complete':'pause'},operator);
    await poll(()=>Promise.resolve(timerPackets.length>=(scenario.lostTimerReply?2:1)),'Timer interruption was blocked behind the answer buffer');
-   const first=timerPackets[0];if(scenario.zero)assert.equal(first.packet.remainingSeconds,0);else assert.ok(first.packet.remainingSeconds>0);assert.equal(first.receipt.applied,true);
+   const first=timerPackets[0];if(scenario.zero||scenario.legacyZero)assert.equal(first.packet.remainingSeconds,0);else assert.ok(first.packet.remainingSeconds>0);assert.equal(first.receipt.applied,true);
+   let expectedBalance=first.packet.remainingSeconds;
+   if(scenario.appliedLegacy&&first.packet.expiresAt!==before.testletTimers.timed.expiresAt){
+    assert.equal(first.packet.expiresAt,initial.testletTimers.timed.expiresAt,'The causal fixture unexpectedly received a fresh timer');
+    expectedBalance=Math.max(0,Math.min(before.testletTimers.timed.remainingSeconds,Math.ceil((Date.parse(before.testletTimers.timed.expiresAt)-first.packet.observedAt)/1000)-1));
+    if(scenario.legacyZero)assert.notEqual(expectedBalance,first.packet.remainingSeconds,'The zero-tick fixture did not distinguish the old balance from the restarted Worker');
+   }
    if(scenario.lostTimerReply){assert.deepEqual(timerPackets[1].packet,first.packet);assert.equal(timerPackets[1].receipt.applied,false);}
    await poll(async()=>new RegExp('STATUS:\\s*'+(scenario.keyword==='pause'?'PAUSED':'TERMINATED')).test(await pane.innerText()),'The controller phase did not enter before its held command');
    const wait=Math.max(0,Date.parse(first.packet.expiresAt)+500-Date.now());await delay(wait);
-   const frozen=await repository.getTestRunById(runId);assert.equal(frozen.status,'running');assert.equal(frozen.currentUnitKey,'first-unit');assert.equal(frozen.testletTimers.timed.status,'paused');assert.equal(frozen.testletTimers.timed.remainingSeconds,first.packet.remainingSeconds);
+   const frozen=await repository.getTestRunById(runId);assert.equal(frozen.testletTimers.timed.status,'paused','Timer preparation did not freeze the matching current timer');assert.equal(frozen.status,'running');assert.equal(frozen.currentUnitKey,'first-unit');assert.equal(frozen.testletTimers.timed.remainingSeconds,expectedBalance);
+   if(scenario.appliedLegacy){assert.deepEqual(first.packet.legacyCommand,legacyPacket);assert.ok(Number.isSafeInteger(first.packet.observedAt));}
+   if(scenario.stale)assert.equal(first.packet.expiresAt,initial.testletTimers.timed.expiresAt);
    assert.equal(frozen.controllerDispatches?.[first.packet.controllerDispatch.controllerId]??0,0);assert.deepEqual(frozen.unitResponses,before.unitResponses);assert.deepEqual(frozen.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(frozen.controllerEntry,before.controllerEntry);
    assert.deepEqual(await repository.getParticipantSessionById(initial.participantSessionId),parentBefore);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
    assert.equal(applications.length,0);if(scenario.keyword==='terminate'||scenario.origin==='native')assert.equal(heldApplication,false,'An answer-draining command reached application before its answer receipt');
    if(scenario.legacy){
-    assert.equal(legacyApplications.length,0,'The legacy state effect settled before its deliberate release');
+    assert.equal(legacyApplications.filter(reply=>reply.application.applied).length,scenario.appliedLegacy?1:0,'The legacy state effect did not match its deliberate application gate');
     const queued=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-rewrite:participant-native-command:v1:')).map(key=>JSON.parse(localStorage.getItem(key))));
     const modern=queued.find(entry=>entry.version===2&&entry.keyword===scenario.keyword);assert.equal(modern.timerInterrupted,true);assert.equal(modern.prepared,undefined);assert.deepEqual(queued.find(entry=>entry.request.deliveryId===legacyPacket.deliveryId).request,legacyPacket);
-    releaseLegacy();await poll(()=>Promise.resolve(legacyApplications.length>=1),'The original unclocked packet did not settle after release');
+    releaseLegacy();releaseFreshState();await poll(()=>Promise.resolve(legacyApplications.length>=1),'The original unclocked packet did not settle after release');
    }
    releaseAnswer();await poll(()=>Promise.resolve(heldApplication),'The timer command did not reach application after its buffer release');releaseApplication();
    await poll(()=>Promise.resolve(applications.length===1),'The timer command application did not complete');
-   const final=await repository.getTestRunById(runId);assert.equal(final.status,'paused');assert.equal(final.testletTimers.timed.remainingSeconds,first.packet.remainingSeconds);assert.deepEqual(final.unitResponses,before.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
+   const final=await repository.getTestRunById(runId);assert.equal(final.status,'paused');assert.equal(final.testletTimers.timed.remainingSeconds,expectedBalance);assert.deepEqual(final.unitResponses,before.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
    assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
    let resumed;
    if(scenario.zero){
@@ -181,9 +210,9 @@ try{
     assert.deepEqual(resumed.unitResponses,before.unitResponses);assert.deepEqual(resumed.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
     await poll(async()=>await page.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue()==='Owned timer answer '+index,'The restarted timed Unit did not restore its exact answer');
    }
-   checks.push({scenario,timerPackets,legacyPacket,legacyApplications,before,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}${scenario.legacy?'-legacy-wait':''}:passed`);
+   checks.push({scenario,timerPackets,legacyPacket,legacyApplications,initial,before,expectedBalance,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}${scenario.legacy?'-legacy-wait':''}${scenario.appliedLegacy?'-applied':''}${scenario.stale?'-stale-state':''}${scenario.lostLegacyReply?'-lost-legacy-reply':''}${scenario.legacyZero?'-legacy-zero':''}:passed`);
   }catch(error){caseFailure=error;await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(error),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw error;
-  }finally{disposing=true;releaseAnswer();releaseApplication();releaseAck();releaseLegacy();await page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}).catch(()=>{});await context.close();}
+  }finally{disposing=true;releaseFreshState();releaseApply();releaseAnswer();releaseApplication();releaseAck();releaseLegacy();await page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}).catch(()=>{});await context.close();}
  }
  for(const check of checks.filter(check=>check.scenario.legacy))assert.equal(check.legacyApplications.filter(reply=>reply.application.applied).length,1,'The repeated legacy wire packet must have exactly one state effect');
  assert.deepEqual(errors,[]);gate.assertHealthy();await writeFile(join(artifacts,'timer-interruptions.json'),JSON.stringify({checks,errors},null,2)+'\n');

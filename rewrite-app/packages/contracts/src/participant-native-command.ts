@@ -25,10 +25,22 @@ export type ParticipantControllerTimerInterruptionRequest = {
   startedAt: string;
   expiresAt: string;
   remainingSeconds: number;
+  observedAt?: number;
+  legacyCommand?: ParticipantNativeCommandRequest;
 };
 export const isParticipantControllerTimerInterruptionRequest = (value: unknown): value is ParticipantControllerTimerInterruptionRequest => {
   const request = value as ParticipantControllerTimerInterruptionRequest | null;
+  const legacy = request?.legacyCommand;
+  const observedAt = request?.observedAt;
+  const validLegacy = legacy === undefined ? observedAt === undefined : Boolean(legacy &&
+    typeof legacy === "object" && !Array.isArray(legacy) && legacy.controllerDispatch === undefined && legacy.terminationNoop === undefined &&
+    ["goto", "resume"].includes(legacy.keyword) && Array.isArray(legacy.arguments) && legacy.arguments.every(arg => typeof arg === "string") &&
+    ["LOADING", "RUNNING", "PAUSED", "ERROR"].includes(legacy.controllerStatus) && Number.isSafeInteger(legacy.timeStamp) && legacy.timeStamp >= 0 &&
+    typeof legacy.deliveryId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(legacy.deliveryId) && legacy.deliveryId !== request?.deliveryId &&
+    ["testRunId", "contentReleaseId", "bookletKey"].every(key => legacy[key as "testRunId"] === request?.[key as "testRunId"]) &&
+    typeof observedAt === "number" && Number.isSafeInteger(observedAt) && observedAt >= 0 && Number.isFinite(new Date(observedAt).getTime()));
   return Boolean(request && typeof request === "object" && !Array.isArray(request) &&
+    validLegacy &&
     ["testRunId", "contentReleaseId", "bookletKey", "unitKey", "testletKey"].every(key =>
       typeof request[key as keyof typeof request] === "string" && Boolean(String(request[key as keyof typeof request]).trim())) &&
     typeof request.deliveryId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(request.deliveryId) &&

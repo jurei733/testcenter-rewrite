@@ -9,7 +9,7 @@ const repository=resolve(process.argv[2]??'../../testcenter');
 const originalCommit='ee2ab9ab64bd91209ef8534bbe6005838024e46d';
 const definitions={
  service:{path:'frontend/src/app/test-controller/services/test-controller.service.ts',className:'TestControllerService',methods:['pause','resume','terminateTest','canDeactivateUnit','setUnitNavigationRequest','startTimer','finishTimer','interruptTimer','cancelTimer','getUnit','unitIsInaccessible','getNavigationState','checkCompleteness','updateSingleLock','updateAllLocks','updateNavigationState','clearCodeLock']},
- controller:{path:'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',className:'TestControllerComponent',methods:['handleCommand','handleTimer']},
+ controller:{path:'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',className:'TestControllerComponent',methods:['handleCommand','handleTimer','goto']},
  timer:{path:'frontend/src/app/test-controller/classes/test-controller.classes.ts',declarations:['TimerData']},
  interfaces:{path:'frontend/src/app/test-controller/interfaces/test-controller.interfaces.ts',declarations:['UnitNavigationTarget','MaxTimerEvent','TestletLockTypes','isUnit','isTestlet']},
  ticker:{path:'frontend/src/app/test-controller/util/worker.util.ts',declarations:['createTicker']},
