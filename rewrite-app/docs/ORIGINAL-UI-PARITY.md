@@ -1,5 +1,89 @@
 # Optional Original UI
 
+### Causal timer interruption after a legacy retime (2026-10-13)
+
+Application checkpoint `0572ff28aa89` corrects an observed same-Unit race: a
+restored unclocked Goto had already changed the server timer, but its reply was
+held or lost. A subsequent Pause/Terminate still observed the earlier deadline.
+The old timer receipt was accepted without freezing the changed timer; the
+actual predecessor frontend reproduces an expired timer after acknowledgement,
+with no unrelated page errors.
+
+New timer preparations may carry the exact outstanding legacy Goto/Resume
+identity and the observation timestamp. The server records a causal witness
+only when that clockless command retimes a running timer on the same current
+Unit. The witness binds the participant/Run, tenant/workspace, immutable
+release/Booklet/assignment, delivery ID, canonical command payload hash, old
+start/deadline, and the exact resulting timer fingerprint. It is retained only
+while that fingerprint and scope still match. Reconciliation requires the
+known old packet and timer plus an observation after its server effect and
+before its new deadline, bounded by the current server time. Other Units,
+subsequent timer changes, different packet bodies, later dispatches and ambiguous
+observation times cannot use this path. Ordinary exact-identity preparations
+retain their existing behavior. The legacy main HTTP body remains unchanged;
+the optional witness uses the existing JSON timer storage without DDL or a
+schema-version change.
+
+The pinned Original's real Blob Worker additionally proves that same-block Goto
+interrupts the last STEP balance and reentry emits its first STEP immediately.
+Native Goto/Resume interruption now honors that STEP; a zero STEP before ENDED
+can restart the authored duration. Already-paused timers retain their previous
+interruption marker. Nine fresh Original Worker groups cover the earlier seven
+Pause/Terminate/zero/expiry cases plus positive-balance and zero-balance Goto
+reentry. This harness executes the actual extracted controller, timer service,
+Worker, guards and Unit-host methods; router wiring and iframe presentation are
+harness-owned, so this is not full Original router/application acceptance.
+
+All 2,330 unit/frontend tests, 1,536 fresh PostgreSQL tests and 498 fresh
+Memory/File/SQLite HTTP tests pass without skips or cancellations. The store
+matrix covers all six execution modes, Pause/Terminate, positive/zero reentry,
+restart before preparation and replay, exact duplicate retention, and negative
+causality/clock/scope cases. The actual previous image passes 57 and fails 81
+of the 138 current store tests, including failed parent groups. Seventy-two
+native-transport tests and three new contract tests pass. Typecheck and the
+production build pass at 469.99 kB under the unchanged 470 kB hard limit.
+
+Twenty-two production Rewrite timer groups pass headed and headless. Ten added
+groups cover already-applied legacy Goto with a held reply or a lost first reply,
+live current-state updates or deliberately withheld current-state replies, and
+zero-tick reentry before Pause/Terminate. Live event reception does not guarantee
+a fresh snapshot before invocation: the assertions derive the exact expected
+balance from the packet's observed timer identity, while deliberately stale
+cases must retain the old identity. The tests hold a genuinely committed Player
+answer independently, prove the early timer freeze beyond the former deadline,
+then release legacy/answer/main replies and prove one legacy state effect,
+retained balance and unchanged sibling, answers and response clocks. The wider
+29 command/loading groups pass headed and headless, plus 14 Debug, five route,
+ten copied-tab/crash, five context, 18 ERROR and five actual older-API groups.
+That is 159 fresh Rewrite and nine fresh Original Worker groups, 168 in total.
+
+A clean archive of all 908 tracked application files produces fresh image
+`1e819f1c4ad6`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 589 API/transaction tests inside the read-only image as node pass. All 169
+image, tested and host production files match; the prior host frontend is
+preserved. All 24 preexisting containers, immutable image IDs/states/mounts,
+85 volumes, 359 prior image aliases and protected files remain intact. Ten
+checkpoint aliases are added and owned containers, volumes and the clean source
+archive are removed. Three closed owned development builds were removed,
+reclaiming 73,809,189 bytes while retaining every frozen production frontend.
+
+The first backend matrix found an already-paused marker regression, now fixed.
+The first full browser matrix incorrectly assumed live SSE meant an already
+fresh view; the corrected assertions preserve the actual snapshot distinction.
+The first current-API context run also emitted SQLite `unable to open database
+file` errors during save-progress/events. Its retained database passes a read-only
+`quick_check`, and all five cases pass on a fresh owned database without any
+source change. The cause remains unresolved; the successful rerun is not a fix
+for that operational failure. Final acceptance uses the corrected matrix and
+retains this separate production-readiness finding. Backend-first rollout is required:
+historical already-applied packets without the server witness, different-Unit
+legacy effects, broader restored/mixed-version concurrency, clock skew, exact
+Worker scheduling/hidden-window behavior, buffer/completion-log and late
+terminal navigation/lock ordering remain open. Global/cross-document and
+post-unload ordering, full visual/property/real-package acceptance, measured
+performance, remote CI, release, deployment and production acceptance also
+remain unproven. This is a local checkpoint; nothing was pushed or deployed.
+
 ### Timer preparation while legacy commands wait (2026-10-13)
 
 Application checkpoint `ed351fc1c0e6` closes the confirmed transport gap where a
