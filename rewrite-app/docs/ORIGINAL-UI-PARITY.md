@@ -1,5 +1,52 @@
 # Optional Original UI
 
+### Separate normal command completion and browser replay (2026-10-14)
+
+Application `38d8e7ef78ff` includes runtime `67a50b1b8157`: opted-in native and
+remote state effects no longer publish their completion log. A fulfilled client
+continuation captures its completion timestamp and queues a separately authorized,
+idempotent completion against the exact accepted command. The API verifies native
+payload identity or the persisted remote execution receipt/content. Completion
+cannot apply a pending command or change Run, parent, answers, field clocks or
+revision. Existing command JSON carries the remote metadata; no schema change is
+required. Old clients/replies preserve their existing logging and timing.
+
+Four real store adapters cover accepted effect versus completion, concurrent
+duplicates, conflicting replay, legacy clients, saving modes and reopen. A durable
+browser journal retains exact completed packets across lost replies/reload, reads
+fresh credentials and preserves other scopes. Timeout plus monotonic retry bounds
+allow recovery when a completion route is temporarily unavailable. Headed and CI
+production Angular/SQLite each prove native and remote termination with held
+reconciliation, then lose the committed completion reply and restore its exact
+packet from a Starter reload. No state effect is repeated and the Run is unchanged.
+
+All 2,447 unit/frontend, 1,580 PostgreSQL and 498 Memory/File/SQLite HTTP checks
+pass without skips/cancellations. All 163 Rewrite browser and nine actual Source
+Worker groups pass. The actual Original three-buffer completion reference remains
+bounded to controlled backend/router and a non-adaptive Unit. The independent
+Memory/File/SQLite witness now passes its held-completion comparison. Full Original
+frontend acceptance is not claimed.
+
+Loading/route/tab assertions now inspect the separate completion packet and exact
+timestamp instead of its former effect-log ID or synchronous persistence. The
+browser-process crash fixture preserves the accepted PAUSED effect while forbidding
+a completion for a handler that never receives its held effect reply. All prior
+failed trials and the final ten-group crash/tab qualification are retained.
+The runtime is unchanged by these browser qualification refinements.
+
+A clean 930-file archive builds the new image; Standard/Demo/production PostgreSQL,
+SQLite runtime and 689 read-only node tests pass. All 169 tested/frozen/image frontend
+files match, the 469.99-kB initial bundle remains within the existing hard cap, and
+runtime build options are absent. All 24 prior containers, their immutable images,
+states and mounts, 86 volumes, 413 image aliases and protected artifacts are preserved.
+Owned containers/volumes are removed; mount list ordering alone is normalized.
+
+The accepting API must precede frontend rollout. Complete mixed-version recovery,
+native Debug completion timing and full Original mixed-command/buffer/lock/navigation
+ordering remain open with the other parity and production requirements. Formal
+parity remains 30 complete/19 partial; Test logs export stays partial. No push,
+release, production deployment or production acceptance occurred.
+
 ### Actual buffer and command-completion reference (2026-10-14)
 
 Reference checkpoint `d9e3f587` replaces a held `closeAllBuffers` approximation
