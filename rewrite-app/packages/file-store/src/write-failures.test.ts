@@ -132,7 +132,7 @@ test("legacy version-one File migration fails without changing its manifest or s
     assert.deepEqual(await readdir(directory), ["owned-source.json"]);
     await chmod(f.root, 0o700);
     assert.equal((await migrateFileFirstSliceStorage(f.file)).migrated, true);
-    assert.equal(JSON.parse(await readFile(f.file, "utf8")).externalizedCollections.version, 2);
+    assert.equal(JSON.parse(await readFile(f.file, "utf8")).externalizedCollections.version, 3);
     assert.equal((await migrateFileFirstSliceStorage(f.file)).migrated, false);
     assert.deepEqual(await createFileFirstSliceRepository(f.file).getSourcePackageById(source.sourcePackageId), source);
   } finally { await f.cleanup(); }

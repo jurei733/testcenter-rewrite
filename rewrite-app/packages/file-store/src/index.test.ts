@@ -259,7 +259,7 @@ describe("createFileFirstSliceRepository", () => {
       assert.deepEqual(coreDocument.sourcePackages, {});
       assert.deepEqual(coreDocument.contentReleases, {});
       assert.deepEqual(coreDocument.externalizedCollections, {
-        version: 2,
+        version: 3,
         sourcePackageIds: [sourcePackage.sourcePackageId],
         contentReleaseIds: [contentRelease.contentReleaseId],
         sourcePackageHashes: { [sourcePackage.sourcePackageId]: createHash("sha256").update(JSON.stringify(sourcePackage)).digest("hex") },
@@ -350,7 +350,7 @@ describe("createFileFirstSliceRepository", () => {
       };
       assert.deepEqual(migratedCore.sourcePackages, {});
       assert.deepEqual(migratedCore.contentReleases, {});
-      assert.equal(migratedCore.externalizedCollections?.version, 2);
+      assert.equal(migratedCore.externalizedCollections?.version, 3);
 
       const restarted = createFileFirstSliceRepository(filePath);
       assert.deepEqual(

@@ -1,6 +1,8 @@
+import { fileStoreTemporaryIdentity, hasFileStoreReaders, isDeadFileStoreTemporary, registerFileStoreAccess, withFileStoreAccess } from "./access.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   access,
+  lstat,
   mkdir,
   open,
   readFile,
@@ -100,7 +102,7 @@ type LegacyExternalizedCollectionManifest = {
   contentReleaseIds: string[];
 };
 type VersionedExternalizedCollectionManifest = {
-  version: 2;
+  version: 2 | 3;
   sourcePackageIds: string[];
   contentReleaseIds: string[];
   sourcePackageHashes: Record<string, string>;
@@ -186,7 +188,7 @@ const isExternalizedCollectionManifest = (
   typeof value === "object" &&
   value !== null &&
   "version" in value &&
-  (value.version === 1 || value.version === 2) &&
+  (value.version === 1 || value.version === 2 || value.version === 3) &&
   "sourcePackageIds" in value &&
   Array.isArray(value.sourcePackageIds) &&
   value.sourcePackageIds.every(entityId => typeof entityId === "string") &&
@@ -206,9 +208,10 @@ const writeJsonAtomically = async (
   await writeRawAtomically(targetPath, JSON.stringify(value, null, pretty ? 2 : undefined));
 };
 
-const writeRawAtomically = async (targetPath: string, raw: string): Promise<void> => {
+const writeRawAtomically = async (targetPath: string, raw: string, storePath = targetPath): Promise<void> => {
   await mkdir(dirname(targetPath), { recursive: true });
-  const temporaryPath = `${targetPath}.${process.pid}.${randomUUID()}.tmp`;
+  const identity = await fileStoreTemporaryIdentity(storePath);
+  const temporaryPath = join(dirname(targetPath), `.pending.${identity.store}.${identity.namespace}.${process.pid}.${randomUUID()}.tmp`);
   try {
     await writeFile(temporaryPath, raw, { encoding: "utf8", flag: "wx", flush: true });
     await rename(temporaryPath, targetPath);
@@ -295,7 +298,7 @@ const persistExternalizedState = async (input: {
   dirtySourcePackageIds: Set<string>;
   dirtyContentReleaseIds: Set<string>;
 }): Promise<VersionedExternalizedCollectionManifest> => {
-  const previous = input.externalizedCollections?.version === 2 ? input.externalizedCollections : null;
+  const previous = input.externalizedCollections && input.externalizedCollections.version !== 1 ? input.externalizedCollections : null;
   const sourcePackageIds = Object.keys(input.state.sourcePackages).sort();
   const contentReleaseIds = Object.keys(input.state.contentReleases).sort();
   const sourcePackageHashes: Record<string, string> = Object.create(null);
@@ -323,14 +326,14 @@ const persistExternalizedState = async (input: {
         exists = false;
       }
       if (!exists) {
-        await writeRawAtomically(path, raw);
+        await writeRawAtomically(path, raw, input.filePath);
         createdPaths.push(path);
       }
       hashes[id] = hash;
     }
   };
   const manifest: VersionedExternalizedCollectionManifest = {
-    version: 2, sourcePackageIds, contentReleaseIds, sourcePackageHashes, contentReleaseHashes
+    version: 3, sourcePackageIds, contentReleaseIds, sourcePackageHashes, contentReleaseHashes
   };
   try {
     await persistCollection("source-packages", sourcePackageIds, input.state.sourcePackages,
@@ -348,7 +351,7 @@ const persistExternalizedState = async (input: {
   }
   // Keep prior versions of live entities for readers of an earlier manifest.
   // Deletion prunes all versions of removed entities; cleanup failures retry on the next mutation.
-  await Promise.all([
+  if (!await hasFileStoreReaders(input.filePath)) await Promise.all([
     removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "source-packages", entityIds: sourcePackageIds }),
     removeUnreferencedExternalFiles({ filePath: input.filePath, collectionName: "content-releases", entityIds: contentReleaseIds })
   ]);
@@ -376,14 +379,14 @@ const readStateFromFile = async (
         filePath,
         collectionName: "source-packages",
         entityIds: externalizedCollections.sourcePackageIds,
-        hashes: externalizedCollections.version === 2 ? externalizedCollections.sourcePackageHashes : undefined,
+        hashes: externalizedCollections.version !== 1 ? externalizedCollections.sourcePackageHashes : undefined,
         resolveEntityId: sourcePackage => sourcePackage.sourcePackageId
       });
       state.contentReleases = await readExternalizedCollection<ContentRelease>({
         filePath,
         collectionName: "content-releases",
         entityIds: externalizedCollections.contentReleaseIds,
-        hashes: externalizedCollections.version === 2 ? externalizedCollections.contentReleaseHashes : undefined,
+        hashes: externalizedCollections.version !== 1 ? externalizedCollections.contentReleaseHashes : undefined,
         resolveEntityId: contentRelease => contentRelease.contentReleaseId
       });
     }
@@ -539,7 +542,7 @@ const checkFileWriterDirectories = async (filePath: string): Promise<void> => {
   for (const directory of directories) await probeAtomicFileWrite(directory);
 };
 
-export const checkFileFirstSliceReadiness = async (
+const checkFileFirstSliceReadinessUnlocked = async (
   filePath: string
 ): Promise<void> => {
   await mkdir(dirname(filePath), { recursive: true });
@@ -569,19 +572,86 @@ export const checkFileFirstSliceReadiness = async (
       .sourcePackageIds) {
       await access(
         externalEntityFilePath(filePath, "source-packages", sourcePackageId,
-          document.externalizedCollections.version === 2 ? document.externalizedCollections.sourcePackageHashes[sourcePackageId] : undefined)
+          document.externalizedCollections.version !== 1 ? document.externalizedCollections.sourcePackageHashes[sourcePackageId] : undefined)
       );
     }
     for (const contentReleaseId of document.externalizedCollections
       .contentReleaseIds) {
       await access(
         externalEntityFilePath(filePath, "content-releases", contentReleaseId,
-          document.externalizedCollections.version === 2 ? document.externalizedCollections.contentReleaseHashes[contentReleaseId] : undefined)
+          document.externalizedCollections.version !== 1 ? document.externalizedCollections.contentReleaseHashes[contentReleaseId] : undefined)
       );
     }
   }
   await checkFileWriterDirectories(filePath);
 };
+
+export const checkFileFirstSliceReadiness = (filePath: string): Promise<void> =>
+  withFileStoreAccess(filePath, "reader", () => checkFileFirstSliceReadinessUnlocked(filePath));
+
+export const compactFileFirstSliceStorage = (filePath: string, input: { apply?: boolean } = {}) =>
+  withFileStoreAccess(filePath, "maintenance", async () => {
+    const before = await readFile(filePath);
+    const loaded = await readStateFromFile(filePath);
+    if (loaded.externalizedCollections?.version !== 3) {
+      throw new Error("File compaction requires the version-three access protocol; stop the old writer and migrate first.");
+    }
+    const manifest = loaded.externalizedCollections;
+    const candidates: Array<{ path: string; bytes: number }> = [];
+    const ignoredPaths: string[] = [];
+    for (const collection of ["source-packages", "content-releases"] as const) {
+      const ids = collection === "source-packages" ? manifest.sourcePackageIds : manifest.contentReleaseIds;
+      const hashes = collection === "source-packages" ? manifest.sourcePackageHashes : manifest.contentReleaseHashes;
+      const selected = new Set(ids.map(id => externalEntityFilePath(filePath, collection, id, hashes[id])));
+      const directory = externalCollectionDirectory(filePath, collection);
+      let entries;
+      try {
+        if (!(await lstat(directory)).isDirectory()) { ignoredPaths.push(directory); continue; }
+        entries = await readdir(directory, { withFileTypes: true });
+      }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
+      for (const entry of entries) {
+        const path = join(directory, entry.name);
+        if (selected.has(path)) continue;
+        if (entry.isFile() && await isDeadFileStoreTemporary(filePath, entry.name)) {
+          candidates.push({ path, bytes: (await stat(path)).size }); continue;
+        }
+        if (!entry.isFile() || !entry.name.endsWith(".json")) { ignoredPaths.push(path); continue; }
+        const hashed = /^(.*)\.([a-f0-9]{64})\.json$/.exec(entry.name);
+        const encodedId = hashed?.[1] ?? entry.name.slice(0, -5);
+        let id;
+        try { id = decodeURIComponent(encodedId!); }
+        catch { ignoredPaths.push(path); continue; }
+        if (encodeURIComponent(id) !== encodedId) { ignoredPaths.push(path); continue; }
+        const raw = await readFile(path, "utf8");
+        let value;
+        try { value = JSON.parse(raw) as Record<string, unknown>; }
+        catch { ignoredPaths.push(path); continue; }
+        const identity = collection === "source-packages" ? "sourcePackageId" : "contentReleaseId";
+        if (value?.[identity] !== id || hashed && createHash("sha256").update(raw).digest("hex") !== hashed[2]) {
+          ignoredPaths.push(path); continue;
+        }
+        candidates.push({ path, bytes: Buffer.byteLength(raw) });
+      }
+    }
+    for (const entry of await readdir(dirname(filePath), { withFileTypes: true })) {
+      if (entry.isFile() && await isDeadFileStoreTemporary(filePath, entry.name)) {
+        const path = join(dirname(filePath), entry.name);
+        candidates.push({ path, bytes: (await stat(path)).size });
+      }
+    }
+    // Participating writers/readers cannot enter while our maintenance marker exists.
+    // Recheck also detects unsupported external modification before any deletion.
+    if (!before.equals(await readFile(filePath))) throw new Error("File manifest changed during compaction.");
+    let removedFiles = 0, reclaimedBytes = 0;
+    if (input.apply === true) for (const candidate of candidates) {
+      await rm(candidate.path);
+      removedFiles++; reclaimedBytes += candidate.bytes;
+    }
+    return { applied: input.apply === true, candidateFiles: candidates.length,
+      candidateBytes: candidates.reduce((sum, item) => sum + item.bytes, 0),
+      removedFiles, reclaimedBytes, ignoredPaths };
+  });
 
 export const migrateFileFirstSliceStorage = async (
   filePath: string
@@ -590,11 +660,11 @@ export const migrateFileFirstSliceStorage = async (
   formatVersion: 1;
   sourcePackageCount: number;
   contentReleaseCount: number;
-}> => {
+}> => withFileStoreAccess(filePath, "writer", async () => {
   const loaded = await readStateFromFile(filePath);
   const sourcePackageCount = Object.keys(loaded.state.sourcePackages).length;
   const contentReleaseCount = Object.keys(loaded.state.contentReleases).length;
-  if (loaded.externalizedCollections?.version !== 2) {
+  if (loaded.externalizedCollections?.version !== 3) {
     await persistExternalizedState({
       filePath,
       state: loaded.state,
@@ -604,15 +674,15 @@ export const migrateFileFirstSliceStorage = async (
     });
   }
   return {
-    migrated: loaded.externalizedCollections?.version !== 2,
+    migrated: loaded.externalizedCollections?.version !== 3,
     formatVersion: 1,
     sourcePackageCount,
     contentReleaseCount
   };
-};
+});
 
-export const createFileFirstSliceRepository = (
-  filePath: string
+const createFileRepository = (
+  filePath: string, registeredWriterCheck?: () => void
 ): FirstSliceRepository => {
   let cachePromise: Promise<PersistedFirstSliceState> | null = null;
   let writeQueue: Promise<void> = Promise.resolve();
@@ -621,7 +691,20 @@ export const createFileFirstSliceRepository = (
   const dirtyContentReleaseIds = new Set<string>();
 
   const getState = async (): Promise<PersistedFirstSliceState> => {
-    cachePromise ??= readStateFromFile(filePath).then(loaded => {
+    registeredWriterCheck?.();
+    const read = async () => {
+      try { return await withFileStoreAccess(filePath, "reader", () => readStateFromFile(filePath)); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+        // Legacy readonly inspectors cannot create access metadata. Compaction
+        // rejects those formats; their upgrade requires stopping all old access.
+        const document = JSON.parse(await readFile(filePath, "utf8")) as PersistedFirstSliceDocument;
+        if (typeof document.externalizedCollections === "object" && document.externalizedCollections !== null &&
+          "version" in document.externalizedCollections && document.externalizedCollections.version === 3) throw error;
+        return readStateFromFile(filePath);
+      }
+    };
+    cachePromise ??= read().then(loaded => {
       externalizedCollections = loaded.externalizedCollections;
       return loaded.state;
     });
@@ -640,10 +723,19 @@ export const createFileFirstSliceRepository = (
     dirtyContentReleaseIds.clear();
   };
 
+  const enqueueMutation = <Result>(operation: () => Promise<Result>): Promise<Result> => {
+    const result = writeQueue.then(() => {
+      registeredWriterCheck?.();
+      return registeredWriterCheck ? operation() : withFileStoreAccess(filePath, "writer", operation);
+    });
+    writeQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
+
   const mutate = <Result>(
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
-    const operation = writeQueue.then(async () => {
+    return enqueueMutation(async () => {
       const current = await getState();
       // Mutators replace rows or edit collection membership; share immutable row payloads,
       // but isolate every collection map until the manifest has committed.
@@ -662,17 +754,12 @@ export const createFileFirstSliceRepository = (
         throw error;
       }
     });
-    writeQueue = operation.then(
-      () => undefined,
-      () => undefined
-    );
-    return operation;
   };
 
   const mutateCommandList = <Result>(
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
-    const operation = writeQueue.then(async () => {
+    return enqueueMutation(async () => {
       const current = await getState();
       const next = { ...current, participantRunCommands: { ...current.participantRunCommands } };
       const result = updater(next);
@@ -682,14 +769,12 @@ export const createFileFirstSliceRepository = (
       cachePromise = Promise.resolve(next);
       return result;
     });
-    writeQueue = operation.then(() => undefined, () => undefined);
-    return operation;
   };
 
   const mutateParticipantRunApplication = <Result extends { applied: boolean } | null>(
     updater: (state: PersistedFirstSliceState) => Result
   ): Promise<Result> => {
-    const operation = writeQueue.then(async () => {
+    return enqueueMutation(async () => {
       const current = await getState();
       const next = { ...current, participantRunCommands: { ...current.participantRunCommands },
         participantProgressDeliveries: { ...current.participantProgressDeliveries },
@@ -701,14 +786,12 @@ export const createFileFirstSliceRepository = (
       cachePromise = Promise.resolve(next);
       return result;
     });
-    writeQueue = operation.then(() => undefined, () => undefined);
-    return operation;
   };
 
   const mutateControllerActivation = (
     input: Parameters<FirstSliceRepository["activateParticipantController"]>[0]
   ): ReturnType<FirstSliceRepository["activateParticipantController"]> => {
-    const operation = writeQueue.then(async () => {
+    return enqueueMutation(async () => {
       const current = await getState();
       const result = prepareParticipantControllerActivation(input,
         current.participantSessions[input.participantSessionId] ?? null, current.testRuns[input.testRunId] ?? null);
@@ -720,8 +803,6 @@ export const createFileFirstSliceRepository = (
       cachePromise = Promise.resolve(next);
       return result;
     });
-    writeQueue = operation.then(() => undefined, () => undefined);
-    return operation;
   };
 
   return {
@@ -1674,4 +1755,18 @@ export const createFileFirstSliceRepository = (
       return deletedCount;
     }
   };
+};
+
+export const createFileFirstSliceRepository = (filePath: string): FirstSliceRepository => createFileRepository(filePath);
+
+export const createFileFirstSliceStorage = async (filePath: string) => {
+  const registration = await registerFileStoreAccess(filePath, "writer");
+  let closing: Promise<void> | undefined;
+  const ensureOpen = () => { if (closing) throw Object.assign(new Error("File storage is closed."), { code: "FILE_STORE_CLOSED" }); };
+  try {
+    const repository = createFileRepository(filePath, ensureOpen);
+    await repository.listTenants();
+    return { repository, readinessCheck: () => { ensureOpen(); return checkFileFirstSliceReadiness(filePath); },
+      shutdown: (): Promise<void> => closing ??= registration.release() };
+  } catch (error) { await registration.release(); throw error; }
 };

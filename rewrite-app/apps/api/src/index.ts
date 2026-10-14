@@ -237,8 +237,7 @@ import {
   firstProductionSliceCapabilities
 } from "@testcenter-rewrite-app/domain";
 import {
-  checkFileFirstSliceReadiness,
-  createFileFirstSliceRepository
+  createFileFirstSliceStorage
 } from "@testcenter-rewrite-app/file-store";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
 import {
@@ -555,13 +554,14 @@ const createRepositoryFromEnvironment = async () => {
     const filePath =
       process.env.FIRST_SLICE_FILE ??
       fileURLToPath(new URL("../../../../.data/first-slice.json", import.meta.url));
+    const storage = await createFileFirstSliceStorage(filePath);
     return {
       kind: "file" as const,
-      repository: createFileFirstSliceRepository(filePath),
+      repository: storage.repository,
       location: filePath,
       schemaVersion: null,
-      readinessCheck: () => checkFileFirstSliceReadiness(filePath),
-      shutdown: async () => undefined
+      readinessCheck: storage.readinessCheck,
+      shutdown: storage.shutdown
     };
   }
 
@@ -822,36 +822,42 @@ const createApiRuntime = async () => {
     originalXmlSchemaValidator
   });
 
-  if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
-    try {
-      await services.adminAuth.bootstrapAdminUser(bootstrapAdmin);
-    } catch (error) {
-      // A second production replica may win the clean-store bootstrap race.
-      // Treat the configured operation as complete only after re-reading the
-      // exact account and its platform role from the shared store; otherwise
-      // preserve the original startup failure, including partial writes.
-      const concurrentlyBootstrappedAdmin =
-        await repository.getAdminUserByUsername(
-          bootstrapAdmin.username.trim().toLowerCase()
-        );
-      const concurrentlyBootstrappedRoles = concurrentlyBootstrappedAdmin
-        ? await repository.listAdminRoleAssignmentsByUserId(
-            concurrentlyBootstrappedAdmin.adminUserId
+  try {
+    if (bootstrapAdmin && (await repository.listAdminUsers()).length === 0) {
+      try {
+        await services.adminAuth.bootstrapAdminUser(bootstrapAdmin);
+      } catch (error) {
+        // A second production replica may win the clean-store bootstrap race.
+        // Treat the configured operation as complete only after re-reading the
+        // exact account and its platform role from the shared store; otherwise
+        // preserve the original startup failure, including partial writes.
+        const concurrentlyBootstrappedAdmin =
+          await repository.getAdminUserByUsername(
+            bootstrapAdmin.username.trim().toLowerCase()
+          );
+        const concurrentlyBootstrappedRoles = concurrentlyBootstrappedAdmin
+          ? await repository.listAdminRoleAssignmentsByUserId(
+              concurrentlyBootstrappedAdmin.adminUserId
+            )
+          : [];
+        if (
+          !concurrentlyBootstrappedAdmin ||
+          !concurrentlyBootstrappedRoles.some(
+            roleAssignment => roleAssignment.role === "platform_admin"
           )
-        : [];
-      if (
-        !concurrentlyBootstrappedAdmin ||
-        !concurrentlyBootstrappedRoles.some(
-          roleAssignment => roleAssignment.role === "platform_admin"
-        )
-      ) {
-        throw error;
+        ) {
+          throw error;
+        }
       }
     }
-  }
 
-  if (demoBootstrapEnabled) {
-    await bootstrapLocalDemoState({ repository, services });
+    if (demoBootstrapEnabled) {
+      await bootstrapLocalDemoState({ repository, services });
+    }
+
+  } catch (error) {
+    await repositoryConfig.shutdown();
+    throw error;
   }
 
   let presenceSweep: Promise<void> | null = null;
@@ -9671,8 +9677,22 @@ export const createProductionApiServer = async () =>
     const runtime = await createApiRuntime();
     const server = createServer(createRequestHandler(runtime));
     applyHttpServerTimeouts(server, runtime);
+    let shutdownPromise: Promise<void> | undefined;
+    const shutdownRuntime = () => shutdownPromise ??= runtime.shutdown();
     server.once("close", () => {
-      void runtime.shutdown();
+      void shutdownRuntime().catch(error => {
+        recordRuntimeOperationalEvent(runtime, "error", "storage_shutdown_failed", {
+          storageKind: runtime.repositoryConfig.kind,
+          error: runtimeErrorDetails(error)
+        });
+      });
+    });
+    const close = server.close.bind(server);
+    server.close = callback => close(error => {
+      void shutdownRuntime().then(() => callback?.(error), failure => {
+        if (callback) callback(error ?? failure as Error);
+        else server.emit("error", failure);
+      });
     });
     return server;
   };

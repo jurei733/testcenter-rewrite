@@ -711,7 +711,7 @@ do not repeatedly serialize every imported Player, definition, and resource.
 Include both paths in backups or moves. `db:migrate:file` externalizes legacy
 single-file state explicitly; the first normal write performs the same migration
 automatically. It also promotes the older version-one sidecar manifest to version
-two. Package and release files now have content-hash names and are never
+three. Package and release files now have content-hash names and are never
 overwritten; one atomic main-manifest replacement publishes the entire mutation.
 Failed writes preserve the committed manifest, selected entity files and live
 cache. Reopening rejects missing or changed selected files rather than treating
@@ -722,14 +722,37 @@ missing.
 The File adapter remains a single-process writer for local development. Keep
 prior versions of live entities in backups: they remain available to readers of
 an earlier manifest. Guarded aggregate deletion drops the manifest references
-and prunes every stored version of the deleted entities; cleanup failures are
-retried by the next successful mutation. Retention/compaction and power-loss behavior
-still require operating qualification. Before upgrading an existing File store,
-stop its writer and back up the manifest together with its objects directory.
-Older binaries cannot read the version-two sidecar manifest; rollback requires
+and prunes every stored version of the deleted entities; active readers and
+cleanup failures defer pruning to the next successful mutation. Before upgrading
+an existing File store, stop all old access and back up the manifest together
+with its objects directory. Older binaries cannot read the version-three
+sidecar manifest; rollback requires
 restoring the complete pre-upgrade backup with the old binary. The public
 migration result's `formatVersion: 1` describes the enclosing state document;
-the nested sidecar manifest version is now 2.
+the nested sidecar manifest version is now 3. Both older version-one and
+version-two sidecar stores are read and promoted on migration.
+
+Version three coordinates maintenance with participating readers and writers.
+The API keeps a writer registration until shutdown; direct repository operations
+register while reading or mutating. Registrations contain process/namespace
+identity in unique `.actors/` filenames. Maintenance refuses active accesses,
+unknown markers and another process namespace; it removes only unique markers
+whose owning process is verified dead in the same namespace. These are local
+cooperative guards, not a distributed locking service. Stop the API before
+compaction. Access metadata and unpublished `.pending.*.tmp` files are ephemeral;
+exclude them from offline backups/moves and transfer the committed manifest and
+object files. Preserve uncertain namespace metadata for operator investigation.
+
+After building, preview with `FIRST_SLICE_FILE=... npm run db:compact:file:built`.
+Use `FIRST_SLICE_FILE=... npm run db:compact:file:built -- --apply` to remove the
+listed unselected versions. The command validates the current selected objects,
+retains unrelated/malformed files and collection-directory symlinks, and never
+changes manifest bytes. Pending files are reclaimed only when both their store
+and process namespace match and their owning process is dead. Tests kill an
+owned writer before sidecar publication, before the manifest switch and after it;
+reopen retains respectively the old, old and new committed data. These SIGKILL
+checks do not prove power-loss durability; that and broader operating acceptance
+remain open.
 
 For relational local persistence, run:
 
