@@ -1,5 +1,52 @@
 # Testcenter parity checklist
 
+### Executable Original command-completion barrier (2026-10-14)
+
+Reference checkpoint `d9e3f587` adds a source-derived controller-completion oracle.
+It executes the pinned October Original's actual three buffer pipelines, chunk
+and state aggregation, saved-event barrier, forced deactivation, termination,
+controller-state subscription and command-completion callback. Five complete
+Original files are SHA-256 verified against `ee2ab9ab64bd91209ef8534bbe6005838024e46d`.
+Backend writes and router completion are controlled; this is not acceptance of
+the complete Original frontend. Adaptive coding and timer internals retain their
+separate qualification boundaries.
+
+Nine fresh cases show that termination waits for every response, Unit-state and
+test-state save before locking, then waits for lock and navigation completion
+before writing `command executed` with its completion-time timestamp. Empty
+response/state buffers, non-saving frontend behavior, a `false` navigation result,
+paused termination, repeated already-terminated commands and exact chunk-string
+aggregation are included. The repeated command's immediate no-op completion can
+precede the first termination's eventual completion; an issuance FIFO would not
+match this behavior.
+
+An independent differential witness executes the actual Rewrite native transport
+and application service with real Memory, File and SQLite adapters. With its
+client application continuation held after the accepted effect, every adapter
+already contains `command executed`; its timestamp is the invocation timestamp
+and remains unchanged when that continuation completes. The Original has no
+completion log while its navigation is held and records the later timestamp on
+completion. `node scripts/audit-participant-command-completion.mjs <report.json>
+--assert-parity` exits 1 for these three cases. This is a confirmed remaining gap,
+not a passing production qualification. HTTP routing and the complete Angular
+view are outside the witness; browser acceptance of the corrected phases is
+still required.
+
+All 2,391 unit/frontend tests pass fresh with zero failures, skips or cancellations.
+At reference commit `d9e3f587`, the prior 918 qualified file hashes remain
+identical; only the package test command changes. These documentation updates
+follow that check, and all 306 application/package files remain unchanged. The prior
+image, browser, PostgreSQL and HTTP evidence remains attached to its original
+application checkpoint; none of those suites was rerun here. Protected artifacts
+remain byte-identical. Formal parity stays at 31 complete and 18 partial areas.
+
+The next implementation must distinguish a committed state effect from handler
+completion, preserve exact completion timestamps and replay identities across
+lost replies/reloads, retain legacy-client behavior, and cover native and remote
+handlers including early returns and overlapping commands. Changing a timestamp
+before the actual completion barrier cannot close this gap. Full functional parity
+and production readiness remain unproven; this checkpoint is local and unpushed.
+
 ### Coordinated File maintenance and process termination (2026-10-14)
 
 Application checkpoint `d3b599ec7eee` adds safe, explicit File version compaction

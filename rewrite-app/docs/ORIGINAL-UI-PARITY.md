@@ -1,5 +1,39 @@
 # Optional Original UI
 
+### Actual buffer and command-completion reference (2026-10-14)
+
+Reference checkpoint `d9e3f587` replaces a held `closeAllBuffers` approximation
+for the new completion cases with the pinned Original's actual three buffer
+pipelines and aggregation, saved-event barrier, forced-deactivation method,
+controller subscription and root command callback. The backend and router remain
+controlled external boundaries; this does not qualify the whole Original app.
+Five complete source hashes match `ee2ab9ab64bd91209ef8534bbe6005838024e46d`.
+
+Nine cases prove all-buffer saving before lock, lock completion before navigation,
+and command-log creation only after navigation resolves, including `false`.
+The log timestamp is captured at that last phase. Empty and non-saving buffers,
+paused termination, the immediate already-TERMINATED no-op, its overtaking an
+earlier held termination, and exact data-part aggregation are also executable.
+Non-saving log assertions cover the frontend backend-method call, not downstream
+server persistence. Adaptive/timer behavior retains its existing separate gates.
+
+The actual Rewrite native transport and application services reproduce a remaining
+phase/timestamp difference on real Memory, File and SQLite adapters: the command
+log is committed while the client application continuation remains held, retaining
+its invocation timestamp after that continuation completes. The differential
+audit's `--assert-parity` exits 1 for all three stores. Its controlled transport
+and view continuation are not HTTP or complete Angular browser acceptance.
+No runtime correction or completion of that parity requirement is claimed.
+
+All 2,391 unit/frontend tests pass fresh without skips or cancellations. All 306
+application/package source files remain unchanged against the preceding qualified
+checkpoint; earlier image/browser/HTTP/PostgreSQL results retain their original
+commit boundaries and were not rerun here. Protected artifacts are preserved.
+Native and remote completion phases, durable retry/reload identity, legacy-client
+behavior, mixed-command overlap and real browser acceptance remain the next
+implementation/qualification work. Full parity and production readiness remain
+unproven; no push occurred.
+
 ### Coordinated File maintenance and process termination (2026-10-14)
 
 Application checkpoint `d3b599ec7eee` adds safe, explicit File version compaction
