@@ -733,6 +733,8 @@ const assertSecurityHeaders = (response: Response): void => {
   );
 };
 
+const isolatedFileDirectories = new WeakMap<Awaited<ReturnType<typeof createProductionApiServer>>, string>();
+
 const closeServer = async (
   targetServer: Awaited<ReturnType<typeof createProductionApiServer>>
 ): Promise<void> => {
@@ -745,6 +747,11 @@ const closeServer = async (
       resolve();
     });
   });
+  const directory = isolatedFileDirectories.get(targetServer);
+  if (directory) {
+    rmSync(directory, { recursive: true, force: true });
+    isolatedFileDirectories.delete(targetServer);
+  }
 };
 
 const createIsolatedServer = async (
@@ -754,6 +761,12 @@ const createIsolatedServer = async (
   baseUrl: string;
 }> => {
   environment = { FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", ...environment };
+  let ownedFileDirectory: string | undefined;
+  if ((environment.FIRST_SLICE_STORE ?? process.env.FIRST_SLICE_STORE) === "file" &&
+    !Object.hasOwn(environment, "FIRST_SLICE_FILE")) {
+    ownedFileDirectory = mkdtempSync(join(tmpdir(), "testcenter-api-isolated-file-"));
+    environment = { ...environment, FIRST_SLICE_FILE: join(ownedFileDirectory, "owned.json") };
+  }
   const previousEnvironment = new Map(
     Object.keys(environment).map(key => [key, process.env[key]])
   );
@@ -767,10 +780,14 @@ const createIsolatedServer = async (
       isolatedServer.listen(0, "127.0.0.1", () => resolve());
     });
     const address = isolatedServer.address() as AddressInfo;
+    if (ownedFileDirectory) isolatedFileDirectories.set(isolatedServer, ownedFileDirectory);
     return {
       server: isolatedServer,
       baseUrl: `http://127.0.0.1:${address.port}`
     };
+  } catch (error) {
+    if (ownedFileDirectory) rmSync(ownedFileDirectory, { recursive: true, force: true });
+    throw error;
   } finally {
     for (const [key, value] of previousEnvironment) {
       if (value == null) {
