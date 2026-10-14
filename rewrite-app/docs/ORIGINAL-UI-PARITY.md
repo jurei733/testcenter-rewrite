@@ -1,5 +1,87 @@
 # Optional Original UI
 
+### Coordinated File maintenance and process termination (2026-10-14)
+
+Application checkpoint `d3b599ec7eee` adds safe, explicit File version compaction
+and closes two observed process-lifetime gaps. The runtime implementation is
+`59fc9bb7b96e`; the subsequent validation changes give File-only isolated integration
+fixtures their own storage paths and wait for the exact trusted Player answer
+after its asynchronous handshake. They change no runtime behavior. The File adapter remains a same-host/PID-namespace, single-writer
+local-development option; PostgreSQL remains the multi-process deployment path.
+
+The new nested sidecar manifest version is 3. Existing inline, version-one and
+version-two data remain readable and migrate on a successful write or explicit
+migration. Older binaries cannot read version 3, so upgrade stops old accesses
+and takes an offline manifest/objects backup. Unique process/namespace access
+markers coordinate current readers, writers and maintenance. The API holds its
+writer registration through shutdown, while direct repository operations enroll
+during access. Maintenance and competing writers are refused while incompatible
+processes are alive. Unknown markers, foreign namespaces and symlinked metadata
+are retained/refused. Only uniquely named markers belonging to a verified dead
+process in the same namespace are removed; no expiry heuristic declares a live
+writer dead. These cooperative local guards are not distributed locks.
+
+`db:compact:file:built` previews candidate count/bytes by default; explicit
+`--apply` removes only unselected known versions and dead owned pending files.
+Selected objects are validated and the main manifest is rechecked before
+deletion. Store and namespace identifiers plus the owning PID distinguish
+pending files from live work and another store in the same directory. Unknown
+or malformed files and collection-directory symlinks are preserved. Active
+readers defer aggregate sidecar pruning until a later successful mutation.
+Process metadata and unpublished pending files are excluded from offline
+backups/moves; uncertain namespace metadata needs operator investigation.
+
+Three owned SIGKILL probes pause the actual writer before sidecar publication,
+before manifest replacement and just after it. Maintenance refuses the still
+live writer. After its confirmed death, reopen observes respectively the old,
+old and new committed value; compaction reclaims crash debris/old versions
+without changing selected data or manifest bytes. Fifty concurrent writer/
+maintenance enrollment trials never grant both actors. These checks leave the
+kernel/disk running and do not prove actual power-loss durability.
+
+A real API counterexample showed its public close callback completing before
+the asynchronous File writer registration was released. The callback now
+awaits one shared runtime shutdown. Another injected bootstrap I/O failure
+left writer ownership active in the same process; failed bootstrap now closes
+storage before rethrowing, allowing a clean retry. Both before-fix probes fail
+and their current counterparts pass. File storage itself releases registration
+after rejected initialization and rejects access after its idempotent shutdown.
+
+All 2,382 unit/frontend tests, 1,536 PostgreSQL tests and the 498 HTTP checks
+across Memory, File and SQLite pass without skips or cancellations. Unit,
+PostgreSQL and Memory HTTP validation belongs to runtime `59fc9bb7b96e`;
+File/SQLite HTTP uses the final File-only fixture correction. The first File
+matrix passed 160 and failed six: its nominally isolated servers inherited the
+active main File path and were correctly refused as second writers. Owned
+private File paths fix the fixture defect without switching adapters or weakening
+writer protection; all six targeted cases and the complete matrix pass.
+The first headless context run asserted an empty iframe input before restoration
+finished; its failure screenshot already shows the exact trusted answer. The
+probe now polls that same expected value within its existing bound, then retains
+the selected-run, sibling-answer and timestamp assertions. Failure evidence is
+retained; both current headed/headless context groups pass.
+Migration, doctor, metadata-required preflight, startup and shutdown also pass.
+
+A clean archive of all 919 tracked application files builds image
+`2aeff9ae818e`. Standard, Demo and production PostgreSQL profiles, SQLite runtime
+and 652 tests inside the read-only image as node pass. All 169 image/frozen/host
+frontend files match byte for byte, and all 206 frontend source files are
+unchanged. The bounded build options remain absent from the final runtime.
+One fresh headed File/Angular flow passes through participant-verona-loading.
+The current backend additionally passes 159 Rewrite browser groups and nine
+pinned Original Worker groups, 168 total, covering context, timer interruption,
+loading/commands, Debug, native routes, copied tabs and runtime errors. The
+Original harness controls router/iframe wiring; this does not establish full
+Original application or visual acceptance.
+
+All 24 preexisting containers with their image IDs/states/mounts, 86 volumes,
+393 prior image aliases and the three protected artifacts remain intact. Owned
+test resources are removed. This checkpoint is local: no push, remote CI,
+release, deployment or production acceptance is claimed. Actual power-loss,
+broader operating/performance qualification, complete Original concurrency/
+timer/Player and package/property/visual/camera acceptance remain open. The
+earlier intermittent SQLite CANTOPEN still has no proven original cause.
+
 ### File mutation publication and real writer readiness (2026-10-14)
 
 Application checkpoint `c4a82157fc98` fixes the three reproduced File-store
