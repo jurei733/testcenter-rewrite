@@ -85,10 +85,12 @@ try {
   releases.push(releaseLoading);
   try {
     loadingPage.on("pageerror", error => errors.push(String(error)));
-    const loadingRequests = []; let initialRun;
-    loadingPage.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) {
-      loadingRequests.push(request.postDataJSON()); loadingObservations.push({ request: request.postDataJSON() });
-    } });
+    const loadingRequests = [], loadingCompletions = []; let initialRun;
+    loadingPage.on("request", request => {
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith("/native-commands")) { loadingRequests.push(request.postDataJSON()); loadingObservations.push({ request: request.postDataJSON() }); }
+      if (path.endsWith("/command-completions")) loadingCompletions.push(request.postDataJSON());
+    });
     await loadingPage.route("**/current-state?*", async route => {
       const response = await route.fetch(); initialRun ??= (await response.json()).currentRunState.testRun;
       await loadingGate; await route.fulfill({ response });
@@ -114,13 +116,20 @@ try {
     await poll(async () => (await executionLogs()).some(log => log.logKey === "CONTROLLER" && log.logContent === "RUNNING"), "Early Resume omitted the LOADING to RUNNING log");
     await poll(async () => /STATUS:\s*RUNNING/.test(await loadingPane.innerText()), "Resume receipt did not advance the loading controller");
     assert.equal(await loadingPage.locator("iframe").count(), 0);
+    const releasedLoadingAt = Date.now();
     releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" });
     await loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
     const run = await loadingRepository.getTestRunById(initialRun.testRunId);
     assert.deepEqual(run.unitResponses, initialRun.unitResponses);
     assert.deepEqual(run.unitResponseFieldTimestamps, initialRun.unitResponseFieldTimestamps);
     assert.equal((await executionLogs()).filter(log => log.logKey === "CONTROLLER").length, 1);
-    assert.equal((await executionLogs()).filter(log => log.logKey === "command executed" && log.logContent === "resume").length, 1);
+    const completionLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
+      .filter(log => log.testRunId === initialRun.testRunId && log.logKey === "command executed" && log.logContent === "resume");
+    await poll(async () => loadingCompletions.length === 1 && (await completionLogs()).length === 1, "Early Resume completion was not persisted after its client continuation");
+    assert.deepEqual(loadingCompletions[0].command, { kind: "native", request: loadingRequests[0] });
+    assert.equal(loadingCompletions[0].testRunId, initialRun.testRunId);
+    assert.ok(loadingCompletions[0].timeStamp >= releasedLoadingAt);
+    assert.equal((await completionLogs())[0].timestamp, loadingCompletions[0].timeStamp);
     await poll(async () => (await controllerLogs()).length >= 2, "Ready transition was not persisted");
     assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING", "RUNNING"], "Early Resume produced a duplicate lifecycle ready state");
     loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), answersAndClocksPreserved: true });
@@ -181,6 +190,10 @@ try {
     assert.deepEqual(applications.map(value=>value.application.command.executionSequence),[1,2]);
     assert.equal(acks.length,2);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
     assert.ok(acks.some(ack=>ack.path.includes(pause.commandId)));assert.ok(acks.some(ack=>ack.path.includes(resume.commandId)));
+    await poll(async()=>{
+      const saved=(await loadingRepository.listParticipantTestLogsByWorkspace(after.tenantId,after.workspaceId)).filter(log=>log.testRunId===runId);
+      return ['pause','resume'].every(keyword=>saved.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length===1);
+    },'The two fulfilled remote command completions were not persisted exactly once');
     const logs=(await loadingRepository.listParticipantTestLogsByWorkspace(after.tenantId,after.workspaceId)).filter(log=>log.testRunId===runId);
     for(const keyword of ['pause','resume'])assert.equal(logs.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length,1);
 
@@ -338,14 +351,14 @@ try {
         await poll(async()=>new RegExp(`STATUS:\\s*${terminalStatus}(?:\\s|$)`).test(await remotePane.innerText()),'Forced termination did not enter its terminal phase before the held answer buffer');
         assert.equal(packets.length,0,'Termination bypassed its held answer buffer');await assertOnlyPreparedTimer();
         if(scenario.noop){
-          const parent=await loadingRepository.getParticipantSessionById(baseline.participantSessionId),logsBefore=(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length;
+          const parent=await loadingRepository.getParticipantSessionById(baseline.participantSessionId),logsBefore=(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.testRunId===runId&&log.logKey==='command executed').length;
           if(scenario.noop==='native')await remotePage.evaluate(()=>window.tc.terminate(['lock']));else releaseAck();
           await poll(()=>Promise.resolve(packets.filter(value=>value.request.terminationNoop).length===(scenario.noop==='native'?2:1)),'An already-TERMINATED command waited for the first answer buffer or changed its guard decision');
           const ignored=packets.filter(value=>value.request.terminationNoop);observation.ignored=ignored;
           if(scenario.noop==='native'){assert.deepEqual(ignored[0].request,ignored[1].request);assert.equal(ignored[1].application.applied,false);await remotePage.waitForFunction(id=>!localStorage.getItem('testcenter-rewrite:participant-native-command:v1:'+id),ignored[0].request.deliveryId);}
           else assert.equal(ignored[0].application.command.terminationNoop,true);
           assert.equal(ignored[0].request.controllerStatus,'TERMINATED');await assertOnlyPreparedTimer();assert.deepEqual(await loadingRepository.getParticipantSessionById(baseline.participantSessionId),parent);
-          assert.equal((await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.logKey==='command executed').length,logsBefore+1);
+          await poll(async()=>(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.testRunId===runId&&log.logKey==='command executed').length===logsBefore+1,'The fulfilled no-op completion was not persisted exactly once for its Run');
           assert.match(await remotePane.innerText(),/STATUS:\s*TERMINATED(?:\s|$)/);assert.equal(packets.filter(value=>value.request.keyword==='terminate'&&!value.request.terminationNoop).length,0);
         }
         if(scenario.later){await remotePage.evaluate(keyword=>window.tc[keyword](),scenario.later);await poll(async()=>new RegExp(`STATUS:\\s*${scenario.later==='pause'?'PAUSED':'RUNNING'}(?:\\s|$)`).test(await remotePane.innerText()),'A command arriving during terminal buffers did not enter its later phase');}

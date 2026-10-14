@@ -1,3 +1,4 @@
+import { observeParticipantCommandCompletions, assertNativeCommandCompletion } from "./participant-command-completion-smoke-observer.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, writeFile } from "node:fs/promises";
@@ -101,6 +102,7 @@ try {
   assert.deepEqual(answers(await read(first.testRunId)), saved);
   mark("document-reload-retains-owner-and-exact-prepared-intent");
 
+  const completionPackets = observeParticipantCommandCompletions(page);
   let lost = false;
   const lostResponse = async route => {
     const response = await route.fetch(); assert.equal(response.status(), 200);
@@ -114,8 +116,7 @@ try {
   const replay = page.waitForResponse(response => new URL(response.url()).pathname.endsWith("/native-commands") && response.request().postDataJSON().deliveryId === committed.id);
   await page.reload({ waitUntil: "networkidle" }); const replayed = (await (await replay).json()).application;
   assert.equal(replayed.applied, false); assert.equal(replayed.deliveryId, committed.id); await emptyJournal();
-  const logs = await repository.listParticipantTestLogsByWorkspace(first.tenantId, first.workspaceId);
-  assert.equal(logs.filter(log => log.participantTestLogId.startsWith(`delivery:${first.testRunId}:console:${committed.id}:`) && log.logKey === "command executed").length, 1);
+  await assertNativeCommandCompletion({ repository, run: first, request: committed.request, packets: completionPackets, poll });
   assert.deepEqual(answers(await read(first.testRunId)), saved);
   mark("reload-after-committed-lost-receipt-is-idempotent");
 

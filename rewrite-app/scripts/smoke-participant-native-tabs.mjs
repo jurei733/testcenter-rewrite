@@ -1,3 +1,4 @@
+import { observeParticipantCommandCompletions, assertNativeCommandCompletion } from "./participant-command-completion-smoke-observer.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, writeFile } from "node:fs/promises";
@@ -145,13 +146,14 @@ try {
   mark("destroying-and-reentering-the-clone-retains-the-source-journal");
 
   await context.unroute("**/native-commands", unavailable);
+  const completionPackets = observeParticipantCommandCompletions(page);
   const sourceBeforeReload = nativeRequests.length; await page.reload({ waitUntil: "networkidle" }); await methods();
   await poll(async () => (await read(first.testRunId)).status === "paused", "Source reload did not deliver its retained pause"); await emptyJournal();
   assert.equal(await ownerOf(page), sourceOwner);
   const sourceReplay = nativeRequests.slice(sourceBeforeReload).filter(item => item.label === "source");
   assert.ok(sourceReplay.length > 0); for (const item of sourceReplay) assert.deepEqual(item.request, queued.request);
   assert.deepEqual(answers(await read(first.testRunId)), saved);
-  assert.equal((await repository.listParticipantTestLogsByWorkspace(first.tenantId, first.workspaceId)).filter(log => log.participantTestLogId.startsWith(`delivery:${first.testRunId}:console:${queued.id}:`) && log.logKey === "command executed").length, 1);
+  await assertNativeCommandCompletion({ repository, run: first, request: queued.request, packets: completionPackets, poll });
   mark("the-originating-tab-still-reloads-and-delivers-its-exact-intent-once");
 
   await context.route("**/native-commands", unavailable); await native("resume");

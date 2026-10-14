@@ -41,12 +41,13 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       background: { service_worker: "background.js" } }));
     await writeFile(join(extension, "background.js"), "chrome.runtime.onInstalled.addListener(() => {});\nchrome.sessions.onChanged.addListener(() => {});\n");
     let initial, recovered, activePage, crashed = false, releaseReceipt, journalEnumerationChanged = false,domStorageProbe;
-    const requests = [], replies = [];
+    const requests = [], replies = [], completionRequests = [];
     const receiptGate = new Promise(done => { releaseReceipt = done; });
     const observe = (page, phase) => {
       track(page, `crash-${kind}-${phase}`);
       page.on("request", request => {
         if (new URL(request.url()).pathname.endsWith("/native-commands")) requests.push({ phase, request: request.postDataJSON() });
+        if (new URL(request.url()).pathname.endsWith("/command-completions")) completionRequests.push({ phase, request: request.postDataJSON() });
       });
     };
     try {
@@ -178,9 +179,15 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       assert.equal(resumed.status, before.status); assert.equal(resumed.currentUnitKey, before.currentUnitKey);
       assert.equal(resumed.locked, before.locked); assert.deepEqual(answers(resumed), saved);
       assert.equal(new URL(reopened.url()).searchParams.get("testRunId"), run.testRunId);
-      const oldLogs = (await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId))
-        .filter(log => entries.some(entry => log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${entry.id}:`)) && log.logKey === "command executed");
-      assert.equal(oldLogs.length, kind === "committed" ? 1 : 0);
+      const oldContents = entries.map(entry => [entry.request.keyword, ...entry.request.arguments].join(' '));
+      const persisted = await repository.listParticipantTestLogsByWorkspace(run.tenantId, run.workspaceId);
+      const oldLogs = persisted.filter(log => log.testRunId === run.testRunId && log.logKey === "command executed" && oldContents.includes(log.logContent));
+      const legacyCommitted = kind === "committed" && entries[0].request.commandCompletion !== 'browser-v1';
+      assert.equal(oldLogs.length, legacyCommitted ? 1 : 0);
+      assert.deepEqual(completionRequests.filter(item => item.request.command?.kind === 'native' && entries.some(entry => item.request.command.request.deliveryId === entry.id)), [],
+        'An unfulfilled pre-crash handler fabricated a completion');
+      if (kind === 'committed') assert.equal(persisted.filter(log => entries.some(entry => log.participantTestLogId.startsWith(`delivery:${run.testRunId}:console:${entry.id}:`)) &&
+        log.logKey === 'CONTROLLER' && log.logContent === 'PAUSED').length, 1, 'The accepted pre-crash state effect was not retained');
       mark(`browser-process-crash-${kind}-reads-server-without-replaying-old-intents`);
 
       for (const keyword of kind === "queued" ? ["pause", "resume"] : ["resume"]) {
