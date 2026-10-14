@@ -22,7 +22,7 @@ const definitions = {
   },
   controller: {
     path: 'frontend/src/app/test-controller/components/test-controller/test-controller.component.ts',
-    className: 'TestControllerComponent', members: ['handleCommand']
+    className: 'TestControllerComponent', members: ['handleCommand', 'toggleDebugPane']
   },
   command: {
     path: 'frontend/src/app/test-controller/services/command.service.ts',

@@ -8,7 +8,7 @@ import { TestScheduler } from 'rxjs/testing';
 export const completionReference = JSON.parse(readFileSync(new URL('./fixtures/original-controller-completion.json', import.meta.url), 'utf8'));
 assert.equal(completionReference.originalCommit, 'ee2ab9ab64bd91209ef8534bbe6005838024e46d');
 const compiled = ts.transpileModule(`export const load = (Subject, bufferWhen, concatMap, map, scan, takeWhile, withLatestFrom,
-  from, forkJoin, lastValueFrom, merge, of, timer, distinctUntilChanged, Date) => {
+  from, forkJoin, lastValueFrom, merge, of, timer, distinctUntilChanged, Date, localStorage) => {
   ${Object.values(completionReference.sources).map(value => value.extracted).join('\n')}
   return {TestControllerService, TestControllerComponent,
     subscribe: function() { return ${completionReference.commandSubscription}; },
@@ -21,10 +21,12 @@ export const referenceMicrotasks = async () => { for (let index = 0; index < 20;
 export const createOriginalCompletionReference = ({ initial = 'RUNNING', saveResponses = true, navigationResult = true } = {}) => {
   let clock = 10_000, resolveNavigation;
   const scheduler = new TestScheduler(assert.deepEqual);
+  const debugPreferences = new Map();
+  const storage = { setItem: (key, value) => debugPreferences.set(key, value), removeItem: key => debugPreferences.delete(key) };
   // Original createClosingSignal has its own timer subscriptions. A virtual
   // scheduler prevents reference timers outliving this owned test process.
   const original = load(Subject, bufferWhen, concatMap, map, scan, takeWhile, withLatestFrom, from,
-    forkJoin, lastValueFrom, merge, of, milliseconds => timer(milliseconds, scheduler), distinctUntilChanged, { now: () => clock });
+    forkJoin, lastValueFrom, merge, of, milliseconds => timer(milliseconds, scheduler), distinctUntilChanged, { now: () => clock }, storage);
   const events = [], writes = { unitData: [], unitState: [], testState: [] }, logs = [], locks = [], navigations = [];
   const navigation = new Promise(resolve => { resolveNavigation = resolve; });
   const backend = {
@@ -65,13 +67,14 @@ export const createOriginalCompletionReference = ({ initial = 'RUNNING', saveRes
   });
   const receive = original.subscribe.call(controller);
   return {
-    service, controller, events, writes, logs, locks, navigations, flushEvents, buffersClosed,
+    service, controller, events, writes, logs, locks, navigations, flushEvents, buffersClosed, debugPreferences,
     setClock(value) { clock = value; },
     seedAnswer() {
       service.unitDataPartsBuffer$.next({ testId: '42', unitAlias: 'alias', dataParts: { main: 'Exact Ä/β\n"; answer' }, unitStateDataType: 'iqb-standard@1.0' });
       service.unitStateBuffer$.next({ testId: '42', unitAlias: 'alias', state: [{ key: 'RESPONSE_PROGRESS', content: 'complete', timeStamp: clock }] });
     },
     receive(args = []) { receive({ keyword: 'terminate', arguments: args }); },
+    receiveDebug(args = []) { receive({ keyword: 'debug', arguments: args }); },
     release(type) { for (const item of writes[type]) { item.completion.next(undefined); item.completion.complete(); } },
     releaseLock() { for (const item of locks) { item.completion.next(true); item.completion.complete(); } },
     releaseNavigation() { resolveNavigation(navigationResult); },

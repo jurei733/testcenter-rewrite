@@ -156,6 +156,28 @@ try {
   const logs = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
   assert.equal(logs.length, prior.length + 1); assert.equal(logs.filter(log => log.logContent === "debug off Paused exact Ω").length, 1);
   assert.deepEqual(await durable(), paused); mark("paused-console-log-preserves-run-parent-and-timer");
+  const clockProbe = await page.evaluate(async () => {
+    const originalNow = Date.now, invokedAt = originalNow(), label = "Owned fulfilled clock Ω";
+    try {
+      Date.now = () => invokedAt;
+      window.tc.debug(["off", label]);
+      const immediate = Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-debug-log:v1:"))
+        .map(key => JSON.parse(localStorage.getItem(key))).filter(entry => entry.args?.[1] === label);
+      const preference = localStorage.getItem("tc-debug");
+      Date.now = () => invokedAt + 25;
+      await Promise.resolve();
+      const completed = Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-debug-log:v1:"))
+        .map(key => JSON.parse(localStorage.getItem(key))).filter(entry => entry.args?.[1] === label);
+      return { invokedAt, immediate, preference, completed };
+    } finally { Date.now = originalNow; }
+  });
+  assert.deepEqual(clockProbe.immediate, []); assert.equal(clockProbe.preference, null);
+  assert.equal(clockProbe.completed.length, 1); assert.equal(clockProbe.completed[0].timestamp, clockProbe.invokedAt + 25);
+  assert.equal(clockProbe.completed[0].scope.testRunId, run.testRunId);
+  await poll(async () => (await api(logPath, undefined, operator)).items.some(item => item.testLog.logContent === "debug off Owned fulfilled clock Ω"), "The completed native Debug log was not saved");
+  const clockLogs = (await api(logPath, undefined, operator)).items.map(item => item.testLog).filter(log => log.logContent === "debug off Owned fulfilled clock Ω");
+  assert.equal(clockLogs.length, 1); assert.equal(clockLogs[0].timestamp, clockProbe.invokedAt + 25);
+  assert.deepEqual(await durable(), paused); mark("native-debug-timestamp-follows-fulfilled-handler-microtask");
   await issue("resume"); await poll(async () => (await durable()).run.status === "running", "Monitor resume missing");
   const native = async (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
   await page.frameLocator("iframe").locator("#demoPlayerAnswer").fill("4");

@@ -20,16 +20,40 @@ function fixture({values=new Map(),respond=async()=>({ok:true,json:async()=>({sa
   now:()=>1791676800123,id:()=>`${idPrefix}-${++identity}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
   fetch:async(url,request)=>{calls.push({url,request});return respond(url,request,calls.length);}};
  const logger=create(options);
- const advance=async(next=time)=>{time=next;for(const timer of timers.slice())if(!timer.canceled&&timer.at<=time){timer.canceled=true;timer.callback();}await flush();};
+ const advance=async(next=time)=>{time=next;await flush();for(const timer of timers.slice())if(!timer.canceled&&timer.at<=time){timer.canceled=true;timer.callback();}await flush();};
  return {logger,options,create,values,storage,calls,listeners,advance,select:value=>{selected=value;logger.observeScope();},status:(value,recorded=false)=>{status=value;alreadyRecorded=recorded;logger.observeScope();},ready:()=>{ready=true;logger.observeScope();},credential:value=>credential=value};
 }
 test('native debug logs bind captured arguments, timestamp and credential to the log-only endpoint',async()=>{
- const f=fixture(),args=['OFF','Exact Ä/β\n";'];try{f.logger.log(args);args[0]='untrusted';assert.equal(f.values.size,1);await f.advance();
+ const f=fixture(),args=['OFF','Exact Ä/β\n";'];try{f.logger.log(args);args[0]='untrusted';await flush();assert.equal(f.values.size,1);await f.advance();
   assert.equal(f.calls.length,1);assert.equal(f.calls[0].url,'/api/v1/participant/test-runs/owned-run/test-logs');
   assert.equal(f.calls[0].request.headers.authorization,'Bearer owned-credential');assert.equal(f.calls[0].request.cache,'no-store');
   assert.deepEqual(JSON.parse(f.calls[0].request.body),{logs:[{unitKey:null,originalUnitId:null,entries:[{key:'command executed',timeStamp:1791676800123,content:'debug OFF Exact Ä/β\n";',clientEntryId:'owned-entry-1'}]}]});
   assert.equal(f.values.size,0);
  }finally{f.logger.stop();}
+});
+
+test('native Debug completion captures its timestamp only in the fulfilled-handler microtask', async () => {
+ const f=fixture(),args=['off','Exact Ω'];let clock=10_000;f.options.now=()=>clock;
+ try{
+  f.logger.log(args);assert.equal(f.values.size,0);assert.equal(f.calls.length,0);
+  args[1]='mutated';clock=20_000;await f.advance();
+  const logged=JSON.parse(f.calls[0].request.body).logs[0].entries[0];
+  assert.equal(logged.timeStamp,20_000);assert.equal(logged.content,'debug off Exact Ω');
+ }finally{f.logger.stop();}
+});
+
+test('a same-turn selection change cannot relabel the original Debug completion', async () => {
+ const f=fixture();let clock=10_000;f.options.now=()=>clock;
+ try{
+  f.logger.log(['off']);f.select({...state(),testRun:{...state().testRun,testRunId:'new-selected-run'}});
+  clock=20_000;await f.advance();assert.equal(f.calls.length,0);
+  const entry=JSON.parse([...f.values.values()][0]);assert.equal(entry.scope.testRunId,'owned-run');assert.equal(entry.timestamp,20_000);
+  f.select(state());await f.advance();assert.equal(f.calls.length,1);assert.equal(f.calls[0].url,'/api/v1/participant/test-runs/owned-run/test-logs');
+ }finally{f.logger.stop();}
+});
+
+test('stopping a Debug logger before its handler microtask settles cannot create a later entry', async () => {
+ const f=fixture();f.logger.log([]);f.logger.stop();await flush();assert.equal(f.values.size,0);assert.equal(f.calls.length,0);
 });
 for(const failure of ['network','500','malformed'])test(`${failure} retries one exact entry after one second; change detection cannot shorten the wait`,async()=>{
  const f=fixture({respond:async(_url,_request,attempt)=>{if(attempt>1)return {ok:true,json:async()=>({savedCount:1})};if(failure==='network')throw Error('Offline');if(failure==='500')return {ok:false,status:503};return {ok:true,json:async()=>({savedCount:-1})};}});

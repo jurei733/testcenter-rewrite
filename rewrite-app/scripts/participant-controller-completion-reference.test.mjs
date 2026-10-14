@@ -2,6 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOriginalCompletionReference, referenceMicrotasks } from './original-controller-completion-reference.mjs';
 
+for (const args of [[], ['off', 'Exact Ω']]) test(`actual Original native Debug logs in its fulfilled-handler microtask: ${JSON.stringify(args)}`, async () => {
+  const f = createOriginalCompletionReference();
+  try {
+    f.setClock(10_000); f.receiveDebug(args);
+    const enabled = args.length === 0;
+    assert.equal(f.controller.debugPane, enabled);
+    assert.equal(f.debugPreferences.get('tc-debug'), enabled ? '["main"]' : undefined);
+    assert.deepEqual(f.logs, [], 'The Source logs before its handler promise fulfills');
+    f.setClock(20_000); await referenceMicrotasks();
+    assert.deepEqual(f.logs, [{ key: 'command executed', timeStamp: 20_000, content: ['debug', ...args].join(' ') }]);
+  } finally { f.stop(); }
+});
+
 for (const order of [['unitData', 'unitState', 'testState'], ['testState', 'unitData', 'unitState'], ['unitState', 'testState', 'unitData']]) {
   test(`actual Original termination waits for all three saved buffers: ${order.join(', ')}`, { timeout: 5_000 }, async () => {
     const f = createOriginalCompletionReference();

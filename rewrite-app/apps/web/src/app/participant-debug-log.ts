@@ -121,13 +121,21 @@ export const createParticipantDebugLog = (options: {
       if (stopped) return;
       const state = options.readState(); if (!state?.executionMode.saveResponses) return;
       const run = state.testRun;
-      const entry: Entry = { scope: { tenantId: run.tenantId, workspaceId: run.workspaceId,
+      const scope = { tenantId: run.tenantId, workspaceId: run.workspaceId,
         participantSessionId: run.participantSessionId, testRunId: run.testRunId,
-        contentReleaseId: run.contentReleaseId, bookletKey: run.bookletKey }, args: [...args],
-        id: options.id?.() ?? globalThis.crypto?.randomUUID?.() ?? `debug-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-        timestamp: options.now?.() ?? Date.now() };
-      if (!valid(entry)) return;
-      persist(entry); observeScope();
+        contentReleaseId: run.contentReleaseId, bookletKey: run.bookletKey };
+      const capturedArguments = [...args];
+      // The Source toggles the pane synchronously, then its fulfilled handler
+      // captures the log timestamp in .then(). Keep the invocation scope even
+      // if another selection is made before that continuation runs.
+      void Promise.resolve().then(() => {
+        if (stopped) return;
+        const entry: Entry = { scope, args: capturedArguments,
+          id: options.id?.() ?? globalThis.crypto?.randomUUID?.() ?? `debug-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+          timestamp: options.now?.() ?? Date.now() };
+        if (!valid(entry)) return;
+        persist(entry); observeScope();
+      });
     },
     stop(): void { stopped = true; flight?.controller.abort(); flight = null; cancelTimer?.(); cancelTimer = null; window?.removeEventListener("online", online); }
   };
