@@ -137,6 +137,8 @@ try {
   assert.ok(stateRequests.slice(beforeState).every(request => request.run === runs.first.testRunId && request.session === identity.participantSession.participantSessionId));
   mark("explicit-selected-run-reload-uses-authenticated-old-state-without-latest-fallback");
   await native("resume"); await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+  await poll(async () => await page.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue() === "Owned first Ω",
+    "Trusted selected-run answer did not restore after the Player handshake");
   assert.equal(await page.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue(), "Owned first Ω");
   assert.equal(nativeRequests.at(-1).testRunId, runs.first.testRunId);
   const assertAnswers = async () => {
