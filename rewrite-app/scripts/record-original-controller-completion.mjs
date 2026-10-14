@@ -14,7 +14,7 @@ const definitions = {
     members: ['bufferClosed$', 'unitDataPartsBuffer$', 'unitStateBuffer$', 'testStateBuffer$',
       'bufferFlushEventsOnClose$', 'subscriptions', 'setupUnitDataPartsBuffer', 'setupUnitStateBuffer',
       'setupTestStateBuffer', 'createClosingSignal', 'closeAllBuffers', 'destroySubscription',
-      'addToTestStateBuffer', 'terminateTest', 'canDeactivateUnit']
+      'addToTestStateBuffer', 'terminateTest', 'canDeactivateUnit', 'pause', 'resume', 'setUnitNavigationRequest']
   },
   state: {
     path: 'frontend/src/app/test-controller/util/test-state.util.ts',
@@ -63,10 +63,12 @@ const interfaceAst = ts.createSourceFile(interfacePath, interfaceSource, ts.Scri
 const bufferTypes = interfaceAst.statements.filter(ts.isVariableStatement).flatMap(node => [...node.declarationList.declarations])
   .find(node => node.name.getText(interfaceAst) === 'bufferTypes');
 assert.ok(bufferTypes);
+const navigationTarget = interfaceAst.statements.find(node => ts.isEnumDeclaration(node) && node.name.text === 'UnitNavigationTarget');
+assert.ok(navigationTarget);
 sources.interfaces = { path: interfacePath, fileSha256: createHash('sha256').update(interfaceSource).digest('hex'),
-  extracted: `const ${bufferTypes.getText(interfaceAst)};` };
+  extracted: `const ${bufferTypes.getText(interfaceAst)};\n${navigationTarget.getText(interfaceAst).replace(/^export /, '')}` };
 writeFileSync(new URL('./fixtures/original-controller-completion.json', import.meta.url), JSON.stringify({
-  originalCommit, scope: 'Actual three buffers, aggregation, saved-event barrier, termination, controller subscription and command-completion callback; controlled backend, router and non-adaptive Unit.',
+  originalCommit, scope: 'Actual three buffers, aggregation, saved-event barrier, termination, pause/resume navigation, controller subscription and command-completion callback; controlled backend, router and non-adaptive Unit.',
   sources, commandSubscription, stateSubscription
 }, null, 2) + '\n');
 console.log('Recorded pinned Original buffers and controller command completion.');

@@ -1,5 +1,34 @@
 # Optional Original UI
 
+### Mixed-command terminal continuation: confirmed open gap (2026-10-14)
+
+The actual pinned Original's Pause/Resume and Unit navigation methods are now
+included in the completion fixture. Eight new overlap cases bring the Original
+completion suite to nineteen passing cases. A Terminate awaiting its three saved
+buffers is not cancelled by a later Pause or Resume: its own optional lock and
+Starter navigation still run, its completion log still waits for that navigation,
+and it does not overwrite the later controller state. Both initially RUNNING and
+PAUSED controllers are covered. Only backend/router I/O is controlled; these
+tests do not run the complete Original app or Player.
+
+The fresh `audit-participant-terminal-overlap.mjs` witness runs 48 corresponding
+native/deferred-remote service cases across Memory/File/SQLite. Every case retains
+the later status/answers/current Unit/dispatch, but fails the terminal continuation:
+the controller entry stays active and requested locking is omitted. The entry
+expectation derives from the observed Original Starter route. Original remote
+delivery, Rewrite Angular/HTTP, PostgreSQL and cross-document overlap remain
+outside this witness. The existing loading smoke's active-entry assertion in its
+later-command branch therefore cannot establish full Original parity.
+
+All 53 focused tests, typecheck and the prior three-store single-command completion
+differential pass. The new overlap differential deliberately exits 1 with
+`--assert-parity` and records the failures in the owning task's
+`outputs/testcenter-terminal-overlap-before-5512e1cd.json`. Runtime application
+`9528a6b6855b` is unchanged; no corrected-runtime, new-image or browser acceptance
+is claimed. Implementation must retain the newer state/data fence while completing
+the earlier lock/navigation and its delayed log. Formal parity remains 30 complete
+and 19 partial. No publication or deployment occurred.
+
 ### Native Debug completion microtask (2026-10-14)
 
 Application `9528a6b6855b` matches the pinned Original's immediate Debug preference

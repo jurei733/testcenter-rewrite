@@ -2,6 +2,45 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOriginalCompletionReference, referenceMicrotasks } from './original-controller-completion-reference.mjs';
 
+for (const initial of ['RUNNING', 'PAUSED']) for (const later of ['pause', 'resume']) for (const lock of [false, true]) {
+  test(`actual Original ${initial} held terminate ${lock ? 'with' : 'without'} lock finishes after later ${later}`, { timeout: 5_000 }, async () => {
+    const f = createOriginalCompletionReference({ initial });
+    try {
+      f.seedAnswer(); f.receive(lock ? ['lock'] : []); await f.buffersClosed; await referenceMicrotasks();
+      assert.equal(f.service.state$.getValue(), initial === 'PAUSED' ? 'TERMINATED_PAUSED' : 'TERMINATED');
+      assert.deepEqual(Object.values(f.writes).map(values => values.length), [1, 1, 1]);
+      assert.deepEqual(f.navigations, []); assert.deepEqual(f.logs, []);
+      const pauseClosed = later === 'pause' ? f.nextBufferClose() : Promise.resolve();
+      f.setClock(20_000); f.receiveCommand(later); await pauseClosed; await referenceMicrotasks();
+      const laterState = later === 'pause' ? 'PAUSED' : 'RUNNING';
+      assert.equal(f.service.state$.getValue(), laterState);
+      assert.deepEqual(f.logs.map(entry => [entry.content, entry.timeStamp]), [[later, 20_000]]);
+      assert.equal(f.navigations.length, 1);
+      assert.equal(f.navigations[0][0][0], later === 'pause' ? '/t/42/status' : '/t/42/u/1');
+      assert.deepEqual(f.locks, []);
+      // The first terminate owns its saved-event barrier. A later command may
+      // finish first, but does not cancel the first continuation.
+      f.setClock(30_000);
+      for (const type of Object.keys(f.writes)) f.release(type);
+      await referenceMicrotasks();
+      assert.equal(f.locks.length, Number(lock));
+      assert.equal(f.navigations.length, lock ? 1 : 2);
+      assert.equal(f.service.state$.getValue(), laterState);
+      if (lock) {
+        assert.equal(f.locks[0].args[1], 30_000);
+        f.setClock(40_000); f.releaseLock(); await referenceMicrotasks();
+      }
+      assert.equal(f.navigations.length, 2);
+      assert.deepEqual(f.navigations[1], [['/r/starter'], { state: { force: true } }]);
+      assert.equal(f.service.state$.getValue(), laterState, 'Termination continuation must not reassert its earlier controller state');
+      assert.equal(f.logs.length, 1, 'Terminate completion still waits for its own navigation');
+      f.setClock(50_000); f.releaseNavigation(); await referenceMicrotasks();
+      assert.deepEqual(f.logs.map(entry => [entry.content, entry.timeStamp]), [[later, 20_000], [lock ? 'terminate lock' : 'terminate', 50_000]]);
+      assert.equal(f.service.state$.getValue(), laterState);
+    } finally { f.stop(); await referenceMicrotasks(); }
+  });
+}
+
 for (const args of [[], ['off', 'Exact Ω']]) test(`actual Original native Debug logs in its fulfilled-handler microtask: ${JSON.stringify(args)}`, async () => {
   const f = createOriginalCompletionReference();
   try {

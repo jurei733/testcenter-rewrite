@@ -1,5 +1,47 @@
 # Testcenter parity checklist
 
+### Held termination survives later Pause/Resume: open counterexample (2026-10-14)
+
+The pinned Original completion fixture now also extracts the actual `pause`,
+`resume`, `setUnitNavigationRequest` and `UnitNavigationTarget` declarations. Its
+five complete source-file hashes still match reference
+`ee2ab9ab64bd91209ef8534bbe6005838024e46d`. Eight new cases cover initially RUNNING
+and PAUSED controllers, each later Pause/Resume and termination with/without lock.
+All nineteen Original completion cases pass. In the new cases, the later command
+finishes while the first termination still waits for its own saved-buffer barrier.
+After that barrier, the first handler still locks when requested, navigates to
+`/r/starter` and logs completion after navigation. It preserves the later PAUSED
+or RUNNING controller state. Original `TestDAO::changeTestLockStatus` updates the
+lock flag independently of controller state and answers.
+
+`scripts/audit-participant-terminal-overlap.mjs` reproduces the corresponding
+state-effect request order against the freshly built Rewrite application on
+Memory, File and SQLite, for native and deferred remote termination. All 48 cases
+fail parity: the old effect leaves the controller entry active, and all 24 lock
+cases also omit the requested lock. All cases preserve the later status, answers,
+current Unit and dispatch highwater, and exact effect replay is idempotent. The
+expected inactive entry is derived from the observed Original Starter destination;
+it is not claimed as an Original metadata field. This witness controls Original
+backend/router I/O and invokes Rewrite application services directly; it does not
+prove full Angular navigation, HTTP, PostgreSQL or Original remote delivery.
+
+The negative report is
+`outputs/testcenter-terminal-overlap-before-5512e1cd.json` in the owning task.
+The existing three-store single-command completion differential remains green;
+all 53 focused logger/Original-reference tests and typecheck pass without skips.
+This checkpoint changes qualification scripts and documentation only, retaining
+application `9528a6b6855b`. It does not qualify a runtime correction or a new image.
+The loading smoke's later-command assertion that the entry stays active is now a
+known expectation mismatch, not evidence of full Original behavior.
+
+The implementation must preserve the newer controller/data projection while
+fulfilling the earlier handler's independent terminal lock and navigation, then
+capture completion after that navigation. Disabling the general supersession
+fence would allow stale answer/timer/Unit projections and is not a correction.
+Receipt replay, selected-Run isolation and later entry changes need qualification
+alongside the actual Angular continuation. Formal parity remains 30 complete and
+19 partial; full production acceptance remains open.
+
 ### Native Debug fulfilled-handler timestamp (2026-10-14)
 
 Application `9528a6b6855b` retains the immediate Debug pane/preference change and

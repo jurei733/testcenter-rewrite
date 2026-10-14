@@ -47,8 +47,11 @@ export const createOriginalCompletionReference = ({ initial = 'RUNNING', saveRes
   Object.assign(service, { testId: '42', testState: {}, state$: new BehaviorSubject(initial),
     navigation$: new BehaviorSubject({ targets: { next: 2 } }), units: { 1: { id: 'authored-unit' } },
     unitAliasMap: { alias: 1 }, booklet: { config: {} }, testMode: { saveResponses }, bs: backend,
-    currentUnit: { parent: { locked: false } },
-    router: { navigate: (...args) => { navigations.push(args); events.push({ phase: 'navigate', time: clock }); return navigation; } },
+    currentUnit: { parent: { locked: false } }, currentUnitSequenceId: 1,
+    router: { navigate: (...args) => {
+      navigations.push(args); events.push({ phase: 'navigate', time: clock });
+      return args[0][0] === '/r/starter' ? navigation : Promise.resolve(navigationResult);
+    } },
     interruptTimer: () => events.push({ phase: 'interrupt', time: clock }),
     // This fixture has no tracked/adaptive variables. Actual sortDataParts and
     // every buffer/save/barrier are retained; adaptive coding has separate gates.
@@ -75,6 +78,17 @@ export const createOriginalCompletionReference = ({ initial = 'RUNNING', saveRes
     },
     receive(args = []) { receive({ keyword: 'terminate', arguments: args }); },
     receiveDebug(args = []) { receive({ keyword: 'debug', arguments: args }); },
+    receiveCommand(keyword, args = []) { receive({ keyword, arguments: args }); },
+    nextBufferClose() {
+      return new Promise(resolve => {
+        const closed = new Map();
+        const subscription = service.bufferFlushEventsOnClose$.subscribe(event => {
+          if (event.event !== 'closed') return;
+          const types = closed.get(event.id) ?? new Set(); types.add(event.type); closed.set(event.id, types);
+          if (types.size === 3) { subscription.unsubscribe(); resolve(event.id); }
+        });
+      });
+    },
     release(type) { for (const item of writes[type]) { item.completion.next(undefined); item.completion.complete(); } },
     releaseLock() { for (const item of locks) { item.completion.next(true); item.completion.complete(); } },
     releaseNavigation() { resolveNavigation(navigationResult); },
