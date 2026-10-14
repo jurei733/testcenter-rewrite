@@ -1,5 +1,6 @@
+import { observeParticipantCommandCompletionSession, queueParticipantCommandCompletion } from "./participant-command-completion";
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
-import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult, ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult, ParticipantControllerTimerInterruptionRequest, ParticipantCommandCompletionRequest, ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import type { ParticipantCommandExecution } from "./participant-command-receiver";
 import { Injectable, effect, inject, signal } from "@angular/core";
@@ -599,6 +600,20 @@ export class ParticipantViewFacade {
       await this.saveCurrentDraftBeforeCompleteInternal(settled);
     }
   }
+  private observedCommandCompletionSession = "";
+  observeCommandCompletions(): void {
+    const sessionId = this.consoleRun?.participantSessionId ?? this.runtime.participantSessionId.trim();
+    if (!sessionId || sessionId === this.observedCommandCompletionSession) return;
+    this.observedCommandCompletionSession = sessionId;
+    observeParticipantCommandCompletionSession(sessionId);
+  }
+  private queueCommandCompletion(scope: ParticipantCommandCompletionResult["scope"], command: ParticipantCommandCompletionRequest["command"]): void {
+    queueParticipantCommandCompletion(scope, { testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId,
+      bookletKey: scope.bookletKey, command, timeStamp: Date.now() });
+  }
+  completeNativeConsoleCommand(scope: ParticipantCommandCompletionResult["scope"], request: ParticipantNativeCommandRequest): void {
+    this.queueCommandCompletion(scope, { kind: "native", request });
+  }
   nativeConsoleCommandFailed(error: Error): void {
     this.uiState.errorMessage.set(error.message);
     this.uiState.renderVersion.update(version => version + 1);
@@ -623,12 +638,14 @@ export class ParticipantViewFacade {
       status: terminal ? result.controllerStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" : result.testRun.status.toUpperCase() };
     if (terminal) {
       this.participantEvents.suspend();
-      const { reconcileAcceptedParticipantCommand } = await import("./participant-command-execution");
+      const execution = await import("./participant-command-execution");
       if (!isCurrent()) return;
-      reconcileAcceptedParticipantCommand({ isCurrent,
+      const continuation = { isCurrent,
         reconcile: () => this.reconcileParticipantTerminalState(result.testRun, false, isCurrent),
-        failed: error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
-      });
+        failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+      };
+      if (result.commandCompletion === "browser-v1") await execution.settleAcceptedParticipantCommand(continuation);
+      else execution.reconcileAcceptedParticipantCommand(continuation);
       return;
     }
     this.participantErrorReceptionSuspended = false;
@@ -638,7 +655,8 @@ export class ParticipantViewFacade {
       this.commandReloadSequence.update(sequence => sequence + 1);
     }
     this.startAcceptedParticipantReception();
-    void this.refreshCurrentStateInternal(true, true).catch(error => {
+    if (result.commandCompletion === "browser-v1") await this.refreshCurrentStateInternal(true, true);
+    else void this.refreshCurrentStateInternal(true, true).catch(error => {
       if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
     });
   }
@@ -789,6 +807,7 @@ export class ParticipantViewFacade {
         }
         this.beginControllerCommand(run.testRunId, command.commandType, dispatch, observedStatus);
       },
+      completed: receipt => this.queueCommandCompletion(run, { kind: "remote", commandId: receipt.commandId }),
       apply: async (application, acceptedDispatch) => {
         if (!isCurrent() || signal.aborted) return;
         if (application.command.terminationNoop) return;
@@ -821,10 +840,12 @@ export class ParticipantViewFacade {
               status: observedStatus === "PAUSED" ? "TERMINATED_PAUSED" : "TERMINATED" };
             this.participantEvents.suspend();
           }
-          execution.reconcileAcceptedParticipantCommand({ signal, isCurrent,
+          const continuation = { signal, isCurrent,
             reconcile: () => this.reconcileParticipantTerminalState(application.testRun, !command.effectsDeferred, isCurrent),
-            failed: error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
-          });
+            failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); }
+          };
+          if (application.command.commandCompletion === "browser-v1") await execution.settleAcceptedParticipantCommand(continuation);
+          else execution.reconcileAcceptedParticipantCommand(continuation);
           return;
         }
         // Another accepted view or native receipt can supersede this snapshot
@@ -848,7 +869,8 @@ export class ParticipantViewFacade {
           this.commandReloadSequence.update(sequence => sequence + 1);
         }
         if (changesControllerState) this.startAcceptedParticipantReception();
-        void this.refreshCurrentStateInternal(true, true).catch(error => {
+        if (application.command.commandCompletion === "browser-v1") await this.refreshCurrentStateInternal(true, true);
+        else void this.refreshCurrentStateInternal(true, true).catch(error => {
           if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
         });
       }

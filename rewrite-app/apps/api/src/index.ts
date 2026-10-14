@@ -1,6 +1,6 @@
 import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
-import { participantNativeCommandRoute, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { participantNativeCommandRoute, participantCommandCompletionRoute, type ParticipantCommandCompletionRequest, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantControllerTimerInterruptionRoute, type ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantStarterExitPreparationRoute, type PrepareParticipantStarterExitRequest, type PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { createHash, randomUUID } from "node:crypto";
@@ -2489,6 +2489,7 @@ const currentRunStatePattern = createRoutePattern(
 );
 const participantDebugStatePattern = createRoutePattern(participantDebugStateRoute);
 const participantNativeCommandPattern = createRoutePattern(participantNativeCommandRoute);
+const participantCommandCompletionPattern = createRoutePattern(participantCommandCompletionRoute);
 const participantControllerContextPattern = createRoutePattern(participantControllerContextRoute);
 const participantControllerTimerInterruptionPattern = createRoutePattern(participantControllerTimerInterruptionRoute);
 const participantEventStreamPattern = createRoutePattern(
@@ -2544,6 +2545,7 @@ const participantResourcePathByRequest = new WeakMap<IncomingMessage, string>();
 const ownedParticipantRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantControllerContextPattern],
   ["POST", participantNativeCommandPattern],
+  ["POST", participantCommandCompletionPattern],
   ["GET", participantDebugStatePattern], ["POST", participantDebugStatePattern],
   ["GET", runtimeStatePattern], ["GET", currentRunStatePattern],
   ["GET", participantEventStreamPattern], ["GET", participantResourcePattern],
@@ -3773,6 +3775,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["PATCH", participantRunCommandAcknowledgementPattern, productionApiRoutes.participant.acknowledgeCommand],
     ["POST", participantRunCommandApplicationPattern, participantCommandExecutionRoute],
     ["POST", participantNativeCommandPattern, participantNativeCommandRoute],
+    ["POST", participantCommandCompletionPattern, participantCommandCompletionRoute],
     ["POST", participantControllerTimerInterruptionPattern, participantControllerTimerInterruptionRoute],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
@@ -8556,7 +8559,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (request.method === "POST" && participantRunCommandApplicationMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.participantSessionId);
         const commandId = decodeRouteGroup(participantRunCommandApplicationMatch.groups.commandId);
-        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"]; terminationNoop?: unknown }>();
+        const body = await readRequestJsonBody<{ testRunId?: unknown; controllerStatus?: unknown; controllerDispatch?: ExecuteParticipantRunCommandRequest["controllerDispatch"]; commandCompletion?: ExecuteParticipantRunCommandRequest["commandCompletion"]; terminationNoop?: unknown }>();
         if (!participantSessionId?.trim() || !commandId?.trim() || typeof body?.testRunId !== "string" || !body.testRunId.trim()) {
           sendError(response, 400, "participant_command_scope_required", "A participant session, selected Run and command are required.");
           return;
@@ -8570,7 +8573,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
         const application = await services.participantRuntime.executeCommand({ participantSessionId, commandId,
-          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop });
+          testRunId: body.testRunId, controllerStatus: body.controllerStatus, controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop, commandCompletion: body.commandCompletion });
         sendJson(response, 200, { application });
         return;
       }
@@ -8646,6 +8649,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson(response, 200, { interruption });
         return;
       }
+      const participantCommandCompletionMatch = participantCommandCompletionPattern.exec(pathname);
+      if (request.method === "POST" && participantCommandCompletionMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(participantCommandCompletionMatch.groups.participantSessionId);
+        const body = await readJsonBody<ParticipantCommandCompletionRequest>(request, runtime.config.maxJsonBodyBytes + 4096);
+        if (!participantSessionId || !body || typeof body !== "object" || Array.isArray(body)) {
+          sendError(response, 400, "participant_command_completion_invalid", "A scoped completion is required."); return;
+        }
+        const completion = await services.participantRuntime.completeCommand({ ...body, participantSessionId });
+        sendJson(response, 200, { completion }); return;
+      }
       const participantNativeCommandMatch = participantNativeCommandPattern.exec(pathname);
       if (request.method === "POST" && participantNativeCommandMatch?.groups) {
         const participantSessionId = decodeRouteGroup(participantNativeCommandMatch.groups.participantSessionId);
@@ -8657,7 +8670,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const application = await services.participantRuntime.executeNativeCommand({ participantSessionId, testRunId: body.testRunId,
           contentReleaseId: body.contentReleaseId, bookletKey: body.bookletKey,
           deliveryId: body.deliveryId, keyword: body.keyword, arguments: body.arguments, controllerStatus: body.controllerStatus, timeStamp: body.timeStamp,
-          controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop });
+          controllerDispatch: body.controllerDispatch, terminationNoop: body.terminationNoop, commandCompletion: body.commandCompletion });
         sendJson<ParticipantNativeCommandResponse>(response, 200, { application });
         return;
       }

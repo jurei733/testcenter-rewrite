@@ -100,6 +100,7 @@ export const createParticipantNativeCommands = (options: {
   started?: (request: ParticipantNativeCommandRequest) => void;
   captureTimer?: (request: ParticipantNativeCommandRequest, allocate: () => ParticipantControllerDispatch) => ParticipantControllerTimerInterruptionRequest | undefined;
   applied: (result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch) => Promise<void>;
+  completed?: (scope: Scope, request: ParticipantNativeCommandRequest) => void;
   failed: (error: Error) => void;
   window?: Window; storage?: Storage | null; fetch?: typeof fetch;
   now?: () => number; id?: () => string;
@@ -132,7 +133,7 @@ export const createParticipantNativeCommands = (options: {
         ["testRunId", "contentReleaseId", "bookletKey"].every(key => entry.timerInterruption![key as "testRunId"] === entry.scope[key as "testRunId"]) &&
         (entry.prepared !== true || entry.timerInterrupted === true)) &&
       participantNativeCommandKeywords.includes(entry.keyword) && Array.isArray(entry.args) && entry.args.every(value => typeof value === "string") &&
-      entry.request && (entry.prepared === undefined || entry.prepared === true) && entry.request.deliveryId === entry.id && entry.request.keyword === entry.keyword &&
+      entry.request && (entry.request.commandCompletion === undefined || entry.version === 2 && entry.request.commandCompletion === "browser-v1") && (entry.prepared === undefined || entry.prepared === true) && entry.request.deliveryId === entry.id && entry.request.keyword === entry.keyword &&
         (entry.request.controllerDispatch === undefined || isParticipantControllerDispatch(entry.request.controllerDispatch) && entry.request.controllerDispatch.controllerId === owner) &&
         entry.request.testRunId === entry.scope.testRunId && entry.request.contentReleaseId === entry.scope.contentReleaseId &&
         entry.request.bookletKey === entry.scope.bookletKey && JSON.stringify(entry.request.arguments) === JSON.stringify(entry.args) &&
@@ -216,6 +217,7 @@ export const createParticipantNativeCommands = (options: {
       if (!application || !validScope(application.scope) || scopeKey(application.scope) !== scopeKey(entry.scope) ||
           application.deliveryId !== entry.id || application.keyword !== entry.keyword || JSON.stringify(application.arguments) !== JSON.stringify(entry.args) ||
           application.controllerStatus !== entry.request.controllerStatus || application.timeStamp !== entry.request.timeStamp ||
+          application.commandCompletion !== undefined && application.commandCompletion !== entry.request.commandCompletion ||
           application.terminationNoop !== entry.request.terminationNoop ||
           application.superseded !== undefined && application.superseded !== true ||
           (application.controllerDispatch !== undefined || application.testRun?.stateRevision !== undefined) &&
@@ -231,6 +233,9 @@ export const createParticipantNativeCommands = (options: {
       }
       remove(entry);
       await options.applied(application, isCurrent, entry.request.controllerDispatch);
+      if (application.commandCompletion === "browser-v1" && entry.request.commandCompletion === "browser-v1") {
+        options.completed?.(entry.scope, structuredClone(entry.request));
+      }
     } catch (error) {
       if (!isCurrent()) return;
       if (!queue.has(entry.id)) { options.failed(error instanceof Error ? error : new Error(String(error))); return; }
@@ -278,6 +283,7 @@ export const createParticipantNativeCommands = (options: {
       const entry: Entry = { scope, owner, id, version: 2, keyword, args: [...args], request: {
         testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId, bookletKey: scope.bookletKey,
         deliveryId: id, keyword, arguments: [...args], controllerStatus, timeStamp: (options.now ?? Date.now)(),
+        ...(options.completed ? { commandCompletion: "browser-v1" as const } : {}),
         ...(keyword === "terminate" ? {} : { controllerDispatch: nextParticipantControllerDispatch(scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches) }) } };
       if (keyword === "terminate" && observedStatus === "TERMINATED") {
         entry.request.terminationNoop = true;

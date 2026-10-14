@@ -31,11 +31,12 @@ export class ParticipantDebugLauncherComponent implements OnInit, OnDestroy, DoC
       started: request => this.view.beginControllerCommand(request.testRunId, request.keyword, request.controllerDispatch, request.controllerStatus),
       prepare: isCurrent => this.view.prepareNativeConsoleCommand(isCurrent),
       applied: (result, isCurrent, dispatch) => this.view.applyNativeConsoleCommand(result, isCurrent, dispatch),
+      completed: (scope, request) => this.view.completeNativeConsoleCommand(scope, request),
       failed: error => this.view.nativeConsoleCommandFailed(error) });
     this.control = createParticipantDebugControl({ readScope: () => this.run, isProductionMode: !isDevMode(),
       changed: state => { this.enabled.set(state.enabled); this.activeWindows.set(state.activeWindows); },
       consoleCommand: args => this.log?.log(args), nativeCommand: (keyword, args) => this.native?.command(keyword, args) });
   }
-  ngDoCheck(): void { this.control?.observeScope(); this.log?.observeScope(); this.native?.observeScope(); }
+  ngDoCheck(): void { this.control?.observeScope(); this.log?.observeScope(); this.native?.observeScope(); this.view.observeCommandCompletions(); }
   ngOnDestroy(): void { this.control?.stop(); this.log?.stop(); this.native?.stop(); }
 }

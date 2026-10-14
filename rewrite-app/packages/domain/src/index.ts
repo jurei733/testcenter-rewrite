@@ -1372,6 +1372,9 @@ export type ParticipantRunCommandInput = ParticipantRunCommandScope & {
 
 /** Durable delivery intent. ACK ends delivery without mutating answers or Run state. */
 export type ParticipantRunCommand = ParticipantRunCommandInput & {
+  /** Browser-completed logs are separate from the accepted state effect. */
+  commandCompletion?: "browser-v1";
+  commandCompletionContent?: string;
   /** Durable result of the Original's already-TERMINATED early return. */
   terminationNoop?: true;
   sequence: number;
@@ -1397,6 +1400,8 @@ export type ParticipantRunCommandApplicationContext = {
 export type ParticipantControllerDispatch = { controllerId: string; sequence: number };
 
 export type ParticipantRunCommandEffect = {
+  commandCompletion?: "browser-v1";
+  commandCompletionContent?: string;
   terminationNoop?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   superseded?: true;

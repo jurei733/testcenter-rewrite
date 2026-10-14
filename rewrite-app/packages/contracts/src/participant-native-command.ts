@@ -11,6 +11,41 @@ export const isParticipantControllerDispatches = (value: unknown): value is Reco
 
 export const participantNativeCommandRoute = "/api/v1/participant/sessions/:participantSessionId/native-commands";
 export const participantControllerContextRoute = "/api/v1/participant/sessions/:participantSessionId/controller-context";
+export const participantCommandCompletionRoute = "/api/v1/participant/sessions/:participantSessionId/command-completions";
+export type ParticipantCommandCompletionRequest = {
+  testRunId: string;
+  contentReleaseId: string;
+  bookletKey: string;
+  timeStamp: number;
+  command: { kind: "native"; request: ParticipantNativeCommandRequest } | { kind: "remote"; commandId: string };
+};
+export type ParticipantCommandCompletionResult = ParticipantCommandCompletionRequest & {
+  scope: ParticipantRunCommandScope & { contentReleaseId: string; bookletKey: string };
+  acceptedAt: string;
+  applied: boolean;
+};
+export const isParticipantCommandCompletionRequest = (value: unknown): value is ParticipantCommandCompletionRequest => {
+  const packet = value as ParticipantCommandCompletionRequest | null;
+  if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
+    Object.keys(packet).some(key => !["testRunId", "contentReleaseId", "bookletKey", "timeStamp", "command"].includes(key)) ||
+    !["testRunId", "contentReleaseId", "bookletKey"].every(key => typeof packet[key as "testRunId"] === "string" && Boolean(packet[key as "testRunId"].trim())) ||
+    !Number.isSafeInteger(packet.timeStamp) || packet.timeStamp < 0 || !Number.isFinite(new Date(packet.timeStamp).getTime())) return false;
+  const command = packet.command;
+  if (command?.kind === "remote") return Object.keys(command).every(key => ["kind", "commandId"].includes(key)) &&
+    typeof command.commandId === "string" && Boolean(command.commandId.trim()) && command.commandId.length <= 160;
+  if (command?.kind !== "native") return false;
+  const request = command.request;
+  return Boolean(request && request.commandCompletion === "browser-v1" &&
+    Object.keys(command).every(key => ["kind", "request"].includes(key)) &&
+    Object.keys(request).every(key => ["commandCompletion", "terminationNoop", "controllerDispatch", "testRunId", "contentReleaseId", "bookletKey", "deliveryId", "keyword", "arguments", "controllerStatus", "timeStamp"].includes(key)) &&
+    ["testRunId", "contentReleaseId", "bookletKey"].every(key => request[key as "testRunId"] === packet[key as "testRunId"]) &&
+    typeof request.deliveryId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(request.deliveryId) &&
+    participantNativeCommandKeywords.includes(request.keyword) && Array.isArray(request.arguments) && request.arguments.every(value => typeof value === "string") &&
+    Number.isSafeInteger(request.timeStamp) && request.timeStamp >= 0 &&
+    ["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(request.controllerStatus) &&
+    (request.controllerDispatch === undefined || isParticipantControllerDispatch(request.controllerDispatch)) &&
+    (request.terminationNoop === undefined || request.terminationNoop === true && request.keyword === "terminate" && request.controllerStatus === "TERMINATED"));
+};
 export const participantControllerTimerInterruptionRoute = "/api/v1/participant/sessions/:participantSessionId/controller-timer-interruptions";
 export type ParticipantControllerTimerInterruptionRequest = {
   testRunId: string;
@@ -60,6 +95,7 @@ export type ParticipantControllerContext = { participantSession: ParticipantSess
 export const participantNativeCommandKeywords = ["pause", "resume", "terminate", "goto"] as const;
 export type ParticipantNativeCommandKeyword = typeof participantNativeCommandKeywords[number];
 export type ParticipantNativeCommandRequest = {
+  commandCompletion?: "browser-v1";
   terminationNoop?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   testRunId: string;
@@ -72,6 +108,7 @@ export type ParticipantNativeCommandRequest = {
   timeStamp: number;
 };
 export type ParticipantNativeCommandResult = {
+  commandCompletion?: "browser-v1";
   terminationNoop?: true;
   superseded?: true;
   controllerDispatch?: ParticipantControllerDispatch;

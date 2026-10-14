@@ -51,6 +51,7 @@ export const executeReceivedParticipantCommand = async (
     prepare: () => Promise<void>;
     started?: (dispatch: ParticipantControllerDispatch) => void;
     apply: (application: ParticipantRunCommandApplicationResult, dispatch: ParticipantControllerDispatch) => Promise<void>;
+    completed?: (command: ParticipantRunCommand) => void;
   }
 ): Promise<void> => {
   if (signal.aborted || !options.isCurrent()) return;
@@ -77,6 +78,7 @@ export const executeReceivedParticipantCommand = async (
   }), { method: "POST", cache: "no-store", signal, headers: {
     "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {})
   }, body: JSON.stringify({ testRunId: command.testRunId, controllerStatus: controllerStatus ?? options.controllerStatus(), controllerDispatch: dispatch,
+    ...(options.completed ? { commandCompletion: "browser-v1" } : {}),
     ...(terminationNoop ? { terminationNoop: true } : {}) }) });
   if (!response.ok) throw Object.assign(new Error(`Command application returned HTTP ${response.status}.`), { retryable: response.status >= 500 });
   const payload = await response.json() as { application?: {
@@ -108,4 +110,30 @@ export const executeReceivedParticipantCommand = async (
     throw Object.assign(new Error("The command application does not match the accepted receipt."), { retryable: false });
   }
   await options.apply({ ...application, command: receipt } as ParticipantRunCommandApplicationResult, dispatch);
+  if (receipt.commandCompletion === "browser-v1") options.completed?.(receipt);
+};
+
+/** A handler waits for its own continuation; other command handlers remain independent. */
+export const settleAcceptedParticipantCommand = async (options: {
+  signal?: AbortSignal;
+  isCurrent: () => boolean;
+  reconcile: () => Promise<void>;
+  failed: (error: Error) => void;
+}): Promise<void> => {
+  while (!options.signal?.aborted && options.isCurrent()) {
+    try { await options.reconcile(); return; }
+    catch (error) {
+      const value = error instanceof Error ? error : new Error(String(error));
+      if ((error as { retryable?: boolean })?.retryable === false ||
+        (error as { statusCode?: number })?.statusCode! >= 400 && (error as { statusCode?: number }).statusCode! < 500) {
+        options.failed(value); throw value;
+      }
+      await new Promise<void>(resolve => {
+        const complete = (): void => { globalThis.clearTimeout(timer); options.signal?.removeEventListener("abort", complete); resolve(); };
+        const timer = globalThis.setTimeout(complete, 1_000);
+        options.signal?.addEventListener("abort", complete, { once: true });
+        if (options.signal?.aborted) complete();
+      });
+    }
+  }
 };

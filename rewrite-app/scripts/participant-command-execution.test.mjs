@@ -221,3 +221,36 @@ test('the durable early-return marker is accepted only on executed deferred term
  const receipt={...application().application.command,commandType:'complete',terminationNoop:true};assert.equal(parseParticipantRunCommand(receipt).terminationNoop,true);
  for(const changed of [{terminationNoop:false},{terminationNoop:'true'},{commandType:'resume'},{effectsDeferred:undefined},{executedAt:null,executionSequence:null}])assert.equal(parseParticipantRunCommand({...receipt,...changed}),null);
 });
+
+test('opted-in remote completion waits for the fulfilled client continuation', async () => {
+  const entered = deferred(), projection = deferred(), completed = [];
+  const f = fixture(async () => {
+    const value = application(); value.application.command.commandCompletion = 'browser-v1'; value.application.command.commandCompletionContent = 'resume';
+    return { ok: true, json: async () => value };
+  });
+  f.options.completed = command => completed.push(command.commandId);
+  f.options.apply = async () => { entered.resolve(); await projection.promise; };
+  const pending = f.execute(); await entered.promise;
+  assert.equal(JSON.parse(f.calls[0].request.body).commandCompletion, 'browser-v1'); assert.deepEqual(completed, []);
+  projection.resolve(false); await pending; assert.deepEqual(completed, ['owned-command']);
+});
+
+test('a rejected client continuation cannot produce a remote completion', async () => {
+  const f = fixture(async () => { const value = application(); value.application.command.commandCompletion = 'browser-v1';
+    value.application.command.commandCompletionContent = 'resume'; return { ok: true, json: async () => value }; });
+  f.options.completed = () => assert.fail('Rejected command completed');
+  f.options.apply = async () => { throw Error('owned rejected continuation'); };
+  await assert.rejects(f.execute(), /owned rejected continuation/);
+});
+
+test('an older API without the completion marker never triggers a second browser log', async () => {
+  const f = fixture(); f.options.completed = () => assert.fail('Legacy server log was duplicated');
+  await f.execute(); assert.equal(JSON.parse(f.calls[0].request.body).commandCompletion, 'browser-v1');
+});
+
+test('a remote completion marker is valid only with its executed deferred receipt and stored content', () => {
+  const receipt = { ...application().application.command, commandCompletion: 'browser-v1', commandCompletionContent: 'resume' };
+  assert.equal(parseParticipantRunCommand(receipt).commandCompletion, 'browser-v1');
+  for (const change of [{ commandCompletion: 'unknown' }, { commandCompletionContent: undefined }, { effectsDeferred: undefined },
+    { executedAt: null, executionSequence: null }]) assert.equal(parseParticipantRunCommand({ ...receipt, ...change }), null);
+});

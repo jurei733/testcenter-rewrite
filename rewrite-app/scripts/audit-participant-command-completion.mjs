@@ -9,7 +9,7 @@ import { createFirstSliceServices } from '@testcenter-rewrite-app/application';
 import { compileBookletRuntimePolicy, resolveRoutePath } from '@testcenter-rewrite-app/contracts';
 import { participantNativeCommandRoute, participantNativeCommandKeywords, isParticipantControllerDispatch,
   isParticipantControllerDispatches, participantControllerTimerInterruptionRoute,
-  isParticipantControllerTimerInterruptionRequest } from '@testcenter-rewrite-app/contracts/participant-native-command';
+  isParticipantControllerTimerInterruptionRequest, participantCommandCompletionRoute, isParticipantCommandCompletionRequest } from '@testcenter-rewrite-app/contracts/participant-native-command';
 import { createInMemoryFirstSliceRepository } from '@testcenter-rewrite-app/memory-store';
 import { createFileFirstSliceStorage } from '@testcenter-rewrite-app/file-store';
 import { createSqliteFirstSliceStorage } from '@testcenter-rewrite-app/sqlite-store';
@@ -28,6 +28,14 @@ const { load } = await import('data:text/javascript;base64,' + Buffer.from(compi
 const create = load(participantNativeCommandRoute, participantNativeCommandKeywords, resolveRoutePath,
   () => 'Owned audit credential', isParticipantControllerDispatch, isParticipantControllerDispatches,
   participantControllerTimerInterruptionRoute, isParticipantControllerTimerInterruptionRequest);
+const completionSource = await readFile(new URL('../apps/web/src/app/participant-command-completion.ts', import.meta.url), 'utf8');
+const completionAst = ts.createSourceFile('completion.ts', completionSource, ts.ScriptTarget.Latest, true);
+const completionStatements = completionAst.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(completionAst).replace(/^export /, ''));
+const completionCompiled = ts.transpileModule(`export const load = (participantCommandCompletionRoute, isParticipantCommandCompletionRequest, resolveRoutePath, readParticipantSessionCredential) => {
+ ${completionStatements.join('\n')}; return createParticipantCommandCompletions;
+};`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+const { load: loadCompletions } = await import('data:text/javascript;base64,' + Buffer.from(completionCompiled).toString('base64'));
+const createCompletions = loadCompletions(participantCommandCompletionRoute, isParticipantCommandCompletionRequest, resolveRoutePath, () => 'Owned audit credential');
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const bounded = async promise => {
   let timeout;
@@ -52,7 +60,7 @@ try {
 const cases = [];
 for (const kind of ['memory', 'file', 'sqlite']) {
   const directory = await mkdtemp(join(tmpdir(), 'testcenter-command-completion-audit-'));
-  let storage, transport;
+  let storage, transport, completionTransport;
   const projection = deferred();
   try {
     storage = kind === 'memory' ? { repository: createInMemoryFirstSliceRepository(), shutdown: async () => {} }
@@ -81,8 +89,17 @@ for (const kind of ['memory', 'file', 'sqlite']) {
     const values = new Map();
     const localStorage = { get length() { return values.size; }, key: index => [...values.keys()][index] ?? null,
       getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+    const browserWindow = { addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout };
+    completionTransport = createCompletions({ window: browserWindow, storage: localStorage,
+      fetch: async (url, request) => {
+        assert.equal(url, resolveRoutePath(participantCommandCompletionRoute, { participantSessionId }));
+        const packet = JSON.parse(request.body);
+        const completion = await services.participantRuntime.completeCommand({ participantSessionId, ...packet });
+        return { ok: true, json: async () => ({ completion }) };
+      } });
     transport = create({ readState: () => ({ testRun: run }), controllerStatus: () => 'RUNNING', ownerId: 'owned-completion-audit',
-      window: { addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout }, storage: localStorage, now: () => clock, id: () => randomUUID(),
+      completed: (scope, request) => completionTransport.complete(scope, { testRunId, contentReleaseId, bookletKey: 'owned', command: { kind: 'native', request }, timeStamp: clock }),
+      window: browserWindow, storage: localStorage, now: () => clock, id: () => randomUUID(),
       prepare: async () => { preparing.resolve(); await prepare.promise; },
       applied: async () => { projecting.resolve(); await projection.promise; projected.resolve(); },
       failed: error => errors.push(error.message), fetch: async (url, request) => {
@@ -100,7 +117,7 @@ for (const kind of ['memory', 'file', 'sqlite']) {
     const before = await commandLogs();
     const committed = await repository.getTestRunById(testRunId);
     assert.equal(committed.status, 'paused'); assert.equal(committed.unitResponses.alias, run.unitResponses.alias);
-    clock = epoch + 20_000; projection.resolve(); await bounded(projected.promise); await referenceMicrotasks();
+    clock = epoch + 20_000; projection.resolve(); await bounded(projected.promise); await referenceMicrotasks(); await bounded(completionTransport.drain());
     const after = await commandLogs();
     assert.ok([...before, ...after].every(log => Number.isSafeInteger(log.timestamp)), 'The witness must retain actual stored timestamps.');
     assert.deepEqual(errors, []);
@@ -109,13 +126,13 @@ for (const kind of ['memory', 'file', 'sqlite']) {
       requestTimeStamp: requests[0].timeStamp, projectionCompletedAt: clock,
       commandLogsBeforeProjectionCompletes: before.length, parity: before.length === expected.commandLogsBeforeNavigationCompletes &&
         after.length === 1 && after[0].timestamp === expected.completionTimeStamp });
-  } finally { projection.resolve(); transport?.stop(); await storage?.shutdown(); await rm(directory, { recursive: true, force: true }); }
+  } finally { projection.resolve(); transport?.stop(); completionTransport?.stop(); await storage?.shutdown(); await rm(directory, { recursive: true, force: true }); }
 }
 const arguments_ = process.argv.slice(2);
 assert.ok(arguments_.filter(value => !value.startsWith('--')).length <= 1 && arguments_.every(value => !value.startsWith('--') || value === '--assert-parity'), 'Pass an optional report path and --assert-parity.');
 const reportPath = arguments_.find(value => value !== '--assert-parity');
 const report = { sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-  referenceCommit: completionReference.originalCommit, nativeTransportSha256: createHash('sha256').update(source).digest('hex'),
+  referenceCommit: completionReference.originalCommit, completionTransportSha256: createHash('sha256').update(completionSource).digest('hex'), nativeTransportSha256: createHash('sha256').update(source).digest('hex'),
   scope: 'Actual Original buffers and completion callback versus actual Rewrite native transport, application service and Memory/File/SQLite adapters; controlled backend/router on Original and controlled transport/view projection on Rewrite. No full Angular browser or HTTP proof.',
   expected, cases, parity: cases.every(value => value.parity) };
 if (reportPath) await writeFile(resolve(reportPath), JSON.stringify(report, null, 2) + '\n');

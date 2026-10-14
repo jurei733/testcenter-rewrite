@@ -105,6 +105,10 @@ export const prepareParticipantRunCommandApplication = (
       context.participantSession.participantSessionId !== input.participantSessionId ||
       context.participantSession.tenantId !== input.tenantId || context.participantSession.workspaceId !== input.workspaceId) return null;
   const { command, testRun, participantSession } = context;
+  if (!(command.commandCompletion === undefined && command.commandCompletionContent === undefined ||
+    command.commandCompletion === "browser-v1" && command.effectsDeferred && command.executedAt && typeof command.commandCompletionContent === "string")) {
+    throw new Error("The persisted command completion protocol is invalid.");
+  }
   if (command.terminationNoop !== undefined && (command.terminationNoop !== true || !command.effectsDeferred || !command.executedAt ||
       !["complete", "complete_and_lock"].includes(command.commandType))) throw new Error("The persisted terminal early-return receipt is invalid.");
   if (!command.acknowledgedAt) throw new ParticipantRunCommandApplicationError("participant_command_not_acknowledged", "Only an acknowledged participant command may be applied.");
@@ -119,6 +123,11 @@ export const prepareParticipantRunCommandApplication = (
   const executionSequence = lastExecutionSequence + 1;
   if (!Number.isSafeInteger(executionSequence) || executionSequence < 1) throw new Error("Participant command application sequence is exhausted.");
   const effect = structuredClone(transform(structuredClone(context)));
+  if (!(effect.commandCompletion === undefined && effect.commandCompletionContent === undefined ||
+    effect.commandCompletion === "browser-v1" && command.effectsDeferred && typeof effect.commandCompletionContent === "string" &&
+    effect.testLogs.every(log => log.logKey !== "command executed"))) {
+    throw new Error("A deferred command completion cannot publish its completion log with the state effect.");
+  }
   if (effect.terminationNoop !== undefined && (effect.terminationNoop !== true || !command.effectsDeferred ||
       !["complete", "complete_and_lock"].includes(command.commandType) || effect.controllerDispatch !== undefined ||
       effect.controllerEntryActive !== undefined || effect.participantSession !== undefined ||
@@ -148,7 +157,8 @@ export const prepareParticipantRunCommandApplication = (
   }
   effect.testRun = withParticipantRunRevision(testRun,
     withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
-  const appliedCommand = { ...command, executedAt, executionSequence, ...(effect.terminationNoop ? { terminationNoop: true as const } : {}) };
+  const appliedCommand = { ...command, executedAt, executionSequence, ...(effect.terminationNoop ? { terminationNoop: true as const } : {}),
+    ...(effect.commandCompletion ? { commandCompletion: effect.commandCompletion, commandCompletionContent: effect.commandCompletionContent } : {}) };
   return { result: structuredClone({ command: appliedCommand, testRun: effect.testRun,
     participantSession: effect.participantSession ?? participantSession, applied: true,
     ...(effect.superseded ? { superseded: true as const } : {}) }), effect };

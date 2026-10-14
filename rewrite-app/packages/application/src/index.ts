@@ -1,7 +1,7 @@
 import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
-import { participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
+import { isParticipantCommandCompletionRequest, participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult, type ParticipantCommandCompletionRequest, type ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
 import { retainedLegacyTimerPreparation, withLegacyTimerPreparation, legacyTimerInterruptionBalance } from "./participant-legacy-timer.js";
@@ -747,8 +747,9 @@ export type ParticipantRuntimePort = {
   getControllerContext(input: { participantSessionId: string; testRunId?: string }): Promise<ParticipantControllerContext>;
   listPendingCommands(input: { participantSessionId: string; testRunId: string }): Promise<ParticipantRunCommand[]>;
   acknowledgeCommand(input: { participantSessionId: string; testRunId: string; commandId: string }): Promise<ParticipantRunCommand>;
-  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"]; terminationNoop?: true }): Promise<ParticipantRunCommandApplicationResult>;
+  executeCommand(input: { participantSessionId: string; testRunId: string; commandId: string; controllerStatus?: string; controllerDispatch?: ParticipantNativeCommandRequest["controllerDispatch"]; terminationNoop?: true; commandCompletion?: "browser-v1" }): Promise<ParticipantRunCommandApplicationResult>;
   executeNativeCommand(input: ParticipantNativeCommandRequest & { participantSessionId: string }): Promise<ParticipantNativeCommandResult>;
+  completeCommand(input: ParticipantCommandCompletionRequest & { participantSessionId: string }): Promise<ParticipantCommandCompletionResult>;
   updateConnection(input: {
     participantSessionId: string; testRunId: string;
     action: "open" | "acknowledge" | "close" | "poll"; connectionId?: string;
@@ -2183,6 +2184,19 @@ const participantProgressPayloadSha256 = (value: unknown): string => createHash(
   JSON.stringify(value, (_key, item) => item !== null && typeof item === "object" && !Array.isArray(item)
     ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)
 ).digest("hex");
+
+const nativeCommandPayloadSha256 = (request: ParticipantNativeCommandRequest): string => participantProgressPayloadSha256({
+  kind: "participant-native-command/v1", keyword: request.keyword, arguments: request.arguments,
+  controllerStatus: request.controllerStatus, timeStamp: request.timeStamp,
+  ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}),
+  ...(request.terminationNoop ? { terminationNoop: true } : {}),
+  ...(request.commandCompletion ? { commandCompletion: request.commandCompletion } : {})
+});
+
+const requireCommandCompletionProtocol = (value: unknown): void => {
+  if (value !== undefined && value !== "browser-v1") throw new FirstSliceError(400,
+    "participant_command_completion_invalid", "Unsupported command completion protocol.");
+};
 
 const usesBrowserControllerLifecycle = (value: unknown): boolean => {
   if (value !== undefined && value !== "browser-v1") {
@@ -32127,6 +32141,7 @@ export const createFirstSliceServices = (
         return command;
       },
       async executeCommand(input) {
+        requireCommandCompletionProtocol(input.commandCompletion);
         if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
           throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
         }
@@ -32148,6 +32163,7 @@ export const createFirstSliceServices = (
             tenantId: session.tenantId, workspaceId: session.workspaceId, participantSessionId: session.participantSessionId,
             testRunId: selected.testRunId, commandId, executedAt
           }, context => {
+            const project = (): ParticipantRunCommandEffect => {
             if (input.terminationNoop && (!context.command.effectsDeferred || !["complete", "complete_and_lock"].includes(context.command.commandType))) {
               throw new FirstSliceError(400, "participant_command_controller_status_invalid", "Only a deferred terminal command can take the terminal early return.");
             }
@@ -32228,6 +32244,15 @@ export const createFirstSliceServices = (
               testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
               activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
                 ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
+            };
+            const effect = project();
+            if (input.commandCompletion === "browser-v1" && context.command.effectsDeferred) {
+              const completion = effect.testLogs.find(log => log.logKey === "command executed");
+              effect.commandCompletion = "browser-v1";
+              effect.commandCompletionContent = completion?.logContent ?? "";
+              effect.testLogs = effect.testLogs.filter(log => log.logKey !== "command executed");
+            }
+            return effect;
           }));
           if (!result) throw new FirstSliceError(404, "participant_command_not_found", "The command was not found in the selected Run.");
           if (Boolean(result.command.terminationNoop) !== Boolean(input.terminationNoop)) {
@@ -32303,6 +32328,7 @@ export const createFirstSliceServices = (
           contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey }, acceptedAt, applied: result.applied };
       },
       async executeNativeCommand(input) {
+        requireCommandCompletionProtocol(input.commandCompletion);
         if (input.controllerDispatch !== undefined && !validParticipantControllerDispatch(input.controllerDispatch)) {
           throw new FirstSliceError(400, "participant_controller_dispatch_invalid", "The controller dispatch is invalid.");
         }
@@ -32330,13 +32356,11 @@ export const createFirstSliceServices = (
         if (!booklet) throw new FirstSliceError(404, "booklet_not_found", "The selected Run's booklet was not found.");
         const roster = await findParticipantRosterEntryByLoginKey(repository, session.tenantId, session.workspaceId, session.loginKey);
         const deliveryId = `console:${request.deliveryId}`;
-        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-native-command/v1", keyword: request.keyword,
-          arguments: request.arguments, controllerStatus: request.controllerStatus, timeStamp: request.timeStamp,
-          ...(request.controllerDispatch ? { controllerDispatch: request.controllerDispatch } : {}),
-          ...(request.terminationNoop ? { terminationNoop: true } : {}) });
+        const payloadSha256 = nativeCommandPayloadSha256(request);
         let executedAt = "";
         try {
           const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+            const project = (): ParticipantRunMutationEffect | null => {
             if (context.progressDelivery) {
               if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409,
                 "participant_delivery_conflict", "An accepted native command cannot change its arguments or observed identity.");
@@ -32395,6 +32419,10 @@ export const createFirstSliceServices = (
                   previousStatus: context.testRun.status, nextStatus: nextRun.status, currentUnitKey: nextRun.currentUnitKey } }],
               progressDelivery: { testRunId: nextRun.testRunId, participantSessionId: nextRun.participantSessionId, tenantId: nextRun.tenantId,
                 workspaceId: nextRun.workspaceId, contentReleaseId: nextRun.contentReleaseId, deliveryId, payloadSha256, acceptedAt: timestamp } };
+            };
+            const effect = project();
+            if (effect && request.commandCompletion === "browser-v1") effect.testLogs = effect.testLogs.filter(log => log.logKey !== "command executed");
+            return effect;
           }));
           if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The selected Run's scope changed.");
           return { ...request, scope: { tenantId: result.testRun.tenantId, workspaceId: result.testRun.workspaceId,
@@ -32407,6 +32435,73 @@ export const createFirstSliceServices = (
           if (error instanceof ParticipantNativeCommandError) throw new FirstSliceError(400, error.errorCode, error.message);
           throw error;
         }
+      },
+      async completeCommand(input) {
+        if (!input || !isParticipantCommandCompletionRequest({ testRunId: input.testRunId, contentReleaseId: input.contentReleaseId,
+          bookletKey: input.bookletKey, timeStamp: input.timeStamp, command: input.command })) {
+          throw new FirstSliceError(400, "participant_command_completion_invalid", "A completion requires its accepted command, immutable Run and completion timestamp.");
+        }
+        const session = await requireAccessibleParticipantSession(normalizeParticipantSessionId(input.participantSessionId));
+        const selected = await getSelectedParticipantSessionRun(repository, session, normalizeTestRunId(input.testRunId));
+        if (!selected || selected.contentReleaseId !== input.contentReleaseId || selected.bookletKey !== input.bookletKey) {
+          throw new FirstSliceError(409, "test_run_scope_changed", "The command completion belongs to another immutable Run.");
+        }
+        const command = structuredClone(input.command);
+        let content: string, identity: string;
+        if (command.kind === "native") {
+          const request = command.request;
+          if (!request || request.commandCompletion !== "browser-v1" ||
+            !["testRunId", "contentReleaseId", "bookletKey"].every(key => request[key as "testRunId"] === input[key as "testRunId"]) ||
+            !participantNativeCommandKeywords.includes(request.keyword) || !Array.isArray(request.arguments) || !request.arguments.every(value => typeof value === "string") ||
+            !Number.isSafeInteger(request.timeStamp) || request.timeStamp < 0 || typeof request.deliveryId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(request.deliveryId) ||
+            !["LOADING", "RUNNING", "PAUSED", "ERROR", "TERMINATED", "TERMINATED_PAUSED"].includes(request.controllerStatus) ||
+            request.controllerDispatch !== undefined && !validParticipantControllerDispatch(request.controllerDispatch) ||
+            request.terminationNoop !== undefined && (request.terminationNoop !== true || request.keyword !== "terminate" || request.controllerStatus !== "TERMINATED")) {
+            throw new FirstSliceError(400, "participant_command_completion_invalid", "The native completion proof is invalid.");
+          }
+          await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId: `console:${request.deliveryId}` }, context => {
+            if (!context.progressDelivery || context.progressDelivery.payloadSha256 !== nativeCommandPayloadSha256(request)) {
+              throw new FirstSliceError(409, "participant_command_not_applied", "Only the exact accepted native command can complete.");
+            }
+            return null;
+          }));
+          content = [request.keyword, ...request.arguments].join(" "); identity = request.deliveryId;
+        } else {
+          if (typeof command.commandId !== "string" || !command.commandId.trim() || command.commandId.length > 160) {
+            throw new FirstSliceError(400, "participant_command_completion_invalid", "A remote command identifier is required.");
+          }
+          const application = await serializeTestRunMutation(selected.testRunId, () => repository.applyParticipantRunCommand({
+            ...selected, commandId: command.commandId, executedAt: now()
+          }, () => { throw new FirstSliceError(409, "participant_command_not_applied", "Only an already applied command can complete."); })).catch(error => {
+            if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, "participant_command_not_applied", "Only an already applied command can complete.");
+            throw error;
+          });
+          if (!application?.command.executedAt || application.command.commandCompletion !== "browser-v1" || typeof application.command.commandCompletionContent !== "string") {
+            throw new FirstSliceError(409, "participant_command_not_applied", "The accepted command does not use browser completion.");
+          }
+          content = application.command.commandCompletionContent; identity = command.commandId;
+        }
+        const deliveryId = `command-completion:${participantProgressPayloadSha256({ kind: command.kind, identity })}`;
+        const payloadSha256 = participantProgressPayloadSha256({ kind: "participant-command-completion/v1", command, timeStamp: input.timeStamp });
+        let acceptedAt = "";
+        const result = await serializeTestRunMutation(selected.testRunId, () => repository.mutateParticipantRun({ ...selected, deliveryId }, context => {
+          if (context.progressDelivery) {
+            if (context.progressDelivery.payloadSha256 !== payloadSha256) throw new FirstSliceError(409, "participant_delivery_conflict", "An accepted command completion cannot change its timestamp or identity.");
+            acceptedAt = context.progressDelivery.acceptedAt; return null;
+          }
+          acceptedAt = now();
+          return { testRun: context.testRun, activityEvents: [],
+            testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses && content ? buildParticipantTestLogs({
+              testRun: context.testRun, deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: input.timeStamp, content }] }]
+            }) : [],
+            progressDelivery: { testRunId: selected.testRunId, participantSessionId: selected.participantSessionId,
+              tenantId: selected.tenantId, workspaceId: selected.workspaceId, contentReleaseId: selected.contentReleaseId, deliveryId, payloadSha256, acceptedAt } };
+        }));
+        if (!result) throw new FirstSliceError(409, "test_run_scope_changed", "The command completion's Run no longer exists.");
+        return { testRunId: input.testRunId, contentReleaseId: input.contentReleaseId, bookletKey: input.bookletKey,
+          command, timeStamp: input.timeStamp, scope: { tenantId: selected.tenantId, workspaceId: selected.workspaceId,
+            participantSessionId: session.participantSessionId, testRunId: selected.testRunId, contentReleaseId: selected.contentReleaseId, bookletKey: selected.bookletKey },
+          acceptedAt, applied: result.applied };
       },
       async getCurrentRunState(input) {
         const participantSessionId = normalizeParticipantSessionId(
