@@ -1,5 +1,32 @@
 # Optional Original UI
 
+### Native Debug completion microtask (2026-10-14)
+
+Application `9528a6b6855b` matches the pinned Original's immediate Debug preference
+change followed by completion logging in the fulfilled-handler microtask. Scope
+and arguments stay attached to their invocation even if selection changes in the
+same turn. Cleanup before continuation prevents an orphan entry. Original on/off
+reference cases execute the actual pane method and root completion callback with
+controlled storage/clock; the complete Original app is outside that oracle.
+
+The old logger fails the new immediate-entry assertion. All 45 focused cases and
+1,055 frontend tests now pass. Fifteen production Angular/SQLite Debug groups pass
+both headed and in CI, including exact before/after microtask timestamps and an
+unchanged paused Run, parent and timer. Existing error and isolation behavior stays
+covered. The 2,452 qualified unit/frontend total combines these fresh frontend
+results with the previous 1,397 non-frontend checks; those were not rerun, and all
+97 backend hashes remain identical. PostgreSQL (1,580) and HTTP (498) proof stays
+attached to that unchanged backend's earlier checkpoint.
+
+The clean 930-file image passes Standard/Demo/production PostgreSQL profiles,
+SQLite runtime and 689 tests as node in a read-only container. All 169 frontend
+files match the tested host/frozen bytes. Existing 24 containers, immutable images,
+states/mounts, 86 volumes, 423 image aliases and protected artifacts are preserved;
+owned containers/volumes are removed. The preceding broader 172-group browser
+qualification was not rerun. Full Original mixed-command and cross-document
+ordering plus the other parity and production requirements remain open.
+Formal parity remains 30 complete/19 partial; no publication/deployment occurred.
+
 ### Separate normal command completion and browser replay (2026-10-14)
 
 Application `38d8e7ef78ff` includes runtime `67a50b1b8157`: opted-in native and
