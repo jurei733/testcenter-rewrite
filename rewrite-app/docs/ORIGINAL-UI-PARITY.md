@@ -24,6 +24,8 @@ its invocation timestamp after that continuation completes. The differential
 audit's `--assert-parity` exits 1 for all three stores. Its controlled transport
 and view continuation are not HTTP or complete Angular browser acceptance.
 No runtime correction or completion of that parity requirement is claimed.
+Test logs export is reopened as partial, leaving 30 complete and 19 partial
+formal areas; the existing export-format proof remains valid within its scope.
 
 All 2,391 unit/frontend tests pass fresh without skips or cancellations. All 306
 application/package source files remain unchanged against the preceding qualified
