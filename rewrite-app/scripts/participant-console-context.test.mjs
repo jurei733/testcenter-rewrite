@@ -4,19 +4,22 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse,hasMeaningfulVeronaResponse} from '@testcenter-rewrite-app/contracts';
 import {isParticipantControllerDispatches,participantControllerContextRoute} from '@testcenter-rewrite-app/contracts/participant-native-command';
+const saveBarrierCode=ts.transpileModule(readFileSync(new URL('../apps/web/src/app/participant-save-barrier.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {createParticipantSaveBarriers}=await import('data:text/javascript;base64,'+Buffer.from(saveBarrierCode).toString('base64'));
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
 const names=['captureControllerTimerInterruption','isControllerTimerInterrupted','handleVeronaControllerError','pendingControllerStatus','beginControllerCommand','isOlderControllerPhase','finishControllerPhase','isOlderRunState','consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand','reconcileParticipantTerminalState','startAcceptedParticipantReception'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
-const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution,isParticipantControllerDispatches)=>class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution,isParticipantControllerDispatches)=>{const listParticipantSaveOutboxEntriesForRun=()=>[];return class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(emitted).toString('base64'));
 const executionSource=readFileSync(new URL('../apps/web/src/app/participant-command-execution.ts',import.meta.url),'utf8');
 const executionAst=ts.createSourceFile('execution.ts',executionSource,ts.ScriptTarget.Latest,true);
 const reconciliation=executionAst.statements.filter(ts.isVariableStatement).flatMap(item=>[...item.declarationList.declarations]).find(item=>item.name.getText(executionAst)==='reconcileAcceptedParticipantCommand');assert.ok(reconciliation?.initializer);
-const reconciliationCode=ts.transpileModule(`export const reconcileAcceptedParticipantCommand=${reconciliation.initializer.getText(executionAst)}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
-const {reconcileAcceptedParticipantCommand}=await import('data:text/javascript;base64,'+Buffer.from(reconciliationCode).toString('base64'));
-const hostClass=(execute,interruptTimer)=>load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse,async()=>({executeReceivedParticipantCommand:execute,deliverParticipantControllerTimerInterruption:interruptTimer,reconcileAcceptedParticipantCommand}),isParticipantControllerDispatches);
+const settlement=executionAst.statements.filter(ts.isVariableStatement).flatMap(item=>[...item.declarationList.declarations]).find(item=>item.name.getText(executionAst)==='settleAcceptedParticipantCommand');assert.ok(settlement?.initializer);
+const reconciliationCode=ts.transpileModule(`export const reconcileAcceptedParticipantCommand=${reconciliation.initializer.getText(executionAst)}; export const settleAcceptedParticipantCommand=${settlement.initializer.getText(executionAst)}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {reconcileAcceptedParticipantCommand,settleAcceptedParticipantCommand}=await import('data:text/javascript;base64,'+Buffer.from(reconciliationCode).toString('base64'));
+const hostClass=(execute,interruptTimer)=>load(productionApiRoutes,resolveRoutePath,JSON.stringify,(path,id)=>path+(id?'?testRunId='+id:''),async()=>({participantControllerContextRoute}),parseVeronaUnitResponse,hasMeaningfulVeronaResponse,async()=>({executeReceivedParticipantCommand:execute,deliverParticipantControllerTimerInterruption:interruptTimer,reconcileAcceptedParticipantCommand,settleAcceptedParticipantCommand}),isParticipantControllerDispatches);
 const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
 const run={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',testRunId:'selected',contentReleaseId:'release',bookletKey:'booklet',bookletAssignmentKey:'booklet',status:'running',currentUnitKey:'unit',unitResponses:{unit:'Exact owned Ω'},unitResponseFieldTimestamps:{unit:{opaque:123}},testletTimers:{},createdAt:'2026-10-12T00:00:00Z',updatedAt:'2026-10-12T00:00:00Z'};
 const session={tenantId:'tenant',workspaceId:'workspace',participantSessionId:'participant',status:'launched'};
@@ -32,9 +35,26 @@ const fixture=(request=async()=>({currentRunState:state(run)}),execute=()=>asser
   recordLoadedBookletAssets(){},shouldPreserveCurrentTextDraft:()=>false,syncCurrentRunState(value){this.currentRunState=value;calls.applied++;},syncCurrentUnitResponse(){},
   reconcileOptimisticVeronaResponse(){},restorePersistentVeronaSave(){},persistLoadCompleteLog(){},loadBookletAssetsInBackground(){},refreshParticipantReviewsInternal:async()=>{},persistState(){},
   settleVeronaAutoSaveBeforeForegroundAction:async()=>{calls.drained++;return null;},saveCurrentDraftBeforeCompleteInternal:async()=>{calls.saved++;},
-  ephemeralUnitResponses:new Map(),nativeConsoleCommandFailed(error){calls.failures.push(error);},commandReloadSequence:{update(){calls.reloads++;}},presentParticipantStarter(){calls.starter++;},replaceSelectedRunEntryLink:async()=>{},commandControllerState:null,remoteTerminalErrorRunId:null});
+  veronaSaveBarriers:createParticipantSaveBarriers(),clearVeronaSaveBuffer(){},drainVeronaSaveQueue:async()=>{},ephemeralUnitResponses:new Map(),nativeConsoleCommandFailed(error){calls.failures.push(error);},commandReloadSequence:{update(){calls.reloads++;}},presentParticipantStarter(){calls.starter++;},replaceSelectedRunEntryLink:async()=>{},commandControllerState:null,remoteTerminalErrorRunId:null});
  return {host,calls};
 };
+for(const keyword of ['pause','goto'])test(`native ${keyword} retains independent answer drainage while an older terminal buffer is held`,async()=>{
+ const held=deferred(),f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.runtime.currentUnitResponse='Unconfirmed controller draft';
+ let drained=false;f.host.drainVeronaSaveQueue=async()=>{await held.promise;drained=true;};
+ await f.host.prepareNativeConsoleCommand(()=>true,keyword);assert.equal(drained,false);assert.equal(f.calls.saved,0);
+ held.resolve();await tick();assert.equal(drained,true);assert.equal(f.calls.failures.length,0);assert.equal(f.calls.saved,0);
+});
+test('native Resume navigates without starting another foreground buffer settlement',async()=>{
+ const f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.settleVeronaAutoSaveBeforeForegroundAction=()=>assert.fail('Resume started a saved-event barrier');f.host.drainVeronaSaveQueue=()=>assert.fail('Resume closed buffers');
+ await f.host.prepareNativeConsoleCommand(()=>true,'resume');assert.equal(f.calls.saved,0);
+});
+test('termination still joins its captured answer request while the next Unit view is unavailable',async()=>{
+ const f=fixture(),held=deferred();f.host.syncRun(run);assert.equal(f.host.debugRunState,null);
+ const packet={version:1,testRunId:'selected',deliveryId:'held-answer',unitKey:'unit',response:'Owned exact Ω',logs:[],status:'running',queuedAt:'2026-10-14T00:00:00Z'};
+ f.host.veronaSaveBarriers.track(packet,held.promise);f.host.settleVeronaAutoSaveBeforeForegroundAction=async barrier=>{assert.deepEqual([...barrier.deliveryIds],['held-answer']);await barrier.wait();return null;};
+ let done=false;const preparation=f.host.prepareNativeConsoleCommand(()=>true,'terminate',phaseDispatch(1)).then(()=>{done=true;});await tick();assert.equal(done,false);
+ held.resolve();await preparation;assert.equal(done,true);assert.equal(f.calls.saved,0);
+});
 const tick=()=>new Promise(done=>setTimeout(done,0));
 test('a URL or serialized former view cannot authorize a console Run; authenticated context does so before the initial state arrives',async()=>{
  const gate=deferred(),f=fixture(async(label)=>label==='Participant Controller'?{controllerContext:{participantSession:session,testRun:run}}:gate.promise);
@@ -492,13 +512,34 @@ for(const initial of ['RUNNING','PAUSED'])test(`the ${initial} controller enters
  assert.equal(f.host.debugControllerStatus,initial==='PAUSED'?'TERMINATED_PAUSED':'TERMINATED');assert.deepEqual(f.host.consoleRun,original);
  assert.equal(f.calls.suspended,1);assert.equal(f.calls.starter,0);assert.equal(f.calls.requests.length,0);assert.equal(f.calls.saved,0);
 });
-for(const keyword of ['pause','resume'])test(`a later ${keyword} during terminal buffers survives the older terminal receipt`,async()=>{
+for(const keyword of ['pause','resume'])test(`a legacy terminal receipt cannot replace a later ${keyword} entry`,async()=>{
  const gate=deferred(),f=fixture(()=>gate.promise);f.host.syncRun(run);f.host.currentRunState=state(run);
  f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');f.host.beginControllerCommand('selected',keyword,phaseDispatch(2));
  await f.host.applyNativeConsoleCommand({keyword:'terminate',testRun:{...run,status:'paused',controllerEntry:{active:false,revision:1}},participantSession:{...session,status:'signed_in'},controllerStatus:'RUNNING'},()=>true,phaseDispatch(1));
  assert.equal(f.host.debugControllerStatus,keyword==='pause'?'PAUSED':'RUNNING');assert.equal(f.calls.starter,0);assert.deepEqual(f.host.consoleRun,run);
  gate.resolve({currentRunState:state({...run,status:keyword==='pause'?'paused':'running',controllerEntry:{active:true,revision:2}})});await tick();assert.equal(f.host.debugControllerStatus,keyword==='pause'?'PAUSED':'RUNNING');
 });
+
+for (const origin of ['native', 'remote']) for (const initial of ['RUNNING', 'PAUSED']) for (const later of ['pause', 'resume']) {
+ test(`${origin}: the ${initial} termination finishes its own Starter continuation after later ${later} without reverting the controller`,async()=>{
+  const runtime=deferred(),entered=deferred();let f,settled=false;
+  const status=later==='pause'?'paused':'running',latest={...run,status,unitResponses:{unit:'Later trusted answer Ω'},controllerEntry:{active:true,revision:2},controllerDispatches:{'owned-controller':2},stateRevision:3};
+  const closed={...latest,controllerEntry:{active:false,revision:3},stateRevision:4};
+  const laterPhase=()=>{f.host.beginControllerCommand('selected',later,phaseDispatch(2));f.host.syncRun(latest);f.host.finishControllerPhase(phaseDispatch(2));f.host.commandControllerState={testRunId:'selected',status:status.toUpperCase(),entryRevision:2};};
+  const request=label=>{if(label==='Participant Starter'){entered.resolve();return runtime.promise;}assert.equal(label,'Participant Controller');return {controllerContext:{participantSession:{...session,contentReleaseId:'release',status:'signed_in'},testRun:closed}};};
+  f=fixture(request,async(command,_signal,options)=>{laterPhase();await options.apply({...remoteApplication(command),command:{...command,commandCompletion:'browser-v1'},testRun:closed,terminalContinuation:true,superseded:true},phaseDispatch(1));});
+  const original={...run,status:initial.toLowerCase()};f.host.syncRun(original);f.host.currentRunState=state(original);
+  let pending;
+  if(origin==='native'){
+   f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),initial);laterPhase();
+   pending=f.host.applyNativeConsoleCommand({keyword:'terminate',controllerStatus:initial,commandCompletion:'browser-v1',terminalContinuation:true,superseded:true,testRun:closed,participantSession:{...session,status:'signed_in'}},()=>true,phaseDispatch(1));
+  }else pending=f.host.applyReceivedParticipantCommand(remoteCommand('complete'),new AbortController().signal,()=>phaseDispatch(1));
+  pending=pending.then(()=>{settled=true;});await entered.promise;await tick();
+  assert.equal(settled,false);assert.equal(f.calls.starter,0);assert.equal(f.host.debugControllerStatus,status.toUpperCase());assert.deepEqual(f.host.consoleRun,latest);
+  runtime.resolve({runtimeState:{participantSession:{...run,status:'signed_in'}}});await pending;
+  assert.equal(settled,true);assert.equal(f.calls.starter,1);assert.equal(f.host.debugControllerStatus,status.toUpperCase());assert.deepEqual(f.host.consoleRun,latest);assert.equal(f.calls.failures.length,0);
+ });
+}
 test('a trusted Player ERROR after terminal phase entry survives the old termination receipt',async()=>{
  const f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.beginControllerCommand('selected','terminate',phaseDispatch(1),'RUNNING');
  f.host.handleVeronaControllerError({testRunId:'selected',unitKey:'unit',message:'Newer error'});assert.equal(f.host.debugControllerStatus,'ERROR');

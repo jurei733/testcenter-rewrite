@@ -108,6 +108,8 @@ export type ParticipantNativeCommandRequest = {
   timeStamp: number;
 };
 export type ParticipantNativeCommandResult = {
+  /** A real browser-v1 termination still owes its own Starter continuation. */
+  terminalContinuation?: true;
   commandCompletion?: "browser-v1";
   terminationNoop?: true;
   superseded?: true;

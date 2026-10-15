@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOriginalCompletionReference, referenceMicrotasks } from './original-controller-completion-reference.mjs';
 
+for (const later of ['pause', 'resume']) for (const lock of [false, true]) test(`actual Original accepted Pause flushes its answer independently of the next terminate and later ${later}${lock ? ' lock' : ''}`, { timeout: 5_000 }, async () => {
+ const f=createOriginalCompletionReference();
+ try {
+  f.seedAnswer();const pauseClosed=f.nextBufferClose();f.receiveCommand('pause');await pauseClosed;await referenceMicrotasks();
+  assert.equal(f.service.state$.getValue(),'PAUSED');assert.deepEqual(f.logs.map(entry=>entry.content),['pause']);
+  assert.deepEqual(Object.values(f.writes).map(values=>values.length),[1,1,1]);
+  f.setClock(20_000);const termClosed=f.nextBufferClose();f.receive(lock?['lock']:[]);await termClosed;await referenceMicrotasks();
+  assert.equal(f.service.state$.getValue(),'TERMINATED_PAUSED');assert.deepEqual(Object.values(f.writes).map(values=>values.length),[1,1,2]);assert.equal(f.locks.length,0);
+  const laterClosed=later==='pause'?f.nextBufferClose():Promise.resolve();f.setClock(25_000);f.receiveCommand(later);await laterClosed;await referenceMicrotasks();
+  const laterState=later==='pause'?'PAUSED':'RUNNING';assert.equal(f.service.state$.getValue(),laterState);assert.deepEqual(f.logs.map(entry=>entry.content),['pause',later]);
+  // Only Terminate's own test-state write is released. The earlier Pause's
+  // answer/unit-state/test-state writes deliberately remain unresolved.
+  f.setClock(30_000);f.writes.testState[1].completion.next(undefined);f.writes.testState[1].completion.complete();await referenceMicrotasks();
+  assert.equal(f.locks.length,Number(lock));if(lock){f.releaseLock();await referenceMicrotasks();}
+  assert.equal(f.navigations.at(-1)[0][0],'/r/starter');assert.equal(f.service.state$.getValue(),laterState);
+  assert.equal(f.writes.unitData[0].completion.isStopped,false);assert.equal(f.writes.unitState[0].completion.isStopped,false);assert.equal(f.writes.testState[0].completion.isStopped,false);
+  f.setClock(40_000);f.releaseNavigation();await referenceMicrotasks();assert.deepEqual(f.logs.map(entry=>[entry.content,entry.timeStamp]),[['pause',10_000],[later,25_000],[lock?'terminate lock':'terminate',40_000]]);
+ }finally{f.stop();await referenceMicrotasks();}
+});
+
 for (const initial of ['RUNNING', 'PAUSED']) for (const later of ['pause', 'resume']) for (const lock of [false, true]) {
   test(`actual Original ${initial} held terminate ${lock ? 'with' : 'without'} lock finishes after later ${later}`, { timeout: 5_000 }, async () => {
     const f = createOriginalCompletionReference({ initial });

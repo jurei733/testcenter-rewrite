@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
 import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
+const {createParticipantSaveBarriers}=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(readFileSync(new URL('../apps/web/src/app/participant-save-barrier.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText).toString('base64')}`);
 
 const transpile = source => ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
@@ -26,7 +27,7 @@ const facadeSource = readFileSync(new URL("../apps/web/src/app/participant-view.
 const ast = ts.createSourceFile("participant-view.facade.ts", facadeSource, ts.ScriptTarget.ES2022, true);
 const declaration = ast.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ParticipantViewFacade");
 const methods = ["saveVeronaResponse", "saveVeronaTestLogs", "effectiveUnitResponse", "scheduleVeronaSaveDrain", "clearVeronaSaveBuffer", "drainVeronaSaveQueue",
-  "nextPersistentVeronaSave", "restorePersistentVeronaSave", "retryVeronaSave", "removeMatchingDeliveredOutbox"].map(name => {
+  "nextPersistentVeronaSave", "restorePersistentVeronaSave", "retryVeronaSave", "removeMatchingDeliveredOutbox", "settleVeronaAutoSaveBeforeForegroundAction"].map(name => {
   const method = declaration?.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(ast) === name);
   assert.ok(method, `The production ${name} method must exist.`);
   return method.getText(ast);
@@ -83,6 +84,9 @@ const withHost = async action => {
   host.ephemeralUnitResponses = new Map();
   host.veronaSaveDrainPromise = null;
   host.veronaSaveInFlight = null;
+  host.veronaSaveBarriers=createParticipantSaveBarriers();
+  host.veronaForegroundSaveSettlements=0;
+  host.runtime.testRunId='selected-run';
   host.veronaSaveRetrySequence = 0;
   host.veronaSaveRetryRunId = null;
   host.currentStateAppliedRefreshSequence = 1;
@@ -129,6 +133,41 @@ test("a successful save during ERROR acknowledges exact data without applying it
   });
 });
 
+test('foreground settlement waits for a direct in-flight request even after a view/outbox acknowledgement removes its entry',async()=>{
+ await withHost(async({host,currentState})=>{
+  const packet=entry('2'),held=deferred();outbox.persistParticipantSaveOutboxEntry(packet);host.pendingVeronaSave=packet;host.respond=()=>held.promise;
+  const drain=host.drainVeronaSaveQueue({allowForegroundSettlement:true,refreshCurrentState:false});assert.equal(host.veronaSaveDrainPromise,null);
+  const barrier=host.veronaSaveBarriers.close([packet],{controllerId:'owned',sequence:1});let settled=false;
+  const waiting=host.settleVeronaAutoSaveBeforeForegroundAction(barrier).then(()=>{settled=true;});
+  outbox.removeParticipantSaveOutboxEntry(packet.testRunId,packet.deliveryId);currentState.testRun.unitResponses['2']=packet.response;host.currentStateAppliedRefreshSequence++;
+  for(let i=0;i<10;i++)await Promise.resolve();assert.equal(settled,false);
+  held.resolve({testRun:currentState.testRun});await drain;await waiting;assert.equal(settled,true);assert.equal(host.veronaForegroundSaveSettlement,false);
+ });
+});
+test('a later termination can settle while an earlier Pause buffer request remains unresolved',async()=>{
+ await withHost(async({host,currentState})=>{
+  const packet=entry('2'),held=deferred();outbox.persistParticipantSaveOutboxEntry(packet);host.pendingVeronaSave=packet;host.respond=()=>held.promise;
+  host.veronaSaveBarriers.close([packet],{controllerId:'owned',sequence:1});const drain=host.drainVeronaSaveQueue({allowForegroundSettlement:true,refreshCurrentState:false});
+  const term=host.veronaSaveBarriers.close([packet],{controllerId:'owned',sequence:2});await host.settleVeronaAutoSaveBeforeForegroundAction(term);
+  assert.equal(host.veronaSaveInFlight.deliveryId,packet.deliveryId);held.resolve({testRun:currentState.testRun});await drain;
+ });
+});
+test('overlapping foreground settlements keep buffering blocked until both concrete waits finish',async()=>{
+ await withHost(async({host})=>{
+  const a=entry('2'),b=entry('3'),first=deferred(),second=deferred();host.veronaSaveBarriers.track(a,first.promise);host.veronaSaveBarriers.track(b,second.promise);
+  const one=host.settleVeronaAutoSaveBeforeForegroundAction(host.veronaSaveBarriers.close([a],{controllerId:'owned',sequence:1}));
+  const two=host.settleVeronaAutoSaveBeforeForegroundAction(host.veronaSaveBarriers.close([b],{controllerId:'owned',sequence:2}));
+  assert.equal(host.veronaForegroundSaveSettlements,2);first.resolve();await one;assert.equal(host.veronaForegroundSaveSettlement,true);assert.equal(host.veronaForegroundSaveSettlements,1);
+  second.resolve();await two;assert.equal(host.veronaForegroundSaveSettlement,false);assert.equal(host.veronaForegroundSaveSettlements,0);
+ });
+});
+test('a response-only acknowledgement cannot reveal a Goto projection before its command receipt arrives',async()=>{
+ await withHost(async({host,calls,currentState})=>{
+  const packet=entry('2');currentState.testRun.currentUnitKey='2';host.pendingControllerStatus='RUNNING';host.pendingVeronaSave=packet;
+  host.respond=()=>({testRun:{...currentState.testRun,currentUnitKey:'3',unitResponses:{'2':packet.response}}});
+  await host.drainVeronaSaveQueue();assert.deepEqual(calls.synchronized,[]);assert.equal(calls.refreshed,0);assert.equal(currentState.testRun.currentUnitKey,'2');
+ });
+});
 test("a response from before an accepted pause cannot overwrite the newer applied state", async () => {
   await withHost(async ({host,calls,currentState}) => {
     const packet=entry("8");outbox.persistParticipantSaveOutboxEntry(packet);

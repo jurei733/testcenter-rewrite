@@ -1,6 +1,62 @@
 # Testcenter parity checklist
 
-### Held termination survives later Pause/Resume: open counterexample (2026-10-14)
+### Independent terminal continuation and closed save buffers (2026-10-15)
+
+The held-termination counterexample below is corrected in the application and
+production browser. An accepted browser-v1 termination retains its own lock and
+Starter continuation after a later Pause/Resume has already finished. Its state
+effect uses the current locked Run and parent, changes only the requested lock,
+controller-entry departure and parent status, and preserves later answers, Unit,
+timers and dispatch highwater. Receipt replay cannot close a subsequent entry.
+The general stale-projection fence remains intact. Legacy command behavior is
+unchanged; this is not complete mixed-version qualification.
+
+The participant facade tracks concrete save-request acknowledgements separately
+from visible/outbox entries and assigns each closed buffer to its first handler.
+Original Pause/Goto close buffers without waiting for their saved events; Resume
+navigates directly. Terminate waits for its own captured buffers, including Player
+updates captured during the existing foreground grace interval. Later handlers
+cannot steal its wait, and an earlier Pause's already-closed answer does not
+become Terminate's new wait. Response-only packets may still save after locking
+without navigating, resuming, unlocking or replacing the controller projection.
+
+Fresh local evidence: all 2,518 unit/frontend tests pass without skips or
+cancellations, the 48-case actual-Original/service differential passes on Memory,
+File and SQLite, and all 43 production Chromium/SQLite loading/overlap groups
+pass. The production build remains 469.99 kB under the unchanged 470 kB hard cap.
+The root CI unit job now also executes the differential as
+`test:parity:terminal-overlap:built`. All 1,616 PostgreSQL tests, 498 full HTTP
+tests on Memory/File/SQLite, and 61 compatibility tests also pass without skips
+or cancellations. PostgreSQL schema-59 doctor, runtime preflight and startup
+pass against an owned PostgreSQL 16 instance. The current production dependency
+audit reports zero vulnerabilities. These are local checks; current container,
+remote CI and release acceptance are not claimed here.
+
+The broader Chromium gates pass all 22 controller-timer cases, 15 Debug groups,
+nine actual Original Worker cases, five old-context-API compatibility groups and
+both native/remote completion lost-reply/reload cases. The latter now has its own
+npm command in the root CI console job. The initial timer-smoke failure pinned
+an obsolete native-Pause answer-wait assumption; the revised gate instead proves
+Pause completes before that answer reply, retains the exact timer/data assertions,
+and keeps Terminate's saved-event wait plus legacy FIFO assertions. Six native
+route groups and ten crash/copied-tab groups also pass, bringing this focused
+browser qualification to 112 groups. The route gate proves independent Goto
+completion and cancellation of Terminate during its own saved-buffer wait. The
+real browser-process crash gate retains both prepared and unprepared terminal
+intents plus a prepared Resume, restores the actual crashed tab through Chromium,
+and proves that a new owner cannot replay or remove the former journal. The older
+unprepared-Goto assumption is replaced by the actual terminal saved-event barrier;
+prepared terminal crash coverage remains intact. The protected presentation's
+SHA-256 remains `7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8a`.
+
+Upstream is now `eedae41840cbe90e5547c0211da818bdf620f5aa` (2026-10-14).
+All five complete Original completion-reference source files retain their pinned
+SHA-256 hashes. Its intervening change concerns unfiltered workspace reports;
+that report behavior needs a separate comparison. Formal parity remains
+30 complete and 19 partial areas. Full functional/visual/package acceptance and
+production-environment proof remain open.
+
+### Held termination survives later Pause/Resume: historical counterexample (2026-10-14)
 
 The pinned Original completion fixture now also extracts the actual `pause`,
 `resume`, `setUnitNavigationRequest` and `UnitNavigationTarget` declarations. Its

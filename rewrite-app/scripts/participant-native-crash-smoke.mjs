@@ -75,8 +75,11 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
         await initial.route("**/native-commands", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"owned_temporarily_unavailable"}' }));
         await command(page, "terminate", ["lock"]);
         await poll(async () => Object.values(await journal(page)).some(raw => JSON.parse(raw).prepared), "The first offline native packet was not prepared");
-        // Overlapping commands can both prepare now. Hold a real, already
-        // committed answer receipt to retain the unprepared-intent crash case.
+        // Goto and Resume do not wait for saved buffers in the Original.
+        // Keep the prepared terminal packet, reopen the local controller, then
+        // capture a new answer in another Terminate's own saved-event barrier.
+        await command(page, "resume");
+        await poll(async () => Object.values(await journal(page)).some(raw => { const entry = JSON.parse(raw); return entry.keyword === "resume" && entry.prepared; }), "The offline Resume was not prepared independently");
         let answerCommitted=false;
         await initial.route("**/save-progress",async route=>{
           const response=await route.fetch();assert.equal(response.status(),200);answerCommitted=true;
@@ -86,7 +89,8 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
         await poll(()=>Promise.resolve(answerCommitted),"The trusted preparation receipt was not committed and held");
         saved=answers(await read(run.testRunId));
         assert.equal(parseVeronaUnitResponse(saved.responses['first-1'])?.unitState.dataParts.answer,answer);
-        await command(page, "goto", ["2"]);
+        await command(page, "terminate", ["lock"]);
+        await poll(async () => Object.values(await journal(page)).some(raw => { const entry = JSON.parse(raw); return entry.keyword === "terminate" && !entry.prepared; }), "The second terminal intent did not retain its own answer barrier");
       } else {
         await initial.route("**/native-commands", async route => {
           const response = await route.fetch(), body = await response.json(); replies.push(body);
@@ -98,9 +102,12 @@ export async function verifyParticipantNativeCrashRecovery({ base, workspaceKey,
       await poll(async () => Object.values(await journal(page)).some(raw => JSON.parse(raw).prepared), "Pre-crash native command was not prepared");
       if (kind === "committed") await poll(() => Promise.resolve(replies.some(body => body.application?.applied)), "The held receipt did not commit on the server");
       const oldJournal = await journal(page), entries = Object.values(oldJournal).map(raw => JSON.parse(raw));
-      assert.equal(entries.length, kind === "queued" ? 2 : 1);
+      assert.equal(entries.length, kind === "queued" ? 3 : 1);
       assert.ok(entries.some(entry => entry.prepared));
-      if (kind === "queued") assert.ok(entries.some(entry => !entry.prepared));
+      if (kind === "queued") {
+        assert.ok(entries.some(entry => entry.keyword === "terminate" && entry.prepared));
+        assert.deepEqual(entries.filter(entry => !entry.prepared).map(entry => entry.keyword), ["terminate"]);
+      }
       const oldOwner = await page.evaluate(key => sessionStorage.getItem(key), ownerKey);
       assert.ok(entries.every(entry => entry.owner === oldOwner && entry.scope.testRunId === run.testRunId));
       assert.ok(!JSON.stringify(oldJournal).includes(identity.sessionToken), "The native journal contains a credential");

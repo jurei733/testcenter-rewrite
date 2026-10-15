@@ -29,7 +29,7 @@ export class ParticipantDebugLauncherComponent implements OnInit, OnDestroy, DoC
       generation: () => this.view.consoleControllerGeneration,
       captureTimer: (request, allocate) => this.view.captureControllerTimerInterruption(request, allocate),
       started: request => this.view.beginControllerCommand(request.testRunId, request.keyword, request.controllerDispatch, request.controllerStatus),
-      prepare: isCurrent => this.view.prepareNativeConsoleCommand(isCurrent),
+      prepare: (isCurrent, keyword, dispatch) => this.view.prepareNativeConsoleCommand(isCurrent, keyword, dispatch),
       applied: (result, isCurrent, dispatch) => this.view.applyNativeConsoleCommand(result, isCurrent, dispatch),
       completed: (scope, request) => this.view.completeNativeConsoleCommand(scope, request),
       failed: error => this.view.nativeConsoleCommandFailed(error) });

@@ -121,7 +121,23 @@ for (const kind of kinds) test(`${kind}: progress delivery receipts and Source f
         assert.deepEqual(await snapshot(f, input.deliveryId), before);
       }
     });
-    for (const state of ['locked', 'completed']) await t.test(`an accepted retry acknowledges the current ${state} Run; new deliveries still reject`, async () => {
+    await t.test('an owned response-only packet survives a terminal lock without reopening its controller or bypassing navigation restrictions', async () => {
+      const f=await fixture(),first=request(f,{responseOnly:true,responseTimestamp:100,unitResponse:packet({dataParts:{answer:'Before lock'}},{dataParts:{answer:100}})});
+      await f.services.participantRuntime.saveProgress(first);
+      await repository.mutateParticipantRun(f.run,context=>({testRun:{...context.testRun,locked:true,status:'paused',pauseSource:'monitor'},
+        participantSession:{...context.participantSession,status:'signed_in'},controllerEntryActive:false,testLogs:[],activityEvents:[]}));
+      const before=await snapshot(f),delivery=request(f,{responseOnly:true,responseTimestamp:101,unitResponse:packet({dataParts:{answer:'Buffered exact Ω\n'}},{dataParts:{answer:101}})});
+      const result=await f.services.participantRuntime.saveProgress(delivery);assert.equal(parseVeronaUnitResponse(result.unitResponses.unit).unitState.dataParts.answer,'Buffered exact Ω\n');
+      const after=await snapshot(f,delivery.deliveryId);
+      for(const key of ['status','pauseSource','currentUnitKey','locked','controllerEntry','controllerDispatches','testletTimers','lockedTestletKeys','lockedUnitKeys'])assert.deepEqual(after.run[key],before.run[key],key);
+      assert.deepEqual(after.parent,before.parent);
+      await f.services.participantRuntime.saveProgress(delivery);assert.deepEqual(await snapshot(f,delivery.deliveryId),after);
+      const stale=request(f,{responseOnly:true,responseTimestamp:99,unitResponse:packet({dataParts:{answer:'Stale'}},{dataParts:{answer:99}})});
+      const ignored=await f.services.participantRuntime.saveProgress(stale);assert.equal(parseVeronaUnitResponse(ignored.unitResponses.unit).unitState.dataParts.answer,'Buffered exact Ω\n');
+      await assert.rejects(f.services.participantRuntime.saveProgress({...delivery,deliveryId:randomUUID(),currentUnitKey:'second'}),denied('participant_response_delivery_invalid'));
+      await assert.rejects(f.services.participantRuntime.saveProgress({...delivery,deliveryId:randomUUID(),responseOnly:false}),denied('test_run_locked'));
+    });
+    for (const state of ['locked', 'completed']) await t.test(`an accepted retry acknowledges the current ${state} Run; new legacy deliveries still reject`, async () => {
       const f = await fixture(), input = request(f); await f.services.participantRuntime.saveProgress(input);
       await repository.mutateParticipantRun(f.run, context => ({ testRun: { ...context.testRun,
         ...(state === 'locked' ? { locked: true, status: 'paused', pauseSource: 'monitor' } : { status: 'completed', currentUnitKey: null, completedAt: timestamp }) }, testLogs: [], activityEvents: [] }));

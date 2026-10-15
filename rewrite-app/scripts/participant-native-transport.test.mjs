@@ -197,6 +197,11 @@ for(const change of [value=>{value.stateRevision=0;},value=>{value.stateRevision
  const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);change(value.application.testRun);return {ok:true,json:async()=>value};}});
  try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);assert.equal(f.values.size,0);}finally{f.native.stop();}
 });
+for(const terminalContinuation of [false,true])test(`a native Pause cannot accept terminal continuation metadata ${terminalContinuation}`,async()=>{
+ const f=fixture({respond:async(body,_count,receipt)=>{const value=receipt(body);value.application.terminalContinuation=terminalContinuation;value.application.commandCompletion='browser-v1';return {ok:true,json:async()=>value};}});
+ f.options.completed=()=>assert.fail('A malformed receipt completed');
+ try{f.native.command('pause',[]);await f.advance();assert.deepEqual(f.applied,[]);assert.equal(f.failures.length,1);}finally{f.native.stop();}
+});
 
 for(const keyword of ['pause','resume','goto'])test(`${keyword} starts synchronously before its own held preparation without repeating on retry`,async()=>{
  const gate=deferred(),starts=[],f=fixture({prepare:()=>gate.promise,started:request=>starts.push(structuredClone(request)),respond:async()=>({ok:false,status:503})});

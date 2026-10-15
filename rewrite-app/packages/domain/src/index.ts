@@ -1414,6 +1414,7 @@ export type ParticipantRunCommandEffect = {
 };
 
 export type ParticipantRunCommandApplicationResult = {
+  terminalContinuation?: true;
   controllerDispatch?: ParticipantControllerDispatch;
   superseded?: true;
   command: ParticipantRunCommand;

@@ -90,13 +90,15 @@ for (const kind of ['memory', 'file', 'sqlite']) {
           controllerStatus: request.controllerStatus, controllerDispatch: request.controllerDispatch, commandCompletion: 'browser-v1' });
       clock = epoch + 20_000; const result = await apply();
       const after = await repository.getTestRunById(testRunId);
+      assert.equal(result.terminalContinuation, true, 'The accepted handler must retain its independent navigation authority');
       for (const key of ['unitResponses', 'unitResponseFieldTimestamps', 'currentUnitKey', 'controllerDispatches']) assert.deepEqual(after[key], before[key], key);
       const actual = { status: after.status, locked: after.locked === true, controllerEntryActive: after.controllerEntry?.active === true };
       const mismatches = Object.keys(expected).filter(key => actual[key] !== expected[key]);
       const effectLogs = (await repository.listParticipantTestLogsByWorkspace(base.tenantId, base.workspaceId))
         .filter(value => value.testRunId === testRunId && value.logKey === 'command executed');
       assert.equal(effectLogs.length, 0, 'Effects must not fabricate a browser completion');
-      await apply(); assert.deepEqual(await repository.getTestRunById(testRunId), after, 'Effect receipt replay must be idempotent');
+      const replay = await apply(); assert.equal(replay.terminalContinuation, true);
+      assert.deepEqual(await repository.getTestRunById(testRunId), after, 'Effect receipt replay must be idempotent');
       cases.push({ kind, origin, initial, later, lock, expected, actual, mismatches, superseded: result.superseded === true,
         preservedAnswersUnitAndDispatch: true, effectReplayPreservedRun: true, parity: mismatches.length === 0 });
     }
@@ -107,6 +109,8 @@ const report = { sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { enco
   referenceFiles: Object.fromEntries(Object.entries(completionReference.sources).map(([key, value]) => [key, { path: value.path, sha256: value.fileSha256 }])),
   auditSha256: sha256(await readFile(new URL(import.meta.url))),
   applicationSourceSha256: sha256(await readFile(new URL('../packages/application/src/index.ts', import.meta.url))),
+  terminalContinuationSourceSha256: sha256(await readFile(new URL('../packages/application/src/participant-terminal-continuation.ts', import.meta.url))),
+  terminalContinuationBuiltSha256: sha256(await readFile(new URL('./participant-terminal-continuation.js', import.meta.resolve('@testcenter-rewrite-app/application')))),
   applicationBuiltSha256: sha256(await readFile(new URL(import.meta.resolve('@testcenter-rewrite-app/application')))),
   scope: 'Actual pinned Original buffer barrier, later native Pause/Resume, terminal lock call, Starter navigation and completion callback versus current built Rewrite native and deferred remote state-effect services on Memory/File/SQLite. Original backend/router are controlled I/O; Rewrite Angular/HTTP/Player and PostgreSQL are outside this witness. Original remote command delivery itself is not covered. Controller-entry expectation derives from the observed Original Starter destination, not Original metadata.',
   references, cases, parity: cases.every(value => value.parity) };

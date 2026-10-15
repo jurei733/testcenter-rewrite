@@ -56,6 +56,51 @@ for (const kind of kinds) test(`${kind}: command completion is distinct from the
     const complete = (scope, command, timeStamp = clock) => ({ participantSessionId: scope.participantSessionId,
       testRunId: scope.testRunId, contentReleaseId, bookletKey: 'owned', command, timeStamp });
     const rejected = (action, code) => assert.rejects(action, error => error.errorCode === code);
+    for (const origin of ['native', 'remote']) for (const later of ['pause', 'resume']) for (const lock of [false, true]) await t.test(`${origin}: held termination finishes after ${later}${lock ? ' with lock' : ''} and replays without closing a fresh entry`, async () => {
+      const scope = await seed(), request = { ...native(scope), arguments: lock ? ['lock'] : [],
+        controllerDispatch: { controllerId: 'owned-overlap', sequence: 1 } };
+      const siblingId = randomUUID(), sibling = { ...(await repository.getTestRunById(scope.testRunId)), testRunId: siblingId, bookletAssignmentKey: 'sibling' };
+      await repository.saveTestRun(sibling);
+      const siblingBefore = await repository.getTestRunById(siblingId);
+      let command = { kind: 'native', request }, apply;
+      if (origin === 'remote') {
+        const commandId = randomUUID(); command = { kind: 'remote', commandId };
+        await repository.appendParticipantRunCommand({ ...scope, commandId, commandType: lock ? 'complete_and_lock' : 'complete',
+          targetUnitKey: null, remainingSeconds: null, actorId: 'owned-monitor', issuedAt: new Date(clock).toISOString(), effectsDeferred: true });
+        await service().participantRuntime.acknowledgeCommand({ participantSessionId: scope.participantSessionId, testRunId: scope.testRunId, commandId });
+        apply = () => service().participantRuntime.executeCommand({ participantSessionId: scope.participantSessionId, testRunId: scope.testRunId,
+          commandId, controllerStatus: 'RUNNING', controllerDispatch: request.controllerDispatch, commandCompletion: 'browser-v1' });
+      } else apply = () => service().participantRuntime.executeNativeCommand({ participantSessionId: scope.participantSessionId, ...request });
+      clock += 5_000;
+      await service().participantRuntime.executeNativeCommand({ participantSessionId: scope.participantSessionId, ...native(scope), keyword: later,
+        controllerStatus: 'TERMINATED', controllerDispatch: { controllerId: 'owned-overlap', sequence: 2 } });
+      const before = await repository.getTestRunById(scope.testRunId);
+      clock += 5_000; const effect = await apply(), after = await repository.getTestRunById(scope.testRunId);
+      assert.equal(effect.terminalContinuation, true); assert.equal(effect.superseded, true);
+      assert.equal(after.status, later === 'pause' ? 'paused' : 'running'); assert.equal(after.locked === true, lock);
+      assert.equal(after.controllerEntry.active, false); assert.ok(after.controllerEntry.revision > before.controllerEntry.revision);
+      for (const key of Object.keys(before).filter(key => !['locked', 'updatedAt', 'controllerEntry', 'stateRevision'].includes(key))) assert.deepEqual(after[key], before[key], key);
+      assert.deepEqual(await repository.getTestRunById(siblingId), siblingBefore);
+      assert.deepEqual(await logs(scope), []);
+      if (kind !== 'memory') { await storage.shutdown(); await open(); }
+      const reopened = await repository.getTestRunById(scope.testRunId);
+      assert.deepEqual(JSON.parse(JSON.stringify(reopened)), JSON.parse(JSON.stringify(after)));
+      const replay = await apply(); assert.equal(replay.applied, false); assert.equal(replay.terminalContinuation, true);
+      assert.deepEqual(await repository.getTestRunById(scope.testRunId), reopened);
+      clock += 5_000; await service().participantRuntime.completeCommand(complete(scope, command));
+      assert.equal((await logs(scope)).length, 1); assert.equal((await logs(scope))[0].logContent, lock ? 'terminate lock' : 'terminate');
+      assert.deepEqual(await repository.getTestRunById(scope.testRunId), reopened);
+      // A subsequent accepted entry is not another application of the old
+      // terminal effect, even when its lost reply is retried afterward.
+      if (!lock) {
+        clock += 5_000;
+        await service().participantRuntime.executeNativeCommand({ participantSessionId: scope.participantSessionId, ...native(scope), keyword: 'resume',
+          controllerStatus: later === 'pause' ? 'PAUSED' : 'RUNNING', controllerDispatch: { controllerId: 'owned-overlap', sequence: 3 } });
+        const fresh = await repository.getTestRunById(scope.testRunId); assert.equal(fresh.controllerEntry.active, true);
+        const stale = await apply(); assert.equal(stale.applied, false); assert.equal(stale.terminalContinuation, true);
+        assert.deepEqual(await repository.getTestRunById(scope.testRunId), fresh);
+      }
+    });
     await t.test('native effect has no completion log; completion and exact replay preserve the Run', async () => {
       const scope = await seed(), request = native(scope);
       const effect = await service().participantRuntime.executeNativeCommand({ participantSessionId: scope.participantSessionId, ...request });

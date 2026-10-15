@@ -1,5 +1,39 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current continuation: held termination and save ownership (2026-10-15)
+
+Continue on `testcenter-production-readiness`. The current correction preserves
+the earlier terminal handler's own lock/Starter navigation after a later
+Pause/Resume without restoring the older controller/data projection. Concrete
+save-request barriers survive outbox/view acknowledgement and preserve each
+handler's closed-buffer ownership. The 48-case Original differential and all
+43 focused production-browser groups pass; all 2,518 unit/frontend tests pass.
+The production build stays 469.99 kB under the unchanged 470 kB gate.
+
+The fresh 1,616 PostgreSQL, 498 HTTP and 61 compatibility tests also pass without
+skips/cancellations; PostgreSQL doctor/preflight/startup and the zero-vulnerability
+production dependency audit pass. The broader browser gates pass all 22 timer,
+15 Debug, nine actual Original Worker, five old-context-API and two lost-completion-
+reply cases. Six native-route and ten crash/copied-tab groups also pass; the
+focused total is 112. The crash probe retains both prepared and unprepared
+terminal intents and restores a real crashed Chromium tab without replaying the
+former owner's journal. The timer smoke's former
+native-Pause saved-answer wait contradicted the actual Original reference; the
+revised gate requires Pause to complete independently while retaining the same
+timer/data checks, Terminate saved-event wait and legacy FIFO assertions.
+The route gate separately proves independent Goto completion and cancellation of
+Terminate during its own buffer wait. Keep failed-attempt evidence. Verify the
+published branch/PR and current remote CI live; no current release/deployment
+evidence is established by older image checks.
+
+Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` has unchanged hashes
+for all five completion-reference sources and a new unfiltered-report fix.
+Compare that report behavior next, then continue the remaining partial areas
+against current source and real packages. Full parity/production readiness is
+still open (30 complete/19 partial); do not promote the focused fix to completion.
+Preserve untracked `docs/testcenter-thread-migration-process.pptx` and local data.
+See [current evidence in PARITY](./PARITY.md#independent-terminal-continuation-and-closed-save-buffers-2026-10-15).
+
 ### Atomic fresh participant Run initialization (2026-10-11)
 
 Local application checkpoint `613e2323e17c` resolves the reserved-Run/initial-log

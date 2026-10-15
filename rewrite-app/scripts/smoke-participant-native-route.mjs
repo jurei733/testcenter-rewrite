@@ -143,16 +143,45 @@ try {
   const heldSave = async route => { const response = await route.fetch(); assert.equal(response.status(), 200); saveHeld = true; await saveGate; try { await route.fulfill({ response }); } catch {} };
   await page.route("**/save-progress", heldSave); await player().fill("Second Unit drain Ω");
   await poll(() => Promise.resolve(saveHeld), "Trusted save was not held");
-  const beforePrepare = nativeRequests.length; await native("goto", ["1"]);
-  await poll(async () => (await journal()).some(entry => !entry.prepared), "Waiting native preparation was not journaled");
+  const beforeGoto = nativeRequests.length; await native("goto", ["1"]);
+  await poll(async () => nativeRequests.length === beforeGoto + 1 && (await read(first.testRunId)).currentUnitKey === "first-1", "Goto waited for the already-closed answer buffer");
+  await emptyJournal(); await player().waitFor();
   await page.goBack(); await page.getByRole("heading", { name: "Privacy", exact: true }).waitFor();
   assert.equal((await journal()).length, 0); assert.equal(await page.evaluate(() => window.ownedRouteDocument), "same document Ω");
   releaseSave(); await page.unroute("**/save-progress", heldSave); await page.goForward(); await methods(); await player().waitFor();
   await page.evaluate(() => dispatchEvent(new Event("online"))); await delay(1200);
-  assert.equal(nativeRequests.length, beforePrepare); const drained = await read(first.testRunId);
-  assert.equal(drained.currentUnitKey, "first-2"); assert.equal(parseVeronaUnitResponse(drained.unitResponses["first-2"]).unitState.dataParts.answer, "Second Unit drain Ω");
+  assert.equal(nativeRequests.length, beforeGoto + 1); const drained = await read(first.testRunId);
+  assert.equal(drained.currentUnitKey, "first-1"); assert.equal(parseVeronaUnitResponse(drained.unitResponses["first-2"]).unitState.dataParts.answer, "Second Unit drain Ω");
   assert.deepEqual(drained.unitResponses["first-1"], saved.responses["first-1"]); assert.deepEqual(drained.unitResponseFieldTimestamps["first-1"], saved.clocks["first-1"]);
-  mark("route-destruction-during-trusted-answer-drain-cannot-dispatch-goto");
+  mark("goto-finishes-before-its-closed-answer-reply-and-route-reentry-cannot-replay-it");
+
+  const beforeTerminalFrame = await page.locator("iframe").elementHandle();
+  await native("goto", ["2"]); await poll(async () => (await read(first.testRunId)).currentUnitKey === "first-2", "Terminal buffer fixture did not return to the second Unit");
+  await poll(() => beforeTerminalFrame.evaluate(frame => !frame.isConnected), "Terminal buffer fixture retained its former Unit frame");
+  await player().waitFor(); await emptyJournal();
+  let releaseTerminalSave, terminalSaveHeld = false;
+  const terminalSaveGate = new Promise(done => { releaseTerminalSave = done; }); releases.push(releaseTerminalSave);
+  const heldTerminalSave = async route => {
+    const response = await route.fetch(); assert.equal(response.status(), 200);
+    if (parseVeronaUnitResponse(route.request().postDataJSON().unitResponse)?.unitState.dataParts.answer === "Own terminal buffer Ω") {
+      terminalSaveHeld = true; await terminalSaveGate;
+    }
+    try { await route.fulfill({ response }); } catch {}
+  };
+  await page.route("**/save-progress", heldTerminalSave); await player().fill("Own terminal buffer Ω");
+  await poll(() => Promise.resolve(terminalSaveHeld), "Termination did not capture its own trusted save request");
+  const beforePrepare = nativeRequests.length; await native("terminate");
+  await poll(async () => (await journal()).some(entry => entry.keyword === "terminate" && !entry.prepared), "Waiting terminal preparation was not journaled");
+  assert.equal(nativeRequests.length, beforePrepare);
+  await page.goBack(); await page.getByRole("heading", { name: "Privacy", exact: true }).waitFor();
+  assert.equal((await journal()).length, 0); assert.equal(await page.evaluate(() => window.ownedRouteDocument), "same document Ω");
+  releaseTerminalSave(); await page.unroute("**/save-progress", heldTerminalSave); await page.goForward(); await methods(); await player().waitFor();
+  await page.evaluate(() => dispatchEvent(new Event("online"))); await delay(1200);
+  const afterCanceledPreparation = await read(first.testRunId);
+  assert.equal(nativeRequests.length, beforePrepare); assert.equal(afterCanceledPreparation.status, "running"); assert.equal(afterCanceledPreparation.currentUnitKey, "first-2");
+  assert.equal(parseVeronaUnitResponse(afterCanceledPreparation.unitResponses["first-2"]).unitState.dataParts.answer, "Own terminal buffer Ω");
+  assert.deepEqual(afterCanceledPreparation.unitResponses["first-1"], saved.responses["first-1"]);
+  mark("route-destruction-during-its-own-saved-buffer-wait-cannot-dispatch-termination");
 
   let releaseNative, nativeHeld = false;
   const nativeGate = new Promise(done => { releaseNative = done; }); releases.push(releaseNative);

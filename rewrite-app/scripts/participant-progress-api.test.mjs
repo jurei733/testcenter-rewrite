@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { Pool } from "pg";
 import { productionApiRoutes as routes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
-import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
+import { mergeCapturedVeronaUnitResponse, parseCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
 import { createPostgresFirstSliceStorage } from "@testcenter-rewrite-app/postgres-store";
 import { createProductionApiServer } from "../apps/api/dist/apps/api/src/index.js";
@@ -163,13 +163,26 @@ test(`real ${postgres ? "PostgreSQL" : "SQLite"} participant progress API preser
       assert.equal(accepted.testRun.unitResponseFieldTimestamps[unitKey].dataParts.answer, clocks.opaque + 1);
       assert.equal((await repository.getTestRunById(target)).unitResponses[unitKey], response);
     });
-    await t.test('an accepted retry after a monitor lock returns the locked Run while a new delivery rejects', async () => {
+    await t.test('a terminal lock accepts owned response-only HTTP writes while legacy writes and navigation remain blocked', async () => {
+      const unitKey=old.responseUnitKey,secondUnitKey=content.bookletEntries[0].unitEntries[1].unitKey;
       await request('POST', workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: 'lock_test' }, operator);
       const before = await repository.getTestRunById(run.testRunId);
       assert.equal(before.locked, true);
       const acknowledged = await save(old); assert.equal(acknowledged.testRun.locked, true);
       await save({ ...old, deliveryId: randomUUID() }, selected.sessionToken, 423);
       assert.deepEqual(await repository.getTestRunById(run.testRunId), before);
+      await request('POST', `/api/v1/participant/sessions/${sessionId}/native-commands`, { testRunId:run.testRunId,
+        contentReleaseId:before.contentReleaseId,bookletKey:before.bookletKey,deliveryId:randomUUID(),keyword:'terminate',arguments:[],
+        controllerStatus:before.status.toUpperCase(),timeStamp:Date.now(),commandCompletion:'browser-v1' },selected.sessionToken);
+      const closed=await repository.getTestRunById(run.testRunId),parent=await repository.getParticipantSessionById(sessionId);
+      assert.equal(closed.controllerEntry.active,false);assert.equal(closed.locked,true);
+      const exact='Late locked HTTP answer Ω\n',response=mergeCapturedVeronaUnitResponse(closed.unitResponses[unitKey]??'',{
+        unitState:{dataParts:{answer:exact}},captureTimestamp:Date.now(),storedFieldTimestamps:closed.unitResponseFieldTimestamps[unitKey] });
+      const accepted=await save({deliveryId:randomUUID(),responseOnly:true,responseUnitKey:unitKey,unitResponse:response,responseTimestamp:Date.now(),status:'running'});
+      assert.equal(parseCapturedVeronaUnitResponse(accepted.testRun.unitResponses[unitKey]).unitState.dataParts.answer,exact);
+      for(const key of ['status','pauseSource','currentUnitKey','locked','controllerEntry','controllerDispatches','testletTimers','lockedTestletKeys','lockedUnitKeys'])assert.deepEqual(accepted.testRun[key],closed[key],key);
+      assert.deepEqual(await repository.getParticipantSessionById(sessionId),parent);
+      await save({deliveryId:randomUUID(),responseOnly:true,responseUnitKey:unitKey,unitResponse:response,currentUnitKey:secondUnitKey,status:'running'},selected.sessionToken,400);
     });
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

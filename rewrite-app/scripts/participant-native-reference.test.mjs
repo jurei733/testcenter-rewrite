@@ -58,8 +58,9 @@ for(const balance of [undefined,0,-1,1.5])test(`pinned restoreTime changes only 
 });
 const file=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8'),ast=ts.createSourceFile('facade.ts',file,ts.ScriptTarget.Latest,true);
 const declaration=ast.statements.find(ts.isClassDeclaration),method=declaration.members.find(member=>member.name?.getText(ast)==='prepareNativeConsoleCommand');assert.ok(method);
-const {load}=await import(emit('export const load=(hasMeaningfulVeronaResponse,parseVeronaUnitResponse)=>class Actual { '+method.getText(ast)+' };'));
-const Actual=load(hasMeaningfulVeronaResponse,parseVeronaUnitResponse);
+const {createParticipantSaveBarriers}=await import(emit(readFileSync(new URL('../apps/web/src/app/participant-save-barrier.ts',import.meta.url),'utf8')));
+const {load}=await import(emit('export const load=(hasMeaningfulVeronaResponse,parseVeronaUnitResponse,createParticipantSaveBarriers)=>{const listParticipantSaveOutboxEntriesForRun=()=>[];return class Actual { veronaSaveBarriers=createParticipantSaveBarriers(); '+method.getText(ast)+' };};'));
+const Actual=load(hasMeaningfulVeronaResponse,parseVeronaUnitResponse,createParticipantSaveBarriers);
 for(const [name,player,response,saved,expected] of [
  ['untouched empty Player shell',{},'{"kind":"verona_unit_state","version":1,"unitState":{}}',undefined,0],
  ['unchanged trusted saved response',{},'{"kind":"verona_unit_state","version":1,"unitState":{"responseProgress":"complete"}}','{"kind":"verona_unit_state","version":1,"unitState":{"responseProgress":"complete"}}',0],

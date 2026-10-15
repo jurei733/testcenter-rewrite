@@ -96,7 +96,7 @@ export const createParticipantNativeCommands = (options: {
   readState: () => Pick<ParticipantCurrentRunState, "testRun"> | null;
   controllerStatus: () => ParticipantNativeCommandRequest["controllerStatus"];
   generation?: () => number;
-  prepare: (isCurrent: () => boolean) => Promise<void>;
+  prepare: (isCurrent: () => boolean, keyword?: ParticipantNativeCommandKeyword, dispatch?: ParticipantControllerDispatch) => Promise<void>;
   started?: (request: ParticipantNativeCommandRequest) => void;
   captureTimer?: (request: ParticipantNativeCommandRequest, allocate: () => ParticipantControllerDispatch) => ParticipantControllerTimerInterruptionRequest | undefined;
   applied: (result: ParticipantNativeCommandResult, isCurrent: () => boolean, dispatch?: ParticipantControllerDispatch) => Promise<void>;
@@ -197,7 +197,7 @@ export const createParticipantNativeCommands = (options: {
       }
       if (timerOnly) return;
       if (!entry.prepared) {
-        await options.prepare(isCurrent); if (!isCurrent()) return;
+        await options.prepare(isCurrent, entry.keyword, entry.request.controllerDispatch); if (!isCurrent()) return;
         if (entry.version === 2) entry.request.controllerDispatch ??= nextParticipantControllerDispatch(entry.scope.testRunId, window, owner, options.readState()?.testRun.controllerDispatches);
         entry.prepared = true;
         persist(entry);
@@ -219,6 +219,8 @@ export const createParticipantNativeCommands = (options: {
           application.controllerStatus !== entry.request.controllerStatus || application.timeStamp !== entry.request.timeStamp ||
           application.commandCompletion !== undefined && application.commandCompletion !== entry.request.commandCompletion ||
           application.terminationNoop !== entry.request.terminationNoop ||
+          application.terminalContinuation !== undefined && (application.terminalContinuation !== true ||
+            entry.keyword !== "terminate" || entry.request.terminationNoop || application.commandCompletion !== "browser-v1") ||
           application.superseded !== undefined && application.superseded !== true ||
           (application.controllerDispatch !== undefined || application.testRun?.stateRevision !== undefined) &&
             JSON.stringify(application.controllerDispatch) !== JSON.stringify(entry.request.controllerDispatch) ||

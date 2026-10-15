@@ -189,15 +189,23 @@ try{
    if(scenario.stale)assert.equal(first.packet.expiresAt,initial.testletTimers.timed.expiresAt);
    assert.equal(frozen.controllerDispatches?.[first.packet.controllerDispatch.controllerId]??0,0);assert.deepEqual(frozen.unitResponses,before.unitResponses);assert.deepEqual(frozen.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);assert.deepEqual(frozen.controllerEntry,before.controllerEntry);
    assert.deepEqual(await repository.getParticipantSessionById(initial.participantSessionId),parentBefore);assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
-   assert.equal(applications.length,0);if(scenario.keyword==='terminate'||scenario.origin==='native')assert.equal(heldApplication,false,'An answer-draining command reached application before its answer receipt');
+   assert.equal(applications.length,0);
+   if(scenario.keyword==='terminate'||scenario.legacy)assert.equal(heldApplication,false,'A saved-buffer barrier or legacy FIFO was bypassed');
+   else await poll(()=>Promise.resolve(heldApplication),'Pause incorrectly waited for the already-closed answer buffer');
    if(scenario.legacy){
     assert.equal(legacyApplications.filter(reply=>reply.application.applied).length,scenario.appliedLegacy?1:0,'The legacy state effect did not match its deliberate application gate');
     const queued=await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('testcenter-rewrite:participant-native-command:v1:')).map(key=>JSON.parse(localStorage.getItem(key))));
     const modern=queued.find(entry=>entry.version===2&&entry.keyword===scenario.keyword);assert.equal(modern.timerInterrupted,true);assert.equal(modern.prepared,undefined);assert.deepEqual(queued.find(entry=>entry.request.deliveryId===legacyPacket.deliveryId).request,legacyPacket);
     releaseLegacy();releaseFreshState();await poll(()=>Promise.resolve(legacyApplications.length>=1),'The original unclocked packet did not settle after release');
    }
-   releaseAnswer();await poll(()=>Promise.resolve(heldApplication),'The timer command did not reach application after its buffer release');releaseApplication();
-   await poll(()=>Promise.resolve(applications.length===1),'The timer command application did not complete');
+   if(scenario.keyword==='pause'){
+    await poll(()=>Promise.resolve(heldApplication),'Pause did not reach application independently of its answer receipt');releaseApplication();
+    await poll(()=>Promise.resolve(applications.length===1),'Pause did not complete before its answer receipt');
+    releaseAnswer();
+   }else{
+    releaseAnswer();await poll(()=>Promise.resolve(heldApplication),'Termination did not reach application after its buffer release');releaseApplication();
+    await poll(()=>Promise.resolve(applications.length===1),'The timer command application did not complete');
+   }
    const final=await repository.getTestRunById(runId);assert.equal(final.status,'paused');assert.equal(final.testletTimers.timed.remainingSeconds,expectedBalance);assert.deepEqual(final.unitResponses,before.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
    assert.deepEqual(await repository.getTestRunById(sibling.testRunId),siblingBefore);
    let resumed;

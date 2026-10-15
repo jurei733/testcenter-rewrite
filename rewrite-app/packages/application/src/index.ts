@@ -4,6 +4,7 @@ import { ParticipantRunCommandApplicationError } from "./participant-run-command
 import { isParticipantCommandCompletionRequest, participantNativeCommandKeywords, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResult, type ParticipantCommandCompletionRequest, type ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionRequest, type ParticipantControllerTimerInterruptionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { projectParticipantNativeCommand, ParticipantNativeCommandError } from "./participant-native-command.js";
+import { projectSupersededParticipantTermination } from "./participant-terminal-continuation.js";
 import { retainedLegacyTimerPreparation, withLegacyTimerPreparation, legacyTimerInterruptionBalance } from "./participant-legacy-timer.js";
 import { validParticipantControllerDispatch, participantControllerDispatchSuperseded } from "./participant-controller-dispatch.js";
 import { withOrderedParticipantResponse } from "./participant-response-persistence.js";
@@ -32183,6 +32184,12 @@ export const createFirstSliceServices = (
             if (command.commandType !== "debug" && participantControllerDispatchSuperseded(context.testRun, input.controllerDispatch)) {
               const content = formatOriginalMonitorCommandLogContent({ commandType: command.commandType, targetUnitKey: command.targetUnitKey,
                 reopenedClosedTestlet: false, remainingSeconds: command.remainingSeconds });
+              if (input.commandCompletion === "browser-v1" && ["complete", "complete_and_lock"].includes(command.commandType)) {
+                const entries: ParticipantTestLogEntryInput[] = [{ key: "command executed", timeStamp: Date.parse(executedAt), content: content ?? "" }];
+                if (command.commandType === "complete_and_lock") entries.unshift({ key: "locked by monitor", timeStamp: Date.parse(executedAt), content: command.actorId ?? "" });
+                return { ...projectSupersededParticipantTermination(context.testRun, participantSession, command.commandType === "complete_and_lock", executedAt),
+                  testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: context.testRun, batches: [{ entries }] }) : [], activityEvents: [] };
+              }
               return { testRun: context.testRun, superseded: true, controllerDispatch: input.controllerDispatch,
                 testLogs: mode.saveResponses && content ? buildParticipantTestLogs({ testRun: context.testRun,
                   batches: [{ entries: [{ key: "command executed", timeStamp: Date.parse(executedAt), content }] }] }) : [], activityEvents: [] };
@@ -32258,7 +32265,9 @@ export const createFirstSliceServices = (
           if (Boolean(result.command.terminationNoop) !== Boolean(input.terminationNoop)) {
             throw new FirstSliceError(409, "participant_command_application_conflict", "An executed terminal command cannot change its early-return decision.");
           }
-          return { ...result, ...(input.controllerDispatch ? { controllerDispatch: input.controllerDispatch,
+          return { ...result, ...(result.command.commandCompletion === "browser-v1" && !result.command.terminationNoop &&
+            ["complete", "complete_and_lock"].includes(result.command.commandType) ? { terminalContinuation: true as const } : {}),
+            ...(input.controllerDispatch ? { controllerDispatch: input.controllerDispatch,
             ...(input.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[input.controllerDispatch.controllerId] ?? 0) ? { superseded: true as const } : {}) } : {}) };
         } catch (error) {
           if (error instanceof ParticipantRunCommandApplicationError) throw new FirstSliceError(409, error.errorCode, error.message);
@@ -32388,6 +32397,15 @@ export const createFirstSliceServices = (
             const projected = projectParticipantControllerCommand({ contentRelease: release, testRun: context.testRun, timestamp,
               request: { ...request, controllerStatus: observedController }, workerStep: ["goto", "resume"].includes(request.keyword) }).testRun;
             if (participantControllerDispatchSuperseded(context.testRun, request.controllerDispatch)) {
+              if (request.keyword === "terminate" && request.commandCompletion === "browser-v1") {
+                const entries: ParticipantTestLogEntryInput[] = [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }];
+                if (request.arguments.includes("lock")) entries.unshift({ key: "BOOKLETLOCKEDbyOPERATOR", timeStamp: Date.parse(timestamp), content: "" });
+                return { ...projectSupersededParticipantTermination(context.testRun, context.participantSession, request.arguments.includes("lock"), timestamp),
+                  testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun, deliveryId, batches: [{ entries }] }) : [],
+                  activityEvents: [], progressDelivery: { testRunId: context.testRun.testRunId, participantSessionId: context.testRun.participantSessionId,
+                    tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId, contentReleaseId: context.testRun.contentReleaseId,
+                    deliveryId, payloadSha256, acceptedAt: timestamp } };
+              }
               return { testRun: context.testRun, superseded: true, controllerDispatch: request.controllerDispatch,
                 testLogs: resolveParticipantExecutionMode(context.testRun.executionMode).saveResponses ? buildParticipantTestLogs({ testRun: context.testRun,
                   deliveryId, batches: [{ entries: [{ key: "command executed", timeStamp: request.timeStamp, content: [request.keyword, ...request.arguments].join(" ") }] }] }) : [],
@@ -32429,6 +32447,7 @@ export const createFirstSliceServices = (
             participantSessionId: result.testRun.participantSessionId, testRunId: result.testRun.testRunId,
             contentReleaseId: result.testRun.contentReleaseId, bookletKey: result.testRun.bookletKey },
             executedAt, applied: result.applied,
+            ...(request.keyword === "terminate" && !request.terminationNoop && request.commandCompletion === "browser-v1" ? { terminalContinuation: true as const } : {}),
             ...(result.superseded || request.controllerDispatch && request.controllerDispatch.sequence < (result.testRun.controllerDispatches?.[request.controllerDispatch.controllerId] ?? 0)
               ? { superseded: true as const } : {}), testRun: result.testRun, participantSession: result.participantSession };
         } catch (error) {
@@ -33270,7 +33289,10 @@ export const createFirstSliceServices = (
           }
           return before.changed ? before.effect : null;
         }
-        requireParticipantTestRunUnlocked(testRun);
+        // Original's owned response/state writes remain valid after a booklet
+        // lock. Response-only packets cannot navigate, resume, unlock or replace
+        // the accepted controller projection; late buffered answers still save.
+        if (!responseOnly) requireParticipantTestRunUnlocked(testRun);
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );

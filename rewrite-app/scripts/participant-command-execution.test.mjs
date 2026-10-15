@@ -54,7 +54,7 @@ test("a durable duplicate receipt still restores an interrupted local projection
 });
 for(const change of [value=>{value.testRun.stateRevision=0;},value=>{value.testRun.controllerDispatches=null;},
  value=>{value.testRun.controllerDispatches={owned:0};},value=>{value.controllerDispatch={controllerId:'foreign',sequence:1};},
- value=>{value.superseded=false;}])test('malformed execution ordering evidence cannot authorize projection',async()=>{
+ value=>{value.superseded=false;},value=>{value.terminalContinuation=false;},value=>{value.terminalContinuation=true;}])test('malformed execution ordering evidence cannot authorize projection',async()=>{
  const f=fixture(async()=>{const value=application();change(value.application);return {ok:true,json:async()=>value};});
  await assert.rejects(f.execute(),error=>error.retryable===false);assert.deepEqual(f.events,['saved','request']);
 });

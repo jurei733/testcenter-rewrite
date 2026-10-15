@@ -1,4 +1,5 @@
 import { observeParticipantCommandCompletionSession, queueParticipantCommandCompletion } from "./participant-command-completion";
+import { createParticipantSaveBarriers, type ParticipantSaveBarrier } from "./participant-save-barrier";
 import type { PrepareParticipantStarterExitRequest, PrepareParticipantStarterExitResponse } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import type { ParticipantControllerContext, ParticipantNativeCommandRequest, ParticipantNativeCommandResult, ParticipantControllerTimerInterruptionRequest, ParticipantCommandCompletionRequest, ParticipantCommandCompletionResult } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { isParticipantControllerDispatches } from "@testcenter-rewrite-app/contracts/participant-native-command";
@@ -71,6 +72,7 @@ import {
   discardParticipantSaveOutboxForRun,
   findParticipantSaveOutboxEntry,
   findParticipantSaveOutboxEntryForUnit,
+  listParticipantSaveOutboxEntriesForRun,
   persistParticipantSaveOutboxEntry,
   queueParticipantSaveOutboxEntryForBackgroundDelivery,
   queueParticipantSaveOutboxForRunForBackgroundDelivery,
@@ -457,10 +459,12 @@ export class ParticipantViewFacade {
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private readonly veronaSaveBarriers = createParticipantSaveBarriers();
   private veronaSaveInFlight: ParticipantSaveOutboxEntry | null = null;
   private veronaSaveRetrySequence = 0;
   private veronaSaveRetryRunId: string | null = null;
   private veronaForegroundSaveSettlement = false;
+  private veronaForegroundSaveSettlements = 0;
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
   private currentStateRefreshSequence = 0;
@@ -588,9 +592,29 @@ export class ParticipantViewFacade {
       ? "LOADING" : this.debugControllerStatus);
     return { testRun: run, status, alreadyRecorded: Boolean(this.pendingControllerStatus) || command?.status === status, ready: Boolean(this.debugRunState && !this.eagerBookletLoading) };
   }
-  async prepareNativeConsoleCommand(isCurrent: () => boolean): Promise<void> {
-    if (!this.debugRunState) return;
-    const settled = await this.settleVeronaAutoSaveBeforeForegroundAction();
+  async prepareNativeConsoleCommand(isCurrent: () => boolean, keyword: ParticipantNativeCommandRequest["keyword"] = "terminate", dispatch?: ParticipantControllerDispatch): Promise<void> {
+    const runId = this.consoleRun?.testRunId;
+    const entries = (): ParticipantSaveOutboxEntry[] => {
+      if (!runId) return [];
+      const current = [...listParticipantSaveOutboxEntriesForRun(runId), ...this.veronaSaveBarriers.entries(runId),
+        ...(this.pendingVeronaSave?.testRunId === runId ? [this.pendingVeronaSave] : [])];
+      return [...new Map(current.map(entry => [entry.deliveryId, entry])).values()];
+    };
+    if (keyword !== "terminate") {
+      // Original Pause/Goto flush closed buffers, not their saved-event
+      // barrier; Resume navigates directly. Keep answer drainage independent
+      // so these handlers can finish while an older Terminate is still saving.
+      if (!this.debugRunState || keyword === "resume") return;
+      const barrier = this.veronaSaveBarriers.close(entries(), dispatch);
+      this.clearVeronaSaveBuffer();
+      void this.drainVeronaSaveQueue({ allowForegroundSettlement: true, refreshCurrentState: false, deliveryIds: barrier.deliveryIds }).catch(error => {
+        if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(String(error)));
+      });
+      return;
+    }
+    if (!this.debugRunState && entries().length === 0) return;
+    const barrier = this.veronaSaveBarriers.close(entries(), dispatch);
+    const settled = await this.settleVeronaAutoSaveBeforeForegroundAction(barrier, () => this.veronaSaveBarriers.close(entries(), dispatch));
     const state = this.debugRunState;
     const response = this.runtime.currentUnitResponse;
     const draftChanged = response !== (state?.testRun.unitResponses[state.currentUnit.unitKey ?? ""] ?? "");
@@ -623,6 +647,14 @@ export class ParticipantViewFacade {
     if (result.terminationNoop) return;
     const entry = result.testRun.controllerEntry;
     if (result.superseded || this.isOlderRunState(result.testRun) || this.isOlderControllerPhase(dispatch)) {
+      if (result.terminalContinuation) {
+        const execution = await import("./participant-command-execution");
+        if (!isCurrent()) return;
+        await execution.settleAcceptedParticipantCommand({ isCurrent,
+          reconcile: () => this.reconcileParticipantTerminalState(result.testRun, false, isCurrent, true),
+          failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); } });
+        return;
+      }
       if (this.hasControllerError) return;
       void this.refreshCurrentStateInternal(true, true).catch(error => {
         if (isCurrent()) this.nativeConsoleCommandFailed(error instanceof Error ? error : new Error(this.veronaErrorText));
@@ -675,7 +707,7 @@ export class ParticipantViewFacade {
       state.executionMode?.receiveRemoteCommands ? this.receiveParticipantCommand : null);
   }
 
-  private async reconcileParticipantTerminalState(run: TestRun, legacy: boolean, isCurrent: () => boolean): Promise<void> {
+  private async reconcileParticipantTerminalState(run: TestRun, legacy: boolean, isCurrent: () => boolean, preserveControllerState = false): Promise<void> {
     const readRuntime = () => this.requestState.request<ParticipantRuntimeStateResponse>("Participant Starter", "GET",
       resolveRoutePath(productionApiRoutes.participant.getRuntimeState, { participantSessionId: run.participantSessionId }), undefined, { quiet: true });
     let runtimeView = this.currentStateAppliedRefreshSequence;
@@ -711,7 +743,7 @@ export class ParticipantViewFacade {
       if (selected.controllerEntry.revision < run.controllerEntry.revision) {
         throw Object.assign(new Error("The terminal entry evidence is older than its application receipt."), { retryable: true });
       }
-      if (this.commandControllerState?.testRunId !== run.testRunId || !this.commandControllerState.status.startsWith("TERMINATED")) return;
+      if (!preserveControllerState && (this.commandControllerState?.testRunId !== run.testRunId || !this.commandControllerState.status.startsWith("TERMINATED"))) return;
       if (selected.controllerEntry.active) {
         if (selected.controllerEntry.revision === run.controllerEntry.revision) {
           throw Object.assign(new Error("The terminal entry evidence contradicts its application receipt."), { retryable: false });
@@ -778,6 +810,7 @@ export class ParticipantViewFacade {
     let observedRun = run;
     let observedStatus: Exclude<ParticipantNativeCommandRequest["controllerStatus"], "LOADING"> = "RUNNING";
     const execution = await import("./participant-command-execution");
+    let preparationDispatch = terminalPhase?.dispatch ?? nonterminalDispatch;
     if (timerInterruption) {
       await execution.deliverParticipantControllerTimerInterruption(timerInterruption, run, { signal, isCurrent });
       if (!isCurrent()) return;
@@ -798,9 +831,11 @@ export class ParticipantViewFacade {
       prepare: async () => {
         // Accepted nonterminal commands must not wait for an older answer
         // receipt. The response-only outbox keeps that answer independently.
-        if (terminal) await this.prepareNativeConsoleCommand(isCurrent);
+        if (terminal) await this.prepareNativeConsoleCommand(isCurrent, "terminate", preparationDispatch);
+        else if (command.commandType === "pause" || command.commandType === "resume" || command.commandType === "goto") await this.prepareNativeConsoleCommand(isCurrent, command.commandType, preparationDispatch);
       },
       started: dispatch => {
+        preparationDispatch = dispatch;
         if (terminal && !terminalPhase) {
           terminalPhase = { dispatch, status: observedStatus };
           this.terminalCommandPhases.set(command, terminalPhase);
@@ -826,7 +861,13 @@ export class ParticipantViewFacade {
         const newer = currentRevision !== undefined && application.testRun.stateRevision !== undefined && application.testRun.stateRevision > currentRevision;
         const superseded = application.superseded || this.isOlderRunState(application.testRun) || !newer &&
           observedView !== this.currentStateAppliedRefreshSequence && JSON.stringify(observedRun) !== JSON.stringify(this.consoleRun);
-        if (application.superseded || this.isOlderControllerPhase(acceptedDispatch)) {
+        if (application.superseded || this.isOlderControllerPhase(acceptedDispatch) || application.terminalContinuation && superseded) {
+          if (application.terminalContinuation) {
+            await execution.settleAcceptedParticipantCommand({ signal, isCurrent,
+              reconcile: () => this.reconcileParticipantTerminalState(application.testRun, false, isCurrent, true),
+              failed: (error: Error) => { if (isCurrent()) this.nativeConsoleCommandFailed(error); } });
+            return;
+          }
           if (this.hasControllerError) return;
           void this.refreshCurrentStateInternal(true, true).catch(error => { if (isCurrent()) this.nativeConsoleCommandFailed(error); });
           return;
@@ -3921,12 +3962,14 @@ export class ParticipantViewFacade {
 
   private async drainVeronaSaveQueue(
     options: {
+      deliveryIds?: ReadonlySet<string>;
       allowForegroundSettlement?: boolean;
       refreshCurrentState?: boolean;
     } = {}
   ): Promise<void> {
     while (
       this.pendingVeronaSave &&
+      (!options.deliveryIds || options.deliveryIds.has(this.pendingVeronaSave.deliveryId)) &&
       (options.allowForegroundSettlement ||
         !this.veronaForegroundSaveSettlement)
     ) {
@@ -3936,7 +3979,7 @@ export class ParticipantViewFacade {
       this.pendingVeronaSave = null;
       this.veronaSaveInFlight = save;
       try {
-        const payload = await this.requestState.request<SaveTestRunProgressResponse>(
+        const request = this.requestState.request<SaveTestRunProgressResponse>(
           "Verona Auto Save",
           "POST",
           resolveRoutePath(productionApiRoutes.participant.saveProgress, {
@@ -3953,6 +3996,8 @@ export class ParticipantViewFacade {
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
         );
+        this.veronaSaveBarriers.track(save, request);
+        const payload = await request;
         const removedFromOutbox = removeParticipantSaveOutboxEntry(
           save.testRunId,
           save.deliveryId
@@ -3965,6 +4010,7 @@ export class ParticipantViewFacade {
         // A durable save receipt acknowledges data, not a new control command.
         // ERROR keeps its local state until an accepted channel update or reload.
         if (this.readCurrentRunState()?.testRun.testRunId === save.testRunId &&
+          !this.pendingControllerStatus &&
           !this.hasControllerError &&
           appliedRefreshSequence === this.currentStateAppliedRefreshSequence) {
           this.syncRun(payload.testRun);
@@ -4012,6 +4058,7 @@ export class ParticipantViewFacade {
     this.persistState();
     if (
       options.refreshCurrentState !== false &&
+      !this.pendingControllerStatus &&
       !this.veronaForegroundSaveSettlement
     ) {
       // The durable delivery is settled. A slow Unit view must not keep this
@@ -4445,9 +4492,10 @@ export class ParticipantViewFacade {
     );
   }
 
-  private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<
+  private async settleVeronaAutoSaveBeforeForegroundAction(nativeBarrier?: ParticipantSaveBarrier, captureAfterGrace?: () => ParticipantSaveBarrier): Promise<
     SettledVeronaResponse | null
   > {
+    let requestBarrier = nativeBarrier ?? this.veronaSaveBarriers.active(this.consoleRun?.testRunId ?? this.runtime.testRunId);
     if (this.veronaPlayer) {
       // Players may debounce stateChanged after an input event. Keep the frame
       // alive briefly so an immediate host navigation cannot retire it before
@@ -4455,6 +4503,12 @@ export class ParticipantViewFacade {
       await new Promise<void>(resolve => {
         globalThis.setTimeout(resolve, VERONA_FOREGROUND_STATE_GRACE_MS);
       });
+    }
+    if (nativeBarrier && captureAfterGrace) {
+      const first = nativeBarrier, additional = captureAfterGrace();
+      nativeBarrier = { deliveryIds: new Set([...first.deliveryIds, ...additional.deliveryIds]),
+        wait: async () => { await Promise.all([first.wait(), additional.wait()]); } };
+      requestBarrier = nativeBarrier;
     }
     const unsettledResponse = this.pendingVeronaSave
       ? {
@@ -4464,22 +4518,23 @@ export class ParticipantViewFacade {
         }
       : this.optimisticVeronaResponse;
     this.clearVeronaSaveBuffer();
-    const previousForegroundSettlement =
-      this.veronaForegroundSaveSettlement;
+    this.veronaForegroundSaveSettlements += 1;
     this.veronaForegroundSaveSettlement = true;
     try {
+      await requestBarrier.wait();
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const activeSave = this.veronaSaveDrainPromise;
-        if (activeSave) {
+        if (!nativeBarrier && activeSave) {
           await activeSave;
         }
-        if (this.pendingVeronaSave) {
+        if (this.pendingVeronaSave && (!nativeBarrier || nativeBarrier.deliveryIds.has(this.pendingVeronaSave.deliveryId))) {
           await this.drainVeronaSaveQueue({
             allowForegroundSettlement: true,
+            deliveryIds: nativeBarrier?.deliveryIds,
             refreshCurrentState: false
           });
         }
-        if (!this.pendingVeronaSave) {
+        if (!this.pendingVeronaSave || nativeBarrier && !nativeBarrier.deliveryIds.has(this.pendingVeronaSave.deliveryId)) {
           return unsettledResponse;
         }
         if (attempt < 2) {
@@ -4495,10 +4550,11 @@ export class ParticipantViewFacade {
       }
       return unsettledResponse;
     } finally {
-      this.veronaForegroundSaveSettlement = previousForegroundSettlement;
+      this.veronaForegroundSaveSettlements -= 1;
+      this.veronaForegroundSaveSettlement = this.veronaForegroundSaveSettlements > 0;
       if (
         this.pendingVeronaSave &&
-        !previousForegroundSettlement &&
+        !this.veronaForegroundSaveSettlement &&
         this.veronaSaveStatus !== "save_failed" &&
         this.veronaSaveStatus !== "queued_offline"
       ) {

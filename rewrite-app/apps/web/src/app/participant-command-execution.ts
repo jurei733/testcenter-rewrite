@@ -87,12 +87,15 @@ export const executeReceivedParticipantCommand = async (
     participantSession?: Partial<ParticipantSession>;
     applied?: unknown;
     superseded?: unknown;
+    terminalContinuation?: unknown;
     controllerDispatch?: unknown;
   } } | null;
   if (signal.aborted || !options.isCurrent()) return;
   const application = payload?.application, receipt = parseParticipantRunCommand(application?.command);
   if (!receipt?.executedAt || !receipt.executionSequence || Boolean(receipt.terminationNoop) !== terminationNoop || typeof application?.applied !== "boolean" ||
       application.superseded !== undefined && application.superseded !== true ||
+      application.terminalContinuation !== undefined && (application.terminalContinuation !== true ||
+        receipt.terminationNoop || !["complete", "complete_and_lock"].includes(receipt.commandType) || receipt.commandCompletion !== "browser-v1") ||
       (application.controllerDispatch !== undefined || application.testRun?.stateRevision !== undefined) && JSON.stringify(application.controllerDispatch) !== JSON.stringify(dispatch) ||
       Object.keys(command).some(key => !["executedAt", "executionSequence"].includes(key) &&
         (key === "debugArguments" ? JSON.stringify(receipt.debugArguments ?? []) !== JSON.stringify(command.debugArguments) :
