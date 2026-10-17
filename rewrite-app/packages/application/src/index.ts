@@ -548,7 +548,8 @@ export type WorkspaceAdminReadPort = {
   exportOriginalResultArchive(input: {
     tenantKey: string;
     workspaceKey: string;
-    groupKeys: string[];
+    /** Omitted selects every workspace group; an explicit empty selection selects none. */
+    groupKeys?: string[];
   }): Promise<WorkspaceOriginalResultArchive>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
@@ -16203,9 +16204,9 @@ const createOriginalResultArchive = (input: {
   testLogs: ParticipantTestLog[];
   contentReleases: ContentRelease[];
 }): WorkspaceOriginalResultArchive => {
-  const responseRows = buildOriginalResponseReportRows(input);
-  const logRows = buildOriginalLogReportRows(input);
-  const reviewReport = buildOriginalReviewReportRows(input);
+  const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
+  const logRows = input.groupKeys.length ? buildOriginalLogReportRows(input) : [];
+  const reviewReport = input.groupKeys.length ? buildOriginalReviewReportRows(input) : { rows: [], categoryColumns: [] };
   const counts = {
     responses: responseRows.length,
     logs: logRows.length,
@@ -30226,17 +30227,10 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const groupKeys = Array.from(
+        const selectedGroupKeys = input.groupKeys === undefined ? undefined : Array.from(
           new Set(input.groupKeys.map(groupKey => groupKey.trim()).filter(Boolean))
         ).sort();
-        if (groupKeys.length === 0) {
-          throw new FirstSliceError(
-            400,
-            "result_archive_group_required",
-            "At least one result group must be selected."
-          );
-        }
-        if (groupKeys.length > 100) {
+        if (selectedGroupKeys && selectedGroupKeys.length > 100) {
           throw new FirstSliceError(
             400,
             "result_archive_group_limit_exceeded",
@@ -30276,6 +30270,9 @@ export const createFirstSliceServices = (
             workspace.workspaceId
           )
         ]);
+        const groupKeys = selectedGroupKeys ?? Array.from(
+          new Set(participantSessions.map(session => session.groupKey))
+        ).sort();
         return createOriginalResultArchive({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,

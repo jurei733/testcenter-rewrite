@@ -10609,20 +10609,17 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       lastChangeAt: "checked-separately"
     });
 
-    const rejectedResultArchive = await requestJsonAt<{ error: string }>(
-      isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip",
+    const allResultArchiveResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
         }
       }
     );
-    assert.equal(rejectedResultArchive.status, 400);
-    assert.equal(
-      rejectedResultArchive.body.error,
-      "result_archive_group_required"
-    );
+    assert.equal(allResultArchiveResponse.status, 200);
+    const allResultArchive = readStoredZipTextEntries(Buffer.from(await allResultArchiveResponse.arrayBuffer()));
+    assert.deepEqual(JSON.parse(allResultArchive.get("manifest.json") ?? "{}").groupKeys, ["group:student-demo"]);
 
     const resultArchiveResponse = await fetch(
       `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip?groupKey=group%3Amissing&groupKey=group%3Astudent-demo`,
@@ -10645,6 +10642,9 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const resultArchiveEntries = readStoredZipTextEntries(
       Buffer.from(await resultArchiveResponse.arrayBuffer())
     );
+    for (const name of ["responses.json", "logs.json", "reviews.json", "responses.csv", "logs.csv", "reviews.csv"]) {
+      assert.equal(allResultArchive.get(name), resultArchiveEntries.get(name), `Unfiltered ${name} must cover all existing groups.`);
+    }
     assert.deepEqual([...resultArchiveEntries.keys()], [
       "manifest.json",
       "responses.json",

@@ -7885,7 +7885,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             workspaceKey,
             groupKeys:
               groupFilter.groupKeys ??
-              (groupFilter.groupKey ? [groupFilter.groupKey] : [])
+              (groupFilter.groupKey ? [groupFilter.groupKey] : undefined)
           });
         sendAsset(response, 200, archive.mediaType, archive.body, {
           "cache-control": "private, no-store",
