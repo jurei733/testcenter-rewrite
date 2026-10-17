@@ -19,7 +19,7 @@ zoneless render and cancels after route destruction. The development Player gate
 passes both interfaces including the formerly failing Original-header `NG0100`.
 See the current [parity evidence](./PARITY.md#participant-input-capture-locked-starter-and-direct-entry-rendering-2026-10-17).
 
-All 2,539 local unit/frontend tests pass, including 1,100 frontend tests, plus the
+All 2,542 local unit/frontend tests pass, including 1,103 frontend tests, plus the
 48-case Original differential. The production build is 469.99 kB with the same
 470 kB hard cap. The 43 loading/overlap, 15 Debug and five deletion-dialog groups
 plus the live monitor lifecycle pass in production Chromium/SQLite. Overlap
@@ -37,6 +37,13 @@ locally and inspect new remote CI against its exact head: the old
 `d07446f4` runs failed at five shared browser sites and cannot qualify this head.
 Keep all earlier failed-attempt evidence. Earlier PostgreSQL/container results
 belong to their stated revisions; do not substitute them for fresh CI.
+
+The response matcher is shared with the Unit-label gate. Capture clocks may
+advance only as valid nondecreasing integers; every other field/type and raw
+dataPart string remains exact, and inactive packets remain byte-exact. Three
+additional matcher unit tests pass. All 32 focused label cases pass with trusted
+Player input, native checked-state, navigation/reload and exact Run identity.
+The complete browser suite is still running; inspect its final result separately.
 
 The Original reference remains `eedae41840cbe90e5547c0211da818bdf620f5aa`.
 Continue the remaining partial areas against current source and real packages

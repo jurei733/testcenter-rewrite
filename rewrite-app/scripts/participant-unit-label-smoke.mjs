@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 
 export async function reloadParticipantUnitLabelPlayer(page, waitForPlayer) {
   // Authorized participant SSE/polling may stay active indefinitely. A quiet
@@ -137,13 +138,13 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
       await assertLabels(fullB, undefined, 2);
       await page.locator(ui === "original" ? "#participantVeronaGlobalBackwardButton" : "#participantRoutePreviousUnitButton").click();
       await assertLabels(fullA, initialShortLabel, 1);
-      assert.equal((await readState()).testRun.unitResponses.a, saved);
+      assert.ok(matchesVeronaSavedResponse((await readState()).testRun.unitResponses.a, saved, true), "Returning to the Unit preserves exact data/types and nondecreasing clocks.");
       await reloadParticipantUnitLabelPlayer(page, waitForPlayer);
       await assertLabels(fullA, initialShortLabel, 1);
       const restored = await readState();
       assert.equal(new URL(page.url()).searchParams.get("testRunId"), runId);
       assert.equal(restored.testRun.testRunId, runId);
-      assert.equal(restored.testRun.unitResponses.a, saved);
+      assert.ok(matchesVeronaSavedResponse(restored.testRun.unitResponses.a, saved, true), "Reloading preserves exact data/types and nondecreasing clocks.");
       assert.equal(await page.frameLocator("#participantVeronaPlayerFrame").locator('[data-cy="TestController-radio1-Aufg1"]').isChecked(), true);
       assert.equal(operatorLeaks, 0);
       assert.deepEqual(errors, []);

@@ -40,7 +40,7 @@ and removed Player instead of reading the former empty editor's status fields.
 Branded/fallback entry navigation waits for DOM readiness followed by the existing
 exact logo/text/loaded-image checks rather than global network silence.
 
-Fresh local validation passes 2,539 unit/frontend tests (1,100 frontend), the
+Fresh local validation passes 2,542 unit/frontend tests (1,103 frontend), the
 48-case actual-Original/service terminal differential, the production build and
 both development-Player lifecycle scenarios. The production initial bundle stays
 469.99 kB under the unchanged 470 kB hard cap. Production Chromium/SQLite passes
@@ -61,6 +61,16 @@ capture distinct owned response data with current Run/Unit clocks, retain exact
 inactive packets, and require unchanged values/types plus
 nondecreasing clocks for every restored field in the active Player. Full browser/remote qualification
 of that fixture correction remains open.
+
+The shared response matcher now applies the same active-Player rule to the
+outbox/reload and Unit-label gates: only valid, nondecreasing per-field capture
+clocks may differ. It compares every other envelope field, raw dataPart string,
+value type, page and metadata exactly; inactive packets stay byte-exact. New
+unit cases reject dropped, older, nonnumeric, negative and fractional clocks,
+and changed/missing/typed response data. All 32 focused real-Player label cases
+pass in both interfaces at desktop/mobile widths, retaining native checked-state,
+exact Run identity and complete label/metadata assertions. The entire browser
+suite remains a separate qualification; a focused pass is not full acceptance.
 
 ### Unfiltered Original result archives (2026-10-17)
 

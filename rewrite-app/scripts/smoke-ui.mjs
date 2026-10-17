@@ -7,7 +7,6 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
-import { isDeepStrictEqual } from "node:util";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
@@ -11381,14 +11380,7 @@ try {
     storedFieldTimestamps: run.unitResponseFieldTimestamps?.[unitKey]
   });
   const recoveryResponse = (unitKey, marker) => captureRecoveryResponse(originalAdaptiveBaseResponse, recoveryRun, unitKey, marker);
-  const matchesRecovery = (actual, expected) => {
-    if (!isDeepStrictEqual(parseVeronaUnitResponse(actual), parseVeronaUnitResponse(expected))) return false;
-    const receivedClocks = JSON.parse(actual).fieldTimestamps, expectedClocks = JSON.parse(expected).fieldTimestamps;
-    // A real active Player can re-report any restored part, advancing its clock.
-    return Object.entries(expectedClocks).every(([group, fields]) => typeof fields === "number"
-        ? Number.isSafeInteger(receivedClocks?.[group]) && receivedClocks[group] >= fields
-        : Object.entries(fields).every(([key, clock]) => Number.isSafeInteger(receivedClocks?.[group]?.[key]) && receivedClocks[group][key] >= clock));
-  };
+  const matchesRecovery = (actual, expected) => matchesVeronaSavedResponse(actual, expected, true);
   const currentUnitOutboxResponse = recoveryResponse(originalAdaptiveUnitKey, "current Ω");
   const otherUnitOutboxResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "other Ω");
   const thirdUnitOutboxResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "third Ω");
