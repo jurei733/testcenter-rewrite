@@ -164,6 +164,10 @@ try {
     let before=await loadingRepository.getTestRunById(runId);const applications=[],acks=[];let pausedHeld=false;
     remotePage.on("request",request=>{if(request.method()==="PATCH"&&new URL(request.url()).pathname.includes("/commands/"))acks.push({path:new URL(request.url()).pathname,body:request.postDataJSON()});});
     const captureApplication=async route=>{const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});};
+    const waitForRemoteReceipt=command=>poll(()=>Promise.resolve(
+      applications.some(value=>value.application.command.commandId===command.commandId)&&
+      acks.some(ack=>ack.path.includes(command.commandId))),
+      `Remote command ${command.commandId} did not apply and acknowledge`);
     await remotePage.route("**/application",captureApplication);
     await remotePage.route("**/current-state?*",async route=>{
       const response=await route.fetch(),data=await response.json();
@@ -531,6 +535,8 @@ try {
     await remotePage.screenshot({path:join(artifacts,'remote-goto-held-target.png'),fullPage:true});
     const gotoPause=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;
     await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),'Remote Pause waited behind the held Goto target view');
+    await waitForRemoteReceipt(gotoPause);
+    assert.equal((await loadingRepository.getTestRunById(runId)).status,'paused');
     releaseGotoView();await poll(()=>Promise.resolve(activeGotoViews.size===0),'A released Goto view route did not settle');
     await remotePage.unrouteAll({behavior:'ignoreErrors'});
     await remotePage.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
@@ -538,6 +544,7 @@ try {
     assert.match(await remotePane.innerText(),/STATUS:\s*PAUSED/,'Late Goto view reverted the following Pause');
     await remotePage.route('**/application',captureApplication);
     const gotoResume=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'resume'},operator)).command;
+    await waitForRemoteReceipt(gotoResume);
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     assert.equal(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue(),'');
     const navigated=await loadingRepository.getTestRunById(runId);assert.equal(navigated.currentUnitKey,'next-unit');
@@ -613,6 +620,7 @@ try {
         await remotePage.unroute('**/commands/*/acknowledgement');
         const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;issued.push(following);
         await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),`${origin} reopened reception did not apply a fresh Pause while views were held`);
+        await waitForRemoteReceipt(following);
         heldRuntime.resolve();
         await poll(()=>Promise.resolve(runtimeReads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
         viewReleased=true;heldView.resolve();

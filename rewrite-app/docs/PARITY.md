@@ -14,6 +14,9 @@ to the Starter with an inactive controller entry and the requested lock. The
 paused Run, answers and unset completion timestamp remain intact. The Starter
 disables a locked/completed selected assignment, still permits another available
 assignment, and no longer renders an orphan response editor in Rewrite mode.
+The controller surface still renders a code gate or loading/error state before
+there is a current Unit: only Login and Starter hide it. The full browser gate
+caught and corrected an over-broad Unit-focused visibility condition.
 
 Direct participant-link parameters also change shared workspace/header state.
 Their initialization now runs after the current Angular tree check, explicitly
@@ -29,6 +32,9 @@ requires exact response values/types and nondecreasing field clocks. The busy
 deletion gate waits for the rendered read-only/disabled controls before asserting
 input, duplicate-submit, Escape and backdrop guards. Monitor completion waits for
 the actual participant application before asserting its locked Starter state.
+Overlap probes distinguish the immediately projected pending Debug phase from
+the exact remote command's durable application and acknowledgement, and require
+those receipts before releasing held views or retiring request routes.
 Starter gates require the visible entry status, cleared persisted Run identity
 and removed Player instead of reading the former empty editor's status fields.
 Branded/fallback entry navigation waits for DOM readiness followed by the existing
@@ -37,8 +43,10 @@ exact logo/text/loaded-image checks rather than global network silence.
 Fresh local validation passes 2,539 unit/frontend tests (1,100 frontend), the
 48-case actual-Original/service terminal differential, the production build and
 both development-Player lifecycle scenarios. The production initial bundle stays
-469.99 kB under the unchanged 470 kB hard cap. Focused production-browser
-requalification and current remote CI remain pending at this checkpoint. Earlier
+469.99 kB under the unchanged 470 kB hard cap. Production Chromium/SQLite passes
+all 43 loading/overlap groups, 15 Debug groups, five deletion-dialog groups and
+the reconnect/idle/error/recovery/pause/resume/locked-Starter monitor flow. The
+complete browser suite and current remote CI remain pending at this checkpoint. Earlier
 PostgreSQL/container results below describe their recorded revisions; they are
 not new qualification of these report/UI changes. Formal parity remains 30
 complete and 19 partial areas, with full production acceptance still open.
@@ -57,10 +65,13 @@ Fifteen fresh Memory/File/SQLite tests prove that every CSV and JSON member equa
 the union of the per-group reports, preserves both groups and exact response/log/
 review content, excludes a separate workspace, and survives durable reopen.
 They also cover empty workspaces, normalized duplicate filters and 103 groups.
+Five additional report cases pass against an owned PostgreSQL 14.24 instance,
+including durable reopen; the combined four-store suite passes all 20 cases.
+The owned server was stopped after the test. PostgreSQL 16 remains the CI target.
 The protected local-demo HTTP scenario passes on each of Memory, File and SQLite,
 comparing all six unfiltered report members to their explicitly selected copies.
 The new focused suite is part of the unit and PostgreSQL CI commands. PostgreSQL
-qualification for this report change remains for the current CI run; prior
+16 qualification for this report change remains for the current CI run; prior
 PostgreSQL results describe the preceding checkpoint. No schema migration is added.
 
 The unchanged selected-group Angular workflow remains available. Formal parity

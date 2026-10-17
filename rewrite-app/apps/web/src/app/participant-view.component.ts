@@ -348,7 +348,7 @@ interface ParticipantVisibleCodeNotice {
         <strong aria-hidden="true">↓</strong>
       </button>
 
-      <article class="card" id="participantRoutePlayer" *ngIf="view.isParticipantPlayerFocused || view.player.runStatus === 'completed'">
+      <article class="card" id="participantRoutePlayer" *ngIf="!view.isParticipantLogin && !view.isParticipantStarter">
         <input
           *ngIf="view.isParticipantPlayerFocused"
           id="participantRouteSessionId"

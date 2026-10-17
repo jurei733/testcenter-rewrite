@@ -9527,27 +9527,33 @@ try {
   await outdatedBrowserContext.close();
   const isVeronaResourceResponse = response =>
     /\/resources\/\.access\/r1\.[A-Za-z0-9_-]{43}\/sample_resource_package\/file\.text$/u.test(new URL(response.url()).pathname);
+  // These waits are awaited below. Observe rejections now so an earlier gate
+  // failure can close the owned browser/API without a masking unhandled error.
   const veronaResourceResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       !response.request().headers()["range"]
   );
+  void veronaResourceResponsePromise.catch(() => undefined);
   const veronaRangeResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=5-19"
   );
+  void veronaRangeResponsePromise.catch(() => undefined);
   const veronaMultiRangeResponsePromise = page.waitForResponse(
     response =>
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=0-3,10-15"
   );
+  void veronaMultiRangeResponsePromise.catch(() => undefined);
   const lazyBookletPreloadPattern = url => matchesParticipantRunRequest(url, {
     baseUrl, endpoint: "current-state", includeBookletAssets: true
   });
   const lazyBookletPreloadStarted = page.waitForRequest(
     request => lazyBookletPreloadPattern(request.url())
   );
+  void lazyBookletPreloadStarted.catch(() => undefined);
   let releaseLazyBookletPreload;
   const lazyBookletPreloadRelease = new Promise(resolve => {
     releaseLazyBookletPreload = resolve;
@@ -9566,6 +9572,7 @@ try {
       lazyBookletPreloadCompleted = true;
       return response;
     });
+  void lazyBookletPreloadResponsePromise.catch(() => undefined);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -26218,6 +26225,7 @@ try {
   successMessage = `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`;
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
+    process.stderr.write(`UI smoke failure at ${page?.url() ?? "unopened page"}: ${String(error?.stack ?? error)}\n`);
     if (page && !page.isClosed()) {
       try {
         const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));

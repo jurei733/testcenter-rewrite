@@ -6,7 +6,9 @@ Continue on `testcenter-production-readiness` and the existing draft
 [PR #6](https://github.com/jurei733/testcenter-rewrite/pull/6). Report checkpoint
 `51efd249` follows the current Original's omitted-filter/all-groups behavior;
 explicit empty service selections remain empty. Its 15 Memory/File/SQLite tests
-and three focused HTTP scenarios pass. PostgreSQL CI includes the new suite.
+and three focused HTTP scenarios pass. The additional owned PostgreSQL 14.24
+run passes five more report cases (20 total across four stores) and stops its
+server afterwards. PostgreSQL 16 CI includes the new suite.
 
 The participant correction retains the native Pause/Goto input-capture interval,
 keeps their HTTP drainage independent, disables locked/completed Starter
@@ -18,8 +20,12 @@ See the current [parity evidence](./PARITY.md#participant-input-capture-locked-s
 
 All 2,539 local unit/frontend tests pass, including 1,100 frontend tests, plus the
 48-case Original differential. The production build is 469.99 kB with the same
-470 kB hard cap. Final production-browser requalification is running. Publish
-the correction, then inspect new remote CI against its exact head: the old
+470 kB hard cap. The 43 loading/overlap, 15 Debug and five deletion-dialog groups
+plus the live monitor lifecycle pass in production Chromium/SQLite. Overlap
+probes wait for their exact command application/acknowledgement before retiring
+routes; a pending Debug phase alone is not evidence of a committed command.
+The full browser suite is running. Publish this test follow-up after qualification,
+then inspect new remote CI against its exact head: the old
 `d07446f4` runs failed at five shared browser sites and cannot qualify this head.
 Keep all earlier failed-attempt evidence. Earlier PostgreSQL/container results
 belong to their stated revisions; do not substitute them for fresh CI.
