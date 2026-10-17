@@ -24,6 +24,19 @@ qualified at `51c6d7b9`; the combined unit/frontend count is 2,548. Full browser
 and current-head CI qualification remain open. The formal count remains 30
 complete/19 partial, with no release or production acceptance claimed.
 
+The same published `34d00de4` subsequently passes all 2,548 unit/frontend and
+1,636 PostgreSQL-16 CI checks without failures/skips/cancellations. The complete
+local browser run passes the former auto-next failure and reaches the later
+result-preservation Pause, where another old fixture treats the dispatch
+snapshot as the applied state. It now requires the exact command's execution
+activity and the resulting paused Run/timer before retaining the snapshot for
+deletion checks. A downloaded CI outbox failure contains only a newly enqueued
+real FOCUS log after answer recovery; the gate now waits for the entire outbox
+to drain instead of assuming an unrelated later log is already absent. Exact
+restored answers and log de-duplication remain mandatory. All 33 focused monitor,
+participant-credential and command HTTP cases pass; complete browser/CI reruns
+remain distinct qualification.
+
 ### Player startup input and asynchronous monitor receipts (2026-10-17)
 
 Published `26bc0965` finishes CI with 24 passing and 14 failing jobs. Downloaded

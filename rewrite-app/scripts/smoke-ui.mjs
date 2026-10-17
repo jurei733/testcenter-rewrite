@@ -10258,12 +10258,11 @@ try {
       }
     }
   );
-  assert.equal(
-    await page.evaluate(() =>
-      localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1")
-    ),
-    null,
-    "A confirmed retry should remove the durable Verona outbox entry."
+  // Reload can enqueue a new real FOCUS log after the recovered answer is
+  // confirmed. Require the entire outbox to drain, including that later log.
+  await page.waitForFunction(() =>
+    localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1") === null,
+    undefined, { timeout: 15_000 }
   );
   const recoveredVeronaLogs = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
@@ -24246,8 +24245,19 @@ try {
   const heldOwnedRunPayload = await heldOwnedRun.json();
   assert.equal(heldOwnedRunPayload.command.testRun.testRunId,pausedTestRunId);
   assert.equal(heldOwnedRunPayload.command.testRun.participantSessionId,participantSessionId);
-  assert.equal(heldOwnedRunPayload.command.testRun.status,"paused");
-  const heldOwnedRunTimer = heldOwnedRunPayload.command.testRun.testletTimers["testlet:timed-paused"];
+  assert.equal(heldOwnedRunPayload.command.testRun.status,"running");
+  const heldOwnedRunStateAfterPause = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state?testRunId=${pausedTestRunId}`,
+    payload => payload?.currentRunState?.testRun?.testRunId === pausedTestRunId &&
+      payload.currentRunState.testRun.status === "paused" &&
+      payload.currentRunState.testRun.testletTimers?.["testlet:timed-paused"]?.status === "paused"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=monitor_run_command_executed&subjectType=test_run&subjectId=${pausedTestRunId}&limit=25`,
+    payload => payload?.items?.some(item => item.activityEvent?.details?.commandId === heldOwnedRunPayload.command.commandId &&
+      item.activityEvent.details.commandType === "pause" && item.activityEvent.details.nextStatus === "paused")
+  );
+  const heldOwnedRunTimer = heldOwnedRunStateAfterPause.currentRunState.testRun.testletTimers["testlet:timed-paused"];
   assert.equal(heldOwnedRunTimer.status,"paused");
   assert.equal(heldOwnedRunTimer.durationSeconds,120);
   assert.ok(heldOwnedRunTimer.remainingSeconds>0);

@@ -18,6 +18,15 @@ browser suite and current-head CI. The preceding full attempt stopped at the
 monitor target assertion; it is not a complete pass. Keep the active branch,
 draft PR #6 and protected presentation. Formal parity remains 30/19 and open.
 
+Exact published `34d00de4` passes 2,548 unit/frontend and 1,636 PostgreSQL-16
+CI tests. The local full browser passes auto-next and stops later at the own
+result Run's Pause receipt. The fixture now waits for that command's execution
+activity and durable paused timer before capturing its deletion baseline.
+The offline-recovery gate also waits for complete outbox drainage, including a
+new real FOCUS log emitted after the recovered answer's acknowledgement. All
+33 focused command/credential/selection checks pass. Inspect the running full
+attempt and fresh head CI separately; keep both earlier failure logs.
+
 ### Latest continuation: Player readiness and monitor receipt gates (2026-10-17)
 
 The production Player host blocks input and overlays the iframe while loading;
