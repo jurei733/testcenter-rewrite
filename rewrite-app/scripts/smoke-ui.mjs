@@ -1103,7 +1103,8 @@ try {
     loginKey,
     participantSessionId,
     testRunId,
-    transition
+    transition,
+    effectsDeferred = false
   }) => {
     const [previousStatus, nextStatus] = transition.split(" -> ");
     await pollJsonWithPredicate(
@@ -1122,6 +1123,7 @@ try {
             details?.commandType === commandType &&
             details?.previousStatus === previousStatus &&
             details?.nextStatus === nextStatus &&
+            Boolean(details?.effectsDeferred) === effectsDeferred &&
             details?.participantSessionId === participantSessionId &&
             details?.loginKey === loginKey &&
             details?.groupKey === groupKey &&
@@ -21748,7 +21750,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "paused -> running"
+    transition: "paused -> paused",
+    effectsDeferred: true
   });
   logStep("monitor-pause-run");
   const monitorEventBeforePause = await page
@@ -21780,7 +21783,6 @@ try {
   await liveParticipantPage
     .locator("#participantRouteStatus", { hasText: "paused" })
     .waitFor({ timeout: 15_000 });
-  await liveParticipantPage.close();
   stopAfter("participant-monitor-live-sync");
   await page.waitForFunction(
     previousEvent => {
@@ -21801,7 +21803,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "running -> paused"
+    transition: "running -> running",
+    effectsDeferred: true
   });
   await fillAndCommit("#monitorCommandHistoryRunFilter", "missing-monitor-run");
   await fillAndCommit("#monitorCommandHistoryLimit", "1");
@@ -21827,7 +21830,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "running -> paused"
+    transition: "running -> running",
+    effectsDeferred: true
   });
   await expectMonitorCommandHistoryCard({
     actorId: expectedMonitorActorId,
@@ -21837,7 +21841,8 @@ try {
     loginKey: participantLoginKey,
     participantSessionId,
     testRunId: pausedTestRunId,
-    transition: "paused -> running"
+    transition: "paused -> paused",
+    effectsDeferred: true
   });
   logStep("monitor-set-testlet-time");
   await fillAndCommit("#monitorTimeSeconds", "1800");
@@ -21950,6 +21955,9 @@ try {
   const bulkPausePayload = await bulkPauseResponse.json();
   assert.equal(bulkPausePayload.succeededCount, 1);
   assert.equal(bulkPausePayload.failedCount, 0);
+  assert.equal(bulkPausePayload.commands[0]?.testRun?.testRunId, pausedTestRunId);
+  assert.equal(bulkPausePayload.commands[0]?.previousStatus, "running");
+  assert.equal(bulkPausePayload.commands[0]?.testRun?.status, "running");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "paused"
@@ -22025,7 +22033,8 @@ try {
   assert.equal(bulkResumePayload.succeededCount, 1);
   assert.equal(bulkResumePayload.failedCount, 0);
   assert.equal(bulkResumePayload.commands[0]?.testRun?.testRunId, pausedTestRunId);
-  assert.equal(bulkResumePayload.commands[0]?.testRun?.status, "running");
+  assert.equal(bulkResumePayload.commands[0]?.previousStatus, "paused");
+  assert.equal(bulkResumePayload.commands[0]?.testRun?.status, "paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "running"
@@ -25210,6 +25219,9 @@ try {
   assert.deepEqual(heldOwnedRunState.testRun.testletTimers["testlet:timed-paused"],heldOwnedRunTimer);
   await waitForNotBusy("hold-owned-result-run-before-deletion");
   logStep("refresh-monitor-command-target");
+  // Keep the real browser-v1 receiver for the entire command chain. The next
+  // independent fixture deliberately retains legacy immediate-command coverage.
+  await liveParticipantPage.close();
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
   const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;
   await sendSmokeJson(

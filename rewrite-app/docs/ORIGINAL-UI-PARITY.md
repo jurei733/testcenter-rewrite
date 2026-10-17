@@ -1,5 +1,16 @@
 # Optional Original UI
 
+### Mounted Player startup interaction (2026-10-17)
+
+The current Original controller covers its mounted Unit iframe while loading.
+The Rewrite host now overlays the mounted iframe and makes it inert until Ready/
+Start, preserving its layout for Player initialization. A production Chromium
+gate explicitly holds Ready, exposes an enabled owned control and proves native
+click/typing cannot change it; Start then enables normal input. The local Demo
+also waits for a nonempty Start session before enabling its restored field.
+All 16 Debug groups and 2,542 unit/frontend tests pass. Complete browser and
+production acceptance remain separate; the formal 30/19 parity count is unchanged.
+
 ### Mixed-command terminal continuation: confirmed open gap (2026-10-14)
 
 The actual pinned Original's Pause/Resume and Unit navigation methods are now

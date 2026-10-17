@@ -144,7 +144,8 @@ type RetiredVeronaFrame = {
         <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatusLabel }}</p>
       </section>
       <div class="verona-player-content">
-        <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
+        <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"
+          [attr.inert]="status === 'running' || status === 'ready' ? null : ''"></div>
         <ng-content select="[original-player-sidebar]" />
       </div>
       <ng-content select="[original-system-check-page-controls]" />

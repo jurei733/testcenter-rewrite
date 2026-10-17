@@ -1,5 +1,25 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Latest continuation: Player readiness and monitor receipt gates (2026-10-17)
+
+The production Player host blocks input and overlays the iframe while loading;
+the local Demo field stays disabled until its Start session and restoration.
+The Debug smoke now holds Ready explicitly and proves native click/typing cannot
+reach an enabled early control, then checks normal use after Start. Its rapid
+Pause case waits for the old restored answer, never for the new answer's save.
+All 16 groups and all 2,542 freshly rerun unit/frontend tests pass. The production
+bundle remains 469.99 kB under the unchanged 470 kB cap.
+
+Published `26bc0965` has 24 passing/14 failing CI jobs. Every failed log is
+downloaded: thirteen share the immutable monitor-issued status expectation,
+one the Player startup window. The browser fixture checks dispatch snapshots
+separately from actual applied state, including bulk Pause/Resume, and keeps its
+real receiver alive through the chain. The independent legacy command fixture
+still checks immediate effects. Full browser/overlap qualification is running;
+inspect final process/log outcomes before reporting it green or restarting it.
+Keep the existing branch/draft PR #6, failed evidence and protected artifacts.
+Formal parity and production acceptance remain open (30 complete/19 partial).
+
 ### Current continuation: participant CI corrections and unfiltered reports (2026-10-17)
 
 Continue on `testcenter-production-readiness` and the existing draft

@@ -53,8 +53,19 @@ try {
   const workspaceKey = "owned-debug", workspace = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
   await api("/api/v1/tenants/demo-tenant/workspaces", { workspaceKey, displayName: "Owned debug browser" }, operator);
   const content = JSON.parse(localDemoSourcePackage.sourceDocument);
+  const immediateReady = `setTimeout(() => parent.postMessage({
+          type: "vopReadyNotification",
+          metadata: { specVersion: "6.0" }
+        }, "*"), 0);`;
+  assert.ok(content.playerEntries[0].html.includes(immediateReady), "Owned readiness gate must replace the real Demo Ready notification");
   // Keep the real Player startup metadata and protocol, changing only the owned response fixture.
   content.playerEntries[0].html = content.playerEntries[0].html
+    .replace(immediateReady, `const ready = () => parent.postMessage({type:"vopReadyNotification",metadata:{specVersion:"6.0"}},"*");
+        addEventListener("message", event => {
+          if (event.source !== parent || event.data?.type !== "ownedDebugReleaseReady") return;
+          ready();
+        });
+        parent.postMessage({type:"ownedDebugReadyRequested"},"*");`)
     .replace('dataParts: { answer: answer.value },', 'unitStateDataType: "iqb-standard@1.0", dataParts: { answer: JSON.stringify([{id:"x",status:"CODING_COMPLETE",value:answer.value,code:Number(answer.value),score:Number(answer.value)}]) },')
     .replace('answer.value = String(event.data.unitState?.dataParts?.answer || "");', 'try { answer.value = JSON.parse(event.data.unitState?.dataParts?.answer || "[]")[0]?.value || ""; } catch { answer.value = ""; }')
     .replace('<textarea id="demoPlayerAnswer"', '<button id="ownedDebugError">Owned runtime error</button><textarea id="demoPlayerAnswer"')
@@ -78,6 +89,16 @@ try {
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
+  // The real Player sandbox has an opaque origin, so only its parent owns
+  // this test-only readiness flag; subsequent frames/reloads release normally.
+  await page.addInitScript(() => {
+    if (window.parent !== window) return;
+    addEventListener("message", event => {
+      if (event.data?.type === "ownedDebugReadyRequested" && sessionStorage.getItem("owned-debug-ready-released")) {
+        event.source.postMessage({ type: "ownedDebugReleaseReady" }, "*");
+      }
+    });
+  });
   page.on("pageerror", error => errors.push(String(error)));
   page.on("request", request => { const url = new URL(request.url()); if (url.pathname.endsWith("/debug-state")) requests.push({ method: request.method(), run: url.searchParams.get("testRunId") }); });
   page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push(JSON.parse(request.postData())); });
@@ -87,7 +108,35 @@ try {
   const signedIn = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/participant/auth/sign-in" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Weiter", exact: true }).click(); const identity = await (await signedIn).json();
   const currentPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
-  const start = async key => { await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click(); await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor(); await page.waitForFunction(() => typeof window.tc?.debug === "function"); };
+  let readinessVerified = false;
+  const start = async key => {
+    await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click();
+    const answer = page.frameLocator("iframe").locator("#demoPlayerAnswer");
+    await answer.waitFor();
+    if (!readinessVerified) {
+      await page.locator("#participantVeronaPlayerLoading").waitFor();
+      assert.equal(await answer.isDisabled(), true, "Demo input must wait for a Start session");
+      assert.equal(await page.locator("#participantVeronaFrameHost").getAttribute("inert"), "");
+      // A third-party Player may expose enabled controls before Ready. The
+      // host must still prevent trusted input until it sends Start.
+      await answer.evaluate(element => { element.disabled = false; });
+      await assert.rejects(answer.click({ timeout: 500 }), /Timeout/);
+      await page.keyboard.type("premature answer");
+      assert.equal(await answer.inputValue(), "");
+      await answer.evaluate(element => { element.disabled = true; });
+      await page.evaluate(() => {
+        sessionStorage.setItem("owned-debug-ready-released", "yes");
+        document.querySelector("iframe").contentWindow.postMessage({ type: "ownedDebugReleaseReady" }, "*");
+      });
+      await poll(async () => await answer.isEnabled(), "Demo input was not enabled after Start");
+      assert.equal(await page.locator("#participantVeronaFrameHost").getAttribute("inert"), null);
+      assert.equal(await page.locator("#participantVeronaPlayerLoading").count(), 0);
+      checks.push("player-ready-gates-trusted-input-before-start");
+      console.log("participant_debug=player-ready-gates-trusted-input-before-start:passed");
+      readinessVerified = true;
+    }
+    await page.waitForFunction(() => typeof window.tc?.debug === "function");
+  };
   await start("first");
   const run = (await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun;
   const repository = createSqliteFirstSliceRepository(file);
@@ -180,6 +229,10 @@ try {
   assert.deepEqual(await durable(), paused); mark("native-debug-timestamp-follows-fulfilled-handler-microtask");
   await issue("resume"); await poll(async () => (await durable()).run.status === "running", "Monitor resume missing");
   const native = async (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
+  // A visible iframe can still precede its Start command. Wait for the old
+  // answer to be restored, then Pause immediately after new input, without
+  // waiting for that new answer's save acknowledgement.
+  await poll(async () => await page.frameLocator("iframe").locator("#demoPlayerAnswer").inputValue() === "3", "Resumed Player did not finish its restored state before trusted input");
   await page.frameLocator("iframe").locator("#demoPlayerAnswer").fill("4");
   await native("pause"); await poll(async () => (await durable()).run.status === "paused", "Native pause missing");
   await poll(async () => await storedValue() === "4", "Native pause did not drain the trusted Player capture");

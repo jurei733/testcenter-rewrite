@@ -1,5 +1,33 @@
 # Testcenter parity checklist
 
+### Player startup input and asynchronous monitor receipts (2026-10-17)
+
+Published `26bc0965` finishes CI with 24 passing and 14 failing jobs. Downloaded
+logs identify thirteen failures at the same monitor-issued history expectation
+and one at rapid native Pause after a resumed Player. Monitor-issued receipts
+retain their dispatch-time status with `effectsDeferred: true`; the browser
+applies the command separately. The full browser fixture now checks that exact
+intent snapshot, keeps its real browser-v1 receiver alive through the command
+chain, and still requires the resulting durable status and Participant UI.
+Bulk Pause/Resume likewise distinguish the accepted snapshot from application.
+The separate legacy fixture retains its immediate-command coverage.
+
+The Player host now blocks interaction while loading and covers the mounted
+iframe with its progress surface, matching the current Original controller's
+loading overlay while preserving iframe layout and startup. The local Demo
+input remains disabled until Start supplies a nonempty session, after restored
+data is installed. A deterministic production-browser gate holds Ready, enables
+the owned fixture's control to model an early third-party input, and proves that
+native click/typing cannot enter an answer. After Ready/Start, the control becomes
+usable. Rapid Pause still follows new trusted input without waiting for its save;
+the fixture first waits only for the previously saved answer to be restored.
+
+Fresh validation passes all 2,542 unit/frontend tests (1,103 frontend), all 16
+Debug browser groups and the production build at 469.99 kB under the unchanged
+470 kB cap. Full browser/overlap and current-head remote qualification remain
+separate. Formal parity remains 30 complete/19 partial; production acceptance
+is open.
+
 ### Participant input capture, locked Starter and direct-entry rendering (2026-10-17)
 
 The first published CI runs for `d07446f4` exposed five shared browser failure
