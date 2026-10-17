@@ -334,7 +334,7 @@ try {
       const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
       await remotePage.route(url=>url.pathname===runtimePath,async route=>{const response=await route.fetch();runtimeHeld=true;await runtimeGate;await route.fulfill({response});});
       await remotePage.route('**/command-completions',async route=>{
-        try{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);completions.push(request);await route.fulfill({response});}
+        try{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);await route.fulfill({response});completions.push(request);}
         catch(error){routeErrors.push(error);}
       });
       await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON();if(scenario.initialPaused&&request.keyword==='terminate'&&!request.terminationNoop){stateEffectHeld=true;await stateEffectGate;}const response=await route.fetch();packets.push({request,application:(await response.json()).application});if(loseNoop&&request.terminationNoop){loseNoop=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_noop_receipt'})});}else await route.fulfill({response});});

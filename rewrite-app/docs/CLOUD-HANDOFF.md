@@ -1,5 +1,23 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: monitor next-block selection (2026-10-17)
+
+The full browser run with the Player input guard passes all STARS phases,
+official families, the Original controller package, 32 label cases and bulk
+Pause/Resume. It then finds the monitor auto-next bug: a Goto dispatch receipt
+still reports the previous Unit. The facade now advances from its requested
+single target or the first accepted batch Run's actual variant target. This
+matches current Original `selectNextBlock`, which advances its selected block.
+Six actual-method tests pass; the unchanged previous facade fails three of them.
+All 1,109 frontend tests and the 469.99 kB production build pass. Combined with
+unchanged backend qualification, the unit/frontend count is 2,548.
+
+The loading probe also records completion only after fulfilling its HTTP reply;
+all 43 groups pass again. Qualify the latest monitor correction in the complete
+browser suite and current-head CI. The preceding full attempt stopped at the
+monitor target assertion; it is not a complete pass. Keep the active branch,
+draft PR #6 and protected presentation. Formal parity remains 30/19 and open.
+
 ### Latest continuation: Player readiness and monitor receipt gates (2026-10-17)
 
 The production Player host blocks input and overlays the iframe while loading;

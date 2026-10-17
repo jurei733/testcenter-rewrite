@@ -1,5 +1,29 @@
 # Testcenter parity checklist
 
+### Monitor next-block selection after asynchronous Goto (2026-10-17)
+
+The full production-browser run passes the six STARS recovery phases, official
+Player families, complete Original Test-Controller package, all 32 Unit-label
+cases and bulk Pause/Resume, then exposes a real next-block selection gap. A
+Goto receipt reports the dispatch-time Unit, so advancing from that field can
+clear the target after jumping to the first block. Current Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`,
+`group-monitor.component.ts::selectNextBlock`, advances from the selected block.
+
+Single Goto now retains its requested target through the asynchronous receipt.
+Batch Goto resolves the first accepted Run's own target from the submitted
+variant groups, including partial failure. Neither path treats the receipt's
+old current Unit as the destination. Manual selection, last-block clearing and
+fully failed batches retain their respective behavior. Six tests execute the
+actual facade methods; three fail against the prior production facade and all
+six pass after the correction. The full frontend suite passes 1,109 tests and
+the production build stays 469.99 kB under the unchanged 470 kB cap.
+
+The backend is unchanged from the 1,439 unit and 1,636 PostgreSQL-16 checks
+qualified at `51c6d7b9`; the combined unit/frontend count is 2,548. Full browser
+and current-head CI qualification remain open. The formal count remains 30
+complete/19 partial, with no release or production acceptance claimed.
+
 ### Player startup input and asynchronous monitor receipts (2026-10-17)
 
 Published `26bc0965` finishes CI with 24 passing and 14 failing jobs. Downloaded

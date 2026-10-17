@@ -4299,6 +4299,7 @@ export class RuntimeViewFacade {
     }
     this.clearMonitorUnitFilterBeforeGoto();
     this.viewState.onActionAsync(async () => {
+      const targetUnitKey = this.runtime.monitorTargetUnitKey.trim();
       const result = await this.runtimeService.issueMonitorRunCommand(
         "goto",
         restoration
@@ -4307,7 +4308,7 @@ export class RuntimeViewFacade {
       );
       this.selectNextMonitorBlockAfterGoto(
         result.command.testRun.testRunId,
-        result.command.testRun.currentUnitKey,
+        targetUnitKey,
         navigationTargets
       );
     });
@@ -4567,11 +4568,17 @@ export class RuntimeViewFacade {
         this.monitorBatchSelection.delete(command.testRun.testRunId);
       }
       if (commandType === "goto" && result.commands[0]) {
-        this.selectNextMonitorBlockAfterGoto(
-          result.commands[0].testRun.testRunId,
-          result.commands[0].testRun.currentUnitKey,
-          navigationTargetsByRun.get(result.commands[0].testRun.testRunId)
-        );
+        const acceptedRunId = result.commands[0].testRun.testRunId;
+        const targetUnitKey = navigationPlan?.groups.find(group =>
+          group.testRunIds.includes(acceptedRunId)
+        )?.targetUnitKey;
+        if (targetUnitKey) {
+          this.selectNextMonitorBlockAfterGoto(
+            acceptedRunId,
+            targetUnitKey,
+            navigationTargetsByRun.get(acceptedRunId)
+          );
+        }
       }
       this.uiState.renderVersion.update(version => version + 1);
     });
