@@ -8,7 +8,8 @@ Continue on `testcenter-production-readiness` and the existing draft
 explicit empty service selections remain empty. Its 15 Memory/File/SQLite tests
 and three focused HTTP scenarios pass. The additional owned PostgreSQL 14.24
 run passes five more report cases (20 total across four stores) and stops its
-server afterwards. PostgreSQL 16 CI includes the new suite.
+server afterwards. Published runtime `2d9c6c0d` also passes all 1,636 PostgreSQL-16
+CI tests without failures/skips/cancellations, including this new suite.
 
 The participant correction retains the native Pause/Goto input-capture interval,
 keeps their HTTP drainage independent, disables locked/completed Starter
@@ -24,8 +25,15 @@ All 2,539 local unit/frontend tests pass, including 1,100 frontend tests, plus t
 plus the live monitor lifecycle pass in production Chromium/SQLite. Overlap
 probes wait for their exact command application/acknowledgement before retiring
 routes; a pending Debug phase alone is not evidence of a committed command.
-The full browser suite is running. Publish this test follow-up after qualification,
-then inspect new remote CI against its exact head: the old
+The full browser suite is running. The subsequent eight downloaded CI failures
+all reach the same 28-Unit STARS recovery fixture. Its six recovery phases now
+use distinct captured response data and current Run/Unit clocks. Inactive packets
+remain byte-exact; an active Player can re-report any restored part, so all its
+field clocks may advance while values/types stay exact. Direct matcher checks
+retain rejection of older clocks, missing/different/wrongly typed values and
+nonnumeric clocks. Failure diagnostics retain the original error and bounded
+input events from the owned synthetic Player. Qualify this fixture correction
+locally and inspect new remote CI against its exact head: the old
 `d07446f4` runs failed at five shared browser sites and cannot qualify this head.
 Keep all earlier failed-attempt evidence. Earlier PostgreSQL/container results
 belong to their stated revisions; do not substitute them for fresh CI.

@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
+import { isDeepStrictEqual } from "node:util";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
@@ -9121,6 +9122,7 @@ try {
       <script>
         let sessionId = "";
         let currentPage = "page-1";
+        window.__ownedVeronaInputEvents = [];
         const sendState = (includeLog = true) => {
           const answer = document.querySelector("#playerAnswer").value;
           parent.postMessage({
@@ -9184,7 +9186,12 @@ try {
           currentPage = String(event.data.playerState?.currentPage || event.data.playerConfig?.startPage || "page-1");
           document.querySelector("#playerCurrentPage").textContent = currentPage;
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
-          document.querySelector("#playerAnswer").addEventListener("input", () => sendState(true));
+          document.querySelector("#playerAnswer").addEventListener("input", event => {
+            window.__ownedVeronaInputEvents.push({ timeStamp: Date.now(), inputType: event.inputType,
+              isTrusted: event.isTrusted, data: event.data, answer: event.target.value });
+            window.__ownedVeronaInputEvents = window.__ownedVeronaInputEvents.slice(-32);
+            sendState(true);
+          });
           parent.postMessage({
             type: "vopStateChangedNotification",
             sessionId,
@@ -11367,15 +11374,21 @@ try {
   // new answer merely because outer JSON whitespace differs. Capture distinct
   // data with current per-Unit clocks through the production Player boundary.
   let recoveryRun = originalAdaptiveStateForOutbox.currentRunState.testRun;
-  const recoveryResponse = (unitKey, marker) => mergeCapturedVeronaUnitResponse(originalAdaptiveBaseResponse, {
-    unitState: { ...parseVeronaUnitResponse(originalAdaptiveBaseResponse).unitState,
-      dataParts: { ...parseVeronaUnitResponse(originalAdaptiveBaseResponse).unitState.dataParts, ownedRecovery: marker } },
+  const captureRecoveryResponse = (baseResponse, run, unitKey, marker) => mergeCapturedVeronaUnitResponse(baseResponse, {
+    unitState: { ...parseVeronaUnitResponse(baseResponse).unitState,
+      dataParts: { ...parseVeronaUnitResponse(baseResponse).unitState.dataParts, ownedRecovery: marker } },
     captureTimestamp: Date.now(),
-    storedFieldTimestamps: recoveryRun.unitResponseFieldTimestamps?.[unitKey]
+    storedFieldTimestamps: run.unitResponseFieldTimestamps?.[unitKey]
   });
-  const matchesRecovery = (actual, expected) =>
-    JSON.stringify(parseVeronaUnitResponse(actual)) === JSON.stringify(parseVeronaUnitResponse(expected)) &&
-    JSON.parse(actual).fieldTimestamps?.dataParts?.ownedRecovery === JSON.parse(expected).fieldTimestamps.dataParts.ownedRecovery;
+  const recoveryResponse = (unitKey, marker) => captureRecoveryResponse(originalAdaptiveBaseResponse, recoveryRun, unitKey, marker);
+  const matchesRecovery = (actual, expected) => {
+    if (!isDeepStrictEqual(parseVeronaUnitResponse(actual), parseVeronaUnitResponse(expected))) return false;
+    const receivedClocks = JSON.parse(actual).fieldTimestamps, expectedClocks = JSON.parse(expected).fieldTimestamps;
+    // A real active Player can re-report any restored part, advancing its clock.
+    return Object.entries(expectedClocks).every(([group, fields]) => typeof fields === "number"
+        ? Number.isSafeInteger(receivedClocks?.[group]) && receivedClocks[group] >= fields
+        : Object.entries(fields).every(([key, clock]) => Number.isSafeInteger(receivedClocks?.[group]?.[key]) && receivedClocks[group][key] >= clock));
+  };
   const currentUnitOutboxResponse = recoveryResponse(originalAdaptiveUnitKey, "current Ω");
   const otherUnitOutboxResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "other Ω");
   const thirdUnitOutboxResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "third Ω");
@@ -13843,12 +13856,12 @@ try {
   const starsUnitKeys = Array.from({ length: 28 }, (_, index) =>
     String(index + 1)
   );
-  const starsForegroundResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 1)}`
-    ])
-  );
+  const captureStarsResponses = async (participantSessionId, phase) => {
+    const run = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`)).currentRunState.testRun;
+    return Object.fromEntries(starsUnitKeys.map(unitKey => [unitKey,
+      captureRecoveryResponse(starsBaseResponse, run, unitKey, `${phase}:${unitKey} Ω`)]));
+  };
+  const starsForegroundResponses = await captureStarsResponses(starsParticipantSessionId, "foreground");
   const starsForegroundResponseUnits = new Map(
     Object.entries(starsForegroundResponses).map(([unitKey, response]) => [
       response,
@@ -13917,8 +13930,9 @@ try {
     payload =>
       starsUnitKeys.every(
         unitKey =>
-          payload?.currentRunState?.testRun?.unitResponses?.[unitKey] ===
-          starsForegroundResponses[unitKey]
+          (unitKey === "2"
+            ? matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[unitKey], starsForegroundResponses[unitKey])
+            : payload?.currentRunState?.testRun?.unitResponses?.[unitKey] === starsForegroundResponses[unitKey])
       ),
     30_000
   );
@@ -13969,48 +13983,12 @@ try {
   );
   const parallelStarsTestRunId =
     parallelStarsState.currentRunState.testRun.testRunId;
-  const starsReloadResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 51)}`
-    ])
-  );
-  const matchesStarsReloadResponse = (unitKey, response) => {
-    const expected = starsReloadResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
-  const parallelStarsReloadResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 151)}`
-    ])
-  );
-  const matchesParallelStarsReloadResponse = (unitKey, response) => {
-    const expected = parallelStarsReloadResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "1" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
+  const starsReloadResponses = await captureStarsResponses(starsParticipantSessionId, "reload");
+  const matchesStarsReloadResponse = (unitKey, response) => response === starsReloadResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsReloadResponses[unitKey]);
+  const parallelStarsReloadResponses = await captureStarsResponses(parallelStarsParticipantSessionId, "parallel-reload");
+  const matchesParallelStarsReloadResponse = (unitKey, response) => response === parallelStarsReloadResponses[unitKey] ||
+    unitKey === "1" && matchesRecovery(response, parallelStarsReloadResponses[unitKey]);
   const starsSaveProgressUrl =
     `${baseUrl}/api/v1/participant/test-runs/${starsTestRunId}/save-progress`;
   const parallelStarsSaveProgressUrl =
@@ -14099,10 +14077,13 @@ try {
       starsUnitKeys,
       `Hard reload must retain the complete isolated run ${testRunId}.`
     );
-    assert.ok(
-      restoredRunEntries.every(entry =>
-        responseMatches(entry.unitKey, entry.response)
-      ),
+    assert.deepEqual(
+      restoredRunEntries.filter(entry => !responseMatches(entry.unitKey, entry.response)).map(entry => ({
+        unitKey: entry.unitKey,
+        actual: JSON.parse(entry.response),
+        expected: JSON.parse((testRunId === starsTestRunId ? starsReloadResponses : parallelStarsReloadResponses)[entry.unitKey])
+      })),
+      [],
       `Hard reload must preserve the responses for run ${testRunId}.`
     );
   }
@@ -14269,12 +14250,7 @@ try {
   );
 
   logStep("participant-original-stars-28-unit-background-sync");
-  const starsBackgroundResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 101)}`
-    ])
-  );
+  const starsBackgroundResponses = await captureStarsResponses(starsParticipantSessionId, "background");
   await page.evaluate(
     ({ storageKey, testRunId, responses }) => {
       const queuedAt = Date.now();
@@ -14337,11 +14313,9 @@ try {
     payload =>
       starsUnitKeys.every(
         unitKey =>
-          matchesVeronaSavedResponse(
-            payload?.currentRunState?.testRun?.unitResponses?.[unitKey],
-            starsBackgroundResponses[unitKey],
-            unitKey === "2"
-          )
+          (unitKey === "2"
+            ? matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[unitKey], starsBackgroundResponses[unitKey])
+            : payload?.currentRunState?.testRun?.unitResponses?.[unitKey] === starsBackgroundResponses[unitKey])
       ),
     45_000
   );
@@ -14375,27 +14349,9 @@ try {
 
   stopAfter("participant-original-stars-28-unit-background-sync");
   logStep("participant-original-stars-browser-process-crash-recovery");
-  const starsRendererCrashResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 301)}`
-    ])
-  );
-  const matchesStarsRendererCrashResponse = (unitKey, response) => {
-    const expected = starsRendererCrashResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
+  const starsRendererCrashResponses = await captureStarsResponses(starsParticipantSessionId, "browser-crash");
+  const matchesStarsRendererCrashResponse = (unitKey, response) => response === starsRendererCrashResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsRendererCrashResponses[unitKey]);
   const browserCrashProfileDirectory = await mkdtemp(
     resolve(".data/ui-smoke-stars-browser-crash-")
   );
@@ -14567,27 +14523,9 @@ try {
   stopAfter("participant-original-stars-browser-process-crash-recovery");
 
   logStep("participant-original-stars-mid-drain-hard-reload");
-  const starsMidDrainResponses = Object.fromEntries(
-    starsUnitKeys.map((unitKey, index) => [
-      unitKey,
-      `${starsBaseResponse}\n${" ".repeat(index + 251)}`
-    ])
-  );
-  const matchesStarsMidDrainResponse = (unitKey, response) => {
-    const expected = starsMidDrainResponses[unitKey];
-    if (response === expected) {
-      return true;
-    }
-    if (unitKey !== "2" || typeof response !== "string") {
-      return false;
-    }
-    try {
-      return JSON.stringify(JSON.parse(response)) ===
-        JSON.stringify(JSON.parse(expected));
-    } catch {
-      return false;
-    }
-  };
+  const starsMidDrainResponses = await captureStarsResponses(starsParticipantSessionId, "mid-drain");
+  const matchesStarsMidDrainResponse = (unitKey, response) => response === starsMidDrainResponses[unitKey] ||
+    unitKey === "2" && matchesRecovery(response, starsMidDrainResponses[unitKey]);
   await page.evaluate(async () => {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map(registration => registration.unregister()));
@@ -26226,6 +26164,11 @@ try {
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
     process.stderr.write(`UI smoke failure at ${page?.url() ?? "unopened page"}: ${String(error?.stack ?? error)}\n`);
+    if (page && !page.isClosed()) {
+      const inputEvents = await Promise.all(page.frames().map(frame => frame.locator("html").evaluate(() =>
+        window.__ownedVeronaInputEvents ?? null, undefined, { timeout: 1_000 }).catch(() => null)));
+      process.stderr.write(`Owned Verona input events: ${JSON.stringify(inputEvents.filter(Boolean))}\n`);
+    }
     if (page && !page.isClosed()) {
       try {
         const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));

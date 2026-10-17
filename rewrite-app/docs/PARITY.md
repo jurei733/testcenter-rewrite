@@ -27,7 +27,7 @@ reload and Unit changes, and catches the former `NG0100` logo-link failure.
 The corrected browser fixtures retain their behavioral checks: local/background
 outbox recovery captures distinct response data with production per-field clocks;
 active-Player recapture may advance unrelated clocks but must preserve every
-response value/type and the recovery field's clock. The development reload gate
+response value/type and nondecreasing field clocks. The development reload gate
 requires exact response values/types and nondecreasing field clocks. The busy
 deletion gate waits for the rendered read-only/disabled controls before asserting
 input, duplicate-submit, Escape and backdrop guards. Monitor completion waits for
@@ -50,6 +50,17 @@ complete browser suite and current remote CI remain pending at this checkpoint. 
 PostgreSQL/container results below describe their recorded revisions; they are
 not new qualification of these report/UI changes. Formal parity remains 30
 complete and 19 partial areas, with full production acceptance still open.
+
+GitHub subsequently passes all 1,636 PostgreSQL-16 tests for published runtime
+checkpoint `2d9c6c0d`, without failures, skips or cancellations. This includes the
+new report-selection cases. Unit/compatibility, live monitoring, quick browser,
+deployability and image checks also pass for that checkpoint. Eight downloaded
+browser failures share the later 28-Unit STARS fixture's copied clocks: outer
+JSON whitespace cannot create a new field update. Its six recovery phases now
+capture distinct owned response data with current Run/Unit clocks, retain exact
+inactive packets, and require unchanged values/types plus
+nondecreasing clocks for every restored field in the active Player. Full browser/remote qualification
+of that fixture correction remains open.
 
 ### Unfiltered Original result archives (2026-10-17)
 
