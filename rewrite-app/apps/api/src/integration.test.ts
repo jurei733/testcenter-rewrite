@@ -16983,6 +16983,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
       bytes: iconv.encode(iso885916BookletXml, "iso-8859-16"),
       displayLabel: "Preț 12 €"
     },
+    ...["utf-8", "utf-16le", "utf-16be"].map(encoding => ({
+      fileName: `authored-replacement-character-${encoding}-booklet.xml`,
+      bytes: iconv.encode(validBookletXml
+        .replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`)
+        .replace("<Label>Sample booklet</Label>", "<Label>Authored � retained</Label>"), encoding),
+      displayLabel: "Authored � retained"
+    })),
     ...registeredLatinEncodingBooklets,
     {
       fileName: "cp850-original-booklet.xml",
@@ -17202,6 +17209,17 @@ test("original Testcenter compatibility corpus imports representative booklets",
     value => iconv.encode(value, "shift_jis")
   );
   const invalidEncodingByteCases = [
+    ...[
+      { encoding: "IBM857", bytes: [0xd5, 0xe7, 0xf2] },
+      { encoding: "IBM864", bytes: [0x9b, 0x9c, 0x9f, 0xa6, 0xa7, 0xff] },
+      { encoding: "IBM869", bytes: [0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x87, 0x93, 0x94] }
+    ].flatMap(({ encoding, bytes }) => bytes.map(byte => ({
+      fileName: `invalid-${encoding.toLowerCase()}-${byte.toString(16)}-booklet.xml`,
+      bytes: invalidEncodedBookletBytes(
+        validBookletXml.replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`),
+        "Sample booklet", Buffer.from([byte]), value => iconv.encode(value, encoding)
+      )
+    }))),
     {
       fileName: "invalid-utf-8-original-booklet.xml",
       bytes: invalidUtf8BookletBytes
@@ -32867,7 +32885,8 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
         runtimeSnapshot: {
           bookletEntries: Array<{
             bookletKey: string;
-            unitEntries: Array<{ unitKey: string }>;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; unitDefinition?: string }>;
           }>;
         };
       } | null;
@@ -33108,14 +33127,14 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
         content: validBooklet(
           "BOOKLET.PARTIAL-VALID-BYTES",
           "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling"
+          "Valid Byte Sibling �"
         )
       },
       {
         fileName: "valid_sibling_unit.xml",
         content: validUnit(
           "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling Unit"
+          "Valid Byte Sibling Unit �"
         )
       }
     ]
@@ -33153,6 +33172,8 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
     sourceFileNames: ["valid_sibling_testtakers.xml"],
     operationalLoginCandidateCount: 0
   });
+  assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.displayLabel, "Valid Byte Sibling �");
+  assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitDefinition, "Valid Byte Sibling Unit � content");
   assert.deepEqual(
     await acceptedPathsFor(
       "integration-workspace-partial-zip-invalid-bytes"

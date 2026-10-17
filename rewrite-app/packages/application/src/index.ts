@@ -8663,13 +8663,13 @@ const hasValidXmlByteSequence = (
   if (["utf-32be", "utf32be"].includes(effectiveEncoding)) {
     return isValidUtf32ByteSequence(encodedBytes, "big-endian");
   }
-  if (
-    isSupportedEbcdicEncodingName(effectiveEncoding) ||
-    ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)
-  ) {
-    // Every currently allowlisted iconv fallback is a complete single-byte
-    // code page, so each possible byte has a defined character mapping.
+  if (isSupportedEbcdicEncodingName(effectiveEncoding)) {
     return true;
+  }
+  if (ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)) {
+    // These single-byte pages cannot encode an authored U+FFFD. Some have
+    // undefined bytes that iconv substitutes with it; reject before parsing.
+    return !decodedSourceDocument.includes("\uFFFD");
   }
 
   try {
@@ -10946,6 +10946,11 @@ const validateTestcenterBookletCondition = (
   return diagnostics;
 };
 
+// Raw-byte validation diagnoses decoder substitutions first. An authored
+// U+FFFD is valid XML; xmldom's heuristic warning does not make it malformed.
+const isXmlReplacementCharacterWarning = (level: string, message: string): boolean =>
+  level === "warning" && message === "Unicode replacement character detected, source encoding issues?";
+
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
   sourceFileName: string,
@@ -10965,7 +10970,9 @@ const validateTestcenterXmlSourceDocument = (
   try {
     document = new DOMParser({
       onError(level, message) {
-        parserErrors.push(`${level}: ${message}`);
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(`${level}: ${message}`);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch (error) {
@@ -16518,8 +16525,10 @@ const collectLooseSourcePackageDependencyReferences = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18079,8 +18088,10 @@ const extractDeclaredTestcenterUnitCrossReferences = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18340,8 +18351,10 @@ const extractZipUnitAttachmentRequests = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18376,8 +18389,10 @@ const parseStandaloneZipUnitEntry = (
   let document: XmlDocument | null = null;
   try {
     document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
   } catch {
@@ -18968,8 +18983,10 @@ const parseTestcenterXmlRoot = (sourceDocument: string): XmlElement | null => {
   const parserErrors: string[] = [];
   try {
     const document = new DOMParser({
-      onError(_level, message) {
-        parserErrors.push(message);
+      onError(level, message) {
+        if (!isXmlReplacementCharacterWarning(level, message)) {
+          parserErrors.push(message);
+        }
       }
     }).parseFromString(sourceDocument, "application/xml");
     return parserErrors.length === 0 ? document?.documentElement ?? null : null;

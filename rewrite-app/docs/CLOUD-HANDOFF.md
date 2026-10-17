@@ -1,5 +1,33 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: authored XML characters (2026-10-17)
+
+The complete `09497d51` SQLite browser checkpoint passes all 548 steps. Its
+monitor auto-next, asynchronous Pause/application, isolated Goto/Terminate,
+attachment lifecycle and exact group-result deletion are qualified locally.
+Inspect current GitHub jobs independently before claiming complete remote CI.
+
+The next XML correction distinguishes authored U+FFFD from undefined legacy
+bytes. Native libxml accepts correctly encoded U+FFFD; xmldom's exact heuristic
+warning previously rejected it. Byte validation now rejects undefined IBM857/
+864/869 bytes explicitly; only that nonfatal parser warning is ignored by XML
+validation and dependency/Unit readers. Other warnings/errors, malformed UTF,
+DOCTYPE and strict XSD checks remain enforced. All 72 compiled three-store
+tests and all 96 tests with owned PostgreSQL 14.24 pass, including strict
+Original-19 import and durable reopen. The owned server is stopped.
+
+All 2,620 unit/frontend checks and 498 full HTTP checks (166 each on Memory,
+File and SQLite) pass, including 21 new encoded cases and the valid U+FFFD
+sibling in a damaged ZIP graph. File/SQLite run sequentially after the parallel
+attempt exhausts host disk; failed logs remain. The production audit finds zero
+vulnerabilities. Inspect new-head GitHub PostgreSQL-16 and browser qualification.
+The previous `09497d51` push ends 37/38 green; only its PostgreSQL browser gate
+fails at the final server-health check on a client-aborted log upload. Investigate
+request cancellation/metrics while retaining fatal internal/storage failures.
+Do not promote the preceding full browser run to proof
+for this new backend. Keep draft PR #6, the current neutral branch and protected
+presentation. Full parity/production readiness remains open (30/19).
+
 ### Current correction: monitor next-block selection (2026-10-17)
 
 The full browser run with the Player input guard passes all STARS phases,

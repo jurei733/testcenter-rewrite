@@ -1,5 +1,47 @@
 # Testcenter parity checklist
 
+### Authored XML replacement characters and undefined legacy bytes (2026-10-17)
+
+Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` validates uploaded
+XML with `simplexml_load_string`. Native libxml accepts a correctly encoded
+U+FFFD (`�`) and rejects undefined IBM857 bytes. The Rewrite previously rejected
+both through xmldom's replacement-character warning, including valid UTF-8/16
+metadata. Invalid bytes were already blocked; this correction does not describe
+a previously accepted corrupted import.
+
+Raw byte validation now recognizes undefined bytes in the allowed legacy
+single-byte pages and returns `source_document_xml_encoding_invalid_bytes`.
+The primary XML validator and dependency/Unit projections ignore only xmldom's
+exact nonfatal replacement-character heuristic. Actual parser errors, other
+warnings, fatal UTF decoding, DOCTYPE and XSD guards remain enforced. Authored
+characters survive Booklet metadata, Unit definitions and strict Original-19
+SysCheck question/label projection.
+
+All 72 compiled Memory/File/SQLite checks pass, including all eighteen undefined
+bytes in IBM857/864/869, UTF-8/UTF-16LE/UTF-16BE, native XSD import and durable
+reopen. The optional PostgreSQL suite passes all 96 four-store checks against an
+owned PostgreSQL 14.24 server, which is stopped afterwards. These checks are
+included in unit and PostgreSQL CI. The actual HTTP corpus adds 21 encoded cases
+and preserves an authored character in the valid sibling of a damaged ZIP graph.
+All 2,620 unit/frontend tests pass (1,109 frontend). Complete Memory, File and
+SQLite HTTP suites pass 166 checks each (498 total), including the new encoded
+cases and mixed ZIP graph. File/SQLite qualification was rerun sequentially
+after the parallel attempt exhausted the host disk; its failed logs are retained.
+The fresh production dependency audit has zero vulnerabilities. New-head remote
+qualification remains separate.
+
+The preceding `09497d51` browser checkpoint passes the full 548-step SQLite
+suite, including all Player/recovery/label/monitor/attachment/result-deletion
+flows. That run predates this XML correction; it is not new-backend browser or
+PostgreSQL-16 proof. Formal parity remains 30 complete/19 partial and production
+acceptance stays open.
+
+The `09497d51` push finishes with 37/38 passing jobs. Its PostgreSQL browser run
+reaches the final server-health assertion and fails on a client-aborted
+`test-logs` upload (`ECONNRESET`), recorded as an internal API error. Investigate
+request-abort classification and metrics without weakening the server failure
+gate or treating downstream/storage failures as cancellation.
+
 ### Monitor next-block selection after asynchronous Goto (2026-10-17)
 
 The full production-browser run passes the six STARS recovery phases, official
