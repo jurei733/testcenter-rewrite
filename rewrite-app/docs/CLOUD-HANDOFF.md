@@ -1,6 +1,36 @@
 # Cloud continuation: Testcenter Rewrite
 
-### Current continuation: held termination and save ownership (2026-10-15)
+### Current continuation: participant CI corrections and unfiltered reports (2026-10-17)
+
+Continue on `testcenter-production-readiness` and the existing draft
+[PR #6](https://github.com/jurei733/testcenter-rewrite/pull/6). Report checkpoint
+`51efd249` follows the current Original's omitted-filter/all-groups behavior;
+explicit empty service selections remain empty. Its 15 Memory/File/SQLite tests
+and three focused HTTP scenarios pass. PostgreSQL CI includes the new suite.
+
+The participant correction retains the native Pause/Goto input-capture interval,
+keeps their HTTP drainage independent, disables locked/completed Starter
+assignments and removes the Rewrite Starter's orphan response editor. Direct-link
+shared-state initialization runs after the current Angular check, requests the
+zoneless render and cancels after route destruction. The development Player gate
+passes both interfaces including the formerly failing Original-header `NG0100`.
+See the current [parity evidence](./PARITY.md#participant-input-capture-locked-starter-and-direct-entry-rendering-2026-10-17).
+
+All 2,539 local unit/frontend tests pass, including 1,100 frontend tests, plus the
+48-case Original differential. The production build is 469.99 kB with the same
+470 kB hard cap. Final production-browser requalification is running. Publish
+the correction, then inspect new remote CI against its exact head: the old
+`d07446f4` runs failed at five shared browser sites and cannot qualify this head.
+Keep all earlier failed-attempt evidence. Earlier PostgreSQL/container results
+belong to their stated revisions; do not substitute them for fresh CI.
+
+The Original reference remains `eedae41840cbe90e5547c0211da818bdf620f5aa`.
+Continue the remaining partial areas against current source and real packages
+after the correction is qualified. Full parity/production readiness remains open
+(30 complete/19 partial). Preserve untracked
+`docs/testcenter-thread-migration-process.pptx` and all user databases/packages.
+
+### Historical continuation: held termination and save ownership (2026-10-15)
 
 Continue on `testcenter-production-readiness`. The current correction preserves
 the earlier terminal handler's own lock/Starter navigation after a later
@@ -28,7 +58,7 @@ evidence is established by older image checks.
 
 Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` has unchanged hashes
 for all five completion-reference sources and a new unfiltered-report fix.
-Compare that report behavior next, then continue the remaining partial areas
+That report behavior is covered by the 2026-10-17 checkpoint above. Continue the remaining partial areas
 against current source and real packages. Full parity/production readiness is
 still open (30 complete/19 partial); do not promote the focused fix to completion.
 Preserve untracked `docs/testcenter-thread-migration-process.pptx` and local data.

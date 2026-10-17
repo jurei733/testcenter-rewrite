@@ -8,10 +8,11 @@ const saveBarrierCode=ts.transpileModule(readFileSync(new URL('../apps/web/src/a
 const {createParticipantSaveBarriers}=await import('data:text/javascript;base64,'+Buffer.from(saveBarrierCode).toString('base64'));
 const source=readFileSync(new URL('../apps/web/src/app/participant-view.facade.ts',import.meta.url),'utf8');
 const ast=ts.createSourceFile('facade.ts',source,ts.ScriptTarget.Latest,true),declaration=ast.statements.find(ts.isClassDeclaration);
-const names=['captureControllerTimerInterruption','isControllerTimerInterrupted','handleVeronaControllerError','pendingControllerStatus','beginControllerCommand','isOlderControllerPhase','finishControllerPhase','isOlderRunState','consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand','reconcileParticipantTerminalState','startAcceptedParticipantReception'];
+const names=['canStartOrResume','captureControllerTimerInterruption','isControllerTimerInterrupted','handleVeronaControllerError','pendingControllerStatus','beginControllerCommand','isOlderControllerPhase','finishControllerPhase','isOlderRunState','consoleRun','isParticipantPlayerFocused','eagerBookletLoading','unitViewPending','isRunPaused','debugControllerStatus','nativeControllerStatus','controllerLogState','isParticipantLogin','isParticipantStarter','resumeSessionInternal','debugRunState','readCurrentRunState','syncRun','updateCurrentTextResponse','hasControllerError','controllerError','refreshCurrentStateInternal','validateParticipantControllerContext','invalidateCurrentStateRefreshes','applyNativeConsoleCommand','prepareNativeConsoleCommand','applyReceivedParticipantCommand','reconcileParticipantTerminalState','startAcceptedParticipantReception'];
 const members=names.map(name=>{const member=declaration.members.find(item=>item.name?.getText(ast)===name);assert.ok(member,name);return member.getText(ast);});
 // Inject only module resolution; the actual production method bodies execute unchanged.
-const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution,isParticipantControllerDispatches)=>{const listParticipantSaveOutboxEntriesForRun=()=>[];return class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const grace=ast.statements.filter(ts.isVariableStatement).flatMap(node=>[...node.declarationList.declarations]).find(node=>node.name.getText(ast)==='VERONA_FOREGROUND_STATE_GRACE_MS').initializer.getText(ast);
+const emitted=ts.transpileModule(`export const load=(productionApiRoutes,resolveRoutePath,prettyPrintJson,withSelectedParticipantRun,loadControllerContract,parseVeronaUnitResponse,hasMeaningfulVeronaResponse,loadCommandExecution,isParticipantControllerDispatches)=>{const VERONA_FOREGROUND_STATE_GRACE_MS=${grace};const listParticipantSaveOutboxEntriesForRun=()=>[];return class Host {${members.join('\n').replaceAll('import("@testcenter-rewrite-app/contracts/participant-native-command")','loadControllerContract()').replaceAll('import("./participant-command-execution")','loadCommandExecution()')}}}`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(emitted).toString('base64'));
 const executionSource=readFileSync(new URL('../apps/web/src/app/participant-command-execution.ts',import.meta.url),'utf8');
 const executionAst=ts.createSourceFile('execution.ts',executionSource,ts.ScriptTarget.Latest,true);
@@ -47,6 +48,31 @@ for(const keyword of ['pause','goto'])test(`native ${keyword} retains independen
 test('native Resume navigates without starting another foreground buffer settlement',async()=>{
  const f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.settleVeronaAutoSaveBeforeForegroundAction=()=>assert.fail('Resume started a saved-event barrier');f.host.drainVeronaSaveQueue=()=>assert.fail('Resume closed buffers');
  await f.host.prepareNativeConsoleCommand(()=>true,'resume');assert.equal(f.calls.saved,0);
+});
+for(const keyword of ['pause','goto'])test(`${keyword} captures a debounced Player report before closing its buffer without waiting for the save reply`,async()=>{
+ const f=fixture(),reply=deferred();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.veronaPlayer={};
+ let drained=false,ids;f.host.drainVeronaSaveQueue=async options=>{drained=true;ids=[...options.deliveryIds];await reply.promise;};
+ const preparation=f.host.prepareNativeConsoleCommand(()=>true,keyword,phaseDispatch(1));
+ assert.equal(drained,false);
+ f.host.pendingVeronaSave={testRunId:'selected',deliveryId:'debounced-player',unitKey:'unit',response:'Latest Ω'};
+ await preparation;assert.equal(drained,true);assert.deepEqual(ids,['debounced-player']);assert.equal(f.calls.saved,0);reply.resolve();
+});
+test('a route or selected-Run change during Player input grace cannot close or drain the replacement buffers',async()=>{
+ for(const change of ['route','run']){
+  const f=fixture();f.host.syncRun(run);f.host.currentRunState=state(run);f.host.veronaPlayer={};let current=true;
+  f.host.drainVeronaSaveQueue=()=>assert.fail('A retired handler drained a replacement');
+  const preparation=f.host.prepareNativeConsoleCommand(()=>current,'pause',phaseDispatch(1));
+  if(change==='route')current=false;else f.host.runtime.testRunId='replacement';
+  await preparation;
+ }
+});
+test('the Starter refuses its selected locked or completed assignment while allowing a different available booklet',()=>{
+ const f=fixture();f.host.runtime.testRunId='';f.host.proofOfWork={busy:()=>false};
+ f.host.assignedBooklets=[{bookletKey:'booklet',status:'locked'},{bookletKey:'other',status:'available'}];
+ assert.equal(f.host.canStartOrResume,false);
+ f.host.assignedBooklets[0].status='completed';assert.equal(f.host.canStartOrResume,false);
+ f.host.runtime.bookletKey='other';assert.equal(f.host.canStartOrResume,true);
+ f.host.assignedBooklets[1].status='in_progress';assert.equal(f.host.canStartOrResume,true);
 });
 test('termination still joins its captured answer request while the next Unit view is unavailable',async()=>{
  const f=fixture(),held=deferred();f.host.syncRun(run);assert.equal(f.host.debugRunState,null);

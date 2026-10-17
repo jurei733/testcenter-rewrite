@@ -151,6 +151,13 @@ try {
       if (screen === "desktop") {
         await Promise.race([held, delay(10_000).then(() => { throw Error("Pending real DELETE was not observed."); })]);
         try {
+          // The HTTP effect may reach its held reply before Angular's next
+          // zoneless render. Observe the actual busy surface before probing it.
+          await page.waitForFunction(() =>
+            document.querySelector("#globalConfirmationPasswordInput")?.readOnly === true &&
+            document.querySelector("#globalConfirmationConfirmButton")?.disabled === true &&
+            document.querySelector("#globalConfirmationCancelButton")?.disabled === true
+          );
           assert.equal(await secretInput.isEditable(), false);
           assert.equal(await submit.isDisabled(), true);
           assert.equal(await page.locator("#globalConfirmationCancelButton").isDisabled(), true);

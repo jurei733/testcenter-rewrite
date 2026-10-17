@@ -10,6 +10,8 @@ import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
+import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
@@ -1914,7 +1916,7 @@ try {
 
   const brandedParticipantPage = await context.newPage();
   await brandedParticipantPage.goto(`${baseUrl}/app/participant`, {
-    waitUntil: "networkidle"
+    waitUntil: "domcontentloaded"
   });
   await brandedParticipantPage.waitForFunction(
     expected => {
@@ -2106,7 +2108,7 @@ try {
   });
   const fallbackParticipantPage = await context.newPage();
   await fallbackParticipantPage.goto(`${baseUrl}/app/participant`, {
-    waitUntil: "networkidle"
+    waitUntil: "domcontentloaded"
   });
   await fallbackParticipantPage.waitForFunction(() => {
     const image = document.querySelector("#participantLoginIllustration");
@@ -7618,10 +7620,10 @@ try {
   );
   await legacyShortLinkPage.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 15_000 }
@@ -7916,10 +7918,10 @@ try {
   await waitForNotBusy("participant-return-to-starter");
   await page.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 30_000 }
@@ -7993,10 +7995,10 @@ try {
   });
   await page.waitForFunction(
     () =>
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "signed_in" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantRouteEntry") != null,
     undefined,
     { timeout: 15_000 }
@@ -8183,8 +8185,8 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelector("#participantRouteSessionId")?.value === "" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet",
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "",
     undefined,
     { timeout: 15_000 }
   );
@@ -9045,10 +9047,8 @@ try {
   await page.waitForFunction(
     ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey]) =>
       document.querySelector("#participantRouteSessionId")?.value === "" &&
-      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet" &&
-      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "idle" &&
+      document.querySelector("#participantRoutePlayer") == null &&
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}").testRunId === "" &&
       document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "idle" &&
       document.querySelector("#participantRouteSessionLink") == null &&
@@ -11356,9 +11356,22 @@ try {
     ];
   const originalAdaptiveBeginnerUnitKey = "beginner-unit";
   const originalAdaptiveBonusUnitKey = "bonus-unit";
-  const currentUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n`;
-  const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
-  const thirdUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n  `;
+  // A timestamped envelope with unchanged field clocks is a duplicate, not a
+  // new answer merely because outer JSON whitespace differs. Capture distinct
+  // data with current per-Unit clocks through the production Player boundary.
+  let recoveryRun = originalAdaptiveStateForOutbox.currentRunState.testRun;
+  const recoveryResponse = (unitKey, marker) => mergeCapturedVeronaUnitResponse(originalAdaptiveBaseResponse, {
+    unitState: { ...parseVeronaUnitResponse(originalAdaptiveBaseResponse).unitState,
+      dataParts: { ...parseVeronaUnitResponse(originalAdaptiveBaseResponse).unitState.dataParts, ownedRecovery: marker } },
+    captureTimestamp: Date.now(),
+    storedFieldTimestamps: recoveryRun.unitResponseFieldTimestamps?.[unitKey]
+  });
+  const matchesRecovery = (actual, expected) =>
+    JSON.stringify(parseVeronaUnitResponse(actual)) === JSON.stringify(parseVeronaUnitResponse(expected)) &&
+    JSON.parse(actual).fieldTimestamps?.dataParts?.ownedRecovery === JSON.parse(expected).fieldTimestamps.dataParts.ownedRecovery;
+  const currentUnitOutboxResponse = recoveryResponse(originalAdaptiveUnitKey, "current Ω");
+  const otherUnitOutboxResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "other Ω");
+  const thirdUnitOutboxResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "third Ω");
   const multiUnitSaveOrder = [];
   const multiUnitPacketWrites = [];
   const observedMultiUnitResponses = new Set();
@@ -11459,9 +11472,9 @@ try {
     await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
     payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[
+      matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[
         originalAdaptiveUnitKey
-      ] === currentUnitOutboxResponse &&
+      ], currentUnitOutboxResponse) &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
       ] === otherUnitOutboxResponse &&
@@ -11500,9 +11513,10 @@ try {
   );
 
   logStep("participant-multi-unit-background-sync");
-  const backgroundCurrentResponse = `${originalAdaptiveBaseResponse}\n   `;
-  const backgroundOtherResponse = `${originalAdaptiveBaseResponse}\n    `;
-  const backgroundThirdResponse = `${originalAdaptiveBaseResponse}\n     `;
+  recoveryRun = (await pollJson(`${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`)).currentRunState.testRun;
+  const backgroundCurrentResponse = recoveryResponse(originalAdaptiveUnitKey, "background current Ω");
+  const backgroundOtherResponse = recoveryResponse(originalAdaptiveBeginnerUnitKey, "background other Ω");
+  const backgroundThirdResponse = recoveryResponse(originalAdaptiveBonusUnitKey, "background third Ω");
   await page.evaluate(
     ({
       storageKey,
@@ -11593,9 +11607,9 @@ try {
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
     payload =>
-      payload?.currentRunState?.testRun?.unitResponses?.[
+      matchesRecovery(payload?.currentRunState?.testRun?.unitResponses?.[
         originalAdaptiveUnitKey
-      ] === backgroundCurrentResponse &&
+      ], backgroundCurrentResponse) &&
       payload.currentRunState.testRun.unitResponses?.[
         originalAdaptiveBeginnerUnitKey
       ] === backgroundOtherResponse &&

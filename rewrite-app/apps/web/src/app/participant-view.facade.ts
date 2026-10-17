@@ -605,6 +605,12 @@ export class ParticipantViewFacade {
       // barrier; Resume navigates directly. Keep answer drainage independent
       // so these handlers can finish while an older Terminate is still saving.
       if (!this.debugRunState || keyword === "resume") return;
+      if (this.veronaPlayer) {
+        // Capture the Player's debounced input before retiring its frame,
+        // while keeping its HTTP acknowledgement independent of this handler.
+        await new Promise<void>(resolve => globalThis.setTimeout(resolve, VERONA_FOREGROUND_STATE_GRACE_MS));
+        if (!isCurrent() || this.consoleRun?.testRunId !== runId) return;
+      }
       const barrier = this.veronaSaveBarriers.close(entries(), dispatch);
       this.clearVeronaSaveBuffer();
       void this.drainVeronaSaveQueue({ allowForegroundSettlement: true, refreshCurrentState: false, deliveryIds: barrier.deliveryIds }).catch(error => {
@@ -2588,6 +2594,8 @@ export class ParticipantViewFacade {
     }
     const currentRunState = this.readCurrentRunState();
     if (!currentRunState) {
+      const selectedBooklet = this.assignedBooklets.find(booklet => booklet.bookletKey === this.runtime.bookletKey.trim());
+      if (selectedBooklet?.status === "locked" || selectedBooklet?.status === "completed") return false;
       return true;
     }
     if (

@@ -23,6 +23,37 @@ const { outputText } = ts.transpileModule(`export const createEntryHost = (produ
 const { createEntryHost } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 const EntryHost = createEntryHost(productionApiRoutes, resolveRoutePath, value => JSON.stringify(value));
 
+const componentSource = readFileSync(new URL('../apps/web/src/app/participant-view.component.ts', import.meta.url), 'utf8');
+const componentAst = ts.createSourceFile('component.ts', componentSource, ts.ScriptTarget.ES2022, true);
+const componentClass = componentAst.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === 'ParticipantViewComponent');
+const initialization = componentClass.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(componentAst) === 'ngOnInit');
+assert.ok(initialization);
+const lifecycleModule = ts.transpileModule(`export class EntryComponent { ${initialization.getText(componentAst)} }`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText;
+const { EntryComponent } = await import(`data:text/javascript;base64,${Buffer.from(lifecycleModule).toString('base64')}`);
+for (const leaveBeforeEntry of [false, true]) test(`direct-link initialization waits until after parent checking and respects route destruction: ${leaveBeforeEntry}`, async () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: {
+    search: '?tenantKey=owned&workspaceKey=selected&participantSessionId=owned-session&testRunId=selected-run&view=starter'
+  } } });
+  const events = [], component = new EntryComponent();
+  component.destruction = { destroyed: false };
+  component.view = { init() { events.push('init'); }, startFromEntryParameters(parameters) { events.push(parameters); } };
+  component.changeDetector = { markForCheck() { events.push('render'); } };
+  try {
+    component.ngOnInit(); assert.deepEqual(events, ['init']);
+    component.destruction.destroyed = leaveBeforeEntry;
+    await Promise.resolve();
+    if (leaveBeforeEntry) assert.deepEqual(events, ['init']);
+    else {
+      assert.equal(events[1].tenantKey, 'owned'); assert.equal(events[1].workspaceKey, 'selected');
+      assert.equal(events[1].participantSessionId, 'owned-session'); assert.equal(events[1].testRunId, 'selected-run');
+      assert.equal(events[1].openStarter, true); assert.equal(events[2], 'render');
+    }
+  } finally { if (previous) Object.defineProperty(globalThis, 'window', previous); else delete globalThis.window; }
+});
+
 const parameters = testRunId => ({ bookletKey: "BOOKLET#level:beginner", testRunId });
 const state = (mode, overrides = {}) => ({
   executionMode: { mode, saveResponses: !["run-demo", "run-review", "run-simulation"].includes(mode) },

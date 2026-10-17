@@ -484,6 +484,13 @@ try {
       assert.equal(reactivatedRuntime.runtimeState.participantSession.status,externalKeyword==='pause'?'signed_in':'launched');
       const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:followingKeyword},operator)).command;
       await poll(async()=>new RegExp('STATUS:\\s*'+(followingKeyword==='pause'?'PAUSED':'RUNNING')).test(await remotePane.innerText()),'The reactivated first controller did not apply a new remote Pause');
+      // The Debug pane exposes the pending controller phase before the Player
+      // capture interval and application request finish. Qualify the actual
+      // command receipt, acknowledgement and durable Run before retiring routes.
+      await poll(async()=>applications.some(value=>value.application.command.commandId===following.commandId)&&
+        acks.some(ack=>ack.path.includes(following.commandId))&&
+        (await loadingRepository.getTestRunById(runId)).status===(followingKeyword==='pause'?'paused':'running'),
+        'The reactivated controller phase did not commit and acknowledge its exact remote command');
       await remotePage.unrouteAll({behavior:'wait'});if(runtimeRouteError)throw runtimeRouteError;
       const finalRun=await loadingRepository.getTestRunById(runId);assert.equal(finalRun.status,followingKeyword==='pause'?'paused':'running');
       assert.deepEqual(finalRun.unitResponses,externalBaseline.unitResponses);assert.deepEqual(finalRun.unitResponseFieldTimestamps,externalBaseline.unitResponseFieldTimestamps);

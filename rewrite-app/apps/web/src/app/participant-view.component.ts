@@ -1,6 +1,8 @@
 import { CommonModule } from "@angular/common";
 import {
+  ChangeDetectorRef,
   Component,
+  DestroyRef,
   ElementRef,
   ViewChild,
   effect,
@@ -346,7 +348,7 @@ interface ParticipantVisibleCodeNotice {
         <strong aria-hidden="true">↓</strong>
       </button>
 
-      <article class="card" id="participantRoutePlayer" *ngIf="!(interfaceMode.mode() === 'original' && (view.isParticipantLogin || view.isParticipantStarter))">
+      <article class="card" id="participantRoutePlayer" *ngIf="view.isParticipantPlayerFocused || view.player.runStatus === 'completed'">
         <input
           *ngIf="view.isParticipantPlayerFocused"
           id="participantRouteSessionId"
@@ -1219,6 +1221,8 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly view = inject(ParticipantViewFacade);
+  private readonly destruction = inject(DestroyRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly originalToasts = inject(OriginalToastService);
   private consumedNavigationToast: { text: string; additionalTexts?: readonly string[] } | null = null;
@@ -1332,7 +1336,7 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.view.init();
     const query = new URLSearchParams(window.location.search);
-    this.view.startFromEntryParameters({
+    const parameters = {
       tenantKey: query.get("tenantKey"),
       workspaceKey: query.get("workspaceKey"),
       loginKey: query.get("loginKey"),
@@ -1344,6 +1348,13 @@ export class ParticipantViewComponent implements OnInit, OnDestroy {
       unitResponse: query.get("unitResponse"),
       legacyShortLink: query.get("legacyShortLink") === "true",
       openStarter: query.get("view") === "starter"
+    };
+    // Entry parameters also update shared header/workspace state. Apply them
+    // after the current tree check instead of mutating an already checked parent.
+    queueMicrotask(() => {
+      if (this.destruction.destroyed) return;
+      this.view.startFromEntryParameters(parameters);
+      this.changeDetector.markForCheck();
     });
   }
 

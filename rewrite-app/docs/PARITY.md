@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Participant input capture, locked Starter and direct-entry rendering (2026-10-17)
+
+The first published CI runs for `d07446f4` exposed five shared browser failure
+sites. Native Pause/Goto now retain the existing 200 ms Player-input capture
+interval before retiring the frame, then drain their own closed buffers without
+waiting for HTTP acknowledgement. Route/Run replacement during that interval
+cancels the old handler. This preserves the real Player's just-typed answer
+without changing the independent command continuation documented below.
+
+A monitor's accepted termination intent is applied by the participant and returns
+to the Starter with an inactive controller entry and the requested lock. The
+paused Run, answers and unset completion timestamp remain intact. The Starter
+disables a locked/completed selected assignment, still permits another available
+assignment, and no longer renders an orphan response editor in Rewrite mode.
+
+Direct participant-link parameters also change shared workspace/header state.
+Their initialization now runs after the current Angular tree check, explicitly
+requests a zoneless render and cancels if the route was destroyed. The real
+Angular development gate passes in both interfaces with trusted text/radio input,
+reload and Unit changes, and catches the former `NG0100` logo-link failure.
+
+The corrected browser fixtures retain their behavioral checks: local/background
+outbox recovery captures distinct response data with production per-field clocks;
+active-Player recapture may advance unrelated clocks but must preserve every
+response value/type and the recovery field's clock. The development reload gate
+requires exact response values/types and nondecreasing field clocks. The busy
+deletion gate waits for the rendered read-only/disabled controls before asserting
+input, duplicate-submit, Escape and backdrop guards. Monitor completion waits for
+the actual participant application before asserting its locked Starter state.
+Starter gates require the visible entry status, cleared persisted Run identity
+and removed Player instead of reading the former empty editor's status fields.
+Branded/fallback entry navigation waits for DOM readiness followed by the existing
+exact logo/text/loaded-image checks rather than global network silence.
+
+Fresh local validation passes 2,539 unit/frontend tests (1,100 frontend), the
+48-case actual-Original/service terminal differential, the production build and
+both development-Player lifecycle scenarios. The production initial bundle stays
+469.99 kB under the unchanged 470 kB hard cap. Focused production-browser
+requalification and current remote CI remain pending at this checkpoint. Earlier
+PostgreSQL/container results below describe their recorded revisions; they are
+not new qualification of these report/UI changes. Formal parity remains 30
+complete and 19 partial areas, with full production acceptance still open.
+
 ### Unfiltered Original result archives (2026-10-17)
 
 Original `eedae41840cbe90e5547c0211da818bdf620f5aa` changes omitted report
@@ -75,8 +118,8 @@ SHA-256 remains `7a2826bc8f1a9ffb92519a90f3784a6b1dbc27000892b21068a55a637a958a8
 
 Upstream is now `eedae41840cbe90e5547c0211da818bdf620f5aa` (2026-10-14).
 All five complete Original completion-reference source files retain their pinned
-SHA-256 hashes. Its intervening change concerns unfiltered workspace reports;
-that report behavior needs a separate comparison. Formal parity remains
+SHA-256 hashes. Its intervening unfiltered-workspace-report change is covered by
+the separate report checkpoint above. Formal parity remains
 30 complete and 19 partial areas. Full functional/visual/package acceptance and
 production-environment proof remain open.
 
