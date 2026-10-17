@@ -25219,8 +25219,8 @@ try {
   assert.deepEqual(heldOwnedRunState.testRun.testletTimers["testlet:timed-paused"],heldOwnedRunTimer);
   await waitForNotBusy("hold-owned-result-run-before-deletion");
   logStep("refresh-monitor-command-target");
-  // Keep the real browser-v1 receiver for the entire command chain. The next
-  // independent fixture deliberately retains legacy immediate-command coverage.
+  // Keep the real browser-v1 receiver for the entire preceding command chain.
+  // The isolated target below uses an explicit authenticated HTTP receiver.
   await liveParticipantPage.close();
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
   const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;
@@ -25253,6 +25253,32 @@ try {
   ).json();
   participantSessionId = refreshedMonitorTarget.participantSession.participantSessionId;
   pausedTestRunId = refreshedMonitorTarget.testRun.testRunId;
+  const receiveIsolatedMonitorCommand = async (responsePromise, commandType) => {
+    const response = await responsePromise;
+    assert.equal(response.status(), 200);
+    const { command } = await response.json();
+    assert.equal(command.commandType, commandType);
+    assert.equal(command.testRun.testRunId, pausedTestRunId);
+    assert.equal(command.testRun.status, "running");
+    const commandsUrl = `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/commands`;
+    const pending = await (await sendSmokeJson(`${commandsUrl}?testRunId=${encodeURIComponent(pausedTestRunId)}`, { method: "GET" })).json();
+    assert.ok(pending.commands.some(item => item.commandId === command.commandId && item.effectsDeferred === true));
+    await sendSmokeJson(`${commandsUrl}/${command.commandId}/acknowledgement`, { method: "PATCH", body: { testRunId: pausedTestRunId } });
+    const acknowledged = (await (await sendSmokeJson(`${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`, { method: "GET" })).json()).currentRunState.testRun;
+    assert.equal(acknowledged.status, command.testRun.status);
+    assert.equal(acknowledged.currentUnitKey, command.testRun.currentUnitKey);
+    assert.equal(acknowledged.locked, command.testRun.locked);
+    const { application } = await (await sendSmokeJson(`${commandsUrl}/${command.commandId}/application`, {
+      body: { testRunId: pausedTestRunId, controllerStatus: "RUNNING" }
+    })).json();
+    assert.equal(application.command.commandId, command.commandId);
+    assert.equal(application.command.commandType, commandType);
+    assert.equal(application.applied, true);
+    return application;
+  };
+  const waitForIsolatedMonitorCommand = () => page.waitForResponse(response =>
+    response.request().method() === "POST" && new URL(response.url()).pathname ===
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`);
   await sendSmokeJson(
     `${baseUrl}/api/v1/participant/test-runs/${encodeURIComponent(
       pausedTestRunId
@@ -25286,10 +25312,12 @@ try {
   await fillAndCommitUntilValue("#testRunId", pausedTestRunId);
   logStep("monitor-goto-unit");
   await fillAndCommitUntilValue("#monitorTargetUnitKey", "unit-1");
+  const isolatedGotoResponse = waitForIsolatedMonitorCommand();
   await clickSelectorAction(
     "Monitor Go To Unit",
     "#runtimeMonitorGotoButton"
   );
+  await receiveIsolatedMonitorCommand(isolatedGotoResponse, "goto");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -25298,7 +25326,9 @@ try {
   );
   await expectInputValue("#monitorTargetUnitKey", "unit-1");
   logStep("monitor-complete-run");
+  const isolatedTerminationResponse = waitForIsolatedMonitorCommand();
   await clickAction("Monitor Complete");
+  await receiveIsolatedMonitorCommand(isolatedTerminationResponse, "complete_and_lock");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -25309,7 +25339,10 @@ try {
       payload.currentRunState != null &&
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
-      payload.currentRunState.testRun.status === "completed"
+      payload.currentRunState.testRun.status === "paused" &&
+      payload.currentRunState.testRun.locked === true &&
+      payload.currentRunState.testRun.completedAt === null &&
+      payload.currentRunState.testRun.controllerEntry?.active === false
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/runtime-state`,
@@ -25319,8 +25352,9 @@ try {
       "runtimeState" in payload &&
       typeof payload.runtimeState === "object" &&
       payload.runtimeState != null &&
-      payload.runtimeState.runtimeStatus === "completed" &&
-      payload.runtimeState.latestTestRun?.status === "completed"
+      payload.runtimeState.runtimeStatus === "locked" &&
+      payload.runtimeState.availableAction === "none" &&
+      payload.runtimeState.latestTestRun?.status === "paused"
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs`,
@@ -25328,7 +25362,7 @@ try {
       typeof payload === "object" &&
       payload != null &&
       Array.isArray(payload.items) &&
-      payload.items.every(item => item?.testRunId !== pausedTestRunId)
+      payload.items.some(item => item?.testRunId === pausedTestRunId && item.status === "paused" && item.locked === true)
   );
   await clickAction("Refresh Runtime Reads");
   await pollJsonWithPredicate(
@@ -25340,8 +25374,9 @@ try {
           item.activityEvent.subjectId === pausedTestRunId &&
           item.activityEvent.details?.commandType === "complete_and_lock" &&
           item.activityEvent.details?.previousStatus === "running" &&
-          item.activityEvent.details?.nextStatus === "completed" &&
-          item.activityEvent.details?.locked === true &&
+          item.activityEvent.details?.nextStatus === "running" &&
+          item.activityEvent.details?.effectsDeferred === true &&
+          item.activityEvent.details?.locked === false &&
           item.activityEvent.details?.participantSessionId === participantSessionId &&
           item.activityEvent.details?.loginKey === monitorCommandLoginKey &&
           item.activityEvent.details?.groupKey === monitorCommandGroupKey &&

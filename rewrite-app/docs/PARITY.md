@@ -10,7 +10,13 @@ applies the command separately. The full browser fixture now checks that exact
 intent snapshot, keeps its real browser-v1 receiver alive through the command
 chain, and still requires the resulting durable status and Participant UI.
 Bulk Pause/Resume likewise distinguish the accepted snapshot from application.
-The separate legacy fixture retains its immediate-command coverage.
+The isolated command target explicitly receives, ACKs and applies the command
+through authenticated participant HTTP routes. Neither dispatch nor ACK may
+change its status, Unit or lock. Termination retains the paused, locked Run and
+answers with an inactive controller entry and no completion timestamp; runtime
+and monitoring must show that exact state, separately from immutable history.
+A focused real SQLite/HTTP run executes the actual smoke helper and passes both
+Goto and Terminate plus answer/clock retention and scoped history assertions.
 
 The Player host now blocks interaction while loading and covers the mounted
 iframe with its progress surface, matching the current Original controller's
@@ -27,6 +33,12 @@ Debug browser groups and the production build at 469.99 kB under the unchanged
 470 kB cap. Full browser/overlap and current-head remote qualification remain
 separate. Formal parity remains 30 complete/19 partial; production acceptance
 is open.
+
+The held-runtime terminal probe now requires the exact terminal application
+before testing its committed state: a preceding Resume may already have an
+unrelated held read. Completion-route failures are collected and rethrown by
+the probe, and the primary error is printed before teardown; they cannot silently
+pass or replace the original failure with an unhandled cleanup rejection.
 
 ### Participant input capture, locked Starter and direct-entry rendering (2026-10-17)
 

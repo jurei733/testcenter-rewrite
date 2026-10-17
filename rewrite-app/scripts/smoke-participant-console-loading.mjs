@@ -29,11 +29,11 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" }, stdio: ["ignore", "pipe", "pipe", "ipc"] });
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
-const errors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [], loadingObservations = [];
+const errors = [], routeErrors = [], checks = [], requests = [], nativeRequests = [], progressRequests = [], loadingObservations = [];
 let browser, page, releaseSnapshot; const releases=[];
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
-  while (Date.now() < deadline) { if (await predicate()) return; await delay(100); }
+  while (Date.now() < deadline) { if (routeErrors.length) throw routeErrors[0]; if (await predicate()) return; await delay(100); }
   throw Error(message);
 };
 try {
@@ -333,7 +333,10 @@ try {
       });
       const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
       await remotePage.route(url=>url.pathname===runtimePath,async route=>{const response=await route.fetch();runtimeHeld=true;await runtimeGate;await route.fulfill({response});});
-      await remotePage.route('**/command-completions',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);completions.push(request);await route.fulfill({response});});
+      await remotePage.route('**/command-completions',async route=>{
+        try{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);completions.push(request);await route.fulfill({response});}
+        catch(error){routeErrors.push(error);}
+      });
       await remotePage.route('**/native-commands',async route=>{const request=route.request().postDataJSON();if(scenario.initialPaused&&request.keyword==='terminate'&&!request.terminationNoop){stateEffectHeld=true;await stateEffectGate;}const response=await route.fetch();packets.push({request,application:(await response.json()).application});if(loseNoop&&request.terminationNoop){loseNoop=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_noop_receipt'})});}else await route.fulfill({response});});
       await remotePage.route('**/controller-timer-interruptions',async route=>{const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);timerInterruptions.push({request,receipt:(await response.json()).interruption});await route.fulfill({response});});
       await remotePage.route('**/application',async route=>{const request=route.request().postDataJSON();if(scenario.initialPaused){stateEffectHeld=true;await stateEffectGate;}const response=await route.fetch(),application=(await response.json()).application;packets.push({request,application});applications.push({application});await route.fulfill({response});});
@@ -386,6 +389,12 @@ try {
           const completion=completions.find(ownCompletion);assert.ok(completion.timeStamp>=releasedAt);const logs=(await loadingRepository.listParticipantTestLogsByWorkspace(baseline.tenantId,baseline.workspaceId)).filter(log=>log.testRunId===runId&&log.logKey==='command executed'&&log.timestamp===completion.timeStamp);assert.ok(logs.some(log=>log.logContent===(scenario.lock?'terminate lock':'terminate')));
           observation.terminalNavigationCompletedBeforeOwnLog=true;observation.completion=completion;
         }else{
+          // A preceding Resume can already have a held runtime read. Only the
+          // exact terminal application proves this command's state is committed.
+          await poll(()=>Promise.resolve(packets.some(value=>scenario.origin==='native'
+            ? value.request.keyword==='terminate'&&!value.request.terminationNoop
+            : value.application.command?.commandType==='complete')),
+          'The terminal command did not receive its own committed application');
           await poll(()=>Promise.resolve(runtimeHeld),'The terminal receipt did not reach its Starter reconciliation');
           const ended=await loadingRepository.getTestRunById(runId);assert.equal(ended.status,'paused');assert.equal(ended.controllerEntry.active,false);
           if(scenario.noop){const first=packets.find(value=>value.request.keyword==='terminate'&&!value.request.terminationNoop);assert.ok(first);assert.equal(first.application.superseded,undefined);assert.equal(ended.locked,false);const actor=first.request.controllerDispatch.controllerId;assert.equal(ended.controllerDispatches[actor],first.request.controllerDispatch.sequence);assert.ok(first.request.controllerDispatch.sequence<observation.ignored[0].request.controllerDispatch.sequence);observation.firstWaitingTerminationStillApplied=true;}
@@ -801,11 +810,12 @@ try {
     ['pause', 'LOADING'], ['resume', 'PAUSED'], ['goto', 'RUNNING'],
     ['terminate', 'RUNNING'], ['resume', 'ERROR'], ['terminate', 'ERROR']
   ]);
-  await page.unrouteAll({behavior:'wait'});assert.deepEqual(errors,[]);
+  await page.unrouteAll({behavior:'wait'});assert.deepEqual(errors,[]);assert.deepEqual(routeErrors,[]);
 
 } catch (error) {
+  console.error("Participant console loading failure:", error.stack ?? String(error));
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
-  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, requests, nativeRequests, progressRequests, loadingObservations, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
+  await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, routeErrors: routeErrors.map(String), requests, nativeRequests, progressRequests, loadingObservations, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
   releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});

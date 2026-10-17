@@ -14,8 +14,14 @@ Published `26bc0965` has 24 passing/14 failing CI jobs. Every failed log is
 downloaded: thirteen share the immutable monitor-issued status expectation,
 one the Player startup window. The browser fixture checks dispatch snapshots
 separately from actual applied state, including bulk Pause/Resume, and keeps its
-real receiver alive through the chain. The independent legacy command fixture
-still checks immediate effects. Full browser/overlap qualification is running;
+real receiver alive through the chain. The isolated target has an explicit
+authenticated HTTP receiver that checks unchanged state at issuance/ACK and
+then applies the actual command. A focused real SQLite/HTTP run executes that
+same helper and passes Goto/Terminate, retained answers/clocks, locked runtime,
+open monitor row and immutable issued history. The terminal held-read probe
+also requires its exact application before asserting the committed Run; route
+errors remain fatal and primary diagnostics precede teardown.
+Full browser/overlap qualification is running;
 inspect final process/log outcomes before reporting it green or restarting it.
 Keep the existing branch/draft PR #6, failed evidence and protected artifacts.
 Formal parity and production acceptance remain open (30 complete/19 partial).
