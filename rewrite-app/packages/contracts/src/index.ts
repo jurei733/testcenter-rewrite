@@ -1618,6 +1618,7 @@ export type GetRuntimeDiagnosticsResponse = {
     activeRequests: number;
     totalRequests: number;
     completedRequests: number;
+    abortedRequests: number;
   };
   memory: {
     rssBytes: number;

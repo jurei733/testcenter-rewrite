@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Client-aborted uploads and HTTP accounting (2026-10-18)
+
+The `09497d51` PostgreSQL browser run reaches the final health assertion but
+fails on a client-aborted `test-logs` upload logged as an internal failure.
+A real partial JSON upload reproduces that same `ECONNRESET` failure before
+the correction. Its closed response also leaves `activeRequests` incremented.
+
+The incoming-body iterator now marks only a proven reset of an aborted,
+incomplete upload as transport cancellation. The API does not process partial
+JSON or attempt a response on that closed connection. Resets without that
+body-stream proof and downstream/storage errors retain their original error
+path. HTTP finish/close accounting settles exactly once, distinguishes
+completed from aborted responses and exposes `abortedRequests` in JSON and
+Prometheus metrics. Capability-bearing resource paths remain redacted in the
+new informational abort event. Handler lifetime and storage shutdown drainage
+remain independent of the closed socket; the server failure gate is unchanged.
+
+All 23 focused checks pass, including the real socket abort, five classifier
+cases, normal malformed JSON, shutdown/SSE drainage and actual SQLite internal
+failures. Fresh complete unit/frontend qualification passes all 2,626 tests;
+all 166 Memory HTTP checks, 43 loading/overlap groups and the 469.99 kB production
+build pass. An earlier local contention-test timeout coincides with a verified
+901-second host sleep; the complete rerun passes without cancelled/skipped tests.
+
+Exact XML revision `06db6347` passes 2,620 unit/frontend, 1,732 PostgreSQL-16
+tests and the complete PostgreSQL browser job. Its push is 37/38 green: the
+remaining console smoke emits `Route is already handled` while fulfilling an
+old held view. The probe now recognizes only a successful held read with an
+explicit browser `net::ERR_ABORTED` after its accepted Resume, still requires
+an actually delivered current view and every existing state/clock/log assertion,
+and keeps unexpected route failures fatal with primary diagnostics.
+Current-head full CI and complete browser qualification remain separate; formal
+parity is still 30 complete/19 partial and production acceptance remains open.
+
 ### Authored XML replacement characters and undefined legacy bytes (2026-10-17)
 
 Current Original `eedae41840cbe90e5547c0211da818bdf620f5aa` validates uploaded

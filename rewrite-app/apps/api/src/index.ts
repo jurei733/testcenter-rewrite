@@ -1178,6 +1178,7 @@ type RuntimeMetrics = {
   activeRequests: number;
   totalRequests: number;
   completedRequests: number;
+  abortedRequests: number;
   requestCountsByMethod: Record<string, number>;
   requestCountsByRoute: Record<string, number>;
   responseCountsByStatusCode: Record<string, number>;
@@ -1206,6 +1207,7 @@ const createRuntimeMetrics = (): RuntimeMetrics => ({
   activeRequests: 0,
   totalRequests: 0,
   completedRequests: 0,
+  abortedRequests: 0,
   requestCountsByMethod: {},
   requestCountsByRoute: {},
   responseCountsByStatusCode: {},
@@ -1333,6 +1335,9 @@ const renderPrometheusMetrics = (
     "# HELP rewrite_app_completed_requests Total completed HTTP requests.",
     "# TYPE rewrite_app_completed_requests counter",
     `rewrite_app_completed_requests ${metrics.completedRequests}`,
+    "# HELP rewrite_app_aborted_requests Total HTTP responses closed before completion.",
+    "# TYPE rewrite_app_aborted_requests counter",
+    `rewrite_app_aborted_requests ${metrics.abortedRequests}`,
     "# HELP rewrite_app_process_resident_memory_bytes Resident process memory in bytes.",
     "# TYPE rewrite_app_process_resident_memory_bytes gauge",
     `rewrite_app_process_resident_memory_bytes ${memory.rssBytes}`,
@@ -2009,6 +2014,27 @@ class RequestBodyTooLargeError extends Error {
   }
 }
 
+class ClientRequestAbortedError extends Error {
+  constructor(cause: unknown) {
+    super("The client closed an incomplete HTTP upload.", { cause });
+    this.name = "ClientRequestAbortedError";
+  }
+}
+
+// Classify only a reset from the incoming body stream. A downstream database
+// reset remains an internal failure, even if the client also disconnected.
+const readRequestChunks = async function* (request: IncomingMessage) {
+  try {
+    yield* request;
+  } catch (error) {
+    if (request.aborted && !request.complete && typeof error === "object" && error !== null &&
+        "code" in error && error.code === "ECONNRESET") {
+      throw new ClientRequestAbortedError(error);
+    }
+    throw error;
+  }
+};
+
 class InvalidMultipartBodyError extends Error {
   constructor(message: string) {
     super(message);
@@ -2037,7 +2063,7 @@ const readRequestBuffer = async (
 
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxBytes) {
@@ -2153,7 +2179,7 @@ const readJsonBody = async <T>(
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxJsonBodyBytes) {
@@ -2185,7 +2211,7 @@ const readOptionalJsonBody = async <T>(
   const chunks: Buffer[] = [];
   let totalBytes = 0;
 
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     totalBytes += buffer.byteLength;
     if (totalBytes > maxJsonBodyBytes) {
@@ -2215,7 +2241,7 @@ const readRequestBodyByteLength = async (
   }
 
   let totalBytes = 0;
-  for await (const chunk of request) {
+  for await (const chunk of readRequestChunks(request)) {
     totalBytes += Buffer.byteLength(chunk);
     if (totalBytes > maxBytes) {
       throw new RequestBodyTooLargeError(maxBytes);
@@ -4579,25 +4605,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     incrementCounter(metrics.requestCountsByMethod, method);
     incrementCounter(metrics.requestCountsByRoute, routeLabel);
 
-    response.once("finish", () => {
+    let responseOutcomeRecorded = false;
+    const recordResponseOutcome = (aborted: boolean): void => {
+      if (responseOutcomeRecorded) return;
+      responseOutcomeRecorded = true;
       const durationMs = Number(process.hrtime.bigint() - requestStartedAt) / 1_000_000;
       metrics.activeRequests -= 1;
+      const context = {
+        requestId, method, route: routeLabel,
+        // Resource suffixes contain capabilities, including encoded spellings.
+        path: participantResourcePattern.test(requestPathname)
+          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath") : requestPathname,
+        durationMs: Number(durationMs.toFixed(3)), storageKind: runtime.repositoryConfig.kind
+      };
+      if (aborted) {
+        metrics.abortedRequests += 1;
+        recordRuntimeOperationalEvent(runtime, "info", "http_request_aborted", {
+          ...context, bodyComplete: request.complete
+        });
+        return;
+      }
       metrics.completedRequests += 1;
       incrementCounter(metrics.responseCountsByStatusCode, response.statusCode);
       recordRouteLatency(metrics, routeLabel, durationMs);
       recordRuntimeOperationalEvent(runtime, "info", "http_request_completed", {
-        requestId,
-        method,
-        route: routeLabel,
-        // Resource URLs carry a purpose-limited capability. Redact the entire
-        // suffix, including percent-encoded spellings, before operational logs.
-        path: participantResourcePattern.test(requestPathname)
-          ? requestPathname.replace(/(\/resources\/).*/u, "$1:resourcePath")
-          : requestPathname,
-        statusCode: response.statusCode,
-        durationMs: Number(durationMs.toFixed(3)),
-        storageKind: runtime.repositoryConfig.kind
+        ...context, statusCode: response.statusCode
       });
+    };
+    response.once("finish", () => recordResponseOutcome(false));
+    response.once("close", () => {
+      if (!response.writableFinished) recordResponseOutcome(true);
     });
 
     if (!request.url || !request.method) {
@@ -4788,7 +4825,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             lifecycle: runtime.lifecycle,
             activeRequests: metrics.activeRequests,
             totalRequests: metrics.totalRequests,
-            completedRequests: metrics.completedRequests
+            completedRequests: metrics.completedRequests,
+            abortedRequests: metrics.abortedRequests
           },
           memory,
           storage: {
@@ -4825,7 +4863,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             lifecycle: runtime.lifecycle,
             activeRequests: metrics.activeRequests,
             totalRequests: metrics.totalRequests,
-            completedRequests: metrics.completedRequests
+            completedRequests: metrics.completedRequests,
+            abortedRequests: metrics.abortedRequests
           },
           memory,
           storage: {
@@ -9604,6 +9643,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       metrics.errorCounts.routeNotFound += 1;
       sendError(response, 404, "route_not_found", `No route matches '${pathname}'.`);
     } catch (error) {
+      if (error instanceof ClientRequestAbortedError) {
+        // The close listener records the transport outcome exactly once.
+        return;
+      }
       if (isFirstSliceError(error)) {
         metrics.errorCounts.firstSlice += 1;
         if (

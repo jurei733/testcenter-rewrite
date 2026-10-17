@@ -1,5 +1,26 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: client aborts and request metrics (2026-10-18)
+
+A real incomplete client upload reproduces the PostgreSQL browser gate's
+`ECONNRESET` internal-failure log. Only the incoming body iterator can now mark
+a proven aborted/incomplete reset as cancellation. Other stream failures and
+all downstream/storage failures remain fatal. Finish/close metrics settle once;
+JSON/Prometheus expose aborted responses without leaking resource capabilities.
+Pending handler lifetime still governs storage shutdown. The failure gate is
+unchanged. All 23 focused cases, 2,626 unit/frontend, 166 Memory HTTP and 43
+loading/overlap checks pass; production output remains 469.99 kB.
+
+`06db6347` finishes 37/38 green, including 1,732 PostgreSQL-16 tests and the
+complete PostgreSQL browser. Its remaining console fixture tries to fulfil an
+old cancelled loading read. The probe recognizes only explicit `net::ERR_ABORTED`
+for its successful held read after accepted Resume, then requires a real current
+view and exact state/log preservation. Unexpected route errors stay fatal.
+Inspect latest-head full CI separately. The local timeout during a verified
+901-second host sleep is retained; its complete rerun has no failures/skips/
+cancellations. Keep failed logs, the draft PR and protected presentation.
+Full parity/production acceptance remains open (30/19).
+
 ### Current correction: authored XML characters (2026-10-17)
 
 The complete `09497d51` SQLite browser checkpoint passes all 548 steps. Its

@@ -85,15 +85,33 @@ try {
   releases.push(releaseLoading);
   try {
     loadingPage.on("pageerror", error => errors.push(String(error)));
-    const loadingRequests = [], loadingCompletions = []; let initialRun;
+    const loadingRequests = [], loadingCompletions = [], loadingViews = []; let initialRun;
     loadingPage.on("request", request => {
       const path = new URL(request.url()).pathname;
       if (path.endsWith("/native-commands")) { loadingRequests.push(request.postDataJSON()); loadingObservations.push({ request: request.postDataJSON() }); }
       if (path.endsWith("/command-completions")) loadingCompletions.push(request.postDataJSON());
     });
     await loadingPage.route("**/current-state?*", async route => {
-      const response = await route.fetch(); initialRun ??= (await response.json()).currentRunState.testRun;
-      await loadingGate; await route.fulfill({ response });
+      const view = { responseStatus: null, fulfilled: false, cancelled: false };
+      loadingViews.push(view);
+      try {
+        const response = await route.fetch(); view.responseStatus = response.status();
+        assert.equal(view.responseStatus, 200);
+        initialRun ??= (await response.json()).currentRunState.testRun;
+        await loadingGate;
+        // Early Resume can cancel its older view read. Only a proven browser
+        // abort of a successful held response is an expected transport outcome.
+        if (loadingRequests.length === 1 && route.request().failure()?.errorText === "net::ERR_ABORTED") {
+          view.cancelled = true; return;
+        }
+        await route.fulfill({ response }); view.fulfilled = true;
+      } catch (error) {
+        if (view.responseStatus === 200 && loadingRequests.length === 1 &&
+            route.request().failure()?.errorText === "net::ERR_ABORTED") {
+          view.cancelled = true; return;
+        }
+        routeErrors.push(error);
+      }
     });
     await loadingPage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
     await loadingPage.locator("#originalLoginName").fill("loading-person");
@@ -118,6 +136,7 @@ try {
     assert.equal(await loadingPage.locator("iframe").count(), 0);
     const releasedLoadingAt = Date.now();
     releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" });
+    await poll(() => Promise.resolve(loadingViews.some(view => view.fulfilled)), "No current loading view was actually delivered after Resume");
     await loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
     const run = await loadingRepository.getTestRunById(initialRun.testRunId);
     assert.deepEqual(run.unitResponses, initialRun.unitResponses);
@@ -132,11 +151,12 @@ try {
     assert.equal((await completionLogs())[0].timestamp, loadingCompletions[0].timeStamp);
     await poll(async () => (await controllerLogs()).length >= 2, "Ready transition was not persisted");
     assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING", "RUNNING"], "Early Resume produced a duplicate lifecycle ready state");
-    loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), answersAndClocksPreserved: true });
+    loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), loadingViews, answersAndClocksPreserved: true });
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume.png"), fullPage: true });
     checks.push("early-resume-observes-loading-and-persists-the-real-controller-transition");
     console.log("participant_console_loading=early-resume-observes-loading-and-persists-the-real-controller-transition:passed");
   } catch (error) {
+    console.error("Initial loading fixture failure:", error.stack ?? String(error));
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume-failure.png"), fullPage: true }).catch(() => {});
     throw error;
   } finally { releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
