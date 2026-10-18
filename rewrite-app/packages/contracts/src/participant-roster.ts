@@ -895,6 +895,22 @@ const readJsonRosterCustomTexts = (
     return {};
   }
 
+  // Text content is authored data; only identifiers use roster trimming.
+  const readText = (candidate: unknown): string | null => {
+    if (typeof candidate === "string" || typeof candidate === "number") {
+      return String(candidate);
+    }
+    const object = asRosterObject(candidate);
+    if (!object) return null;
+    for (const name of ["value", "text", "defaultValue", "defaultvalue", "content"]) {
+      if (Object.hasOwn(object, name)) return readText(object[name]);
+    }
+    const entry = Object.entries(object).find(([key]) =>
+      ["value", "text", "defaultvalue", "content"].includes(key.toLowerCase())
+    );
+    return entry ? readText(entry[1]) : null;
+  };
+
   const readEntries = (candidate: unknown): Array<readonly [string, string]> => {
     if (Array.isArray(candidate)) {
       return candidate.flatMap(entry => {
@@ -909,15 +925,8 @@ const readJsonRosterCustomTexts = (
           "name",
           "identifier"
         );
-        const text = readJsonRosterString(
-          objectEntry,
-          "value",
-          "text",
-          "defaultValue",
-          "defaultvalue",
-          "content"
-        );
-        return key && text ? [[key, text] as const] : [];
+        const text = readText(objectEntry);
+        return key && text !== null ? [[key, text] as const] : [];
       });
     }
 
@@ -935,20 +944,8 @@ const readJsonRosterCustomTexts = (
     }
     return Object.entries(objectCandidate).flatMap(([key, entryValue]) => {
       const normalizedKey = normalizeRosterTextValue(key);
-      const normalizedText =
-        typeof entryValue === "string" || typeof entryValue === "number"
-          ? normalizeRosterTextValue(String(entryValue))
-          : asRosterObject(entryValue)
-            ? readJsonRosterString(
-                entryValue as Record<string, unknown>,
-                "value",
-                "text",
-                "defaultValue",
-                "defaultvalue",
-                "content"
-              )
-            : null;
-      return normalizedKey && normalizedText
+      const normalizedText = readText(entryValue);
+      return normalizedKey && normalizedText !== null
         ? [[normalizedKey, normalizedText] as const]
         : [];
     });

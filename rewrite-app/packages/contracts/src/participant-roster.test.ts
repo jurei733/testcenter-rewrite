@@ -881,6 +881,19 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  for (const [shape, customTexts] of [
+    ["map", { empty: "", padded: "  Keep\ntext  ", whitespace: " \t ", zero: 0, ignored: null }],
+    ["value objects", { empty: { value: "" }, padded: { TEXT: "  Keep\ntext  " }, whitespace: { content: " \t " }, zero: { defaultValue: 0 }, ignored: { value: null } }],
+    ["entry array", { items: [
+      { key: "empty", value: "" }, { key: "padded", text: "  Keep\ntext  " },
+      { key: "whitespace", content: " \t " }, { key: "zero", defaultValue: 0 },
+      { key: "ignored", text: null }
+    ] }]
+  ] as const) it(`preserves exact JSON custom-text values in ${shape}`, () => {
+    const [entry] = parseParticipantRosterText({ customTexts, groups: [{ id: "g", logins: [{ name: "p", booklets: [{ id: "b" }] }] }] });
+    assert.deepEqual(entry?.customTexts, { empty: "", padded: "  Keep\ntext  ", whitespace: " \t ", zero: "0" });
+  });
+
   it("parses native JSON roster objects and arrays", () => {
     assert.deepEqual(
       parseParticipantRosterText({

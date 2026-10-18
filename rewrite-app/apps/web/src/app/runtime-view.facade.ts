@@ -8,6 +8,7 @@ import {
   filterOpenMonitorRunsByProfile,
   resolveOpenMonitorRunSuperState,
   resolveMonitorCustomText,
+  resolveMonitorCustomTextValue,
   type MonitorCustomTextKey
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -261,6 +262,10 @@ export class RuntimeViewFacade {
       this.applicationSettings.settings().customTexts,
       this.operatorAccess.customTexts
     );
+  }
+
+  monitorValue(key: MonitorCustomTextKey): string {
+    return resolveMonitorCustomTextValue(this.effectiveMonitorCustomTexts, key);
   }
 
   monitorText(key: MonitorCustomTextKey, fallback?: string): string {

@@ -45,6 +45,7 @@ import {
   productionApiRoutes,
   resolveAndFormatParticipantCustomText,
   resolveParticipantCustomText,
+  resolveParticipantCustomTextValue,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import {
@@ -2343,30 +2344,17 @@ export class ParticipantViewFacade {
       return null;
     }
     if (event.kind === "started") {
-      const minutes = Math.floor(event.durationSeconds / 60);
-      const seconds = event.durationSeconds % 60;
       return {
         kind: event.kind,
-        message: `${
-          this.customText(
-            "booklet_msgTimerStarted",
-            "The time for this block has started: "
-          ).trimEnd()
-        } ${minutes}:${String(seconds).padStart(2, "0")}`
+        message: `${this.customTextValue("booklet_msgTimerStarted")}${Math.round(event.durationSeconds / 60)} min`
       };
     }
     return {
       kind: event.kind,
       message:
         event.kind === "expired"
-          ? this.customText(
-              "booklet_msgTimeOver",
-              "The time for this block has ended."
-            )
-          : this.customText(
-              "booklet_msgTimerCancelled",
-              "The timed block was cancelled."
-            )
+          ? this.customTextValue("booklet_msgTimeOver")
+          : this.customTextValue("booklet_msgTimerCancelled")
     };
   }
 
@@ -3219,6 +3207,10 @@ export class ParticipantViewFacade {
     } finally {
       this.participantSignOutBusy.set(false);
     }
+  }
+
+  customTextValue(key: ParticipantCustomTextKey): string {
+    return resolveParticipantCustomTextValue(this.participantCustomTexts, key);
   }
 
   customText(key: ParticipantCustomTextKey, fallback?: string): string {

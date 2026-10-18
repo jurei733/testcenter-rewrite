@@ -299,7 +299,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
           </section>
           <details id="applicationCustomTextsEditor" class="span-all application-custom-texts-editor">
             <summary>Custom text overrides ({{ view.applicationCustomTextKeys.length }})</summary>
-            <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Empty global values inherit the built-in default.</p>
+            <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Text values, spaces and line breaks are kept. Use Inherit to remove a global override.</p>
             <div class="application-custom-text-add">
               <label>
                 Additional key
@@ -325,7 +325,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
                 </label>
                 <div class="actions compact-actions">
                   <button class="ghost" type="button" *ngIf="view.applicationCustomTextDefault(key)" (click)="view.setApplicationCustomTextToDefault(key)">Use default</button>
-                  <button class="ghost" type="button" [disabled]="!view.applicationCustomTextDrafts[key]" (click)="view.removeApplicationCustomText(key)">Inherit</button>
+                  <button class="ghost" type="button" [disabled]="!view.hasApplicationCustomTextOverride(key)" (click)="view.removeApplicationCustomText(key)">Inherit</button>
                 </div>
               </div>
             </div>
@@ -688,7 +688,7 @@ import { OriginalAdminLoginComponent } from "./original-admin-login.component";
           </label>
         </div>
         <p id="adminCustomTextsValidationError" *ngIf="view.normalizedAdminCustomTextsUpdate === null" role="alert">Use a JSON object with at most 250 valid keys and string values within the supported size limits.</p>
-        <p>{{ view.adminCustomTextsUpdateCount }} non-empty login-specific custom text(s) will replace the complete current map. Values are trimmed; empty values remove their key.</p>
+        <p>{{ view.adminCustomTextsUpdateCount }} login-specific custom text(s) will replace the complete current map. Values are kept exactly. Remove a key to inherit global text.</p>
         <div class="actions">
           <button id="adminUpdateCustomTextsButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserCustomTexts" (click)="view.confirmUpdateAdminUserCustomTexts()">Update Custom Texts</button>
         </div>

@@ -1,5 +1,43 @@
 # Testcenter parity checklist
 
+### Exact custom-text values through settings, accounts and rendering (2026-10-19)
+
+Global and operator-account normalizers previously trimmed text and discarded
+empty values after correct roster extraction. This could revive a global
+monitor headline that an empty login override intentionally suppressed. Both
+protected APIs and their Angular editors now retain authored strings exactly;
+removing a key explicitly inherits the broader scope. Existing entry/key/UTF-8
+byte limits still apply to all authored whitespace. The editor also rejects
+primitive JSON instead of interpreting it as an empty replacement map, and
+uses own-key checks for empty overrides and catalog defaults.
+
+The pinned Original CustomtextService, production pipe and AppConfig methods
+execute with actual RxJS in the regression gate. They distinguish direct reads
+(empty remains empty) from template fallback (an empty value uses the supplied
+template). Twenty-eight comparisons cover both participant and monitor scopes.
+Eighteen further comparisons execute the actual Original TimerData getter and
+notice expression: the start notice appends rounded minutes (`1 min` for 62
+seconds) directly to the authored prefix. No prefix trimming or extra space is
+introduced. Existing browser expectations now use that format and the actual
+Original default messages.
+
+JSON roster maps, value objects and entry arrays also retain empty and padded
+text; identifier normalization is unchanged. All 156 compiled contract tests,
+1,196 frontend checks and 168 Memory HTTP tests pass. Protected settings,
+account creation/update, fresh sign-in, oversized-value rejection and durable
+reopen pass on File and SQLite. Real authenticated Chromium/SQLite proves
+that an empty imported login headline overrides a global headline, a padded
+pause label survives, and a JSON roster reaches participant sign-in unchanged.
+Starting its real 62-second timed block renders the exact padded prefix plus
+`1 min`, without page errors. Initial bundle size is 469.79 kB under the
+unchanged 470 kB error cap.
+
+This closes these normalization/rendering paths. Booklet/SysCheck import values,
+remaining direct-read callsites and runtime-only monitor keys still require
+separate source-backed checks; the formatting oracle does not qualify complete
+timer reentry or production operation. Formal status remains 30 complete /
+19 partial. Full remote qualification of this change is pending.
+
 ### Explicit GET for the shared Booklet corpus adapter (2026-10-19)
 
 Published `cb530787` CI completes with 24 successful and 14 failed jobs. All

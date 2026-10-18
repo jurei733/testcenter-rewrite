@@ -10,7 +10,7 @@ import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 import QRCode from "qrcode";
-import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { originalParticipantCustomTextDefaults, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
@@ -9740,7 +9740,7 @@ try {
   await timerStartedMessage.waitFor();
   assert.match(
     (await timerStartedMessage.innerText()).trim(),
-    /^Project timer started: \d+:\d{2}$/
+    /^Project timer started: \d+ min$/
   );
   await page
     .locator("#participantRouteTestletTimerLeave")
@@ -18442,7 +18442,7 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "ended" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimeOver })
     .waitFor();
 
   await openOriginalBookletConfig(
@@ -19041,7 +19041,7 @@ try {
     await page.locator("#participantRouteTestletTimer").waitFor();
     await page
       .locator("#participantRouteTimerLifecycleMessage")
-      .filter({ hasText: "started" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerStarted })
       .waitFor();
     await pollJsonWithPredicate(
       `${baseUrl}/api/v1/participant/sessions/${controller.participantSessionId}/current-state`,
@@ -19083,7 +19083,7 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "started" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerStarted })
     .waitFor();
   await page.locator("#participantVeronaPlayerStatus").filter({ hasText: /^running$/ }).waitFor();
   await demoController.frame
@@ -19848,7 +19848,7 @@ try {
   );
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "ended" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimeOver })
     .waitFor({ timeout: 20_000 });
   await page
     .locator("#participantRouteUnitKey")
@@ -19954,7 +19954,7 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTimerLifecycleMessage")
-    .filter({ hasText: "cancelled" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerCancelled })
     .waitFor();
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${confirmLeaveController.participantSessionId}/current-state`,

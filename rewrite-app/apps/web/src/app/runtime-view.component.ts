@@ -68,7 +68,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="section-heading">
           <div>
             <span class="eyebrow">{{ view.monitorText("gm_controls") }}</span>
-            <h2 id="monitorCustomHeadline">{{ view.monitorText("gm_headline") }}</h2>
+            <h2 id="monitorCustomHeadline">{{ view.monitorValue("gm_headline") }}</h2>
           </div>
           <div class="actions">
             <button id="monitorScrollDownButton" class="ghost" type="button" [attr.title]="view.monitorText('gm_scroll_down')" (click)="view.scrollMonitorRunsIntoView()">{{ view.monitorText("gm_scroll_down") }}</button>

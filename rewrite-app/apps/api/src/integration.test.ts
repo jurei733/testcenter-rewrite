@@ -3417,7 +3417,8 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(updatedAdminCustomTexts.status, 200);
   assert.deepEqual(updatedAdminCustomTexts.body.adminUser.customTexts, {
     gm_headline: "Updated workspace headline",
-    gm_control_pause: "Hold workspace tests"
+    gm_control_pause: "Hold workspace tests",
+    empty_value: "   "
   });
 
   const accessWindowRestoredSignIn = await requestJson<{
@@ -3434,7 +3435,8 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(accessWindowRestoredSignIn.status, 200);
   assert.deepEqual(accessWindowRestoredSignIn.body.adminUser.customTexts, {
     gm_headline: "Updated workspace headline",
-    gm_control_pause: "Hold workspace tests"
+    gm_control_pause: "Hold workspace tests",
+    empty_value: "   "
   });
 
   const selfDisable = await requestJson<{ error: string }>(
@@ -3710,9 +3712,9 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       item.eventType === "admin_user_updated" &&
       item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
       item.details["previousCustomTextCount"] === 0 &&
-      item.details["nextCustomTextCount"] === 2 &&
+      item.details["nextCustomTextCount"] === 3 &&
       Array.isArray(item.details["changedCustomTextKeys"]) &&
-      item.details["changedCustomTextKeys"].length === 2
+      item.details["changedCustomTextKeys"].length === 3
   );
   assert.ok(adminCustomTextsUpdateAuditEvent);
   assert.deepEqual(
@@ -3721,7 +3723,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         "changedCustomTextKeys"
       ] as string[])
     ].sort(),
-    ["gm_control_pause", "gm_headline"]
+    ["empty_value", "gm_control_pause", "gm_headline"]
   );
   assert.equal(
     JSON.stringify(adminCustomTextsUpdateAuditEvent.details).includes(
@@ -4617,7 +4619,7 @@ test("platform application settings are public, durable, validated, and audited"
     configuredAccessibilityNotice
   );
   assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
-    login_subtitle: "Global test selection",
+    login_subtitle: "  Global test selection  ",
     login_testResumeButtonLabel: "Begin"
   });
   assert.deepEqual(updatedSettings.body.applicationSettings.assetAssignments, {
@@ -8360,6 +8362,68 @@ test("production transport and secret-file bootstrap stay configurable, idempote
       await closeServer(activeServer);
     }
     rmSync(secretDirectory, { recursive: true, force: true });
+  }
+});
+
+test("custom-text values remain exact through protected settings, account creation, update, sign-in and reopen", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "exact-custom-text-api-"));
+  const environment = {
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+    FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: ""
+  };
+  let isolated = await createIsolatedServer(environment);
+  let token = "", previousGlobal: Record<string, string> | null = null;
+  const request = <T = any>(path: string, method = "GET", body?: unknown) => requestJsonAt<T>(isolated.baseUrl, path,
+    { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body });
+  try {
+    let root = await request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username: "integration.admin", password: "integration-secret" });
+    if (root.status === 401) {
+      assert.equal((await request("/api/v1/admin/auth/bootstrap", "POST", { username: "integration.admin", password: "integration-secret" })).status, 201);
+      root = await request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username: "integration.admin", password: "integration-secret" });
+    }
+    assert.equal(root.status, 200); token = root.body.sessionToken;
+    previousGlobal = (await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts;
+    const global = { gm_headline: "  Global headline\n", gm_control_pause: "", login_subtitle: " \t " };
+    const globalUpdate = await request("/api/v1/admin/application-settings", "PATCH", { customTexts: global });
+    assert.equal(globalUpdate.status, 200); assert.deepEqual(globalUpdate.body.applicationSettings.customTexts, global);
+    assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    const stamp = randomUUID(), tenantKey = `exact-text-${stamp}`, workspaceKey = "owned";
+    assert.equal((await request("/api/v1/platform/tenants", "POST", { tenantKey, displayName: tenantKey })).status, 201);
+    assert.equal((await request(`/api/v1/tenants/${tenantKey}/workspaces`, "POST", { workspaceKey, displayName: workspaceKey })).status, 201);
+    assert.equal((await request(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, "POST", {
+      rosterText: [{ loginKey: "p", groupKey: "g", bookletKey: "B", mode: "run-hot-return" }]
+    })).status, 201);
+    const customTexts = { gm_headline: "", gm_control_pause: "  Local pause\n ", gm_menu_filter: " \t " };
+    const username = `exact-text-${stamp}`;
+    const created = await request<CreateAdminUserResponse>("/api/v1/admin/users", "POST", {
+      username, displayName: "Exact text monitor", password: "exact-text-password", confirmationPassword: "integration-secret", customTexts,
+      roleAssignments: [{ role: "group_monitor", tenantKey, workspaceKey, groupKey: "g" }]
+    });
+    assert.equal(created.status, 201); assert.deepEqual(created.body.adminUser.customTexts, customTexts);
+    const signIn = () => request<AdminSignInResponse>("/api/v1/admin/auth/sign-in", "POST", { username, password: "exact-text-password" });
+    assert.deepEqual((await signIn()).body.adminUser.customTexts, customTexts);
+    const updatedTexts = { ...customTexts, gm_headline: "\t ", gm_control_pause: "", login_subtitle: "  Authored  " };
+    const updated = await request(`/api/v1/admin/users/${created.body.adminUser.adminUserId}`, "PATCH", {
+      customTexts: updatedTexts, confirmationPassword: "integration-secret"
+    });
+    assert.equal(updated.status, 200); assert.deepEqual(updated.body.adminUser.customTexts, updatedTexts);
+    for (const [path, code, body] of [
+      ["/api/v1/admin/application-settings", "application_custom_texts_too_large", { customTexts: { gm_headline: " ".repeat(10001) } }],
+      [`/api/v1/admin/users/${created.body.adminUser.adminUserId}`, "admin_custom_texts_too_large", { customTexts: { gm_headline: " ".repeat(10001) }, confirmationPassword: "integration-secret" }]
+    ] as const) {
+      const oversized = await request(path, "PATCH", body); assert.equal(oversized.status, 400); assert.equal(oversized.body.error, code);
+    }
+    assert.deepEqual((await signIn()).body.adminUser.customTexts, updatedTexts);
+    assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    if (environment.FIRST_SLICE_STORE !== "memory") {
+      await closeServer(isolated.server); isolated = await createIsolatedServer(environment);
+      assert.deepEqual((await signIn()).body.adminUser.customTexts, updatedTexts);
+      assert.deepEqual((await request("/api/v1/system/application-settings")).body.applicationSettings.customTexts, global);
+    }
+  } finally {
+    if (previousGlobal) await request("/api/v1/admin/application-settings", "PATCH", { customTexts: previousGlobal });
+    await closeServer(isolated.server); rmSync(directory, { recursive: true, force: true });
   }
 });
 

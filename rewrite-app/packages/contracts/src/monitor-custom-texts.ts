@@ -74,11 +74,16 @@ export const mergeMonitorCustomTextScopes = (
   ...(loginCustomTexts ?? {})
 });
 
+export const resolveMonitorCustomTextValue = (
+  customTexts: Readonly<Record<string, string>> | null | undefined,
+  key: MonitorCustomTextKey
+): string => customTexts?.[key] ?? originalMonitorCustomTextDefaults[key];
+
 export const resolveMonitorCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
   key: MonitorCustomTextKey,
   fallback: string = originalMonitorCustomTextDefaults[key]
-): string => customTexts?.[key]?.trim() || fallback;
+): string => resolveMonitorCustomTextValue(customTexts, key) || fallback;
 
 export const formatMonitorCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
