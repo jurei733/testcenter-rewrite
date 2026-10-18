@@ -1,5 +1,24 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Explicit GET for the shared Booklet corpus adapter (2026-10-19)
+
+Published `cb530787` CI completes with 24 successful and 14 failed jobs. All
+14 failures are the same test-helper integration error: release detail was read
+without an explicit method, so the main smoke's default-POST adapter sent POST
+to a GET-only route and received 404. Earlier standalone acceptance used an
+implicit GET default and could not detect this mismatch. Production routing
+and authorization remain correct.
+
+The helper now explicitly requests GET. A default-POST adapter regression fails
+before this change and passes afterward. The strict, authenticated, complete
+20-case Angular/SQLite fixture is also rerun through that same default-POST
+contract and passes all cases. Main CI coverage remains mandatory; the adapter
+fix does not weaken the API or bypass the failing corpus stage. The prior
+native-route correction passes its complete participant-console CI job.
+
+This correction and the subsequent local runtime changes require a fresh full
+workflow. The preceding run is recorded as failed, not as full qualification.
+
 ### Original roster XML text and structural content (2026-10-19)
 
 A self-closing `CustomText` previously consumed its next sibling and lost that
@@ -54,7 +73,8 @@ rows remain unavailable for batch commands. This does not claim native
 corrupt-package acceptance or a complete live Original UI comparison.
 
 The production Initial total is 469.75 kB under the unchanged 470 kB error cap.
-These changes are local while the complete published `cb530787` CI runs.
+This section records local qualification at `1f15b6cb`; subsequent publication
+and workflow results are tracked in the newer entries above.
 Full parity remains 30 complete / 19 partial; production acceptance stays open.
 
 ### Bounded browser-fixture credential capture (2026-10-19)

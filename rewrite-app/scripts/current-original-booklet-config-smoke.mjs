@@ -48,7 +48,7 @@ export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
   assert.deepEqual(imported.importJob.diagnostics, []);
   assert.ok(imported.stagedContentRelease?.contentReleaseId);
   const releaseId = imported.stagedContentRelease.contentReleaseId;
-  const release = await (await sendJson(`${workspaceUrl}/content-releases/${releaseId}`)).json();
+  const release = await (await sendJson(`${workspaceUrl}/content-releases/${releaseId}`, { method: "GET" })).json();
   assert.equal(release.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries.length, 56);
   await sendJson(`${workspaceUrl}/content-releases/${releaseId}/activate`, { body: {} });
   const rosterResult = await (await sendJson(`${workspaceUrl}/participant-roster`, { body: { rosterText: roster.toString("utf8") } })).json();
