@@ -29,7 +29,9 @@ import {
   type GetContentReleaseResponse,
   type GetSourcePackageResponse,
   type CreateProofOfWorkChallengeResponse,
-  type ProofOfWorkSolution
+  type ProofOfWorkSolution,
+  type ParticipantSignInResponse,
+  type ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
 import { participantCommandExecutionRoute } from "@testcenter-rewrite-app/contracts/participant-run-command";
 import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
@@ -41,6 +43,7 @@ import type { MonitorRunCommandResult, ParticipantSession, TestRun } from "@test
 
 import { createProductionApiServer } from "./index.js";
 import { ProofOfWorkManager } from "./proof-of-work.js";
+import { localDemoSourcePackage } from "./local-demo-bootstrap.js";
 
 let server: Awaited<ReturnType<typeof createProductionApiServer>>;
 
@@ -1024,6 +1027,84 @@ test("Original 19 schema policy is runtime-local and invalid/offline configurati
     assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, false);
     assert.equal(process.env.FIRST_SLICE_XML_SCHEMA_PROFILE, originalProfile);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("Original CustomTexts survive strict HTTP import, participant delivery and durable reopen", async () => {
+  const reference = JSON.parse(readFileSync(resolve(process.cwd(),
+    "test-fixtures/original-testcenter/current-roster-custom-text-reference.json"), "utf8")) as {
+    cases: Array<{ name: string; xml: string; expected: Record<string, string> }>;
+  };
+  const directory = mkdtempSync(join(tmpdir(), "original-custom-text-api-"));
+  const environment = {
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+    FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19", FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false",
+    REQUIRE_LOGIN_PASSWORD: "false"
+  };
+  let isolated = await createIsolatedServer(environment);
+  const tenantKey = `custom-text-${randomUUID()}`;
+  const stored: Array<{ path: string; expected: Record<string, string> }> = [];
+  const post = <T = any>(path: string, body: unknown) => requestJsonAt<T>(isolated.baseUrl, path, { method: "POST", body });
+  try {
+    const config = await requestJsonAt<GetRuntimeConfigResponse>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(config.body.runtimeConfig.xmlSchema.profile, "original-19");
+    assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, true);
+    assert.equal((await post("/api/v1/platform/tenants", { tenantKey, displayName: tenantKey })).status, 201);
+    for (const item of reference.cases) {
+      const workspaceKey = item.name;
+      assert.equal((await post(`/api/v1/tenants/${tenantKey}/workspaces`, { workspaceKey, displayName: workspaceKey })).status, 201);
+      const path = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+      const imported = await post(`${path}/participant-roster`, { rosterText: item.xml.replace("<Testtakers>", '<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/>').replace('<Group id="g">', '<Group id="g" label="Original custom text">') });
+      if (item.name === "self-closing-section") {
+        // Native XSD requires one CustomText when the section exists. The
+        // lower-level SimpleXML extraction oracle does not weaken that guard.
+        assert.equal(imported.status, 400);
+        assert.equal(imported.body.error, "participant_roster_xml_invalid");
+        continue;
+      }
+      assert.equal(imported.status, 201, `${item.name}: ${JSON.stringify(imported.body)}`);
+      assert.deepEqual(imported.body.items.map((entry: { loginKey: string }) => entry.loginKey), ["p"]);
+      assert.deepEqual(imported.body.operationalLoginCandidates.map((entry: { loginKey: string }) => entry.loginKey), ["m"]);
+      assert.deepEqual(imported.body.items[0].customTexts, item.expected);
+      assert.deepEqual(imported.body.operationalLoginCandidates[0].customTexts, item.expected);
+      const source = JSON.parse(localDemoSourcePackage.sourceDocument!);
+      source.bookletEntries = [{ ...source.bookletEntries[0], bookletKey: "B" }];
+      const uploaded = await post(`${path}/source-packages`, { fileName: "custom-text-runtime.json", mediaType: "application/json", contentStructure: source });
+      assert.equal(uploaded.status, 201);
+      const staged = await post(`${path}/import-jobs`, { sourcePackageId: uploaded.body.sourcePackage.sourcePackageId });
+      assert.equal(staged.body.importJob.status, "completed", JSON.stringify(staged.body.importJob.diagnostics));
+      assert.equal((await post(`${path}/content-releases/${staged.body.stagedContentRelease.contentReleaseId}/activate`, {})).status, 200);
+      const identity = await post<ParticipantSignInResponse>("/api/v1/participant/auth/sign-in", { tenantKey, workspaceKey, loginKey: "p" });
+      assert.equal(identity.status, 200);
+      assert.deepEqual(identity.body.participantRosterEntry?.customTexts, item.expected);
+      const resumed = await requestJsonAt<any>(isolated.baseUrl,
+        `/api/v1/participant/sessions/${identity.body.participantSession.participantSessionId}/resume`, {
+          method: "POST", headers: { authorization: `Bearer ${identity.body.sessionToken}` }, body: { bookletKey: "B" }
+        });
+      assert.equal(resumed.status, 200);
+      const runtime = await requestJsonAt<ParticipantRuntimeStateResponse>(isolated.baseUrl,
+        `/api/v1/participant/sessions/${identity.body.participantSession.participantSessionId}/runtime-state`, {
+          headers: { authorization: `Bearer ${identity.body.sessionToken}` }
+        });
+      assert.equal(runtime.status, 200);
+      assert.deepEqual(runtime.body.runtimeState.participantRosterEntry?.customTexts, item.expected);
+      stored.push({ path, expected: item.expected });
+    }
+    assert.equal(stored.length, reference.cases.filter(item => item.name !== "self-closing-section").length);
+    if (environment.FIRST_SLICE_STORE !== "memory") {
+      await closeServer(isolated.server);
+      isolated = await createIsolatedServer(environment);
+      for (const item of stored) {
+        const roster = await requestJsonAt<any>(isolated.baseUrl, `${item.path}/participant-roster`);
+        assert.equal(roster.status, 200);
+        assert.deepEqual(roster.body.items[0].customTexts, item.expected);
+      }
+    }
+  } finally {
+    await closeServer(isolated.server);
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("participant access credentials rotate and revoke without changing sessions or saved answers", async () => {

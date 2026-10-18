@@ -1,3 +1,4 @@
+import { parseXmlRosterCustomTexts, prepareXmlRosterStructure } from "./roster-custom-texts.js";
 import {
   participantCodeInputTypes,
   participantExecutionModes as supportedParticipantExecutionModes
@@ -1527,32 +1528,6 @@ const findNearestXmlRosterContextValue = (
   return matchingRanges[0]?.value ?? null;
 };
 
-const parseXmlRosterCustomTexts = (
-  rosterText: string
-): Record<string, string> => {
-  const section = rosterText.match(
-    /<((?:[a-zA-Z_][\w.-]*:)?customtexts)\b[^>]*>([\s\S]*?)<\/\1>/i
-  )?.[2];
-  if (!section) {
-    return {};
-  }
-  return Object.fromEntries(
-    Array.from(
-      section.matchAll(
-        /<((?:[a-zA-Z_][\w.-]*:)?customtext)\b([^>]*)>([\s\S]*?)<\/\1>/gi
-      )
-    ).flatMap(match => {
-      const key = normalizeRosterTextValue(
-        readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "key")
-      );
-      if (!key) {
-        return [];
-      }
-      return [[key, decodeXmlText((match[3] ?? "").trim())] as const];
-    })
-  );
-};
-
 const parseParticipantRosterXmlText = (
   rosterText: string
 ): ParsedParticipantRosterEntry[] => {
@@ -1562,6 +1537,7 @@ const parseParticipantRosterXmlText = (
 
   const entries: ParsedParticipantRosterEntry[] = [];
   const customTexts = parseXmlRosterCustomTexts(rosterText);
+  rosterText = prepareXmlRosterStructure(rosterText);
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -2250,6 +2226,9 @@ export const parseOriginalTestcenterOperationalLogins = (
     return [];
   }
 
+  const customTexts = parseXmlRosterCustomTexts(rosterText);
+  rosterText = prepareXmlRosterStructure(rosterText);
+
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -2296,7 +2275,6 @@ export const parseOriginalTestcenterOperationalLogins = (
     originalTestcenterOperationalLoginModes
   );
   const monitorProfiles = parseOriginalTestcenterMonitorProfiles(rosterText);
-  const customTexts = parseXmlRosterCustomTexts(rosterText);
   const candidates: OriginalTestcenterOperationalLoginCandidate[] = [];
 
   for (const match of rosterText.matchAll(

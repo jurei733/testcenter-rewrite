@@ -1,5 +1,38 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Original roster XML text and structural content (2026-10-19)
+
+A self-closing `CustomText` previously consumed its next sibling and lost that
+sibling's key. XML comments and CDATA could also be interpreted as real Login
+markup; a commented-out participant was imported as an active roster entry.
+Custom-text extraction now walks XML tokens, preserves empty/authored text,
+normalizes literal XML line endings and decodes named/numeric references once.
+The structural roster view removes comments/processing instructions and escapes
+CDATA as literal text, while custom texts retain their original character data.
+Participant and operational-login parsing use the same prepared structure.
+
+The actual pinned Original `XMLFileTesttakers::getCustomTexts` body executes on
+PHP 8.3.35 / libxml 2.9.14 with native SimpleXML. Its 14 fixtures yield 28 paired
+participant/operator checks. They cover empty/self-closing fields, following
+siblings, CDATA/markup, comments, instructions, references, whitespace, zero,
+prototype-like keys, hidden Login examples and actual CDATA Booklet IDs. All
+153 compiled contract tests pass. Three new structural checks fail before the
+preparation fix and pass afterward; the earlier regex fails 16 of the first
+18 native text comparisons.
+
+Strict Original-19/native-XSD HTTP gates pass on Memory/File/SQLite: 13 valid
+rosters per store retain exact text through import, operational candidates,
+participant sign-in and resumed runtime reads. File/SQLite reopen retains all
+13 maps. An empty CustomTexts section still fails its unchanged XSD requirement
+for at least one child. HTTP fixtures add the required schema reference,
+Metadata and Group label; the extraction oracle alone does not prove XSD validity.
+All 167 Memory HTTP tests and 1,145 current frontend checks pass. Initial bundle
+size stays 469.75 kB under the unchanged 470 kB error cap.
+
+This qualifies roster parsing and participant delivery, not all later operator
+account normalizers or full custom-text/production acceptance. Formal status
+remains 30 complete / 19 partial. New-head full remote qualification is pending.
+
 ### Current fixed monitor Booklet diagnostics (2026-10-19)
 
 Current Original `eedae418` / change `cc3fd9bc6` removes the four
