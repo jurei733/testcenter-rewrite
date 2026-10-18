@@ -1,5 +1,33 @@
 # Testcenter parity checklist
 
+### Current Original 56-account Booklet Config corpus (2026-10-19)
+
+An explicit live-source audit finds 56 Booklet Config cases in Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`; the previous current package pins
+51. Cases 40/41 now use modern toolbar-label keys, and 52–56 add authored short
+labels and missing-short-label fallbacks for toolbar, navigation and header.
+The refreshed package retains all older fixtures, adds exact current overrides
+and five Units with current 17.6 schema references, and pins the complete 56-account roster.
+All 63 source files (56 Booklets, five Units, Player and roster) independently
+match that Original Git revision byte-for-byte. Forty-five unchanged Booklets
+retain their existing source fixtures; eleven use explicit current overrides.
+
+125 contract checks pass. The production HTTP corpus gate explicitly requires
+the Original-19 profile and native XSD validation and passes on Memory, File
+and SQLite: all 56 Booklets stage without diagnostics, all 56 real roster
+accounts are classified, and 24 real participant sign-ins/resumes cover the
+existing entry points plus all five new cases. Runtime projections preserve
+the two Unit aliases, optional short labels and independent toolbar/navigation/
+header policies. The strict package uses Original workspace files without an
+invented IMS migration manifest; that additional manifest requires the separate
+compatibility profile and initially fails strict root validation as expected.
+
+This extends exact-source import/runtime coverage. The earlier 32 native label
+browser cases remain separate from execution of these five exact new Booklets.
+Other current-source schema/config drift, complete package acceptance and full
+production readiness remain open; formal parity stays 30 complete / 19 partial.
+The preceding `3eb48b8a` CI continues independently from this corpus refresh.
+
 ### Auxiliary deep links and full Angular camera visibility (2026-10-19)
 
 Initial navigation can still expose `Router.url` as `/` while a camera or public

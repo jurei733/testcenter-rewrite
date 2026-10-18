@@ -1,5 +1,24 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current Original Booklet Config corpus refresh (2026-10-19)
+
+Live Original `eedae418` has 56 Booklet Config cases rather than the pinned 51.
+The refreshed current package retains older fixtures and combines eleven
+current overrides with 45 byte-unchanged Booklets. Five current Unit documents,
+the same real Player and the complete 56-account roster give 63 independently
+Git-verified source files. Cases 40/41 use modern toolbar keys; 52–56 cover
+short toolbar/navigation/header labels and authored fallback omissions.
+
+125 contract checks and strict Original-19/native-XSD HTTP gates pass across
+Memory/File/SQLite, staging every Booklet without diagnostics and exercising
+24 real participant sign-ins/resumes. A generated IMS migration manifest is
+deliberately absent from this Original workspace package; its earlier strict
+root rejection is retained rather than bypassed through compatibility mode.
+Exact new-Booklet Angular execution remains separate from earlier 32 native
+label cases. Audit other current-source schema/config drift next. Keep formal
+30/19, physical acceptance, production boundaries and the presentation intact.
+Complete the existing `3eb48b8a` PR CI before publishing the corpus refresh.
+
 ### Auxiliary entry routing and complete Angular native visibility (2026-10-19)
 
 A direct camera/legal/privacy/accessibility entry could be overwritten by home

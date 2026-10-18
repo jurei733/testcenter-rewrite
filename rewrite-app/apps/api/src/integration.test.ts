@@ -23897,7 +23897,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
   }
 });
 
-test("original Testcenter compatibility corpus executes the current 51-account Booklet Config package", async () => {
+test("original Testcenter compatibility corpus executes the current 56-account Booklet Config package", async () => {
   type BookletFixture = {
     fixture: string;
     bookletKey: string;
@@ -23926,8 +23926,8 @@ test("original Testcenter compatibility corpus executes the current 51-account B
     };
   };
   type RuntimePolicy = {
-    navigation: { browserNavigation: string };
-    display: { fullscreenPrompt: boolean };
+    navigation: { browserNavigation: string; unitLabel: string };
+    display: { fullscreenPrompt: boolean; toolbarUnitLabel: string; headerContent: string };
   };
 
   const corpus = JSON.parse(
@@ -23985,7 +23985,9 @@ test("original Testcenter compatibility corpus executes the current 51-account B
   const isolatedEnvironment: Record<string, string> = {
     FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
-    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19",
+    FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false"
   };
   if (isolatedStore === "file") {
     isolatedEnvironment.FIRST_SLICE_FILE = `${
@@ -24000,6 +24002,11 @@ test("original Testcenter compatibility corpus executes the current 51-account B
   const isolated = await createIsolatedServer(isolatedEnvironment);
 
   try {
+    const configuration = await requestJsonAt<{
+      runtimeConfig: { xmlSchema: { profile: string; validatedByXsd: boolean } };
+    }>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+    assert.equal(configuration.body.runtimeConfig.xmlSchema.profile, "original-19");
+    assert.equal(configuration.body.runtimeConfig.xmlSchema.validatedByXsd, true);
     const tenantKey = "integration-tenant-current-original-booklet-config";
     const workspaceKey = "integration-workspace-current-original-booklet-config";
     assert.equal(
@@ -24025,26 +24032,9 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       201
     );
 
-    const manifestResources = [
-      ...bookletDocuments.map(
-        booklet =>
-          `<resource identifier="${booklet.bookletKey}" href="${booklet.fileName}" />`
-      ),
-      ...unitDocuments.map(
-        unit => `<resource identifier="${unit.unitKey}" href="${unit.fileName}" />`
-      ),
-      `<resource identifier="${expectation.player.playerKey}" href="${playerFileName}" />`
-    ].join("\n");
+    // Current Original workspace ZIP: byte-exact Booklets/Units/Player,
+    // without an extra IMS migration manifest requiring compatibility mode.
     const zipPayload = createZipBase64([
-      {
-        fileName: "export/imsmanifest.xml",
-        content: `
-          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
-            <resources>${manifestResources}</resources>
-          </manifest>
-        `,
-        compressionMethod: 8
-      },
       ...bookletDocuments.map(booklet => ({
         fileName: `export/${booklet.fileName}`,
         content: booklet.content,
@@ -24103,7 +24093,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
             bookletEntries: Array<{
               bookletKey: string;
               policy: RuntimePolicy;
-              unitEntries: Array<{ unitKey: string; playerKey?: string }>;
+              unitEntries: Array<{ unitKey: string; playerKey?: string; shortLabel?: string }>;
             }>;
             playerEntries?: Array<{ playerKey: string; html: string }>;
           };
@@ -24115,7 +24105,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
     );
     const runtimeSnapshot =
       release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
-    assert.equal(runtimeSnapshot.bookletEntries.length, 51);
+    assert.equal(runtimeSnapshot.bookletEntries.length, 56);
     assert.deepEqual(
       new Set(runtimeSnapshot.bookletEntries.map(booklet => booklet.bookletKey)),
       new Set(expectation.bookletKeys)
@@ -24163,6 +24153,26 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       )?.policy.navigation.browserNavigation,
       "prevent"
     );
+    const labelCases: Array<{
+      suffix: number; toolbar?: string; navigation?: string; header?: string;
+      shortLabels: Array<string | undefined>;
+    }> = [
+      { suffix: 40, toolbar: "label", shortLabels: ["1", "2"] },
+      { suffix: 41, toolbar: "hidden", shortLabels: ["1", "2"] },
+      { suffix: 52, toolbar: "label_short", shortLabels: ["A1", "A2"] },
+      { suffix: 53, toolbar: "label_short", shortLabels: [undefined, "A2"] },
+      { suffix: 54, navigation: "label_short", shortLabels: ["A1", "A2"] },
+      { suffix: 55, header: "unit_short", shortLabels: ["A1", "A2"] },
+      { suffix: 56, header: "unit_short", shortLabels: [undefined, "A2"] }
+    ];
+    for (const labelCase of labelCases) {
+      const booklet = runtimeSnapshot.bookletEntries.find(entry => entry.bookletKey === `Cy-Bklt_BkltConfig-${labelCase.suffix}`);
+      assert.ok(booklet);
+      assert.deepEqual(booklet.unitEntries.map(unit => unit.shortLabel), labelCase.shortLabels);
+      if (labelCase.toolbar) assert.equal(booklet.policy.display.toolbarUnitLabel, labelCase.toolbar);
+      if (labelCase.navigation) assert.equal(booklet.policy.navigation.unitLabel, labelCase.navigation);
+      if (labelCase.header) assert.equal(booklet.policy.display.headerContent, labelCase.header);
+    }
     assert.deepEqual(runtimeSnapshot.playerEntries, [
       { playerKey: expectation.player.playerKey, html: playerDocument }
     ]);
@@ -24217,7 +24227,7 @@ test("original Testcenter compatibility corpus executes the current 51-account B
       assert.deepEqual(participant.validationWarnings, []);
     }
 
-    for (const suffix of [1, 27, 51]) {
+    for (const suffix of [1, 27, 51, 52, 53, 54, 55, 56]) {
       const loginKey = `${expectation.roster.loginPrefix}${suffix}`;
       const bookletKey = `Cy-Bklt_BkltConfig-${suffix}`;
       const signIn = await requestJsonAt<{
