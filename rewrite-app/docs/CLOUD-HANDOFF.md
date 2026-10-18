@@ -1,5 +1,25 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Auxiliary entry routing and complete Angular native visibility (2026-10-19)
+
+A direct camera/legal/privacy/accessibility entry could be overwritten by home
+navigation while Router.url was still its initial `/`. The shell now derives
+entry-root status from the actual pathname. Eight production-method regressions
+fail before the correction and all 19 pass after; 1,136 frontend tests and the
+469.99 kB production build pass without changing budgets.
+
+The independent native visibility proof now also runs the complete built
+Angular application, real operator authentication and actual Start camera UI.
+Native minimization hides the document, ends the old stream and clears video;
+restoration starts a distinct stream. Raw CDP reads only DOM/stream/native
+state; there is no injected capture host, Angular-state or visibility mock.
+The own browser/API close successfully. Synthetic media qualifies full Angular
+window pause/resume; physical front/rear hardware acceptance remains open.
+
+`820bf4e2` PR CI completes 38/38 successfully with 2,639 unit/frontend checks
+and full SQLite/PostgreSQL browser coverage. Qualify the next combined head
+independently; keep formal 30/19 and the protected presentation unchanged.
+
 ### Native camera component visibility witness (2026-10-19)
 
 An independent raw-Chrome/public-CDP probe now executes actual capture methods,
@@ -9,8 +29,8 @@ inactive camera, cleared video stream and ended old tracks. Native restoration
 yields a normal visible window and active distinct new stream; the old tracks
 stay ended. The owned browser exits cleanly. Preserve the successful states,
 events and source/worker hashes alongside earlier failed probes. This is an
-owned synthetic-camera component harness: full Angular and physical-camera
-acceptance remain unqualified, and formal 30/19 stays unchanged.
+owned synthetic-camera component harness; the later complete Angular witness
+above additionally passes. Physical hardware remains open and formal 30/19 stays unchanged.
 
 ### Current correction: strict declared UTF-7 XML (2026-10-19)
 
@@ -44,12 +64,12 @@ cannot stop a replacement camera. All 112 focused and 1,117 frontend checks
 pass; built image/manual, rear/front flows pass 62/60/60 steps and worker closure.
 The build remains 469.99 kB. Keep whole-head CI qualification separate.
 
-The `820bf4e2` PR workflow still runs; its full image/rear/front attachment job
-passes. Only its redundant push workflow was cancelled to free capacity; the
+The `820bf4e2` PR workflow now finishes 38/38 successfully; its full
+image/rear/front attachment job passes. Only its redundant push workflow was cancelled to free capacity; the
 complete PR gate remains required. The later raw-Chrome component witness now
 qualifies actual native minimize/stop and restore/resume; earlier SDK/startup
-attempts remain failed. Complete Angular/physical-camera acceptance remains
-separate. Preserve formal 30/19, production boundaries and the presentation.
+attempts remain failed. Complete Angular synthetic-media visibility now additionally passes;
+physical-camera acceptance remains open. Preserve formal 30/19, production boundaries and the presentation.
 
 ### Current correction: printed camera page and QR region (2026-10-18)
 

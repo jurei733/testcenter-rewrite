@@ -285,7 +285,9 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     const initialView = this.getInitialViewFromLocation();
-    const isApplicationRoot = this.router.url === "/" || this.router.url === "";
+    // Router.url can still be '/' during an auxiliary route's initial guard.
+    // Only the actual entry path should trigger the default home navigation.
+    const isApplicationRoot = /^\/(?:app\/?)?$/.test(window.location.pathname);
     this.app.init(initialView ?? (isApplicationRoot ? "home" : null));
     if (!initialView && isApplicationRoot) {
       await this.router.navigateByUrl("/home", {
