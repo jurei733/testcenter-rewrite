@@ -51,10 +51,6 @@ export const originalMonitorCustomTextDefaults = {
   gm_timeleft_tooltip: "Verbleibende Zeit: %s von %s Minute(n)",
   gm_timeup_tooltip: "Zeit abgelaufen",
   gm_timemax_tooltip: "Zeitgesteuerter Block: %s Minute(n)",
-  gm_booklet_error_missing_id: "Kein Testheft zugeordnet!",
-  gm_booklet_error_missing_file: "Kein Zugriff auf Testheft-Datei!",
-  gm_booklet_error_xml: "Konnte Testheft-Datei nicht lesen!",
-  gm_booklet_error_general: "Fehler beim Zugriff auf Testheft-Datei!",
   gm_control_goto_tooltip: "Bitte Block auswählen",
   gm_multiple_booklet_species_warning:
     " - Die verwendeten Booklets sind zu unterschiedlich, um gemeinsam gesteuert zu werden.",

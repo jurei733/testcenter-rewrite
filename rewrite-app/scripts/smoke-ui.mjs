@@ -23242,10 +23242,10 @@ try {
     "Booklet-error presentation needs one real scoped run."
   );
   const monitorBookletErrors = [
-    ["missing-id", "UI No Booklet Assigned"],
-    ["missing-file", "UI Missing Booklet File"],
-    ["xml", "UI Broken Booklet XML"],
-    ["general", "UI Booklet Access Error"]
+    ["missing-id", "Fehler beim Lesen der Testheft-Datei: Kein Testheft zugeordnet."],
+    ["missing-file", "Fehler beim Lesen der Testheft-Datei: Datei nicht gefunden."],
+    ["xml", "Fehler beim Lesen der Testheft-Datei: Invalides XML-Format."],
+    ["general", "Fehler beim Lesen der Testheft-Datei."]
   ];
   const monitorBookletErrorRouteOperations = new Set();
   let monitorBookletErrorPresentationActive = true;
@@ -23290,6 +23290,9 @@ try {
   for (const [, expectedCopy] of monitorBookletErrors) {
     await scopedOpenRuns.getByText(expectedCopy, { exact: true }).waitFor();
   }
+  assert.doesNotMatch(await scopedOpenRuns.innerText(),
+    /UI No Booklet Assigned|UI Missing Booklet File|UI Broken Booklet XML|UI Booklet Access Error/,
+    "Removed Original custom-text keys cannot replace fixed booklet diagnostics.");
   assert.equal(
     await scopedOpenRuns.getByRole("button", { name: "Add to Batch" }).count(),
     0,

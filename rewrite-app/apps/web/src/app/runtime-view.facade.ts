@@ -1,3 +1,4 @@
+import { originalMonitorBookletErrorText } from "./original-monitor-booklet-errors";
 import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
@@ -196,15 +197,6 @@ const monitorSuperStateSortOrder = [
   "connection_polling",
   "ok"
 ] as const;
-
-const monitorBookletErrorTextKeys: Readonly<
-  Record<NonNullable<OpenMonitorRun["bookletError"]>, MonitorCustomTextKey>
-> = {
-  "missing-id": "gm_booklet_error_missing_id",
-  "missing-file": "gm_booklet_error_missing_file",
-  xml: "gm_booklet_error_xml",
-  general: "gm_booklet_error_general"
-};
 
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
@@ -2671,9 +2663,7 @@ export class RuntimeViewFacade {
         const bookletStates = Object.entries(openRun.bookletStates).map(
           ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
         );
-        const bookletErrorText = openRun.bookletError
-          ? this.monitorText(monitorBookletErrorTextKeys[openRun.bookletError])
-          : null;
+        const bookletErrorText = originalMonitorBookletErrorText(openRun.bookletError);
         const monitorState = resolveOpenMonitorRunSuperState(openRun);
         const batchSelectable =
           !openRun.bookletError && monitorState !== "pending";

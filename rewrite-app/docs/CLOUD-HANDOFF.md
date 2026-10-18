@@ -1,5 +1,29 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current fixed monitor Booklet diagnostics (2026-10-19)
+
+Current Original `eedae418` / change `cc3fd9bc6` removes the four
+`gm_booklet_error_*` custom-text keys and renders fixed diagnostics for
+missing IDs/files, malformed XML and general Booklet access failures. The
+Rewrite still advertised 58 monitor keys and let stored legacy overrides
+replace those messages. Its catalog now exactly matches all 54 current
+`gm_*` keys and defaults; the four error states use the current fixed copy.
+Existing stored unknown overrides remain data but cannot alter these labels.
+
+The complete actual Original catalog JSON and monitor template are pinned with
+source hashes. Six source-reference checks pass, including every catalog key/
+default and all four template messages. Four compiled catalog tests and all
+1,144 frontend checks pass. A production Angular/SQLite browser witness with
+real operator login and persisted legacy overrides fails against the preceding
+built UI and passes all four corrected labels; only the four malformed monitor
+rows are controlled response fixtures derived from a real scoped Run. Broken
+rows remain unavailable for batch commands. This does not claim native
+corrupt-package acceptance or a complete live Original UI comparison.
+
+The production Initial total is 469.75 kB under the unchanged 470 kB error cap.
+These changes are local while the complete published `cb530787` CI runs.
+Full parity remains 30 complete / 19 partial; production acceptance stays open.
+
 ### Bounded browser-fixture credential capture (2026-10-19)
 
 The authenticated browser fixture's HTTP actor awaited all pending browser
