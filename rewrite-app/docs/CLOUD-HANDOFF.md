@@ -14,8 +14,12 @@ its pathname in the diagnostic. It does not issue a fallback request, expose
 query credentials or change production authentication. Late completion still
 learns the real issued credential for subsequent calls. All five focused tests
 and all 1,138 frontend checks pass with zero failures/skips/cancellations.
-Whether this caused the old live `ui-ops` stall is not established; complete
-new-head CI remains necessary.
+The preceding `ui-ops` job ultimately passes; the credential-starvation witness
+is an independent fixture defect, not a confirmed cause of a remote failure.
+The complete `3eb48b8a` workflow finishes with 37 successful jobs and one failed
+native-route fixture. No job was canceled: a cancellation request made during
+the final status transition was rejected because the workflow had completed.
+Complete new-head CI remains necessary.
 
 ### Native route smoke save ownership (2026-10-19)
 
@@ -55,8 +59,8 @@ Unit navigation and same-Run native checked-state restoration pass without
 operator-token leaks or page errors. The main browser suite executes these
 alongside the earlier 32 synthetic native-label cases. Audit other current-source
 schema/config drift next. Keep formal 30/19, physical acceptance, production
-boundaries and the presentation intact. Complete the existing `3eb48b8a` PR CI
-before publishing the corpus refresh and native-route test correction.
+boundaries and the presentation intact. The existing `3eb48b8a` PR CI is complete (37 successful jobs, one native-route
+fixture failure). Publish these local commits and require a fresh complete gate.
 
 ### Auxiliary entry routing and complete Angular native visibility (2026-10-19)
 

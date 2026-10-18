@@ -14,8 +14,12 @@ its pathname in the diagnostic. It does not issue a fallback request, expose
 query credentials or change production authentication. Late completion still
 learns the real issued credential for subsequent calls. All five focused tests
 and all 1,138 frontend checks pass with zero failures/skips/cancellations.
-Whether this caused the old live `ui-ops` stall is not established; complete
-new-head CI remains necessary.
+The preceding `ui-ops` job ultimately passes; the credential-starvation witness
+is an independent fixture defect, not a confirmed cause of a remote failure.
+The complete `3eb48b8a` workflow finishes with 37 successful jobs and one failed
+native-route fixture. No job was canceled: a cancellation request made during
+the final status transition was rejected because the workflow had completed.
+Complete new-head CI remains necessary.
 
 ### Native route smoke save ownership (2026-10-19)
 
@@ -66,8 +70,8 @@ No operator token enters the participant requests and no page errors occur.
 The complete browser gate now executes these cases alongside the earlier 32
 synthetic native-label cases. Other current-source schema/config drift, complete
 package acceptance and full production readiness remain open; formal parity
-stays 30 complete / 19 partial. The preceding `3eb48b8a` CI continues independently
-from this corpus refresh.
+stays 30 complete / 19 partial. The preceding `3eb48b8a` CI completes with 37/38 jobs successful; its failed
+native-route fixture is corrected separately. Full new-head CI remains open.
 
 ### Auxiliary deep links and full Angular camera visibility (2026-10-19)
 
