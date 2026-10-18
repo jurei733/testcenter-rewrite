@@ -39,11 +39,18 @@ header policies. The strict package uses Original workspace files without an
 invented IMS migration manifest; that additional manifest requires the separate
 compatibility profile and initially fails strict root validation as expected.
 
-This extends exact-source import/runtime coverage. The earlier 32 native label
-browser cases remain separate from execution of these five exact new Booklets.
-Other current-source schema/config drift, complete package acceptance and full
-production readiness remain open; formal parity stays 30 complete / 19 partial.
-The preceding `3eb48b8a` CI continues independently from this corpus refresh.
+All 20 production Angular/SQLite browser cases also pass: five exact new
+Booklets × both interfaces × 1280/390 px viewports. They use the real password
+roster and unchanged Player/buffer defaults, check full/short/fallback labels
+independently in header, toolbar and navigation, preserve full iframe metadata,
+enter a native radio answer, move through the repeated Unit alias, and restore
+the same Run, response data/types/clocks and checked control after reload.
+No operator token enters the participant requests and no page errors occur.
+The complete browser gate now executes these cases alongside the earlier 32
+synthetic native-label cases. Other current-source schema/config drift, complete
+package acceptance and full production readiness remain open; formal parity
+stays 30 complete / 19 partial. The preceding `3eb48b8a` CI continues independently
+from this corpus refresh.
 
 ### Auxiliary deep links and full Angular camera visibility (2026-10-19)
 

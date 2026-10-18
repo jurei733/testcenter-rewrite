@@ -19,6 +19,7 @@ import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
   assertResultGroupRemoved, assertResultGroupRetained } from "./group-result-deletion-check.mjs";
 import { withChromiumIbRuntime } from "./chromium-ib-runtime.mjs";
 import { runParticipantUnitLabelSmoke } from "./participant-unit-label-smoke.mjs";
+import { runCurrentOriginalBookletConfigSmoke } from "./current-original-booklet-config-smoke.mjs";
 import { setWorkspaceAutoRefreshEnabled } from "./workspace-auto-refresh-smoke.mjs";
 import { createAttachmentQrCameraVideo } from "./attachment-camera-fixture.mjs";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
@@ -20158,6 +20159,10 @@ try {
     sendJson: sendSmokeJson, createZip: createStoredZipBuffer,
     unitDocument: testControllerUnitDocuments.find(document => document.unitKey === "CY-Unit.Sample-101").content,
     playerDocument: testControllerPlayerDocument, operatorToken: smokeAdminSessionToken
+  });
+  await runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
+    tenantKey: `${tenantKey}-current-booklet-config`, workspaceKey: `${workspaceKey}-current-booklet-config`,
+    sendJson: sendSmokeJson, createZip: createStoredZipBuffer, operatorToken: smokeAdminSessionToken
   });
   stopAfter("participant-current-unit-labels");
 

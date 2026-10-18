@@ -31,10 +31,15 @@ Memory/File/SQLite, staging every Booklet without diagnostics and exercising
 24 real participant sign-ins/resumes. A generated IMS migration manifest is
 deliberately absent from this Original workspace package; its earlier strict
 root rejection is retained rather than bypassed through compatibility mode.
-Exact new-Booklet Angular execution remains separate from earlier 32 native
-label cases. Audit other current-source schema/config drift next. Keep formal
-30/19, physical acceptance, production boundaries and the presentation intact.
-Complete the existing `3eb48b8a` PR CI before publishing the corpus refresh.
+The five exact new Booklets now pass 20 production Angular/SQLite browser
+cases across both interfaces and desktop/mobile. Real password login, full/
+short/fallback labels, original buffer defaults, trusted radio input, repeated
+Unit navigation and same-Run native checked-state restoration pass without
+operator-token leaks or page errors. The main browser suite executes these
+alongside the earlier 32 synthetic native-label cases. Audit other current-source
+schema/config drift next. Keep formal 30/19, physical acceptance, production
+boundaries and the presentation intact. Complete the existing `3eb48b8a` PR CI
+before publishing the corpus refresh and native-route test correction.
 
 ### Auxiliary entry routing and complete Angular native visibility (2026-10-19)
 
