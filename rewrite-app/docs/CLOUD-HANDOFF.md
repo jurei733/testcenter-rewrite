@@ -1,5 +1,25 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: strict declared UTF-7 XML (2026-10-19)
+
+The prior runtime rejects a valid declared UTF-7 Booklet. PHP 8.3.35/libxml
+2.9.14 in isolated official Debian Bookworm accepts the exact `Ä + 日本` label
+and the current Booklet XSD; cached Alpine PHP rejects the encoding entirely.
+These are runtime/schema witnesses rather than complete Original app runs.
+The new XML-only decoder accepts four confirmed aliases, validates shift bits,
+UTF-16 and direct characters, and preserves authored U+FFFD. MIME-only charset,
+embedded declarations in JSON, transport codecs, BOM mismatch and decoded
+DOCTYPE cannot bypass existing boundaries. Bare `+`/`+!` remain explicit
+RFC-invalid rejections despite Debian libxml dropping their shift marker.
+
+1,617 backend checks pass; the unchanged frontend from the locally qualified
+camera revision has 1,117 passing tests. 205 focused four-store checks include
+owned PostgreSQL 16, strict XSD and durable reopen. Six HTTP corpus/mixed-ZIP
+cases pass across Memory/File/SQLite, preserving valid UTF-7 siblings while
+quarantining the invalid Unit and dependent files. The owned PostgreSQL
+container has been stopped and removed. Keep whole-head CI qualification
+separate and retain formal 30 complete / 19 partial plus production boundaries.
+
 ### Current correction: camera confirmation and next-page reset (2026-10-18)
 
 Capture confirmation now replaces the camera/QR controls with its photo;

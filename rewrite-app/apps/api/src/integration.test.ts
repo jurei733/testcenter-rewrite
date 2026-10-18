@@ -56,6 +56,12 @@ const readBrotliBase64Fixture = (fixturePath: string): string =>
     Buffer.from(readFileSync(fixturePath, "utf8"), "base64")
   ).toString("utf8");
 
+const encodeUtf7XmlFixture = (xml: string): Buffer => {
+  if (!xml.startsWith("<?xml")) xml = '<?xml version="1.0" encoding="UTF-7"?>' + xml;
+  const end = xml.indexOf("?>") + 2;
+  return Buffer.concat([Buffer.from(xml.slice(0, end), "ascii"), iconv.encode(xml.slice(end), "utf7")]);
+};
+
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const solveProofOfWork = (
@@ -16990,6 +16996,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
         .replace("<Label>Sample booklet</Label>", "<Label>Authored � retained</Label>"), encoding),
       displayLabel: "Authored � retained"
     })),
+    ...["UTF-7", "UTF7", "UTF_7", "unicode-1-1-utf-7"].map(encoding => {
+      const xml = validBookletXml.replace(/encoding=["']utf-8["']/i, `encoding="${encoding}"`)
+        .replace("<Label>Sample booklet</Label>", "<Label>Ä + 日本 😀 �</Label>");
+      return { fileName: `utf7-${encoding}-original-booklet.xml`,
+        bytes: encodeUtf7XmlFixture(xml),
+        displayLabel: "Ä + 日本 😀 �" };
+    }),
     ...registeredLatinEncodingBooklets,
     {
       fileName: "cp850-original-booklet.xml",
@@ -17148,10 +17161,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     /encoding=["']utf-8["']/i,
     'encoding="base64"'
   );
-  const unsafeUtf7EncodingXml = validBookletXml.replace(
+  const invalidUtf7EncodingXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-7"'
-  );
+  ).replace("<Label>Sample booklet</Label>", "<Label>+AOQ/-</Label>");
   const ibm037EncodingMismatchXml = validBookletXml.replace(
     /encoding=["']utf-8["']/i,
     'encoding="UTF-8"'
@@ -17274,10 +17287,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     {
       fileName: "utf-7-encoding-original-booklet.xml",
       sourceDocument: `data:application/xml;base64,${Buffer.from(
-        unsafeUtf7EncodingXml,
+        invalidUtf7EncodingXml,
         "utf8"
       ).toString("base64")}`,
-      diagnosticCode: "source_document_xml_encoding_unsupported"
+      diagnosticCode: "source_document_xml_encoding_invalid_bytes"
     },
     {
       fileName: "ibm037-declared-utf-8-original-booklet.xml",
@@ -33093,97 +33106,103 @@ test("original Testcenter compatibility corpus isolates invalid ZIP members and 
       "utf8"
     )
   ]);
-  const invalidBytesResult = await importArchive(
-    "integration-workspace-partial-zip-invalid-bytes",
-    "invalid-byte-sibling-graph.zip",
-    [
-      {
-        fileName: "invalid_bytes_testtakers.xml",
-        content: validRoster(
-          "BOOKLET.PARTIAL-INVALID-BYTES",
-          "group-partial-invalid-bytes",
-          "login-partial-invalid-bytes"
-        )
-      },
-      {
-        fileName: "invalid_bytes_booklet.xml",
-        content: validBooklet(
-          "BOOKLET.PARTIAL-INVALID-BYTES",
-          "UNIT.PARTIAL-INVALID-BYTES",
-          "Invalid Byte Graph"
-        )
-      },
-      { fileName: "invalid_bytes_unit.xml", content: invalidUtf8UnitBytes },
-      {
-        fileName: "valid_sibling_testtakers.xml",
-        content: validRoster(
-          "BOOKLET.PARTIAL-VALID-BYTES",
-          "group-partial-valid-bytes",
-          "login-partial-valid-bytes"
-        )
-      },
-      {
-        fileName: "valid_sibling_booklet.xml",
-        content: validBooklet(
-          "BOOKLET.PARTIAL-VALID-BYTES",
-          "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling �"
-        )
-      },
-      {
-        fileName: "valid_sibling_unit.xml",
-        content: validUnit(
-          "UNIT.PARTIAL-VALID-BYTES",
-          "Valid Byte Sibling Unit �"
-        )
-      }
-    ]
-  );
-  assert.equal(invalidBytesResult.status, 201);
-  assert.equal(invalidBytesResult.body.importJob.status, "completed");
-  assert.deepEqual(
-    invalidBytesResult.body.importJob.diagnostics.map(diagnostic => [
-      diagnostic.severity,
-      diagnostic.code
-    ]),
-    [
-      ["warning", "source_document_xml_encoding_invalid_bytes"],
-      ["warning", "source_document_booklet_unit_missing"],
-      ["warning", "source_document_testtakers_booklet_missing"]
-    ]
-  );
-  assert.deepEqual(
-    invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
-      booklet => ({
-        bookletKey: booklet.bookletKey,
-        unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
-      })
-    ),
-    [
-      {
-        bookletKey: "BOOKLET.PARTIAL-VALID-BYTES",
-        unitKeys: ["UNIT.PARTIAL-VALID-BYTES"]
-      }
-    ]
-  );
-  assert.deepEqual(invalidBytesResult.body.participantRosterImport, {
-    importedCount: 1,
-    updatedCount: 0,
-    sourceFileNames: ["valid_sibling_testtakers.xml"],
-    operationalLoginCandidateCount: 0
-  });
-  assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.displayLabel, "Valid Byte Sibling �");
-  assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitDefinition, "Valid Byte Sibling Unit � content");
-  assert.deepEqual(
-    await acceptedPathsFor(
-      "integration-workspace-partial-zip-invalid-bytes"
-    ),
-    [
-      "valid_sibling_testtakers.xml",
-      "valid_sibling_booklet.xml",
-      "valid_sibling_unit.xml"
-    ]
-  );
+  for (const encoding of ["utf8", "utf7"] as const) {
+    const workspace = "integration-workspace-partial-zip-invalid-bytes-" + encoding;
+    const encodeSibling = (xml: string): string | Buffer => encoding === "utf7" ? encodeUtf7XmlFixture(xml) : xml;
+    const invalidBytesResult = await importArchive(
+      workspace,
+      "invalid-byte-sibling-graph.zip",
+      [
+        {
+          fileName: "invalid_bytes_testtakers.xml",
+          content: validRoster(
+            "BOOKLET.PARTIAL-INVALID-BYTES",
+            "group-partial-invalid-bytes-" + encoding,
+            "login-partial-invalid-bytes-" + encoding
+          )
+        },
+        {
+          fileName: "invalid_bytes_booklet.xml",
+          content: validBooklet(
+            "BOOKLET.PARTIAL-INVALID-BYTES",
+            "UNIT.PARTIAL-INVALID-BYTES",
+            "Invalid Byte Graph"
+          )
+        },
+        { fileName: "invalid_bytes_unit.xml", content: encoding === "utf7"
+          ? Buffer.from('<?xml version="1.0" encoding="UTF-7"?>' + validUnit("UNIT.PARTIAL-INVALID-BYTES", "+AOQ/-"), "ascii")
+          : invalidUtf8UnitBytes },
+        {
+          fileName: "valid_sibling_testtakers.xml",
+          content: encodeSibling(validRoster(
+            "BOOKLET.PARTIAL-VALID-BYTES",
+            "group-partial-valid-bytes-" + encoding,
+            "login-partial-valid-bytes-" + encoding
+          ))
+        },
+        {
+          fileName: "valid_sibling_booklet.xml",
+          content: encodeSibling(validBooklet(
+            "BOOKLET.PARTIAL-VALID-BYTES",
+            "UNIT.PARTIAL-VALID-BYTES",
+            "Valid Byte Sibling �"
+          ))
+        },
+        {
+          fileName: "valid_sibling_unit.xml",
+          content: encodeSibling(validUnit(
+            "UNIT.PARTIAL-VALID-BYTES",
+            "Valid Byte Sibling Unit �"
+          ))
+        }
+      ]
+    );
+    assert.equal(invalidBytesResult.status, 201);
+    assert.equal(invalidBytesResult.body.importJob.status, "completed");
+    assert.deepEqual(
+      invalidBytesResult.body.importJob.diagnostics.map(diagnostic => [
+        diagnostic.severity,
+        diagnostic.code
+      ]),
+      [
+        ["warning", "source_document_xml_encoding_invalid_bytes"],
+        ["warning", "source_document_booklet_unit_missing"],
+        ["warning", "source_document_testtakers_booklet_missing"]
+      ]
+    );
+    assert.deepEqual(
+      invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.map(
+        booklet => ({
+          bookletKey: booklet.bookletKey,
+          unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
+        })
+      ),
+      [
+        {
+          bookletKey: "BOOKLET.PARTIAL-VALID-BYTES",
+          unitKeys: ["UNIT.PARTIAL-VALID-BYTES"]
+        }
+      ]
+    );
+    assert.deepEqual(invalidBytesResult.body.participantRosterImport, {
+      importedCount: 1,
+      updatedCount: 0,
+      sourceFileNames: ["valid_sibling_testtakers.xml"],
+      operationalLoginCandidateCount: 0
+    });
+    assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.displayLabel, "Valid Byte Sibling �");
+    assert.equal(invalidBytesResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitDefinition, "Valid Byte Sibling Unit � content");
+    assert.deepEqual(
+      await acceptedPathsFor(
+        workspace
+      ),
+      [
+        "valid_sibling_testtakers.xml",
+        "valid_sibling_booklet.xml",
+        "valid_sibling_unit.xml"
+      ]
+    );
+  }
 });
 
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {

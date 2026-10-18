@@ -28,6 +28,7 @@ import { TextDecoder } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
 import iconv from "iconv-lite";
+import { decodeUtf7XmlBytes, isUtf7XmlEncoding } from "./xml-utf7.js";
 import type { ParticipantAssignmentRunInitializer } from "./participant-assignment-runs.js";
 export { selectParticipantAssignmentRun, prepareParticipantAssignmentRunCreation } from "./participant-assignment-runs.js";
 export type { ParticipantAssignmentRunInitializer, ParticipantAssignmentRunCreationEffect } from "./participant-assignment-runs.js";
@@ -2744,8 +2745,9 @@ const IBM1141_ENCODING_NAMES = [
 // Node's WHATWG TextDecoder intentionally supports only the browser encoding
 // set. Original Testcenter XML is decoded by libxml/iconv and can therefore use
 // registered legacy encodings outside that set. Keep this fallback explicitly
-// allowlisted so iconv-lite's transport codecs (for example base64, hex, and
-// UTF-7) cannot become XML declaration encodings by accident.
+// allowlisted so iconv-lite's transport codecs (for example base64 and hex)
+// cannot become XML declaration encodings by accident. UTF-7 has a separate
+// strict XML-only decoder rather than iconv-lite's permissive transport path.
 const ICONV_XML_ENCODING_NAMES = new Map<string, string>([
   ["iso-8859-10", "iso-8859-10"],
   ["iso-ir-157", "iso-8859-10"],
@@ -2838,6 +2840,10 @@ const decodeSourceTextBytesWithDeclaredEncoding = (
   declaredEncoding: string
 ): string | null => {
   const normalizedEncoding = normalizeSourceTextEncodingName(declaredEncoding);
+  if (isUtf7XmlEncoding(normalizedEncoding)) {
+    const decoded = decodeUtf7XmlBytes(bytes);
+    return decoded === null ? null : stripTextByteOrderMark(decoded);
+  }
   if (
     ["iso-8859-1", "iso8859-1", "latin1", "latin-1"].includes(
       normalizedEncoding
@@ -2957,10 +2963,13 @@ const decodeSourceTextBytes = (bytes: Buffer, mediaType?: string): string => {
     }
   }
 
-  const declaredEncoding =
-    readDeclaredXmlEncoding(bytes.subarray(0, 1024).toString("latin1")) ??
+  const declarationProbe = bytes.subarray(0, 1024).toString("latin1");
+  const declaredXmlEncoding = readDeclaredXmlEncoding(declarationProbe);
+  const declaredEncoding = declaredXmlEncoding ??
     mediaType?.match(/;\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
-  if (declaredEncoding) {
+  if (declaredEncoding &&
+      (!isUtf7XmlEncoding(normalizeSourceTextEncodingName(declaredEncoding)) ||
+       (declaredXmlEncoding && /^\s*<\?xml\b/i.test(declarationProbe)))) {
     const decodedSourceDocument = decodeSourceTextBytesWithDeclaredEncoding(
       bytes,
       declaredEncoding
@@ -8666,6 +8675,9 @@ const hasValidXmlByteSequence = (
   if (isSupportedEbcdicEncodingName(effectiveEncoding)) {
     return true;
   }
+  if (isUtf7XmlEncoding(effectiveEncoding)) {
+    return decodeUtf7XmlBytes(encodedBytes) !== null;
+  }
   if (ICONV_XML_ENCODING_NAMES.has(effectiveEncoding)) {
     // These single-byte pages cannot encode an authored U+FFFD. Some have
     // undefined bytes that iconv substitutes with it; reject before parsing.
@@ -8704,7 +8716,10 @@ const validateXmlEncoding = (
         ];
   }
 
-  if (!isSupportedSourceTextEncoding(declaredEncoding)) {
+  if (!isSupportedSourceTextEncoding(declaredEncoding) ||
+      (isUtf7XmlEncoding(normalizeSourceTextEncodingName(declaredEncoding)) &&
+       (!readDeclaredXmlEncoding(decodedSourceDocument) ||
+        !/^\s*<\?xml\b/i.test(decodedSourceDocument)))) {
     return [
       createImportDiagnostic(
         "source_document_xml_encoding_unsupported",

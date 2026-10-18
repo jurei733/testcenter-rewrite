@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Declared UTF-7 XML without transport-codec expansion (2026-10-19)
+
+The previous runtime rejects a valid UTF-7 Booklet with
+`source_document_xml_encoding_unsupported`. An isolated official PHP 8.3
+Debian Bookworm runtime, matching the Original Dockerfile's PHP/distribution
+family, reads its exact `Ä + 日本` label through SimpleXML and validates the
+Booklet against the current Original-19 profile's 18.0 XSD. This is a native
+runtime/schema witness, not execution of the complete Original application.
+The cached Alpine PHP runtime does not support this encoding, so host-native
+XML acceptance alone is not used as the deployment compatibility oracle.
+
+A separate strict decoder now accepts `UTF-7`, `UTF7`, `UTF_7` and
+`unicode-1-1-utf-7` in a readable leading XML declaration. It validates direct
+bytes, complete UTF-16BE units, zero padding and surrogate pairs before import.
+Implicit shift termination and shifted ASCII remain valid, and authored U+FFFD
+is retained. Corrupt bytes, incomplete shifts and undefined Unicode fail
+without publishing. Bare `+`/`+!` remain rejected under the
+[RFC 2152](https://www.rfc-editor.org/rfc/rfc2152.html) grammar even though the
+Debian library silently discards their shift marker. This deliberate boundary
+avoids reproducing silent source-data loss. UTF-7 is absent from the generic
+single-byte fallback: a MIME-only charset or an embedded XML declaration in
+JSON cannot activate this decoder. BOM/declaration mismatch and decoded
+DOCTYPE rejection remain enforced.
+
+All 1,617 backend checks pass (114 lifecycle/API, 274 compiled core, 1,229
+application/API groups); the existing exact camera frontend revision separately
+passes 1,117 frontend tests. The focused four-store set passes 205 codec/import
+checks including PostgreSQL 16, native strict XSD validation and durable reopen.
+Six real HTTP corpus/ZIP cases pass across Memory, File and SQLite. They retain
+the four UTF-7 alias labels and isolate a corrupt Unit and its dependent graph
+from a valid UTF-7 sibling package. Whole-head CI remains a separate gate.
+Text-encoding parity remains partial because other registered encodings and
+production package variants still lack representative acceptance evidence.
+
 ### Capture confirmation and continuous-page lifecycle (2026-10-18)
 
 The current Original stops the camera before confirmation, presents the
@@ -7099,7 +7133,7 @@ Latest P0 legacy-encoding closure: declaration-driven XML decoding no longer
 stops at Node's browser-oriented WHATWG set. A production `iconv-lite`
 fallback now accepts the valid IANA `ISO-8859-16`/Latin-10 and DOS `CP850`
 aliases used by older source systems, while an explicit allowlist prevents
-iconv transport codecs such as base64, hex, CESU-8, or UTF-7 from becoming XML
+iconv transport codecs such as base64, hex or CESU-8 from becoming XML
 declaration encodings. The representative Booklets retain Romanian, German,
 Euro, and umlaut labels through the complete import/release projection in
 memory, file, and SQLite. Other IANA encodings outside the WHATWG and explicit
