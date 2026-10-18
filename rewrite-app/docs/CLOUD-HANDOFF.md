@@ -1,5 +1,22 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Bounded browser-fixture credential capture (2026-10-19)
+
+The authenticated browser fixture's HTTP actor awaited all pending browser
+JSON captures repeatedly until none remained. A regression witness shows that
+an unrelated response arriving after an API call started can extend that call's
+credential barrier. A continuous stream can therefore starve fixture API work.
+The new test fails on the preceding helper and passes with a snapshot of the
+captures already in flight when the call starts.
+
+A body that does not finish now fails the fixture after 30 seconds with only
+its pathname in the diagnostic. It does not issue a fallback request, expose
+query credentials or change production authentication. Late completion still
+learns the real issued credential for subsequent calls. All five focused tests
+and all 1,138 frontend checks pass with zero failures/skips/cancellations.
+Whether this caused the old live `ui-ops` stall is not established; complete
+new-head CI remains necessary.
+
 ### Native route smoke save ownership (2026-10-19)
 
 PR CI `39170753534` at `3eb48b8a` fails in the native-route browser fixture:
