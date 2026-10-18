@@ -17,6 +17,7 @@ import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 import { AttachmentManagerService } from "./attachment-manager.service";
 import { AttachmentCameraScanner } from "./attachment-camera-scanner";
 import { AttachmentQrDecoder } from "./attachment-qr-decoder";
+import { attachmentCameraMirrored, attachmentPageGeometry } from "./attachment-page-geometry";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
@@ -38,12 +39,12 @@ type AttachmentScope = {
     .status-pill { display: inline-block; padding: .4rem .7rem; vertical-align: middle; }
     .capture-intro { max-width: 70ch; color: var(--muted); }
     .capture-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); gap: 1rem; }
-    .camera-shell { position: relative; min-height: 24rem; display: grid; place-items: center; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
-    .camera-shell video { display: block; width: 100%; max-height: 70vh; object-fit: contain; transition: opacity .15s ease; }
+    .camera-shell { position: relative; width: min(100%, calc(70vh * 210 / 297)); aspect-ratio: 210 / 297; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
+    .camera-shell video { position: absolute; top: 0; left: 0; display: block; max-width: none; transition: opacity .15s ease; }
     .camera-shell:not(.is-active) video { opacity: 0; }
     .camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; }
     .camera-shell.is-active .camera-placeholder { display: none; }
-    .scan-frame { position: absolute; inset: 12% 16%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 1rem; box-shadow: 0 0 0 999px rgba(0, 0, 0, .22); pointer-events: none; }
+    .scan-frame { position: absolute; left: calc(18 / 210 * 100%); top: calc(18 / 297 * 100%); width: calc(44 / 210 * 100%); height: calc(44 / 297 * 100%); border: 3px solid rgba(255, 255, 255, .9); box-sizing: border-box; border-radius: 3px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .22); pointer-events: none; }
     .capture-controls { display: grid; gap: .9rem; align-content: start; }
     .capture-panel { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: rgba(255, 255, 255, .62); }
     .capture-panel h2, .capture-panel h3 { margin-top: 0; }
@@ -56,7 +57,6 @@ type AttachmentScope = {
     input[type="file"] { width: 100%; }
     @media (max-width: 820px) {
       .capture-grid { grid-template-columns: 1fr; }
-      .camera-shell { min-height: 18rem; }
     }
   `],
   template: `
@@ -91,11 +91,14 @@ type AttachmentScope = {
         <div class="capture-grid">
           <section>
             <div class="camera-shell" [class.is-active]="cameraActive">
-              <video #cameraVideo id="attachmentCaptureVideo" playsinline muted></video>
+              <video #cameraVideo id="attachmentCaptureVideo" playsinline muted
+                [style.width.%]="cameraGeometry?.videoWidthPercent || 100"
+                [style.height.%]="cameraGeometry?.videoHeightPercent || 100"
+                (loadedmetadata)="onCameraMetadataLoaded()"></video>
               <div class="camera-placeholder">
                 <p>{{ cameraMessage || 'Start the rear camera or use the QR-image and manual-code fallbacks.' }}</p>
               </div>
-              <div class="scan-frame" *ngIf="cameraActive" aria-hidden="true"></div>
+              <div class="scan-frame" *ngIf="cameraActive" [style.left.%]="cameraGeometry?.scanLeftPercent" aria-hidden="true"></div>
             </div>
             <canvas #captureCanvas hidden></canvas>
             <div class="actions">
@@ -212,6 +215,16 @@ export class AttachmentCaptureComponent
   busy = false;
   status = "Scan a QR code or enter an attachment code to begin.";
   statusIsError = false;
+
+  get cameraGeometry(): ReturnType<typeof attachmentPageGeometry> {
+    const video = this.cameraVideo?.nativeElement;
+    return video ? attachmentPageGeometry(video.videoWidth, video.videoHeight,
+      attachmentCameraMirrored(video.srcObject as MediaStream | null)) : null;
+  }
+
+  onCameraMetadataLoaded(): void {
+    this.refreshView();
+  }
 
   get selectedCameraIsListed(): boolean {
     return this.cameras.some(camera => camera.id === this.selectedCameraId);
@@ -425,15 +438,9 @@ export class AttachmentCaptureComponent
     const code = this.attachmentCode;
     const canvas = this.captureCanvas.nativeElement;
     const stream = video.srcObject;
-    const pageRatio = 210 / 297;
-    let sourceWidth = video.videoWidth;
-    let sourceHeight = sourceWidth / pageRatio;
-    if (sourceHeight > video.videoHeight) {
-      sourceHeight = video.videoHeight;
-      sourceWidth = sourceHeight * pageRatio;
-    }
-    const sourceX = Math.max(0, (video.videoWidth - sourceWidth) / 2);
-    const sourceY = Math.max(0, (video.videoHeight - sourceHeight) / 2);
+    const geometry = this.cameraGeometry;
+    if (!geometry) return null;
+    const { x: sourceX, y: sourceY, width: sourceWidth, height: sourceHeight } = geometry.page;
     const outputScale = Math.min(1, 1_600 / sourceHeight);
     canvas.width = Math.max(1, Math.round(sourceWidth * outputScale));
     canvas.height = Math.max(1, Math.round(sourceHeight * outputScale));

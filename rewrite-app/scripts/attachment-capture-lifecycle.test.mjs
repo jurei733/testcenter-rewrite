@@ -11,11 +11,14 @@ const declaration = ast.statements.find(node => ts.isClassDeclaration(node)
   && node.name?.text === "AttachmentCaptureComponent");
 const members = declaration.members.filter(node => ts.isMethodDeclaration(node)
   || ts.isGetAccessor(node)).map(node => node.getText(ast)).join("\n");
+const geometrySource = ts.transpileModule(readFileSync(new URL("../apps/web/src/app/attachment-page-geometry.ts", import.meta.url), "utf8"), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText;
 const { outputText } = ts.transpileModule(`export const create = (AttachmentQrDecoder, QrScanner) => class Host {
   captureVersion = 0; targetVersion = 0; operationVersion = 0;
   ${members}
 }`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
-const { create } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+const { create } = await import(`data:text/javascript;base64,${Buffer.from(geometrySource.replace(/export /g, "") + outputText).toString("base64")}`);
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -31,8 +34,9 @@ const fixture = () => {
   }, { NO_QR_CODE_FOUND: "No QR code found" });
   const component = new Host();
   const callbacks = [], uploads = [], lookups = [], lookup = deferred(), upload = deferred();
-  const video = { videoWidth: 640, videoHeight: 480, srcObject: {} };
-  const canvas = { getContext: () => ({ drawImage() {} }), toBlob(callback) { callbacks.push(callback); } };
+  const video = { videoWidth: 640, videoHeight: 480, srcObject: { getVideoTracks: () => [] } };
+  const drawCalls = [];
+  const canvas = { getContext: () => ({ drawImage(...args) { drawCalls.push(args); } }), toBlob(callback) { callbacks.push(callback); } };
   Object.assign(component, {
     uiState: { ops: { adminSessionToken: "own-token" }, workspace: { tenantKey: "own-tenant", workspaceKey: "own-workspace" } },
     operatorAccess: { isReadOnlyAdmin: false, isSystemCheckOnly: false },
@@ -47,11 +51,25 @@ const fixture = () => {
       describeError: error => error.message
     }
   });
-  return { component, video, callbacks, uploads, lookups, lookup, upload, qr, disposed };
+  return { component, video, canvas, drawCalls, callbacks, uploads, lookups, lookup, upload, qr, disposed };
 };
 const finish = async (f, pending, value = image("own-photo")) => {
   f.callbacks.at(-1)(value); await pending;
 };
+
+for (const front of [false, true]) test(`the actual capture draws the ${front ? "front" : "rear"} camera's framed A4 page with positive image dimensions`, async () => {
+  const f = fixture();
+  f.video.videoWidth = 1000; f.video.videoHeight = 500;
+  f.video.srcObject = { getVideoTracks: () => [{ label: front ? "front camera" : "rear camera", getSettings: () => ({}) }] };
+  await finish(f, f.component.captureCurrentFrame());
+  const [video, x, y, width, height, outX, outY, outWidth, outHeight] = f.drawCalls[0];
+  assert.equal(video, f.video); assert.equal(y, 0); assert.equal(height, 500);
+  assert.ok(Math.abs(width - 500 * 210 / 297) < 1e-8);
+  assert.ok(Math.abs(x - (front ? 1000 - width : 0)) < 1e-8);
+  assert.equal(outX, 0); assert.equal(outY, 0);
+  assert.equal(outWidth, Math.round(width)); assert.equal(outHeight, 500);
+  assert.ok(f.component.captureBlob); f.component.clearCapture();
+});
 
 for (const change of ["reset", "retake", "replacement photo", "target", "operator", "workspace", "tenant", "destroy", "camera"]) {
   test(`late camera encoding cannot replace the capture after ${change}`, async () => {

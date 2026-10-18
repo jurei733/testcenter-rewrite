@@ -25694,7 +25694,9 @@ try {
   )?.trim();
   assert.match(selectedAttachmentCode ?? "", /^att-/);
   if (attachmentQrCameraFile) {
-    await writeFile(resolve(attachmentQrCameraFile), createAttachmentQrCameraVideo(selectedAttachmentCode), { flag: "wx" });
+    await writeFile(resolve(attachmentQrCameraFile), createAttachmentQrCameraVideo(selectedAttachmentCode, {
+      position: process.env.UI_SMOKE_ATTACHMENT_CAMERA_FACING === "front" ? "printed-front" : "printed"
+    }), { flag: "wx" });
   }
   await fillAndCommit(
     "#attachmentLabelTemplate",

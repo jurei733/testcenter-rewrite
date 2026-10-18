@@ -1,5 +1,29 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: printed camera page and QR region (2026-10-18)
+
+`7178a463` is fully green in both GitHub workflows (38 jobs each): 2,629
+unit/frontend, 1,732 PostgreSQL-16, full SQLite/PostgreSQL browser and monitor
+review. A separate local full attempt fails at step 309 with SQLite code 14
+during low disk; a later read-only database quick check passes. Do not turn
+that failed local run into a pass or infer the exact cause solely from code 14.
+Closed owned test databases were removed with open-file checks; logs, reference
+database, current database and protected presentation are retained.
+
+The next correction unifies A4 preview/capture and the Original's padded printed
+QR region, including front-camera preview mirroring. Captures use positive
+dimensions and readable pixels; the Original negative-width draw method's
+reversed/transparent results are recorded separately instead of reproduced.
+Live workers cannot select a QR outside the page region, while saved-image
+fallback remains. All 107 focused and 1,117 frontend tests pass, and native
+Chromium gates both facing cases, QR decoding from the actual encoded photo,
+outside-region rejection and 1280/390 px geometry. Built Angular rear and front
+flows pass 60 steps each. Build stays 469.99 kB. Image/manual flow also passes 61 steps, including error/inversion recovery and
+late-encoding isolation. Qualify new-head complete CI separately; CI now also
+runs the full front flow.
+Physical hidden-window acceptance, complete capture layout and overall formal
+parity/production remain open. Preserve the source/proof revision boundaries.
+
 ### Current correction: parser completion versus body consumption (2026-10-18)
 
 `d333c94b` PR and push each finish 37/38 green. PR passes full SQLite browser,

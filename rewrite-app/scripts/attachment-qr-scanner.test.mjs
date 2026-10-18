@@ -10,9 +10,12 @@ const productionSource = name => ts.transpileModule(readFileSync(new URL(
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText.replaceAll('"qr-scanner"', JSON.stringify(import.meta.resolve("qr-scanner")));
 const decoderModule = dataModule(productionSource("attachment-qr-decoder"));
+const geometryModule = dataModule(productionSource("attachment-page-geometry"));
+const { attachmentPageGeometry, attachmentCameraMirrored } = await import(geometryModule);
 const { AttachmentQrDecoder, createAttachmentQrWorker } = await import(decoderModule);
 const { AttachmentCameraScanner } = await import(dataModule(productionSource("attachment-camera-scanner")
-  .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule))));
+  .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule))
+  .replace('"./attachment-page-geometry"', JSON.stringify(geometryModule))));
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -54,6 +57,45 @@ test("actual decoder supplies one owned worker through the public SDK option and
   await Promise.resolve();
   assert.deepEqual(calls, ["create", "scan", "scan", "terminate"]);
   await assert.rejects(decoder.decode(image), abort);
+});
+
+test("camera QR decoding stays within the printed region while a saved QR image retains full-image lookup", async () => {
+  const options = [], region = { x: 18, y: 18, width: 44, height: 44 };
+  const decoder = new AttachmentQrDecoder({ async createWorker() { return { terminate() {} }; },
+    async scanImage(_image, input) { options.push(input); throw QrScanner.NO_QR_CODE_FOUND; }
+  });
+  await assert.rejects(decoder.decode(new Blob(), region), error => error === QrScanner.NO_QR_CODE_FOUND);
+  await assert.rejects(decoder.decode(new Blob()), error => error === QrScanner.NO_QR_CODE_FOUND);
+  assert.deepEqual(options.map(({ scanRegion, alsoTryWithoutScanRegion }) => ({ scanRegion, alsoTryWithoutScanRegion })),
+    [{ scanRegion: region, alsoTryWithoutScanRegion: false }, { scanRegion: undefined, alsoTryWithoutScanRegion: true }]);
+  decoder.dispose();
+});
+
+for (const [width, height] of [[1000, 500], [640, 480], [480, 720], [1, 1]]) {
+  test(`the real page geometry keeps the A4 frame and 20/20/40 mm QR allowance aligned at ${width}x${height}`, () => {
+    const rear = attachmentPageGeometry(width, height), front = attachmentPageGeometry(width, height, true);
+    const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
+    near(rear.page.width / rear.page.height, 210 / 297);
+    assert.equal(rear.page.x, 0); assert.equal(rear.page.y, 0);
+    assert.ok(rear.page.width <= width && rear.page.height <= height);
+    near(front.page.x + front.page.width, width);
+    near(rear.scanRegion.x / rear.page.width, 18 / 210);
+    near(rear.scanRegion.y / rear.page.height, 18 / 297);
+    near(rear.scanRegion.width / rear.page.width, 44 / 210);
+    near(rear.scanRegion.height / rear.page.height, 44 / 297);
+    near(front.scanRegion.x, front.page.x + rear.scanRegion.x);
+    near(front.scanLeftPercent / 100, (210 - 18 - 44) / 210);
+    near(rear.videoWidthPercent / 100 * rear.page.width, width);
+    near(rear.videoHeightPercent / 100 * rear.page.height, height);
+  });
+}
+
+test("invalid camera dimensions do not create a region, and facing detection uses the actual stream", () => {
+  for (const dimensions of [[0, 480], [640, 0], [-1, 480], [Infinity, 480], [640, NaN]])
+    assert.equal(attachmentPageGeometry(...dimensions), null);
+  assert.equal(attachmentCameraMirrored(null), false);
+  for (const [settings, label, expected] of [[{ facingMode: "user" }, "camera", true], [{}, "Front camera", true], [{ facingMode: "environment" }, "rear camera", false]])
+    assert.equal(attachmentCameraMirrored({ getVideoTracks: () => [{ getSettings: () => settings, label }] }), expected);
 });
 
 test("actual decoder serializes pending requests instead of overlapping worker work", async () => {
@@ -139,8 +181,8 @@ const cameraFixture = ({ media, play, decode, onDecode, visibility, settings = {
   }, error => errors.push(error), "environment", {
     async getUserMedia(value) { constraints.push(value); return media ? media(value) : stream; },
     createDecoder() { events.push("decoder-create"); return {
-      async decode(received) { assert.equal(received, video); events.push("decode");
-        return decode ? decode() : { data: "att-camera", cornerPoints: [] }; },
+      async decode(received, region) { assert.equal(received, video); events.push("decode");
+        return decode ? decode(region) : { data: "att-camera", cornerPoints: [] }; },
       dispose() { events.push("decoder-dispose"); }
     }; },
     schedule(callback, milliseconds) { const key = ++handle; timers.set(key, callback); events.push(["schedule", milliseconds]); return key; },
@@ -154,6 +196,21 @@ const cameraFixture = ({ media, play, decode, onDecode, visibility, settings = {
   };
   return { scanner, video, stream, track, events, errors, results, timers, constraints, tick };
 };
+
+for (const front of [false, true]) test(`the running ${front ? "front" : "rear"} camera sends only its displayed printed QR region to the worker`, async () => {
+  const regions = [], f = cameraFixture({ settings: { facingMode: front ? "user" : "environment" },
+    decode(region) { regions.push(region); throw QrScanner.NO_QR_CODE_FOUND; } });
+  await f.scanner.start(); await f.tick();
+  assert.equal(regions.length, 1);
+  const region = regions[0], scale = 480 / 297;
+  assert.ok(Math.abs(region.x - ((front ? 640 - 480 * 210 / 297 : 0) + 18 * scale)) < 1e-8);
+  assert.ok(Math.abs(region.y - 18 * scale) < 1e-8);
+  assert.ok(Math.abs(region.width - 44 * scale) < 1e-8);
+  assert.equal(region.width, region.height);
+  assert.equal(f.video.style.transform, front ? "scaleX(-1)" : "");
+  assert.deepEqual(f.results, []); assert.deepEqual(f.errors, []);
+  f.scanner.destroy();
+});
 
 test("actual camera owns the media stream and decodes video through the worker without native detector", async () => {
   const f = cameraFixture();
@@ -369,14 +426,16 @@ const componentSource = ts.transpileModule(readFileSync(new URL(
 }).outputText.replace(/"(?:@angular\/(?:common|core|forms|router)|\.\/(?:attachment-manager.service|rewrite-app-ui-state.service|rewrite-app-operator-access.service))"/g,
   JSON.stringify(componentHost))
   .replace('"qr-scanner"', JSON.stringify(import.meta.resolve("qr-scanner")))
+  .replace('"./attachment-page-geometry"', JSON.stringify(geometryModule))
   .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule))
   .replace('"./attachment-camera-scanner"', JSON.stringify(dataModule(productionSource("attachment-camera-scanner")
-    .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule)))));
+    .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule))
+    .replace('"./attachment-page-geometry"', JSON.stringify(geometryModule)))));
 const { AttachmentCaptureComponent } = await import(dataModule(componentSource));
 const withCapture = async action => {
   const previous = globalThis.__attachmentCaptureHost;
   const destroy = { destroyed: false }; let lookups = 0, blobCallback;
-  const stream = {}, video = { srcObject: stream, videoWidth: 640, videoHeight: 480 };
+  const stream = { getVideoTracks: () => [] }, video = { srcObject: stream, videoWidth: 640, videoHeight: 480 };
   globalThis.__attachmentCaptureHost = {
     AttachmentManagerService: { async get() { lookups++; }, describeError: error => error.message },
     RewriteAppUiStateService: { workspace: { tenantKey: "owned", workspaceKey: "owned" }, ops: { adminSessionToken: "owned" } },
