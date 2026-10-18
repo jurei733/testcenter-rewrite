@@ -2016,7 +2016,7 @@ class RequestBodyTooLargeError extends Error {
 
 class ClientRequestAbortedError extends Error {
   constructor(cause: unknown) {
-    super("The client closed an incomplete HTTP upload.", { cause });
+    super("The client closed an HTTP upload before body consumption finished.", { cause });
     this.name = "ClientRequestAbortedError";
   }
 }
@@ -2027,7 +2027,10 @@ const readRequestChunks = async function* (request: IncomingMessage) {
   try {
     yield* request;
   } catch (error) {
-    if (request.aborted && !request.complete && typeof error === "object" && error !== null &&
+    // complete describes HTTP parsing, not whether the application consumed
+    // the buffered body. A client can disconnect during asynchronous auth
+    // after all bytes arrived but before the body reader emits end.
+    if (request.aborted && !request.readableEnded && typeof error === "object" && error !== null &&
         "code" in error && error.code === "ECONNRESET") {
       throw new ClientRequestAbortedError(error);
     }

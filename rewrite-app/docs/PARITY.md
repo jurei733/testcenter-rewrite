@@ -1,5 +1,32 @@
 # Testcenter parity checklist
 
+### Received but unread HTTP bodies (2026-10-18)
+
+Both `d333c94b` workflows finish 37/38 green. The PR run passes the complete
+SQLite browser suite and monitor-review; its PostgreSQL browser reaches the
+unchanged server-health gate with two incoming-stream resets. Both have
+`bodyComplete: true`. HTTP-parser completion does not imply application-reader
+completion: asynchronous authentication may leave all received bytes buffered
+when the client disconnects. A real socket regression reproduces that state
+and fails against the preceding reader with `Error: aborted`.
+
+The incoming-body boundary now checks `readableEnded` rather than `complete`,
+still requiring the request's abort flag and an `ECONNRESET` thrown by that
+specific incoming iterator. Resets after consumption, resets without an abort,
+other stream errors and downstream failures retain their error path. A second
+real production-API regression holds the native body iterator until the whole
+body arrives, disconnects the client, and proves cancellation without parsing,
+application validation, internal errors or leaked request metrics. The earlier
+incomplete-upload and malformed-JSON checks remain.
+
+All 26 focused checks and all 2,629 unit/frontend tests pass without failures,
+skips or cancellations. Current-head remote and full PostgreSQL browser
+qualification remain open. The separate `d333c94b` push monitor-review job times
+out waiting for the transient timer-ended notice; the same exact revision's PR
+monitor-review and full SQLite jobs pass. Preserve that failed log and inspect
+fresh qualification before attributing a new timer defect or weakening the gate.
+Formal parity remains 30 complete/19 partial; production acceptance is open.
+
 ### Client-aborted uploads and HTTP accounting (2026-10-18)
 
 The `09497d51` PostgreSQL browser run reaches the final health assertion but

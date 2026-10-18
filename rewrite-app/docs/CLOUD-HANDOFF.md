@@ -1,5 +1,24 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: parser completion versus body consumption (2026-10-18)
+
+`d333c94b` PR and push each finish 37/38 green. PR passes full SQLite browser,
+monitor-review and PostgreSQL tests; its PostgreSQL browser still reports two
+incoming body resets after `bodyComplete: true`. A real socket witness proves
+that complete HTTP parsing can precede application consumption and then abort.
+It fails against the prior reader. The boundary now requires an aborted request,
+an incoming-iterator `ECONNRESET` and `!readableEnded`; parser `complete` is not
+the consumption boundary. Completed consumption and downstream failures remain
+fatal. Both incomplete and complete-but-unread real production API cases pass,
+including exact metrics and no partial body/application validation.
+
+All 26 focused checks and 2,629 complete unit/frontend tests pass. Inspect the
+new head's full CI independently. The separate push's monitor-review timeout
+waiting for the transient timer-ended notice does not reproduce in the same
+revision's successful PR monitor-review or complete SQLite browser job. Its log
+is retained; do not alter timer semantics or lower assertions without evidence.
+Keep the protected presentation unchanged. Full parity/production remains open.
+
 ### Current correction: client aborts and request metrics (2026-10-18)
 
 A real incomplete client upload reproduces the PostgreSQL browser gate's
