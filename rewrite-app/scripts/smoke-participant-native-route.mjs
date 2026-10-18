@@ -140,9 +140,27 @@ try {
   await native("resume"); await player().waitFor(); await emptyJournal();
   let releaseSave, saveHeld = false;
   const saveGate = new Promise(done => { releaseSave = done; }); releases.push(releaseSave);
-  const heldSave = async route => { const response = await route.fetch(); assert.equal(response.status(), 200); saveHeld = true; await saveGate; try { await route.fulfill({ response }); } catch {} };
-  await page.route("**/save-progress", heldSave); await player().fill("Second Unit drain Ω");
-  await poll(() => Promise.resolve(saveHeld), "Trusted save was not held");
+  let unrelatedSaveSeen = false;
+  const heldSave = async route => {
+    const request = route.request().postDataJSON();
+    const response = await route.fetch(); assert.equal(response.status(), 200);
+    // Player startup/focus logs share this endpoint. Only this Unit's actual
+    // answer proves its closed buffer has reached the server before Goto.
+    const ownsAnswer = (request.responseUnitKey ?? request.currentUnitKey) === "first-2" &&
+      parseVeronaUnitResponse(request.unitResponse)?.unitState.dataParts.answer === "Second Unit drain Ω";
+    observations.push({ kind: "closed-buffer-save", unitKey: request.responseUnitKey ?? request.currentUnitKey,
+      ownsAnswer, hasUnitResponse: typeof request.unitResponse === "string" });
+    if (ownsAnswer) { saveHeld = true; await saveGate; }
+    else unrelatedSaveSeen = true;
+    try { await route.fulfill({ response }); } catch {}
+  };
+  await page.route("**/save-progress", heldSave);
+  await player().focus();
+  await poll(() => Promise.resolve(unrelatedSaveSeen), "Player focus did not exercise an unrelated save");
+  assert.equal(saveHeld, false, "A lifecycle/log-only save cannot qualify the closed answer buffer");
+  mark("closed-answer-gate-ignores-player-lifecycle-and-focus-logs");
+  await player().fill("Second Unit drain Ω");
+  await poll(() => Promise.resolve(saveHeld), "The second Unit's exact trusted answer save was not held");
   const beforeGoto = nativeRequests.length; await native("goto", ["1"]);
   await poll(async () => nativeRequests.length === beforeGoto + 1 && (await read(first.testRunId)).currentUnitKey === "first-1", "Goto waited for the already-closed answer buffer");
   await emptyJournal(); await player().waitFor();
@@ -151,7 +169,7 @@ try {
   releaseSave(); await page.unroute("**/save-progress", heldSave); await page.goForward(); await methods(); await player().waitFor();
   await page.evaluate(() => dispatchEvent(new Event("online"))); await delay(1200);
   assert.equal(nativeRequests.length, beforeGoto + 1); const drained = await read(first.testRunId);
-  assert.equal(drained.currentUnitKey, "first-1"); assert.equal(parseVeronaUnitResponse(drained.unitResponses["first-2"]).unitState.dataParts.answer, "Second Unit drain Ω");
+  assert.equal(drained.currentUnitKey, "first-1"); assert.equal(parseVeronaUnitResponse(drained.unitResponses["first-2"])?.unitState.dataParts.answer, "Second Unit drain Ω", "The captured second Unit answer must survive Goto and route reentry");
   assert.deepEqual(drained.unitResponses["first-1"], saved.responses["first-1"]); assert.deepEqual(drained.unitResponseFieldTimestamps["first-1"], saved.clocks["first-1"]);
   mark("goto-finishes-before-its-closed-answer-reply-and-route-reentry-cannot-replay-it");
 

@@ -1,5 +1,22 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Native route smoke save ownership (2026-10-19)
+
+PR CI `39170753534` at `3eb48b8a` fails in the native-route browser fixture:
+the second Unit answer is absent after Goto and route reentry. The former
+fixture waits for any `save-progress` reply, even though startup/focus logs use
+the same endpoint. A real-browser witness satisfies that gate with a log-only
+packet before any answer input. This proves the fixture cannot establish the
+claimed closed-answer precondition; it does not alone identify every cause of
+the remote missing answer.
+
+The held reply now belongs to `first-2` and the exact trusted answer. A preceding
+real focus explicitly exercises an unrelated save and proves it does not open
+the gate. All seven local production-bundle/SQLite browser checks pass, retaining
+exact answer/clock preservation, Goto-before-reply, canceled route continuations,
+terminal preparation and replacement-Run isolation. Runtime behavior and final
+answer assertions are unchanged. Complete remote confirmation is pending.
+
 ### Current Original Booklet Config corpus refresh (2026-10-19)
 
 Live Original `eedae418` has 56 Booklet Config cases rather than the pinned 51.
