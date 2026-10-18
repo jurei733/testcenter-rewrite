@@ -108,6 +108,57 @@ test("an unchanged capture preserves the actual encoded image", async () => {
   assert.equal(f.component.statusIsError, false); f.component.clearCapture();
 });
 
+test("manual page capture stops scanning before the operator reviews the photo", async () => {
+  const f = fixture(), c = f.component;
+  const pending = c.capturePage();
+  await finish(f, pending);
+  assert.ok(c.captureBlob);
+  assert.equal(c.cameraActive, false);
+  assert.match(c.status, /Review the image and target/);
+  c.clearCapture();
+});
+
+test("a late invalidated manual capture cannot stop a replacement camera", async () => {
+  const f = fixture(), c = f.component;
+  const pending = c.capturePage();
+  c.clearCapture(); f.video.srcObject = { getVideoTracks: () => [] };
+  await finish(f, pending);
+  assert.equal(c.captureBlob, null); assert.equal(c.cameraActive, true);
+});
+
+test("selecting a device photo stops live decoding and retains the exact chosen file", () => {
+  const f = fixture(), c = f.component, file = image("owned-device-photo");
+  c.selectCaptureFile({ target: { files: [file], value: "owned.png" } });
+  assert.equal(c.captureBlob, file); assert.equal(c.cameraActive, false);
+  assert.match(c.status, /Image ready/); c.clearCapture();
+});
+
+test("successful upload resets the old target, restarts capture and keeps its own three-second confirmation", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const f = fixture(), c = f.component;
+  let starts = 0;
+  c.cameraActive = false;
+  c.startCamera = async () => { starts++; c.cameraActive = true; c.status = "Camera active"; };
+  c.setCapture(image("owned-upload"), "owned.png");
+  const pending = c.uploadCapture(); f.upload.resolve(target("first")); await pending;
+  assert.equal(c.attachment, null); assert.equal(c.attachmentCode, "");
+  assert.equal(c.captureBlob, null); assert.equal(c.busy, false);
+  assert.equal(starts, 1); assert.equal(c.cameraActive, true);
+  assert.match(c.uploadNotice, /Attachment uploaded for Own first/);
+  assert.equal(c.status, "Camera active");
+  t.mock.timers.tick(2_999); assert.ok(c.uploadNotice);
+  t.mock.timers.tick(1); assert.equal(c.uploadNotice, null);
+  c.ngOnDestroy();
+});
+
+test("destroy cancels pending upload-notice presentation", t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const f = fixture(), c = f.component;
+  c.showUploadNotice("Owned uploaded page"); c.ngOnDestroy();
+  t.mock.timers.tick(3_000);
+  assert.equal(c.uploadNotice, "Owned uploaded page");
+});
+
 test("a failed encoding does not stop the camera or resolve a scanned target", async () => {
   const f = fixture(), c = f.component;
   c.attachment = null; c.attachmentCode = "";

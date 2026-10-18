@@ -1,5 +1,37 @@
 # Testcenter parity checklist
 
+### Capture confirmation and continuous-page lifecycle (2026-10-18)
+
+The current Original stops the camera before confirmation, presents the
+captured page beside its target/actions, and resets the target and starts the
+next scan after successful upload. The Rewrite now follows that lifecycle.
+Manual camera capture and selecting a device photo stop live decoding; stale
+manual encoding cannot stop a replacement camera. Confirmation replaces the
+camera/QR selector with the captured page. Desktop controls sit beside the
+preview and mobile controls follow it, without the former duplicate inactive
+camera panel. New capture clears the photo and target and restarts scanning.
+
+Successful upload resets its completed target and starts the next scan, while
+a separate three-second notice retains the upload result through camera status
+changes. Failed uploads retain their exact photo/target for retry. Destruction
+cancels notice timing; existing scope, target and capture-version guards still
+reject obsolete callbacks. Five actual-method regressions extend the focused
+camera/lifecycle set to 112 passing checks. All 1,117 frontend tests pass, and
+the production build stays 469.99 kB under the unchanged 470 kB error cap.
+Built image/manual, rear and front sequences pass 62/60/60 steps, including
+native new-capture reset, automatic next-scan state, 1280/390 px layout and
+closure of every observed worker.
+
+Native-window acceptance remains unproved. An additional native-UI probe times
+out waiting for the combined hidden/stopped-stream condition; without separate
+runtime diagnostics it cannot identify which conjunct failed. Local Playwright
+source explicitly enables focus emulation on its main page. An independent
+direct Chrome probe fails before creating its debugging port/window; its owned
+process is stopped and both failure logs remain. Neither attempt is application
+pause/resume acceptance. The previous `820bf4e2` PR CI continues separately;
+its image/rear/front attachment job already passes. Its redundant push workflow
+was cancelled, with the full PR gate retained. Formal parity remains 30/19.
+
 ### Printed A4 camera framing and QR isolation (2026-10-18)
 
 The camera now uses one geometry for its A4 preview, encoded page and QR search.

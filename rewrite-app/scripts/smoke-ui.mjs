@@ -25957,20 +25957,48 @@ try {
     const geometry = await attachmentCapture.evaluate(card => {
       const heading = card.querySelector(".section-heading").getBoundingClientRect();
       const introduction = card.querySelector(".capture-intro").getBoundingClientRect();
+      const preview = card.querySelector("#attachmentCapturePreview").closest("section").getBoundingClientRect();
+      const controls = card.querySelector(".capture-controls").getBoundingClientRect();
       return { headingBottom: heading.bottom, introductionTop: introduction.top,
-        scrollWidth: card.scrollWidth, clientWidth: card.clientWidth };
+        scrollWidth: card.scrollWidth, clientWidth: card.clientWidth,
+        preview: preview.toJSON(), controls: controls.toJSON(),
+        cameraVisible: card.querySelector(".camera-shell").getClientRects().length > 0,
+        qrInputVisible: card.querySelector("#attachmentQrImageInput") != null };
     });
     assert.ok(geometry.introductionTop >= geometry.headingBottom,
       `Capture status badge must not overlap the introduction at ${width}px.`);
     assert.ok(geometry.scrollWidth <= geometry.clientWidth,
       `Capture controls must fit their card at ${width}px.`);
+    assert.equal(geometry.cameraVisible, false, "Confirmation replaces the camera with its captured page.");
+    assert.equal(geometry.qrInputVisible, false, "Confirming a photo must not expose another live QR target selector.");
+    assert.ok(width > 820 ? geometry.controls.right <= geometry.preview.left : geometry.preview.bottom <= geometry.controls.top,
+      `Expected desktop controls beside the preview and mobile controls after it at ${width}px.`);
   }
   if (captureViewport) await page.setViewportSize(captureViewport);
+  if (!attachmentQrCameraFile) {
+    logStep("attachment-retake-clears-target-and-restarts-camera");
+    await attachmentCapture.locator("#retakeAttachmentCaptureButton").click();
+    await page.waitForFunction(() => !document.querySelector("#attachmentCapturePreview") &&
+      !document.querySelector("#attachmentCaptureTarget") &&
+      document.querySelector("#attachmentCaptureCode")?.value === "" &&
+      document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream);
+    await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
+      name: "attachment-code-after-new-capture.png", mimeType: "image/png",
+      buffer: await QRCode.toBuffer(selectedAttachmentCode, { type: "png", margin: 4, width: 512 })
+    });
+    await attachmentCapture.locator("#attachmentCaptureTarget").filter({ hasText: "Attachment Smoke Participant" }).waitFor();
+    await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+    await attachmentCapture.locator("#attachmentCapturePreview").waitFor();
+    await page.waitForFunction(() => document.querySelector("#attachmentCaptureVideo")?.srcObject === null);
+  }
   await attachmentCapture.locator("#uploadCapturedAttachmentButton").click();
   await attachmentCapture
-    .locator("#attachmentCaptureStatus")
+    .locator("#attachmentCaptureUploadStatus")
     .filter({ hasText: "Attachment uploaded for Attachment Smoke Participant" })
     .waitFor();
+  if (!attachmentQrCameraFile) await page.waitForFunction(() => !document.querySelector("#attachmentCapturePreview") &&
+    !document.querySelector("#attachmentCaptureTarget") &&
+    document.querySelector("#attachmentCaptureVideo")?.srcObject instanceof MediaStream);
   await attachmentCapture
     .getByRole("link", { name: "Back to Attachment Manager" })
     .click();

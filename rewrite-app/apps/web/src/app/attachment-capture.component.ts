@@ -38,14 +38,15 @@ type AttachmentScope = {
     .section-heading h2 { margin: .4rem 0 0; }
     .status-pill { display: inline-block; padding: .4rem .7rem; vertical-align: middle; }
     .capture-intro { max-width: 70ch; color: var(--muted); }
-    .capture-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); gap: 1rem; }
+    .capture-grid { display: grid; grid-template-columns: minmax(18rem, .75fr) minmax(0, 1.25fr); gap: 1rem; }
+    .camera-shell.has-preview { display: none; }
     .camera-shell { position: relative; width: min(100%, calc(70vh * 210 / 297)); aspect-ratio: 210 / 297; overflow: hidden; border-radius: var(--radius-lg); background: #101519; color: #fff; }
     .camera-shell video { position: absolute; top: 0; left: 0; display: block; max-width: none; transition: opacity .15s ease; }
     .camera-shell:not(.is-active) video { opacity: 0; }
     .camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; }
     .camera-shell.is-active .camera-placeholder { display: none; }
     .scan-frame { position: absolute; left: calc(18 / 210 * 100%); top: calc(18 / 297 * 100%); width: calc(44 / 210 * 100%); height: calc(44 / 297 * 100%); border: 3px solid rgba(255, 255, 255, .9); box-sizing: border-box; border-radius: 3px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .22); pointer-events: none; }
-    .capture-controls { display: grid; gap: .9rem; align-content: start; }
+    .capture-controls { display: grid; gap: .9rem; align-content: start; order: -1; }
     .capture-panel { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: rgba(255, 255, 255, .62); }
     .capture-panel h2, .capture-panel h3 { margin-top: 0; }
     .capture-code { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; }
@@ -57,21 +58,22 @@ type AttachmentScope = {
     input[type="file"] { width: 100%; }
     @media (max-width: 820px) {
       .capture-grid { grid-template-columns: 1fr; }
+      .capture-controls { order: 0; }
     }
   `],
   template: `
     <article id="attachmentCaptureCard" class="card capture-card">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">Original Attachment Manager flow</span>
-          <h2>Scan, capture, confirm</h2>
+          <span class="eyebrow">Attachments</span>
+          <h2>Capture a printed page</h2>
         </div>
-        <span class="status-pill">Server-scoped</span>
+        <span class="status-pill">Review before uploading</span>
       </div>
       <p class="capture-intro">
-        Point the camera at the QR code on a printed attachment page. The code
-        selects the participant slot; the image is uploaded only after you
-        confirm the scoped participant, booklet, unit, and variable.
+        Align the printed page with the camera preview and its QR code with the
+        highlighted box. Check the image, participant, booklet, unit and variable
+        before uploading.
       </p>
       <p class="scope-line">
         <span><strong>Tenant:</strong> {{ tenantKey || 'not selected' }}</span>
@@ -90,7 +92,7 @@ type AttachmentScope = {
       <ng-container *ngIf="hasSessionScope">
         <div class="capture-grid">
           <section>
-            <div class="camera-shell" [class.is-active]="cameraActive">
+            <div class="camera-shell" [class.is-active]="cameraActive" [class.has-preview]="capturePreviewUrl != null">
               <video #cameraVideo id="attachmentCaptureVideo" playsinline muted
                 [style.width.%]="cameraGeometry?.videoWidthPercent || 100"
                 [style.height.%]="cameraGeometry?.videoHeightPercent || 100"
@@ -100,13 +102,14 @@ type AttachmentScope = {
               </div>
               <div class="scan-frame" *ngIf="cameraActive" [style.left.%]="cameraGeometry?.scanLeftPercent" aria-hidden="true"></div>
             </div>
+            <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Captured attachment page ready to review" />
             <canvas #captureCanvas hidden></canvas>
-            <div class="actions">
+            <div class="actions" *ngIf="!capturePreviewUrl">
               <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting" (click)="startCamera()">Start camera</button>
               <button id="stopAttachmentCameraButton" class="ghost" type="button" [disabled]="!cameraActive" (click)="stopCamera()">Stop camera</button>
               <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" (click)="toggleFlash()">{{ flashOn ? 'Turn flash off' : 'Turn flash on' }}</button>
             </div>
-            <label *ngIf="cameras.length > 1">
+            <label *ngIf="!capturePreviewUrl && cameras.length > 1">
               Camera
               <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId" (change)="selectCamera()">
                 <option *ngIf="!selectedCameraIsListed" [value]="selectedCameraId">{{ selectedCameraId ? 'Selected camera' : 'Default camera (rear preferred)' }}</option>
@@ -117,8 +120,8 @@ type AttachmentScope = {
           </section>
 
           <section class="capture-controls">
-            <div class="capture-panel">
-              <h3>1. Resolve QR code</h3>
+            <div class="capture-panel" *ngIf="!capturePreviewUrl">
+              <h3>Select a page</h3>
               <label>
                 Scan a saved QR image
                 <input id="attachmentQrImageInput" type="file" accept="image/png,image/jpeg,image/webp" [disabled]="busy" (change)="scanQrImage($event)" />
@@ -133,7 +136,7 @@ type AttachmentScope = {
             </div>
 
             <div id="attachmentCaptureTarget" class="capture-panel" *ngIf="attachment as target">
-              <h3>2. Confirm target</h3>
+              <h3>Page belongs to</h3>
               <p><strong>{{ target.personLabel }}</strong></p>
               <p>{{ target.groupKey }} / {{ target.loginKey }}</p>
               <p>{{ target.testLabel }}</p>
@@ -142,32 +145,32 @@ type AttachmentScope = {
               <span class="status-pill">{{ target.dataType }}</span>
             </div>
 
-            <div class="capture-panel" *ngIf="attachment && canCaptureTarget">
-              <h3>3. Capture page</h3>
+            <div class="capture-panel" *ngIf="attachment && canCaptureTarget && !capturePreviewUrl">
+              <h3>Capture page</h3>
               <div class="actions">
-                <button id="captureAttachmentFrameButton" class="secondary" type="button" [disabled]="busy || !cameraActive" (click)="captureCurrentFrame()">Capture camera frame</button>
+                <button id="captureAttachmentFrameButton" class="secondary" type="button" [disabled]="busy || !cameraActive" (click)="capturePage()">Capture camera frame</button>
               </div>
               <label>
                 Or take/select a photo
                 <input id="attachmentCaptureFileInput" type="file" accept="image/png,image/jpeg" capture="environment" [disabled]="busy" (change)="selectCaptureFile($event)" />
               </label>
-              <img id="attachmentCapturePreview" class="capture-preview" *ngIf="capturePreviewUrl" [src]="capturePreviewUrl" alt="Attachment page ready to upload" />
             </div>
 
             <div class="capture-panel" *ngIf="attachment && canCaptureTarget && captureBlob">
-              <h3>4. Upload confirmed image</h3>
+              <h3>Confirm upload</h3>
               <div class="actions">
                 <button id="uploadCapturedAttachmentButton" class="primary" type="button" [disabled]="busy || !canWrite" (click)="uploadCapture()">{{ busy ? 'Uploading…' : 'Upload attachment' }}</button>
-                <button class="ghost" type="button" [disabled]="busy" (click)="clearCapture()">Retake</button>
+                <button id="retakeAttachmentCaptureButton" class="ghost" type="button" [disabled]="busy" (click)="resetTarget()">New capture</button>
               </div>
               <p *ngIf="!canWrite">This operator session does not have write access. The server will not accept an upload.</p>
             </div>
           </section>
         </div>
 
+        <p id="attachmentCaptureUploadStatus" class="capture-status" *ngIf="uploadNotice" role="status" aria-live="polite">{{ uploadNotice }}</p>
         <p id="attachmentCaptureStatus" class="capture-status" [class.is-error]="statusIsError" role="status" aria-live="polite">{{ status }}</p>
         <div class="actions">
-          <button id="resetAttachmentCaptureButton" class="ghost" type="button" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
+          <button id="resetAttachmentCaptureButton" class="ghost" type="button" *ngIf="!capturePreviewUrl || !attachment || !canCaptureTarget" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
           <a class="button-link secondary" routerLink="/runtime">Back to Attachment Manager</a>
         </div>
       </ng-container>
@@ -199,6 +202,7 @@ export class AttachmentCaptureComponent
   private captureVersion = 0;
   private targetVersion = 0;
   private operationVersion = 0;
+  private uploadNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;
@@ -215,6 +219,7 @@ export class AttachmentCaptureComponent
   busy = false;
   status = "Scan a QR code or enter an attachment code to begin.";
   statusIsError = false;
+  uploadNotice: string | null = null;
 
   get cameraGeometry(): ReturnType<typeof attachmentPageGeometry> {
     const video = this.cameraVideo?.nativeElement;
@@ -271,6 +276,7 @@ export class AttachmentCaptureComponent
   }
 
   ngOnDestroy(): void {
+    if (this.uploadNoticeTimeout != null) clearTimeout(this.uploadNoticeTimeout);
     this.destroyScanner();
     this.imageDecoder?.dispose();
     this.imageDecoder = null;
@@ -424,6 +430,13 @@ export class AttachmentCaptureComponent
     }
   }
 
+  async capturePage(): Promise<void> {
+    const captured = await this.captureCurrentFrame();
+    if (!captured || this.captureBlob !== captured) return;
+    this.stopCamera();
+    this.status = "Page captured. Review the image and target before uploading.";
+  }
+
   async captureCurrentFrame(): Promise<Blob | null> {
     const video = this.cameraVideo.nativeElement;
     if (!this.cameraActive || !video.videoWidth || !video.videoHeight) {
@@ -494,6 +507,7 @@ export class AttachmentCaptureComponent
       return;
     }
     this.setCapture(file, file.name || `attachment-capture-${Date.now()}.png`);
+    this.stopCamera();
     this.status = "Image ready. Confirm the target details before uploading.";
     this.statusIsError = false;
   }
@@ -525,9 +539,8 @@ export class AttachmentCaptureComponent
         }
       );
       if (!current()) return;
-      this.attachment = updated;
-      this.clearCapture();
-      this.status = `Attachment uploaded for ${updated.personLabel}. Scan another page when ready.`;
+      this.resetTarget();
+      this.showUploadNotice(`Attachment uploaded for ${updated.personLabel}. Ready for the next page.`);
     } catch (error) {
       if (!current()) return;
       this.status = this.manager.describeError(error);
@@ -546,6 +559,16 @@ export class AttachmentCaptureComponent
     this.capturePreviewUrl = null;
     this.captureBlob = null;
     this.captureFileName = "";
+  }
+
+  private showUploadNotice(message: string): void {
+    if (this.uploadNoticeTimeout != null) clearTimeout(this.uploadNoticeTimeout);
+    this.uploadNotice = message;
+    this.uploadNoticeTimeout = setTimeout(() => {
+      this.uploadNoticeTimeout = null;
+      this.uploadNotice = null;
+      this.refreshView();
+    }, 3_000);
   }
 
   resetTarget(): void {

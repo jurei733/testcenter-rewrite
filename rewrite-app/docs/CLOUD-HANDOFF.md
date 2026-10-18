@@ -1,5 +1,27 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Current correction: camera confirmation and next-page reset (2026-10-18)
+
+Capture confirmation now replaces the camera/QR controls with its photo;
+desktop actions sit beside it and mobile actions follow it. Manual frame and
+device-file capture stop scanning before review. New capture resets photo and
+target and starts scanning, and successful upload does the same while retaining
+a separate three-second success notice. Failed upload still retains exact
+retry data. Destruction cancels the notice timer and stale capture callbacks
+cannot stop a replacement camera. All 112 focused and 1,117 frontend checks
+pass; built image/manual, rear/front flows pass 62/60/60 steps and worker closure.
+The build remains 469.99 kB. Keep whole-head CI qualification separate.
+
+The `820bf4e2` PR workflow still runs; its full image/rear/front attachment job
+passes. Only its redundant push workflow was cancelled to free capacity; the
+complete PR gate remains required. Native window visibility remains unproved:
+the UI-driven combined hidden/paused gate times out without an independent
+trace of each conjunct, and direct Chrome fails at native startup. Both logs
+are retained and the owned raw process is stopped. Do not classify those
+attempts as a product defect, prerequisite-only failure or successful physical
+acceptance without stronger evidence. Preserve formal 30/19 and production
+boundaries plus the protected presentation.
+
 ### Current correction: printed camera page and QR region (2026-10-18)
 
 `7178a463` is fully green in both GitHub workflows (38 jobs each): 2,629
