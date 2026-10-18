@@ -4985,6 +4985,99 @@ test("participant custom texts retain global-login-booklet precedence inputs", a
   assert.equal(resetSettings.status, 200);
 });
 
+for (const sourceKind of ["typed JSON", "manifest JSON", "Booklet XML", "SysCheck XML"] as const) {
+  test(`content custom-text values survive ${sourceKind} intake and durable reopen`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), "content-text-values-"));
+    const environment = {
+      FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE || "memory",
+      FIRST_SLICE_FILE: join(directory, "store.json"), FIRST_SLICE_SQLITE_FILE: join(directory, "store.sqlite"),
+      FIRST_SLICE_BOOTSTRAP_DEMO: "false", FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+      FIRST_SLICE_XML_SCHEMA_PROFILE: "original-19", FIRST_SLICE_XML_SCHEMA_DOWNLOAD: "false"
+    };
+    let isolated = await createIsolatedServer(environment);
+    const workspace = `/api/v1/tenants/content-text-${randomUUID()}/workspaces/owned`;
+    const post = (path: string, body: unknown) => requestJsonAt<any>(isolated.baseUrl, path, { method: "POST", body });
+    const reference = JSON.parse(readFileSync(resolve(originalTestcenterCorpusRoot, "current-content-text-reference.json"), "utf8"));
+    assert.equal(reference.originalCommit, "eedae41840cbe90e5547c0211da818bdf620f5aa");
+    for (const file of reference.files) assert.equal(createHash("sha256").update(file.source).digest("hex"), file.sha256);
+    const customTexts = reference.values;
+    assert.deepEqual(reference.nativeWitness.booklet.values, customTexts);
+    assert.deepEqual(reference.nativeWitness.syscheck.values, customTexts);
+    const xmlTexts = reference.customTextXml;
+    const structure = { bookletEntries: [{ bookletKey: "OWN.TEXT", displayLabel: "Owned text", customTexts,
+      unitEntries: [{ unitKey: "OWN.UNIT", displayLabel: "Owned unit", prompt: "Owned prompt" }] }],
+      systemCheckEntries: [{ checkId: "OWN.CHECK", displayLabel: "Owned check", skipNetwork: true, customTexts, questions: [] }] };
+    const xml = sourceKind === "Booklet XML"
+      ? '<Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-booklet-xml/18.0"><Metadata><Id>OWN.TEXT</Id><Label>Owned text</Label></Metadata><CustomTexts>' + xmlTexts + '</CustomTexts><Units><Unit id="OWN.UNIT" label="Owned unit"/></Units></Booklet>'
+      : '<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-syscheck-xml/18.0"><Metadata><Id>OWN.CHECK</Id><Label>Owned check</Label></Metadata><Config skipnetwork="true">' + xmlTexts + '</Config></SysCheck>';
+    try {
+      assert.equal((await post("/api/v1/platform/tenants", { tenantKey: workspace.split("/")[4], displayName: "Owned text" })).status, 201);
+      assert.equal((await post(workspace.substring(0, workspace.lastIndexOf("/")), { workspaceKey: "owned", displayName: "Owned text" })).status, 201);
+      const config = await requestJsonAt<GetRuntimeConfigResponse>(isolated.baseUrl, productionApiRoutes.system.getRuntimeConfig);
+      assert.equal(config.body.runtimeConfig.xmlSchema.validatedByXsd, true);
+      if (sourceKind === "Booklet XML") {
+        const player = JSON.parse(localDemoSourcePackage.sourceDocument!).playerEntries[0];
+        assert.equal((await post(workspace + "/source-packages", { fileName: "Player.html", mediaType: "text/html", sourceDocument: player.html })).status, 201);
+        const unit = await post(workspace + "/source-packages", { fileName: "Unit.xml", mediaType: "application/xml",
+          sourceDocument: '<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/unit-xml/17.6"><Metadata><Id>OWN.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="testcenter-demo-player@1.0">Owned prompt</Definition></Unit>' });
+        assert.equal(unit.status, 201, JSON.stringify(unit.body));
+      }
+      const upload = await post(workspace + "/source-packages", {
+        fileName: sourceKind.endsWith("XML") ? "owned.xml" : "owned.json",
+        mediaType: sourceKind.endsWith("XML") ? "application/xml" : "application/json",
+        ...(sourceKind === "typed JSON" ? { contentStructure: structure } :
+          { sourceDocument: sourceKind === "manifest JSON" ? JSON.stringify(structure) : xml })
+      });
+      assert.equal(upload.status, 201, JSON.stringify(upload.body));
+      const imported = await post(workspace + "/import-jobs", { sourcePackageId: upload.body.sourcePackage.sourcePackageId });
+      assert.equal(imported.status, 201, JSON.stringify(imported.body));
+      assert.equal(imported.body.importJob.status, "completed", JSON.stringify(imported.body.importJob));
+      const release = imported.body.stagedContentRelease;
+      const snapshotTexts = (snapshot: any) => sourceKind === "typed JSON"
+        ? [snapshot.bookletEntries[0]?.customTexts, snapshot.systemCheckEntries[0]?.customTexts]
+        : [snapshot.bookletEntries[0]?.customTexts];
+      const assertTexts = async (snapshot?: any) => {
+        if (sourceKind === "SysCheck XML") {
+          const configurations = await requestJsonAt<any>(isolated.baseUrl, workspace + "/system-checks");
+          assert.equal(configurations.status, 200);
+          assert.deepEqual(configurations.body.items[0]?.customTexts, customTexts);
+        } else {
+          assert.ok(snapshot, JSON.stringify(imported.body.importJob));
+          for (const values of snapshotTexts(snapshot)) assert.deepEqual(values, customTexts);
+        }
+      };
+      await assertTexts(release?.runtimeSnapshot);
+      if (sourceKind === "Booklet XML") {
+        for (const [manifest, code] of [
+          ['<manifest><resources></manifest>', "source_document_xml_malformed"],
+          ['<!DOCTYPE manifest><manifest/>', "source_document_xml_doctype_unsupported"],
+          ['<Other><manifest/></Other>', "testcenter_xml_root_invalid"],
+          ['<Booklet><!-- <manifest> --><Metadata><Id>DECOY</Id><Label>Decoy</Label></Metadata><Units><Unit id="U" label="U"/></Units></Booklet>', "testcenter_xml_schema_reference_missing"]
+        ] as const) {
+          const rejectedSource = await post(workspace + "/source-packages", { fileName: `invalid-manifest-${randomUUID()}.zip`, mediaType: "application/zip",
+            sourceDocument: "data:application/zip;base64," + createZipBase64([{ fileName: "imsmanifest.xml", content: manifest }]) });
+          assert.equal(rejectedSource.status, 201);
+          const rejected = await post(workspace + "/import-jobs", { sourcePackageId: rejectedSource.body.sourcePackage.sourcePackageId });
+          assert.equal(rejected.status, 201);
+          assert.equal(rejected.body.importJob.status, "failed");
+          assert.equal(rejected.body.stagedContentRelease, null);
+          assert.ok(rejected.body.importJob.diagnostics.some((item: { code: string }) => item.code === code), JSON.stringify(rejected.body.importJob));
+        }
+        const standalone = await post(workspace + "/source-packages", { fileName: "standalone.xml", mediaType: "application/xml", sourceDocument: '<manifest><resources/></manifest>' });
+        const rejected = await post(workspace + "/import-jobs", { sourcePackageId: standalone.body.sourcePackage.sourcePackageId });
+        assert.equal(rejected.body.importJob.status, "failed");
+        assert.ok(rejected.body.importJob.diagnostics.some((item: { code: string }) => item.code === "testcenter_xml_root_invalid"));
+      }
+      if (environment.FIRST_SLICE_STORE !== "memory") {
+        await closeServer(isolated.server); isolated = await createIsolatedServer(environment);
+        const reopened = sourceKind === "SysCheck XML" ? null : await requestJsonAt<GetContentReleaseResponse>(isolated.baseUrl, workspace + "/content-releases/" + release.contentReleaseId);
+        if (reopened) assert.equal(reopened.status, 200);
+        await assertTexts(reopened?.body.contentReleaseDetail.contentRelease.runtimeSnapshot);
+      }
+    } finally { await closeServer(isolated.server); rmSync(directory, { recursive: true, force: true }); }
+  });
+}
+
 test("attachment manager retains typed BaseVariable requests and enforces capture scope", async () => {
   const tenantKey = "attachment-tenant";
   const workspaceKey = "attachment-workspace";

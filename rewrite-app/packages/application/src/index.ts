@@ -8992,7 +8992,7 @@ const normalizeContentStructure = (
       downloadSpeed: normalizeSpeed(entry.downloadSpeed),
       customTexts: Object.fromEntries(
         Object.entries(entry.customTexts ?? {})
-          .map(([key, value]) => [key.trim(), String(value).trim()] as const)
+          .map(([key, value]) => [key.trim(), String(value)] as const)
           .filter(([key]) => Boolean(key))
       ),
       questions
@@ -9035,8 +9035,8 @@ const normalizeContentStructure = (
       };
     const customTexts = Object.fromEntries(
       Object.entries(bookletEntry.customTexts ?? {})
-        .map(([key, value]) => [key.trim(), String(value).trim()] as const)
-        .filter(([key, value]) => Boolean(key && value))
+        .map(([key, value]) => [key.trim(), String(value)] as const)
+        .filter(([key]) => Boolean(key))
     );
     if (Object.keys(customTexts).length > 0) {
       normalizedBooklet.customTexts = {
@@ -9626,7 +9626,7 @@ const normalizeParsedJsonContentStructure = (
     return Object.fromEntries(
       Object.entries(record).flatMap(([key, entryValue]) =>
         typeof entryValue === "string" && key.trim()
-          ? [[key.trim(), entryValue.trim()] as const]
+          ? [[key.trim(), entryValue] as const]
           : []
       )
     );
@@ -10963,7 +10963,8 @@ const isXmlReplacementCharacterWarning = (level: string, message: string): boole
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
   sourceFileName: string,
-  context: XmlValidationContext
+  context: XmlValidationContext,
+  allowPackageManifest = false
 ): ImportJobDiagnostic[] => {
   if (/<!DOCTYPE\b/i.test(sourceDocument)) {
     return [
@@ -11006,6 +11007,9 @@ const validateTestcenterXmlSourceDocument = (
     candidate => candidate.toLowerCase() === rootName.toLowerCase()
   );
   if (!canonicalRootName) {
+    // A selected, well-formed resource manifest has its own graph validation.
+    // DOCTYPE and malformed XML have already been rejected above.
+    if (allowPackageManifest && rootName === "manifest") return [];
     return context.profile === "original-19"
       ? [createImportDiagnostic("testcenter_xml_root_invalid",
           "Original Testcenter XML requires Booklet, Unit, Testtakers or SysCheck as its root element.")]
@@ -14492,7 +14496,7 @@ const collectXmlBookletHierarchies = (
         : []
       ).flatMap(customText => {
         const key = customText.getAttribute("key")?.trim() ?? "";
-        return key ? [[key, xmlElementText(customText).trim()] as const] : [];
+        return key ? [[key, String(customText.textContent ?? "")] as const] : [];
       })
     );
     const testletEntries: SourcePackageTestletEntry[] = [];
@@ -15169,7 +15173,7 @@ const parseSystemCheckSourceDocument = (
   const customTexts = Object.fromEntries(
     (config ? xmlChildrenNamed(config, "CustomText") : []).flatMap(element => {
       const key = readAttribute(element, "key");
-      return key ? [[key, xmlElementText(element)]] : [];
+      return key ? [[key, String(element.textContent ?? "")]] : [];
     })
   );
   const unitKey = readAttribute(config, "unit");
@@ -19425,7 +19429,8 @@ const validateZipXmlEntries = (
       continue;
     }
     diagnostics.push(
-      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName, context)
+      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName, context,
+        zipEntryPathIdentity(entry.fileName) === zipEntryPathIdentity(manifestExtraction.manifestFileName))
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
     let hasDuplicateXmlIdentity = false;

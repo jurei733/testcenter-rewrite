@@ -1,5 +1,38 @@
 # Testcenter parity checklist
 
+### Content text preservation and strict package manifests (2026-10-19)
+
+The same raw-value guarantee now reaches Booklet and SysCheck imports. Their
+XML readers use untrimmed character data; structured JSON and Booklet manifest
+normalizers retain empty, whitespace-only and padded strings. Other metadata,
+identifiers and ordinary XML text fields retain their existing normalization.
+The actual pinned Original Booklet parser and both DOM traversal methods run
+in Chromium 147; the actual Original SysCheck extraction method runs on PHP
+8.3.35 / libxml 2.9.14. Both return the fixture's exact empty, padded, whitespace,
+CDATA/entity-literal and zero values. The SysCheck witness sets `isValid` true
+to isolate extraction; HTTP fixtures separately require native Original-19 XSD
+acceptance. Full source bytes and hashes accompany both witnesses.
+
+Four HTTP gates cover structured JSON, manifest JSON Booklet text, loose
+Booklet XML with its actual Unit/Player dependency assembly, and SysCheck XML.
+All four pass on Memory/File/SQLite; every File/SQLite result is read again
+after reopening the server. Booklet dependency assembly also exposed a strict
+intake defect: its selected IMS manifest was treated as Testcenter content and
+rejected for having a `manifest` root. The selected, well-formed `manifest`
+now uses the existing resource-graph checks. XML parsing, DOCTYPE, encoding,
+archive integrity and each content member's native XSD checks still apply.
+All 305 compiled backend checks and 172 Memory HTTP tests pass.
+Four invalid packaged manifests and one standalone manifest remain rejected,
+including a Booklet with a misleading manifest comment and no schema reference.
+
+The preceding published `089cffc1` completes all 38 CI jobs successfully,
+including PostgreSQL and full participant/operator browser gates. Its duplicate
+push run is completed/cancelled. These later content changes have local
+qualification and still require fresh full remote CI. Complete parity remains
+30 complete / 19 partial; remaining direct-read callsites, editor default keys,
+real production-package/staging acceptance and physical-camera checks remain
+open.
+
 ### Exact custom-text values through settings, accounts and rendering (2026-10-19)
 
 Global and operator-account normalizers previously trimmed text and discarded
@@ -54,8 +87,9 @@ contract and passes all cases. Main CI coverage remains mandatory; the adapter
 fix does not weaken the API or bypass the failing corpus stage. The prior
 native-route correction passes its complete participant-console CI job.
 
-This correction and the subsequent local runtime changes require a fresh full
-workflow. The preceding run is recorded as failed, not as full qualification.
+Published `089cffc1` subsequently completes all 38 workflow jobs successfully.
+The preceding `cb530787` remains recorded as failed. Later local runtime
+changes require qualification on their own published head.
 
 ### Original roster XML text and structural content (2026-10-19)
 
