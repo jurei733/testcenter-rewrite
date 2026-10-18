@@ -1,5 +1,17 @@
 # Cloud continuation: Testcenter Rewrite
 
+### Native camera component visibility witness (2026-10-19)
+
+An independent raw-Chrome/public-CDP probe now executes actual capture methods,
+scanner and shipped QR worker without SDK focus emulation or visibility mocks.
+CUA minimization yields a minimized native window, `document.hidden=true`,
+inactive camera, cleared video stream and ended old tracks. Native restoration
+yields a normal visible window and active distinct new stream; the old tracks
+stay ended. The owned browser exits cleanly. Preserve the successful states,
+events and source/worker hashes alongside earlier failed probes. This is an
+owned synthetic-camera component harness: full Angular and physical-camera
+acceptance remain unqualified, and formal 30/19 stays unchanged.
+
 ### Current correction: strict declared UTF-7 XML (2026-10-19)
 
 The prior runtime rejects a valid declared UTF-7 Booklet. PHP 8.3.35/libxml
@@ -34,13 +46,10 @@ The build remains 469.99 kB. Keep whole-head CI qualification separate.
 
 The `820bf4e2` PR workflow still runs; its full image/rear/front attachment job
 passes. Only its redundant push workflow was cancelled to free capacity; the
-complete PR gate remains required. Native window visibility remains unproved:
-the UI-driven combined hidden/paused gate times out without an independent
-trace of each conjunct, and direct Chrome fails at native startup. Both logs
-are retained and the owned raw process is stopped. Do not classify those
-attempts as a product defect, prerequisite-only failure or successful physical
-acceptance without stronger evidence. Preserve formal 30/19 and production
-boundaries plus the protected presentation.
+complete PR gate remains required. The later raw-Chrome component witness now
+qualifies actual native minimize/stop and restore/resume; earlier SDK/startup
+attempts remain failed. Complete Angular/physical-camera acceptance remains
+separate. Preserve formal 30/19, production boundaries and the presentation.
 
 ### Current correction: printed camera page and QR region (2026-10-18)
 
