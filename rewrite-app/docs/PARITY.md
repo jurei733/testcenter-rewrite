@@ -1,5 +1,15 @@
 # Testcenter parity checklist
 
+### Complete published CI baseline (2026-10-19)
+
+Published `aafa0fbe` passes all 38 jobs in workflow `39182233472`, including
+PostgreSQL, the full shared browser flow, participant-console Debug/native
+routes/tabs, administration and synchronization gates. The later direct
+participant and monitor text corrections below pass their local/source/browser
+checks and still require their own complete remote run. This green baseline
+does not establish production or physical-device acceptance; formal parity
+remains 30 complete / 19 partial areas.
+
 ### Monitor filter pipes and direct values (2026-10-19)
 
 Generated filter labels now read the exact Original `gm_filter_target_*` and
