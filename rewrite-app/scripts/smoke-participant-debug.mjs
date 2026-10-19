@@ -89,6 +89,11 @@ try {
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
+  const commandApplications = new Map();
+  page.on("response", response => {
+    const match = new URL(response.url()).pathname.match(/^\/api\/v1\/participant\/sessions\/[^/]+\/commands\/([^/]+)\/application$/);
+    if (match && response.request().method() === "POST") commandApplications.set(match[1], response);
+  });
   // The real Player sandbox has an opaque origin, so only its parent owns
   // this test-only readiness flag; subsequent frames/reloads release normally.
   await page.addInitScript(() => {
@@ -193,14 +198,31 @@ try {
   assert.equal(requests.length, count); await context.setOffline(false);
   await poll(async () => await storedValue() === "3", "Offline capture was not delivered after reconnect");
   mark("tracked-variables-offline-local-capture");
+  const waitForDebugLog = content => page.waitForResponse(response => {
+    if (new URL(response.url()).pathname !== `/api/v1/participant/test-runs/${run.testRunId}/test-logs` || response.request().method() !== "POST") return false;
+    return response.request().postDataJSON()?.logs?.some(log => log.entries?.some(entry => entry.key === "command executed" && entry.content === content));
+  });
+  const previousOffLogged = waitForDebugLog("debug off");
   await debug(["off"]); await tabs.waitFor({ state: "detached" }); assert.equal(await page.evaluate(() => localStorage.getItem("tc-debug")), null);
+  assert.equal((await previousOffLogged).status(), 200);
   const issue = async (type, args) => (await api(workspace + `/monitor/open-runs/${run.testRunId}/commands`, { commandType: type, ...(args ? { debugArguments: args } : {}) }, operator)).command;
-  await issue("debug", ["on"]); await tabs.waitFor(); mark("remote-debug-through-real-receiver");
-  await issue("pause"); await poll(async () => (await durable()).run.status === "paused", "Real monitor pause missing");
+  const issueApplied = async (type, args) => {
+    const command = await issue(type, args);
+    await poll(() => Promise.resolve(commandApplications.has(command.commandId)), `Missing ${type} application receipt`);
+    const response = commandApplications.get(command.commandId); assert.equal(response.status(), 200);
+    const { application } = await response.json();
+    assert.equal(application.command.commandId, command.commandId);
+    assert.ok(application.command.executedAt); assert.ok(application.command.executionSequence > 0);
+    return command;
+  };
+  // Visible state may precede the durable execution log. Snapshot only after
+  // both exact remote commands have committed their application receipts.
+  await issueApplied("debug", ["on"]); await tabs.waitFor(); mark("remote-debug-through-real-receiver");
+  await issueApplied("pause"); await poll(async () => (await durable()).run.status === "paused", "Real monitor pause missing");
   await poll(async () => /STATUS:\s*PAUSED/.test(await windowPane("main").innerText()), "Pane did not show PAUSED");
   const paused = await durable(); const logPath = workspace + `/test-logs?testRunId=${run.testRunId}&logKey=command%20executed`;
   const prior = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
-  const logged = page.waitForResponse(response => new URL(response.url()).pathname === `/api/v1/participant/test-runs/${run.testRunId}/test-logs` && response.request().method() === "POST");
+  const logged = waitForDebugLog("debug off Paused exact Ω");
   await debug(["off", "Paused exact Ω"]); assert.equal((await logged).status(), 200); await tabs.waitFor({ state: "detached" });
   const logs = (await api(logPath, undefined, operator)).items.map(item => item.testLog);
   assert.equal(logs.length, prior.length + 1); assert.equal(logs.filter(log => log.logContent === "debug off Paused exact Ω").length, 1);

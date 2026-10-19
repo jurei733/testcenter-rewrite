@@ -1,5 +1,28 @@
 # Testcenter parity checklist
 
+### Correlated Debug fixture acknowledgements (2026-10-19)
+
+The `c887012d` participant-console CI job reaches the paused Debug check but
+counts five logs against an expected four. An earlier native `debug off` had
+not committed when the fixture captured its baseline. The test also treated
+any successful test-log response as acknowledgement of the new, labelled
+`debug off`, so an earlier queue entry could satisfy the wrong waiter.
+
+A real headful Angular/SQLite reproduction delays only the earlier `debug off`
+request by five seconds. The unchanged fixture captures three prior logs and
+then observes five, reproducing the CI error. The corrected fixture awaits the
+exact earlier log, both remote commands' correlated application receipts
+(including persisted execution timestamp/sequence), and the exact labelled
+new log before checking its delta. The same delayed witness passes the whole
+Debug browser suite. The exact one-new-row/one-label checks and full equality
+of the paused Run, parent session and timers remain unchanged. This correction
+changes the browser fixture only, not runtime delivery or Original console
+promise semantics; the fulfilled-handler timestamp checks still pass.
+
+The full workflow remains failed until the next head completes all its gates.
+This deterministic timing witness and the local full Debug browser suite do
+not substitute for remote participant-console qualification.
+
 ### Systemcheck text consumers, complete editor catalog and filter copy (2026-10-19)
 
 Systemcheck rendering now keeps the selected check's empty and authored values
