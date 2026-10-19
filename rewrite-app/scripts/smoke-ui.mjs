@@ -8808,7 +8808,7 @@ try {
     .waitFor();
   await page
     .locator("#participantRouteDraftDetail")
-    .filter({ hasText: "Complete Test saves this draft" })
+    .filter({ hasText: "Finishing the test saves this draft" })
     .waitFor();
   logStep("participant-route-unit-previous");
   await clickAction("Previous Unit");
@@ -8908,7 +8908,7 @@ try {
   );
   await page
     .locator("#participantRouteDraftDetail")
-    .filter({ hasText: "Complete Test saves this draft before closing" })
+    .filter({ hasText: "Finishing the test saves this draft before closing" })
     .waitFor();
   await page
     .locator("#participantRouteCompletionReadinessLabel")
@@ -8917,10 +8917,10 @@ try {
   await page
     .locator("#participantRouteCompletionReadinessDetail")
     .filter({
-      hasText: "All units will be answered after Complete Test saves the current draft."
+      hasText: "All units will be answered after finishing saves the current draft."
     })
     .waitFor();
-  await clickAction("Complete Test");
+  await clickAction(originalParticipantCustomTextDefaults.login_testEndButtonLabel);
   await page.locator("#participantRouteEntry").waitFor();
   const returnedAfterEnd = await (
     await fetch(`${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`)
@@ -10651,15 +10651,15 @@ try {
   await page
     .locator("#participantRouteNavigationNotice")
     .filter({ hasText: "In an enforced test, this action would be blocked." })
-    .filter({ hasText: "Complete the required response" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgNavigationDeniedText_responsesIncomplete })
     .waitFor();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave task?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTitle-unit"] })
     .waitFor();
   await page
     .locator("#participantConfirmationMessage")
-    .filter({ hasText: "cannot be opened again" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTextPrompt-unit"] })
     .waitFor();
   await page.waitForTimeout(250);
   await page.locator("#participantConfirmationContinueButton").click();
@@ -15963,7 +15963,7 @@ try {
     }
     await page
       .locator("#participantConfirmationTitle")
-      .filter({ hasText: "Leave timed block?" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
       .waitFor({ timeout: 30_000 });
     await page.locator("#participantConfirmationContinueButton").click();
     await page
@@ -19709,7 +19709,7 @@ try {
     .click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave timed block?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
     .waitFor();
   const hotReturnDialogStateBeforeResponse = await sendSmokeJson(
     `${baseUrl}/api/v1/participant/sessions/${hotReturnTimedController.participantSessionId}/current-state`,
@@ -19940,7 +19940,7 @@ try {
   await confirmLeaveTarget.click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave timed block?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_warningLeaveTimerBlockTitle })
     .waitFor();
   await page.locator("#participantConfirmationStayButton").click();
   await page
@@ -20053,7 +20053,7 @@ try {
   await confirmedUnitLockTarget.click();
   await page
     .locator("#participantConfirmationTitle")
-    .filter({ hasText: "Leave task?" })
+    .filter({ hasText: originalParticipantCustomTextDefaults["booklet_warningLeaveTitle-unit"] })
     .waitFor();
   await page.locator("#participantConfirmationStayButton").click();
   await page

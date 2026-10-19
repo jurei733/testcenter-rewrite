@@ -5555,7 +5555,7 @@ export class ParticipantViewFacade {
       return {
         label: "Ready to complete",
         detail: args.hasUnsavedResponse
-          ? "All units will be answered after Complete Test saves the current draft."
+          ? "All units will be answered after finishing saves the current draft."
           : "All units already have saved responses.",
         state: "ready"
       };
@@ -5564,7 +5564,7 @@ export class ParticipantViewFacade {
     return {
       label: `${missingUnitCount} ${missingUnitCount === 1 ? "response" : "responses"} missing`,
       detail: args.hasUnsavedResponse
-        ? `Complete Test will save this draft, but ${missingResponseLabel}.`
+        ? `Finishing will save this draft, but ${missingResponseLabel}.`
         : `${missingResponseLabel} before the test is fully answered.`,
       state: "incomplete"
     };
@@ -5598,7 +5598,7 @@ export class ParticipantViewFacade {
       return "This test is complete; responses are no longer editable.";
     }
     if (args.hasUnsavedResponse) {
-      return "Use save, navigation, or Complete Test to store this answer. Complete Test saves this draft before closing.";
+      return "Use save, navigation, or finish the test to store this answer. Finishing the test saves this draft before closing.";
     }
     if (args.savedUnitResponse.length > 0) {
       return "The answer shown here matches the saved response for this unit.";

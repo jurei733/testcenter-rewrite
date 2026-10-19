@@ -1,5 +1,23 @@
 # Testcenter parity checklist
 
+### Default completion and leave labels in the shared browser fixture (2026-10-19)
+
+The longer local shared flow reaches participant completion after passing the
+settings, systemcheck, account, role and session stages, then searches for the
+old `Complete Test` fallback. The actual button now correctly resolves the
+Original `login_testEndButtonLabel` default. The browser action and remaining
+unit/timed-block confirmation and response-completeness advisory expectations
+now use their exact Original keys, rather than old English fallbacks. A second
+full local run passes completion and reaches the response advisory; its old
+English expectation is likewise replaced with the actual Original default. No API or completion guard is relaxed.
+
+Three draft/completion hints also named the fixed `Complete Test` label even
+when a project customized that button. They now describe finishing the test
+without assuming its visible label; their saved-response/readiness conditions
+are unchanged. The production build remains 469.88 kB and all 1,268 frontend
+checks pass. A fresh full shared browser flow is running against this build;
+its complete result and next-head remote qualification are still pending.
+
 ### Correlated Debug fixture acknowledgements (2026-10-19)
 
 The `c887012d` participant-console CI job reaches the paused Debug check but
