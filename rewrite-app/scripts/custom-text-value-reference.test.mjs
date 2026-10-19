@@ -136,3 +136,115 @@ for (const key of Object.keys(systemDefaults)) test(`Original system-check fallb
   const expected = key === "syscheck_report_aboutPassword" ? systemDefaults[key] : templateFallbacks[key];
   assert.equal(expressions[0], expected, key);
 });
+
+// Run the actual Original controller consumers as well as its resolver: direct
+// reads deliberately do not share the template pipe's empty-value fallback.
+const directExports = {};
+const directSource = `export class OriginalController {
+ ${members("test-controller.service.ts", "TestControllerService", ["setUnitNavigationRequest", "checkAndSolveTimer", "checkAndSolveCompleteness", "checkAndSolveLeaveLocks"])}
+}
+export class OriginalComponent {
+ ${members("test-controller.component.ts", "TestControllerComponent", ["handleTimer", "requestFullScreen"])}
+}
+export class ActualParticipant {
+ ${facade.members.filter(node => ["veronaErrorText", "controllerErrorText", "leaveLockConfirmationTitle", "leaveLockConfirmationText", "completeRunWithConfirmation", "describeNavigationReasons", "presentNavigationDenial"].includes(node.name?.getText(participantAst))).map(node => node.getText(participantAst)).join("\n")}
+}`;
+new Function("exports", "of", "UnitNavigationTarget", "MaxTimerEvent", ts.transpileModule(directSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+}).outputText)(directExports, of, { ERROR: "error" }, { STEP: "step" });
+
+function directFixture(item, keys) {
+  const scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? Object.fromEntries(keys.map(key => [key, scope.value])) : {});
+  const service = new exports.ReferenceService(); new exports.ReferenceConfig(service).setCustomTexts(scopes[0]);
+  for (const scope of scopes.slice(1)) service.addCustomTexts(scope);
+  const effective = Object.assign({}, ...scopes);
+  const actual = Object.assign(new directExports.ActualParticipant(), {
+    // Bind the shipped resolvers, including their different empty semantics.
+    customText: (key, fallback) => participant.resolveParticipantCustomText(effective, key, fallback),
+    customTextValue: key => participant.resolveParticipantCustomTextValue(effective, key),
+    customTextFormat: (key, fallback, ...values) => participant.resolveAndFormatParticipantCustomText(effective, key, values, fallback)
+  });
+  const original = Object.assign(new directExports.OriginalController(), { cts: service });
+  return { actual, original, service };
+}
+for (const item of cases) {
+  test(`both actual error surfaces match the Original direct error dialog: ${item.name}`, async () => {
+    const { actual, original } = directFixture(item, ["booklet_errormessage"]);
+    let message;
+    Object.assign(original, { booklet: {}, closeAllBuffers: async () => ({}), messageService: { showErrorDialog: text => { message = text; } } });
+    assert.equal(await original.setUnitNavigationRequest("error"), false);
+    assert.equal(actual.veronaErrorText, message);
+    assert.equal(actual.controllerErrorText, message);
+  });
+  for (const scope of ["unit", "testlet"]) test(`actual ${scope} leave dialog matches Original authored values: ${item.name}`, async () => {
+    const { actual, original } = directFixture(item, [`booklet_warningLeaveTitle-${scope}`, `booklet_warningLeaveTextPrompt-${scope}`]);
+    const parent = { id: "old-block", restrictions: { lockAfterLeaving: { scope, confirm: true } } };
+    const expected = await firstValueFrom(original.checkAndSolveLeaveLocks({ parent }, { parent: { id: "new-block" } }));
+    assert.equal(expected.kind, "confirm");
+    const lock = { scope, confirm: true, detail: "Rewrite detail must not replace authored empty text" };
+    assert.equal(actual.leaveLockConfirmationTitle(lock), expected.title);
+    assert.equal(actual.leaveLockConfirmationText(lock), expected.content);
+  });
+  test(`actual timed completion confirmation matches Original: ${item.name}`, async () => {
+    const { actual, original } = directFixture(item, ["booklet_warningLeaveTimerBlockTitle", "booklet_warningLeaveTimerBlockTextPrompt"]);
+    Object.assign(original, { currentTimerId: "timer", testlets: { timer: { restrictions: { timeMax: { leave: "confirm" } } } }, testMode: { forceTimeRestrictions: true } });
+    const expected = await firstValueFrom(original.checkAndSolveTimer({}, null));
+    let confirmation;
+    Object.assign(actual, { player: { testletTimer: { leave: "confirm", displayLabel: "Own block" } }, readCurrentRunState: () => ({ executionMode: { forceTimeRestrictions: true } }), requestConfirmation: async value => { confirmation = value; return false; } });
+    await actual.completeRunWithConfirmation();
+    assert.equal(confirmation.title, expected.title);
+    assert.equal(confirmation.message, expected.content);
+  });
+  for (const reasons of [["presentationIncomplete"], ["responsesIncomplete"], ["presentationIncomplete", "responsesIncomplete"]]) test(`actual navigation denial matches Original direct reasons ${reasons.join("+")}: ${item.name}`, async () => {
+    const keys = ["booklet_msgNavigationDeniedTitle", ...reasons.map(reason => `booklet_msgNavigationDeniedText_${reason}`)];
+    const { actual, original } = directFixture(item, keys);
+    Object.assign(original, { checkCompleteness: () => reasons, testMode: { forceNaviRestrictions: true }, _navigationDenial$: { next() {} } });
+    const expected = await firstValueFrom(original.checkAndSolveCompleteness({ sequenceId: 1 }, { sequenceId: 2 }));
+    const rewriteReasons = reasons.map(reason => reason === "presentationIncomplete" ? "presentation_incomplete" : "response_incomplete");
+    assert.equal(actual.describeNavigationReasons(rewriteReasons), expected.infoDialog.content);
+    let advisory;
+    Object.assign(actual, { clearNavigationAdvisory() {}, readCurrentRunState: () => ({ booklet: { policy: { display: { silentMode: false } } }, navigation: { forwardDeniedReasons: rewriteReasons } }), navigationAdvisory: { set: value => { advisory = value; } }, uiState: { renderVersion: { update() {} } } });
+    actual.presentNavigationDenial("forward");
+    if (expected.infoDialog.content) assert.deepEqual(advisory, { title: expected.infoDialog.title, message: expected.infoDialog.content });
+  });
+}
+
+const playerMember = facade.members.find(node => node.name?.getText(participantAst) === "player");
+let warningExpression;
+function findWarning(node) {
+  if (ts.isPropertyAssignment(node) && node.name.getText(participantAst) === "warningMessage") {
+    assert.ok(ts.isConditionalExpression(node.initializer));
+    warningExpression = node.initializer.whenTrue.getText(participantAst);
+  }
+  ts.forEachChild(node, findWarning);
+}
+findWarning(playerMember);
+assert.ok(warningExpression);
+const actualTimerWarning = new Function("activeWarning", `return ${warningExpression};`);
+const participantTemplate = readFileSync(new URL("../apps/web/src/app/participant-view.component.ts", import.meta.url), "utf8");
+const fullscreenExpression = participantTemplate.match(/id="participantRouteFullscreenPromptTitle">\s*{{\s*(.*?)\s*}}/)[1];
+const actualFullscreenText = new Function("view", `return ${fullscreenExpression};`);
+for (const text of [undefined, "", " \t ", "  Own text  ", "%s / %s", "%%s", "0"]) {
+  test(`actual timer warning keeps raw text and replaces only the first token: ${JSON.stringify(text)}`, async () => {
+    const item = { scopes: [text === undefined ? {} : { value: text }] };
+    const { actual, service } = directFixture(item, ["booklet_msgSoonTimeOver"]);
+    let expected;
+    const original = Object.assign(new directExports.OriginalComponent(), {
+      cts: service, tcs: { timers: {}, timerWarningPoints: [2], shouldShowConfirmationUI: () => true, addToTestStateBuffer() {} },
+      snackBar: { open: value => { expected = value; } }
+    });
+    await original.handleTimer({ type: "step", id: "timer", timeLeftSeconds: 120 });
+    assert.equal(actualTimerWarning.call(actual, { minutes: 2 }), expected);
+  });
+  test(`actual fullscreen prompt matches Original direct service read: ${JSON.stringify(text)}`, async () => {
+    const item = { scopes: [text === undefined ? {} : { value: text }] };
+    const { actual, service } = directFixture(item, ["booklet_requestFullscreen"]);
+    let expected;
+    const original = Object.assign(new directExports.OriginalComponent(), {
+      cts: service, mainDataService: { isFullScreen: false },
+      messageService: { showConfirmDialog: value => { expected = value.content; return of(false); } }
+    });
+    await original.requestFullScreen();
+    assert.equal(actualFullscreenText(actual), expected);
+  });
+}

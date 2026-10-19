@@ -19370,6 +19370,10 @@ try {
   await protectedControllerFrame
     .getByText(/Testung Controller: Aufgabe1:/)
     .waitFor({ timeout: 15_000 });
+  // Apply the same viewport render barrier as completeOriginalControllerUnit,
+  // without advancing this buffered-answer scenario to the following page.
+  await page.locator("#participantVeronaPlayerFrame").scrollIntoViewIfNeeded();
+  await page.locator("#participantVeronaPlayerFrame").screenshot();
   await protectedControllerFrame
     .locator('[data-cy="TestController-radio1-Aufg1"]')
     .check();

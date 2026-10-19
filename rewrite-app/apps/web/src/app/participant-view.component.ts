@@ -379,7 +379,7 @@ interface ParticipantVisibleCodeNotice {
         >
           <div>
             <span>Display Check</span>
-            <strong id="participantRouteFullscreenPromptTitle">{{ view.customText('booklet_requestFullscreen', 'Use fullscreen for this test?') }}</strong>
+            <strong id="participantRouteFullscreenPromptTitle">{{ view.customTextValue('booklet_requestFullscreen') }}</strong>
             <p>The booklet requests a distraction-free fullscreen presentation.</p>
           </div>
           <div class="actions">

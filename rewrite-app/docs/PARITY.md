@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Direct participant controller text consumers (2026-10-19)
+
+Participant error surfaces, timer warnings, navigation-denial text, Unit/Testlet
+leave confirmations and fullscreen copy now use the same direct-value semantics
+as the Original controller service/component. An explicitly empty scoped value
+stays empty instead of reviving template fallback copy. The lazy Starter-exit
+policy receives that same direct resolver. Timer warnings replace only the
+first `%s`, exactly like the actual Original `String.replace` call. Ordinary
+template-pipe consumers retain their own fallback behavior.
+
+Both full controller source files are pinned with hashes to Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`. Executing the actual Original
+navigation, error, timer, leave and fullscreen methods against the actual
+Rewrite consumers adds 63 comparisons. Nine of the 180 text-reference cases
+fail on the previous implementation and all pass after the correction. Seven
+additional Starter-exit checks cover empty/padded Unit, Testlet and timer
+dialogs plus an empty completeness dialog. All 1,342 frontend checks pass.
+
+Six authenticated, strict Original-19 Chromium/SQLite scenarios verify the
+visible fullscreen prompt and timed-leave dialog in both interfaces for
+defaults, empty local overrides over global text, and padded multiline text.
+The exact text assertions pass; opening and cancelling issue no completion or
+Starter-return mutation. Error and timer-warning text have source-execution
+coverage here, not an additional real-browser claim. The production initial
+bundle remains 469.88 kB under the unchanged 470 kB cap.
+
+The previous shared flow passes Original ASPECT, the sample package and the
+current Booklet Config, then fails at a native radio check in the protected
+Controller case. That one call now uses the same explicit frame scroll/render
+barrier already used by the neighboring Controller completion helper, while
+retaining native `check()` and the subsequent buffered-answer assertions. A
+fresh full flow is running; complete browser/remote qualification and the
+remaining monitor/attachment direct-text audit are still open.
+
 ### Player readiness and complete fixture HTTP bodies (2026-10-19)
 
 Published `b6bf7e94` finishes with 23 successful and 15 failed CI jobs. The

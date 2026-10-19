@@ -1440,11 +1440,7 @@ export class ParticipantViewFacade {
                   : "Leaving this block requires confirmation.",
             showTimeLeft: activeTestletTimer.showTimeLeft,
             warningMessage: activeWarning
-              ? this.customTextFormat(
-                  "booklet_msgSoonTimeOver",
-                  `You have ${activeWarning.minutes} minute${activeWarning.minutes === 1 ? "" : "s"} left for this timed block.`,
-                  activeWarning.minutes
-                )
+              ? this.customTextValue("booklet_msgSoonTimeOver").replace("%s", activeWarning.minutes.toString(10))
               : null
           };
         })()
@@ -1584,10 +1580,7 @@ export class ParticipantViewFacade {
       navigationNoticeTitle: policy.display.silentMode
         ? ""
         : persistentNavigationDenial
-          ? this.customText(
-              "booklet_msgNavigationDeniedTitle",
-              "This unit cannot be left yet"
-            )
+          ? this.customTextValue("booklet_msgNavigationDeniedTitle")
           : navigationAdvisory?.title ?? "",
       navigationNotice: policy.display.silentMode
         ? ""
@@ -1784,10 +1777,7 @@ export class ParticipantViewFacade {
   }
 
   get veronaErrorText(): string {
-    return this.customText(
-      "booklet_errormessage",
-      "The unit could not be loaded. Reload the player or ask the test supervisor for help."
-    );
+    return this.customTextValue("booklet_errormessage");
   }
 
   reloadPage(): void {
@@ -1958,10 +1948,7 @@ export class ParticipantViewFacade {
   }
 
   get controllerErrorText(): string {
-    return this.customText(
-      "booklet_errormessage",
-      "A technical problem occurred. Reload the page and ask the test supervisor for help if the problem continues."
-    );
+    return this.customTextValue("booklet_errormessage");
   }
 
   handleVeronaControllerError(controllerError: VeronaControllerError): void {
@@ -2087,18 +2074,12 @@ export class ParticipantViewFacade {
     const messages: string[] = [];
     if (reasons.includes("presentation_incomplete")) {
       messages.push(
-        this.customText(
-          "booklet_msgNavigationDeniedText_presentationIncomplete",
-          "View all required unit content before moving forward or completing the test."
-        )
+        this.customTextValue("booklet_msgNavigationDeniedText_presentationIncomplete")
       );
     }
     if (reasons.includes("response_incomplete")) {
       messages.push(
-        this.customText(
-          "booklet_msgNavigationDeniedText_responsesIncomplete",
-          "Complete the required response before moving forward or completing the test."
-        )
+        this.customTextValue("booklet_msgNavigationDeniedText_responsesIncomplete")
       );
     }
     if (messages.length > 0) {
@@ -2156,10 +2137,7 @@ export class ParticipantViewFacade {
       return;
     }
     this.navigationAdvisory.set({
-      title: this.customText(
-        "booklet_msgNavigationDeniedTitle",
-        "This unit cannot be left yet"
-      ),
+      title: this.customTextValue("booklet_msgNavigationDeniedTitle"),
       message
     });
     this.uiState.renderVersion.update(version => version + 1);
@@ -3241,22 +3219,16 @@ export class ParticipantViewFacade {
       return "Continue?";
     }
     return leaveLock.scope === "unit"
-      ? this.customText(
-          "booklet_warningLeaveTextPrompt-unit",
-          `${leaveLock.detail} Continue?`
-        )
-      : this.customText(
-          "booklet_warningLeaveTextPrompt-testlet",
-          `${leaveLock.detail} Continue?`
-        );
+      ? this.customTextValue("booklet_warningLeaveTextPrompt-unit")
+      : this.customTextValue("booklet_warningLeaveTextPrompt-testlet");
   }
 
   private leaveLockConfirmationTitle(
     leaveLock: ParticipantPlayerState["leaveLock"]
   ): string {
     return leaveLock?.scope === "unit"
-      ? this.customText("booklet_warningLeaveTitle-unit", "Leave task?")
-      : this.customText("booklet_warningLeaveTitle-testlet", "Leave section?");
+      ? this.customTextValue("booklet_warningLeaveTitle-unit")
+      : this.customTextValue("booklet_warningLeaveTitle-testlet");
   }
 
   private requestConfirmation(
@@ -3277,14 +3249,8 @@ export class ParticipantViewFacade {
     if (
       confirmTestletTimeLeave &&
       !(await this.requestConfirmation({
-        title: this.customText(
-          "booklet_warningLeaveTimerBlockTitle",
-          "Leave timed block?"
-        ),
-        message: this.customText(
-          "booklet_warningLeaveTimerBlockTextPrompt",
-          `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
-        ),
+        title: this.customTextValue("booklet_warningLeaveTimerBlockTitle"),
+        message: this.customTextValue("booklet_warningLeaveTimerBlockTextPrompt"),
         cancelLabel: "Stay here",
         confirmLabel: "Leave anyway"
       }))
@@ -3335,7 +3301,7 @@ export class ParticipantViewFacade {
         this.viewLifecycleSequence !== viewLifecycleSequence) return;
     const plan = planParticipantStarterExit({ state: currentState,
       response: this.runtime.currentUnitResponse, timer: this.player.testletTimer,
-      lock: this.player.leaveLock, customText: this.customText.bind(this) });
+      lock: this.player.leaveLock, customText: this.customTextValue.bind(this) });
     this.clearNavigationAdvisory();
     if (plan.originalNotices.length) this.originalNavigationToast.set({
       text: plan.originalNotices[0], additionalTexts: plan.originalNotices.slice(1)
@@ -4127,14 +4093,8 @@ export class ParticipantViewFacade {
       if (
         confirmTestletTimeLeave &&
         !(await this.requestConfirmation({
-          title: this.customText(
-            "booklet_warningLeaveTimerBlockTitle",
-            "Leave timed block?"
-          ),
-          message: this.customText(
-            "booklet_warningLeaveTimerBlockTextPrompt",
-            `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
-          ),
+          title: this.customTextValue("booklet_warningLeaveTimerBlockTitle"),
+          message: this.customTextValue("booklet_warningLeaveTimerBlockTextPrompt"),
           cancelLabel: "Stay here",
           confirmLabel: "Leave anyway"
         }))

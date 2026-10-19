@@ -24,7 +24,8 @@ export function planParticipantStarterExit(input: {
   response: string;
   timer: ParticipantViewFacade["player"]["testletTimer"];
   lock: ParticipantViewFacade["player"]["leaveLock"];
-  customText: (key: ParticipantCustomTextKey, fallback?: string) => string;
+  // These are direct controller service reads in Original, not template pipes.
+  customText: (key: ParticipantCustomTextKey) => string;
 }): ExitPlan {
   const { state, lock, customText } = input;
   const timer = input.timer && !["paused", "cancelled", "expired"].includes(input.timer.status) ? input.timer : null;
@@ -67,8 +68,8 @@ export function planParticipantStarterExit(input: {
   if (state.executionMode.forceTimeRestrictions && timer?.leave === "forbidden") {
     plan.originalNotices.push("Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist.");
     plan.advisory = {
-      title: customText("booklet_warningLeaveTimerBlockTitle", "Leave timed block?"),
-      message: customText("booklet_warningLeaveTimerBlockTextPrompt", `The timed block "${timer.displayLabel}" cannot be left while its timer is active.`)
+      title: customText("booklet_warningLeaveTimerBlockTitle"),
+      message: customText("booklet_warningLeaveTimerBlockTextPrompt")
     };
     return plan;
   }
@@ -86,12 +87,12 @@ export function planParticipantStarterExit(input: {
     (lock.confirm ? plan.confirmedNotices : plan.afterTimerNotices).push(notice);
   }
   const restriction = plan.confirmTestletTimeLeave ? {
-    title: customText("booklet_warningLeaveTimerBlockTitle", "Leave timed block?"),
-    message: customText("booklet_warningLeaveTimerBlockTextPrompt", `Leave the timed block "${timer?.displayLabel}" and close it permanently?`),
+    title: customText("booklet_warningLeaveTimerBlockTitle"),
+    message: customText("booklet_warningLeaveTimerBlockTextPrompt"),
     cancelLabel: "Stay here", confirmLabel: "Leave anyway"
   } : plan.confirmTestletLeaveLock ? {
-    title: customText(lock?.scope === "unit" ? "booklet_warningLeaveTitle-unit" : "booklet_warningLeaveTitle-testlet", lock?.scope === "unit" ? "Leave task?" : "Leave section?"),
-    message: customText(lock?.scope === "unit" ? "booklet_warningLeaveTextPrompt-unit" : "booklet_warningLeaveTextPrompt-testlet", `${lock?.detail} Continue?`),
+    title: customText(lock?.scope === "unit" ? "booklet_warningLeaveTitle-unit" : "booklet_warningLeaveTitle-testlet"),
+    message: customText(lock?.scope === "unit" ? "booklet_warningLeaveTextPrompt-unit" : "booklet_warningLeaveTextPrompt-testlet"),
     cancelLabel: "Stay here", confirmLabel: "Leave anyway"
   } : null;
   const confirmation = restriction ? { ...restriction, title: state.executionMode.saveResponses ? "Return to test selection?" : restriction.title }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
-import { compileBookletRuntimePolicy, parseVeronaUnitResponse, productionApiRoutes, resolveRoutePath, resolveParticipantCustomText, serializeVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
+import { compileBookletRuntimePolicy, parseVeronaUnitResponse, productionApiRoutes, resolveRoutePath, resolveParticipantCustomText, resolveParticipantCustomTextValue, serializeVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { bookletStarterExitDeniedReasons } from "@testcenter-rewrite-app/contracts/booklet-completeness";
 import { participantStarterExitPreparationRoute } from "@testcenter-rewrite-app/contracts/participant-starter-exit";
 import { completenessCases } from "./exit-completeness-fixture.mjs";
@@ -44,6 +44,7 @@ function facadeFixture({saving=true,force=true,timer=null,lock=null,customTexts=
   facade.readCurrentRunState=()=>state;facade.confirmationDialog=signal(null);
   facade.originalNavigationToast=signal(null);facade.navigationAdvisory=signal(null);
   facade.customText=(key,fallback)=>resolveParticipantCustomText(customTexts,key,fallback);
+  facade.customTextValue=key=>resolveParticipantCustomTextValue(customTexts,key);
   facade.leaveLockConfirmationTitle=()=>"Rewrite lock title";
   facade.leaveLockConfirmationText=()=>"Rewrite lock message";
   facade.returnToStarterInternal=async(...args)=>returns.push(args);
@@ -80,6 +81,21 @@ test("non-saving timed confirmation keeps its scoped Source title",async()=>{
   const pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();const request=f.facade.confirmationDialog();
   assert.equal(request.original.title,"Own title");f.parent.resolveOriginalConfirmation(request,false);
   await pending;assert.deepEqual(f.returns,[]);
+});
+for(const value of ["", "  Authored\ntext  "]) for(const kind of ["timer", "unit", "testlet"]) test(`actual Starter exit preserves direct ${kind} dialog value ${JSON.stringify(value)}`,async()=>{
+  const title=kind==="timer"?"booklet_warningLeaveTimerBlockTitle":`booklet_warningLeaveTitle-${kind}`;
+  const message=kind==="timer"?"booklet_warningLeaveTimerBlockTextPrompt":`booklet_warningLeaveTextPrompt-${kind}`;
+  const f=facadeFixture({saving:false,...(kind==="timer"?{timer:{leave:"confirm"}}:{lock:{scope:kind,confirm:true}}),customTexts:{[title]:value,[message]:value}});
+  const pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();const request=f.facade.confirmationDialog();
+  assert.equal(request.title,value);assert.equal(request.message,value);
+  assert.equal(request.original.title,value);assert.equal(request.original.message,value);
+  f.parent.resolveOriginalConfirmation(request,false);await pending;assert.deepEqual(f.returns,[]);
+});
+test("actual Starter completeness dialog retains explicitly empty direct title and reason",async()=>{
+  const f=facadeFixture({required:true,progress:{presentation:"complete",response:"none"},customTexts:{booklet_msgNavigationDeniedTitle:"",booklet_msgNavigationDeniedText_responsesIncomplete:""}});
+  const pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();const request=f.facade.confirmationDialog();
+  assert.equal(request.kind,"information");assert.equal(request.original.title,"");assert.equal(request.original.message,"");
+  f.parent.resolveOriginalConfirmation(request,false);await pending;assert.deepEqual(f.returns,[]);
 });
 test("enforced forbidden timer reports every attempt and cannot ask or return",async()=>{
   const f=facadeFixture({timer:{leave:"forbidden",displayLabel:"Own block"}});
