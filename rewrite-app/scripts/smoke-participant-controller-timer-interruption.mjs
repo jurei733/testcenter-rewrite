@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {access,mkdtemp,writeFile} from 'node:fs/promises';
+import {access,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
+import {createWriteStream} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -10,10 +11,13 @@ import {createSqliteFirstSliceRepository} from '@testcenter-rewrite-app/sqlite-s
 import {productionApiRoutes,resolveRoutePath,parseVeronaUnitResponse} from '@testcenter-rewrite-app/contracts';
 import {localDemoSourcePackage} from '../apps/api/dist/apps/api/src/local-demo-bootstrap.js';
 import {createServerRequestFailureGate} from './server-request-failure-gate.mjs';
+import {createSmokeRouteFailureGate,describeSmokeRouteFailure} from './smoke-route-failure-gate.mjs';
 
 const root=resolve(process.env.UI_SMOKE_FRONTEND_ROOT||'.');
 await access(join(root,'dist/apps/web/browser/index.html'));
-const artifacts=await mkdtemp(join(tmpdir(),'testcenter-controller-timer-'));
+const artifactRoot=process.env.UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT?.trim()||tmpdir();
+await mkdir(artifactRoot,{recursive:true});
+const artifacts=await mkdtemp(join(artifactRoot,'testcenter-controller-timer-'));
 console.log('owned_artifacts='+artifacts);
 const file=join(artifacts,'owned.sqlite'),gate=createServerRequestFailureGate();
 const module=pathToFileURL(resolve('apps/api/dist/apps/api/src/index.js')).href;
@@ -23,12 +27,15 @@ const server=spawn(process.execPath,['--input-type=module','-e',`
  process.once('SIGTERM',()=>server.close(()=>process.exit(0)));`],{cwd:root,env:{...process.env,FIRST_SLICE_STORE:'sqlite',FIRST_SLICE_SQLITE_FILE:file,
  FIRST_SLICE_BOOTSTRAP_DEMO:'true',FIRST_SLICE_OPERATOR_AUTH_REQUIRED:'true',FIRST_SLICE_PROOF_OF_WORK_SCOPES:'',FIRST_SLICE_XML_SCHEMA_PROFILE:'legacy-compatibility',REQUIRE_LOGIN_PASSWORD:'false'},stdio:['ignore','pipe','pipe','ipc']});
 gate.observeStream(server.stdout);gate.observeStream(server.stderr);
+const apiLog=createWriteStream(join(artifacts,'api.log'));
+server.stdout.pipe(apiLog,{end:false});server.stderr.pipe(apiLog,{end:false});
 const closed=new Promise(done=>server.once('close',done));
 const errors=[],checks=[],releases=[];
 let browser;
+let activeRouteFailures;
 const poll=async(predicate,message)=>{
  const deadline=Date.now()+20_000;
- while(Date.now()<deadline){if(await predicate())return;await delay(50);}
+ while(Date.now()<deadline){activeRouteFailures?.assertHealthy();const matched=await predicate();activeRouteFailures?.assertHealthy();if(matched)return;await delay(50);}
  throw Error(message);
 };
 try{
@@ -73,6 +80,8 @@ try{
  for(const [index,scenario] of scenarios.entries()){
   const context=await browser.newContext({viewport:{width:1280,height:800},locale:'de-DE'}),page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
+  const routeFailures=createSmokeRouteFailureGate();activeRouteFailures=routeFailures;
+  const intercept=(pattern,handler)=>page.route(pattern,routeFailures.wrap(pattern,handler));
   let releaseFreshState,releaseApply,releaseAnswer,releaseApplication,releaseAck,releaseLegacy,holdLegacyRoute,caseFailure,disposing=false,heldAnswer=false,heldApplication=false,heldAck=false,heldLegacy=false,loseReply=Boolean(scenario.lostTimerReply);
   const answerGate=new Promise(done=>{releaseAnswer=done;}),applicationGate=new Promise(done=>{releaseApplication=done;}),ackGate=new Promise(done=>{releaseAck=done;}),legacyGate=new Promise(done=>{releaseLegacy=done;});releases.push(releaseAnswer,releaseApplication,releaseAck,releaseLegacy);
   const applyGate=new Promise(done=>{releaseApply=done;}),freshStateGate=new Promise(done=>{releaseFreshState=done;});releases.push(releaseApply,releaseFreshState);
@@ -104,7 +113,7 @@ try{
       if(!disposing||!/Route is already handled|Target.*closed|Request.*aborted/i.test(error.message))throw error;
      });
     };
-    await page.route('**/native-commands',holdLegacyRoute);
+    await intercept('**/native-commands',holdLegacyRoute);
     // Seed only the replacement document: the departing live controller must
     // not discover and start this migration fixture before the real reload.
     await page.addInitScript(({run,packet})=>{
@@ -138,12 +147,12 @@ try{
    assert.equal(initial.testletTimers.timed.status,'running');
    const sibling={...structuredClone(initial),testRunId:crypto.randomUUID(),bookletKey:'second',bookletAssignmentKey:'second',currentUnitKey:'sibling-unit',testletTimers:{},unitResponses:{'sibling-unit':'Protected sibling'},unitResponseFieldTimestamps:{'sibling-unit':{opaque:99}}};await repository.saveTestRun(sibling);
    const siblingBefore=await repository.getTestRunById(sibling.testRunId);let parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
-   await page.route('**/save-progress',async route=>{
+   await intercept('**/save-progress',async route=>{
     const request=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);
     if(parseVeronaUnitResponse(request.unitResponse)?.unitState.dataParts?.answer==='Owned timer answer '+index){heldAnswer=true;await answerGate;}
     await route.fulfill({response});
    });
-   await page.route('**/controller-timer-interruptions',async route=>{
+   await intercept('**/controller-timer-interruptions',async route=>{
     const packet=route.request().postDataJSON(),response=await route.fetch();assert.equal(response.status(),200);const receipt=(await response.json()).interruption;
     timerPackets.push({packet,receipt});
     if(loseReply){loseReply=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'owned_lost_timer_reply'})});}
@@ -153,12 +162,12 @@ try{
     if(scenario.legacy&&route.request().postDataJSON().deliveryId===legacyPacket.deliveryId)return holdLegacyRoute(route);
     heldApplication=true;await applicationGate;const response=await route.fetch();assert.equal(response.status(),200);applications.push(await response.json());await route.fulfill({response});
    };
-   await page.route('**/native-commands',captureApplication);await page.route('**/commands/*/application',captureApplication);
+   await intercept('**/native-commands',captureApplication);await intercept('**/commands/*/application',captureApplication);
    await page.frameLocator('iframe').locator('#demoPlayerAnswer').fill('Owned timer answer '+index);
    await poll(()=>Promise.resolve(heldAnswer),'The timer fixture did not hold its committed Player answer');
    let before=await repository.getTestRunById(runId);
    if(scenario.appliedLegacy){
-    if(scenario.stale)await page.route('**/current-state**',async route=>{await freshStateGate;const response=await route.fetch();await route.fulfill({response});});
+    if(scenario.stale)await intercept('**/current-state**',async route=>{await freshStateGate;const response=await route.fetch();await route.fulfill({response});});
     await delay(scenario.legacyZero?Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-650-Date.now()):333);
     releaseApply();await poll(()=>Promise.resolve(legacyApplications.length>=(scenario.lostLegacyReply?2:1)),'The old command did not commit before its held reply');
     before=await repository.getTestRunById(runId);parentBefore=await repository.getParticipantSessionById(initial.participantSessionId);
@@ -166,7 +175,7 @@ try{
     if(scenario.legacyZero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)+150-Date.now()));
    }
    if(scenario.zero&&scenario.origin==='remote'){
-    await page.route('**/commands/*/acknowledgement',async route=>{const response=await route.fetch();assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
+    await intercept('**/commands/*/acknowledgement',async route=>{const response=await route.fetch();assert.equal(response.status(),200);heldAck=true;await ackGate;await route.fulfill({response});});
     await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator);await poll(()=>Promise.resolve(heldAck),'The zero-tick remote Pause did not reach its held ACK');
    }
    if(scenario.zero)await delay(Math.max(0,Date.parse(initial.testletTimers.timed.expiresAt)-950-Date.now()));
@@ -219,11 +228,18 @@ try{
     await poll(async()=>await page.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue()==='Owned timer answer '+index,'The restarted timed Unit did not restore its exact answer');
    }
    checks.push({scenario,timerPackets,legacyPacket,legacyApplications,initial,before,expectedBalance,frozen,final,resumed});console.log(`participant_controller_timer=${scenario.origin}-${scenario.keyword}${scenario.lostTimerReply?'-lost-reply':''}${scenario.zero?'-zero-'+scenario.resume+'-resume':''}${scenario.legacy?'-legacy-wait':''}${scenario.appliedLegacy?'-applied':''}${scenario.stale?'-stale-state':''}${scenario.lostLegacyReply?'-lost-legacy-reply':''}${scenario.legacyZero?'-legacy-zero':''}:passed`);
-  }catch(error){caseFailure=error;await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(error),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw error;
-  }finally{disposing=true;releaseFreshState();releaseApply();releaseAnswer();releaseApplication();releaseAck();releaseLegacy();await page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}).catch(()=>{});await context.close();}
+  }catch(error){caseFailure=error;await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(error),failure:describeSmokeRouteFailure(error),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw error;
+  }finally{
+   disposing=true;routeFailures.beginCleanup();releaseFreshState();releaseApply();releaseAnswer();releaseApplication();releaseAck();releaseLegacy();
+   await routeFailures.wrap('unrouteAll cleanup',()=>page.unrouteAll({behavior:caseFailure?'ignoreErrors':'wait'}))();
+   await routeFailures.wrap('context cleanup',()=>context.close())();activeRouteFailures=undefined;
+   await routeFailures.settle();
+   const failure=routeFailures.failure(caseFailure);
+   if(failure){await writeFile(join(artifacts,'failure.json'),JSON.stringify({scenario,error:String(caseFailure??failure),failure:describeSmokeRouteFailure(failure),timerPackets,legacyPacket,legacyApplications,heldAnswer,heldApplication,heldLegacy,errors},null,2)+'\n');throw failure;}
+  }
  }
  for(const check of checks.filter(check=>check.scenario.legacy))assert.equal(check.legacyApplications.filter(reply=>reply.application.applied).length,1,'The repeated legacy wire packet must have exactly one state effect');
  assert.deepEqual(errors,[]);gate.assertHealthy();await writeFile(join(artifacts,'timer-interruptions.json'),JSON.stringify({checks,errors},null,2)+'\n');
 }finally{
- for(const release of releases)release();await browser?.close();server.kill('SIGTERM');await closed;gate.assertHealthy();console.log('owned_api=shutdown');
+ for(const release of releases)release();await browser?.close();server.kill('SIGTERM');await closed;await new Promise(done=>apiLog.end(done));gate.assertHealthy();console.log('owned_api=shutdown');
 }

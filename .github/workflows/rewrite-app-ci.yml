@@ -137,6 +137,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run ${{ matrix.check }}
         if: matrix.check != 'ui-quick'
+        env:
+          UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
         run: ${{ matrix.command }}
       - name: Run ui-quick
         if: matrix.check == 'ui-quick'
@@ -151,6 +153,16 @@ jobs:
           name: ui-quick-diagnostics
           path: ${{ runner.temp }}/rewrite-ui-quick.log
           if-no-files-found: error
+          retention-days: 7
+      - name: Retain failed controller timer diagnostics
+        if: failure() && matrix.check == 'ui-participant-console'
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller-timer-diagnostics
+          path: |
+            ${{ runner.temp }}/controller-timer-diagnostics/**/failure.json
+            ${{ runner.temp }}/controller-timer-diagnostics/**/api.log
+          if-no-files-found: warn
           retention-days: 7
 
   verify-postgres:

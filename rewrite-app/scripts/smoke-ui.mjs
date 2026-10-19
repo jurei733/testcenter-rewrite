@@ -22204,7 +22204,8 @@ try {
     .filter({ hasText: "UI Hidden Sessions" })
     .filter({ hasText: "UI Pending Sessions: —" })
     .filter({ hasText: "UI Locked Sessions: —" })
-    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui" })
+    // The column override does not configure the separate filter-target key.
+    .filter({ hasText: "Current participant — personLabel UI Contains UI Excluding student-ui" })
     .waitFor();
   assert.equal(
     await page.locator("#monitorPendingFilterButton").getAttribute("aria-pressed"),
@@ -22225,7 +22226,7 @@ try {
   await importedMonitorFilterButton.click();
   await page
     .locator("#monitorProfilePresentation")
-    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui: —" })
+    .filter({ hasText: "Current participant — personLabel UI Contains UI Excluding student-ui: —" })
     .waitFor();
   await page.locator("#monitorResetRuntimeFiltersButton").click();
   await page.waitForFunction(

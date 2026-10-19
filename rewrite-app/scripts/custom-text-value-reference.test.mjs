@@ -346,3 +346,12 @@ for (const item of cases) {
     assert.equal(actual.runtime.monitorCommandNotice, expected.replacements[2]);
   });
 }
+
+for (const configuredTarget of [false, true]) test(`authored profile name keeps column and generated target text independent: explicit target ${configuredTarget}`, () => {
+  const overrides = { gm_col_personLabel: "UI Candidate", gm_filter_type_substring: "UI Contains", gm_filter_not: "UI Excluding",
+    ...(configuredTarget ? { gm_filter_target_personLabel: "UI Filter Target" } : {}) };
+  const { actual } = monitorFixture(overrides);
+  const filter = { id: "owned", label: "Current participant", target: "personLabel", type: "substring", not: true, value: "student-ui", subValue: null };
+  assert.equal(actual.monitorCustomFilterTargetOptions.find(option => option.value === "personLabel").label, "UI Candidate");
+  assert.equal(actual.monitorProfileFilterLabel(filter), `Current participant — ${configuredTarget ? "UI Filter Target" : "personLabel"} UI Contains UI Excluding student-ui`);
+});

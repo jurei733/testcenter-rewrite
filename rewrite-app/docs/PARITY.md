@@ -1,5 +1,42 @@
 # Testcenter parity checklist
 
+### Monitor fixture expectation and owned route diagnostics (2026-10-19)
+
+Published `b9345905` completes workflow `39185026985` with 26 successful and
+12 failed jobs. Eleven shared browser jobs reach the same obsolete imported
+profile expectation: the `gm_col_personLabel` override was also expected in a
+generated filter label. Both expectation sites now use the separate
+`personLabel` fallback; the column override is still checked independently.
+Two strict Original-19 Chromium/SQLite cases import the actual profile, sign in
+with its monitor account, verify column/target independence with and without
+an explicit runtime target key, and toggle/reset the real profile filter.
+
+The separate participant-console job stops in the eighth controller-timer
+case with an unhandled `route.fetch: read ECONNRESET`. Its cause remains
+unproven. The unchanged four-case local Zero-Tick matrix passes, as does the
+four-case observed matrix and the complete 22-case observed timer matrix.
+Timer balances, saved answers, clocks, sibling/parent equality, application
+counts, legacy FIFO and idempotency assertions remain unchanged.
+
+Owned route callbacks now record failures for the scenario, preserve native
+causes and record the phases where work starts and failures are observed.
+Rejected routes are explicitly completed, and their callback promises are
+settled after failed-scenario disposal. Successful scenarios still wait for
+their handlers before closing. An injected browser assertion remains the first
+reported failure while a later cleanup transport/closed-target error is retained
+separately. The before witness also retained that assertion, so this does not
+establish masking as the cause of the actual CI reset. No transport retries are
+added and genuine route/protocol failures still fail the gate.
+
+Six tests cover these failure/cleanup contracts, including a real truncated
+HTTP body and header-free bounded artifact serialization with unchanged native
+causes. All 1,781 frontend checks pass. The timer gate now writes its own API
+log and structured failure JSON under a configurable diagnostics root; failed
+participant-console CI retains only those two file types for seven days,
+excluding its SQLite data. The workflow YAML parses, and the configured nested
+artifact-root failure witness produces both files. Full exact-head CI remains
+required; this is stronger diagnosis, not proof the observed reset is fixed.
+
 ### Complete published CI baseline (2026-10-19)
 
 Published `aafa0fbe` passes all 38 jobs in workflow `39182233472`, including
