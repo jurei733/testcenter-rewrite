@@ -164,7 +164,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               </label>
               <label class="checkbox-label">
                 <input id="monitorCustomFilterNot" name="monitorCustomFilterNot" type="checkbox" [(ngModel)]="view.monitorCustomFilterNot" />
-                {{ view.monitorText("gm_filter_not") }}
+                {{ view.monitorText("gm_filter_not", "Nicht") }}
               </label>
             </div>
             <div class="actions">

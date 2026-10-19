@@ -265,7 +265,7 @@ export class RuntimeViewFacade {
     );
   }
 
-  monitorValue(key: MonitorCustomTextKey): string {
+  monitorValue(key: MonitorRuntimeCustomTextKey): string {
     return resolveMonitorCustomTextValue(this.effectiveMonitorCustomTexts, key);
   }
 
@@ -360,7 +360,8 @@ export class RuntimeViewFacade {
   }> {
     return Object.keys(monitorFilterTargetTextKeys).map(value => ({
       value,
-      label: this.monitorText(monitorFilterTargetTextKeys[value]!)
+      label: this.monitorText(`gm_col_${value}`, "") ||
+        this.monitorText(`gm_filter_target_${value}`, value)
     }));
   }
 
@@ -370,7 +371,7 @@ export class RuntimeViewFacade {
   }> {
     return Object.keys(monitorFilterTypeTextKeys).map(value => ({
       value,
-      label: this.monitorText(monitorFilterTypeTextKeys[value]!)
+      label: this.monitorText(monitorFilterTypeTextKeys[value]!, value)
     }));
   }
 
@@ -4283,7 +4284,7 @@ export class RuntimeViewFacade {
     );
     if (restoration) {
       const confirmed = await this.confirmation.confirm({
-        title: this.monitorText(
+        title: this.monitorValue(
           "gm_control_goto_unlock_blocks_confirm_headline"
         ),
         message: this.monitorGotoRestorationMessage(restoration),
@@ -4327,7 +4328,7 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("unlock_test", undefined, () => {
         this.runtime.monitorCommandNoticeKind = "warning";
-        this.runtime.monitorCommandNotice = this.monitorText(
+        this.runtime.monitorCommandNotice = this.monitorValue(
           "gm_control_unlock_success_warning"
         );
       })
@@ -4473,7 +4474,7 @@ export class RuntimeViewFacade {
     const commandConfirmation = `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`;
     const confirmed = await this.confirmation.confirm({
       title: restoration
-        ? this.monitorText("gm_control_goto_unlock_blocks_confirm_headline")
+        ? this.monitorValue("gm_control_goto_unlock_blocks_confirm_headline")
         : "Issue monitor command?",
       message: restoration
         ? `${this.monitorGotoRestorationMessage(restoration)}\n\n${commandConfirmation}`
@@ -4545,7 +4546,7 @@ export class RuntimeViewFacade {
               commandType === "unlock_test"
             ) {
               this.runtime.monitorCommandNoticeKind = "warning";
-              this.runtime.monitorCommandNotice = this.monitorText(
+              this.runtime.monitorCommandNotice = this.monitorValue(
                 "gm_control_unlock_success_warning"
               );
             } else if (
@@ -5572,15 +5573,13 @@ export class RuntimeViewFacade {
   private monitorProfileFilterLabel(
     filter: MonitorViewProfile["filters"][number]
   ): string {
-    const targetKey = monitorFilterTargetTextKeys[filter.target];
-    const typeKey = monitorFilterTypeTextKeys[filter.type];
     const filterValue = Array.isArray(filter.value)
       ? filter.value.join(", ")
       : filter.value;
     const generatedLabel = [
-      targetKey ? this.monitorText(targetKey) : filter.target,
-      typeKey ? this.monitorText(typeKey) : filter.type,
-      filter.not ? this.monitorText("gm_filter_not") : "",
+      this.monitorValue(`gm_filter_target_${filter.target}`) || filter.target,
+      this.monitorValue(`gm_filter_type_${filter.type}`) || filter.type,
+      filter.not ? this.monitorValue("gm_filter_not") : "",
       filterValue,
       filter.subValue ?? ""
     ]
@@ -5824,7 +5823,7 @@ export class RuntimeViewFacade {
     const restoredMinutes = this.formatMonitorMinutes(
       restoration.remainingSeconds / 60
     );
-    return `${this.monitorText("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
+    return `${this.monitorValue("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
   }
 
   private clearMonitorUnitFilterBeforeGoto(): void {

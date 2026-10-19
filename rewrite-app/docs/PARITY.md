@@ -1,5 +1,36 @@
 # Testcenter parity checklist
 
+### Monitor filter pipes and direct values (2026-10-19)
+
+Generated filter labels now read the exact Original `gm_filter_target_*` and
+`gm_filter_type_*` keys directly, falling back to their target/type identifiers
+only when empty. Negation keeps an authored empty value. The target dropdown
+has a different Original rule: first the column template pipe with an empty
+fallback, then the filter-target pipe with the target identifier. Type options
+also use their identifier as template fallback. The negation checkbox retains
+the Original `Nicht` fallback, while generated labels omit empty negation.
+Runtime key patterns support those non-catalog reads without adding invented
+defaults to the unchanged 54-key monitor catalog or 102-default editor.
+
+Go-to restoration titles/content and both unlock-warning paths now retain raw
+direct values. The actual Original filter method, command-response method,
+service and pipe are pinned/executed with their full source hashes. The 431
+additional checks cover 312 generated labels, 96 dropdown options, seven toggle
+cases, 14 direct confirmations/notices and both complete target/type inventories.
+On the previous implementation, 201 of the complete 611 reference cases fail;
+all 611 now pass. Authored user filter-name prefixes and advanced sub-value
+display metadata are outside this comparison's claim.
+
+Eight real authenticated strict Original-19 Chromium/SQLite cases create and
+activate filters at 1280/390 px. They verify defaults, empty login values over
+global text, padded multiline text, and a configured non-catalog column key.
+All 24 exact option/generated-label assertions and negation checks pass with
+no page errors. Test accounts complete the actual required password change
+through the API before a new real browser sign-in. All 1,773 frontend and 156
+compiled contract checks pass; core and production web builds pass with the
+unchanged 469.88 kB initial bundle and 470 kB error cap. Full remote qualification
+of this follow-up remains pending.
+
 ### Direct participant controller text consumers (2026-10-19)
 
 Participant error surfaces, timer warnings, navigation-denial text, Unit/Testlet
@@ -30,9 +61,11 @@ The previous shared flow passes Original ASPECT, the sample package and the
 current Booklet Config, then fails at a native radio check in the protected
 Controller case. That one call now uses the same explicit frame scroll/render
 barrier already used by the neighboring Controller completion helper, while
-retaining native `check()` and the subsequent buffered-answer assertions. A
-fresh full flow is running; complete browser/remote qualification and the
-remaining monitor/attachment direct-text audit are still open.
+retaining native `check()` and the subsequent buffered-answer assertions. The
+fresh complete shared SQLite flow passes at `292169f7`, including the entire
+Controller sequence, current Unit labels, monitor operations and attachments.
+The later monitor text changes above have their own focused browser gates;
+their full remote qualification and the attachment text inheritance remain open.
 
 ### Player readiness and complete fixture HTTP bodies (2026-10-19)
 

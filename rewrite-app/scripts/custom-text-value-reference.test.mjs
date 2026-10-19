@@ -248,3 +248,101 @@ for (const text of [undefined, "", " \t ", "  Own text  ", "%s / %s", "%%s", "0"
     assert.equal(actualFullscreenText(actual), expected);
   });
 }
+
+const runtimeSource = readFileSync(new URL("../apps/web/src/app/runtime-view.facade.ts", import.meta.url), "utf8");
+const runtimeAst = ts.createSourceFile("runtime.ts", runtimeSource, ts.ScriptTarget.Latest, true);
+const runtimeClass = runtimeAst.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "RuntimeViewFacade");
+const runtimeVariables = runtimeAst.statements.filter(ts.isVariableStatement).flatMap(node => node.declarationList.declarations);
+const filterMaps = Object.fromEntries(["monitorFilterTargetTextKeys", "monitorFilterTypeTextKeys"].map(name => {
+  const declaration = runtimeVariables.find(node => node.name.getText(runtimeAst) === name);
+  return [name, new Function(`return (${declaration.initializer.getText(runtimeAst)});`)()];
+}));
+const monitorExports = {};
+const runtimeMembers = ["monitorValue", "monitorText", "monitorProfileFilterLabel", "monitorCustomFilterTargetOptions", "monitorCustomFilterTypeOptions", "monitorGotoRestorationMessage", "issueMonitorGoto", "issueMonitorUnlockTest"];
+new Function("exports", "of", "resolveMonitorCustomText", "resolveMonitorCustomTextValue", ...Object.keys(filterMaps), ts.transpileModule(`
+export class ActualMonitor { ${runtimeClass.members.filter(node => runtimeMembers.includes(node.name?.getText(runtimeAst))).map(node => node.getText(runtimeAst)).join("\n")} }
+export class OriginalFilter { ${members("add-filter-dialog.component.ts", "AddFilterDialogComponent", ["updateFilterId", "isStringArray"])} }
+export class OriginalMonitor { ${members("group-monitor.component.ts", "GroupMonitorComponent", ["commandResponseToMessage"])} }
+`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)(monitorExports, of, monitor.resolveMonitorCustomText, monitor.resolveMonitorCustomTextValue, ...Object.values(filterMaps));
+
+function monitorFixture(overrides, scopes = [overrides]) {
+  const service = new exports.ReferenceService(); new exports.ReferenceConfig(service).setCustomTexts(scopes[0]);
+  for (const scope of scopes.slice(1)) service.addCustomTexts(scope);
+  return { service, actual: Object.assign(new monitorExports.ActualMonitor(), { effectiveMonitorCustomTexts: overrides }) };
+}
+const filterTargets = Object.keys(filterMaps.monitorFilterTargetTextKeys), filterTypes = Object.keys(filterMaps.monitorFilterTypeTextKeys);
+const filterInterfaces = reference.files.find(file => file.path.endsWith("group-monitor.interfaces.ts")).source;
+const interfacesAst = ts.createSourceFile("interfaces.ts", filterInterfaces, ts.ScriptTarget.Latest, true);
+const originalLists = interfacesAst.statements.filter(ts.isVariableStatement).flatMap(node => node.declarationList.declarations);
+for (const [name, values] of [["testSessionFilterTargetLists", filterTargets], ["testSessionFilterTypeLists", filterTypes]]) {
+  const literal = originalLists.find(node => node.name.getText(interfacesAst) === name).initializer;
+  const parsed = new Function(ts.transpileModule(`return ${literal.getText(interfacesAst)};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText)();
+  test(`all actual Original ${name} are represented in the text comparison`, () => assert.deepEqual([...values].sort(), [...parsed.basic, ...parsed.advanced].sort()));
+}
+const targetTextKeys = filterTargets.map(target => `gm_filter_target_${target}`), columnTextKeys = filterTargets.map(target => `gm_col_${target}`), typeTextKeys = filterTypes.map(type => `gm_filter_type_${type}`);
+for (const [name, value] of [["default", undefined], ["empty", ""], ["padded", "  Authored\ntext  "], ["custom", "CUSTOM"]]) for (const target of filterTargets) for (const type of filterTypes) for (const not of [false, true]) test(`actual generated filter label matches Original ${name}/${target}/${type}/${not}`, () => {
+  const overrides = value === undefined ? {} : Object.fromEntries([...targetTextKeys, ...typeTextKeys, "gm_filter_not"].map(key => [key, value]));
+  const { service, actual } = monitorFixture(overrides);
+  const filter = { id: "", label: "", target, type, not, value: target === "state" ? ["VALUE"] : "VALUE" };
+  const expected = Object.assign(new monitorExports.OriginalFilter(), { cts: service, filter: structuredClone(filter) });
+  expected.updateFilterId();
+  assert.equal(actual.monitorProfileFilterLabel(filter), expected.filter.label);
+});
+
+const filterTemplate = reference.files.find(file => file.path.endsWith("add-filter-dialog.component.html")).source;
+assert.ok(filterTemplate.includes("('' | customtext : 'gm_col_' + target | async) || (target | customtext : 'gm_filter_target_' + target | async)"));
+assert.ok(filterTemplate.includes("type | customtext : 'gm_filter_type_' + type | async"));
+assert.ok(filterTemplate.includes("'Nicht' | customtext : 'gm_filter_not' | async"));
+const runtimeTemplate = readFileSync(new URL("../apps/web/src/app/runtime-view.component.ts", import.meta.url), "utf8");
+const negationExpression = runtimeTemplate.match(/{{\s*(view\.monitorText\("gm_filter_not"[^}]+)\s*}}/)[1].trim();
+const actualNegationToggle = new Function("view", `return ${negationExpression};`);
+for (const item of cases) test(`actual negation toggle keeps its distinct Original template fallback: ${item.name}`, async () => {
+  const scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? { gm_filter_not: scope.value } : {});
+  const { service, actual } = monitorFixture(Object.assign({}, ...scopes), scopes);
+  const expected = await firstValueFrom(new exports.ReferencePipe(service).transform("Nicht", "gm_filter_not"));
+  assert.equal(actualNegationToggle(actual), expected);
+});
+const dropdownCases = [
+  ["defaults", {}],
+  ["filter-only", Object.fromEntries(targetTextKeys.map(key => [key, "FILTER"]))],
+  ["column-only", Object.fromEntries(columnTextKeys.map(key => [key, "COLUMN"]))],
+  ["empty-columns", Object.fromEntries([...columnTextKeys.map(key => [key, ""]), ...targetTextKeys.map(key => [key, "FILTER"])])],
+  ["empty-all", Object.fromEntries([...columnTextKeys, ...targetTextKeys, ...typeTextKeys].map(key => [key, ""]))],
+  ["padded", Object.fromEntries([...columnTextKeys, ...targetTextKeys, ...typeTextKeys].map(key => [key, "  Authored\ntext  "]))]
+];
+for (const [name, overrides] of dropdownCases) {
+  for (const target of filterTargets) test(`actual filter target option follows both Original pipes: ${name}/${target}`, async () => {
+    const { service, actual } = monitorFixture(overrides), pipe = new exports.ReferencePipe(service);
+    const expected = await firstValueFrom(pipe.transform("", `gm_col_${target}`)) || await firstValueFrom(pipe.transform(target, `gm_filter_target_${target}`));
+    assert.equal(actual.monitorCustomFilterTargetOptions.find(option => option.value === target).label, expected);
+  });
+  for (const type of filterTypes) test(`actual filter type option follows Original template fallback: ${name}/${type}`, async () => {
+    const { service, actual } = monitorFixture(overrides);
+    const expected = await firstValueFrom(new exports.ReferencePipe(service).transform(type, `gm_filter_type_${type}`));
+    assert.equal(actual.monitorCustomFilterTypeOptions.find(option => option.value === type).label, expected);
+  });
+}
+for (const item of cases) {
+  const keys = ["gm_control_goto_unlock_blocks_confirm_headline", "gm_control_goto_unlock_blocks_confirm_text", "gm_control_unlock_success_warning"];
+  const scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? Object.fromEntries(keys.map(key => [key, scope.value])) : {});
+  test(`actual monitor go-to confirmation retains Original direct values: ${item.name}`, async () => {
+    const { service, actual } = monitorFixture(Object.assign({}, ...scopes), scopes);
+    let confirmation;
+    Object.assign(actual, { canIssueMonitorGoto: true, monitorBlockNavigationTargets: [], selectedOpenMonitorRun: null,
+      monitorGotoRestoration: () => ({ affectedCount: 1, remainingSeconds: 120 }), formatMonitorMinutes: () => "2",
+      monitorFormattedText: (key, replacements) => monitor.formatMonitorCustomText({}, key, replacements),
+      confirmation: { confirm: async value => { confirmation = value; return false; } } });
+    await actual.issueMonitorGoto();
+    assert.equal(confirmation.title, service.getCustomText(keys[0]));
+    assert.equal(confirmation.message, `${service.getCustomText(keys[1])}\n\nZeitgesteuerter Block: 2 Minute(n) · 1 run`);
+  });
+  test(`actual monitor unlock notice matches Original command-response consumer: ${item.name}`, () => {
+    const { service, actual } = monitorFixture(Object.assign({}, ...scopes), scopes);
+    const sourceMonitor = Object.assign(new monitorExports.OriginalMonitor(), { cts: service });
+    const expected = sourceMonitor.commandResponseToMessage({ commandType: "unlock", testIds: ["owned-run"] });
+    Object.assign(actual, { canUseMonitorRunActions: true, runtime: {}, viewState: { onActionAsync: action => action() },
+      runtimeService: { issueMonitorRunCommand: (type, payload, accepted) => { assert.equal(type, "unlock_test"); accepted(); } } });
+    actual.issueMonitorUnlockTest();
+    assert.equal(actual.runtime.monitorCommandNotice, expected.replacements[2]);
+  });
+}
