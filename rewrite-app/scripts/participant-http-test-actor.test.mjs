@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createServer } from "node:net";
 import { runInNewContext } from "node:vm";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 
@@ -126,4 +127,29 @@ test("an unfinished browser body fails credential capture with a bounded secret-
   await new Promise(done => setImmediate(done));
   await actor.fetch("http://127.0.0.1:9999/api/v1/participant/sessions/session-a/resume");
   assert.deepEqual(requests, [`Bearer ${token}`]);
+});
+
+test("a real malformed chunked JSON response remains a protocol failure with a safe owning path", async () => {
+  const sockets = new Set();
+  const server = createServer(socket => {
+    sockets.add(socket); socket.once("close", () => sockets.delete(socket));
+    socket.once("data", () => {
+      socket.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+      setTimeout(() => socket.end("not-a-hex-chunk\r\n{}\r\n0\r\n\r\n"), 25);
+    });
+  });
+  await new Promise(done => server.listen(0, "127.0.0.1", done));
+  const actor = createParticipantHttpTestActor();
+  try {
+    await assert.rejects(actor.fetch(`http://127.0.0.1:${server.address().port}/api/v1/participant/sessions/owned/current-state?token=must-not-appear`), error => {
+      assert.match(error.message, /^Participant fixture GET \/api\/v1\/participant\/sessions\/owned\/current-state JSON capture failed$/);
+      assert.ok(!error.message.includes("must-not-appear"));
+      assert.equal(error.cause.cause.code, "HPE_INVALID_CHUNK_SIZE");
+      assert.deepEqual(actor.headers(`http://127.0.0.1:${server.address().port}/api/v1/participant/test-runs/foreign/save-progress`), {});
+      return true;
+    });
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise(done => server.close(done));
+  }
 });

@@ -181,6 +181,9 @@ try {
   mark("a-copied-tab-reloaded-before-bootstrap-cannot-adopt-the-source-owner");
   await context.unroute("**/native-commands", unavailable); await page.evaluate(() => dispatchEvent(new Event("online")));
   await poll(async () => (await read(first.testRunId)).status === "running", "Source resume did not retry"); await emptyJournal(); await player().waitFor();
+  // A mounted iframe precedes its real Ready/Start replay. Keep the exact
+  // saved-value assertion, but wait until the Player can receive trusted input.
+  await poll(async () => !await player().isDisabled() && await player().inputValue() === "First trusted Ω", "The resumed Player did not restore its trusted saved answer after Start");
   assert.deepEqual(answers(await read(first.testRunId)), saved); assert.equal(await player().inputValue(), "First trusted Ω");
   assert.deepEqual(await repository.listPendingParticipantRunCommands(first), []);
   await page.screenshot({ path: join(artifacts, "source-retained-answer.png"), fullPage: true });

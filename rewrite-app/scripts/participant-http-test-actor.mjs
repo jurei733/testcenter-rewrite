@@ -62,7 +62,13 @@ export function createParticipantHttpTestActor(nativeFetch = globalThis.fetch) {
     const response = await nativeFetch(url, { ...init, headers: explicitHeaders });
     if (response.ok && isParticipant(url) && !new URL(url).pathname.includes("/resources/") &&
         response.headers.get("content-type")?.includes("application/json")) {
-      capture(url, await response.clone().json(), explicitHeaders.get("authorization"));
+      try {
+        capture(url, await response.clone().json(), explicitHeaders.get("authorization"));
+      } catch (cause) {
+        // Add only method/path to the message; retain the native error and
+        // its protocol code as the cause for transport diagnosis.
+        throw new Error(`Participant fixture ${init.method ?? "GET"} ${new URL(url).pathname} JSON capture failed`, { cause });
+      }
     }
     return response;
   };

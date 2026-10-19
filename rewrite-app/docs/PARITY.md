@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Player readiness and complete fixture HTTP bodies (2026-10-19)
+
+Published `b6bf7e94` finishes with 23 successful and 15 failed CI jobs. The
+complete Debug suite and all seven native-route cases pass. Fourteen shared
+browser jobs stop at the obsolete `Complete Test` expectation corrected below.
+The remaining participant-console job reaches the native-tabs scenario and
+reads an empty Player input immediately after the iframe mounts, before the
+real Ready/Start replay restores its saved answer.
+
+A headful production Angular/SQLite witness delays only the DemoPlayer's
+actual Ready notification by two seconds. The old fixture reproduces that
+exact empty-versus-`First trusted Ω` failure; waiting for enabled input and the
+exact restored value passes all ten tab/crash scenarios. Backend answer,
+pending-command, clock and tab-owner assertions remain intact. Runtime code
+does not change.
+
+The shared fixture also discarded the response bodies of 118 status-only JSON
+setup calls, including large source/release responses. Those calls now await
+complete body consumption while discarding chunks rather than buffering them.
+Callers that read the returned response keep their existing behavior. Real
+HTTP tests prove that successful headers cannot advance past a delayed body,
+and that a truncated body still rejects. Participant credential-capture errors
+also retain the original protocol cause while adding the owning method/path;
+a real malformed chunked response verifies that error propagation.
+
+All 1,272 frontend checks pass. The last longer shared flow passed completion,
+response advisories and the earlier Player families, then failed with
+`HPE_INVALID_CHUNK_SIZE` around Original ASPECT. Its cause remains unproven:
+32 subsequent transfers of the same roughly 51.9 MB current-state payload pass
+through native fetch, the participant actor, node:http and raw TCP chunk
+validation. Draining ignored bodies corrects a confirmed resource-management
+gap; it is not proof of the cause of that framing error. A fresh complete
+shared flow and next-head remote qualification remain pending.
+
 ### Default completion and leave labels in the shared browser fixture (2026-10-19)
 
 The longer local shared flow reaches participant completion after passing the
@@ -15,8 +49,9 @@ Three draft/completion hints also named the fixed `Complete Test` label even
 when a project customized that button. They now describe finishing the test
 without assuming its visible label; their saved-response/readiness conditions
 are unchanged. The production build remains 469.88 kB and all 1,268 frontend
-checks pass. A fresh full shared browser flow is running against this build;
-its complete result and next-head remote qualification are still pending.
+checks pass. The fresh full flow passes these changed labels and later fails
+at the separate ASPECT transport observation recorded above. Complete shared
+flow and next-head remote qualification are still pending.
 
 ### Correlated Debug fixture acknowledgements (2026-10-19)
 
@@ -37,9 +72,10 @@ of the paused Run, parent session and timers remain unchanged. This correction
 changes the browser fixture only, not runtime delivery or Original console
 promise semantics; the fulfilled-handler timestamp checks still pass.
 
-The full workflow remains failed until the next head completes all its gates.
-This deterministic timing witness and the local full Debug browser suite do
-not substitute for remote participant-console qualification.
+The next `b6bf7e94` CI run passes the entire Debug suite, including exact log
+delta and fulfilled-handler timestamp checks. Its participant-console job
+later fails in the separate native-tabs readiness check recorded above; the
+overall workflow remains failed.
 
 ### Systemcheck text consumers, complete editor catalog and filter copy (2026-10-19)
 

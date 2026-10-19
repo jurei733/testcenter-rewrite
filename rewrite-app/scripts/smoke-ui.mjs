@@ -14,6 +14,7 @@ import QRCode from "qrcode";
 import { originalParticipantCustomTextDefaults, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
+import { drainSmokeResponse } from "./drain-smoke-response.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
@@ -214,6 +215,15 @@ const sendSmokeJson = async (url, { method = "POST", body } = {}) => {
   }
 
   return response;
+};
+
+const sendSmokeJsonAndDrain = async (url, options) => {
+  const response = await sendSmokeJson(url, options);
+  try {
+    await drainSmokeResponse(response);
+  } catch (cause) {
+    throw new Error(`Smoke fixture ${options?.method ?? "POST"} ${new URL(url).pathname} body drain failed`, { cause });
+  }
 };
 
 const solveSmokeProofOfWork = challenge => {
@@ -1597,11 +1607,11 @@ try {
   } finally {
     await accessWindowContext.close();
   }
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/admin/users/${scheduledAdminPayload.adminUser.adminUserId}`,
     { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/admin/users/${expiredAdminPayload.adminUser.adminUserId}`,
     { method: "DELETE", body: { confirmationPassword: adminPassword } }
   );
@@ -1851,13 +1861,13 @@ try {
   const customTextWorkspaceKey = "ui-custom-text-workspace";
   const customTextBookletKey = "BOOKLET.UI-CUSTOM-TEXT";
   const customTextUnitKey = "UNIT.UI-CUSTOM-TEXT";
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: customTextTenantKey,
       displayName: "UI Custom Text Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces`,
     {
       body: {
@@ -1900,11 +1910,11 @@ try {
     }
   );
   const customTextImportPayload = await customTextImportResponse.json();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/content-releases/${customTextImportPayload.stagedContentRelease.contentReleaseId}/activate`,
     { body: { activatedByActorId: "ui-custom-text-smoke" } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -2436,13 +2446,13 @@ try {
         })
       })
     );
-    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
         tenantKey: systemCheckTenantKey,
         displayName: "UI System Check Tenant"
       }
     });
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces`,
       {
         body: {
@@ -2503,7 +2513,7 @@ try {
         )
       }
     ]) {
-      await sendSmokeJson(
+      await sendSmokeJsonAndDrain(
         `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
         { body: dependency }
       );
@@ -3989,7 +3999,7 @@ try {
     logStep("workspace-delete");
     const disposableWorkspaceKey = `ui-delete-${Date.now()}`;
     const disposableWorkspaceDisplayName = "Disposable Workspace";
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
       {
         body: {
@@ -3998,7 +4008,7 @@ try {
         }
       }
     );
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${disposableWorkspaceKey}/source-packages`,
       {
         body: {
@@ -7434,19 +7444,19 @@ try {
   const ambiguousParticipantWorkspaceKey = `ui-ambiguous-workspace-${Date.now()}`;
   const ambiguousParticipantTenantA = `ui-ambiguous-tenant-a-${Date.now()}`;
   const ambiguousParticipantTenantB = `ui-ambiguous-tenant-b-${Date.now()}`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ambiguousParticipantTenantA,
       displayName: "UI Ambiguous Tenant A"
     }
   });
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ambiguousParticipantTenantB,
       displayName: "UI Ambiguous Tenant B"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantA}/workspaces`,
     {
       body: {
@@ -7455,7 +7465,7 @@ try {
       }
     }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantB}/workspaces`,
     {
       body: {
@@ -7567,7 +7577,7 @@ try {
   const legacyShortLinkLoginKey = "student-legacy-short-link";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
   const participantEntrySignInDisplayName = "Student Entry Sign In";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -7959,7 +7969,7 @@ try {
 
   logStep("participant-entry-review-comments");
   const participantReviewLoginKey = "student-entry-review";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8169,7 +8179,7 @@ try {
   const protectedParticipantGroupKey = "group:participant-entry-protected";
   const protectedParticipantDisplayName = "Student Entry Protected";
   const protectedParticipantPassword = "entry-protected-secret";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8284,7 +8294,7 @@ try {
   logStep("participant-entry-second-code");
   const codedParticipantLoginKey = "student-entry-coded";
   const codedParticipantGroupKey = "group:participant-entry-coded";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -8550,7 +8560,7 @@ try {
   const participantRouteUnitResponse = "Prefilled participant route response";
   const participantRouteNextUnitResponse = "Second unit participant response";
   const participantRouteDisplayName = "Student Participant Route";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -9448,11 +9458,11 @@ try {
   const veronaContentReleaseId =
     veronaImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(veronaContentReleaseId, "Verona smoke import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${veronaContentReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -11125,11 +11135,11 @@ try {
     originalAdaptiveReleaseId,
     "Original adaptive browser smoke import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${originalAdaptiveReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -11728,13 +11738,13 @@ try {
       content: legacyPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: legacyPlayerTenantKey,
       displayName: "Official Verona 3 Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${legacyPlayerTenantKey}/workspaces`,
     {
       body: {
@@ -11778,11 +11788,11 @@ try {
   const legacyPlayerReleaseId =
     legacyPlayerImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(legacyPlayerReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${legacyPlayerWorkspaceApiUrl}/content-releases/${legacyPlayerReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${legacyPlayerWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${legacyPlayerWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12060,13 +12070,13 @@ try {
         content: protocolPlayerDocument
       }
     ]);
-    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
       body: {
         tenantKey: protocolTenantKey,
         displayName: `Official Verona ${apiMajor} Player`
       }
     });
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/tenants/${protocolTenantKey}/workspaces`,
       {
         body: {
@@ -12123,11 +12133,11 @@ try {
     const protocolReleaseId =
       protocolImportPayload.stagedContentRelease?.contentReleaseId;
     assert.ok(protocolReleaseId);
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${protocolWorkspaceApiUrl}/content-releases/${protocolReleaseId}/activate`,
       { body: {} }
     );
-    await sendSmokeJson(`${protocolWorkspaceApiUrl}/participant-roster`, {
+    await sendSmokeJsonAndDrain(`${protocolWorkspaceApiUrl}/participant-roster`, {
       body: {
         rosterText: [
           {
@@ -12348,13 +12358,13 @@ try {
       content: abiPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: abiTenantKey,
       displayName: "Official ABI Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${abiTenantKey}/workspaces`,
     {
       body: {
@@ -12393,11 +12403,11 @@ try {
   );
   const abiReleaseId = abiImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(abiReleaseId, "Official ABI import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${abiWorkspaceApiUrl}/content-releases/${abiReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${abiWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${abiWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12551,13 +12561,13 @@ try {
       content: currentAbiPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentAbiTenantKey,
       displayName: "Current Official ABI Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentAbiTenantKey}/workspaces`,
     {
       body: {
@@ -12598,11 +12608,11 @@ try {
   const currentAbiReleaseId =
     currentAbiImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentAbiReleaseId, "Current ABI import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentAbiWorkspaceApiUrl}/content-releases/${currentAbiReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentAbiWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentAbiWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12773,10 +12783,10 @@ try {
       content: evaPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: { tenantKey: evaTenantKey, displayName: "Official EVA Player" }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${evaTenantKey}/workspaces`,
     {
       body: {
@@ -12816,11 +12826,11 @@ try {
   assert.deepEqual(evaImportPayload.importJob.diagnostics, []);
   const evaReleaseId = evaImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(evaReleaseId, "Official EVA import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${evaWorkspaceApiUrl}/content-releases/${evaReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${evaWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${evaWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -12965,13 +12975,13 @@ try {
       content: danPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: danTenantKey,
       displayName: "Official DAN Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${danTenantKey}/workspaces`,
     {
       body: {
@@ -13010,11 +13020,11 @@ try {
   );
   const danReleaseId = danImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(danReleaseId, "Official DAN import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${danWorkspaceApiUrl}/content-releases/${danReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${danWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${danWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13177,13 +13187,13 @@ try {
       content: currentDanPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentDanTenantKey,
       displayName: "Current Official DAN Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentDanTenantKey}/workspaces`,
     {
       body: {
@@ -13224,11 +13234,11 @@ try {
   const currentDanReleaseId =
     currentDanImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentDanReleaseId, "Current DAN import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentDanWorkspaceApiUrl}/content-releases/${currentDanReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentDanWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentDanWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13406,13 +13416,13 @@ try {
       content: historicalDanPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: historicalDanTenantKey,
       displayName: "Historical DAN Testbed"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${historicalDanTenantKey}/workspaces`,
     {
       body: {
@@ -13465,11 +13475,11 @@ try {
     historicalDanReleaseId,
     "Historical DAN import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${historicalDanWorkspaceApiUrl}/content-releases/${historicalDanReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${historicalDanWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${historicalDanWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -13662,13 +13672,13 @@ try {
       content: starsPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: starsTenantKey,
       displayName: "Official STARS Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${starsTenantKey}/workspaces`,
     {
       body: {
@@ -13707,11 +13717,11 @@ try {
   );
   const starsReleaseId = starsImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(starsReleaseId, "Official STARS import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${starsWorkspaceApiUrl}/content-releases/${starsReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${starsWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${starsWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: starsRosterDocument
     }
@@ -13731,7 +13741,7 @@ try {
   const starsParticipantSessionId =
     starsSignInPayload.participantSession.participantSessionId;
   assert.ok(starsParticipantSessionId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/resume`,
     { body: { bookletKey: starsBookletKey } }
   );
@@ -13966,7 +13976,7 @@ try {
   const parallelStarsParticipantSessionId =
     parallelStarsSignInPayload.participantSession.participantSessionId;
   assert.ok(parallelStarsParticipantSessionId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${parallelStarsParticipantSessionId}/resume`,
     { body: { bookletKey: starsBookletKey } }
   );
@@ -14888,13 +14898,13 @@ try {
       content: currentStarsPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentStarsTenantKey,
       displayName: "Official STARS 0.7.2 Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentStarsTenantKey}/workspaces`,
     {
       body: {
@@ -14935,11 +14945,11 @@ try {
   const currentStarsReleaseId =
     currentStarsImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(currentStarsReleaseId, "Official STARS 0.7.2 should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentStarsWorkspaceApiUrl}/content-releases/${currentStarsReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentStarsWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15119,13 +15129,13 @@ try {
       content: speedtestPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: speedtestTenantKey,
       displayName: "Official Speedtest Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${speedtestTenantKey}/workspaces`,
     {
       body: {
@@ -15170,11 +15180,11 @@ try {
     speedtestReleaseId,
     "Official Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${speedtestWorkspaceApiUrl}/content-releases/${speedtestReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${speedtestWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${speedtestWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15406,13 +15416,13 @@ try {
       content: currentSpeedtestPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentSpeedtestTenantKey,
       displayName: "Current Official Speedtest Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentSpeedtestTenantKey}/workspaces`,
     {
       body: {
@@ -15459,11 +15469,11 @@ try {
     currentSpeedtestReleaseId,
     "Current official Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentSpeedtestWorkspaceApiUrl}/content-releases/${currentSpeedtestReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentSpeedtestWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentSpeedtestWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -15742,13 +15752,13 @@ try {
       content: currentOriginalSpeedPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentOriginalSpeedTenantKey,
       displayName: "Current Original Speedtest"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentOriginalSpeedTenantKey}/workspaces`,
     {
       body: {
@@ -15796,11 +15806,11 @@ try {
     currentOriginalSpeedReleaseId,
     "Current Original Speedtest import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentOriginalSpeedWorkspaceApiUrl}/content-releases/${currentOriginalSpeedReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentOriginalSpeedWorkspaceApiUrl}/participant-roster`,
     { body: { rosterText: currentOriginalSpeedRosterDocument } }
   );
@@ -15824,7 +15834,7 @@ try {
   );
   const currentOriginalSpeedParticipantSessionId =
     currentOriginalSpeedSignInPayload.participantSession.participantSessionId;
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/sessions/${currentOriginalSpeedParticipantSessionId}/resume`,
     { body: { bookletKey: currentOriginalSpeedPackage.booklet.bookletKey } }
   );
@@ -16137,13 +16147,13 @@ try {
       content: sharedParameterPlayerHtml
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: sharedParameterTenantKey,
       displayName: "Shared Parameters"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${sharedParameterTenantKey}/workspaces`,
     {
       body: {
@@ -16188,11 +16198,11 @@ try {
   const sharedParameterReleaseId =
     sharedParameterImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(sharedParameterReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${sharedParameterWorkspaceApiUrl}/content-releases/${sharedParameterReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${sharedParameterWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${sharedParameterWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16423,13 +16433,13 @@ try {
       content: lottieAvatarPackage
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: lottieTenantKey,
       displayName: "Official Lottie Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${lottieTenantKey}/workspaces`,
     {
       body: {
@@ -16481,11 +16491,11 @@ try {
   const lottieReleaseId =
     lottieImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(lottieReleaseId, "Official Lottie import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${lottieWorkspaceApiUrl}/content-releases/${lottieReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${lottieWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${lottieWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16724,13 +16734,13 @@ try {
       content: currentAspectPlayerDocument
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: currentAspectTenantKey,
       displayName: "Current Official Aspect Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${currentAspectTenantKey}/workspaces`,
     {
       body: {
@@ -16776,11 +16786,11 @@ try {
     currentAspectReleaseId,
     "Current Aspect import should stage a release."
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${currentAspectWorkspaceApiUrl}/content-releases/${currentAspectReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${currentAspectWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${currentAspectWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -16987,13 +16997,13 @@ try {
       content: ibResourcePackage
     }
   ]);
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: ibTenantKey,
       displayName: "Official IB ItemBuilder Player"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${ibTenantKey}/workspaces`,
     {
       body: {
@@ -17034,11 +17044,11 @@ try {
   );
   const ibReleaseId = ibImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(ibReleaseId, "Official IB import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${ibWorkspaceApiUrl}/content-releases/${ibReleaseId}/activate`,
     { body: {} }
   );
-  await sendSmokeJson(`${ibWorkspaceApiUrl}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${ibWorkspaceApiUrl}/participant-roster`, {
     body: {
       rosterText: [
         {
@@ -17246,7 +17256,7 @@ try {
   const aspectReleaseId =
     aspectImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(aspectReleaseId, "Original Aspect import should stage a release.");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${aspectReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
@@ -17452,13 +17462,13 @@ try {
   const originalSampleResponse = "Saved from the original external HTML unit";
   const originalSampleResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: originalSampleTenantKey,
       displayName: "UI Original Sample Package Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${originalSampleTenantKey}/workspaces`,
     {
       body: {
@@ -17564,7 +17574,7 @@ try {
   const originalSampleReleaseId =
     originalSampleImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(originalSampleReleaseId);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${originalSampleWorkspaceApiUrl}` +
       `/content-releases/${originalSampleReleaseId}/activate`,
     { body: { forceActivation: true } }
@@ -17676,13 +17686,13 @@ try {
   logStep("participant-original-booklet-config");
   const bookletConfigTenantKey = `${tenantKey}-booklet-config`;
   const bookletConfigWorkspaceKey = `${workspaceKey}-booklet-config`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: bookletConfigTenantKey,
       displayName: "UI Original Booklet Config Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces`,
     {
       body: {
@@ -17844,7 +17854,7 @@ try {
       bookletConfigImportPayload.importJob?.diagnostics ?? []
     )}`
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/content-releases/${bookletConfigReleaseId}/activate`,
     { body: {} }
   );
@@ -17889,7 +17899,7 @@ try {
     const participantSessionId =
       signInPayload.participantSession?.participantSessionId;
     assert.ok(participantSessionId, `${loginKey} should create a session.`);
-    await sendSmokeJson(
+    await sendSmokeJsonAndDrain(
       `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
       { body: { bookletKey } }
     );
@@ -18035,7 +18045,7 @@ try {
     await configOneBrowser.playerFrame.locator("#end-unit").isEnabled(),
     true
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -18537,7 +18547,7 @@ try {
   stopAfter("optional-original-player-navigation");
 
   logStep("optional-original-player-surface");
-  await sendSmokeJson(`${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`, {
     body: { rosterText: [
       "loginKey,groupKey,bookletKey,displayName,pw,executionMode",
       "original-surface-review,original-surface,Cy-Bklt_BkltConfig-34,Original Surface,123,run-review"
@@ -18609,13 +18619,13 @@ try {
   logStep("participant-original-test-controller");
   const testControllerTenantKey = `${tenantKey}-test-controller`;
   const testControllerWorkspaceKey = `${workspaceKey}-test-controller`;
-  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/platform/tenants`, {
     body: {
       tenantKey: testControllerTenantKey,
       displayName: "UI Original Test Controller Tenant"
     }
   });
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces`,
     {
       body: {
@@ -18744,7 +18754,7 @@ try {
       testControllerImportPayload.importJob?.diagnostics ?? []
     )}`
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/content-releases/${testControllerReleaseId}/activate`,
     { body: {} }
   );
@@ -20273,7 +20283,7 @@ try {
   const monitorEventBeforeExternalSave = await page
     .locator("#monitorConnectionDetail")
     .textContent();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/test-runs/${aspectStateBeforeMonitorPush.currentRunState.testRun.testRunId}/save-progress`,
     {
       body: {
@@ -21128,7 +21138,7 @@ try {
   await expectInputValue("#bookletKey", participantRouteBookletKey);
   stopAfter("activation-roster-warning-cards");
   logStep("reactivate-starter-release");
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${starterContentReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
@@ -21299,7 +21309,7 @@ try {
   logStep("participant-start");
   const participantLoginKey = "student-ui";
   const participantBookletKey = "booklet:starter";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -25243,7 +25253,7 @@ try {
   await liveParticipantPage.close();
   const monitorCommandLoginKey = `${participantLoginKey}-monitor-command`;
   const monitorCommandGroupKey = `${participantGroupKey}-monitor-command`;
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       body: {
@@ -25282,7 +25292,7 @@ try {
     const commandsUrl = `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/commands`;
     const pending = await (await sendSmokeJson(`${commandsUrl}?testRunId=${encodeURIComponent(pausedTestRunId)}`, { method: "GET" })).json();
     assert.ok(pending.commands.some(item => item.commandId === command.commandId && item.effectsDeferred === true));
-    await sendSmokeJson(`${commandsUrl}/${command.commandId}/acknowledgement`, { method: "PATCH", body: { testRunId: pausedTestRunId } });
+    await sendSmokeJsonAndDrain(`${commandsUrl}/${command.commandId}/acknowledgement`, { method: "PATCH", body: { testRunId: pausedTestRunId } });
     const acknowledged = (await (await sendSmokeJson(`${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`, { method: "GET" })).json()).currentRunState.testRun;
     assert.equal(acknowledged.status, command.testRun.status);
     assert.equal(acknowledged.currentUnitKey, command.testRun.currentUnitKey);
@@ -25298,7 +25308,7 @@ try {
   const waitForIsolatedMonitorCommand = () => page.waitForResponse(response =>
     response.request().method() === "POST" && new URL(response.url()).pathname ===
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${pausedTestRunId}/commands`);
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/participant/test-runs/${encodeURIComponent(
       pausedTestRunId
     )}/save-progress`,
@@ -25468,7 +25478,7 @@ try {
     logStep("attachment-manager");
     const attachmentWorkspaceKey = `${workspaceKey}-attachments`;
     const attachmentBookletKey = "booklet:attachment-smoke";
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
     {
       body: {
@@ -25523,11 +25533,11 @@ try {
       }
     )
   ).json();
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/content-releases/${attachmentImport.stagedContentRelease.contentReleaseId}/activate`,
     { body: { activatedByActorId: "ui-attachment-smoke" } }
   );
-  await sendSmokeJson(
+  await sendSmokeJsonAndDrain(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/participant-roster`,
     {
       body: {
@@ -25542,7 +25552,7 @@ try {
       }
     }
   );
-  await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
+  await sendSmokeJsonAndDrain(`${baseUrl}/api/v1/participant/starter:launch`, {
     body: {
       tenantKey,
       workspaceKey: attachmentWorkspaceKey,
