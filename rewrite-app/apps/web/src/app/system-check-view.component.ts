@@ -1,3 +1,4 @@
+import { resolveSystemCheckCustomText, type SystemCheckPresentationTextKey } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
@@ -1164,10 +1165,11 @@ export class SystemCheckViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  customText(key: string, fallback: string): string {
-    return (
-      this.systemCheck?.customTexts[key]?.trim() ||
-      this.applicationSettings.settings().customTexts[key]?.trim() ||
+  customText(key: SystemCheckPresentationTextKey, fallback: string): string {
+    return resolveSystemCheckCustomText(
+      this.applicationSettings.settings().customTexts,
+      this.systemCheck?.customTexts,
+      key,
       fallback
     );
   }

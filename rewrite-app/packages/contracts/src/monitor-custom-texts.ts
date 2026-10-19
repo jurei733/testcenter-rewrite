@@ -61,6 +61,8 @@ export const originalMonitorCustomTextDefaults = {
 } as const;
 
 export type MonitorCustomTextKey = keyof typeof originalMonitorCustomTextDefaults;
+// This key is used by the Original template but absent from its defaults catalog.
+export type MonitorRuntimeCustomTextKey = MonitorCustomTextKey | "gm_add_custom_filter";
 
 export const originalMonitorCustomTextKeys = Object.freeze(
   Object.keys(originalMonitorCustomTextDefaults) as MonitorCustomTextKey[]
@@ -76,13 +78,13 @@ export const mergeMonitorCustomTextScopes = (
 
 export const resolveMonitorCustomTextValue = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
-  key: MonitorCustomTextKey
-): string => customTexts?.[key] ?? originalMonitorCustomTextDefaults[key];
+  key: MonitorRuntimeCustomTextKey
+): string => customTexts?.[key] ?? (key === "gm_add_custom_filter" ? "" : originalMonitorCustomTextDefaults[key]);
 
 export const resolveMonitorCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
-  key: MonitorCustomTextKey,
-  fallback: string = originalMonitorCustomTextDefaults[key]
+  key: MonitorRuntimeCustomTextKey,
+  fallback: string = key === "gm_add_custom_filter" ? "Eigenen Filter hinzufügen" : originalMonitorCustomTextDefaults[key]
 ): string => resolveMonitorCustomTextValue(customTexts, key) || fallback;
 
 export const formatMonitorCustomText = (

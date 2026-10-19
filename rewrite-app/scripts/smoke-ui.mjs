@@ -1,3 +1,4 @@
+import { originalSystemCheckCustomTextDefaults } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1317,7 +1318,7 @@ try {
     });
     await offlineShellPage
       .locator("#participantCustomLoginSubtitle")
-      .filter({ hasText: "Start or Resume Test" })
+      .filter({ hasText: originalParticipantCustomTextDefaults.login_subtitle })
       .waitFor();
     if (await offlineShellPage.evaluate(() => navigator.onLine)) {
       await offlineShellPage.evaluate(() => {
@@ -2029,7 +2030,7 @@ try {
   await brandedParticipantPage.waitForURL(/\/app\/participant$/);
   await brandedParticipantPage
     .locator("#participantRouteStartOrResumeButton")
-    .filter({ hasText: "UI Global Resume" })
+    .filter({ hasText: originalParticipantCustomTextDefaults.booklet_starterStartTestButtonLabel })
     .waitFor();
   await brandedParticipantPage
     .locator("#participantTenantKey")
@@ -3343,7 +3344,7 @@ try {
       delete window.navigator.mozConnection;
     });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
@@ -3488,7 +3489,7 @@ try {
       .filter({ hasText: "Measurement complete after" })
       .waitFor({ timeout: 45_000 });
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
@@ -3696,7 +3697,7 @@ try {
       0
     );
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
@@ -3737,7 +3738,7 @@ try {
     );
     await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     const resumedSecondSystemCheckPlayerFrame = page.frameLocator(
       "#participantVeronaPlayerFrame"
     );
@@ -3777,7 +3778,7 @@ try {
     );
     await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
-    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByRole("heading", { name: originalSystemCheckCustomTextDefaults.syscheck_unitPrompt }).waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire", exact: true }).waitFor();
     await page.locator("#systemCheckNextButton").click();
@@ -20743,7 +20744,7 @@ try {
     .waitFor();
   await page
     .locator("#systemCheckIntroText")
-    .filter({ hasText: "This check verifies whether the current device is ready" })
+    .filter({ hasText: originalSystemCheckCustomTextDefaults.syscheck_intro })
     .waitFor();
   await page
     .locator(".system-check-facts")

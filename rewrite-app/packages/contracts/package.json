@@ -53,6 +53,10 @@
     "./participant-debug-condition": {
       "types": "./dist/packages/contracts/src/participant-debug-condition.d.ts",
       "default": "./dist/packages/contracts/src/participant-debug-condition.js"
+    },
+    "./system-check-custom-texts": {
+      "types": "./dist/packages/contracts/src/system-check-custom-texts.d.ts",
+      "default": "./dist/packages/contracts/src/system-check-custom-texts.js"
     }
   },
   "dependencies": {

@@ -1,5 +1,48 @@
 # Testcenter parity checklist
 
+### Systemcheck text consumers, complete editor catalog and filter copy (2026-10-19)
+
+Systemcheck rendering now keeps the selected check's empty and authored values
+when resolving global < check scopes. An empty local override selects that
+specific template's fallback; it no longer revives the global override.
+Unconfigured values use all seven actual Original systemcheck defaults,
+including the shared participant page-navigation token. The global editor now
+offers every one of the actual catalog's 102 defaults (41 participant, 54
+monitor, seven systemcheck). The Original template also uses
+`gm_add_custom_filter` although its catalog omits that key. Both filter-editor
+entry points now honor its global/login overrides and Original fallback while
+the advertised monitor default catalog correctly stays at 54 keys.
+
+The pinned service/production pipe executes against the actual Rewrite
+systemcheck method in 56 cases: eight keys by seven authored-value/scope cases.
+Seven further comparisons cover the runtime-only monitor filter key. Complete
+catalog/default checks and six editor checks accompany these gates. The
+Original systemcheck templates are pinned as full bytes/hashes. Their literal
+fallbacks match, with one deliberate copy correction: the source joins
+`das` + `Sie` without a space in the password explanation; the Rewrite retains
+the correctly spaced wording from the Original default catalog.
+
+All 156 compiled contracts and 1,268 frontend checks pass. Strict Original-19,
+authenticated Chromium/SQLite covers five systemcheck value/scope scenarios in
+both interfaces (desktop/mobile) plus three actual monitor logins: 13 browser
+cases and 26 exact rendered-text assertions, without page errors. The complete
+shared browser flow passes through systemcheck report handling. The new
+systemcheck contract has an independent module entry point, so the catalog
+stays with its lazy consumers: the production initial bundle is 469.88 kB,
+within the unchanged 470 kB cap. Full shared browser verification is running.
+
+Published `c887012d` completes with 22 successful and 16 failed CI jobs.
+PostgreSQL passes all 1,814 tests, including all four raw content-import/reopen
+cases and protected global/account text mutation/reopen. Fifteen browser jobs
+stop at one obsolete offline subtitle expectation (`Start or Resume Test`
+instead of Original `Testauswahl`). That expectation now uses the actual
+Original default; the branding gate also uses the actual Starter key's default
+rather than a different Login key's override. Local shared flow passes both.
+The remaining CI failure is the separately reproduced Debug fixture race
+recorded below. This is a failed workflow, not full remote qualification.
+Formal parity remains 30 complete / 19 partial; production acceptance remains
+open.
+
 ### Content text preservation and strict package manifests (2026-10-19)
 
 The same raw-value guarantee now reaches Booklet and SysCheck imports. Their

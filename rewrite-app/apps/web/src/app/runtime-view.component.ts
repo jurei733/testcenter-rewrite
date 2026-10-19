@@ -135,7 +135,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <button id="monitorResetRuntimeFiltersButton" class="ghost" type="button" (click)="view.resetMonitorRuntimeFilters()">Reset to Profile</button>
           </div>
           <details id="monitorCustomFilterEditor" open>
-            <summary>Eigenen Filter hinzufügen</summary>
+            <summary>{{ view.monitorText("gm_add_custom_filter") }}</summary>
             <p>Passende Testsitzungen werden ausgeblendet, bis der Filter deaktiviert oder entfernt wird.</p>
             <div class="form-grid">
               <label>
@@ -168,7 +168,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               </label>
             </div>
             <div class="actions">
-              <button id="monitorSaveCustomFilterButton" class="secondary" type="button" [disabled]="!view.canSaveMonitorCustomFilter" (click)="view.saveMonitorCustomFilter()">{{ view.monitorCustomFilterEditingId ? 'Filter aktualisieren' : 'Eigenen Filter hinzufügen' }}</button>
+              <button id="monitorSaveCustomFilterButton" class="secondary" type="button" [disabled]="!view.canSaveMonitorCustomFilter" (click)="view.saveMonitorCustomFilter()">{{ view.monitorCustomFilterEditingId ? 'Filter aktualisieren' : view.monitorText('gm_add_custom_filter') }}</button>
               <button *ngIf="view.monitorCustomFilterEditingId" id="monitorCancelCustomFilterEditButton" class="ghost" type="button" (click)="view.cancelMonitorCustomFilterEdit()">Bearbeiten abbrechen</button>
             </div>
             <div id="monitorCustomFilterList" class="actions" *ngIf="view.monitorCustomFilterOptions.length > 0">

@@ -1,3 +1,4 @@
+import { originalSystemCheckCustomTextDefaults, originalSystemCheckCustomTextKeys } from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { Injectable, inject } from "@angular/core";
 
 import type {
@@ -364,6 +365,7 @@ export class OpsViewFacade {
     return [...new Set([
       ...originalParticipantCustomTextKeys,
       ...originalMonitorCustomTextKeys,
+      ...originalSystemCheckCustomTextKeys,
       ...Object.keys(this.applicationCustomTextDrafts)
     ])].sort((left, right) => left.localeCompare(right));
   }
@@ -374,6 +376,9 @@ export class OpsViewFacade {
     }
     if (Object.hasOwn(originalMonitorCustomTextDefaults, key)) {
       return originalMonitorCustomTextDefaults[key as keyof typeof originalMonitorCustomTextDefaults];
+    }
+    if (Object.hasOwn(originalSystemCheckCustomTextDefaults, key)) {
+      return originalSystemCheckCustomTextDefaults[key as keyof typeof originalSystemCheckCustomTextDefaults];
     }
     return "";
   }

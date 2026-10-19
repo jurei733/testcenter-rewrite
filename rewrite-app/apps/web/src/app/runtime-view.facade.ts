@@ -9,7 +9,8 @@ import {
   resolveOpenMonitorRunSuperState,
   resolveMonitorCustomText,
   resolveMonitorCustomTextValue,
-  type MonitorCustomTextKey
+  type MonitorCustomTextKey,
+  type MonitorRuntimeCustomTextKey
 } from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
@@ -268,7 +269,7 @@ export class RuntimeViewFacade {
     return resolveMonitorCustomTextValue(this.effectiveMonitorCustomTexts, key);
   }
 
-  monitorText(key: MonitorCustomTextKey, fallback?: string): string {
+  monitorText(key: MonitorRuntimeCustomTextKey, fallback?: string): string {
     return resolveMonitorCustomText(
       this.effectiveMonitorCustomTexts,
       key,

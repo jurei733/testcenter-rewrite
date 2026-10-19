@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import * as compiledContracts from "@testcenter-rewrite-app/contracts/system-check-custom-texts";
 import { BehaviorSubject, firstValueFrom, of } from "rxjs";
 import { map, switchMap } from "rxjs/operators";
 import ts from "typescript";
@@ -82,4 +83,56 @@ for (const prefix of ["", "  Started  ", "\nReady:\t"]) for (const duration of [
     customTextValue: field => participant.resolveParticipantCustomTextValue(customTexts, field)
   });
   assert.equal(view.getTimerLifecycleEvent().message, expected);
+});
+
+// Execute the real Angular component method without constructing its injected UI.
+const systemSource = readFileSync(new URL("../apps/web/src/app/system-check-view.component.ts", import.meta.url), "utf8");
+const systemAst = ts.createSourceFile("system.ts", systemSource, ts.ScriptTarget.Latest, true);
+const systemClass = systemAst.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "SystemCheckViewComponent");
+const systemMethod = systemClass.members.find(node => node.name?.getText(systemAst) === "customText");
+const systemExports = {};
+new Function("exports", "resolveSystemCheckCustomText", ts.transpileModule(`export class ActualSystemCheck { ${systemMethod.getText(systemAst)} }`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+}).outputText)(systemExports, compiledContracts.resolveSystemCheckCustomText);
+const systemDefaults = Object.fromEntries(Object.entries(catalog).filter(([key]) => key.startsWith("syscheck_")).map(([key, entry]) => [key, entry.defaultvalue]));
+test("all seven system-check defaults match the complete actual Original catalog", () => {
+  assert.equal(Object.keys(systemDefaults).length, 7);
+  assert.deepEqual(compiledContracts.originalSystemCheckCustomTextDefaults, systemDefaults);
+});
+for (const key of [...Object.keys(systemDefaults), "login_pagesNaviPrompt"]) for (const item of cases) test(`actual system-check method matches the Original pipe: ${key}/${item.name}`, async () => {
+  const scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? { [key]: scope.value } : {});
+  const global = scopes[0], local = Object.assign({}, ...scopes.slice(1));
+  const service = new exports.ReferenceService(); new exports.ReferenceConfig(service).setCustomTexts(global);
+  service.addCustomTexts(local);
+  const view = Object.assign(new systemExports.ActualSystemCheck(), { applicationSettings: { settings: () => ({ customTexts: global }) }, systemCheck: { customTexts: local } });
+  const expected = await firstValueFrom(new exports.ReferencePipe(service).transform("Template fallback", key));
+  assert.equal(view.customText(key, "Template fallback"), expected);
+});
+
+const templateFallbacks = {};
+for (const file of reference.files.filter(file => file.path.endsWith(".html"))) {
+  for (const [, expression, key] of file.source.matchAll(/((?:'(?:\\.|[^'\\])*'\s*(?:\+\s*)?)+)\|\s*customtext\s*:\s*'([^']+)'/g)) {
+    templateFallbacks[key] = new Function(`return (${expression});`)();
+  }
+}
+assert.equal(templateFallbacks.gm_add_custom_filter, "Eigenen Filter hinzufügen");
+for (const item of cases) test(`runtime-only filter text matches the actual Original template: ${item.name}`, async () => {
+  const key = "gm_add_custom_filter", scopes = item.scopes.map(scope => Object.hasOwn(scope, "value") ? { [key]: scope.value } : {});
+  const service = new exports.ReferenceService(); new exports.ReferenceConfig(service).setCustomTexts(scopes[0]);
+  for (const scope of scopes.slice(1)) service.addCustomTexts(scope);
+  const expected = await firstValueFrom(new exports.ReferencePipe(service).transform(templateFallbacks[key], key));
+  assert.equal(monitor.resolveMonitorCustomText(Object.assign({}, ...scopes), key), expected);
+  assert.ok(!monitor.originalMonitorCustomTextKeys.includes(key));
+});
+for (const key of Object.keys(systemDefaults)) test(`Original system-check fallback or documented word spacing is retained: ${key}`, () => {
+  const files = ["original-system-check-content.component.ts", "original-system-check-questionnaire.component.ts", "original-system-check-unit.component.ts", "original-system-check-report.component.ts"];
+  const expressions = files.flatMap(file => {
+    const source = readFileSync(new URL(`../apps/web/src/app/${file}`, import.meta.url), "utf8");
+    return [...source.matchAll(/view\.customText\('([^']+)', ('(?:\\.|[^'\\])*')\)/g)].filter(([, field]) => field === key).map(([, , text]) => new Function(`return (${text});`)());
+  });
+  assert.equal(expressions.length, 1, key);
+  // The source joins "das" + "Sie" without a space in this one fallback.
+  // Keep the correctly spaced wording from the Original catalog in the UI.
+  const expected = key === "syscheck_report_aboutPassword" ? systemDefaults[key] : templateFallbacks[key];
+  assert.equal(expressions[0], expected, key);
 });

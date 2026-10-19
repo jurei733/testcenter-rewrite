@@ -17,6 +17,9 @@
     "paths": {
       "@testcenter-rewrite-app/domain": ["packages/domain/src/index.ts"],
       "@testcenter-rewrite-app/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite-app/contracts/system-check-custom-texts": [
+        "packages/contracts/src/system-check-custom-texts.ts"
+      ],
       "@testcenter-rewrite-app/contracts/participant-response-capture": [
         "packages/contracts/src/participant-response-capture.ts"
       ],
