@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "repository": "iqb-berlin/testcenter",
+  "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sources": [
+    {
+      "path": "frontend/src/app/superadmin/users/users.component.ts",
+      "sha256": "22055a9151c199a7a829576b20e7d3736c8540510522be8c70b3c2718be826ca",
+      "handler": "selectPermissions(user: IdRoleData, role: string): void {\n    if (role === 'RW') {\n      user.role = (user.role === 'RW') ? 'RO' : 'RW';\n    } else if (role === 'RO') {\n      user.role = (user.role === 'RO' || user.role === 'RW') ? '' : 'RO';\n    }\n    this.pendingWorkspaceChanges = true;\n  }"
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/workspaces.component.ts",
+      "sha256": "af17c086c3d002f37a8f40d86a8d93728d0e65fb4ac09052805f84f9e1b4f925",
+      "handler": "selectPermissions(user: IdRoleData, role: string): void {\n    if (role === 'RW') {\n      user.role = (user.role === 'RW') ? 'RO' : 'RW';\n    } else if (role === 'RO') {\n      user.role = (user.role === 'RO' || user.role === 'RW') ? '' : 'RO';\n    }\n    this.pendingUserChanges = true;\n  }"
+    }
+  ]
+}

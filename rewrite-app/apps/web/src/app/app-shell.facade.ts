@@ -98,6 +98,10 @@ export class AppShellFacade {
     return this.uiState.adminSessionActive();
   }
 
+  get isPlatformAdmin(): boolean {
+    return this.hasAdminSession && this.operatorAccess.isPlatformAdmin;
+  }
+
   async changeRequiredAdminPassword(password: string): Promise<void> {
     await this.adminPasswordChange.changePassword({ password });
   }

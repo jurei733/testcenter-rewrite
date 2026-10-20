@@ -28,8 +28,9 @@ login, proof of work, Systemcheck, participant isolation/variants and real IB
 restoration. These run before the long browser journeys can occupy runner slots.
 A failure prevents expensive dependent jobs and still fails `CI acceptance`.
 
-All 27 existing browser scenarios remain independently required. The other 19
-run in `quick-extended` after fast feedback, with four concurrent slots, alongside
+All 27 existing browser scenarios remain independently required. Original
+administration adds an independent real-API gate, bringing the set to 28. The
+20 extended scenarios run in `quick-extended` after fast feedback, with four concurrent slots, alongside
 PostgreSQL, the broad matrix, deployability and the three Compose modes. Long
 prefix journeys therefore do not block the first meaningful checkpoint or
 serialize the start of the PostgreSQL flow. The cap leaves runner capacity for
@@ -41,7 +42,8 @@ from source independently. `Fast feedback` alone is not release acceptance.
 One production build supplies all host test jobs. The archive is only 3.3 MiB in
 the local checkpoint. Built-script aliases retain each original test command
 and environment. A source-pinned baseline command inventory checks that no prior
-qualification was lost. The eight serial Ops gates are independent jobs; every
+qualification was lost. The eight prior Ops gates are independent jobs; the new Original administration
+flow also runs in the extended entry group. Every
 existing scenario, both camera facings, native routes/tabs, controller references,
 full browser flow, database adapter and deployment mode remains required.
 

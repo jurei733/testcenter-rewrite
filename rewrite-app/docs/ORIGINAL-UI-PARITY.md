@@ -1,5 +1,54 @@
 # Optional Original UI
 
+### Original system administration adapter (2026-10-20)
+
+The optional Original interface now mounts the German Material Systemverwaltung
+header, account menu and Admins/Arbeitsbereiche tables for authenticated platform
+administrators. The shared API remains authoritative. The two pinned Original
+`selectPermissions` implementations are captured with full-file hashes and
+executed directly against twelve corresponding Rewrite cases; the Source build
+verifier rejects a missing, changed or substituted reference.
+
+The adapter reads every workspace with its actual tenant key. A name-only new
+workspace goes into the dedicated `original-interface` tenant (display name
+`Testcenter`), created through the existing platform API when absent. It never
+uses the last selected study tenant. Workspace keys use browser cryptographic
+randomness. Reads, continuations, next batch writes and modal submissions retain
+their captured administrator session. Successful permission rows are acknowledged
+individually, so a partial failure retries only the remaining changes. Workspace
+deletion removes its cached scoped assignments after the server's real cascade.
+Existing self-deletion, self-demotion and password policy remain enforced by the
+backend. Own-password reset remains available under the existing backend contract.
+
+An owned SQLite/production-browser gate signs in through the real Original form,
+grants RO and cross-tenant RW access, renames and creates workspaces, rejects an
+incorrect deletion password, confirms deletion and its membership cascade, creates
+and promotes/deletes an administrator, and resets a password followed by actual
+required self-change and token revocation. It retains twelve users/workspaces
+captures across all three themes and desktop/mobile viewports. Captures are
+Rewrite diagnostics, not paired Source pixel acceptance. Stable table identity
+also preserves the actual focused permission checkbox after a native edit; the
+pre-fix browser regression fails when the row is recreated.
+
+Required/own-password forms now load on demand while the existing root controller
+keeps validation, credential cleanup and revocation. The required form's missing
+chunk fallback offers real sign-out; a deliberately aborted renderer proves the
+server password gate and subsequent 401 after closing. The production initial
+bundle stays under the unchanged 470-kB limit. No server/auth/storage schema or
+migration is changed by this presentation adapter.
+
+The Settings tab still projects the existing settings controls; full Original
+settings appearance, non-platform workspace administration, notification/sorting
+differences and paired whole-page Source qualification remain open. The formal
+30-complete/19-partial count and all eight full-page acceptance rows stay open at
+their previous boundaries. The last published run at `37a34bc4` passed 77 jobs,
+including Source captures, PostgreSQL, Compose and the saved Systemcheck fix, but
+failed JSON-roster shared-parameter publishing and final acceptance. Its follow-up
+now records exactly one trusted Publish click per actual mounted definition and
+waits for the parent Player surface to become interactive; fresh local and Linux
+qualification are required before that failure is called fixed.
+
+
 ### Mounted Player startup interaction (2026-10-17)
 
 The current Original controller covers its mounted Unit iframe while loading.

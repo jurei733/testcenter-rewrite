@@ -8,6 +8,18 @@ import { fileURLToPath } from "node:url";
 export const originalBrowserSource = JSON.parse(await readFile(new URL("./fixtures/original-browser-source.json", import.meta.url), "utf8"));
 const manifestName = "original-reference-manifest.json";
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
+const originalAdministrationReference = JSON.parse(await readFile(new URL("./fixtures/original-administration-permissions.json", import.meta.url), "utf8"));
+export async function verifyOriginalAdministrationSource(root, reference = originalAdministrationReference) {
+  assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
+  assert.equal(reference.commit, originalBrowserSource.commit);
+  assert.equal(reference.sources.length, 2); assert.equal(new Set(reference.sources.map(item=>item.path)).size, 2);
+  for (const item of reference.sources) {
+    assert.match(item.path, /^frontend\/src\/app\/superadmin\/(?:users\/users|workspaces\/workspaces)\.component\.ts$/);
+    const bytes = await readFile(join(root,item.path));
+    assert.equal(sha256(bytes), item.sha256, "Administration references must retain the actual pinned Source file.");
+    assert.ok(bytes.toString("utf8").includes(item.handler), "Never substitute a rewritten permission handler for Source.");
+  }
+}
 const appCommit = () => {
   assert.match(process.env.GITHUB_SHA ?? "", /^[a-f0-9]{40}$/);
   return process.env.GITHUB_SHA;
@@ -19,6 +31,7 @@ export async function verifyOriginalSource(root) {
   const lock = await readFile(join(root, "frontend/package-lock.json"));
   assert.equal(sha256(lock), originalBrowserSource.frontendLockSha256, "Original dependencies must retain their pinned lockfile.");
   assert.equal(Number(process.versions.node.split(".")[0]), 22);
+  await verifyOriginalAdministrationSource(root);
 }
 async function filesUnder(root, directory = root) {
   assert.ok((await lstat(directory)).isDirectory(), "Reference paths must be real directories, never links.");

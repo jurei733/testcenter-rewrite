@@ -16,6 +16,7 @@ import {
 } from "@angular/router";
 
 import { ActivityFeedComponent } from "./activity-feed.component";
+import { AdminPasswordDialogsComponent } from "./admin-password-dialogs.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BugReportDialogComponent } from "./bug-report-dialog.component";
@@ -46,6 +47,7 @@ const routeViews: AppView[] = [
   standalone: true,
   imports: [
     NgTemplateOutlet,
+    AdminPasswordDialogsComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -132,6 +134,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get isOriginalAdminLogin(): boolean {
     return this.interfaceMode.mode() === "original" && this.isSignedOutOpsView;
+  }
+
+  get isOriginalAdministration(): boolean {
+    return this.interfaceMode.mode() === "original" && this.activeRouteView === "ops" && this.app.isPlatformAdmin;
   }
 
   get activeRouteView(): AppView {

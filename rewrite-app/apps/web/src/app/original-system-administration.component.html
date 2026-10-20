@@ -1,0 +1,125 @@
+<app-original-overlay-styles />
+<app-original-administration-surface-styles />
+<mat-toolbar data-cy="header" id="originalAdministrationHeader">
+  <div class="side">
+    <button matIconButton id="originalAdministrationAccountButton" class="account-button"
+      aria-label="Nutzerinformationen" [matMenuTriggerFor]="accountMenu" #account="matMenuTrigger" data-cy="account-button">
+      <mat-icon originalAdministrationIcon name="person" />
+    </button>
+    <mat-menu #accountMenu="matMenu" class="original-administration-account-menu">
+      <div class="heading"><div>Nutzerinformationen</div>
+        <button matIconButton aria-label="Nutzerinformationen schließen" (click)="account.closeMenu()"><mat-icon originalAdministrationIcon name="close" /></button>
+      </div>
+      <dl>
+        <dt>Anmeldename:</dt><dd>{{ app.operatorAccountUsername }}</dd>
+        <dt>Gruppe:</dt><dd></dd>
+        <dt>Berechtigung:</dt><dd>Verwaltung von Nutzerrechten und von grundsätzlichen Systemeinstellungen</dd>
+        <dt>Version:</dt><dd>{{ version }}</dd>
+      </dl>
+      <mat-divider />
+      <button matButton="tonal" id="globalAdminSignOutButton" class="logout-button" data-cy="logout-button"
+        [disabled]="directory.busy" (click)="$event.stopPropagation(); confirmLogout(account)">Abmelden</button>
+    </mat-menu>
+  </div>
+  <div class="center"><h1>Systemverwaltung</h1></div>
+  <div class="side logo"><a routerLink="/workspace" aria-label="Gehe zur Startseite">
+    <img id="applicationLogo" data-cy="logo" [src]="settings.assetUrl('logo', settings.settings().mainLogo)"
+      alt="Logo der Anwendung" matTooltip="Zur Startseite" />
+  </a></div>
+</mat-toolbar>
+<section id="originalSystemAdministration" [attr.aria-busy]="directory.busy">
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+    @for (tab of sections; track tab.id) {
+      <a mat-tab-link [routerLink]="['/ops']" [queryParams]="{ui:'original',adminSection:tab.id}"
+        [active]="section === tab.id" [disabled]="directory.busy" [attr.data-cy]="'superadmin-tabs:' + tab.id"
+        (click)="choose(tab.id)"><h2>{{ tab.label }}</h2></a>
+    }
+  </nav>
+  <mat-tab-nav-panel #tabPanel>
+    @if (showDirectoryProblem) { <p id="originalAdministrationError" role="alert">{{ directory.problem }}</p> }
+    @if (section === 'settings') {
+      <ng-container [ngTemplateOutlet]="settingsTemplate" />
+    } @else {
+      <div class="directory-columns">
+        <div class="directory-list">
+          <div class="toolbar">
+            @if (section === 'users') {
+              <button mat-fab data-cy="add-user" aria-label="Administrator:in hinzufügen" matTooltip="Administrator:in hinzufügen"
+                [disabled]="directory.busy" (click)="addUser()"><mat-icon originalAdministrationIcon name="add" /></button>
+              <button mat-fab data-cy="delete-user" aria-label="Markierte Administrator:in löschen" matTooltip="Markierte Administrator:in löschen"
+                [disabled]="directory.busy || !directory.selectedAdmin || directory.selectedAdminId === selfId"
+                (click)="confirmAction('delete-user')"><mat-icon originalAdministrationIcon name="delete" /></button>
+              <button mat-fab data-cy="change-password" aria-label="Kennwort ändern" matTooltip="Kennwort ändern"
+                [disabled]="directory.busy || !directory.selectedAdmin"
+                (click)="resetPassword()"><mat-icon originalAdministrationIcon name="edit" /></button>
+              <button mat-fab data-cy="change-superadmin" aria-label="Superadmin-Status ändern" matTooltip="Superadmin-Status ändern"
+                [disabled]="directory.busy || !directory.selectedAdmin || directory.selectedAdminId === selfId"
+                (click)="confirmAction('superadmin')"><mat-icon originalAdministrationIcon name="supervisor_account" /></button>
+            } @else {
+              <button mat-fab data-cy="add-workspace" aria-label="Arbeitsbereich hinzufügen" matTooltip="Arbeitsbereich hinzufügen"
+                [disabled]="directory.busy" (click)="addWorkspace()"><mat-icon originalAdministrationIcon name="add" /></button>
+              <button mat-fab data-cy="delete-workspace" aria-label="Markierten Arbeitsbereich löschen" matTooltip="Markierten Arbeitsbereich löschen"
+                [disabled]="directory.busy || !directory.selectedWorkspace" (click)="confirmAction('delete-workspace')"><mat-icon originalAdministrationIcon name="delete" /></button>
+              <button mat-fab data-cy="rename-workspace" aria-label="Arbeitsbereich umbenennen" matTooltip="Arbeitsbereich umbenennen"
+                [disabled]="directory.busy || !directory.selectedWorkspace" (click)="renameWorkspace()"><mat-icon originalAdministrationIcon name="edit" /></button>
+            }
+          </div>
+          @if (directory.busy && !directory.admins.length) { <mat-progress-bar mode="indeterminate" /> }
+          @if (section === 'users') {
+            <mat-table [dataSource]="users" [trackBy]="trackUser" matSort (matSortChange)="sortUsers($event)">
+              <ng-container matColumnDef="name"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Name</mat-header-cell>
+                <mat-cell *matCellDef="let row">{{ row.adminUser.username }} {{ directory.isSuperadmin(row) ? '*' : '' }}</mat-cell>
+              </ng-container>
+              <mat-header-row *matHeaderRowDef="['name']" />
+              <mat-row *matRowDef="let row; columns:['name']" tabindex="0" [attr.data-admin-id]="row.adminUser.adminUserId"
+                (click)="directory.selectAdmin(row.adminUser.adminUserId)" (keydown.enter)="directory.selectAdmin(row.adminUser.adminUserId)"
+                [style.background]="directory.selectedAdminId === row.adminUser.adminUserId ? 'lightblue' : ''" />
+            </mat-table>
+          } @else {
+            <mat-table [dataSource]="workspaces" [trackBy]="trackWorkspace" matSort (matSortChange)="sortWorkspaces($event)">
+              <ng-container matColumnDef="name"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Name</mat-header-cell>
+                <mat-cell *matCellDef="let row">{{ row.displayName }}</mat-cell></ng-container>
+              <ng-container matColumnDef="modification_timestamp"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Letztes Änderungsdatum</mat-header-cell>
+                <mat-cell *matCellDef="let row">{{ formatModification(row.latestFileModificationAt) }}</mat-cell></ng-container>
+              <mat-header-row *matHeaderRowDef="['name','modification_timestamp']" />
+              <mat-row *matRowDef="let row; columns:['name','modification_timestamp']" tabindex="0" [attr.data-workspace-id]="row.workspaceId"
+                (click)="directory.selectWorkspace(row.workspaceId)" (keydown.enter)="directory.selectWorkspace(row.workspaceId)"
+                [style.background]="directory.selectedWorkspaceId === row.workspaceId ? 'lightblue' : ''" />
+            </mat-table>
+          }
+        </div>
+        <div class="directory-permissions">
+          @if (section === 'users' ? directory.selectedAdmin : directory.selectedWorkspace) {
+            <div class="toolbar permission-heading">
+              <div>Zugriffsrechte für {{ section === 'users' ? directory.selectedAdmin?.adminUser?.username : '"' + directory.selectedWorkspace?.displayName + '"' }}:</div>
+              <button mat-fab data-cy="save" aria-label="Speichern" matTooltip="Speichern" matTooltipPosition="above"
+                [disabled]="directory.busy || !directory.changes.size" (click)="directory.savePermissions()"><mat-icon originalAdministrationIcon name="save" /></button>
+            </div>
+          } @else {
+            <div>{{ section === 'users' ? 'Zugriffsrechte für Arbeitsbereich(e):' : 'Zugriffsberechtigte für Arbeitsbereich:' }}</div>
+            <div>{{ section === 'users' ? 'Bitte links Administrator:in wählen' : 'Bitte links einen Arbeitsbereich wählen' }}</div>
+          }
+          <mat-table [dataSource]="permissionRows" [trackBy]="trackPermission" matSort (matSortChange)="sortPermissions($event)">
+            <ng-container matColumnDef="selectCheckbox"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Read | Write</mat-header-cell>
+              <mat-cell *matCellDef="let row; let i=index">
+                @let adminId = row.adminUserId;
+                @let workspaceId = row.workspaceId;
+                <mat-checkbox [attr.data-cy]="section === 'users' ? 'workspace-' + workspaceId + '-role-ro' : 'workspace-role-ro' + i"
+                  aria-label="Nur Lesen" matTooltip="Nur Lesen" [disabled]="directory.busy"
+                  [checked]="directory.access(adminId,workspaceId) !== ''" (change)="directory.togglePermission(adminId,workspaceId,'RO')" />
+                <mat-checkbox [attr.data-cy]="section === 'users' ? 'workspace-' + workspaceId + '-role-rw' : 'workspace-role-rw' + i"
+                  aria-label="Lesen und Schreiben" matTooltip="Lesen und Schreiben" [disabled]="directory.busy"
+                  [checked]="directory.access(adminId,workspaceId) === 'RW'" (change)="directory.togglePermission(adminId,workspaceId,'RW')" />
+              </mat-cell>
+            </ng-container>
+            <ng-container matColumnDef="label"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">{{ section === 'users' ? 'Arbeitsbereich' : 'Admins' }}</mat-header-cell>
+              <mat-cell *matCellDef="let row">{{ row.label }}</mat-cell></ng-container>
+            <mat-header-row *matHeaderRowDef="['selectCheckbox','label']" />
+            <mat-row *matRowDef="let row; columns:['selectCheckbox','label']" />
+          </mat-table>
+        </div>
+      </div>
+    }
+    @if (directory.notice) { <p id="originalAdministrationNotice" role="status">{{ directory.notice }}</p> }
+  </mat-tab-nav-panel>
+</section>
