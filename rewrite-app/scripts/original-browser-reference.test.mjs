@@ -47,7 +47,7 @@ for (const change of ["corrupt", "extra", "missing", "symlink", "directory-link"
 test("capture tasks cover each renderer family without duplicate tasks or a rewrite driver", async () => {
   assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter"]);
   const tasks = Object.values(originalReferenceTasks).flat();
-  assert.equal(tasks.length, 16); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.equal(tasks.length, 18); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
   for (const task of tasks) {
     assert.match(task.script, /^reference-original-[\w-]+\.mjs$/);
     await readFile(new URL(task.script, import.meta.url));
@@ -57,11 +57,11 @@ test("the capture family cannot inherit a single-case selector, unrelated scenar
   const parent = { ORIGINAL_RUNTIME_CONTRACT: "true", ORIGINAL_PAUSED_LOCK_ONLY: "true", ORIGINAL_RUNTIME_COMMAND_OVERLAP: "pending-pause",
     REFERENCE_SINGLE: "true", REFERENCE_COMPLETENESS: "true", ORIGINAL_LOGIN_REFERENCE_INSECURE: "true", ORIGINAL_PLAYER_VERSION_ERROR: "unsupported", UI_SMOKE_BROWSER_CHANNEL: "foreign",
     UI_SMOKE_HEADFUL: "true", CI: "true" };
-  const environment = originalCaptureEnvironment(parent, originalReferenceTasks.entry[0], "/owned/source", "/owned/evidence");
+  const environment = originalCaptureEnvironment(parent, originalReferenceTasks.entry.find(task => task.name === "login"), "/owned/source", "/owned/evidence");
   for (const key of Object.keys(parent).filter(key => !["UI_SMOKE_HEADFUL", "CI"].includes(key))) assert.equal(environment[key], undefined, key);
   assert.equal(environment.CI, "true"); assert.equal(environment.UI_SMOKE_HEADFUL, "true");
   assert.equal(environment.ORIGINAL_LOGIN_REFERENCE_ROOT, "/owned/source");
   assert.equal(environment.ORIGINAL_REFERENCE_CAPTURE_ONLY, "true");
-  const selected = originalCaptureEnvironment(parent, originalReferenceTasks.entry[2], "/owned/source", "/owned/evidence");
+  const selected = originalCaptureEnvironment(parent, originalReferenceTasks.entry.find(task => task.name === "insecure-admin"), "/owned/source", "/owned/evidence");
   assert.equal(selected.ORIGINAL_LOGIN_REFERENCE_INSECURE, "true"); assert.equal(selected.ORIGINAL_LOGIN_REFERENCE_ENTRY, "admin");
 });

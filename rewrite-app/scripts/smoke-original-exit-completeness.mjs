@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser, assertOriginalVisualCase } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -12,6 +13,7 @@ import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo
 import { completenessCases, completenessPlayer, legacyCompletenessCase, closeIconMetrics } from "./exit-completeness-fixture.mjs";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 
+const reference = await loadOriginalVisualReference("original-exit-completeness");
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root,"dist/apps/web/browser/index.html"));
 const artifacts = await mkdtemp(join(tmpdir(),"testcenter-exit-completeness-"));
@@ -28,7 +30,7 @@ const server = spawn(process.execPath,["--input-type=module","-e",`
   FIRST_SLICE_XML_SCHEMA_PROFILE:"legacy-compatibility",REQUIRE_LOGIN_PASSWORD:"false"},stdio:["ignore","pipe","pipe","ipc"]});
 failureGate.observeStream(server.stdout);failureGate.observeStream(server.stderr);
 const serverClosed=new Promise(done=>server.once("close",done));
-const errors=[],states={};let browser,reference;
+const errors=[],states={};let browser;
 const themes=process.env.EXIT_COMPLETENESS_SINGLE==="true"?["Primar"]:["Primar","Sekundar","Erwachsene"];
 const screens=process.env.EXIT_COMPLETENESS_SINGLE==="true"?[["desktop",1280,720]]:[["desktop",1280,720],["mobile",390,844]];
 const cases=process.env.EXIT_COMPLETENESS_LEGACY==="true"?{legacy:legacyCompletenessCase}:{...completenessCases,legacy:legacyCompletenessCase};
@@ -65,6 +67,7 @@ try {
     await api(workspace+"/participant-roster",{rosterText:`<Testtakers><Group id="owned" label="Exit Group">${names.map(name=>`<Login mode="run-hot-return" name="${name}"><Booklet>owned-exit</Booklet></Login>`).join("")}</Group></Testtakers>`},operator);
   }
   browser=await chromium.launch({headless:process.env.CI==="true"&&process.env.UI_SMOKE_HEADFUL!=="true"});
+  assertOriginalVisualBrowser(browser, reference);
   for(const theme of themes) {
     await api("/api/v1/admin/application-settings",{themeName:theme},operator,"PATCH");
     for(const [screen,width,height] of screens) for(const leave of ["none","confirm","forbidden"]) for(const [progress,values] of Object.entries(cases)) {
@@ -110,7 +113,7 @@ try {
           content:dialog.querySelector('[data-cy="deny-navigation-message"]').textContent,
           buttons:[...dialog.querySelectorAll("button")].map(n=>({text:n.textContent.trim(),box:rect(n)}))};
       });
-      reference??=JSON.parse(await readFile(new URL("./fixtures/original-exit-completeness.json",import.meta.url),"utf8"));
+      assertOriginalVisualCase(reference, `${theme}-${screen}-${progress}`);
       assert.equal(reference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
       assert.deepEqual(dialog,reference.information[`${theme}-${screen}-${progress}`]);states[key].information=dialog;
       states[key].closeIconMetrics=await page.locator('[data-cy="close-deny-navigation-message"]').evaluate(closeIconMetrics);

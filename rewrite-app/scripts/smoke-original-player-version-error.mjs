@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
@@ -13,7 +14,7 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
-const reference = JSON.parse(await readFile(new URL("./fixtures/original-player-version-error.json", import.meta.url), "utf8"));
+const reference = await loadOriginalVisualReference("original-player-version-error");
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-player-version-error-"));
 console.log(`owned_artifacts=${artifacts}`);
@@ -56,6 +57,7 @@ try {
   };
   const operator = (await api("/api/v1/admin/auth/sign-in", {username:"demo-admin",password:"demo-admin-password"})).sessionToken;
   browser = await chromium.launch({headless:process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true"});
+  assertOriginalVisualBrowser(browser, reference);
   for (const [key, expected] of Object.entries(reference.cases)) {
     if (process.env.UI_SMOKE_ONLY_CASE && key !== process.env.UI_SMOKE_ONLY_CASE) continue;
     const [, variant, theme, screen] = key.match(/^(missing|unsupported)-run-hot-return-(Primar|Sekundar|Erwachsene)-(desktop|mobile)-forbidden-false$/);

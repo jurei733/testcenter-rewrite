@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -35,7 +36,7 @@ const serverClosed = new Promise(done => server.once("close", done));
 let browser;
 const errors = [];
 const metrics = {};
-const reference = JSON.parse(await readFile(new URL("./fixtures/original-header-logo.json", import.meta.url), "utf8"));
+const reference = await loadOriginalVisualReference("original-header-logo");
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 const fixtures = {};
 try {
@@ -75,6 +76,7 @@ try {
   }
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  assertOriginalVisualBrowser(browser, reference);
 
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");

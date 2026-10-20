@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
@@ -15,7 +16,7 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
 const contract = process.env.UI_SMOKE_RUNTIME_CONTRACT === "true";
-const reference = JSON.parse(await readFile(new URL(contract ? "./fixtures/original-runtime-error-contract.json" : "./fixtures/original-runtime-error.json", import.meta.url), "utf8"));
+const reference = await loadOriginalVisualReference(contract ? "original-runtime-error-contract" : "original-runtime-error");
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 if (contract) assert.deepEqual(Object.keys(reference.cases), runtimeErrorContractCases.map(s => s.key));
 if (process.env.UI_SMOKE_ONLY_CASE) assert.ok(Object.hasOwn(reference.cases, process.env.UI_SMOKE_ONLY_CASE), "The requested runtime case must exist.");
@@ -73,6 +74,7 @@ try {
   };
   const operator = (await api("/api/v1/admin/auth/sign-in", {username:"demo-admin",password:"demo-admin-password"})).sessionToken;
   browser = await chromium.launch({headless:process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true"});
+  assertOriginalVisualBrowser(browser, reference);
   for (const [key, expected] of Object.entries(reference.cases)) {
     if (process.env.UI_SMOKE_ONLY_CASE && key !== process.env.UI_SMOKE_ONLY_CASE) continue;
     const scenario = expected.definition;
