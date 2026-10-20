@@ -278,13 +278,17 @@ jobs:
           playwright: "true"
       - name: Run Quick browser gates
         shell: bash
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
         run: xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
       - name: Retain failed Quick browser log
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ui-quick-${{ matrix.check }}-diagnostics
-          path: ${{ runner.temp }}/rewrite-ui-quick.log
+          path: |
+            ${{ runner.temp }}/rewrite-ui-quick.log
+            ${{ runner.temp }}/rewrite-ui-artifacts/
           if-no-files-found: warn
           retention-days: 7
 

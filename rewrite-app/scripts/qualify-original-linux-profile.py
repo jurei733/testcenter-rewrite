@@ -80,22 +80,23 @@ fixtures['original-paused-exit'] = {'cases': cases}
 information, pixels = {}, {}
 for key, expected in base('original-exit-completeness')['information'].items():
     theme, screen, progress = key.split('-')
-    if progress == 'legacy':
-        continue  # This Source scenario must be captured before qualifying it on Linux.
+    source_task = tasks['legacy-completeness' if progress == 'legacy' else 'completeness']
     source_key = f'{theme}-{screen}-header-none-{progress}'
-    actual = tasks['completeness']['data']['states'][source_key]['information']['dialog']
+    actual = source_task['data']['states'][source_key]['information']['dialog']
     information[key] = project(expected, actual)
-    pixels[key] = tasks['completeness']['closeButtonPixelSha256'][source_key]
+    pixels[key] = source_task['closeButtonPixelSha256'][source_key]
     for leave in ('confirm', 'forbidden'):
         other = f'{theme}-{screen}-header-{leave}-{progress}'
-        assert project(expected, tasks['completeness']['data']['states'][other]['information']['dialog']) == information[key]
-        assert tasks['completeness']['closeButtonPixelSha256'][other] == pixels[key]
+        assert project(expected, source_task['data']['states'][other]['information']['dialog']) == information[key]
+        assert source_task['closeButtonPixelSha256'][other] == pixels[key]
 fixtures['original-exit-completeness'] = {'information': information, 'closeButtonPixelSha256': pixels}
+
+fixtures['original-system-check-welcome'] = {'measurements': project(base('original-system-check-welcome')['measurements'], tasks['system-check-welcome']['data']['measurements'])}
 
 profile = {'version': 1, 'source': first['manifest']['source'], 'platform': 'linux', 'architecture': 'x64', 'nodeMajor': 22,
     'browserVersion': first['browserVersion'], 'browserPackage': first['browserPackage'], 'browserMode': 'visible',
     'provenance': provenance,
-    'unqualifiedCases': ['original-exit-completeness/Primar-desktop-legacy'], 'fixtures': fixtures}
+    'unqualifiedCases': [], 'fixtures': fixtures}
 target = repo / 'scripts/fixtures/original-linux-chromium147.json'
 target.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + '\n')
 print(target, target.stat().st_size)

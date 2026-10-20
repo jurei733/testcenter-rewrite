@@ -18857,7 +18857,7 @@ try {
       testRunId: resumePayload.testRun?.testRunId
     };
   };
-  const completeOriginalControllerUnit = async frame => {
+  const checkOriginalControllerRadio = async frame => {
     // Complete a real viewport render of the opaque frame before native input.
     // Chrome can target its owner when check() combines an off-screen scroll
     // and immediate radio click. Keep the checked-state assertion unchanged.
@@ -18866,6 +18866,9 @@ try {
     await frame
       .locator('[data-cy="TestController-radio1-Aufg1"]')
       .check();
+  };
+  const completeOriginalControllerUnit = async frame => {
+    await checkOriginalControllerRadio(frame);
     await frame.locator("#next-page").click();
     await frame
       .getByText("Presentation complete", { exact: true })
@@ -19099,9 +19102,7 @@ try {
     .filter({ hasText: originalParticipantCustomTextDefaults.booklet_msgTimerStarted })
     .waitFor();
   await page.locator("#participantVeronaPlayerStatus").filter({ hasText: /^running$/ }).waitFor();
-  await demoController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(demoController.frame);
   await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
@@ -19185,9 +19186,7 @@ try {
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ timeout: 15_000 });
   await page.locator("#participantRouteTestletTimerValue").waitFor();
-  await reviewController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(reviewController.frame);
   await page.locator("#participantRouteReviewReviewer").fill("tobias");
   await page
     .locator("#participantRouteReviewPriority")
@@ -19486,9 +19485,7 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ timeout: 15_000 });
-  await hotRestartController.frame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(hotRestartController.frame);
   await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
@@ -19622,9 +19619,7 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
     .waitFor({ state: "attached" });
-  await completionControllerFrame
-    .locator('[data-cy="TestController-radio1-Aufg1"]')
-    .check();
+  await checkOriginalControllerRadio(completionControllerFrame);
   assert.equal(
     await page.locator("#participantRouteNextUnitButton").isDisabled(),
     false
@@ -26275,7 +26270,7 @@ try {
     }
     if (page && !page.isClosed()) {
       try {
-        const failureDirectory = await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
+        const failureDirectory = artifactDirectory ?? await mkdtemp(resolve(tmpdir(), "testcenter-ui-failure-"));
         await page.screenshot({ path: resolve(failureDirectory, "failure.png"), fullPage: true });
         process.stderr.write(`UI smoke failure screenshot: ${failureDirectory}/failure.png\n`);
       } catch (captureError) {

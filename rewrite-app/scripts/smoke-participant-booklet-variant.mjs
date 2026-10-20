@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -9,7 +9,9 @@ import { chromium } from "playwright";
 
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-participant-variant-"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-participant-variant-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : scratch;
+await mkdir(artifacts, { recursive: true });
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const apiModule = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
 const server = spawn(process.execPath, ["--input-type=module", "-e", `
@@ -18,7 +20,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
   server.listen(0, "127.0.0.1", () => process.send({ port: server.address().port }));
   process.once("SIGTERM", () => server.close(() => process.exit(0)));
 `], { cwd: frontendRoot, env: { ...process.env, PORT: "4310", FIRST_SLICE_STORE: "sqlite",
-  FIRST_SLICE_SQLITE_FILE: join(artifacts, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+  FIRST_SLICE_SQLITE_FILE: join(scratch, "store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO: "true",
   FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true", FIRST_SLICE_PROOF_OF_WORK_SCOPES: "",
   FIRST_SLICE_XML_SCHEMA_PROFILE: "legacy-compatibility", REQUIRE_LOGIN_PASSWORD: "false" },
   stdio: ["ignore", "ignore", "inherit", "ipc"] });
@@ -78,7 +80,7 @@ try {
     activePage = page;
     const errors = [];
     page.on("pageerror", error => errors.push(String(error)));
-    await page.goto(`${baseUrl}/app/participant?ui=${ui}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/app/participant?ui=${ui}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "domcontentloaded" });
     if (ui === "original") {
       await page.getByLabel("Anmeldename", { exact: true }).fill("variant-browser");
     } else {
@@ -173,7 +175,7 @@ try {
     await textarea.fill(secondAnswer);
     assert.deepEqual((await leave(otherRunId)).unitResponses, { "variant-unit": secondAnswer });
     assert.deepEqual((await enter(secondAssignment)).unitResponses, { "variant-unit": secondAnswer });
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, secondAnswer);
     assert.equal(new URL(page.url()).searchParams.get("testRunId"), otherRunId);
@@ -220,7 +222,7 @@ try {
     if (ui === "original") {
       // The Original surface hides the Rewrite fallback toolbar. Verify the
       // real browser reload here; its Verona toolbar has separate acceptance.
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "domcontentloaded" });
     } else {
       await Promise.all([page.waitForEvent("load"), page.locator("#participantRouteReloadButton").click()]);
     }
@@ -244,9 +246,11 @@ try {
     assert.equal(legacy.status, 200);
     assert.equal((await legacy.json()).currentRunState.testRun.testRunId, otherRunId,
       "The selection fixture must really have a different latest run.");
+    // This page owns a persistent event stream. Document and scoped Run
+    // assertions below establish readiness; global network idleness cannot.
     const eventPath = `${sessionPath}/events`;
     const [, channel, acknowledgement] = await Promise.all([
-      page.goto(reentryLink.href, { waitUntil: "networkidle" }),
+      page.goto(reentryLink.href, { waitUntil: "domcontentloaded" }),
       page.waitForResponse(response => new URL(response.url()).pathname === eventPath &&
         new URL(response.url()).searchParams.get("testRunId") === initial.testRunId),
       page.waitForResponse(response => new URL(response.url()).pathname === `${eventPath}/acknowledgements` &&
@@ -256,7 +260,7 @@ try {
     assert.equal(acknowledgement.status(), 200);
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await textarea.inputValue(), exactAnswer);
@@ -318,7 +322,7 @@ try {
     });
     assert.equal(completedEntry.status, 409);
     assert.equal((await completedEntry.json()).error, "booklet_already_completed");
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await textarea.waitFor();
     await page.waitForFunction(answer => document.querySelector("#participantRouteUnitResponse")?.value === answer, exactAnswer);
     assert.equal(await page.locator("#participantRouteRunId").innerText(), initial.testRunId,
@@ -360,7 +364,7 @@ try {
       activePage = entryPage;
       const entryErrors = [];
       entryPage.on("pageerror", error => entryErrors.push(String(error)));
-      await entryPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey: "demo-tenant", workspaceKey: entryWorkspaceKey })}`, { waitUntil: "networkidle" });
+      await entryPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({ ui, tenantKey: "demo-tenant", workspaceKey: entryWorkspaceKey })}`, { waitUntil: "domcontentloaded" });
       if (ui === "original") await entryPage.getByLabel("Anmeldename", { exact: true }).fill(mode);
       else await entryPage.locator("#participantLoginKey").fill(mode);
       const identityResponse = entryPage.waitForResponse(value =>
@@ -392,7 +396,11 @@ try {
       assert.deepEqual(beforeEntry.testRun.unitResponses, {});
       const entryRunId = beforeEntry.testRun.testRunId;
       assert.equal(new URL(entryPage.url()).searchParams.get("testRunId"), entryRunId);
-      await entryPage.reload({ waitUntil: "networkidle" });
+      const resetEntry = entryPage.waitForResponse(response =>
+        new URL(response.url()).pathname === `${entrySessionPath}/resume` && response.request().method() === "POST");
+      await entryPage.reload({ waitUntil: "domcontentloaded" });
+      assert.equal((await resetEntry).status(), 200);
+      await entryPage.locator("#participantRouteTestletUnlockCode").waitFor();
       const afterEntry = await readEntry();
       assert.equal(afterEntry.testRun.testRunId, entryRunId);
       assert.equal(afterEntry.testRun.currentUnitKey, null, "Non-saving hard reload must restore the code gate.");

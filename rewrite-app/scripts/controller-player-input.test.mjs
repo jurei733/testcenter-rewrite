@@ -7,17 +7,23 @@ import ts from "typescript";
 // is verified separately with the original Controller corpus, not mocked here.
 const source = readFileSync(new URL("./smoke-ui.mjs", import.meta.url), "utf8");
 const ast = ts.createSourceFile("smoke-ui.mjs", source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
-const candidates = [];
+const helperNames = ["checkOriginalControllerRadio", "completeOriginalControllerUnit"];
+const candidates = Object.fromEntries(helperNames.map(name => [name, []]));
 const visit = node => {
-  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === "completeOriginalControllerUnit") {
-    candidates.push(node.initializer);
+  if (ts.isVariableDeclaration(node) && helperNames.includes(node.name.getText(ast))) {
+    candidates[node.name.getText(ast)].push(node.initializer);
   }
   ts.forEachChild(node, visit);
 };
 visit(ast);
-assert.equal(candidates.length, 1, "The real Controller completion helper must be unambiguous.");
-assert.ok(candidates[0]);
-const moduleSource = `export const createControllerHelper = page => (${candidates[0].getText(ast)});`;
+for (const name of helperNames) {
+  assert.equal(candidates[name].length, 1, `The real ${name} helper must be unambiguous.`);
+  assert.ok(candidates[name][0]);
+}
+const moduleSource = `export const createControllerHelper = page => {
+  const checkOriginalControllerRadio = ${candidates.checkOriginalControllerRadio[0].getText(ast)};
+  return (${candidates.completeOriginalControllerUnit[0].getText(ast)});
+};`;
 const { createControllerHelper } = await import(`data:text/javascript;base64,${Buffer.from(moduleSource).toString("base64")}`);
 
 const fixture = ({ prepare, paint, check, next } = {}) => {

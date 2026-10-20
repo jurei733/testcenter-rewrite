@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const read = async name => JSON.parse(await readFile(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
+const qualifiedProvenance = await read("original-linux-chromium147-provenance");
 const visualKeys = new Set(["x", "y", "width", "height", "font", "color", "background", "padding", "margin", "border",
   "borderRadius", "boxShadow", "transform", "gap", "radius", "cursor", "boxSizing", "lineHeight", "display", "verticalAlign", "overflow", "position"]);
 
@@ -19,7 +20,8 @@ export function overlayOriginalVisuals(base, overlay, path = []) {
     }
     return result;
   }
-  if (!visualKeys.has(path.at(-1)) && !path.includes("closeButtonPixelSha256")) {
+  const visualSize = ["logoSize", "iconSize"].includes(path.at(-2)) && typeof base === "number" && typeof overlay === "number";
+  if (!visualKeys.has(path.at(-1)) && !visualSize && !path.includes("closeButtonPixelSha256")) {
     assert.deepEqual(overlay, base, `A visual profile cannot rewrite behavior at ${path.join("/")}`);
   }
   return overlay;
@@ -27,9 +29,7 @@ export function overlayOriginalVisuals(base, overlay, path = []) {
 export function validateOriginalVisualProfile(profile, source, environment) {
   assert.equal(profile.version, 1); assert.deepEqual(profile.source, source);
   for (const [key, value] of Object.entries(environment)) assert.equal(profile[key], value, `Unqualified Original ${key}`);
-  assert.equal(profile.provenance.headCommit, "629eea0528004e2748282a35a0f38dd310cb7325");
-  assert.equal(profile.provenance.mergeCommit, "4af12a60bfbc391df514366b58a22ea2e02cad05");
-  assert.equal(profile.provenance.run, "https://github.com/jurei733/testcenter-rewrite/actions/runs/39428558228");
+  assert.deepEqual(profile.provenance, qualifiedProvenance);
   for (const family of ["entry", "dialogs", "starter"]) {
     assert.ok(Number.isSafeInteger(profile.provenance.archives[family].id));
     assert.match(profile.provenance.archives[family].sha256, /^[a-f0-9]{64}$/);

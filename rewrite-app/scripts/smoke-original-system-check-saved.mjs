@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp } from "node:fs/promises";
@@ -11,6 +12,7 @@ import { chromium } from "playwright";
 // particular it never resets a caller-provided SQLite file or uses port 4311.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
+const welcomeReference = await loadOriginalVisualReference("original-system-check-welcome");
 const root = await mkdtemp(join(tmpdir(), "testcenter-original-system-check-saved-"));
 process.stdout.write(`owned_artifacts=${root}\n`);
 const port = await new Promise((done, reject) => {
@@ -60,6 +62,7 @@ try {
   assert.equal(imported.importJob.status, "completed");
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  assertOriginalVisualBrowser(browser, welcomeReference);
   for (const [theme, closeAction] of [["Primar", "cancel"], ["Sekundar", "confirm"], ["Erwachsene", "escape"]]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -96,19 +99,7 @@ try {
           titleCentered: Math.abs(titleBounds.x + titleBounds.width / 2 - toolbar.x - toolbar.width / 2) < .01
             && Math.abs(titleBounds.y + titleBounds.height / 2 - toolbar.y - toolbar.height / 2) < .01 };
       });
-      const { logoSize, ...exactAppearance } = appearance;
-      const expectedLogo = width < 600 ? [92.8671875, 40] : [111.4375, 48];
-      // Chromium quantizes proportional image widths differently on Linux
-      // and macOS (one 1/128px half-step). Retain the rendered-reference
-      // dimensions with a single 1/64px layout-unit tolerance, not a pixel.
-      assert.ok(Math.abs(logoSize[0] - expectedLogo[0]) <= 1 / 64,
-        `Original logo width: ${logoSize[0]} instead of ${expectedLogo[0]}`);
-      assert.equal(logoSize[1], expectedLogo[1]);
-      assert.deepEqual(exactAppearance, { width, color: "rgb(25, 28, 29)",
-        backgrounds: ["rgb(255, 255, 255)", "rgb(255, 255, 255)"], disabled: true,
-        opacity: "1", iconSize: [24, 24], tableSizing: "content-box",
-        topbarHeight: width < 600 ? 56 : 64,
-        titleTypography: ['"Nunito Sans"', "22px", "28px"], titleCentered: true });
+      assert.deepEqual(appearance, welcomeReference.measurements[`${theme}-${screen}`]);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: true });
     }

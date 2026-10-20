@@ -12,6 +12,9 @@ test("the verified Source capture qualifies the Linux renderer without relabelin
     assert.equal(qualified.referenceRevision, base.referenceRevision);
     if (base.cases) assert.deepEqual(Object.keys(qualified.cases), Object.keys(base.cases));
   }
+  assert.deepEqual(profile.unqualifiedCases, []);
+  assert.equal(profile.fixtures["original-system-check-welcome"].measurements["Primar-mobile"].width, 375);
+  assert.ok(profile.fixtures["original-exit-completeness"].information["Primar-desktop-legacy"]);
   assert.equal(profile.fixtures["original-header-logo"].measurements["Primar-desktop"].width, 94.859375);
   assert.equal(profile.fixtures["original-login-notices"].measurements["Primar-desktop"].httpsParticipant.host.width, 719.078125);
   assert.equal(profile.fixtures["original-exit-completeness"].closeButtonPixelSha256["Primar-desktop-presentation"], "dd27c7238d2e37357752aab815449302d466e918fa6e798178ac7cad70cd44cf");
@@ -37,7 +40,7 @@ test("visual overlays cannot remove controls, invent properties or rewrite behav
   const result = overlayOriginalVisuals(base, { boxes: [{ box: { width: 31 } }] });
   assert.equal(result.boxes[0].text, "Confirm"); assert.equal(result.boxes[0].box.width, 31);
 });
-test("the uncaptured legacy progress case fails rather than falling back to Mac pixels", () => {
+test("an uncaptured visual case fails rather than falling back to Mac pixels", () => {
   const reference = { unqualifiedVisualCases: ["Primar-desktop-legacy"] };
   assert.throws(() => assertOriginalVisualCase(reference, "Primar-desktop-legacy"));
   assertOriginalVisualCase(reference, "Primar-desktop-presentation");

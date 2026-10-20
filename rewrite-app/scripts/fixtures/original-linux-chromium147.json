@@ -12,30 +12,28 @@
   "browserPackage": "1.59.1",
   "browserMode": "visible",
   "provenance": {
-    "run": "https://github.com/jurei733/testcenter-rewrite/actions/runs/39428558228",
-    "headCommit": "629eea0528004e2748282a35a0f38dd310cb7325",
-    "mergeCommit": "4af12a60bfbc391df514366b58a22ea2e02cad05",
+    "run": "https://github.com/jurei733/testcenter-rewrite/actions/runs/39434786458",
+    "headCommit": "072a0d5f582cabc45ae9aa4891303f2951317c54",
+    "mergeCommit": "7e862c43ebab5c0ed9ba342c819ea68cc49593a0",
     "archives": {
       "entry": {
-        "id": 12266729237,
-        "sha256": "5237da89f30cd8a0c57734d84fddec196ac18890037aaac2f13f047fa19154d8",
-        "file": "original-entry-linux-629eea05.zip"
+        "id": 12269359427,
+        "sha256": "ffd4a1b12290b1a9ac35ce6fe3f69c5b89a038e41ee0a615b818c47ec61fd60d",
+        "file": "source-entry-linux-072a0d5f.zip"
       },
       "dialogs": {
-        "id": 12268025593,
-        "sha256": "781d450e89edbf4f17a7e20e980ee357432c42e8ac17368262dd327d2db5a4e6",
-        "file": "original-captures-dialogs-629eea05.zip"
+        "id": 12272225540,
+        "sha256": "153e3d4ce9258ba1a8d2253ed2ea552a0b5491a6234ca84eeef3706bb123b020",
+        "file": "source-dialogs-linux-072a0d5f.zip"
       },
       "starter": {
-        "id": 12266958626,
-        "sha256": "0e89dc0ab6886acc6910f329be0a4bdbfd03a81a18ac18713bf4d46524b9b9f1",
-        "file": "original-captures-starter-629eea05.zip"
+        "id": 12272720364,
+        "sha256": "2fb53712f106e916de4fb6c04c18dd5c753e5b970c889b248669eeab3ecea681",
+        "file": "source-starter-linux-072a0d5f.zip"
       }
     }
   },
-  "unqualifiedCases": [
-    "original-exit-completeness/Primar-desktop-legacy"
-  ],
+  "unqualifiedCases": [],
   "fixtures": {
     "original-login-notices": {
       "measurements": {
@@ -16792,6 +16790,38 @@
               }
             }
           ]
+        },
+        "Primar-desktop-legacy": {
+          "role": "dialog",
+          "box": {
+            "x": 280,
+            "y": 285,
+            "width": 720,
+            "height": 150,
+            "font": "16px \"Nunito Sans\", sans-serif",
+            "color": "rgb(25, 28, 29)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "borderRadius": "0px"
+          },
+          "title": "Aufgabe darf nicht verlassen werden",
+          "content": " Es müssen erst alle Audio-Dateien vollständig abgespielt werden und auf allen Seiten bis ganz nach unten gescrollt werden.",
+          "buttons": [
+            {
+              "text": "",
+              "box": {
+                "x": 935,
+                "y": 311,
+                "width": 40,
+                "height": 40,
+                "font": "24px Arial",
+                "color": "rgb(25, 97, 117)",
+                "background": "rgba(0, 0, 0, 0)",
+                "padding": "8px",
+                "borderRadius": "12px"
+              }
+            }
+          ]
         }
       },
       "closeButtonPixelSha256": {
@@ -16812,7 +16842,324 @@
         "Erwachsene-desktop-both": "5733a661b8bcc6dc9fa2fbb6f14305a8efd3d239c64598a069de70aed1ab599f",
         "Erwachsene-mobile-presentation": "1c95749d79845a36d6d897da7cd0ca70e6fe55713de5c07fa91238de5c99d837",
         "Erwachsene-mobile-response": "1c95749d79845a36d6d897da7cd0ca70e6fe55713de5c07fa91238de5c99d837",
-        "Erwachsene-mobile-both": "1c95749d79845a36d6d897da7cd0ca70e6fe55713de5c07fa91238de5c99d837"
+        "Erwachsene-mobile-both": "1c95749d79845a36d6d897da7cd0ca70e6fe55713de5c07fa91238de5c99d837",
+        "Primar-desktop-legacy": "dd27c7238d2e37357752aab815449302d466e918fa6e798178ac7cad70cd44cf"
+      }
+    },
+    "original-system-check-welcome": {
+      "measurements": {
+        "Primar-desktop": {
+          "width": 1280,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Primar-mobile": {
+          "width": 375,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Primar-toolbar-small": {
+          "width": 584,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Primar-toolbar-large": {
+          "width": 585,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Sekundar-desktop": {
+          "width": 1280,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Sekundar-mobile": {
+          "width": 375,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Sekundar-toolbar-small": {
+          "width": 584,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Sekundar-toolbar-large": {
+          "width": 585,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Erwachsene-desktop": {
+          "width": 1280,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Erwachsene-mobile": {
+          "width": 375,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Erwachsene-toolbar-small": {
+          "width": 584,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 56,
+          "logoSize": [
+            92.859375,
+            40
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        },
+        "Erwachsene-toolbar-large": {
+          "width": 585,
+          "color": "rgb(25, 28, 29)",
+          "backgrounds": [
+            "rgb(255, 255, 255)",
+            "rgb(255, 255, 255)"
+          ],
+          "disabled": true,
+          "opacity": "1",
+          "iconSize": [
+            24,
+            24
+          ],
+          "tableSizing": "content-box",
+          "topbarHeight": 64,
+          "logoSize": [
+            111.4375,
+            48
+          ],
+          "titleTypography": [
+            "\"Nunito Sans\"",
+            "22px",
+            "28px"
+          ],
+          "titleCentered": true
+        }
       }
     }
   }
