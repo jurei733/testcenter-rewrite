@@ -137,6 +137,8 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(download.with["digest-mismatch"], "error");
   assert.equal(download.with["run-id"], undefined); assert.equal(download.with["github-token"], undefined);
   assert.equal(consumer.env.UI_SMOKE_HEADFUL, "true");
+  const evidence = consumer.steps.find(step => step.uses?.startsWith("actions/upload-artifact@"));
+  assert.equal(evidence.with["retention-days"], 30, "Source images and raw measurements must survive the review window.");
   assert.ok(consumer.steps.some(step => step.run?.startsWith("xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture")));
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {

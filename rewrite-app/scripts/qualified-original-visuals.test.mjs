@@ -16,6 +16,8 @@ test("the verified Source capture qualifies the Linux renderer without relabelin
   assert.equal(profile.fixtures["original-system-check-welcome"].measurements["Primar-mobile"].width, 375);
   assert.ok(profile.fixtures["original-exit-completeness"].information["Primar-desktop-legacy"]);
   assert.equal(profile.fixtures["original-header-logo"].measurements["Primar-desktop"].width, 94.859375);
+  assert.equal(profile.fixtures["original-login-notices"].measurements["Primar-mobile"].invalidCredentials.host.width, 180.953125,
+    "The authored native scrollbar must survive Source capture.");
   assert.equal(profile.fixtures["original-login-notices"].measurements["Primar-desktop"].httpsParticipant.host.width, 719.078125);
   assert.equal(profile.fixtures["original-exit-completeness"].closeButtonPixelSha256["Primar-desktop-presentation"], "dd27c7238d2e37357752aab815449302d466e918fa6e798178ac7cad70cd44cf");
 });
