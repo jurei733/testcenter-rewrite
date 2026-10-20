@@ -418,13 +418,15 @@ const componentHost = dataModule(`
   export class ChangeDetectorRef {} export class DestroyRef {} export class ElementRef {}
   export class AttachmentManagerService {} export class RewriteAppUiStateService {}
   export class RewriteAppOperatorAccessService {} export class ActivatedRoute {}
+  export class InterfaceModeService {} export class ApplicationSettingsService {}
   export const CommonModule = {}, FormsModule = {}, RouterLink = {};
 `);
 const componentSource = ts.transpileModule(readFileSync(new URL(
   "../apps/web/src/app/attachment-capture.component.ts", import.meta.url), "utf8"), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, experimentalDecorators: true }
-}).outputText.replace(/"(?:@angular\/(?:common|core|forms|router)|\.\/(?:attachment-manager.service|rewrite-app-ui-state.service|rewrite-app-operator-access.service))"/g,
+}).outputText.replace(/"(?:@angular\/(?:common|core|forms|router)|\.\/(?:attachment-manager.service|rewrite-app-ui-state.service|rewrite-app-operator-access.service|interface-mode.service|application-settings.service))"/g,
   JSON.stringify(componentHost))
+  .replace('"./attachment-custom-texts"', JSON.stringify(dataModule(productionSource("attachment-custom-texts"))))
   .replace('"qr-scanner"', JSON.stringify(import.meta.resolve("qr-scanner")))
   .replace('"./attachment-page-geometry"', JSON.stringify(geometryModule))
   .replace('"./attachment-qr-decoder"', JSON.stringify(decoderModule))

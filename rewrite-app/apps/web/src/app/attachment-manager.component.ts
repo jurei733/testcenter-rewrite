@@ -8,6 +8,9 @@ import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 import { AttachmentManagerService } from "./attachment-manager.service";
 import { downloadBlobFile } from "./download-text-file";
 import { InterfaceModeService } from "./interface-mode.service";
+import { ApplicationSettingsService } from "./application-settings.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { attachmentTextValue, resolveAttachmentText, type AttachmentCustomTextKey } from "./attachment-custom-texts";
 
 @Component({
   selector: "app-attachment-manager",
@@ -32,16 +35,16 @@ import { InterfaceModeService } from "./interface-mode.service";
     <article id="attachmentManagerCard" class="card">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">Original Testcenter parity</span>
-          <h2>Attachment Manager</h2>
+          <h2>{{ originalInterface ? 'Verwaltung der Aufgabenanhänge' : 'Attachment Manager' }}</h2>
         </div>
         <span class="status-pill">{{ attachments.length }} requested · {{ captureCount }} capture-ready · {{ imageCount }} captured</span>
       </div>
       <p>Inspect every requested participant attachment by group, login, test, unit, and variable. Camera capture is available for the original <code>capture-image</code> format; other imported formats remain visible without pretending to offer an unsupported workflow.</p>
+      <h3 *ngIf="originalInterface">{{ customText('am_tools_headline', 'Tools') }}</h3>
       <div class="actions">
         <button id="loadAttachmentsButton" class="primary" type="button" [disabled]="busy || !hasScope" (click)="load()">{{ busy ? 'Working…' : 'Load Attachments' }}</button>
         <button id="downloadAttachmentPagesButton" class="secondary" type="button" [disabled]="busy || captureCount === 0" (click)="downloadPages()">Download capture QR pages</button>
-        <a id="openAttachmentCaptureButton" class="button-link secondary" routerLink="/attachment-capture" *ngIf="captureCount > 0">Open camera capture</a>
+        <a id="openAttachmentCaptureButton" class="button-link secondary" routerLink="/attachment-capture" *ngIf="captureCount > 0">{{ customText('am_capture_image', 'Open camera capture') }}</a>
       </div>
       <label>
         QR page label template
@@ -68,14 +71,14 @@ import { InterfaceModeService } from "./interface-mode.service";
               <span>{{ attachment.groupKey }} / {{ attachment.loginKey }}</span>
               <span>{{ attachment.testLabel }}</span>
               <span>{{ attachment.unitLabel }} · {{ attachment.variableId }}</span>
-              <span>type: {{ attachment.attachmentType || 'unspecified' }}</span>
+              <span>type: {{ isCaptureImage(attachment) ? customText('am_attachment_type_capture-image', 'Photo of a page') : attachment.attachmentType || 'unspecified' }}</span>
             </span>
           </button>
         </div>
 
         <section class="attachment-side" *ngIf="selectedAttachment as selected">
           <h3>{{ selected.unitLabel }} · {{ selected.variableId }}</h3>
-          <p>Attachment type: <code>{{ selected.attachmentType || 'unspecified' }}</code></p>
+          <p>Attachment type: <code>{{ isCaptureImage(selected) ? customText('am_attachment_type_capture-image', 'Photo of a page') : selected.attachmentType || 'unspecified' }}</code></p>
           <p class="attachment-code" id="selectedAttachmentCode">{{ selected.attachmentId }}</p>
           <div class="actions">
             <button class="ghost" type="button" (click)="copyCode(selected.attachmentId)">Copy attachment code</button>
@@ -86,7 +89,7 @@ import { InterfaceModeService } from "./interface-mode.service";
               routerLink="/attachment-capture"
               [queryParams]="{ code: selected.attachmentId }"
               *ngIf="!readOnly && isCaptureImage(selected)"
-            >Capture on this device</a>
+            >{{ customText('am_capture_image', 'Capture on this device') }}</a>
           </div>
           <p id="unsupportedAttachmentType" *ngIf="!isCaptureImage(selected)">
             This attachment declaration is retained for Original Testcenter compatibility. No {{ selected.attachmentType || 'unspecified' }} capture workflow is implemented yet.
@@ -106,7 +109,7 @@ import { InterfaceModeService } from "./interface-mode.service";
               <span class="attachment-code">{{ fileId }}</span>
               <div class="attachment-file-actions">
                 <button class="secondary" type="button" [disabled]="busy" (click)="preview(selected, fileId)">Preview</button>
-                <button class="danger" type="button" [disabled]="busy || readOnly" (click)="deleteFile(selected, fileId)">Delete</button>
+                <button class="danger" type="button" [disabled]="busy || readOnly" (click)="deleteFile(selected, fileId)">{{ customText('am_button_delete_attachment', 'Delete') }}</button>
               </div>
             </div>
           </div>
@@ -123,6 +126,8 @@ import { InterfaceModeService } from "./interface-mode.service";
 export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   private readonly manager = inject(AttachmentManagerService);
   private readonly interfaceMode = inject(InterfaceModeService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   @Input({ required: true }) sessionToken = "";
@@ -135,7 +140,21 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   status = "Load the workspace attachment inventory to begin.";
   busy = false;
   previewUrl: string | null = null;
-  labelTemplate = "%TESTTAKER% | %BOOKLET% | %UNIT% | %VAR%";
+  private labelTemplateOverride: string | null = null;
+
+  get originalInterface(): boolean { return this.interfaceMode.mode() === "original"; }
+
+  customText(key: AttachmentCustomTextKey, rewriteFallback: string): string {
+    return resolveAttachmentText(this.applicationSettings.settings().customTexts,
+      this.operatorAccess.customTexts, key, this.originalInterface ? undefined : rewriteFallback);
+  }
+
+  get labelTemplate(): string {
+    const configured = attachmentTextValue(this.applicationSettings.settings().customTexts,
+      this.operatorAccess.customTexts, "am_page_template_label");
+    return this.labelTemplateOverride ?? (this.originalInterface ? configured
+      : configured || "%TESTTAKER% | %BOOKLET% | %UNIT% | %VAR%");
+  }
 
   get hasScope(): boolean {
     return Boolean(
@@ -166,6 +185,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(): void {
+    this.labelTemplateOverride = null;
     this.attachments = [];
     this.selectedAttachmentId = "";
     this.clearPreview();
@@ -239,7 +259,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   }
 
   setLabelTemplate(event: Event): void {
-    this.labelTemplate = (event.target as HTMLInputElement).value;
+    this.labelTemplateOverride = (event.target as HTMLInputElement).value;
   }
 
   async downloadPages(): Promise<void> {

@@ -1070,6 +1070,8 @@ export type WorkspaceAttachment = {
   testRunId: string;
   groupKey: string;
   loginKey: string;
+  participantCode?: string | null;
+  groupLabel?: string | null;
   personLabel: string;
   bookletKey: string;
   testLabel: string;
