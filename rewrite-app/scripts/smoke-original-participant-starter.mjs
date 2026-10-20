@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -293,7 +294,7 @@ try {
           const resume = root.getByRole("button", { name: actionTexts.booklet_starterContinueTestButtonLabel, exact: true });
           await resume.click();
           await root.getByRole("button", { name: "Bitte warten …", exact: true }).waitFor();
-          await Promise.race([requestSeen, delay(10_000).then(() => { throw new Error("Starter resume did not reach the owned boundary."); })]);
+          await raceWithSmokeDeadline(requestSeen, 10_000, () => { throw new Error("Starter resume did not reach the owned boundary."); });
           assert.deepEqual(await root.locator("mat-card button").evaluateAll(buttons => buttons.map(button => button.disabled)), [true, true, true]);
           await page.keyboard.press("Enter");
           assert.equal(requested, 1, "A pending starter submit must not issue a duplicate request.");

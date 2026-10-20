@@ -48,6 +48,36 @@ add time.
 Total compute is also reduced by removing repeated host builds and duplicate
 feature-branch push/PR runs. More parallel jobs do not imply more test coverage.
 
+Run `39446720581` qualifies the corrected Linux login, protected login, header,
+Starter, Systemcheck, saved-report, attachment, variant and real IB restoration
+gates. It is still a failed run, so it is not a complete timing baseline. Its
+player-exit trace records Playwright completing a click while Material still
+has `mdc-dialog--opening`; no trusted pointer event reaches the confirmation
+button and no return request exists. The fixture now awaits Material's actual
+opening lifecycle and rendered finite transitions before its native click.
+The same barrier protects the reopened completeness dialog. It does not force
+clicks, change animation durations, synthesize events or retry mutations.
+
+Two other readiness conditions retain the exact restoration assertions. Runtime
+error recovery waits for a new document `performance.timeOrigin` and the owned
+Player's enabled answer input, which is enabled only after its real Verona
+Start packet restores answer and progress. Shared-parameter navigation waits
+for the second Player's actual `publish-red` definition: inherited `language=de`
+alone can still be visible in the preceding iframe. Administrator captures
+foreground the page before interaction, await the destination component after
+navigation and wait for two rendering frames; capture errors remain fatal and
+save viewport/component diagnostics in the uploaded failure artifacts. These
+are fixture synchronization changes, not weaker application assertions.
+
+Smoke deadlines now clear their losing timers on both success and rejection.
+Previously a successful owned API shutdown still kept each child process alive
+for ten seconds, repeated across runtime-error variants; header/exit cleanup
+also retained five-second timers. `smoke-deadline.test.mjs` runs real subprocesses
+to demonstrate that the old pattern remains alive and the replacement exits,
+and verifies unchanged failure identity, timeout failure and cleanup escalation.
+The shutdown limits and forced termination of stalled servers are retained.
+This removes harness idle time; complete hosted speedup remains unmeasured.
+
 ## Artifact and credential boundaries
 
 - Third-party Actions use immutable commit SHAs. Checkouts do not persist the

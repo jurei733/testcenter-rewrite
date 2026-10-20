@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -168,7 +169,7 @@ try {
     assert.deepEqual(current.testRun.lockedUnitKeys, []); assert.deepEqual(current.testRun.lockedTestletKeys, []);
     assert.deepEqual(current.testRun.unitResponses, {"unit-intro":packet}, "A rejected ready notification must preserve the exact existing answer packet.");
     const address = page.url();
-    if (deliveryFailure) await Promise.race([blocked, delay(10_000).then(() => {throw Error("Owned startup save did not start");})]);
+    if (deliveryFailure) await raceWithSmokeDeadline(blocked, 10_000, () => {throw Error("Owned startup save did not start");});
     await page.locator("#participantRouteControllerReloadButton").click();
     if (deliveryFailure) {
       if (deliveryFailure === "reject") await poll(async () => attempts, n => n >= 3);
@@ -196,6 +197,6 @@ try {
 } finally {
   await writeFile(join(artifacts, "player-version-error.json"), JSON.stringify({states,errors}, null, 2));
   await browser?.close(); server.kill("SIGTERM");
-  await Promise.race([serverClosed, delay(10_000).then(() => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");})]);
+  await raceWithSmokeDeadline(serverClosed, 10_000, () => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");});
   failureGate.assertHealthy(); console.log("owned_api=shutdown");
 }

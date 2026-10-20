@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -105,6 +106,7 @@ try {
       await context.route(`**/${matches[0]}`, route => route.abort("failed"));
     }
     const page = await context.newPage(); page.on("pageerror", error => errors.push({key,error:String(error)}));
+    await page.bringToFront();
     await page.goto(`${base}/app/participant?ui=original&theme=${theme}&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, {waitUntil:"networkidle"});
     await page.locator("#originalLoginName").fill("exit-person");
     const [signedIn] = await Promise.all([
@@ -489,6 +491,7 @@ try {
     }
     let expectedPacket = packet, expectedAnswer = answer;
     let expectedRuntimeLogCount = expected.repeatedRuntimeLogCount;
+    const beforeReloadTimeOrigin = await page.evaluate(() => performance.timeOrigin);
     if (replacementMode) {
       const lateError = "Third owned runtime log during replacement Ω";
       const writes = [];
@@ -513,7 +516,7 @@ try {
       await frame.locator("#ownedRuntimeError").evaluate((button, message) => {
         button.dataset.message = message; button.click();
       }, lateError);
-      const older = await Promise.race([blocked, delay(10_000).then(() => {throw Error("Owned log-bearing delivery did not start");})]);
+      const older = await raceWithSmokeDeadline(blocked, 10_000, () => {throw Error("Owned log-bearing delivery did not start");});
       expectedAnswer += " newer packet Ω";
       await frame.locator("#demoPlayerAnswer").evaluate((input, value) => {
         input.value = value; input.dispatchEvent(new Event("input", {bubbles:true}));
@@ -562,7 +565,7 @@ try {
       await frame.locator("#demoPlayerAnswer").evaluate((input, value) => {
         input.value = value; input.dispatchEvent(new Event("input", {bubbles:true}));
       }, expectedAnswer);
-      await Promise.race([blocked, delay(10_000).then(() => {throw Error("Owned late save did not start");})]);
+      await raceWithSmokeDeadline(blocked, 10_000, () => {throw Error("Owned late save did not start");});
       const address = page.url();
       await page.locator("#participantRouteControllerReloadButton").click();
       if (saveFailure === "reject") await poll(async () => attempts, n => n >= 3);
@@ -576,7 +579,11 @@ try {
         await page.locator("#participantRouteControllerReloadButton").click();
       } else releaseSave();
     } else await page.locator("#participantRouteControllerReloadButton").click();
-    await frame.locator("#ownedRuntimeError").waitFor(); await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").waitFor({state:"detached"});
+    // The error button exists in the initial iframe HTML, before Verona starts
+    // it. This input becomes enabled only after the actual Start packet restores
+    // its answer and progress; asserting earlier races the real message delivery.
+    await page.waitForFunction(origin => performance.timeOrigin !== origin, beforeReloadTimeOrigin);
+    await frame.locator("#demoPlayerAnswer:enabled").waitFor(); await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").waitFor({state:"detached"});
     assert.equal(await frame.locator("#demoPlayerAnswer").inputValue(), expectedAnswer);
     assert.equal(await frame.locator("#exitPresentation").inputValue(), "some"); assert.equal(await frame.locator("#exitResponse").inputValue(), "none");
     const link = new URL(page.url()); assert.equal(link.searchParams.get("ui"), "original"); assert.equal(link.searchParams.get("testRunId"), runId);
@@ -591,6 +598,6 @@ try {
 } finally {
   await writeFile(join(artifacts, "runtime-error.json"), JSON.stringify({states,errors}, null, 2));
   await browser?.close(); server.kill("SIGTERM");
-  await Promise.race([serverClosed, delay(10_000).then(() => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");})]);
+  await raceWithSmokeDeadline(serverClosed, 10_000, () => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");});
   failureGate.assertHealthy(); console.log("owned_api=shutdown");
 }

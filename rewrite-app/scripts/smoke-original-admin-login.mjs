@@ -2,7 +2,7 @@ import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qual
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdtemp, readFile, readdir } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -22,7 +22,10 @@ const readNotice = element => {
   return { text: element.textContent.trim(), host, icon };
 };
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-original-admin-login-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR
+  ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "original-admin-login")
+  : await mkdtemp(join(tmpdir(), "testcenter-original-admin-login-"));
+await mkdir(artifacts, {recursive:true});
 process.stdout.write(`owned_artifacts=${artifacts}\n`);
 const proof = ["1", "true"].includes(String(process.env.UI_SMOKE_ADMIN_PROOF_OF_WORK));
 const serverModule = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -80,6 +83,7 @@ try {
       for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844]]) {
         const context = await browser.newContext({ viewport: { width, height }, serviceWorkers: "block" });
         const page = await context.newPage(), credentialRequests = [];
+        await page.bringToFront();
         page.on("request", request => {
           if (request.method() === "POST" && ["/api/v1/admin/auth/sign-in", "/api/v1/system/proof-of-work/challenges"].includes(new URL(request.url()).pathname)) credentialRequests.push(request);
         });
@@ -104,9 +108,26 @@ try {
           const authenticated = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/admin/auth/sign-in" && response.ok());
           await submit.click(); assert.equal((await authenticated).status(), 200);
           await page.waitForURL(url => url.pathname === "/app/workspace"); assert.equal(credentialRequests.length, 1);
+          await page.locator("#workspaceDirectorySortCard").waitFor();
         }
         await page.bringToFront();
-        await page.screenshot({ path: join(artifacts, `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}.png`), fullPage: false });
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        const captureName = `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}`;
+        try {
+          await page.screenshot({ path: join(artifacts, `${captureName}.png`), fullPage: false });
+        } catch (error) {
+          const packet = await page.evaluate(() => ({ url:location.pathname, ready:document.readyState,
+            visibility:document.visibilityState, focus:document.hasFocus(),
+            viewport:{width:innerWidth,height:innerHeight,visual:visualViewport?.toJSON?.() ??
+              {width:visualViewport?.width,height:visualViewport?.height,scale:visualViewport?.scale,pageTop:visualViewport?.pageTop}},
+            root:document.querySelector("app-root")?.getBoundingClientRect().toJSON(),
+            workspace:document.querySelector("app-workspace-view")?.getBoundingClientRect().toJSON(),
+            animations:document.getAnimations().map(a=>({pending:a.pending,state:a.playState,timing:a.effect?.getComputedTiming()}))
+          }));
+          await writeFile(join(artifacts, `${captureName}-capture-failure.json`), JSON.stringify({error:String(error),...packet},null,2));
+          console.error(`admin_capture_failure=${JSON.stringify(packet)}`);
+          throw error;
+        }
         await context.close();
         process.stdout.write(`insecure_admin_entry=${theme}/${screen}/${mode}/${proof ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
       }
@@ -114,6 +135,7 @@ try {
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       const context = await browser.newContext({ viewport: { width, height } });
       const page = await context.newPage(); const errors = [], signIns = [];
+      await page.bringToFront();
       page.on("pageerror", error => errors.push(String(error)));
       page.on("console", message => { if (message.type() === "error" && /TypeError|ReferenceError|SyntaxError|NG\d{4}/u.test(message.text())) errors.push(message.text()); });
       page.on("response", response => {
