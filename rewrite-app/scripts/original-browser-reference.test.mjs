@@ -4,8 +4,24 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { verifyOriginalBuild, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
+import { verifyOriginalBuild, verifyOriginalAdministrationSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
+for (const change of ["none","file","handler","revision","path"]) test(`administration Source oracle validates real file bytes and embedded methods: ${change}`,async t=>{
+  const root=await mkdtemp(join(tmpdir(),"original-administration-policy-"));t.after(()=>rm(root,{recursive:true,force:true}));
+  const reference={version:1,repository:originalBrowserSource.repository,commit:originalBrowserSource.commit,sources:[]};
+  for(const folder of ["users","workspaces"]){
+    const path=`frontend/src/app/superadmin/${folder}/${folder}.component.ts`,handler="selectPermissions(row, role) { row.role = role; }";
+    const source=`export class Owned { ${handler} }`;
+    await mkdir(join(root,"frontend/src/app/superadmin",folder),{recursive:true});await writeFile(join(root,path),source);
+    reference.sources.push({path,sha256:digest(source),handler});
+  }
+  if(change==="file")await writeFile(join(root,reference.sources[0].path),"changed source bytes");
+  if(change==="handler")reference.sources[0].handler="selectPermissions() { throw Error('replacement'); }";
+  if(change==="revision")reference.commit="a".repeat(40);
+  if(change==="path")reference.sources[0].path="../outside.ts";
+  if(change==="none")await verifyOriginalAdministrationSource(root,reference);
+  else await assert.rejects(verifyOriginalAdministrationSource(root,reference));
+});
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "original-build-policy-"));
   t.after(() => rm(root, { recursive: true, force: true }));

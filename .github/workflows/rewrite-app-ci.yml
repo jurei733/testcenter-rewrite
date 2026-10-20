@@ -250,6 +250,9 @@ jobs:
       max-parallel: 4
       matrix:
         include:
+          - check: original-administration
+            group: entry
+            command: npm run smoke:ui:original-administration:built
           - check: offline-shell
             group: entry
             command: npm run smoke:ui:offline-shell:built

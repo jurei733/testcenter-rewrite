@@ -4,6 +4,8 @@
 // CDK overlays live under body, outside the component's themed host.
 // Scope their theme explicitly; never affect a Rewrite menu or dialog.
 :root[data-interface-mode='original'] .original-participant-account-menu,
+:root[data-interface-mode='original'] .original-administration-account-menu,
+:root[data-interface-mode='original'] .original-administration-editor-dialog,
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
@@ -18,6 +20,7 @@
 // Rewrite's general button hover lifts by one pixel; the pinned Material
 // dialogs do not. Keep the correction local to these Original renderers.
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-administration-editor-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-error-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-participant-confirmation-dialog button.mat-mdc-button-base:hover {
   transform: none;
@@ -26,6 +29,7 @@
 // Pinned 19.0 theme/material-overrides.scss. Only Original overlays inherit
 // these tokens; the native Rewrite confirmation renderer stays untouched.
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
+:root[data-interface-mode='original'] .original-administration-editor-dialog,
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog,
 :root[data-interface-mode='original'] .original-system-check-saved-dialog,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog,

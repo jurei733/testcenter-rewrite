@@ -951,8 +951,11 @@ try {
   };
   const restorePlatformAdminSession = async () => {
     logStep("restore-platform-admin-session-start");
-    await page.goto(`${baseUrl}/app/ops`, { waitUntil: "domcontentloaded" });
-    await page.waitForURL(/\/app\/ops$/);
+    // This helper exercises the existing Rewrite operator controls. Original
+    // administration has its own real-login/API gate and can be selected by
+    // preceding participant journeys in this same browser context.
+    await page.goto(`${baseUrl}/app/ops?ui=rewrite`, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(url => url.pathname === "/app/ops" && url.searchParams.get("ui") === "rewrite");
     await waitForRouteTarget("#operatorAccessCard");
     const signOutButton = page.locator("#adminSignOutButton");
     if (await signOutButton.isVisible().catch(() => false)) {
@@ -16072,7 +16075,9 @@ try {
               renderConfig(message.playerConfig);
             }
           });
-          document.querySelector("#sharedParameterPublish").addEventListener("click", () => {
+          window.ownedSharedParameterClicks = [];
+          document.querySelector("#sharedParameterPublish").addEventListener("click", event => {
+            window.ownedSharedParameterClicks.push({trusted:event.isTrusted,definition:activeDefinition});
             const firstUnit = activeDefinition === "publish-blue";
             parent.postMessage({
               type: "vopStateChangedNotification",
@@ -16249,7 +16254,20 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(sharedParameterSessionId);
-  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  const publishOwnedSharedParameters = async definition => {
+    // Start can render inside the frame before Angular removes the parent's
+    // loading/inert surface. Input must wait for that actual interaction gate.
+    await page.locator("app-verona-player-host .verona-player-content:not([inert])").waitFor();
+    await page.bringToFront();
+    await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+    const button=sharedParameterFrame.locator("#sharedParameterPublish");
+    await button.click();
+    const witness=await button.evaluate(element=>element.ownerDocument.defaultView.ownedSharedParameterClicks);
+    assert.equal(witness.filter(event=>event.definition===definition).length,1,"Publish must receive exactly one actual native click in the current Player.");
+    assert.deepEqual(witness.at(-1),{trusted:true,definition});
+    console.log(`shared_parameter_native_input=${definition}:trusted-once`);
+  };
+  await publishOwnedSharedParameters("publish-blue");
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"avatar","value":"blue"' })
@@ -16279,7 +16297,7 @@ try {
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"language","value":"de"' })
     .waitFor({ timeout: 30_000 });
-  await sharedParameterFrame.locator("#sharedParameterPublish").click();
+  await publishOwnedSharedParameters("publish-red");
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"tool","value":"calculator"' })

@@ -43,7 +43,7 @@ test("Quick logs retain an upstream test failure instead of reporting tee succes
     "An inner pipefail bash cannot fix the historical outer logger pipeline");
   assert.equal(spawnSync("bash", ["-e", "-o", "pipefail", "-c", legacy]).status, 37);
 });
-test("all 27 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
+test("all 28 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
   const extended = workflow.jobs["quick-extended"];
   const shards = [...quick.strategy.matrix.include, ...extended.strategy.matrix.include];
@@ -51,7 +51,7 @@ test("all 27 browser scenarios run once across fast and extended shards, with co
   assert.equal(extended.strategy["fail-fast"], false);
   assert.equal(extended.strategy["max-parallel"], 4, "Long prefix journeys must leave capacity for Postgres and the broad matrix");
   assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
-  assert.equal(shards.length, 27);
+  assert.equal(shards.length, 28);
   assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
   const split = command => expand(command).split("&&").map(value => value.trim()).filter(Boolean);
   const complete = split("npm run ci:browser:quick:built");
@@ -81,7 +81,7 @@ test("all 27 browser scenarios run once across fast and extended shards, with co
 test("the early browser set is bounded and retains real authentication, isolation, Start restoration and Systemcheck", () => {
   assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
     ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
-  assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,19);
+  assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,20);
   assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback"]);
   assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
 });

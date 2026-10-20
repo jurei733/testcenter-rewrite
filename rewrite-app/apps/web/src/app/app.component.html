@@ -32,154 +32,20 @@
       <span>The application shell is available, but signing in, loading test content, and saving require a connection.</span>
     </section>
   }
-  @if (app.requiresAdminPasswordChange) {
-    <section
-      id="requiredAdminPasswordChangeDialog"
-      class="required-password-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="requiredAdminPasswordChangeTitle"
-    >
-      <form class="required-password-card" (submit)="$event.preventDefault(); submitRequiredAdminPassword()">
-        <span class="eyebrow">Account security</span>
-        <h2 id="requiredAdminPasswordChangeTitle">Choose your own password</h2>
-        <p>An administrator set the current password. Change it before opening workspace administration.</p>
-        <p id="requiredAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
-        <label>
-          New password
-          <input
-            id="requiredAdminPassword"
-            name="requiredAdminPassword"
-            type="password"
-            autocomplete="new-password"
-            [attr.minlength]="adminPasswordMinimumLength"
-            [attr.maxlength]="adminPasswordMaximumLength"
-            [attr.pattern]="adminPasswordPattern"
-            required
-            [value]="requiredAdminPassword"
-            (input)="updateRequiredAdminPassword($event)"
-          />
-        </label>
-        <label>
-          Confirm new password
-          <input
-            id="requiredAdminPasswordConfirmation"
-            name="requiredAdminPasswordConfirmation"
-            type="password"
-            autocomplete="new-password"
-            [attr.minlength]="adminPasswordMinimumLength"
-            [attr.maxlength]="adminPasswordMaximumLength"
-            [attr.pattern]="adminPasswordPattern"
-            required
-            [value]="requiredAdminPasswordConfirmation"
-            (input)="updateRequiredAdminPasswordConfirmation($event)"
-          />
-        </label>
-        @if (requiredAdminPasswordError) {
-          <p
-            id="requiredAdminPasswordError"
-            class="required-password-error"
-            role="alert"
-          >{{ requiredAdminPasswordError }}</p>
-        }
-        <div class="actions">
-          <button
-            id="requiredAdminPasswordSubmitButton"
-            class="primary"
-            type="submit"
-            [disabled]="!canSubmitRequiredAdminPassword"
-          >Change password and sign out</button>
-          <button
-            id="requiredAdminPasswordSignOutButton"
-            class="ghost"
-            type="button"
-            [disabled]="app.activeRequestLabel() !== null"
-            (click)="signOutRequiredAdmin()"
-          >Sign out</button>
-        </div>
-      </form>
-    </section>
-  }
-  @if (ownAdminPasswordDialogOpen) {
-    <section
-      id="ownAdminPasswordChangeDialog"
-      class="required-password-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ownAdminPasswordChangeTitle"
-    >
-      <form class="required-password-card" (submit)="$event.preventDefault(); submitOwnAdminPassword()">
-        <span class="eyebrow">Account security</span>
-        <h2 id="ownAdminPasswordChangeTitle">Change your password</h2>
-        <p>Enter the current password and choose a new one. All active sessions will be signed out after the change.</p>
-        <p id="ownAdminPasswordPolicy">Use {{ adminPasswordMinimumLength }}–{{ adminPasswordMaximumLength }} characters and match <code>{{ adminPasswordPattern }}</code>.</p>
-        <label>
-          Current password
-          <input
-            id="currentAdminPassword"
-            name="currentAdminPassword"
-            type="password"
-            autocomplete="current-password"
-            [attr.maxlength]="adminPasswordMaximumLength"
-            required
-            [value]="currentAdminPassword"
-            (input)="updateCurrentAdminPassword($event)"
-          />
-        </label>
-        <label>
-          New password
-          <input
-            id="ownAdminPassword"
-            name="ownAdminPassword"
-            type="password"
-            autocomplete="new-password"
-            [attr.minlength]="adminPasswordMinimumLength"
-            [attr.maxlength]="adminPasswordMaximumLength"
-            [attr.pattern]="adminPasswordPattern"
-            required
-            [value]="ownAdminPassword"
-            (input)="updateOwnAdminPassword($event)"
-          />
-        </label>
-        <label>
-          Confirm new password
-          <input
-            id="ownAdminPasswordConfirmation"
-            name="ownAdminPasswordConfirmation"
-            type="password"
-            autocomplete="new-password"
-            [attr.minlength]="adminPasswordMinimumLength"
-            [attr.maxlength]="adminPasswordMaximumLength"
-            [attr.pattern]="adminPasswordPattern"
-            required
-            [value]="ownAdminPasswordConfirmation"
-            (input)="updateOwnAdminPasswordConfirmation($event)"
-          />
-        </label>
-        @if (ownAdminPasswordError) {
-          <p
-            id="ownAdminPasswordError"
-            class="required-password-error"
-            role="alert"
-          >{{ ownAdminPasswordError }}</p>
-        }
-        <div class="actions">
-          <button
-            id="ownAdminPasswordSubmitButton"
-            class="primary"
-            type="submit"
-            [disabled]="!canSubmitOwnAdminPassword"
-          >Change password and sign out</button>
-          <button
-            id="ownAdminPasswordCancelButton"
-            class="ghost"
-            type="button"
-            [disabled]="app.activeRequestLabel() !== null"
-            (click)="closeOwnAdminPasswordDialog()"
-          >Cancel</button>
-        </div>
-      </form>
-    </section>
+  @if (app.requiresAdminPasswordChange || ownAdminPasswordDialogOpen) {
+    @defer (when true) {
+      <app-admin-password-dialogs [host]="this" />
+    } @placeholder {
+      <section class="required-password-backdrop" role="dialog" aria-modal="true" aria-label="Password change">
+        <article class="required-password-card"><p>Loading password form…</p></article>
+      </section>
+    } @error {
+      <section class="required-password-backdrop" role="alertdialog" aria-modal="true" aria-label="Password form unavailable">
+        <article class="required-password-card"><p>The password form could not be loaded. Please try again.</p>
+          <button type="button" (click)="app.requiresAdminPasswordChange ? signOutRequiredAdmin() : closeOwnAdminPasswordDialog()">Close</button>
+        </article>
+      </section>
+    }
   }
   <ng-template #participantLogo let-standalone="standalone">
     @defer (when interfaceMode.mode() === 'original') {
@@ -264,7 +130,7 @@
     @if (isOriginalAdminLogin) {
       <ng-container [ngTemplateOutlet]="entryHeader"></ng-container>
     }
-    @if (!isOriginalAdminLogin) {
+    @if (!isOriginalAdminLogin && !isOriginalAdministration) {
       <section class="hero" [class.is-home-hero]="isFocusedEntryView">
         <div class="hero-panel">
           <div class="application-brand operator-brand">
@@ -374,7 +240,7 @@
         }
       </section>
     }
-    @if (!isOriginalAdminLogin && (app.activeRequestLabel() || app.errorMessage())) {
+    @if (!isOriginalAdminLogin && !isOriginalAdministration && (app.activeRequestLabel() || app.errorMessage())) {
       <section
         class="status-banner"
         [class.is-error]="!!app.errorMessage()"
@@ -398,7 +264,7 @@
         }
       </section>
     }
-    @if (!isOriginalAdminLogin) {
+    @if (!isOriginalAdminLogin && !isOriginalAdministration) {
       <nav class="view-nav" aria-label="Application Views">
         @for (view of app.views; track view) {
           <a
@@ -474,7 +340,7 @@
         }
       </nav>
     }
-    @if (isFocusedEntryView) {
+    @if (isFocusedEntryView || isOriginalAdministration) {
       <main class="home-stage" [class.participant-stage]="isOriginalAdminLogin">
         <router-outlet></router-outlet>
       </main>
@@ -509,7 +375,7 @@
     }
   }
 
-  @if (interfaceMode.mode() === 'original' && (isParticipantView || isOriginalAdminLogin)) {
+  @if (interfaceMode.mode() === 'original' && (isParticipantView || isOriginalAdminLogin || isOriginalAdministration)) {
     @if (isOriginalAdminLogin || (activeRouteView === 'participant' && !app.runtime.participantSessionId)) {
       @defer (when true) { <app-original-footer /> }
     }
