@@ -9,6 +9,22 @@ export const originalBrowserSource = JSON.parse(await readFile(new URL("./fixtur
 const manifestName = "original-reference-manifest.json";
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 const originalSettingsCatalogReference = JSON.parse(await readFile(new URL("../test-fixtures/original-testcenter/current-monitor-text-reference.json", import.meta.url), "utf8"));
+const originalAssetDeletionReference = JSON.parse(await readFile(new URL("../test-fixtures/original-testcenter/current-asset-deletion-reference.json", import.meta.url), "utf8"));
+export async function verifyOriginalAssetDeletionSource(root, reference = originalAssetDeletionReference) {
+  assert.equal(reference.originalCommit, originalBrowserSource.commit);
+  const paths = ["backend/src/dao/AssetDAO.class.php", "backend/src/controller/AssetController.class.php", "scripts/database/full.sql"];
+  assert.deepEqual(reference.files.map(file => file.path), paths);
+  const sources = {};
+  for (const file of reference.files) {
+    const bytes = await readFile(join(root, file.path));
+    assert.equal(sha256(bytes), file.sha256, "Asset cascade references must retain the actual pinned Source bytes.");
+    sources[file.path] = bytes.toString("utf8");
+  }
+  assert.ok(sources[paths[0]].includes(reference.deleteSql));
+  assert.ok(sources[paths[2]].includes(reference.scopeType));
+  assert.equal(reference.tables.length, 2);
+  for (const table of reference.tables) assert.ok(sources[paths[2]].includes(table), "Execute actual Source DDL, including the assignment foreign key.");
+}
 export async function verifyOriginalSettingsSource(root, reference = originalSettingsCatalogReference) {
   assert.equal(reference.originalCommit, originalBrowserSource.commit);
   const catalog = reference.files.find(file => file.path === "definitions/testtaker/custom-texts.json");
@@ -42,6 +58,7 @@ export async function verifyOriginalSource(root) {
   assert.equal(Number(process.versions.node.split(".")[0]), 22);
   await verifyOriginalAdministrationSource(root);
   await verifyOriginalSettingsSource(root);
+  await verifyOriginalAssetDeletionSource(root);
 }
 async function filesUnder(root, directory = root) {
   assert.ok((await lstat(directory)).isDirectory(), "Reference paths must be real directories, never links.");

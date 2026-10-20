@@ -21,6 +21,17 @@ Neither earlier run establishes full release acceptance.
 
 ## Fast feedback
 
+For local asset/settings iterations, `npm run test:application-assets` builds
+only the TypeScript core and runs catalog/assignment rollback, real protected
+HTTP and controller tests, without compiling Angular or starting a browser.
+After an existing core build, use `npm run test:application-assets:built`.
+Set `FIRST_SLICE_STORE=postgres` and an owned `FIRST_SLICE_POSTGRES_URL` to also
+exercise the actual Source SQL foreign-key cascade, queued cross-connection
+stale writes and PostgreSQL rollback. The same store/HTTP regressions remain
+mandatory in `test:unit:built` and the full PostgreSQL integration runner.
+The Source build verifier also checks their captured PHP/DDL provenance.
+These focused commands supplement complete CI acceptance; they do not replace it.
+
 `Fast feedback` requires the production build, development typecheck, CI policy,
 dependency audit, complete unit/frontend/terminal-overlap tests and eight short
 browser gates: bug reporting, real Original login, protected login, administrator
@@ -47,15 +58,25 @@ flow also runs in the extended entry group. Every
 existing scenario, both camera facings, native routes/tabs, controller references,
 full browser flow, database adapter and deployment mode remains required.
 
+Run [`39490598043`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39490598043)
+at `36113122` completes **all 80 jobs successfully**, including complete acceptance,
+Source references, PostgreSQL, all browser tiers and Docker/Compose. From the
+workflow start at 20:16:43 UTC, `Fast feedback` completes in **4:25** and final
+workflow success in **33:40**. The actual jobs consume **399.3 runner-minutes**.
+This is a qualified baseline for that commit, before the new atomic asset slice;
+it does not establish production or complete-page visual acceptance.
+
 The earlier **3–6 minute** fast estimate remains provisional. Actual run
 `39446720581` demonstrates why putting every prefix journey in the first tier
 was insufficient: even its successful runtime-error job took 400 seconds,
 before considering queued jobs and the later PostgreSQL flow. The eight short
 gates and cancelled idle timers address that critical path. The **20–25 minute**
-complete estimate is also provisional; confirm actual hosted timings only after
-a completely successful run. Queues and cold downloads add time.
-Total compute is also reduced by removing repeated host builds and duplicate
-feature-branch push/PR runs. More parallel jobs do not imply more test coverage.
+complete estimate was not achieved by the qualified 33:40 run above. Queues and
+cold downloads add time. Reusing host builds and suppressing duplicate feature
+push/PR runs avoid redundant work, but do not establish a total compute saving:
+399.3 runner-minutes exceeds the historical 302.2-minute, 38-job apparent-green
+baseline, with wider coverage and corrected failure propagation. More parallel
+jobs do not imply more test coverage.
 
 Run `39446720581` qualifies the corrected Linux login, protected login, header,
 Starter, Systemcheck, saved-report, attachment, variant and real IB restoration

@@ -4,8 +4,26 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
+import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
+for (const change of ["none", "revision", "path", "bytes", "delete", "scope", "tables", "foreign-key"]) test(`asset deletion Source oracle rejects substituted provenance or SQL: ${change}`, async t => {
+  const root = await mkdtemp(join(tmpdir(), "original-asset-policy-")); t.after(() => rm(root, { recursive: true, force: true }));
+  const reference = { originalCommit: originalBrowserSource.commit, deleteSql: "delete from assets where id = :id",
+    scopeType: "CREATE TYPE assignment_scope AS ENUM ('global', 'group', 'user');",
+    tables: ["CREATE TABLE assets (id integer PRIMARY KEY);", "CREATE TABLE asset_assignment (asset_id integer REFERENCES assets(id) ON DELETE CASCADE);"], files: [] };
+  const sources = [["backend/src/dao/AssetDAO.class.php", reference.deleteSql], ["backend/src/controller/AssetController.class.php", "owned controller"],
+    ["scripts/database/full.sql", [reference.scopeType, ...reference.tables].join("\n")]];
+  for (const [path, source] of sources) { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), source); reference.files.push({ path, sha256: digest(source) }); }
+  if (change === "revision") reference.originalCommit = "a".repeat(40);
+  if (change === "path") reference.files[0].path = "../outside.php";
+  if (change === "bytes") await writeFile(join(root, reference.files[1].path), "changed controller");
+  if (change === "delete") reference.deleteSql = "delete from asset_assignment";
+  if (change === "scope") reference.scopeType = "CREATE TYPE foreign_scope AS ENUM ('global');";
+  if (change === "tables") reference.tables.pop();
+  if (change === "foreign-key") reference.tables[1] = reference.tables[1].replace("CASCADE", "RESTRICT");
+  if (change === "none") await verifyOriginalAssetDeletionSource(root, reference);
+  else await assert.rejects(verifyOriginalAssetDeletionSource(root, reference));
+});
 for (const change of ["none","file","handler","revision","path"]) test(`administration Source oracle validates real file bytes and embedded methods: ${change}`,async t=>{
   const root=await mkdtemp(join(tmpdir(),"original-administration-policy-"));t.after(()=>rm(root,{recursive:true,force:true}));
   const reference={version:1,repository:originalBrowserSource.repository,commit:originalBrowserSource.commit,sources:[]};

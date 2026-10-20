@@ -99,7 +99,7 @@
                   @for (asset of controller.assets; track asset.applicationAssetId) {
                     <mat-grid-tile><mat-card class="asset-card" [attr.data-asset-id]="asset.applicationAssetId">
                       <mat-card-header><mat-card-title>{{ asset.originalName }}</mat-card-title></mat-card-header>
-                      <img mat-card-image [src]="applicationSettings.applicationAssetUrl(asset.originalName)" [alt]="asset.originalName" />
+                      <img mat-card-image [src]="applicationSettings.applicationAssetUrl(asset.originalName,asset.applicationAssetId+':'+asset.updatedAt)" [alt]="asset.originalName" />
                       <mat-card-actions><button matButton type="button" [disabled]="controller.busy"
                         (click)="controller.deleteAsset(asset.applicationAssetId)">Bild entfernen</button></mat-card-actions>
                     </mat-card></mat-grid-tile>

@@ -1183,6 +1183,7 @@ export type UploadApplicationAssetResponse = {
   applicationAsset: ApplicationAssetSummary;
 };
 
+export type DeleteApplicationAssetRequest = { cascadeAssignments?: boolean };
 export type DeleteApplicationAssetResponse = UploadApplicationAssetResponse;
 
 export type ListAttachmentsResponse = {

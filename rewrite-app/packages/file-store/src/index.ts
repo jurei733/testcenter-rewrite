@@ -15,6 +15,8 @@ import {
 import { dirname, join } from "node:path";
 
 import {
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
@@ -812,6 +814,7 @@ const createFileRepository = (
     },
     async saveApplicationSettings(settings) {
       await mutate(state => {
+        validateApplicationAssetReferences(settings.assetAssignments,Object.values(state.applicationAssets));
         state.applicationSettings = { ...settings };
       });
     },
@@ -831,10 +834,35 @@ const createFileRepository = (
         ) ?? null
       );
     },
-    async saveApplicationAsset(applicationAsset) {
-      await mutate(state => {
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      return mutate(state => {
+        const existing=replaceByOriginalName?Object.values(state.applicationAssets).find(asset=>asset.originalName===applicationAsset.originalName):null;
+        if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
         state.applicationAssets[applicationAsset.applicationAssetId] =
           applicationAsset;
+        return { applicationAsset, replaced: Boolean(existing) };
+      });
+    },
+    async mutateApplicationAssetDeletion(input) {
+      return mutate(state=>{
+        const scopes=Object.values(state.workspacesByScope).map(workspace=>({...workspace,
+          tenantKey:Object.values(state.tenants).find(tenant=>tenant.tenantId===workspace.tenantId)?.tenantKey??workspace.tenantId}));
+        const effect=prepareApplicationAssetDeletion(input,{
+          asset:state.applicationAssets[input.applicationAssetId]??null,settings:state.applicationSettings,
+          roster:Object.values(state.participantRosterEntries).map(row=>({...row,assetAssignments:row.assetAssignments??{}})),
+          operational:Object.entries(state.operationalLoginMigrationCandidates).map(([key,candidates])=>{
+          const scope=scopes.find(scope=>scope.tenantId+"::"+scope.workspaceId===key);
+          if(scope)return {...scope,candidates};
+          const parts=key.split("::");if(parts.length!==2)throw Error("Invalid stored operational asset scope.");
+          return {tenantId:parts[0]!,workspaceId:parts[1]!,candidates};
+        }),scopes
+        });
+        if(!effect)return null;
+        if(effect.settings)state.applicationSettings=effect.settings;
+        for(const row of effect.roster)state.participantRosterEntries[row.participantRosterEntryId]={...state.participantRosterEntries[row.participantRosterEntryId]!,assetAssignments:row.assetAssignments};
+        for(const group of effect.operational)state.operationalLoginMigrationCandidates[group.tenantId+"::"+group.workspaceId]=group.candidates;
+        delete state.applicationAssets[effect.asset.applicationAssetId];state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=effect.auditEvent;
+        return effect.asset;
       });
     },
     async deleteApplicationAsset(applicationAssetId) {
@@ -1432,6 +1460,7 @@ const createFileRepository = (
       candidates
     ) {
       await mutate(state => {
+        for(const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Object.values(state.applicationAssets));
         state.operationalLoginMigrationCandidates[
           `${tenantId}::${workspaceId}`
         ] = candidates;
@@ -1447,6 +1476,7 @@ const createFileRepository = (
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await mutate(state => {
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Object.values(state.applicationAssets));
         state.participantRosterEntries[
           participantRosterEntry.participantRosterEntryId
         ] = participantRosterEntry;
