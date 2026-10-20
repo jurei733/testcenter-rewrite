@@ -38,6 +38,10 @@ test("Quick logs retain an upstream test failure instead of reporting tee succes
   assert.equal(result.status, 37); assert.match(result.stdout, /owned-failure/);
   const implicit = spawnSync("bash", ["-e", "-c", command], { encoding: "utf8" });
   assert.equal(implicit.status, 0, "The old implicit shell must reproduce the false green");
+  const legacy = 'bash --noprofile --norc -e -o pipefail -c "exit 37" 2>&1 | tee /dev/null';
+  assert.equal(spawnSync("bash", ["-e", "-c", legacy]).status, 0,
+    "An inner pipefail bash cannot fix the historical outer logger pipeline");
+  assert.equal(spawnSync("bash", ["-e", "-o", "pipefail", "-c", legacy]).status, 37);
 });
 test("all Quick browser scenarios run once across independent shards, each required by fast feedback", () => {
   const quick = workflow.jobs.quick;
