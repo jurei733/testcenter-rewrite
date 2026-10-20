@@ -255,12 +255,24 @@
     "smoke:ui:participant-native-tabs:built": "node ./scripts/smoke-participant-native-tabs.mjs",
     "db:compact:file": "npm run build && FIRST_SLICE_STORE=file node ./scripts/storage-admin.mjs compact",
     "db:compact:file:built": "FIRST_SLICE_STORE=file node ./scripts/storage-admin.mjs compact",
-    "smoke:ui:attachment-custom-text:built": "node scripts/smoke-attachment-custom-text.mjs"
+    "smoke:ui:attachment-custom-text:built": "node scripts/smoke-attachment-custom-text.mjs",
+    "ci:browser:quick:built": "npm run smoke:ui:bug-report:built && npm run smoke:ui:offline-shell:built && npm run smoke:ui:system-check:built && npm run smoke:ui:system-check-saved:built && npm run smoke:ui:original-login:built && npm run smoke:ui:original-login-protected:built && npm run smoke:ui:original-admin-login:built && npm run smoke:ui:attachment-custom-text:built && npm run smoke:ui:original-header:built && npm run smoke:ui:original-player-exit:built && npm run smoke:ui:original-exit-completeness:built && npm run smoke:ui:original-starter-advisories:built && npm run smoke:ui:original-runtime-error:built && npm run smoke:ui:original-runtime-error-contract:built && npm run smoke:ui:original-player-version-error:built && npm run smoke:ui:original-paused-exit:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:original-starter:built && npm run smoke:ui:participant-variant:built && npm run smoke:ui:content:built && npm run smoke:ui:json-roster:built && npm run smoke:ui:participant-entry:built && npm run smoke:ui:participant-review:built && npm run smoke:ui:proof-of-work:built && npm run smoke:ui:verona-player:built && npm run smoke:ui:ib-player:built && npm run smoke:ui:activation-roster-warnings:built",
+    "ci:deployability:built": "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json npm run db:migrate:file:built && FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json npm run db:doctor:file:built && APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true npm run preflight:runtime:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-ci.sqlite npm run db:migrate:sqlite:built && APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-ci.sqlite RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true npm run preflight:runtime:built && APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-startup.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true npm run smoke:startup:built",
+    "smoke:startup:file:built": "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/smoke-startup.json node ./scripts/smoke-startup.mjs",
+    "smoke:shutdown:file:built": "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/smoke-shutdown.json SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
+    "smoke:startup:sqlite:built": "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs",
+    "smoke:shutdown:sqlite:built": "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
+    "smoke:local-demo:built": "node ./scripts/smoke-local-demo.mjs",
+    "smoke:ui:built": "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke.sqlite node ./scripts/smoke-ui.mjs",
+    "test:integration:memory:built": "node --test apps/api/dist/apps/api/src/integration.test.js",
+    "smoke:ui:verona-development:built": "node ./scripts/smoke-verona-development.mjs",
+    "smoke:compose:postgres:built": "node ./scripts/smoke-compose-postgres.mjs",
+    "test:ci-policy": "node --test scripts/ci-build-artifact.test.mjs scripts/ci-workflow.test.mjs"
   },
   "devDependencies": {
     "@angular/build": "21.2.26",
-    "@angular/cli": "21.2.26",
     "@angular/cdk": "20.2.14",
+    "@angular/cli": "21.2.26",
     "@angular/common": "21.2.25",
     "@angular/compiler": "21.2.25",
     "@angular/compiler-cli": "21.2.25",
@@ -275,7 +287,8 @@
     "@types/ua-parser-js": "0.7.39",
     "playwright": "^1.54.1",
     "rxjs": "^7.8.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "yaml": "2.9.1"
   },
   "dependencies": {
     "altcha-lib": "^1.4.1",

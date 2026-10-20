@@ -1,0 +1,323 @@
+{
+  "commit": "4e797ea8fa023456e308944abbcb8503f3db1fdd",
+  "additional": [
+    {
+      "check": "verify-postgres:npm run typecheck",
+      "leaves": [
+        "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
+        "ng build rewrite-app-web --configuration development"
+      ]
+    },
+    {
+      "check": "verify-postgres:npm run build",
+      "leaves": []
+    },
+    {
+      "check": "verify-postgres:npm run db:migrate:postgres:built",
+      "leaves": [
+        "FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs migrate"
+      ]
+    },
+    {
+      "check": "verify-postgres:npm run db:doctor:postgres:built",
+      "leaves": [
+        "FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs doctor"
+      ]
+    },
+    {
+      "check": "verify-postgres:Run Postgres runtime preflight",
+      "leaves": [
+        "APP_BUILD_SHA=\"${GITHUB_SHA::12}\" \\ APP_BUILD_TIMESTAMP=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\ FIRST_SLICE_STORE=postgres \\ RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true \\ node ./scripts/runtime-preflight.mjs"
+      ]
+    },
+    {
+      "check": "verify-postgres:npm run test:integration:postgres:built",
+      "leaves": [
+        "node ./scripts/run-postgres-integration.mjs"
+      ]
+    },
+    {
+      "check": "verify-postgres:Run protected Postgres startup smoke",
+      "leaves": [
+        "APP_BUILD_SHA=\"${GITHUB_SHA::12}\" \\ APP_BUILD_TIMESTAMP=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\ FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true \\ FIRST_SLICE_STORE=postgres node ./scripts/smoke-startup.mjs"
+      ]
+    },
+    {
+      "check": "verify-postgres-ui:npm run build",
+      "leaves": []
+    },
+    {
+      "check": "verify-postgres-ui:npm run smoke:ui:postgres:built",
+      "leaves": [
+        "node ./scripts/run-postgres-ui-smoke.mjs"
+      ]
+    },
+    {
+      "check": "deployability:Run metadata-required file and SQLite gates",
+      "leaves": [
+        "APP_BUILD_SHA=\"${GITHUB_SHA::12}\" \\ APP_BUILD_TIMESTAMP=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\",
+        "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json FIRST_SLICE_STORE=file node ./scripts/storage-admin.mjs migrate",
+        "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json FIRST_SLICE_STORE=file node ./scripts/storage-admin.mjs doctor",
+        "APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/deployability-ci.json RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true node ./scripts/runtime-preflight.mjs",
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-ci.sqlite FIRST_SLICE_STORE=sqlite node ./scripts/storage-admin.mjs migrate",
+        "APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-ci.sqlite RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true node ./scripts/runtime-preflight.mjs",
+        "APP_BUILD_SHA=${APP_BUILD_SHA:-local-deployability} APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-1970-01-01T00:00:00Z} FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/deployability-startup.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true node ./scripts/smoke-startup.mjs"
+      ]
+    },
+    {
+      "check": "docker-image-runtime-smoke:Build and run production image smoke",
+      "leaves": [
+        "APP_BUILD_SHA=\"${GITHUB_SHA::12}\" \\ APP_BUILD_TIMESTAMP=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\ DOCKER_IMAGE_TAG=\"testcenter-rewrite-app:${GITHUB_SHA::12}\" \\ docker build --build-arg APP_BUILD_SHA=${APP_BUILD_SHA:-local-docker} --build-arg APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-unknown} -t ${DOCKER_IMAGE_TAG:-testcenter-rewrite-app:smoke} .",
+        "node ./scripts/smoke-docker-runtime.mjs"
+      ]
+    },
+    {
+      "check": "docker-compose-release-smoke:Run compose release smoke",
+      "leaves": [
+        "APP_BUILD_SHA=\"${GITHUB_SHA::12}\" \\ APP_BUILD_TIMESTAMP=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \\ FIRST_SLICE_BOOTSTRAP_DEMO=\"${{ matrix.bootstrap-demo }}\" \\ SMOKE_COMPOSE_PRODUCTION_BOUNDARY=\"${{ matrix.production-boundary }}\" \\",
+        "node ./scripts/smoke-compose-postgres.mjs"
+      ]
+    }
+  ],
+  "workflowSha256": "fe92f2fb334c9a4f3e512ed64196055c0cb6fc79cbd5ee0c23f23f0ff58451e5",
+  "commands": [
+    {
+      "check": "typecheck",
+      "leaves": [
+        "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
+        "ng build rewrite-app-web --configuration development"
+      ]
+    },
+    {
+      "check": "unit",
+      "leaves": [
+        "node --test scripts/attachment-pages-pdf.test.mjs scripts/api-request-lifecycle.test.mjs scripts/api-client-abort.test.mjs scripts/api-sqlite-readiness.test.mjs scripts/api-file-readiness.test.mjs scripts/api-file-shutdown.test.mjs scripts/api-file-startup-failure.test.mjs scripts/file-store-crash.test.mjs scripts/file-store-compact.test.mjs scripts/attachment-capture-lifecycle.test.mjs scripts/server-request-failure-gate.test.mjs",
+        "node --test packages/contracts/dist/packages/contracts/src/*.test.js packages/application/dist/packages/application/src/*.test.js packages/file-store/dist/packages/file-store/src/*.test.js packages/sqlite-store/dist/packages/sqlite-store/src/*.test.js",
+        "node --test scripts/participant-controller-timer-resume.test.mjs scripts/participant-presence.test.mjs scripts/participant-assignment-runs.test.mjs scripts/participant-controller-activation.test.mjs scripts/participant-run-creation.test.mjs scripts/participant-run-creation-api.test.mjs scripts/participant-debug-runtime.test.mjs scripts/participant-native-command.test.mjs scripts/participant-command-completion.test.mjs scripts/participant-command-completion-api.test.mjs scripts/original-result-archive.test.mjs scripts/xml-source-characters.test.mjs scripts/participant-run-mutation.test.mjs scripts/participant-progress-delivery.test.mjs scripts/participant-progress-api.test.mjs scripts/group-result-deletion-presence.test.mjs scripts/participant-starter-completeness.test.mjs scripts/participant-run-commands.test.mjs scripts/participant-command-application.test.mjs scripts/participant-command-api.test.mjs",
+        "node --test scripts/app-initial-route.test.mjs scripts/participant-command-completion-journal.test.mjs scripts/participant-controller-completion-reference.test.mjs scripts/participant-controller-timer-reference.test.mjs scripts/participant-command-handler-reference.test.mjs scripts/shell-lifecycle.test.mjs scripts/runtime-read-context.test.mjs scripts/monitor-goto-selection.test.mjs scripts/monitor-booklet-errors.test.mjs scripts/service-worker-save.test.mjs scripts/participant-access-credentials.test.mjs scripts/participant-http-test-actor.test.mjs scripts/drain-smoke-response.test.mjs scripts/smoke-route-failure-gate.test.mjs scripts/participant-sign-out.test.mjs scripts/participant-session-links.test.mjs scripts/participant-entry-lifecycle.test.mjs scripts/participant-save-barrier.test.mjs scripts/participant-save-drain.test.mjs scripts/participant-response-clock-capture.test.mjs scripts/participant-test-log-identities.test.mjs scripts/participant-navigation-completeness.test.mjs scripts/operator-run-links.test.mjs scripts/participant-run-request-match.test.mjs scripts/verona-save-response-match.test.mjs scripts/event-stream-watchdog.test.mjs scripts/browser-compatibility-presentation.test.mjs scripts/password-confirmation.test.mjs scripts/original-admin-login.test.mjs scripts/proof-of-work-entry.test.mjs scripts/frontend-bundle-references.test.mjs scripts/chromium-frame-diagnostics.test.mjs scripts/chromium-ib-runtime.test.mjs scripts/chromium-ib-resource-reload.test.mjs scripts/group-result-deletion-check.test.mjs scripts/controller-player-input.test.mjs scripts/participant-unit-labels.test.mjs scripts/participant-review-download.test.mjs scripts/participant-unit-label-reload.test.mjs scripts/current-original-booklet-config-smoke.test.mjs scripts/custom-text-value-reference.test.mjs scripts/attachment-custom-text-reference.test.mjs scripts/custom-text-editor-state.test.mjs scripts/workspace-auto-refresh-smoke.test.mjs scripts/attachment-qr-scanner.test.mjs scripts/original-review-panel.test.mjs scripts/original-participant-confirmation.test.mjs scripts/original-error-timestamp.test.mjs scripts/verona-ready-error.test.mjs scripts/participant-error-reception.test.mjs scripts/participant-command-receiver.test.mjs scripts/participant-command-execution.test.mjs scripts/participant-debug-control.test.mjs scripts/participant-debug-log.test.mjs scripts/participant-native-transport.test.mjs scripts/participant-console-context.test.mjs scripts/participant-native-reference.test.mjs scripts/participant-debug-responses.test.mjs scripts/participant-debug-testlets.test.mjs scripts/participant-debug-reference.test.mjs scripts/participant-debug-interactions.test.mjs scripts/participant-debug-snapshot.test.mjs",
+        "node scripts/audit-participant-terminal-overlap.mjs --assert-parity"
+      ]
+    },
+    {
+      "check": "compatibility",
+      "leaves": [
+        "node --test --test-name-pattern=\"^original Testcenter compatibility corpus\" packages/contracts/dist/packages/contracts/src/original-testcenter-corpus.test.js apps/api/dist/apps/api/src/integration.test.js"
+      ]
+    },
+    {
+      "check": "integration-memory",
+      "leaves": [
+        "node --test apps/api/dist/apps/api/src/integration.test.js"
+      ]
+    },
+    {
+      "check": "integration-file",
+      "leaves": [
+        "node ./scripts/run-file-integration.mjs"
+      ]
+    },
+    {
+      "check": "integration-sqlite",
+      "leaves": [
+        "rm -f ./.data/integration-sqlite.sqlite ./.data/integration-sqlite.sqlite-shm ./.data/integration-sqlite.sqlite-wal ./.data/integration-sqlite.sqlite-journal",
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js"
+      ]
+    },
+    {
+      "check": "startup-file",
+      "leaves": [
+        "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/smoke-startup.json node ./scripts/smoke-startup.mjs"
+      ]
+    },
+    {
+      "check": "shutdown-file",
+      "leaves": [
+        "FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/smoke-shutdown.json SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs"
+      ]
+    },
+    {
+      "check": "startup",
+      "leaves": [
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs"
+      ]
+    },
+    {
+      "check": "shutdown",
+      "leaves": [
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs"
+      ]
+    },
+    {
+      "check": "ui-quick",
+      "leaves": [
+        "UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_STOP_AFTER_STEP=central-bug-report FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-bug-report.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=offline-app-shell FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-offline-shell.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=system-check-report FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-system-check.sqlite node ./scripts/smoke-ui.mjs",
+        "node ./scripts/smoke-original-system-check-saved.mjs",
+        "node ./scripts/smoke-original-participant-login.mjs",
+        "FIRST_SLICE_PROOF_OF_WORK_SCOPES=participant,second_code FIRST_SLICE_PROOF_OF_WORK_SECRET=owned-original-login-challenge-secret-not-production FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=128 node scripts/smoke-original-participant-login.mjs",
+        "FIRST_SLICE_PROOF_OF_WORK_SCOPES=second_code FIRST_SLICE_PROOF_OF_WORK_SECRET=owned-original-login-challenge-secret-not-production FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=128 node scripts/smoke-original-participant-login.mjs",
+        "UI_SMOKE_ADMIN_PROOF_OF_WORK=true node scripts/smoke-original-admin-login.mjs",
+        "node scripts/smoke-attachment-custom-text.mjs",
+        "node ./scripts/smoke-original-header.mjs",
+        "node ./scripts/smoke-original-player-exit.mjs",
+        "node ./scripts/smoke-original-exit-completeness.mjs",
+        "node ./scripts/smoke-original-starter-advisories.mjs",
+        "node ./scripts/run-original-runtime-error-smoke.mjs",
+        "node ./scripts/run-original-runtime-error-contract-smoke.mjs",
+        "node ./scripts/run-original-player-version-error-smoke.mjs",
+        "node ./scripts/smoke-original-paused-exit.mjs",
+        "node ./scripts/smoke-participant-debug.mjs",
+        "node ./scripts/smoke-original-participant-starter.mjs",
+        "node ./scripts/smoke-participant-booklet-variant.mjs",
+        "UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true UI_SMOKE_SKIP_WORKSPACE_RENAME=true UI_SMOKE_STOP_AFTER_STEP=content-prompt-read-model FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-content.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=generate-entry-links FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-json-roster.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=participant-entry-completed-session-reentry FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-participant-entry.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=participant-entry-review-comments FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-participant-review.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=participant-entry-second-code FIRST_SLICE_PROOF_OF_WORK_SCOPES='admin,participant,second_code' FIRST_SLICE_PROOF_OF_WORK_SECRET='ui-smoke-proof-of-work-secret-1234567890' FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER=128 FIRST_SLICE_PROOF_OF_WORK_TTL_MS=120000 FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-proof-of-work.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=participant-verona-player FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-verona-player.sqlite node ./scripts/smoke-ui.mjs",
+        "node ./scripts/smoke-participant-navigation-completeness.mjs",
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-ib-player.sqlite UI_SMOKE_INTERFACE=rewrite node ./scripts/smoke-ib-player.mjs",
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-ib-player-original.sqlite UI_SMOKE_INTERFACE=original node ./scripts/smoke-ib-player.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=activation-roster-warning-cards FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-activation-roster-warnings.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-participant-console",
+      "leaves": [
+        "node ./scripts/reference-original-controller-timer-worker.mjs",
+        "node ./scripts/smoke-participant-controller-timer-interruption.mjs",
+        "node ./scripts/smoke-participant-debug.mjs",
+        "node ./scripts/smoke-participant-console-loading.mjs",
+        "node ./scripts/smoke-participant-console-context-compat.mjs",
+        "node ./scripts/smoke-participant-command-completion.mjs",
+        "node ./scripts/smoke-participant-native-route.mjs",
+        "node ./scripts/smoke-participant-native-tabs.mjs"
+      ]
+    },
+    {
+      "check": "ui-review-readiness",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=filter-reviews FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-review-readiness.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-original-review",
+      "leaves": [
+        "node ./scripts/smoke-original-review.mjs"
+      ]
+    },
+    {
+      "check": "ui-monitor-review",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=study-monitor-review-queue-review-response FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-monitor-review.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-monitor-detail-review",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=study-monitor-group-detail-review-response FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-monitor-detail-review.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-run-detail-review",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=run-detail-select-review FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-run-detail-review.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-unit-detail-review",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=study-monitor-unit-detail-review-response FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-unit-detail-review.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-participant-detail-review",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=study-monitor-participant-detail-review-response FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-participant-detail-review.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-participant-monitor-live",
+      "leaves": [
+        "node ./scripts/smoke-participant-monitor-live.mjs"
+      ]
+    },
+    {
+      "check": "ui-monitor-bulk",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=monitor-bulk-pause-resume FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-monitor-bulk.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-monitor-auto-next",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=group-monitor-auto-next-block FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-monitor-auto-next.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-monitor-finish-all",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=group-monitor-finish-all FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-monitor-finish-all.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-open-run-sync",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=open-run-select-sync FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-open-run-sync.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-activation-blocking-runtime",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=open-blocking-run-in-runtime FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-activation-blocking-runtime.sqlite node ./scripts/smoke-ui.mjs",
+        "node scripts/smoke-participant-save-retry.mjs"
+      ]
+    },
+    {
+      "check": "ui-adaptive-runtime",
+      "leaves": [
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-adaptive-runtime.sqlite node ./scripts/smoke-adaptive-runtime.mjs"
+      ]
+    },
+    {
+      "check": "ui-ops",
+      "leaves": [
+        "node scripts/smoke-original-xml-schema.mjs",
+        "node ./scripts/smoke-deletion-confirmation.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=delete-group-results FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-delete-group-results.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=admin-workspace-access-matrix UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-admin-workspace-access.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=admin-user-bulk-delete FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-admin-delete.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=workspace-rename UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-workspace-rename.sqlite node ./scripts/smoke-ui.mjs",
+        "UI_SMOKE_STOP_AFTER_STEP=workspace-delete UI_SMOKE_SKIP_OFFLINE_APP_SHELL=true FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-workspace-delete.sqlite node ./scripts/smoke-ui.mjs",
+        "FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-auth.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-full",
+      "leaves": [
+        "FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke.sqlite node ./scripts/smoke-ui.mjs"
+      ]
+    },
+    {
+      "check": "ui-attachments",
+      "leaves": [
+        "UI_SMOKE_STOP_AFTER_STEP=attachment-manager FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-attachments.sqlite node ./scripts/smoke-ui.mjs",
+        "node ./scripts/run-attachment-camera-smoke.mjs",
+        "UI_SMOKE_ATTACHMENT_CAMERA_FACING=front node ./scripts/run-attachment-camera-smoke.mjs"
+      ]
+    },
+    {
+      "check": "ui-verona-development",
+      "leaves": [
+        "node ./scripts/smoke-verona-development.mjs"
+      ]
+    },
+    {
+      "check": "local-demo",
+      "leaves": [
+        "node ./scripts/smoke-local-demo.mjs"
+      ]
+    }
+  ]
+}

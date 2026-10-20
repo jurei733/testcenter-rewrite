@@ -11,6 +11,7 @@
 .npm-cache
 .tmp-angular-sample
 .data
+.ci
 coverage
 dist
 node_modules
