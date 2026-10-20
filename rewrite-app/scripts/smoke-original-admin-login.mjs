@@ -105,7 +105,8 @@ try {
           await submit.click(); assert.equal((await authenticated).status(), 200);
           await page.waitForURL(url => url.pathname === "/app/workspace"); assert.equal(credentialRequests.length, 1);
         }
-        await page.screenshot({ path: join(artifacts, `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}.png`), fullPage: true });
+        await page.bringToFront();
+        await page.screenshot({ path: join(artifacts, `${theme}-${screen}-${mode}-insecure-${proof ? "blocked" : "inactive"}.png`), fullPage: false });
         await context.close();
         process.stdout.write(`insecure_admin_entry=${theme}/${screen}/${mode}/${proof ? "blocked-no-request" : "inactive-authorized"}:passed\n`);
       }
@@ -160,6 +161,7 @@ try {
       assert.equal(signIns.length, 1); assert.equal(signIns[0].status(), 401);
       assert.equal(await name.inputValue(), ""); assert.equal(await pw.inputValue(), "");
       assert.equal(await submit.isDisabled(), true);
+      await page.bringToFront();
       await page.screenshot({ path: join(artifacts, `${theme}-${screen}-wrong.png`) });
       await name.fill("demo-admin"); await pw.fill(password);
       const pending = (() => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; })();

@@ -39,7 +39,9 @@ serverFailureGate.observeStream(server.stdout);
 serverFailureGate.observeStream(server.stderr);
 const serverClosed = new Promise(done => server.once("close",done));
 const errors = [], states = {};
-let browser;
+let browser, activePage, activeContext, activeKey;
+let activeNetwork = [];
+const traceFailures = Boolean(process.env.UI_SMOKE_ARTIFACT_DIR);
 try {
   const port = await new Promise((done,reject) => {
     const timer=setTimeout(()=>reject(new Error("Owned API startup timed out.")),20_000);
@@ -81,6 +83,33 @@ try {
     await api("/api/v1/admin/application-settings",{themeName:theme},operatorToken,"PATCH");
     for(const [screen,width,height] of screens) for(const [fixtureKey,fixture] of Object.entries(fixtures)) {
       const key=`${theme}-${screen}-${fixtureKey}`,context=await browser.newContext({viewport:{width,height},locale:"de-DE"}),page=await context.newPage();
+      activePage=page;activeContext=context;activeKey=key;activeNetwork=[];
+      if(traceFailures) await context.tracing.start({screenshots:true,snapshots:true,sources:true});
+      await page.addInitScript(()=>{
+        const events=[];window.__ownedExitInputEvents=events;
+        for(const type of ["pointerdown","pointerup","click","keydown","keyup"]) window.addEventListener(type,event=>{
+          const target=event.target instanceof Element?event.target.closest("button,a,mat-dialog-container"):null;
+          if(!target || !/participantApplicationLogo|participantStandaloneLogo|participantConfirmation|mat-mdc-dialog/.test(target.id))return;
+          events.push({type,id:target.id,text:target.textContent.trim().slice(0,100),trusted:event.isTrusted,
+            ...(event instanceof KeyboardEvent?{key:event.key}:{})});
+          if(events.length>80)events.shift();
+        },true);
+      });
+      for(const type of ["request","requestfailed"]) page.on(type,request=>{
+        const pathname=new URL(request.url()).pathname;
+        if(pathname.startsWith("/api/v1/participant/")) {
+          activeNetwork.push({type,path:pathname,method:request.method(),
+            ...(type==="requestfailed"?{failure:request.failure()?.errorText}:{})});
+          if(activeNetwork.length>100)activeNetwork.shift();
+        }
+      });
+      page.on("response",response=>{
+        const pathname=new URL(response.url()).pathname;
+        if(pathname.startsWith("/api/v1/participant/")){
+          activeNetwork.push({type:"response",path:pathname,method:response.request().method(),status:response.status()});
+          if(activeNetwork.length>100)activeNetwork.shift();
+        }
+      });
       page.on("pageerror",error=>errors.push({key,error:String(error)}));
       await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${fixture.workspaceKey}`,{waitUntil:"networkidle"});
       await page.locator("#originalLoginName").fill(loginKey(theme,screen));
@@ -108,7 +137,7 @@ try {
               timing:a.effect?.getComputedTiming(),target:a.effect?.target?.outerHTML.slice(0,500)}))}),phase);
           throw error;
         }
-        await page.screenshot({path:join(artifacts,`${key}-${phase}.png`),fullPage:true});
+        await page.screenshot({path:join(artifacts,`${key}-${phase}.png`),fullPage:false});
         return page.evaluate(()=>{const rect=n=>{if(!n)return null;const b=n.getBoundingClientRect(),s=getComputedStyle(n);return{x:b.x,y:b.y,width:b.width,height:b.height,font:s.font,color:s.color,background:s.backgroundColor,padding:s.padding,borderRadius:s.borderRadius};};
           const dialog=document.querySelector("mat-dialog-container");return{logo:rect(document.querySelector("#participantStandaloneLogo,#participantApplicationLogoButton")),logoImage:rect(document.querySelector("#applicationLogo")),
             dialog:dialog?{role:dialog.getAttribute("role"),box:rect(dialog),title:dialog.querySelector('[data-cy="dialog-title"]').textContent,content:dialog.querySelector('[data-cy="dialog-content"]').textContent,
@@ -181,7 +210,8 @@ try {
         const runtime=(await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/runtime-state`,undefined,identity.sessionToken)).runtimeState;
         assert.deepEqual(runtime.latestTestRun.unitResponses,saved);assert.equal(runtime.latestTestRun.testRunId,runId);
       }
-      await context.close();console.log(`original_player_exit=${key}:passed`);
+      if(traceFailures)await context.tracing.stop();
+      await context.close();activePage=activeContext=undefined;console.log(`original_player_exit=${key}:passed`);
     }
   }
   // A missing lazy dialog bundle keeps the shared guarded action usable.
@@ -248,6 +278,29 @@ try {
     await context.close();console.log(`rewrite_player_exit=${fixtureKey}:passed`);
   }
   assert.deepEqual(errors,[]);
+} catch(error) {
+  const diagnostic=async(name,action)=>{
+    try { await action(); } catch(failure) { console.error(`Exit ${name} diagnostic unavailable: ${String(failure)}`); }
+  };
+  let snapshot=null;
+  await diagnostic("snapshot",async()=>{
+    if(activePage && !activePage.isClosed()) snapshot=await activePage.evaluate(()=>({
+      inputEvents:window.__ownedExitInputEvents??[],
+      activeElement:document.activeElement?.id,
+      dialogs:[...document.querySelectorAll("mat-dialog-container")].map(n=>({text:n.textContent,html:n.outerHTML})),
+      runId:document.querySelector("#participantRouteRunId")?.textContent,
+      unitKey:document.querySelector("#participantRouteUnitKey")?.textContent,
+      status:document.querySelector("#participantRouteStatus")?.textContent,
+      busy:document.querySelector(".page")?.classList.contains("is-busy"),
+      globalError:document.querySelector(".status-banner.is-error")?.textContent,
+      playerStatus:document.querySelector("#participantVeronaPlayerStatus")?.textContent
+    }));
+  });
+  await diagnostic("packet",()=>writeFile(join(artifacts,"failure.json"),JSON.stringify({key:activeKey,error:String(error),snapshot,network:activeNetwork},null,2)));
+  await diagnostic("screenshot",()=>activePage?.screenshot({path:join(artifacts,"failure.png"),fullPage:false,animations:"disabled"}));
+  if(traceFailures)await diagnostic("trace",()=>activeContext?.tracing.stop({path:join(artifacts,"failure-trace.zip")}));
+  console.error(`original_player_exit_failure=${activeKey}; diagnostic=${join(artifacts,"failure.json")}`);
+  throw error;
 } finally {
   await writeFile(join(artifacts,"exit.json"),JSON.stringify({states,errors},null,2));
   await browser?.close();

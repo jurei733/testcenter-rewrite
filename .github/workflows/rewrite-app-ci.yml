@@ -142,7 +142,7 @@ jobs:
           name: original-captures-${{ matrix.family }}
           path: ${{ runner.temp }}/original-captures/
           if-no-files-found: warn
-          retention-days: 1
+          retention-days: 30
 
   dependencies:
     name: Dependency audit

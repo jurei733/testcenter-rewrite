@@ -105,7 +105,8 @@ try {
       });
       assert.deepEqual(appearance, welcomeReference.measurements[`${theme}-${screen}`]);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-      await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: true });
+      await page.bringToFront();
+      await page.screenshot({ path: join(root, `${theme}-welcome-${screen}.png`), fullPage: false });
     }
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.locator("#syscheck-next-step").click();
@@ -134,12 +135,14 @@ try {
     assert.equal(await dialog.getByRole("button", { name: labels[0], exact: true }).evaluate(element => element === document.activeElement), true);
     await page.keyboard.press("Shift+Tab");
     assert.equal(await dialog.getByRole("button", { name: labels[1], exact: true }).evaluate(element => element === document.activeElement), true);
-    await page.screenshot({ path: join(root, `${theme}-desktop.png`), fullPage: true });
+    await page.bringToFront();
+    await page.screenshot({ path: join(root, `${theme}-desktop.png`), fullPage: false });
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     const bounds = await dialog.boundingBox();
     assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390 && bounds.y >= 0 && bounds.y + bounds.height <= 844);
-    await page.screenshot({ path: join(root, `${theme}-mobile.png`), fullPage: true });
+    await page.bringToFront();
+    await page.screenshot({ path: join(root, `${theme}-mobile.png`), fullPage: false });
     if (closeAction === "escape") await page.keyboard.press("Escape");
     else await page.locator(closeAction === "cancel" ? "#globalConfirmationCancelButton" : "#globalConfirmationConfirmButton").click();
     await page.waitForURL(url => url.pathname === "/app/home");
