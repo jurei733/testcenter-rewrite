@@ -190,9 +190,6 @@ jobs:
           - check: bug-report
             group: entry
             command: npm run smoke:ui:bug-report:built
-          - check: offline-shell
-            group: entry
-            command: npm run smoke:ui:offline-shell:built
           - check: original-login
             group: entry
             command: npm run smoke:ui:original-login:built
@@ -202,15 +199,63 @@ jobs:
           - check: original-admin-login
             group: entry
             command: npm run smoke:ui:original-admin-login:built
-          - check: original-header
-            group: entry
-            command: npm run smoke:ui:original-header:built
           - check: proof-of-work
             group: entry
             command: npm run smoke:ui:proof-of-work:built
           - check: system-check
             group: system-check
             command: npm run smoke:ui:system-check:built
+          - check: participant-variant
+            group: participant
+            command: npm run smoke:ui:participant-variant:built
+          - check: ib-player
+            group: content
+            command: npm run smoke:ui:ib-player:built
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          playwright: "true"
+      - name: Run Quick browser gates
+        shell: bash
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
+        run: xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+      - name: Retain failed Quick browser log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-quick-${{ matrix.check }}-diagnostics
+          path: |
+            ${{ runner.temp }}/rewrite-ui-quick.log
+            ${{ runner.temp }}/rewrite-ui-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  quick-extended:
+    name: verify-memory-sqlite (ui-qualification-${{ matrix.check }})
+    needs: [build, fast-feedback]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    defaults:
+      run:
+        working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - check: offline-shell
+            group: entry
+            command: npm run smoke:ui:offline-shell:built
+          - check: original-header
+            group: entry
+            command: npm run smoke:ui:original-header:built
           - check: system-check-saved
             group: system-check
             command: npm run smoke:ui:system-check-saved:built
@@ -244,9 +289,6 @@ jobs:
           - check: original-starter
             group: participant
             command: npm run smoke:ui:original-starter:built
-          - check: participant-variant
-            group: participant
-            command: npm run smoke:ui:participant-variant:built
           - check: participant-entry
             group: participant
             command: npm run smoke:ui:participant-entry:built
@@ -262,9 +304,6 @@ jobs:
           - check: verona-player
             group: content
             command: npm run smoke:ui:verona-player:built
-          - check: ib-player
-            group: content
-            command: npm run smoke:ui:ib-player:built
           - check: activation-roster-warnings
             group: content
             command: npm run smoke:ui:activation-roster-warnings:built
@@ -607,7 +646,7 @@ jobs:
   acceptance:
     name: CI acceptance
     if: always()
-    needs: [build, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    needs: [build, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
