@@ -22,16 +22,21 @@ Neither earlier run establishes full release acceptance.
 ## Fast feedback
 
 `Fast feedback` requires the production build, development typecheck, CI policy,
-dependency audit, complete unit/frontend/terminal-overlap tests and every Quick
-browser gate. Quick has 27 independently required scenario jobs, organized into
-four local command groups: entry, system-check, participant and content. Each
-scenario appears exactly once; policy reconciles the distributed commands with
-both the complete local Quick command and each group. It runs before
-the long matrix can occupy runner slots. A failure
-here prevents expensive dependent jobs, and `CI acceptance` still fails.
-For successful commits, the complete matrix, PostgreSQL, deployability and three
-Compose modes run after this checkpoint. The Docker image gate also builds from
-source independently. `Fast feedback` alone is not release acceptance.
+dependency audit, complete unit/frontend/terminal-overlap tests and eight short
+browser gates: bug reporting, real Original login, protected login, administrator
+login, proof of work, Systemcheck, participant isolation/variants and real IB
+restoration. These run before the long browser journeys can occupy runner slots.
+A failure prevents expensive dependent jobs and still fails `CI acceptance`.
+
+All 27 existing browser scenarios remain independently required. The other 19
+run in `quick-extended` after fast feedback, with four concurrent slots, alongside
+PostgreSQL, the broad matrix, deployability and the three Compose modes. Long
+prefix journeys therefore do not block the first meaningful checkpoint or
+serialize the start of the PostgreSQL flow. The cap leaves runner capacity for
+the other qualification groups. Policy reconciles both tiers with the complete
+local Quick command and all four local groups, requires every scenario exactly
+once and requires both tiers for full acceptance. The Docker image gate builds
+from source independently. `Fast feedback` alone is not release acceptance.
 
 One production build supplies all host test jobs. The archive is only 3.3 MiB in
 the local checkpoint. Built-script aliases retain each original test command
@@ -40,11 +45,13 @@ qualification was lost. The eight serial Ops gates are independent jobs; every
 existing scenario, both camera facings, native routes/tabs, controller references,
 full browser flow, database adapter and deployment mode remains required.
 
-The earlier **3–6 minute** fast estimate must be measured again now that all
-Quick commands are actually required. Per-scenario sharding removes that serial
-chain. The **20–25 minute** complete estimate is also provisional; confirm actual
-hosted timings only after a completely successful run. Queues and cold downloads
-add time.
+The earlier **3–6 minute** fast estimate remains provisional. Actual run
+`39446720581` demonstrates why putting every prefix journey in the first tier
+was insufficient: even its successful runtime-error job took 400 seconds,
+before considering queued jobs and the later PostgreSQL flow. The eight short
+gates and cancelled idle timers address that critical path. The **20–25 minute**
+complete estimate is also provisional; confirm actual hosted timings only after
+a completely successful run. Queues and cold downloads add time.
 Total compute is also reduced by removing repeated host builds and duplicate
 feature-branch push/PR runs. More parallel jobs do not imply more test coverage.
 

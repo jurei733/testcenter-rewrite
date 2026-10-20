@@ -43,10 +43,13 @@ test("Quick logs retain an upstream test failure instead of reporting tee succes
     "An inner pipefail bash cannot fix the historical outer logger pipeline");
   assert.equal(spawnSync("bash", ["-e", "-o", "pipefail", "-c", legacy]).status, 37);
 });
-test("all Quick browser scenarios run once across independent shards, each required by fast feedback", () => {
+test("all 27 browser scenarios run once across fast and extended shards, with complete acceptance requiring both", () => {
   const quick = workflow.jobs.quick;
-  const shards = quick.strategy.matrix.include;
+  const extended = workflow.jobs["quick-extended"];
+  const shards = [...quick.strategy.matrix.include, ...extended.strategy.matrix.include];
   assert.equal(quick.strategy["fail-fast"], false);
+  assert.equal(extended.strategy["fail-fast"], false);
+  assert.equal(extended.strategy["max-parallel"], 4, "Long prefix journeys must leave capacity for Postgres and the broad matrix");
   assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
   assert.equal(shards.length, 27);
   assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
@@ -59,16 +62,40 @@ test("all Quick browser scenarios run once across independent shards, each requi
     assert.deepEqual(shards.filter(item => item.group === group).flatMap(item => split(item.command)).sort(),
       split(`npm run ci:browser:quick:${group}:built`).sort());
   }
-  assert.equal(quick.steps.find(step => step.run?.includes("| tee")).run, 'xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
-  assert.equal(quick.env.UI_SMOKE_HEADFUL, "true", "Source visual measurements use a visible Chromium renderer");
-  const log = quick.steps.find(step => step.name === "Retain failed Quick browser log");
-  assert.equal(log.if, "failure()"); assert.match(log.with.name, /matrix\.check/);
-  const browserArtifacts = quick.steps.find(step => step.run?.includes("| tee")).env.UI_SMOKE_ARTIFACT_DIR;
-  assert.equal(browserArtifacts, "${{ runner.temp }}/rewrite-ui-artifacts");
-  assert.ok(log.with.path.includes(browserArtifacts + "/"));
-  assert.ok(log.with.path.includes("rewrite-ui-quick.log"));
+  for (const tier of [quick, extended]) {
+    const execution = tier.steps.find(step => step.run?.includes("| tee"));
+    assert.equal(execution.run, 'xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
+    assert.equal(execution.shell, "bash");
+    assert.equal(tier.env.UI_SMOKE_HEADFUL, "true", "Source visual measurements use a visible Chromium renderer");
+    const log = tier.steps.find(step => step.name === "Retain failed Quick browser log");
+    assert.equal(log.if, "failure()"); assert.match(log.with.name, /matrix\.check/);
+    const browserArtifacts = execution.env.UI_SMOKE_ARTIFACT_DIR;
+    assert.equal(browserArtifacts, "${{ runner.temp }}/rewrite-ui-artifacts");
+    assert.ok(log.with.path.includes(browserArtifacts + "/"));
+    assert.ok(log.with.path.includes("rewrite-ui-quick.log"));
+  }
   assert.ok(workflow.jobs["fast-feedback"].needs.includes("quick"));
   assert.ok(workflow.jobs.acceptance.needs.includes("quick"));
+  assert.ok(workflow.jobs.acceptance.needs.includes("quick-extended"));
+});
+test("the early browser set is bounded and retains real authentication, isolation, Start restoration and Systemcheck", () => {
+  assert.deepEqual(workflow.jobs.quick.strategy.matrix.include.map(item=>item.check).sort(),
+    ["bug-report","original-login","original-login-protected","original-admin-login","proof-of-work","system-check","participant-variant","ib-player"].sort());
+  assert.equal(workflow.jobs["quick-extended"].strategy.matrix.include.length,19);
+  assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback"]);
+  assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
+});
+test("a green early checkpoint cannot certify missing, cancelled or failed extended qualification", () => {
+  const gate = workflow.jobs.acceptance;
+  const results = Object.fromEntries(gate.needs.map(name=>[name,{result:"success"}]));
+  const execute = values => spawnSync("bash",["-e","-o","pipefail","-c",gate.steps[0].run],{
+    encoding:"utf8",env:{...process.env,RESULTS:JSON.stringify(values)}
+  });
+  assert.equal(execute(results).status,0);
+  for (const result of ["skipped","cancelled","failure"]) {
+    const outcome=execute({...results,"quick-extended":{result}});
+    assert.equal(outcome.status,1); assert.match(outcome.stderr,new RegExp(`quick-extended: ${result}`));
+  }
 });
 function extendsExplicitTestFiles(previous, current) {
   const files = command => {
@@ -143,7 +170,7 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
-  for (const id of ["unit", "quick", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
+  for (const id of ["unit", "quick", "quick-extended", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {
     const job = workflow.jobs[id];
     if (["unit", "quick"].includes(id)) assert.equal(job.needs, "build");
     else assert.deepEqual(job.needs, ["build", "fast-feedback"]);
