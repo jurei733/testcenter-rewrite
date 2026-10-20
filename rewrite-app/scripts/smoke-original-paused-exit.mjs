@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -148,6 +149,6 @@ try {
 } finally {
   await writeFile(join(artifacts,"paused-exit.json"),JSON.stringify({states,errors},null,2));
   await browser?.close();server.kill("SIGTERM");
-  await Promise.race([serverClosed,delay(10_000).then(()=>{server.kill("SIGKILL");throw Error("Owned API shutdown timed out");})]);
+  await raceWithSmokeDeadline(serverClosed, 10_000, () => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");});
   failureGate.assertHealthy();console.log("owned_api=shutdown");
 }

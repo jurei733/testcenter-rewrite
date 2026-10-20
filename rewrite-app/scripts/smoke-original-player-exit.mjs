@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -9,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
 
 // Real participant authentication, Verona input, SQLite, and guarded return.
 // The Source dialog reference uses the same owned synthetic player/booklet.
@@ -83,6 +85,7 @@ try {
     await api("/api/v1/admin/application-settings",{themeName:theme},operatorToken,"PATCH");
     for(const [screen,width,height] of screens) for(const [fixtureKey,fixture] of Object.entries(fixtures)) {
       const key=`${theme}-${screen}-${fixtureKey}`,context=await browser.newContext({viewport:{width,height},locale:"de-DE"}),page=await context.newPage();
+      await page.bringToFront();
       activePage=page;activeContext=context;activeKey=key;activeNetwork=[];
       if(traceFailures) await context.tracing.start({screenshots:true,snapshots:true,sources:true});
       await page.addInitScript(()=>{
@@ -166,6 +169,8 @@ try {
         assert.equal(current.activeTestletTimer.testletKey,timerBefore.testletKey);
       } else {
         const dialog=page.getByRole("dialog",{name:"Sicher, dass du den Test beenden möchtest?",exact:true});await dialog.waitFor();
+        await waitForMaterialDialog(page);
+        await page.waitForFunction(()=>document.activeElement?.tagName==="MAT-DIALOG-CONTAINER");
         states[key].confirmation=await capture("confirmation");
         assert.deepEqual(states[key].confirmation.dialog,reference.measurements[key].confirmation.dialog);
         assert.equal(states[key].confirmation.activeTag,"MAT-DIALOG-CONTAINER");
@@ -189,13 +194,17 @@ try {
         await page.keyboard.press("Tab");assert.equal(await page.evaluate(()=>!!document.activeElement.closest("mat-dialog-container")),true);
         await page.keyboard.press("Escape");await dialog.waitFor({state:"detached"});
         assert.equal(await logo.evaluate(n=>n===document.activeElement),true);assert.deepEqual(mutations,[]);
-        await logo.click();await dialog.waitFor();await page.locator(".cdk-overlay-backdrop").click({position:{x:5,y:5}});
+        await logo.click();await waitForMaterialDialog(page);await page.locator(".cdk-overlay-backdrop").click({position:{x:5,y:5}});
         await dialog.waitFor({state:"detached"});assert.deepEqual(mutations,[]);
-        await logo.click();await dialog.waitFor();await page.locator("#participantConfirmationStayButton").click();await dialog.waitFor({state:"detached"});
+        await logo.click();await waitForMaterialDialog(page);await page.locator("#participantConfirmationStayButton").click();await dialog.waitFor({state:"detached"});
         assert.deepEqual(mutations,[]);current=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
         assert.equal(current.testRun.status,"running");assert.deepEqual(current.testRun.unitResponses,saved);
         if(timerBefore)assert.equal(current.activeTestletTimer.testletKey,timerBefore.testletKey);
         await logo.focus();await page.keyboard.press("Enter");await dialog.waitFor();
+        // The Linux trace showed a successful Playwright click while Material
+        // still had mdc-dialog--opening, with no trusted event reaching either
+        // button. DOM visibility precedes the compositor's opening transition.
+        await waitForMaterialDialog(page);
         const returned=page.waitForResponse(r=>new URL(r.url()).pathname===returnPath && r.request().method()==="POST");
         await page.locator("#participantConfirmationContinueButton").click();assert.equal((await returned).status(),200);
         const result=await (await returned).json();assert.equal(mutations.length,1);
@@ -304,6 +313,6 @@ try {
 } finally {
   await writeFile(join(artifacts,"exit.json"),JSON.stringify({states,errors},null,2));
   await browser?.close();
-  if(server.exitCode===null){const stopped=new Promise(done=>server.once("exit",done));server.kill("SIGTERM");await Promise.race([stopped,delay(5000)]);if(server.exitCode===null){server.kill("SIGKILL");await stopped;}}
+  if(server.exitCode===null){const stopped=new Promise(done=>server.once("exit",done));server.kill("SIGTERM");await raceWithSmokeDeadline(stopped,5000,()=>undefined);if(server.exitCode===null){server.kill("SIGKILL");await stopped;}}
   await serverClosed;console.log("owned_api=shutdown");serverFailureGate.assertHealthy();
 }

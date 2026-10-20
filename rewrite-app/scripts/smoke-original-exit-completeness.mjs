@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser, assertOriginalVisualCase } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -12,6 +13,7 @@ import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { completenessCases, completenessPlayer, legacyCompletenessCase, closeIconMetrics } from "./exit-completeness-fixture.mjs";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
 
 const reference = await loadOriginalVisualReference("original-exit-completeness");
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
@@ -73,6 +75,7 @@ try {
     for(const [screen,width,height] of screens) for(const leave of ["none","confirm","forbidden"]) for(const [progress,values] of Object.entries(cases)) {
       if(progress==="legacy"&&(theme!=="Primar"||screen!=="desktop")) continue;
       const key=`${theme}-${screen}-header-${leave}-${progress}`,context=await browser.newContext({viewport:{width,height},locale:"de-DE"}),page=await context.newPage();
+      await page.bringToFront();
       page.on("pageerror",error=>errors.push({key,error:String(error)}));
       const workspaceKey=`complete-exit-${leave}`;
       await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`,{waitUntil:"networkidle"});
@@ -105,6 +108,7 @@ try {
       const mutations=[];page.on("request",request=>{if(new URL(request.url()).pathname===returnPath)mutations.push(request.postDataJSON());});
       const logo=page.locator("#participantApplicationLogoButton");await logo.click();
       await page.locator('[data-cy="deny-navigation-message"]').waitFor();
+      await waitForMaterialDialog(page);
       await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).every(a=>!a.pending&&a.playState!=="running"));
       await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,`${key}-information.png`),fullPage:true});
       const dialog=await page.locator("mat-dialog-container").evaluate(dialog=>{
@@ -133,7 +137,7 @@ try {
       await page.keyboard.press("Shift+Tab");assert.equal(await close.evaluate(n=>n===document.activeElement),true);
       await page.keyboard.press("Escape");await page.locator("mat-dialog-container").waitFor({state:"detached"});
       assert.equal(await logo.evaluate(n=>n===document.activeElement),true);
-      await logo.click();await close.waitFor();await close.click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
+      await logo.click();await waitForMaterialDialog(page);await close.click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
       assert.deepEqual(mutations,[]);
       const retained=(await api(currentPath,undefined,token)).currentRunState;
       assert.equal(retained.testRun.testRunId,runId);assert.equal(retained.testRun.status,"running");assert.equal(retained.testRun.unitResponses["unit-intro"],packet);
@@ -166,6 +170,6 @@ try {
 } finally {
   await writeFile(join(artifacts,"completeness.json"),JSON.stringify({states,errors},null,2));
   await browser?.close();server.kill("SIGTERM");
-  await Promise.race([serverClosed,delay(10_000).then(()=>{server.kill("SIGKILL");throw Error("Owned API shutdown timed out");})]);
+  await raceWithSmokeDeadline(serverClosed, 10_000, () => {server.kill("SIGKILL");throw Error("Owned API shutdown timed out");});
   failureGate.assertHealthy();
 }

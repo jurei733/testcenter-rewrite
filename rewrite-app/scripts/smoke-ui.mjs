@@ -16270,6 +16270,11 @@ try {
     .filter({ hasText: sharedParameterSecondUnitKey })
     .waitFor({ timeout: 30_000 });
   sharedParameterFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  // The route label can advance while the previous iframe still exposes the
+  // same inherited language. Wait for the actual second Verona definition
+  // before publishing, so the click cannot run the first unit's handler again.
+  await sharedParameterFrame.locator("#sharedParameterDefinition")
+    .filter({ hasText: "publish-red" }).waitFor({ timeout: 30_000 });
   await sharedParameterFrame
     .locator("#sharedParameterConfig")
     .filter({ hasText: '"language","value":"de"' })

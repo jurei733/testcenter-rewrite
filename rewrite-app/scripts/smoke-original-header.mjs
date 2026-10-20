@@ -1,3 +1,4 @@
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -203,7 +204,7 @@ try {
   await browser?.close();
   if (server.exitCode === null) {
     const stopped=new Promise(done=>server.once('exit',done));server.kill('SIGTERM');
-    await Promise.race([stopped,delay(5000)]);if(server.exitCode===null){server.kill('SIGKILL');await stopped;}
+    await raceWithSmokeDeadline(stopped,5000,()=>undefined);if(server.exitCode===null){server.kill('SIGKILL');await stopped;}
   }
   await serverClosed;
   console.log('owned_api=shutdown');
