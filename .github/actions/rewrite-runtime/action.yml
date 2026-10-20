@@ -1,0 +1,40 @@
+name: Rewrite runtime
+description: Locked Node installation and optional same-run verified build/browser reuse
+inputs:
+  prebuilt:
+    description: Restore the build produced by this workflow run
+    default: "false"
+  playwright:
+    description: Install Chromium and its system libraries
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: rewrite-app/package-lock.json
+    - shell: bash
+      working-directory: rewrite-app
+      run: npm ci --no-audit --no-fund
+    - if: inputs.playwright == 'true'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+    - if: inputs.playwright == 'true'
+      shell: bash
+      working-directory: rewrite-app
+      run: npx --no-install playwright install --with-deps chromium
+    - if: inputs.prebuilt == 'true'
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: rewrite-build-${{ github.sha }}
+        path: ${{ runner.temp }}/rewrite-build
+    - if: inputs.prebuilt == 'true'
+      shell: bash
+      working-directory: rewrite-app
+      env:
+        CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
+      run: node scripts/ci-build-artifact.mjs restore

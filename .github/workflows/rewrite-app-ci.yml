@@ -2,26 +2,143 @@ name: rewrite-app-ci
 
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/rewrite-app-ci.yml"
+      - ".github/actions/**"
       - "rewrite-app/**"
   pull_request:
     paths:
       - ".github/workflows/rewrite-app-ci.yml"
+      - ".github/actions/**"
       - "rewrite-app/**"
+
+  workflow_dispatch:
+  merge_group:
 
 permissions:
   contents: read
 
 env:
   CI: "true"
+  FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Shared production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm run build
+      - name: Package commit-bound production outputs
+        env:
+          CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
+        run: node scripts/ci-build-artifact.mjs pack
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rewrite-build-${{ github.sha }}
+          path: ${{ runner.temp }}/rewrite-build/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  typecheck:
+    name: verify-memory-sqlite (typecheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm run test:ci-policy
+      - run: npm run typecheck
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm audit --audit-level=high
+        working-directory: rewrite-app
+
+  unit:
+    name: verify-memory-sqlite (unit)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+      - run: npm run test:unit:built && npm run test:parity:terminal-overlap:built
+
+  quick:
+    name: verify-memory-sqlite (ui-quick)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          playwright: "true"
+      - name: Run Quick browser gates
+        run: npm run ci:browser:quick:built 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+      - name: Retain failed Quick browser log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-quick-diagnostics
+          path: ${{ runner.temp }}/rewrite-ui-quick.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  fast-feedback:
+    name: Fast feedback
+    if: always()
+    needs: [build, typecheck, dependencies, unit, quick]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the fast qualification set
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'for (const [name, result] of Object.entries(JSON.parse(process.env.RESULTS))) { if (result.result !== "success") { console.error(name + ": " + result.result); process.exitCode = 1; } }'
+
   verify-memory-sqlite:
+    needs: [build, fast-feedback]
     name: verify-memory-sqlite (${{ matrix.check }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -32,131 +149,126 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - check: typecheck
-            command: npm run typecheck
-            playwright: false
-          - check: unit
-            command: npm run test:unit && npm run test:parity:terminal-overlap:built
-            playwright: false
           - check: compatibility
-            command: npm run build && npm run test:compatibility:built
+            command: npm run test:compatibility:built
             playwright: false
           - check: integration-memory
-            command: npm run test:integration:memory
+            command: npm run test:integration:memory:built
             playwright: false
           - check: integration-file
-            command: npm run test:integration:file
+            command: npm run test:integration:file:built
             playwright: false
           - check: integration-sqlite
-            command: npm run test:integration:sqlite
+            command: npm run test:integration:sqlite:built
             playwright: false
           - check: startup-file
-            command: npm run smoke:startup:file
+            command: npm run smoke:startup:file:built
             playwright: false
           - check: shutdown-file
-            command: npm run smoke:shutdown:file
+            command: npm run smoke:shutdown:file:built
             playwright: false
           - check: startup
-            command: npm run smoke:startup:sqlite
+            command: npm run smoke:startup:sqlite:built
             playwright: false
           - check: shutdown
-            command: npm run smoke:shutdown:sqlite
+            command: npm run smoke:shutdown:sqlite:built
             playwright: false
-          - check: ui-quick
-            command: npm run ci:browser:quick
-            playwright: true
           - check: ui-participant-console
-            command: npm run build && npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built && npm run smoke:ui:participant-command-completion:built && npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
+            command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built && npm run smoke:ui:participant-command-completion:built && npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
             playwright: true
           - check: ui-review-readiness
-            command: npm run smoke:ui:review-readiness
+            command: npm run smoke:ui:review-readiness:built
             playwright: true
           - check: ui-original-review
-            command: npm run smoke:ui:original-review
+            command: npm run smoke:ui:original-review:built
             playwright: true
           - check: ui-monitor-review
-            command: npm run smoke:ui:monitor-review
+            command: npm run smoke:ui:monitor-review:built
             playwright: true
           - check: ui-monitor-detail-review
-            command: npm run smoke:ui:monitor-detail-review
+            command: npm run smoke:ui:monitor-detail-review:built
             playwright: true
           - check: ui-run-detail-review
-            command: npm run smoke:ui:run-detail-review
+            command: npm run smoke:ui:run-detail-review:built
             playwright: true
           - check: ui-unit-detail-review
-            command: npm run smoke:ui:unit-detail-review
+            command: npm run smoke:ui:unit-detail-review:built
             playwright: true
           - check: ui-participant-detail-review
-            command: npm run smoke:ui:participant-detail-review
+            command: npm run smoke:ui:participant-detail-review:built
             playwright: true
           - check: ui-participant-monitor-live
-            command: npm run smoke:ui:participant-monitor-live
+            command: npm run smoke:ui:participant-monitor-live:built
             playwright: true
           - check: ui-monitor-bulk
-            command: npm run smoke:ui:monitor-bulk
+            command: npm run smoke:ui:monitor-bulk:built
             playwright: true
           - check: ui-monitor-auto-next
-            command: npm run smoke:ui:monitor-auto-next
+            command: npm run smoke:ui:monitor-auto-next:built
             playwright: true
           - check: ui-monitor-finish-all
-            command: npm run smoke:ui:monitor-finish-all
+            command: npm run smoke:ui:monitor-finish-all:built
             playwright: true
           - check: ui-open-run-sync
-            command: npm run smoke:ui:open-run-sync
+            command: npm run smoke:ui:open-run-sync:built
             playwright: true
           - check: ui-activation-blocking-runtime
-            command: npm run smoke:ui:activation-blocking-runtime && npm run smoke:ui:participant-save-retry:built
+            command: npm run smoke:ui:activation-blocking-runtime:built && npm run smoke:ui:participant-save-retry:built
             playwright: true
           - check: ui-adaptive-runtime
-            command: npm run smoke:ui:adaptive-runtime
+            command: npm run smoke:ui:adaptive-runtime:built
             playwright: true
           - check: ui-ops
-            command: npm run ci:browser:ops
+            command: npm run smoke:ui:operator-auth:built
             playwright: true
           - check: ui-full
-            command: npm run smoke:ui
+            command: npm run smoke:ui:built
             playwright: true
           - check: ui-attachments
-            command: npm run build && npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built && UI_SMOKE_ATTACHMENT_CAMERA_FACING=front npm run smoke:ui:attachments-live:built
+            command: npm run smoke:ui:attachments:built && npm run smoke:ui:attachments-live:built && UI_SMOKE_ATTACHMENT_CAMERA_FACING=front npm run smoke:ui:attachments-live:built
             playwright: true
           - check: ui-verona-development
-            command: npm run smoke:ui:verona-development
+            command: npm run smoke:ui:verona-development:built
             playwright: true
           - check: local-demo
-            command: npm run smoke:local-demo
+            command: npm run smoke:local-demo:built
+            playwright: true
+          - check: ui-original-xml-schema
+            command: npm run smoke:ui:original-xml-schema:built
+            playwright: true
+          - check: ui-deletion-confirmation
+            command: npm run smoke:ui:deletion-confirmation:built
+            playwright: true
+          - check: ui-delete-group-results
+            command: npm run smoke:ui:delete-group-results:built
+            playwright: true
+          - check: ui-admin-workspace-access
+            command: npm run smoke:ui:admin-workspace-access:built
+            playwright: true
+          - check: ui-admin-delete
+            command: npm run smoke:ui:admin-delete:built
+            playwright: true
+          - check: ui-workspace-rename
+            command: npm run smoke:ui:workspace-rename:built
+            playwright: true
+          - check: ui-workspace-delete
+            command: npm run smoke:ui:workspace-delete:built
             playwright: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: rewrite-app/package-lock.json
-      - run: npm ci
-      - if: ${{ matrix.playwright }}
-        run: npx playwright install --with-deps chromium
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          playwright: ${{ matrix.playwright && 'true' || 'false' }}
       - name: Run ${{ matrix.check }}
-        if: matrix.check != 'ui-quick'
         env:
           UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
         run: ${{ matrix.command }}
-      - name: Run ui-quick
-        if: matrix.check == 'ui-quick'
-        env:
-          CHECK_COMMAND: ${{ matrix.command }}
-        run: |
-          bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND" 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
-      - name: Retain failed Quick browser log
-        if: failure() && matrix.check == 'ui-quick'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-quick-diagnostics
-          path: ${{ runner.temp }}/rewrite-ui-quick.log
-          if-no-files-found: error
-          retention-days: 7
       - name: Retain failed controller timer diagnostics
         if: failure() && matrix.check == 'ui-participant-console'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: controller-timer-diagnostics
           path: |
@@ -166,6 +278,7 @@ jobs:
           retention-days: 7
 
   verify-postgres:
+    needs: [build, fast-feedback]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -188,15 +301,12 @@ jobs:
     env:
       FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: rewrite-app/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
       - run: npm run db:migrate:postgres:built
       - run: npm run db:doctor:postgres:built
       - name: Run Postgres runtime preflight
@@ -215,6 +325,7 @@ jobs:
           npm run smoke:startup:postgres:built
 
   verify-postgres-ui:
+    needs: [build, fast-feedback]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -238,18 +349,17 @@ jobs:
       FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
       FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: rewrite-app/package-lock.json
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          playwright: "true"
       - run: npm run smoke:ui:postgres:built
 
   deployability:
+    needs: [build, fast-feedback]
     name: Deployability preflight
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -257,18 +367,17 @@ jobs:
       run:
         working-directory: rewrite-app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: rewrite-app/package-lock.json
-      - run: npm ci
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
       - name: Run metadata-required file and SQLite gates
         run: |
           APP_BUILD_SHA="${GITHUB_SHA::12}" \
           APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          npm run ci:deployability
+          npm run ci:deployability:built
 
   docker-image-runtime-smoke:
     name: Docker image runtime smoke
@@ -278,8 +387,10 @@ jobs:
       run:
         working-directory: rewrite-app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Build and run production image smoke
@@ -290,6 +401,7 @@ jobs:
           npm run smoke:docker:runtime
 
   docker-compose-release-smoke:
+    needs: [build, fast-feedback]
     name: Compose Postgres smoke (${{ matrix.mode }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -310,17 +422,29 @@ jobs:
             bootstrap-demo: "false"
             production-boundary: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: rewrite-app/package-lock.json
-      - run: npm ci
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
       - name: Run compose release smoke
         run: |
           APP_BUILD_SHA="${GITHUB_SHA::12}" \
           APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           FIRST_SLICE_BOOTSTRAP_DEMO="${{ matrix.bootstrap-demo }}" \
           SMOKE_COMPOSE_PRODUCTION_BOUNDARY="${{ matrix.production-boundary }}" \
-          npm run smoke:compose:postgres
+          npm run smoke:compose:postgres:built
+
+  acceptance:
+    name: CI acceptance
+    if: always()
+    needs: [build, typecheck, dependencies, unit, quick, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every qualification group
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, result] of Object.entries(results)) { if (result.result !== "success") { console.error(name + ": " + result.result); process.exitCode = 1; } }'

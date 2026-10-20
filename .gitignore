@@ -8,6 +8,8 @@ rewrite-spike/**/dist/
 rewrite-app/node_modules/
 rewrite-app/.angular/
 rewrite-app/.data/
+rewrite-app/.ci/
+.ci-artifacts/
 rewrite-app/.env
 rewrite-app/.env.local
 rewrite-app/.npm-cache/
