@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [entry, dialogs, starter]
+        family: [entry, dialogs, starter, administration]
     defaults:
       run:
         working-directory: rewrite-app

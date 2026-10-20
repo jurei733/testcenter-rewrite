@@ -114,9 +114,9 @@
               <div class="asset-slot-row"><p>{{ slot.label }}</p>
                 <mat-form-field appearance="fill"><mat-label>Bild auswählen</mat-label>
                   <mat-select [attr.data-asset-slot]="slot.key" [attr.aria-label]="slot.label" [disabled]="controller.busy"
-                    [value]="controller.assignments[slot.key] || ''" (valueChange)="controller.setAssignment(slot.key,$event)"
+                    [value]="controller.assignments[slot.key] || undefined" (valueChange)="controller.setAssignment(slot.key,$event)"
                     panelClass="original-administration-settings-overlay">
-                    <mat-option value="">Keines</mat-option>
+                    <mat-option [value]="undefined">Keines</mat-option>
                     @for (asset of controller.assets; track asset.applicationAssetId) { <mat-option [value]="asset.originalName">{{ asset.originalName }}</mat-option> }
                   </mat-select>
                 </mat-form-field>

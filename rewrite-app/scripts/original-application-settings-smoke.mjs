@@ -75,6 +75,11 @@ export async function runOriginalApplicationSettingsSmoke(page,api,{artifacts}){
  await root.locator('mat-select[data-asset-slot="loginIllustration"]').click();await page.getByRole('option',{name:filename,exact:true}).click();
  await saveSettings(page.locator('#originalSettingsSaveAssignments'));
  settings=(await api('/api/v1/system/application-settings')).applicationSettings;assert.equal(settings.assetAssignments.loginIllustration,filename);assert.equal(settings.globalWarningText,'Owned future warning');
+ await root.locator('mat-select[data-asset-slot="loginIllustration"]').click();await page.getByRole('option',{name:'Keines',exact:true}).click();
+ await saveSettings(page.locator('#originalSettingsSaveAssignments'));
+ assert.equal((await api('/api/v1/system/application-settings')).applicationSettings.assetAssignments.loginIllustration,undefined);
+ await root.locator('mat-select[data-asset-slot="loginIllustration"]').click();await page.getByRole('option',{name:filename,exact:true}).click();
+ await saveSettings(page.locator('#originalSettingsSaveAssignments'));
  const originalAsset=(await api('/api/v1/admin/application-assets')).items.find(asset=>asset.originalName===filename);
  const legacy=await api('/api/v1/admin/application-assets?applicationAssetId='+encodeURIComponent(originalAsset.applicationAssetId),undefined,'DELETE',409);
  assert.equal(legacy.error,'application_asset_in_use');

@@ -1,3 +1,4 @@
+import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
@@ -11,6 +12,7 @@ import { chromium } from "playwright";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
+import { createSmokeRouteFailureGate } from "./smoke-route-failure-gate.mjs";
 
 // Real participant authentication, Verona input, SQLite, and guarded return.
 // The Source dialog reference uses the same owned synthetic player/booklet.
@@ -150,13 +152,58 @@ try {
       assert.deepEqual(states[key].player.logo,reference.measurements[key].player.logo);
       assert.deepEqual(states[key].player.logoImage,reference.measurements[key].player.logoImage);
       // Real trusted Player input, then compare the exact stored packet.
-      const answer=`Own ${key}\n Ω  exact whitespace  `;await frame.locator("#demoPlayerAnswer").fill(answer);
+      const answer=`Own ${key}\n Ω  exact whitespace  `;
+      const answerPath=resolveRoutePath(productionApiRoutes.participant.saveProgress,{testRunId:runId});
+      const answered=page.waitForResponse(response=>{
+        if(new URL(response.url()).pathname!==answerPath||response.request().method()!=="POST")return false;
+        const packet=response.request().postDataJSON();
+        return packet?.responseUnitKey==="unit-intro"&&typeof packet.unitResponse==="string"&&packet.unitResponse.includes(JSON.stringify(answer).slice(1,-1));
+      });
+      let acknowledgedPacket;
+      const holdAnswerAck=key==="Primar-desktop-header-forbidden";
+      const committed=Promise.withResolvers(),releaseAck=Promise.withResolvers(),answerRoutes=createSmokeRouteFailureGate();
+      let browserAcknowledged=false,answerFailure,held=false;
+      void committed.promise.catch(()=>{});
+      void answered.then(()=>{browserAcknowledged=true;},()=>{});
+      const heldAnswerRoute=answerRoutes.wrap("answer committed before browser acknowledgement",async route=>{
+        const packet=route.request().postDataJSON();
+        if(held||typeof packet?.unitResponse!=="string"||!packet.unitResponse.includes(JSON.stringify(answer).slice(1,-1)))return route.continue();
+        held=true;
+        try{
+          const upstream=await route.fetch();assert.equal(upstream.status(),200);committed.resolve();
+          await releaseAck.promise;await route.fulfill({response:upstream});
+        }catch(error){committed.reject(error);throw error;}
+      });
+      if(holdAnswerAck)await page.route(base+answerPath,heldAnswerRoute);
+      try{
+        await frame.locator("#demoPlayerAnswer").fill(answer);
+        if(holdAnswerAck){
+          await raceWithSmokeDeadline(committed.promise,10000,()=>{throw Error("Owned answer was not committed before its held ACK.");});
+          const visible=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
+          assert.ok(visible.testRun.unitResponses["unit-intro"]?.includes(JSON.stringify(answer).slice(1,-1)));
+          const clientSaveStatus=(await page.locator("#participantVeronaSaveStatus").textContent()).trim();
+          assert.notEqual(clientSaveStatus,"saved");assert.equal(browserAcknowledged,false);
+          states[key].heldAnswerAck={storedBeforeBrowserAck:true,clientSaveStatus,browserAcknowledged};
+          releaseAck.resolve();
+        }
+        const answerAcknowledgement=await answered;assert.equal(answerAcknowledgement.status(),200);
+        await answerAcknowledgement.finished();acknowledgedPacket=answerAcknowledgement.request().postDataJSON().unitResponse;
+      }catch(error){answerFailure=error;}
+      finally{
+        releaseAck.resolve();await answerRoutes.settle();
+        if(holdAnswerAck)await page.unroute(base+answerPath,heldAnswerRoute);
+      }
+      const answerError=answerRoutes.failure(answerFailure);if(answerError)throw answerError;
+      // A database read can see a write before the browser receives its ACK.
+      // Take the immutable cancellation baseline only after the actual drainer settles.
+      await page.waitForFunction(()=>document.querySelector("#participantVeronaSaveStatus")?.textContent.trim()==="saved");
       for(let attempt=0;attempt<100;attempt++) {
         current=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
         if(current.testRun.unitResponses["unit-intro"]?.includes(JSON.stringify(answer).slice(1,-1)))break;
         await delay(100);
       }
       assert.ok(current.testRun.unitResponses["unit-intro"]?.includes(JSON.stringify(answer).slice(1,-1)),"Actual Verona answer must reach SQLite before navigation.");
+      assert.equal(current.testRun.unitResponses["unit-intro"],acknowledgedPacket,"The immutable baseline must retain the acknowledged Player bytes and clocks.");
       const saved=structuredClone(current.testRun.unitResponses),timerBefore=current.activeTestletTimer;
       await logo.click();
       if(fixture.restriction==="forbidden") {

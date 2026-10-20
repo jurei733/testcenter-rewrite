@@ -1,5 +1,45 @@
 # Optional Original UI
 
+### Paired Original settings viewports (2026-10-20)
+
+The settings reference now captures the actual unchanged Source and Rewrite in
+one Chromium session, across Primar/Sekundar/Erwachsene and 1280/390 px at 844 px
+height. Each Allgemein/Bildersetzungen form has an initial and a natively scrolled
+bottom state: 24 complete visible viewports, with all image slots, notices,
+theme previews and save/reset actions covered. Source uses owned read-only API
+fixtures; Rewrite uses an actual protected SQLite API session created by real
+UI sign-in. This does not prove Original backend authorization or every editor,
+dialog, error and directory state. All eight broad visual rows stay open.
+
+Source and Rewrite screenshot bytes are decoded by the same browser and every
+RGBA channel is compared. A changed pixel, alpha channel, incomplete buffer or
+changed viewport fails; there are no reference masks or numeric tolerances.
+Each image must preserve its measured viewport/navigation layout. Initial tab
+states start in a fresh document; bottom states use a native wheel in the empty
+panel gutter. Capture waits for actual finite transitions and transient ripples
+to finish, retaining Material's stable radio ripples. Original files are verified
+before and after the job. The fourth mandatory reference family retains PNGs,
+per-state geometry, pixel hashes and differences alongside the existing 18 tasks.
+
+The complete local CI wrapper passes all 24 comparisons with zero changed
+pixels and equal pixel hashes in Chromium 147.0.7727.15, after verifying the
+Source artifact before and after rendering. The 121 CI/reference checks,
+1,949 frontend tests, development/production builds and Actionlint pass; initial
+output remains 467.97 kB under the unchanged 470 kB cap. Real administration and
+settings actions, including clear/save/reassign and cascade deletion, pass
+separately against the production build and owned protected SQLite API. Linux
+qualification and complete current-head CI remain pending.
+
+The paired evidence identified early navigation activation before Material's
+pagination controls render. RouterLinkActive now provides Source's activation
+lifecycle while the current query-selected section disambiguates the shared
+Rewrite route; busy/session guards remain. Scoping Source's content-box behavior
+to pagination chevrons and theme previews restores their size and mobile text
+wrapping. Material buttons retain their own themed fonts; the native font reset
+is limited to icon buttons. An unassigned image uses Source's undefined value
+and placeholder, and the real browser gate verifies clearing, saving and
+reassigning it before guarded/cascading deletion.
+
 ### Original application settings controls (2026-10-20)
 
 The Original Systemverwaltung settings tab now loads its German Allgemein and
@@ -32,9 +72,9 @@ not establish Original backend authorization. Material tab captures wait for the
 active body to finish translating and for outgoing portals to detach; a pair of
 frames alone can still capture the transition. Each narrow case starts with a
 fresh page, matching the Source reference rather than a resized desktop tab bar.
-The twelve local paired neutral captures still have nonzero pixel differences;
-the narrow outer navigation is offset by 45 pixels and other header/control states
-remain to be aligned. No exact full-page image acceptance is claimed.
+The earlier twelve captures exposed a narrow navigation offset and additional
+control states. The new paired initial/bottom gate above replaces that diagnostic
+comparison; it does not close the complete System administration acceptance row.
 
 The Original adapter explicitly requests `cascadeAssignments: true`; absent or
 false retains the existing 409 in-use policy for other callers. Every store now

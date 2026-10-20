@@ -169,7 +169,10 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(upload.with["include-hidden-files"], true, "The official compiled assets include .browserslistrc; its digest must survive upload.");
   const consumer = workflow.jobs["original-browser-reference"];
   assert.deepEqual(consumer.needs, ["build", "original-reference-build"]);
-  assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter"]);
+  assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter", "administration"]);
+  const runtime = consumer.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
+  assert.equal(runtime.with.prebuilt, "true", "Paired Source/Rewrite pages require the verified same-run application build.");
+  assert.equal(runtime.with.playwright, "true");
   const download = consumer.steps.find(step => step.uses?.startsWith("actions/download-artifact@"));
   assert.equal(download.with.name, "original-reference-${{ github.sha }}");
   assert.equal(download.with["digest-mismatch"], "error");

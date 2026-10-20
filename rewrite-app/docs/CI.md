@@ -19,6 +19,26 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Settings renderer and immutable exit baseline
+
+The administration Source family adds 24 exact viewport comparisons in one
+lockfile Chromium: both settings tabs, initial/bottom views, three themes and
+desktop/mobile. It retains the existing 18 Source tasks and runs independently
+of Fast feedback, using both verified same-run builds. Complete acceptance now
+also requires this fourth reference family. Pixel/alpha/dimension failures stay
+fatal; raw PNGs, geometry and hashes are retained for the same review window.
+
+Parent `2878bcfc` finishes run `39496695102` with 78 successful jobs and a failed
+Player-exit gate/final acceptance. The actual difference is one millisecond in
+otherwise identical captured field clocks. Its old baseline only checked that
+the answer was visible in SQLite, which can precede browser acknowledgement.
+The fixture now waits for its real answer-save HTTP 200 and completed client
+drainer before copying the exact answer/clock bytes. A held upstream ACK proves
+the store/client ordering gap and then releases the actual response. All 36
+Original exits, six Rewrite variants and missing-bundle recovery pass locally;
+the original exact answer/clock, cancellation and timer assertions remain.
+This closes that observation gap; current Linux qualification is still required.
+
 ## Build dependency audit
 
 Run `39495831501` correctly fails the unchanged high-severity audit gate after
