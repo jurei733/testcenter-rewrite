@@ -116,6 +116,25 @@ test("PR code runs once per update while main, merge queue and manual runs remai
   for (const event of ["push", "pull_request"]) assert.ok(workflow.on[event].paths.includes(".github/actions/**"));
   assert.equal(workflow.concurrency["cancel-in-progress"], true);
 });
+test("Linux source reference uses an unchanged commit-pinned Original and same-run verified artifact", () => {
+  const source = JSON.parse(read("./fixtures/original-browser-source.json"));
+  const producer = workflow.jobs["original-reference-build"];
+  const checkout = producer.steps.find(step => step.with?.repository);
+  assert.equal(checkout.with.repository, source.repository); assert.equal(checkout.with.ref, source.commit);
+  assert.ok(producer.steps.some(step => step.run?.includes("verify-source")));
+  assert.ok(producer.steps.some(step => step.run?.includes(" pack ")));
+  const upload = producer.steps.find(step => step.uses?.startsWith("actions/upload-artifact@"));
+  assert.equal(upload.with["include-hidden-files"], true, "The official compiled assets include .browserslistrc; its digest must survive upload.");
+  const consumer = workflow.jobs["original-browser-reference"];
+  assert.deepEqual(consumer.needs, ["build", "original-reference-build"]);
+  assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter"]);
+  const download = consumer.steps.find(step => step.uses?.startsWith("actions/download-artifact@"));
+  assert.equal(download.with.name, "original-reference-${{ github.sha }}");
+  assert.equal(download.with["digest-mismatch"], "error");
+  assert.equal(download.with["run-id"], undefined); assert.equal(download.with["github-token"], undefined);
+  assert.equal(consumer.env.UI_SMOKE_HEADFUL, "true");
+  assert.ok(consumer.steps.some(step => step.run?.startsWith("xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture")));
+});
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
   for (const id of ["unit", "quick", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {

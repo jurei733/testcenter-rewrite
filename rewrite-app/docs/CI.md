@@ -123,6 +123,40 @@ PostgreSQL full-browser run also times out returning from a resumed Starter
 card; this is not a successful release result. The workflow must expose these
 failures and skip dependent long qualification rather than conceal them.
 
+## Original reference on the qualification platform
+
+The first truthful 27-scenario Linux run exposes more than the two initially
+observed failures. Several exact Mac measurements differ from Linux's native
+scrollbars, font metrics and rasterization. Changing the rewrite to match Mac
+coordinates on Linux would not prove correspondence with the Original there.
+
+`Pinned Original browser build` checks out the official
+`iqb-berlin/testcenter` revision
+`eedae41840cbe90e5547c0211da818bdf620f5aa`, verifies a clean tracked tree and
+the exact frontend lock hash, and uses that frontend's normal production build.
+Only its documented ignored environment file is generated from its own template.
+It builds once. A same-run artifact supplies entry, dialog and Starter capture
+jobs under the same Linux/Chromium/Xvfb mode as the rewrite. Its manifest binds
+the consuming commit, Original revision, Node major, OS, architecture and every
+compiled file; extra/missing/changed files and links are rejected before use.
+
+The Source drivers retain their click, keyboard, request, unknown-route and
+state assertions. Their explicit capture mode records the pinned Original's
+actual geometry instead of comparing it to an unrelated Mac measurement.
+This mode is restricted to the Source capture driver and never bypasses a
+rewrite assertion. Single-case selectors, scenario flags and alternate browser
+channels are cleared between captures. JSON and screenshots identify the
+Source revision, browser version and renderer; close-button RGBA hashes are
+decoded separately from the actual Source PNGs. Finite screenshot animations
+are completed before geometry is sampled, so an entering tooltip cannot become
+a new baseline. These are UI fixture references,
+not proof of Original backend authentication.
+
+The rewrite gates continue to require their existing comparisons while these
+platform-specific references are qualified. The source jobs are also required
+by complete acceptance. Collecting evidence does not itself close any full-page
+Original UI acceptance row.
+
 ## Local verification
 
 Use Node 22. Run `npm run test:ci-policy`, `npm audit --audit-level=high` and
