@@ -2810,6 +2810,21 @@ Compare source files from that revision, not the older local checkout.
 
 ## Acceptance matrix
 
+### Attachment labels and QR-page text (2026-10-20)
+
+The shared manager/camera now honor Original runtime text keys with exact
+global < operator precedence and the distinct template/direct empty rules.
+Source-executed checks pin the German fallback wording without extending the
+102-default editor. Sixteen real protected production Chromium/SQLite cases
+cover both interfaces, desktop/mobile, defaults, global text, empty overrides
+and padded multiline text, including actual QR-PDF download parameters and
+foreign-group denial. Original PDFs substitute the actual second-code suffix,
+insert replacement-token characters literally and use distinct group labels
+for batch document titles. See the 2026-10-20 PARITY.md entry for evidence.
+
+This does not adapt the complete manager/camera Material layout or prove
+physical devices or full-page identity. No complete visual row is closed.
+
 ### Separate Player and Review toolbar references (2026-10-09)
 
 The current unmodified Source has two different icon hosts: the main Player

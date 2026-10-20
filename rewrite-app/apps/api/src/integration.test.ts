@@ -5276,7 +5276,9 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
           {
             loginKey: "attachment-a",
             groupKey: "group-a",
+            groupLabel: "Attachment Group A",
             bookletKey,
+            booklets: [{ id: bookletKey, codes: "suffix-a" }],
             displayName: "Attachment Alpha"
           },
           {
@@ -5299,7 +5301,8 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
       "/api/v1/participant/starter:launch",
       {
         method: "POST",
-        body: { tenantKey, workspaceKey, loginKey, groupKey, bookletKey }
+        body: { tenantKey, workspaceKey, loginKey, groupKey, bookletKey,
+          ...(loginKey === "attachment-a" ? { participantCode: "suffix-a" } : {}) }
       }
     );
     assert.equal(launch.status, 200);
@@ -5317,6 +5320,8 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
       attachmentId: string;
       groupKey: string;
       loginKey: string;
+      participantCode: string | null;
+      groupLabel: string;
       variableId: string;
       attachmentType: string;
       dataType: string;
@@ -5327,6 +5332,10 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   });
   assert.equal(inventory.status, 200);
   assert.equal(inventory.body.items.length, 12);
+  assert.ok(inventory.body.items.filter(item => item.groupKey === "group-a")
+    .every(item => item.participantCode === "suffix-a" && item.groupLabel === "Attachment Group A"));
+  assert.ok(inventory.body.items.filter(item => item.groupKey === "group-b")
+    .every(item => item.participantCode === null && item.groupLabel === "group-b"));
   assert.deepEqual(
     inventory.body.items
       .filter(item => item.groupKey === "group-a")
@@ -5487,6 +5496,13 @@ test("attachment manager retains typed BaseVariable requests and enforces captur
   );
   assert.equal(singlePagePdf.getPageCount(), 1);
   assert.match(singlePagePdf.getTitle() ?? "", /^Attachment Alpha \| att-/);
+  const originalCodeResponse = await fetch(
+    `${baseUrl}${attachmentPath}/page.pdf?layout=original&labelTemplate=${encodeURIComponent("%GROUP%|%LOGIN%|%CODE%|%CODE%")}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(originalCodeResponse.status, 200);
+  assert.equal((await PDFDocument.load(await originalCodeResponse.arrayBuffer())).getTitle(),
+    "group-a|attachment-a|suffix-a|suffix-a");
   for (const path of [attachmentPagesPath, `${attachmentPath}/page.pdf`]) {
     const originalResponse = await fetch(`${baseUrl}${path}?layout=original`, {
       headers: { authorization: groupAuthorization }

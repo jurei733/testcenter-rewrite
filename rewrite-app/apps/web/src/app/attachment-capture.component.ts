@@ -20,6 +20,9 @@ import { AttachmentQrDecoder } from "./attachment-qr-decoder";
 import { attachmentCameraMirrored, attachmentPageGeometry } from "./attachment-page-geometry";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { InterfaceModeService } from "./interface-mode.service";
+import { ApplicationSettingsService } from "./application-settings.service";
+import { resolveAttachmentText, type AttachmentCustomTextKey } from "./attachment-custom-texts";
 
 type AttachmentScope = {
   sessionToken: string;
@@ -66,14 +69,12 @@ type AttachmentScope = {
       <div class="section-heading">
         <div>
           <span class="eyebrow">Attachments</span>
-          <h2>Capture a printed page</h2>
+          <h2>{{ customText('am_capture_image', 'Capture a printed page') }}</h2>
         </div>
         <span class="status-pill">Review before uploading</span>
       </div>
       <p class="capture-intro">
-        Align the printed page with the camera preview and its QR code with the
-        highlighted box. Check the image, participant, booklet, unit and variable
-        before uploading.
+        {{ customText('am_capture_image_instructions', 'Align the printed page with the camera preview and its QR code with the highlighted box. Check the image, participant, booklet, unit and variable before uploading.') }}
       </p>
       <p class="scope-line">
         <span><strong>Tenant:</strong> {{ tenantKey || 'not selected' }}</span>
@@ -107,10 +108,10 @@ type AttachmentScope = {
             <div class="actions" *ngIf="!capturePreviewUrl">
               <button id="startAttachmentCameraButton" class="primary" type="button" [disabled]="busy || cameraActive || cameraStarting" (click)="startCamera()">Start camera</button>
               <button id="stopAttachmentCameraButton" class="ghost" type="button" [disabled]="!cameraActive" (click)="stopCamera()">Stop camera</button>
-              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" (click)="toggleFlash()">{{ flashOn ? 'Turn flash off' : 'Turn flash on' }}</button>
+              <button id="toggleAttachmentFlashButton" class="ghost" type="button" [disabled]="!cameraActive || !hasFlash" [attr.aria-pressed]="flashOn" (click)="toggleFlash()">{{ customText('gm_flash_checkbox', flashOn ? 'Turn flash off' : 'Turn flash on') }}</button>
             </div>
             <label *ngIf="!capturePreviewUrl && cameras.length > 1">
-              Camera
+              {{ customText('am_available_cameras', 'Camera') }}
               <select id="attachmentCameraSelect" [(ngModel)]="selectedCameraId" (change)="selectCamera()">
                 <option *ngIf="!selectedCameraIsListed" [value]="selectedCameraId">{{ selectedCameraId ? 'Selected camera' : 'Default camera (rear preferred)' }}</option>
                 <option *ngFor="let camera of cameras" [value]="camera.id">{{ camera.label || camera.id }}</option>
@@ -171,7 +172,7 @@ type AttachmentScope = {
         <p id="attachmentCaptureStatus" class="capture-status" [class.is-error]="statusIsError" role="status" aria-live="polite">{{ status }}</p>
         <div class="actions">
           <button id="resetAttachmentCaptureButton" class="ghost" type="button" *ngIf="!capturePreviewUrl || !attachment || !canCaptureTarget" [disabled]="busy" (click)="resetTarget()">Scan another page</button>
-          <a class="button-link secondary" routerLink="/runtime">Back to Attachment Manager</a>
+          <a id="backToAttachmentManager" class="button-link secondary" routerLink="/runtime">{{ customText('am_goto_attachment_overview', 'Back to Attachment Manager') }}</a>
         </div>
       </ng-container>
     </article>
@@ -187,6 +188,8 @@ export class AttachmentCaptureComponent
   private readonly captureCanvas!: ElementRef<HTMLCanvasElement>;
 
   private readonly manager = inject(AttachmentManagerService);
+  private readonly interfaceMode = inject(InterfaceModeService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly route = inject(ActivatedRoute);
@@ -203,6 +206,11 @@ export class AttachmentCaptureComponent
   private targetVersion = 0;
   private operationVersion = 0;
   private uploadNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  customText(key: AttachmentCustomTextKey, rewriteFallback: string): string {
+    return resolveAttachmentText(this.applicationSettings.settings().customTexts,
+      this.operatorAccess.customTexts, key, this.interfaceMode.mode() === "original" ? undefined : rewriteFallback);
+  }
 
   attachmentCode = "";
   attachment: WorkspaceAttachment | null = null;

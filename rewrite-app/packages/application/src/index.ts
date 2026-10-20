@@ -24737,6 +24737,8 @@ export const createFirstSliceServices = (
               testRunId: testRun.testRunId,
               groupKey: participantSession.groupKey,
               loginKey: participantSession.loginKey,
+              participantCode: participantSession.participantCode ?? null,
+              groupLabel: rosterEntry?.groupLabel ?? participantSession.groupKey,
               personLabel:
                 rosterEntry?.displayName?.trim() || participantSession.loginKey,
               bookletKey: booklet.bookletKey,

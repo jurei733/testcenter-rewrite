@@ -1,5 +1,57 @@
 # Testcenter parity checklist
 
+### Attachment text inheritance and literal PDF fields (2026-10-20)
+
+Current Source remains `eedae41840cbe90e5547c0211da818bdf620f5aa` on a fresh
+fetch. Published parent `d39d8d46` now has a completed successful full workflow
+[`39187723764`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39187723764),
+including its previously failing timer and shared-flow jobs. That qualifies the
+parent, not the follow-up described here.
+
+The attachment manager and camera now read global < authenticated operator
+`am_*` text, with the Original template-pipe fallback after an empty override.
+Padded/multiline values survive. These runtime keys do not add invented entries
+to the 102-default editor. The selected QR-page template uses the separate
+direct-value rule; HTTP omits an empty template like Source's backend client,
+but transmits a nonempty whitespace-only or padded value exactly. A temporary
+editor override is discarded when the manager's authenticated scope changes.
+Source fallbacks, HTML and PHP are byte/hash-pinned in
+`current-attachment-text-reference.json`, with the existing MIT notice retained.
+
+Original PDF `%CODE%` now substitutes the started participant's second-code
+suffix (empty for an uncoded login), rather than the unrelated QR attachment ID.
+The authorized attachment projection carries that suffix and its authored group
+label without new storage. Replacement values containing JavaScript `$&`,
+backtick/apostrophe or `$$` tokens are inserted literally as PHP `str_replace`
+does. Original batch document titles list distinct authored group labels in
+first-seen order. The Rewrite-specific CODE and batch-title behavior is retained.
+All three PDF mismatches reproduce independently against parent `d39d8d46`.
+
+Production/core builds pass; initial output stays 469.88 kB below the unchanged
+470 kB cap. All 1,876 frontend checks and 231 focused attachment/PDF/lifecycle
+checks pass. The protected attachment HTTP case, including a real coded roster,
+single PDF, typed attachments and group isolation, passes separately on Memory,
+File and SQLite. `smoke:ui:attachment-custom-text:built` passes 16 actual
+production Chromium/SQLite cases: both interfaces at 1280/390 px with defaults,
+global values, empty login overrides and padded multiline login values. Every
+case signs in, verifies the scoped inventory, downloads the actual PDF and
+checks its exact query, rejects a foreign group's export and opens the camera's
+authored labels. The gate is included in Quick CI; source-execution regressions
+run with the frontend suite. Desktop/mobile screenshots were inspected.
+
+This is a functional text/export correction. Full Original attachment-page
+layout, extended PDF glyph/markup identity, physical cameras, complete current
+CI and production acceptance remain separate. The formal matrix remains 30
+complete / 19 partial and all eight full-page visual acceptance rows remain open.
+
+For the autonomous continuation requested on 2026-10-20, the planning range is
+roughly 4–8 engineer-weeks to complete functional, whole-page visual and
+operational acceptance, with roughly 1–2 weeks attributable to functional
+qualification alone. This is a judgment range from the explicit remaining
+matrix, not elapsed autonomous runtime, a commitment or the historical 94%
+functional estimate. Full-page operator/workspace/monitor rendering and wider
+production package, Player and storage/device qualification dominate uncertainty.
+
 ### Monitor fixture expectation and owned route diagnostics (2026-10-19)
 
 Published `b9345905` completes workflow `39185026985` with 26 successful and
