@@ -157,6 +157,7 @@ try {
         assert.equal(await page.locator("mat-dialog-container").count(),0);
         assert.deepEqual((await api(returnPath,{confirmTestletTimeLeave:true},token,"POST",409)).details.deniedReasons,["testlet_time_leave_forbidden"]);
       } else {
+        await waitForMaterialDialog(page);
         await page.locator("#participantConfirmationContinueButton").click();
         await page.locator("#originalParticipantStarter mat-card").first().waitFor();assert.equal(mutations.length,1);
         const runtime=await api(`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/runtime-state`,undefined,token);
