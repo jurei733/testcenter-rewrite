@@ -19,6 +19,30 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Build dependency audit
+
+Run `39495831501` correctly fails the unchanged high-severity audit gate after
+new advisory records identify Angular CLI's transitive MCP SDK 1.31.0 and
+Angular Build's Vite 7.3.6. The root overrides pin only SDK 1.32.0 and Vite
+7.3.7, with matching registry integrity in the lockfile; Angular versions,
+the Original reference lock and the audit threshold stay unchanged. Remove
+these overrides when the pinned Angular release carries compatible fixed
+dependencies itself. A clean `npm ci` and fresh `npm audit` report zero known
+vulnerabilities with the repaired lock. Both development/production builds,
+all 3,624 unit/frontend checks and 117 CI policy checks pass. An actual Vite
+dev server with a separate owned protected API carries a real browser sign-in
+to the Original settings form; the complete production administration/settings
+browser gate also passes with the patched install.
+
+The primary advisories identify SDK 1.32.0 as the fix for
+[cross-session experimental tasks](https://github.com/advisories/GHSA-22jm-h49p-29qw)
+and [cross-origin HTTP/OAuth redirects](https://github.com/advisories/GHSA-6prh-2h8m-c8cw).
+[Vite 7.3.7 fixes the inherited Windows editor argument issue](https://github.com/advisories/GHSA-698v-4r3x-3vcv).
+These are development-tool dependencies; the Angular CLI MCP transport in this
+locked release is stdio. The fix retains the gate rather than excluding the
+packages or accepting a framework-major upgrade from `npm audit fix --force`.
+Successful historical audits remain observations at their recorded time.
+
 ## Fast feedback
 
 For local asset/settings iterations, `npm run test:application-assets` builds
