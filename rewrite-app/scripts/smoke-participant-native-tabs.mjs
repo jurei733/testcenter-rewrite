@@ -145,9 +145,14 @@ try {
   assert.deepEqual((await journal()).find(entry => entry.id === queued.id), queued);
   mark("destroying-and-reentering-the-clone-retains-the-source-journal");
 
-  await context.unroute("**/native-commands", unavailable);
   const completionPackets = observeParticipantCommandCompletions(page);
-  const sourceBeforeReload = nativeRequests.length; await page.reload({ waitUntil: "networkidle" }); await methods();
+  // Keep old-document retries unavailable until the reload has committed.
+  // Otherwise a timer can acknowledge and clear the intent between unroute
+  // and the request checkpoint, leaving no retained intent for reload to prove.
+  await page.reload({ waitUntil: "commit" });
+  const sourceBeforeReload = nativeRequests.length;
+  await context.unroute("**/native-commands", unavailable);
+  await page.waitForLoadState("networkidle"); await methods();
   await poll(async () => (await read(first.testRunId)).status === "paused", "Source reload did not deliver its retained pause"); await emptyJournal();
   assert.equal(await ownerOf(page), sourceOwner);
   const sourceReplay = nativeRequests.slice(sourceBeforeReload).filter(item => item.label === "source");

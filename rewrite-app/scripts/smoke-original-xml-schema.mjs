@@ -64,7 +64,12 @@ try {
       await page.locator("#adminUsername").fill("demo-admin");
       await page.locator("#adminPassword").fill("demo-admin-password");
       await page.locator("#adminSignInButton").click();
-      await page.locator("#adminSignOutButton").waitFor();
+      if (ui === "original") {
+        await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
+        await page.locator('#originalAdministrationHeader .logo a').click();
+      } else {
+        await page.locator("#adminSignOutButton").waitFor();
+      }
       await page.locator('[data-view-nav="workspace"]').click();
       await page.locator("#tenantKey").fill("demo-tenant"); await page.locator("#tenantKey").dispatchEvent("change");
       await page.locator("#workspaceKey").fill(workspaceKey); await page.locator("#workspaceKey").dispatchEvent("change");

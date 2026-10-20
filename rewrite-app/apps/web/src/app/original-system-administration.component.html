@@ -38,7 +38,9 @@
   <mat-tab-nav-panel #tabPanel>
     @if (showDirectoryProblem) { <p id="originalAdministrationError" role="alert">{{ directory.problem }}</p> }
     @if (section === 'settings') {
-      <ng-container [ngTemplateOutlet]="settingsTemplate" />
+      @defer (when true) { <app-original-application-settings [sessionToken]="sessionToken" /> }
+      @placeholder { <p>Einstellungen werden geladen.</p> }
+      @error { <p role="alert">Die Einstellungen konnten nicht geladen werden. Bitte laden Sie die Seite erneut.</p> }
     } @else {
       <div class="directory-columns">
         <div class="directory-list">

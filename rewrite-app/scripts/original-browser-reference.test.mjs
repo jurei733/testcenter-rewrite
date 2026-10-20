@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { verifyOriginalBuild, verifyOriginalAdministrationSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
+import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
 for (const change of ["none","file","handler","revision","path"]) test(`administration Source oracle validates real file bytes and embedded methods: ${change}`,async t=>{
   const root=await mkdtemp(join(tmpdir(),"original-administration-policy-"));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -80,4 +80,12 @@ test("the capture family cannot inherit a single-case selector, unrelated scenar
   assert.equal(environment.ORIGINAL_REFERENCE_CAPTURE_ONLY, "true");
   const selected = originalCaptureEnvironment(parent, originalReferenceTasks.entry.find(task => task.name === "insecure-admin"), "/owned/source", "/owned/evidence");
   assert.equal(selected.ORIGINAL_LOGIN_REFERENCE_INSECURE, "true"); assert.equal(selected.ORIGINAL_LOGIN_REFERENCE_ENTRY, "admin");
+});
+
+for(const changed of [false,true]) test(`settings catalog matches the unchanged Source bytes: changed=${changed}`,async t=>{
+ const root=await mkdtemp(join(tmpdir(),"original-settings-source-"));t.after(()=>rm(root,{recursive:true,force:true}));
+ const path="definitions/testtaker/custom-texts.json",source=JSON.stringify({login_subtitle:{label:"Owned label",defaultvalue:"Owned default"}});
+ await mkdir(join(root,"definitions/testtaker"),{recursive:true});await writeFile(join(root,path),changed?"changed":source);
+ const reference={originalCommit:originalBrowserSource.commit,files:[{path,source,sha256:digest(source)}]};
+ if(changed)await assert.rejects(verifyOriginalSettingsSource(root,reference));else await verifyOriginalSettingsSource(root,reference);
 });

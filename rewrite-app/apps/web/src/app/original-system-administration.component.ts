@@ -1,5 +1,4 @@
-import { NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectorRef, Component, EventEmitter, Input, Output, TemplateRef, inject, type OnChanges, type OnDestroy } from "@angular/core";
+import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject, type OnChanges, type OnDestroy } from "@angular/core";
 import { Router, RouterLink } from "@angular/router";
 import { MatButton, MatFabButton, MatIconButton } from "@angular/material/button";
 import { MatCheckbox } from "@angular/material/checkbox";
@@ -19,6 +18,7 @@ import { ConfirmationDialogService } from "./confirmation-dialog.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { OpsViewFacade } from "./ops-view.facade";
+import { OriginalApplicationSettingsComponent } from "./original-application-settings.component";
 import type { AdministrationSection } from "./administration-nav.component";
 import { OriginalOverlayStylesComponent } from "./original-overlay-styles.component";
 import { OriginalAdministrationIconComponent } from "./original-administration-icon.component";
@@ -34,7 +34,7 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
 // existing authorization, role-assignment and workspace aggregate APIs.
 @Component({
   selector:"app-original-system-administration",standalone:true,
-  imports:[NgTemplateOutlet,RouterLink,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
+  imports:[OriginalApplicationSettingsComponent,RouterLink,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
     MatMenu,MatMenuTrigger,MatProgressBar,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,
     MatCellDef,MatCell,MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTabNav,MatTabLink,MatTabNavPanel,
     MatToolbar,MatTooltip,OriginalOverlayStylesComponent,OriginalAdministrationIconComponent,OriginalAdministrationSurfaceStylesComponent],
@@ -44,7 +44,6 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
 export class OriginalSystemAdministrationComponent implements OnChanges, OnDestroy {
   @Input({required:true}) sessionToken = "";
   @Input() section: AdministrationSection = "users";
-  @Input() settingsTemplate: TemplateRef<unknown> | null = null;
   @Output() sectionSelected = new EventEmitter<AdministrationSection>();
   readonly app = inject(AppShellFacade);
   readonly settings = inject(ApplicationSettingsService);

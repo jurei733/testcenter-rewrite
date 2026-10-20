@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
+import { runOriginalApplicationSettingsSmoke } from "./original-application-settings-smoke.mjs";
 import { waitForMaterialDialog } from "./material-dialog-ready.mjs";
 
 // Real protected API, native Original controls and an owned SQLite database.
@@ -116,6 +117,7 @@ try{
   await page.locator("#globalConfirmationConfirmButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/admin/users")).items.some(item=>item.adminUser.adminUserId===created.adminUser.adminUserId),false);
   console.log("original_administration=real-user-create-step-up-promotion-and-delete:passed");
+  await runOriginalApplicationSettingsSmoke(page,api,{artifacts});
   const resetInOriginal=async password=>{
     await page.locator(`[data-admin-id="${adminId}"]`).click();await page.locator('[data-cy="change-password"]').click();await waitForMaterialDialog(page);
     await page.locator("#originalAdministrationPassword").fill(password);await page.locator("#originalAdministrationEditorSave").click();
