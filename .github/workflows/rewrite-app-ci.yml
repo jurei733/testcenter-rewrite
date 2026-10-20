@@ -68,6 +68,82 @@ jobs:
       - run: npm run test:ci-policy
       - run: npm run typecheck
 
+  original-reference-build:
+    name: Pinned Original browser build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: iqb-berlin/testcenter
+          ref: eedae41840cbe90e5547c0211da818bdf620f5aa
+          path: original-reference
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: original-reference/frontend/package-lock.json
+      - run: node rewrite-app/scripts/original-browser-reference.mjs verify-source original-reference
+      - run: npm ci --no-audit --no-fund
+        working-directory: original-reference/frontend
+      - name: Compile the unchanged Original frontend
+        working-directory: original-reference/frontend
+        run: |
+          cp src/environments/environment.dev.ts src/environments/environment.ts
+          npm run build -- --configuration production
+      - run: node rewrite-app/scripts/original-browser-reference.mjs pack original-reference
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: original-reference-${{ github.sha }}
+          path: original-reference/frontend/dist/testcenter-frontend/browser/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  original-browser-reference:
+    name: Original browser reference (${{ matrix.family }})
+    needs: [build, original-reference-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [entry, dialogs, starter]
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      UI_SMOKE_HEADFUL: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+        with:
+          prebuilt: "true"
+          playwright: "true"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: original-reference-${{ github.sha }}
+          path: ${{ runner.temp }}/original-browser
+          digest-mismatch: error
+      - run: xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture ${{ matrix.family }}
+        env:
+          ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
+          ORIGINAL_BROWSER_CAPTURE_DIR: ${{ runner.temp }}/original-captures
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: original-captures-${{ matrix.family }}
+          path: ${{ runner.temp }}/original-captures/
+          if-no-files-found: warn
+          retention-days: 1
+
   dependencies:
     name: Dependency audit
     runs-on: ubuntu-latest
@@ -527,7 +603,7 @@ jobs:
   acceptance:
     name: CI acceptance
     if: always()
-    needs: [build, typecheck, dependencies, unit, quick, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
+    needs: [build, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

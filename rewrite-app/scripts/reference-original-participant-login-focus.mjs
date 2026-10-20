@@ -15,9 +15,14 @@ const insecureReference = process.env.ORIGINAL_LOGIN_REFERENCE_INSECURE === "tru
 const headerReference = process.env.ORIGINAL_LOGIN_REFERENCE_HEADER === "true";
 const starterReference = headerReference && process.env.ORIGINAL_LOGIN_REFERENCE_STARTER === "true";
 const adminReference = (insecureReference || headerReference) && process.env.ORIGINAL_LOGIN_REFERENCE_ENTRY === "admin";
+const sourceCapture = process.env.ORIGINAL_REFERENCE_CAPTURE_ONLY === "true";
+if (sourceCapture) {
+  const source = JSON.parse(await readFile(new URL("./fixtures/original-browser-source.json", import.meta.url), "utf8"));
+  assert.equal(process.env.ORIGINAL_LOGIN_REFERENCE_COMMIT, source.commit);
+}
 assert.ok(!starterReference || (!adminReference && !insecureReference), "Starter reference requires the secure participant header mode.");
 const headerFixture = headerReference ? JSON.parse(await readFile(new URL("./fixtures/original-header-logo.json", import.meta.url), "utf8")) : null;
-if (headerFixture) assert.equal(process.env.ORIGINAL_LOGIN_REFERENCE_COMMIT, headerFixture.referenceRevision);
+if (headerFixture && !sourceCapture) assert.equal(process.env.ORIGINAL_LOGIN_REFERENCE_COMMIT, headerFixture.referenceRevision);
 const noticeReference = JSON.parse(await readFile(new URL("./fixtures/original-login-notices.json", import.meta.url), "utf8"));
 const readNotice = element => {
   const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
@@ -111,7 +116,7 @@ try {
             nameValue: document.querySelector("input[formcontrolname=name]")?.value ?? null,
             passwordEmpty: document.querySelector("input[formcontrolname=pw]")?.value === "" };
         });
-        await page.screenshot({ path: join(artifacts, `${key}-${phase}.png`), fullPage: true });
+        await page.screenshot({animations: "disabled",  path: join(artifacts, `${key}-${phase}.png`), fullPage: true });
         return states[`${key}-${phase}`];
       };
       if (headerReference) {
@@ -136,7 +141,7 @@ try {
             color: style.color, background: style.backgroundColor, font: style.font, lineHeight: style.lineHeight,
             padding: style.padding, borderRadius: style.borderRadius };
         });
-        assert.deepEqual(measured, headerFixture.measurements[key]);
+        if (!sourceCapture) assert.deepEqual(measured, headerFixture.measurements[key]);
         states[`${key}-header-tooltip`].tooltip = measured;
         await page.mouse.move(0, height / 2);
         await tooltip.waitFor({ state: "detached" });
@@ -186,7 +191,7 @@ try {
         await notice.waitFor();
         const state = await capture("https-notice");
         state.notice = await notice.evaluate(readNotice);
-        assert.deepEqual(state.notice, noticeReference.measurements[key][adminReference ? "httpsAdmin" : "httpsParticipant"]);
+        if (!sourceCapture) assert.deepEqual(state.notice, noticeReference.measurements[key][adminReference ? "httpsAdmin" : "httpsParticipant"]);
         assert.equal(await page.getByRole("button", { name: "Anmelden", exact: true }).isDisabled(), true);
         assert.deepEqual(requests, adminReference ? [] : [{ name: "owned-missing-login", password: "" }]);
         await context.close();
@@ -214,7 +219,7 @@ try {
       await warning.waitFor();
       const caps = await capture("caps-on");
       caps.notice = await warning.evaluate(readNotice);
-      assert.deepEqual(caps.notice, noticeReference.measurements[key].capsLock);
+      if (!sourceCapture) assert.deepEqual(caps.notice, noticeReference.measurements[key].capsLock);
       assert.equal(await warning.evaluate(element => element.getBoundingClientRect().top -
         element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
       await password.evaluate(input => input.dispatchEvent(new KeyboardEvent("keyup", {
@@ -236,7 +241,7 @@ try {
       const invalid = await capture("invalid");
       assert.equal(invalid.tag, "BODY"); assert.equal(invalid.nameValue, "");
       invalid.notice = await warning.evaluate(readNotice);
-      assert.deepEqual(invalid.notice, noticeReference.measurements[key].invalidCredentials);
+      if (!sourceCapture) assert.deepEqual(invalid.notice, noticeReference.measurements[key].invalidCredentials);
       assert.equal(await warning.evaluate(element => element.getBoundingClientRect().top -
         element.closest("form").querySelector("mat-form-field").getBoundingClientRect().bottom), 24);
       assert.notEqual(await name.getAttribute("aria-invalid"), "true");

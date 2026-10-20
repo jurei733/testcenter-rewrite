@@ -82,7 +82,7 @@ try{
   const capture=async phase=>{
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).every(a=>!a.pending&&a.playState!=='running'));
-    await page.screenshot({path:join(artifacts,`${key}-${phase}.png`),fullPage:true});
+    await page.screenshot({animations: "disabled", path:join(artifacts,`${key}-${phase}.png`),fullPage:true});
     return page.evaluate(()=>{
       const read=n=>{if(!n)return null;const b=n.getBoundingClientRect(),s=getComputedStyle(n);return{x:b.x,y:b.y,width:b.width,height:b.height,font:s.font,color:s.color,background:s.backgroundColor,padding:s.padding,margin:s.margin,borderRadius:s.borderRadius,boxShadow:s.boxShadow};};
       const dialog=document.querySelector('mat-dialog-container');
