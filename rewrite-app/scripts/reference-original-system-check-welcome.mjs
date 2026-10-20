@@ -47,10 +47,13 @@ try {
     await page.locator("mat-card td").first().waitFor();
     assert.equal(await page.locator("mat-card").count(), 2);
     assert.equal(await page.locator("#syscheck-previous-step").isDisabled(), true);
+    await page.locator("#syscheck-next-step:not([disabled])").waitFor();
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {
       await page.setViewportSize({ width, height });
       await page.evaluate(() => document.fonts.ready);
-      await page.screenshot({ animations: "disabled", path: join(artifacts, `${theme}-${screen}.png`), fullPage: true });
+      await page.bringToFront();
+      await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+      await page.screenshot({ animations: "disabled", path: join(artifacts, `${theme}-${screen}.png`), fullPage: false });
       measurements[`${theme}-${screen}`] = await page.evaluate(() => {
         const button = document.querySelector("#syscheck-previous-step"), header = button.parentElement, icon = button.querySelector("svg");
         const title = document.querySelector("tc-header h1"), titleStyle = getComputedStyle(title), titleBounds = title.getBoundingClientRect();

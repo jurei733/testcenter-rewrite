@@ -120,14 +120,32 @@ try {
           const entry = document.querySelector(".login-wrapper") ?? document.querySelector(".login-page");
           const footer = document.querySelector("tc-footer").getBoundingClientRect();
           const bounds = entry.getBoundingClientRect();
+          let scroller = entry.parentElement;
+          while (scroller && !["auto", "scroll"].includes(getComputedStyle(scroller).overflow)) scroller = scroller.parentElement;
+          const border = scroller ? getComputedStyle(scroller) : null;
+          const horizontalScrollbarHeight = scroller ? scroller.offsetHeight - scroller.clientHeight -
+            parseFloat(border.borderTopWidth) - parseFloat(border.borderBottomWidth) : 0;
           const version = document.createRange();
           version.selectNodeContents(document.querySelector("tc-footer .version-label"));
-          return { width: bounds.width, height: bounds.height, footer: [footer.y, footer.height],
+          return { width: bounds.width, height: bounds.height, horizontalScrollbarHeight, adminForm: entry.classList.contains("login-wrapper"),
+            footer: [footer.y, footer.height],
             documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
             versionBottom: version.getBoundingClientRect().bottom,
             header: document.querySelector("tc-header mat-toolbar").getBoundingClientRect().height };
         });
-        await page.screenshot({animations: "disabled",  path: join(artifacts, `${key}-${phase}.png`), fullPage: true });
+        const layout = () => {
+          const entry = document.querySelector(".login-wrapper,.login-page");
+          return { viewport: [innerWidth, innerHeight], entry: entry ? [entry.getBoundingClientRect().width, entry.getBoundingClientRect().height] : null };
+        };
+        const beforeScreenshot = await page.evaluate(layout);
+        // The Source clips html/body. A beyond-viewport capture of footer text
+        // can hide Chromium's native scrollbars and change subsequent metrics.
+        await page.screenshot({ animations: "disabled", path: join(artifacts, `${key}-${phase}.png`), fullPage: false });
+        assert.deepEqual(await page.evaluate(layout), beforeScreenshot, "A reference screenshot must preserve the authored viewport layout.");
+        const geometry = states[`${key}-${phase}`].entryGeometry;
+        if (geometry?.adminForm) assert.equal(geometry.height,
+          height - geometry.header - geometry.footer[1] - 14 - geometry.horizontalScrollbarHeight,
+          "Source administrator form reserves the actual native horizontal scrollbar.");
         return states[`${key}-${phase}`];
       };
       if (headerReference) {
