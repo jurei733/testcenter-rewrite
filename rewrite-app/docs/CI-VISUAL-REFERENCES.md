@@ -1,6 +1,6 @@
 # Original browser reference qualification
 
-CI renders the unmodified official Original frontend at the exact Source revision and lockfile in `scripts/fixtures/original-browser-source.json`. The producer packages only its compiled browser files with an app-commit manifest and individual SHA-256 digests. Each capture family verifies every file before and after rendering. The three families run independently and remain required for complete CI acceptance.
+CI renders the unmodified official Original frontend at the exact Source revision and lockfile in `scripts/fixtures/original-browser-source.json`. The producer packages only its compiled browser files with an app-commit manifest and individual SHA-256 digests. Each capture family verifies every file before and after rendering. The four families run independently and remain required for complete CI acceptance. The first three retain their 18 existing tasks; the administration family adds a paired settings task.
 
 Quick checks reuse committed, measured Linux reference coordinates instead of waiting for the Source capture jobs. This preserves independent feedback and all existing text, behavior, geometry and close-button pixel comparisons. The profile accepts only Linux x64, Node 22, lockfile Playwright 1.59.1, visible Chromium 147.0.7727.15 and the pinned Source revision. Other renderers cannot silently consume it. Mac retains its original references. The historical behavioral reference revision remains unchanged; the visual profile records its own newer Source provenance separately.
 
@@ -17,6 +17,26 @@ Validation at this change: 1,914 frontend tests, 99 CI policy tests, workflow ac
 Quick failures also upload the explicit browser artifact directory, alongside the complete failure log, for seven days. The shared browser flow and variant/exit gates write diagnostics there while keeping their SQLite fixture stores in a separate scratch directory. Persistent event-stream pages establish readiness through document, exact Run and completed resume assertions; they do not wait for global network idleness. Opaque controller frames are rendered before native radio input, preserving checked-state and saved-response assertions.
 
 The Source system-check welcome view retains a 1280px content toolbar on a 1280px Linux desktop; narrow views legitimately reserve a native 15px scrollbar. The rewrite now uses the Source fixed window/header/footer with scrolling inside the routed content instead of a window scrollbar that narrowed the desktop view. Login geometry capture additionally records the original entry/header/footer bounds for diagnosing the remaining Linux login discrepancies without inferring coordinates from rewrite output.
+
+## Same-run settings comparison
+
+The administration family renders the pinned compiled Source and the current
+production Rewrite in the same lockfile Chromium, with German locale, Berlin
+timezone and identical viewport/DPR. Twenty-four initial/bottom states cover both
+settings tabs in all three themes at 1280/390 by 844 px. The visible viewport is
+captured without resizing and its geometry must remain unchanged by the image.
+A shared self-contained comparator decodes both actual PNGs and checks every
+RGBA channel; malformed/different dimensions and even one changed channel fail.
+The task stores both PNGs, geometry, hashes and differences for review.
+
+Rewrite's visual contexts inherit only state from an actual protected browser
+sign-in against an owned SQLite API. Source's controlled API is read-only and
+its fixture authentication does not establish Original backend authorization.
+The captured static forms include native wheel navigation to the bottom, empty
+image assignments, all slots, notices and theme previews; editor/dialog/error
+states and full administration acceptance remain open. This comparison uses the
+same-run Source directly; the existing three-archive Linux profile and its 18
+historical renderer captures remain unchanged.
 
 ## Viewport-preserving entry capture
 

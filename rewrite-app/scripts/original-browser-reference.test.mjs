@@ -79,9 +79,9 @@ for (const change of ["corrupt", "extra", "missing", "symlink", "directory-link"
   await assert.rejects(verifyOriginalBuild(f.root));
 });
 test("capture tasks cover each renderer family without duplicate tasks or a rewrite driver", async () => {
-  assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter"]);
+  assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter", "administration"]);
   const tasks = Object.values(originalReferenceTasks).flat();
-  assert.equal(tasks.length, 18); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.equal(tasks.length, 19); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
   for (const task of tasks) {
     assert.match(task.script, /^reference-original-[\w-]+\.mjs$/);
     await readFile(new URL(task.script, import.meta.url));

@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, EventEmitter, Input, Output, inject, type OnChanges, type OnDestroy } from "@angular/core";
-import { Router, RouterLink } from "@angular/router";
+import { Router, RouterLink, RouterLinkActive } from "@angular/router";
 import { MatButton, MatFabButton, MatIconButton } from "@angular/material/button";
 import { MatCheckbox } from "@angular/material/checkbox";
 import { MatDialog, type MatDialogRef } from "@angular/material/dialog";
@@ -34,7 +34,7 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
 // existing authorization, role-assignment and workspace aggregate APIs.
 @Component({
   selector:"app-original-system-administration",standalone:true,
-  imports:[OriginalApplicationSettingsComponent,RouterLink,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
+  imports:[OriginalApplicationSettingsComponent,RouterLink,RouterLinkActive,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
     MatMenu,MatMenuTrigger,MatProgressBar,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,
     MatCellDef,MatCell,MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTabNav,MatTabLink,MatTabNavPanel,
     MatToolbar,MatTooltip,OriginalOverlayStylesComponent,OriginalAdministrationIconComponent,OriginalAdministrationSurfaceStylesComponent],

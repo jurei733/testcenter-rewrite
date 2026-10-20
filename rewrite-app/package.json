@@ -267,7 +267,7 @@
     "test:integration:memory:built": "node --test apps/api/dist/apps/api/src/integration.test.js",
     "smoke:ui:verona-development:built": "node ./scripts/smoke-verona-development.mjs",
     "smoke:compose:postgres:built": "node ./scripts/smoke-compose-postgres.mjs",
-    "test:ci-policy": "node --test scripts/ci-build-artifact.test.mjs scripts/ci-workflow.test.mjs scripts/original-browser-reference.test.mjs scripts/qualified-original-visuals.test.mjs",
+    "test:ci-policy": "node --test scripts/ci-build-artifact.test.mjs scripts/ci-workflow.test.mjs scripts/original-browser-reference.test.mjs scripts/qualified-original-visuals.test.mjs scripts/exact-rgba-comparison.test.mjs",
     "ci:browser:quick:entry:built": "npm run smoke:ui:bug-report:built && npm run smoke:ui:offline-shell:built && npm run smoke:ui:original-login:built && npm run smoke:ui:original-login-protected:built && npm run smoke:ui:original-admin-login:built && npm run smoke:ui:original-header:built && npm run smoke:ui:proof-of-work:built && npm run smoke:ui:original-administration:built",
     "ci:browser:quick:system-check:built": "npm run smoke:ui:system-check:built && npm run smoke:ui:system-check-saved:built && npm run smoke:ui:attachment-custom-text:built",
     "ci:browser:quick:participant:built": "npm run smoke:ui:original-player-exit:built && npm run smoke:ui:original-exit-completeness:built && npm run smoke:ui:original-starter-advisories:built && npm run smoke:ui:original-runtime-error:built && npm run smoke:ui:original-runtime-error-contract:built && npm run smoke:ui:original-player-version-error:built && npm run smoke:ui:original-paused-exit:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:original-starter:built && npm run smoke:ui:participant-variant:built && npm run smoke:ui:participant-entry:built && npm run smoke:ui:participant-review:built",
@@ -275,7 +275,8 @@
     "smoke:ui:original-administration:built": "node scripts/smoke-original-administration.mjs",
     "smoke:ui:original-administration": "npm run build && npm run smoke:ui:original-administration:built",
     "test:application-assets": "npm run build:core && npm run test:application-assets:built",
-    "test:application-assets:built": "node --test scripts/application-asset-cascade.test.mjs scripts/application-asset-cascade-api.test.mjs scripts/original-settings-controller.test.mjs"
+    "test:application-assets:built": "node --test scripts/application-asset-cascade.test.mjs scripts/application-asset-cascade-api.test.mjs scripts/original-settings-controller.test.mjs",
+    "reference:ui:original-administration-settings:built": "node scripts/reference-original-administration-settings.mjs"
   },
   "devDependencies": {
     "@angular/build": "21.2.26",

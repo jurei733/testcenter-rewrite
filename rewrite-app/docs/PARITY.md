@@ -1,5 +1,37 @@
 # Testcenter parity checklist
 
+### Paired settings pages and acknowledged exit baseline (2026-10-20)
+
+The new required administration reference family compares 24 complete visible
+settings viewports against the actual unchanged Source: both tabs, initial and
+natively scrolled bottom states, all three themes and 1280/390 by 844 px. The
+complete local wrapper passes with zero differing RGBA pixels and matching
+hashes. Its evidence corrects early tab activation, pagination/theme-preview
+box sizing, inherited button fonts and the unassigned-image placeholder. Actual
+protected browser actions also clear, save and reassign the undefined slot
+before checking the compatibility guard and native cascade. Every prior Source
+task remains required; the reference set grows from 18 tasks/three families to
+19/four, without changing the historical Linux profile.
+
+Published parent `2878bcfc` completes [run 39496695102](https://github.com/jurei733/testcenter-rewrite/actions/runs/39496695102)
+with 78 successful jobs; the Player-exit clock comparison and final acceptance
+fail. Dependency audit, Source, PostgreSQL and deployment gates pass. The exit
+test now observes its exact successful answer-save HTTP ACK and the client's
+completed drainer before taking the immutable answer/clock baseline. A held-ACK
+case proves that SQLite can already contain the answer while the client still
+shows saving; no answer/clock assertions are removed. All 36 Original cases,
+six Rewrite variants and missing-renderer recovery pass locally. Fresh Linux
+confirmation remains required; this does not prove that the observed ordering
+hole is the only possible cause of the prior intermittent failure.
+
+Local validation also passes 1,949 frontend checks, 121 CI/reference checks,
+development/production builds, Actionlint and the real protected administration/
+settings gate. Initial JavaScript is 467.97 kB below the unchanged 470 kB cap.
+The Source visual fixture uses read-only controlled API data; full Original
+backend authorization, edited/dialog/directory states and complete-page/cross-
+cutting acceptance remain open. Formal status stays **29 done / 20 partial**,
+with all eight broad visual rows open. Complete publication CI is pending.
+
 ### Atomic Original assigned-image removal (2026-10-20)
 
 The Original settings adapter now explicitly requests assigned-image removal.

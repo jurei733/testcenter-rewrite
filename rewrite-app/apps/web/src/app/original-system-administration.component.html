@@ -29,9 +29,12 @@
 </mat-toolbar>
 <section id="originalSystemAdministration" [attr.aria-busy]="directory.busy">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+    <!-- Router activation follows Material's pagination layout; section selects among the shared /ops links. -->
     @for (tab of sections; track tab.id) {
-      <a mat-tab-link [routerLink]="['/ops']" [queryParams]="{ui:'original',adminSection:tab.id}"
-        [active]="section === tab.id" [disabled]="directory.busy" [attr.data-cy]="'superadmin-tabs:' + tab.id"
+      <a #link="routerLinkActive" mat-tab-link routerLinkActive
+        [routerLink]="['/ops']" [queryParams]="{ui:'original',adminSection:tab.id}"
+        [routerLinkActiveOptions]="{paths:'exact',queryParams:'ignored',matrixParams:'ignored',fragment:'ignored'}"
+        [active]="link.isActive && section === tab.id" [disabled]="directory.busy" [attr.data-cy]="'superadmin-tabs:' + tab.id"
         (click)="choose(tab.id)"><h2>{{ tab.label }}</h2></a>
     }
   </nav>

@@ -119,6 +119,9 @@ export const originalReferenceTasks = {
     task("paused", "reference-original-paused-exit.mjs"),
     task("paused-locked", "reference-original-paused-exit.mjs", { ORIGINAL_PAUSED_LOCK_ONLY: "true" }),
     task("advisories", "reference-original-starter-advisories.mjs")
+  ],
+  administration: [
+    task("settings", "reference-original-administration-settings.mjs", {}, "settings.json")
   ]
 };
 function measurementOnly(value) {

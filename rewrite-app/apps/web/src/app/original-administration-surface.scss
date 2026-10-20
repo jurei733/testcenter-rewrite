@@ -9,6 +9,9 @@
 :root[data-interface-mode='original'] app-ops-view:has(#originalSystemAdministration) {
   display:flex; flex:1; flex-direction:column; min-height:0; overflow:hidden;
 }
+:root[data-interface-mode='original'] #originalSystemAdministration .mat-mdc-tab-header-pagination-chevron {
+  box-sizing:content-box;
+}
 :root[data-interface-mode='original'] .original-administration-account-menu {
   width:330px; padding:12px;
   font:16px 'Nunito Sans',sans-serif;

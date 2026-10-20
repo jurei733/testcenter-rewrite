@@ -114,7 +114,7 @@ export class OriginalApplicationSettingsController {
       for(const key of Object.keys(changes))this.customTextChanges.delete(key);
     },"Textersetzungen gespeichert");
   }
-  setAssignment(slot:ApplicationAssetSlotName,name:string):void{
+  setAssignment(slot:ApplicationAssetSlotName,name:string|undefined):void{
     if(this.busy)return;this.assignments={...this.assignments};
     if(name)this.assignments[slot]=name;else delete this.assignments[slot];this.changed();
   }
