@@ -98,13 +98,100 @@ jobs:
       - run: npm run test:unit:built && npm run test:parity:terminal-overlap:built
 
   quick:
-    name: verify-memory-sqlite (ui-quick)
+    name: verify-memory-sqlite (ui-quick-${{ matrix.check }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      UI_SMOKE_HEADFUL: "true"
     defaults:
       run:
         working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: bug-report
+            group: entry
+            command: npm run smoke:ui:bug-report:built
+          - check: offline-shell
+            group: entry
+            command: npm run smoke:ui:offline-shell:built
+          - check: original-login
+            group: entry
+            command: npm run smoke:ui:original-login:built
+          - check: original-login-protected
+            group: entry
+            command: npm run smoke:ui:original-login-protected:built
+          - check: original-admin-login
+            group: entry
+            command: npm run smoke:ui:original-admin-login:built
+          - check: original-header
+            group: entry
+            command: npm run smoke:ui:original-header:built
+          - check: proof-of-work
+            group: entry
+            command: npm run smoke:ui:proof-of-work:built
+          - check: system-check
+            group: system-check
+            command: npm run smoke:ui:system-check:built
+          - check: system-check-saved
+            group: system-check
+            command: npm run smoke:ui:system-check-saved:built
+          - check: attachment-custom-text
+            group: system-check
+            command: npm run smoke:ui:attachment-custom-text:built
+          - check: original-player-exit
+            group: participant
+            command: npm run smoke:ui:original-player-exit:built
+          - check: original-exit-completeness
+            group: participant
+            command: npm run smoke:ui:original-exit-completeness:built
+          - check: original-starter-advisories
+            group: participant
+            command: npm run smoke:ui:original-starter-advisories:built
+          - check: original-runtime-error
+            group: participant
+            command: npm run smoke:ui:original-runtime-error:built
+          - check: original-runtime-error-contract
+            group: participant
+            command: npm run smoke:ui:original-runtime-error-contract:built
+          - check: original-player-version-error
+            group: participant
+            command: npm run smoke:ui:original-player-version-error:built
+          - check: original-paused-exit
+            group: participant
+            command: npm run smoke:ui:original-paused-exit:built
+          - check: participant-debug
+            group: participant
+            command: npm run smoke:ui:participant-debug:built
+          - check: original-starter
+            group: participant
+            command: npm run smoke:ui:original-starter:built
+          - check: participant-variant
+            group: participant
+            command: npm run smoke:ui:participant-variant:built
+          - check: participant-entry
+            group: participant
+            command: npm run smoke:ui:participant-entry:built
+          - check: participant-review
+            group: participant
+            command: npm run smoke:ui:participant-review:built
+          - check: content
+            group: content
+            command: npm run smoke:ui:content:built
+          - check: json-roster
+            group: content
+            command: npm run smoke:ui:json-roster:built
+          - check: verona-player
+            group: content
+            command: npm run smoke:ui:verona-player:built
+          - check: ib-player
+            group: content
+            command: npm run smoke:ui:ib-player:built
+          - check: activation-roster-warnings
+            group: content
+            command: npm run smoke:ui:activation-roster-warnings:built
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -114,12 +201,13 @@ jobs:
           prebuilt: "true"
           playwright: "true"
       - name: Run Quick browser gates
-        run: npm run ci:browser:quick:built 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
+        shell: bash
+        run: xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"
       - name: Retain failed Quick browser log
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ui-quick-diagnostics
+          name: ui-quick-${{ matrix.check }}-diagnostics
           path: ${{ runner.temp }}/rewrite-ui-quick.log
           if-no-files-found: warn
           retention-days: 7

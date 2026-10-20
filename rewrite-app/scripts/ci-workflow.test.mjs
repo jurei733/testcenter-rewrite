@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
 
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -17,11 +18,50 @@ function expand(command, trail = []) {
   });
 }
 const matrix = workflow.jobs["verify-memory-sqlite"].strategy.matrix.include;
-const commands = [...matrix.map(item => item.command), ...Object.values(workflow.jobs).flatMap(job =>
-  (job.steps ?? []).map(step => step.run).filter(run => typeof run === "string" && run.includes("npm run")))];
+const commands = Object.values(workflow.jobs).flatMap(job => [
+  ...(job.strategy?.matrix?.include ?? []).map(item => item.command).filter(command => typeof command === "string"),
+  ...(job.steps ?? []).map(step => step.run).filter(run => typeof run === "string" && run.includes("npm run"))
+]);
 const leaves = commands.flatMap(command => expand(command.replace(/ 2>&1 \| tee[^\n]+/g, ""))
   .split("&&").map(value => value.trim().replace(/\s+/g, " ")).filter(Boolean));
 const environmentPreludes = baseline.additional.flatMap(item => item.leaves).filter(leaf => leaf.endsWith("\\"));
+test("Quick logs retain an upstream test failure instead of reporting tee success", () => {
+  const step = workflow.jobs.quick.steps.find(step => step.run?.includes("| tee"));
+  assert.equal(step.shell, "bash", "GitHub's implicit bash -e shell does not enable pipefail");
+  // GitHub's explicit bash shell is bash --noprofile --norc -e -o pipefail.
+  // Reproduce a failing test piped through the exact logging command without
+  // invoking the full browser suite or depending on its eventual runtime.
+  const command = step.run.replace("${{ matrix.command }}", "(echo owned-failure; exit 37)")
+    .replace("xvfb-run --auto-servernum ", "")
+    .replace('"$RUNNER_TEMP/rewrite-ui-quick.log"', "/dev/null");
+  const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", command], { encoding: "utf8" });
+  assert.equal(result.status, 37); assert.match(result.stdout, /owned-failure/);
+  const implicit = spawnSync("bash", ["-e", "-c", command], { encoding: "utf8" });
+  assert.equal(implicit.status, 0, "The old implicit shell must reproduce the false green");
+});
+test("all Quick browser scenarios run once across independent shards, each required by fast feedback", () => {
+  const quick = workflow.jobs.quick;
+  const shards = quick.strategy.matrix.include;
+  assert.equal(quick.strategy["fail-fast"], false);
+  assert.deepEqual([...new Set(shards.map(item => item.group))], ["entry", "system-check", "participant", "content"]);
+  assert.equal(shards.length, 27);
+  assert.equal(new Set(shards.map(item => item.check)).size, shards.length);
+  const split = command => expand(command).split("&&").map(value => value.trim()).filter(Boolean);
+  const complete = split("npm run ci:browser:quick:built");
+  const distributed = shards.flatMap(item => split(item.command));
+  assert.deepEqual([...distributed].sort(), [...complete].sort());
+  assert.equal(new Set(distributed).size, distributed.length, "Quick scenarios must not be duplicated across shards");
+  for (const group of ["entry", "system-check", "participant", "content"]) {
+    assert.deepEqual(shards.filter(item => item.group === group).flatMap(item => split(item.command)).sort(),
+      split(`npm run ci:browser:quick:${group}:built`).sort());
+  }
+  assert.equal(quick.steps.find(step => step.run?.includes("| tee")).run, 'xvfb-run --auto-servernum ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/rewrite-ui-quick.log"');
+  assert.equal(quick.env.UI_SMOKE_HEADFUL, "true", "Source visual measurements use a visible Chromium renderer");
+  const log = quick.steps.find(step => step.name === "Retain failed Quick browser log");
+  assert.equal(log.if, "failure()"); assert.match(log.with.name, /matrix\.check/);
+  assert.ok(workflow.jobs["fast-feedback"].needs.includes("quick"));
+  assert.ok(workflow.jobs.acceptance.needs.includes("quick"));
+});
 function extendsExplicitTestFiles(previous, current) {
   const files = command => {
     if (!command.startsWith("node --test ")) return null;

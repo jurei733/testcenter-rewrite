@@ -8,21 +8,21 @@ const source=readFileSync(new URL('../apps/web/src/app/participant-native-comman
 const ast=ts.createSourceFile('native.ts',source,ts.ScriptTarget.Latest,true);
 assert.equal(ast.parseDiagnostics.length,0,'The real native transport must parse before extracting it for execution.');
 const statements=ast.statements.filter(node=>!ts.isImportDeclaration(node)).map(node=>node.getText(ast).replace(/^export /,''));
-const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest)=>{'+statements.join('\n')+';return Object.assign(createParticipantNativeCommands,{next:nextParticipantControllerDispatch,received:receivedParticipantControllerDispatch});};',
+const compiled=ts.transpileModule('export const load=(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,readParticipantSessionCredential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest,crypto=globalThis.crypto)=>{'+statements.join('\n')+';return Object.assign(createParticipantNativeCommands,{next:nextParticipantControllerDispatch,received:receivedParticipantControllerDispatch});};',
  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {load}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const scope={tenantId:'owned',workspaceId:'workspace',participantSessionId:'participant',testRunId:'run',contentReleaseId:'release',bookletKey:'booklet'};
 const deferred=()=>{let resolve;return {promise:new Promise(done=>resolve=done),get resolve(){return resolve;}};};
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve();};
-function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING',started,captureTimer}={}){
+function fixture({values=new Map(),owner='owned-tab',respond,prepare,browserWindow,controllerStatus=()=> 'RUNNING',started,captureTimer,webCrypto,nativeIdentity=false}={}){
  let state={testRun:{...scope}},generation=0,credential='Owned credential',time=0,id=0;const calls=[],applied=[],failures=[],timers=[],listeners=new Map(),prepared=[];
  const storage={get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
- const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest);
+ const create=load(participantNativeCommandRoute,participantNativeCommandKeywords,resolveRoutePath,()=>credential,isParticipantControllerDispatch,isParticipantControllerDispatches,participantControllerTimerInterruptionRoute,isParticipantControllerTimerInterruptionRequest,webCrypto);
  const receipt=body=>body.testletKey?{interruption:{...body,scope:{...scope},applied:true,acceptedAt:'2026-10-12T00:00:00.000Z'}}:({application:{...body,scope:{...scope},applied:true,executedAt:'2026-10-12T00:00:00.000Z',testRun:{...scope},participantSession:{tenantId:scope.tenantId,workspaceId:scope.workspaceId,participantSessionId:scope.participantSessionId}}});
  const options={...(owner===null?{}:{ownerId:owner}),readState:()=>state,controllerStatus,started,captureTimer,generation:()=>generation,
   prepare:async current=>{prepared.push(current);if(prepare)await prepare(current);},applied:async(value,current)=>{if(current())applied.push(value);},failed:error=>failures.push(error.message),storage,
   window:browserWindow??{addEventListener:(k,v)=>listeners.set(k,v),removeEventListener:(k,v)=>{if(listeners.get(k)===v)listeners.delete(k);}},
-  now:()=>1791763200123,id:()=>`owned-${++id}`,schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
+  now:()=>1791763200123,...(nativeIdentity?{}:{id:()=>`owned-${++id}`}),schedule:(callback,delay)=>{const timer={at:time+delay,callback,canceled:false};timers.push(timer);return()=>timer.canceled=true;},
   fetch:async(url,request)=>{calls.push({url,request});const body=JSON.parse(request.body);return respond?respond(body,calls.length,receipt):{ok:true,json:async()=>receipt(body)};}};
  const native=create(options);
  const advance=async(next=time)=>{time=next;for(const t of timers.slice())if(!t.canceled&&t.at<=time){t.canceled=true;t.callback();}await flush();};
@@ -120,6 +120,42 @@ const documentFor=({session=new Map(),type='navigate',denied=false}={})=>{
   addEventListener:(name,callback)=>{if(!events.has(name))events.set(name,new Set());events.get(name).add(callback);},removeEventListener:(name,callback)=>events.get(name)?.delete(callback)};
  return {window,session,events,event:name=>{for(const callback of events.get(name)??[])callback();}};
 };
+test('HTTP without randomUUID creates separate RFC 4122 v4 document and delivery identities with CSPRNG bytes',async()=>{
+ let samples=0;
+ const webCrypto={getRandomValues(bytes){assert.equal(bytes.length,16);bytes.fill(++samples);return bytes;}};
+ const doc=documentFor(),f=fixture({owner:null,browserWindow:doc.window,webCrypto,nativeIdentity:true});
+ try{
+  const owner=doc.session.get(ownerKey);
+  assert.equal(owner,'01010101-0101-4101-8101-010101010101');
+  f.native.command('pause',[]);await f.advance();f.native.command('resume',[]);await f.advance();
+  const packets=f.calls.map(call=>JSON.parse(call.request.body));
+  assert.deepEqual(packets.map(packet=>packet.deliveryId),['02020202-0202-4202-8202-020202020202','03030303-0303-4303-8303-030303030303']);
+  assert.ok(packets.every(packet=>packet.controllerDispatch.controllerId===owner));
+  assert.deepEqual(packets.map(packet=>packet.controllerDispatch.sequence),[1,2]);
+  assert.equal(f.applied.length,2);assert.equal(samples,3);assert.deepEqual(f.failures,[]);
+ }finally{f.native.stop();}
+});
+for(const denied of [false,true])test(`HTTP CSPRNG identities retain durable retries and document ownership (storage denied=${denied})`,async()=>{
+ const webCrypto={getRandomValues:bytes=>globalThis.crypto.getRandomValues(bytes)};
+ const doc=documentFor({denied}),f=fixture({owner:null,browserWindow:doc.window,webCrypto,nativeIdentity:true,respond:async()=>{throw Error('Offline');}});
+ try{
+  f.native.command('pause',[]);await f.advance();await f.advance(1000);
+  assert.equal(f.calls.length,2);assert.equal(f.calls[0].request.body,f.calls[1].request.body);
+  const packet=JSON.parse(f.calls[0].request.body);
+  for(const value of [packet.deliveryId,packet.controllerDispatch.controllerId])assert.match(value,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.notEqual(packet.deliveryId,packet.controllerDispatch.controllerId);
+  const next=f.create({...f.options,ownerId:undefined,readState:()=>null});next.stop();
+  assert.equal(denied?undefined:doc.session.get(ownerKey),denied?undefined:packet.controllerDispatch.controllerId);
+ }finally{f.native.stop();}
+});
+test('native randomUUID stays the identity source when it is available',async()=>{
+ let samples=0;
+ const webCrypto={randomUUID(){return `owned-native-${++samples}`;},getRandomValues(){throw Error('Native UUID must be preferred');}};
+ const doc=documentFor(),f=fixture({owner:null,browserWindow:doc.window,webCrypto,nativeIdentity:true});
+ try{f.native.command('pause',[]);await f.advance();const packet=JSON.parse(f.calls[0].request.body);
+  assert.equal(doc.session.get(ownerKey),'owned-native-1');assert.equal(packet.deliveryId,'owned-native-2');assert.equal(f.applied.length,1);
+ }finally{f.native.stop();}
+});
 test('a cloned live document cannot replay or cancel the original tab even after an early reload',async()=>{
  const first=documentFor(),f=fixture({owner:null,browserWindow:first.window,respond:async()=>{throw Error('Offline');}});
  try{f.native.command('pause',[]);await f.advance();const packet=[...f.values.values()][0];
