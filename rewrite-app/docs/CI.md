@@ -157,6 +157,25 @@ platform-specific references are qualified. The source jobs are also required
 by complete acceptance. Collecting evidence does not itself close any full-page
 Original UI acceptance row.
 
+The first hosted capture at `629eea05`, run `39428558228`, passes the pinned
+build and all three families (16 Source tasks). Its Linux tooltip width is
+94.859375; its HTTPS notice is 719.078125 wide and 46 high. Those are exactly
+the values rejected by the old Mac references in the rewrite jobs. The three
+downloaded capture archives match their GitHub artifact SHA-256 digests.
+This proves the calibration issue; consuming qualified Linux values remains
+separate work, and the rewrite comparisons are still required.
+
+The variant browser gate also contained a deterministic fixture race: a visible
+resumed answer did not prove that the command's completion write had finished.
+The final competing background save now follows the exact accepted command ID's
+real completion response, retaining the earlier overlapping writes. The legacy
+latest-by-updatedAt assertion and selected-Run/answer assertions remain strict.
+Original uses its visible logo to return, the browser's reload for its raw-text
+extension, and its visible paused panel; the hidden Rewrite toolbar/status is
+not treated as an Original user control. The complete gate passes both renderer
+modes locally, in both interfaces and all three non-saving entry modes, with
+actual SQLite/authenticated requests and trace artifacts.
+
 ## Local verification
 
 Use Node 22. Run `npm run test:ci-policy`, `npm audit --audit-level=high` and
