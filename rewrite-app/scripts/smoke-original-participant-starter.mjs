@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -31,7 +32,7 @@ let browser;
 const errors = [];
 const metrics = {};
 const toastMetrics = {};
-const toastReference = JSON.parse(await readFile(new URL("./fixtures/original-starter-review-toasts.json", import.meta.url),"utf8"));
+const toastReference = await loadOriginalVisualReference("original-starter-review-toasts");
 assert.equal(toastReference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 assert.equal(Object.keys(toastReference.states).length,18);
 const closeEnough = (actual, expected, name) =>
@@ -115,6 +116,7 @@ try {
   }
   const headful = ["1", "true", "yes", "on"].includes(String(process.env.UI_SMOKE_HEADFUL || "").toLowerCase());
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful });
+  assertOriginalVisualBrowser(browser, toastReference);
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
     for (const [state, fixture] of Object.entries(fixtures)) {

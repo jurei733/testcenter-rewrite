@@ -57,6 +57,7 @@ export async function verifyOriginalBuild(root) {
 const task = (name, script, environment = {}, output = "exit.json") => ({ name, script, environment, output });
 export const originalReferenceTasks = {
   entry: [
+    task("system-check-welcome", "reference-original-system-check-welcome.mjs", {}, "welcome.json"),
     task("login", "reference-original-participant-login-focus.mjs", {}, "focus.json"),
     task("insecure-participant", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_INSECURE: "true" }, "focus.json"),
     task("insecure-admin", "reference-original-participant-login-focus.mjs", { ORIGINAL_LOGIN_REFERENCE_INSECURE: "true", ORIGINAL_LOGIN_REFERENCE_ENTRY: "admin" }, "focus.json"),
@@ -67,6 +68,7 @@ export const originalReferenceTasks = {
   dialogs: [
     task("exit", "reference-original-player-exit.mjs"),
     task("completeness", "reference-original-player-exit.mjs", { REFERENCE_COMPLETENESS: "true" }),
+    task("legacy-completeness", "reference-original-player-exit.mjs", { REFERENCE_COMPLETENESS: "true", REFERENCE_LEGACY_PROGRESS: "true" }),
     task("runtime", "reference-original-runtime-error.mjs"),
     task("runtime-contract", "reference-original-runtime-error.mjs", { ORIGINAL_RUNTIME_CONTRACT: "true" }),
     task("version-missing", "reference-original-player-version-error.mjs", { ORIGINAL_PLAYER_VERSION_ERROR: "missing" }),

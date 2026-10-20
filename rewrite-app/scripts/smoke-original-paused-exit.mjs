@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -13,7 +14,7 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root,"dist/apps/web/browser/index.html"));
-const reference=JSON.parse(await readFile(new URL("./fixtures/original-paused-exit.json",import.meta.url),"utf8"));
+const reference = await loadOriginalVisualReference("original-paused-exit");
 assert.equal(reference.referenceRevision,"ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 const artifacts = await mkdtemp(join(tmpdir(),"testcenter-paused-exit-"));
 console.log(`owned_artifacts=${artifacts}`);
@@ -64,6 +65,7 @@ try {
     fixtures.set(key,{workspaceKey,workspace});
   }
   browser=await chromium.launch({headless:process.env.CI==="true"&&process.env.UI_SMOKE_HEADFUL!=="true"});
+  assertOriginalVisualBrowser(browser, reference);
   for(const [key,expected] of Object.entries(reference.cases)) {
     if(process.env.UI_SMOKE_ONLY_CASE&&key!==process.env.UI_SMOKE_ONLY_CASE)continue;
     const [,theme,screen,leave,silentText]=key.match(/^(run-hot-return|run-hot-restart)-(Primar|Sekundar|Erwachsene)-(desktop|mobile)-(allowed|confirm|forbidden)-(false|true)(?:-locked)?$/).slice(1);

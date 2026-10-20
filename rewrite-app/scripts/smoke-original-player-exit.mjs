@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
@@ -15,7 +16,7 @@ const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-original-player-exit-"));
 console.log(`owned_artifacts=${artifacts}`);
-const reference = JSON.parse(await readFile(new URL("./fixtures/original-player-exit.json", import.meta.url), "utf8"));
+const reference = await loadOriginalVisualReference("original-player-exit");
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
 const serverFailureGate = createServerRequestFailureGate();
 const apiModule = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -73,6 +74,7 @@ try {
     fixtures[key]={workspaceKey,hidden,restriction};
   }
   browser=await chromium.launch({headless:process.env.CI==="true" && process.env.UI_SMOKE_HEADFUL!=="true"});
+  assertOriginalVisualBrowser(browser, reference);
   for(const theme of themes) {
     await api("/api/v1/admin/application-settings",{themeName:theme},operatorToken,"PATCH");
     for(const [screen,width,height] of screens) for(const [fixtureKey,fixture] of Object.entries(fixtures)) {

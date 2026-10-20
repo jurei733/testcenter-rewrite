@@ -1,3 +1,4 @@
+import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdtemp, readFile } from "node:fs/promises";
@@ -9,7 +10,7 @@ import { chromium } from "playwright";
 
 // Own the API/database; never consume or reset the interactive port 4311.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
-const noticeReference = JSON.parse(await readFile(new URL("./fixtures/original-login-notices.json", import.meta.url), "utf8"));
+const noticeReference = await loadOriginalVisualReference("original-login-notices");
 const readNotice = element => {
   const box = el => { const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, color: style.color,
@@ -66,6 +67,7 @@ try {
   browser = await chromium.launch({ headless: process.env.CI === "true" && !headful,
     ...(process.env.UI_SMOKE_BROWSER_CHANNEL ? { channel: process.env.UI_SMOKE_BROWSER_CHANNEL } : {}),
     args: ["--host-resolver-rules=MAP testcenter-proof.insecure 127.0.0.1"] });
+  assertOriginalVisualBrowser(browser, noticeReference);
   const protectedParticipant = String(process.env.FIRST_SLICE_PROOF_OF_WORK_SCOPES || "").split(/[\s,]+/u).includes("participant");
   for (const theme of ["Primar", "Sekundar", "Erwachsene"]) {
     await api("/api/v1/admin/application-settings", { themeName: theme }, "PATCH");
