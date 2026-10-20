@@ -107,3 +107,28 @@
   display: block;
   line-height: 0;
 }
+
+/* Source Systemcheck keeps window/header/footer fixed and scrolls its routed
+   content. A window scrollbar incorrectly narrows even the desktop toolbar. */
+:root[data-interface-mode="original"]:has(.original-system-check-shell),
+:root[data-interface-mode="original"] body:has(.original-system-check-shell) {
+  height: 100%;
+  overflow: hidden;
+}
+:root[data-interface-mode="original"] .page:has(.original-system-check-shell) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+}
+:root[data-interface-mode="original"] .participant-stage:has(.original-system-check-shell) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+:root[data-interface-mode="original"] app-system-check-view:has(.original-system-check-shell) {
+  flex: 1;
+  min-width: 0;
+}
