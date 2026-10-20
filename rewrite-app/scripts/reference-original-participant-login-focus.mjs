@@ -116,6 +116,17 @@ try {
             nameValue: document.querySelector("input[formcontrolname=name]")?.value ?? null,
             passwordEmpty: document.querySelector("input[formcontrolname=pw]")?.value === "" };
         });
+        if (!starterReference) states[`${key}-${phase}`].entryGeometry = await page.evaluate(() => {
+          const entry = document.querySelector(".login-wrapper") ?? document.querySelector(".login-page");
+          const footer = document.querySelector("tc-footer").getBoundingClientRect();
+          const bounds = entry.getBoundingClientRect();
+          const version = document.createRange();
+          version.selectNodeContents(document.querySelector("tc-footer .version-label"));
+          return { width: bounds.width, height: bounds.height, footer: [footer.y, footer.height],
+            documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+            versionBottom: version.getBoundingClientRect().bottom,
+            header: document.querySelector("tc-header mat-toolbar").getBoundingClientRect().height };
+        });
         await page.screenshot({animations: "disabled",  path: join(artifacts, `${key}-${phase}.png`), fullPage: true });
         return states[`${key}-${phase}`];
       };

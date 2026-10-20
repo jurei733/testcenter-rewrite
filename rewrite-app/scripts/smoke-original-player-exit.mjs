@@ -1,7 +1,7 @@
 import { loadOriginalVisualReference, assertOriginalVisualBrowser } from "./qualified-original-visuals.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -14,7 +14,9 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 // The Source dialog reference uses the same owned synthetic player/booklet.
 const frontendRoot = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(frontendRoot, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-original-player-exit-"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-original-player-exit-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR) : scratch;
+await mkdir(artifacts, { recursive: true });
 console.log(`owned_artifacts=${artifacts}`);
 const reference = await loadOriginalVisualReference("original-player-exit");
 assert.equal(reference.referenceRevision, "ee2ab9ab64bd91209ef8534bbe6005838024e46d");
@@ -28,7 +30,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 `], {
   cwd: frontendRoot,
   env: {...process.env, PORT:"4310", FIRST_SLICE_STORE:"sqlite",
-    FIRST_SLICE_SQLITE_FILE:join(artifacts,"store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO:"true",
+    FIRST_SLICE_SQLITE_FILE:join(scratch,"store.sqlite"), FIRST_SLICE_BOOTSTRAP_DEMO:"true",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED:"true", FIRST_SLICE_PROOF_OF_WORK_SCOPES:"",
     FIRST_SLICE_XML_SCHEMA_PROFILE:"legacy-compatibility", REQUIRE_LOGIN_PASSWORD:"false"},
   stdio:["ignore","pipe","pipe","ipc"]

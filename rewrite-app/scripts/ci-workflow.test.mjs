@@ -63,6 +63,10 @@ test("all Quick browser scenarios run once across independent shards, each requi
   assert.equal(quick.env.UI_SMOKE_HEADFUL, "true", "Source visual measurements use a visible Chromium renderer");
   const log = quick.steps.find(step => step.name === "Retain failed Quick browser log");
   assert.equal(log.if, "failure()"); assert.match(log.with.name, /matrix\.check/);
+  const browserArtifacts = quick.steps.find(step => step.run?.includes("| tee")).env.UI_SMOKE_ARTIFACT_DIR;
+  assert.equal(browserArtifacts, "${{ runner.temp }}/rewrite-ui-artifacts");
+  assert.ok(log.with.path.includes(browserArtifacts + "/"));
+  assert.ok(log.with.path.includes("rewrite-ui-quick.log"));
   assert.ok(workflow.jobs["fast-feedback"].needs.includes("quick"));
   assert.ok(workflow.jobs.acceptance.needs.includes("quick"));
 });
