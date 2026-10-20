@@ -73,6 +73,10 @@ try {
     await page.goto(`${baseUrl}/app/system-check?ui=original&tenantKey=ack-tenant&workspaceKey=ack-workspace&checkId=ACK.SAMPLE`, { waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
     await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden",
+      "A fresh Original Systemcheck must load its window/route styles without visiting login first.");
+    assert.equal(await page.locator(".system-check-navigation").count(), 0,
+      "Original navigation is owned by its header and report controls.");
     // Values verified against the unmodified 19.0 frontend, not a screenshot
     // of this adaptation. Scope the assertions to the matched welcome state.
     for (const [screen, width, height] of [["desktop", 1280, 720], ["mobile", 390, 844], ["toolbar-small", 599, 844], ["toolbar-large", 600, 844]]) {

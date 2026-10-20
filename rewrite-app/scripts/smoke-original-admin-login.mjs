@@ -126,9 +126,12 @@ try {
       const geometry = await root.evaluate(element => {
         const b = element.getBoundingClientRect(), card = element.querySelector("mat-card");
         const footer = document.querySelector("#originalApplicationFooter").getBoundingClientRect();
+        const scroller = element.closest(".home-stage"), border = getComputedStyle(scroller);
+        const horizontalScrollbarHeight = scroller.offsetHeight - scroller.clientHeight -
+          parseFloat(border.borderTopWidth) - parseFloat(border.borderBottomWidth);
         const versionText = document.createRange();
         versionText.selectNodeContents(document.querySelector("#originalApplicationFooter .version-label"));
-        return { width: b.width, height: b.height, footer: [footer.y, footer.height],
+        return { width: b.width, height: b.height, horizontalScrollbarHeight, footer: [footer.y, footer.height],
           versionBottom: versionText.getBoundingClientRect().bottom,
           documentHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
           header: document.querySelector("#participantApplicationHeader").getBoundingClientRect().height,
@@ -137,7 +140,7 @@ try {
           extraHero: Boolean(document.querySelector(".hero")), extraNavigation: Boolean(document.querySelector(".view-nav")),
           passwordSuffix: Boolean(element.querySelector(".mat-mdc-form-field-icon-suffix")) };
       });
-      assert.equal(geometry.height, height - (width < 600 ? 56 : 64) - 56 - 14);
+      assert.equal(geometry.height, height - (width < 600 ? 56 : 64) - 56 - 14 - geometry.horizontalScrollbarHeight);
       assert.ok(Math.abs(geometry.width - width * .98) <= 1 / 64);
       assert.deepEqual(geometry.footer, [height - 56, 56]);
       assert.ok(geometry.versionBottom <= geometry.documentHeight + 1,

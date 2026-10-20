@@ -2642,6 +2642,14 @@ try {
     });
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     const originalChoices = page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}']`);
+    const returnToOriginalSystemCheckSelection = async () => {
+      // Source returns through its native home logo and Systemcheck entry.
+      // It offers no Rewrite "Choose Another Check" row in the check body.
+      await page.locator("#participantApplicationLogoButton").click();
+      await page.waitForURL(url => url.pathname === "/app/home");
+      await page.locator("#startSystemCheck").click();
+      await originalChoices.first().waitFor();
+    };
     await originalChoices.first().waitFor();
     assert.equal(await originalChoices.count(), 4);
     assert.equal(await page.locator("#systemCheckTenantKey").count(), 0);
@@ -2726,7 +2734,7 @@ try {
     await page.locator("#syscheck-previous-step").click();
     await page.reload({ waitUntil: "networkidle" });
     await page.locator("#originalSystemCheckWelcome").waitFor();
-    await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+    await returnToOriginalSystemCheckSelection();
     await originalChoices.first().waitFor();
     await page.waitForURL(url => !url.searchParams.has("checkId"));
     const networkPageErrors = [];
@@ -2781,7 +2789,8 @@ try {
           await page.locator("#participantApplicationLogoButton").click();
           await page.waitForURL(url => url.pathname === "/app/home");
         } else {
-          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+          if (interfaceName === "original") await returnToOriginalSystemCheckSelection();
+          else await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
           const choice = interfaceName === "original"
             ? page.locator(`#originalSystemCheckStarter button[data-system-check-id='${noSaveSystemCheckId}']`)
             : page.locator(`[data-system-check-id='${noSaveSystemCheckId}']`);
@@ -2798,7 +2807,8 @@ try {
           await page.locator(interfaceName === "original" ? "#syscheck-next-step" : "#systemCheckNextButton").click();
           assert.equal(await page.getByRole("textbox", { name: /Assigned device/ }).inputValue(), "",
             "The new check has its own clean answers, not late state from the cancelled check");
-          await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
+          if (interfaceName === "original") await returnToOriginalSystemCheckSelection();
+          else await page.getByRole("button", { name: "Choose Another Check", exact: true }).click();
         }
       } finally {
         clearTimeout(interceptionTimeout);

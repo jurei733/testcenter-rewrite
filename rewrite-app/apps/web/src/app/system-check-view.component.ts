@@ -427,7 +427,7 @@ const readSystemCheckUnitResponse = (
           </section>
         </article>
 
-        <div class="actions system-check-navigation" *ngIf="interfaceMode.mode() !== 'original' || step !== 'report'">
+        <div class="actions system-check-navigation" *ngIf="interfaceMode.mode() !== 'original'">
           <button id="systemCheckBackButton" class="ghost" type="button" *ngIf="interfaceMode.mode() !== 'original'" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
           <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report' && interfaceMode.mode() !== 'original'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
           <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>
