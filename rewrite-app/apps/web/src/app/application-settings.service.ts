@@ -123,6 +123,9 @@ export class ApplicationSettingsService {
     return `${productionApiRoutes.system.getApplicationAsset}?originalName=${encodeURIComponent(originalName)}`;
   }
 
+  /** Accept an already verified, current-session response from a settings editor. */
+  applyServerSettings(settings: ApplicationSettings): void { this.apply(settings); }
+
   private apply(settings: ApplicationSettings): void {
     this.settings.set({ ...settings, assetAssignments: settings.assetAssignments ?? {} });
     this.loaded.set(true);

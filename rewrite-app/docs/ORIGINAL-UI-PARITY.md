@@ -1,5 +1,60 @@
 # Optional Original UI
 
+### Original application settings controls (2026-10-20)
+
+The Original Systemverwaltung settings tab now loads its German Allgemein and
+Bildersetzungen forms, with the pinned Source grouping/order/labels/defaults for
+all 102 text replacements, separate general/text/image-assignment saves, warning
+calendar day/hour, public notices, audience themes and the eight asset slots.
+The existing protected settings/assets API is unchanged. New settings actions
+capture the administrator before any asynchronous work, including FileReader;
+retired replies cannot apply the global title/theme or dispatch a later write.
+Separate saves read current settings and retain the required title/warning fields,
+unknown custom-text overrides and unsaved edits in the other editor. The existing
+full-map endpoint still has no concurrent merge/CAS contract; cross-client races
+between that read and replacement write are not qualified as Source equivalence.
+
+Nine focused tests cover the complete Source catalog, authored whitespace and
+empty-to-default input, separate drafts/saves, retry, retired reads and file reads,
+and local date/hour conversion. The real production Angular/owned-SQLite browser
+gate saves general/legal/theme/warning fields, all three editor categories, uploads
+an actual image, assigns/unassigns it, checks the existing in-use rejection and
+deletes it. It also proves live title/theme updates and retains twelve settings
+captures plus the twelve administration captures across three themes and both
+viewports. These captures are diagnostic; whole-page pixel acceptance remains open.
+A direct unchanged Source capture exposed Rewrite's inherited 12-pixel column gap
+and a calendar-suffix difference; the renderer now retains the actual Source
+component's layout/imports. The Material date input still supports manual/keyboard
+entry as in Source. Local Source capture uses owned read-only API fixtures; it does
+not establish Original backend authorization. Material tab captures wait for the
+active body to finish translating and for outgoing portals to detach; a pair of
+frames alone can still capture the transition. Each narrow case starts with a
+fresh page, matching the Source reference rather than a resized desktop tab bar.
+The twelve local paired neutral captures still have nonzero pixel differences;
+the narrow outer navigation is offset by 45 pixels and other header/control states
+remain to be aligned. No exact full-page image acceptance is claimed.
+
+The existing in-use asset guard remains authoritative: assigned or roster-referenced
+images require unassignment before deletion. Original backend deletion cascades
+assignments, so that behavior remains a functional difference. Persistent notices
+still need the Original toast presentation. Non-platform workspace administration,
+full paired-page qualification and the other formal parity requirements remain open;
+this slice does not close a full-page row. The administrator capability is reopened
+as partial after this Source audit, leaving 29 done / 20 partial formal areas.
+
+Published e2304c30 exposed two obsolete tests that looked for Rewrite batch controls
+inside the new Original administration. The deletion gate now retains Rewrite batch
+coverage in both viewports and exercises actual Original single-account actions,
+cancellation/focus, wrong-password retry, held-DELETE protection, acknowledged cache,
+failed subsequent reload and missing-renderer recovery. XML intake uses the actual
+Original home link to reach workspace controls. Both complete local gates pass.
+The native-tab journal gate now keeps old-document retries unavailable until reload
+commit; otherwise an already accepted retry could clear the journal before its
+request checkpoint. It retains exact packets, owner/run/answers/clocks and completion
+assertions, and passes the complete local crash/tab/reload journey. No runtime change
+was introduced for that fixture ordering correction. Fresh publication CI remains
+required; historical green fast feedback alone is not full acceptance.
+
 ### Original system administration adapter (2026-10-20)
 
 The optional Original interface now mounts the German Material Systemverwaltung
@@ -37,7 +92,7 @@ server password gate and subsequent 401 after closing. The production initial
 bundle stays under the unchanged 470-kB limit. No server/auth/storage schema or
 migration is changed by this presentation adapter.
 
-The Settings tab still projects the existing settings controls; full Original
+At that adapter checkpoint the Settings tab still projected existing controls; full Original
 settings appearance, non-platform workspace administration, notification/sorting
 differences and paired whole-page Source qualification remain open. The formal
 30-complete/19-partial count and all eight full-page acceptance rows stay open at

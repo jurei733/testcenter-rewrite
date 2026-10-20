@@ -271,7 +271,7 @@ import { OriginalSystemAdministrationComponent } from "./original-system-adminis
     } @else if (interfaceMode.mode() === 'original' && view.canManageApplicationSettings) {
       @defer (when true) {
         <app-original-system-administration [sessionToken]="view.ops.adminSessionToken"
-          [section]="activeAdminSection" [settingsTemplate]="applicationSettings"
+          [section]="activeAdminSection"
           (sectionSelected)="selectAdminSection($event)" />
       } @error {
         <p role="alert">Die Systemverwaltung konnte nicht geladen werden.</p>

@@ -8,6 +8,15 @@ import { fileURLToPath } from "node:url";
 export const originalBrowserSource = JSON.parse(await readFile(new URL("./fixtures/original-browser-source.json", import.meta.url), "utf8"));
 const manifestName = "original-reference-manifest.json";
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
+const originalSettingsCatalogReference = JSON.parse(await readFile(new URL("../test-fixtures/original-testcenter/current-monitor-text-reference.json", import.meta.url), "utf8"));
+export async function verifyOriginalSettingsSource(root, reference = originalSettingsCatalogReference) {
+  assert.equal(reference.originalCommit, originalBrowserSource.commit);
+  const catalog = reference.files.find(file => file.path === "definitions/testtaker/custom-texts.json");
+  assert.ok(catalog, "The actual Original settings catalog is required.");
+  assert.equal(sha256(catalog.source), catalog.sha256);
+  assert.equal(sha256(await readFile(join(root,catalog.path))), catalog.sha256,
+    "Settings labels, defaults and ordering must come from the pinned Source catalog.");
+}
 const originalAdministrationReference = JSON.parse(await readFile(new URL("./fixtures/original-administration-permissions.json", import.meta.url), "utf8"));
 export async function verifyOriginalAdministrationSource(root, reference = originalAdministrationReference) {
   assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
@@ -32,6 +41,7 @@ export async function verifyOriginalSource(root) {
   assert.equal(sha256(lock), originalBrowserSource.frontendLockSha256, "Original dependencies must retain their pinned lockfile.");
   assert.equal(Number(process.versions.node.split(".")[0]), 22);
   await verifyOriginalAdministrationSource(root);
+  await verifyOriginalSettingsSource(root);
 }
 async function filesUnder(root, directory = root) {
   assert.ok((await lstat(directory)).isDirectory(), "Reference paths must be real directories, never links.");

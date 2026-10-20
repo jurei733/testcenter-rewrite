@@ -9,7 +9,6 @@ mat-toolbar h1 { margin:0; font:400 22px/28px 'Nunito Sans'; letter-spacing:norm
 .account-button { background:white; color:var(--secondary); border-radius:12px; font-family:revert; font-weight:revert; }
 #originalSystemAdministration { display:flex; flex-direction:column; flex:1; min-height:0; padding:25px; }
 mat-tab-nav-panel { overflow-y:auto; padding:5px; }
-nav h2 { letter-spacing:normal; }
 .directory-columns { display:flex; flex-direction:row; justify-content:space-between; }
 .directory-list { display:flex; flex-direction:column; width:50%; }
 .directory-permissions { display:flex; flex-direction:column; width:40%; }
