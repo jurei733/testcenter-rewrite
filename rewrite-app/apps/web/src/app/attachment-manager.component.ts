@@ -12,6 +12,12 @@ import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { attachmentTextValue, resolveAttachmentText, type AttachmentCustomTextKey } from "./attachment-custom-texts";
 
+type AttachmentManagerScope = {
+  sessionToken: string;
+  tenantKey: string;
+  workspaceKey: string;
+};
+
 @Component({
   selector: "app-attachment-manager",
   standalone: true,
@@ -71,14 +77,14 @@ import { attachmentTextValue, resolveAttachmentText, type AttachmentCustomTextKe
               <span>{{ attachment.groupKey }} / {{ attachment.loginKey }}</span>
               <span>{{ attachment.testLabel }}</span>
               <span>{{ attachment.unitLabel }} · {{ attachment.variableId }}</span>
-              <span>type: {{ isCaptureImage(attachment) ? customText('am_attachment_type_capture-image', 'Photo of a page') : attachment.attachmentType || 'unspecified' }}</span>
+              <span>type: {{ isCaptureImage(attachment) ? customText('am_attachment_type_capture-image', 'capture-image') : attachment.attachmentType || 'unspecified' }}</span>
             </span>
           </button>
         </div>
 
-        <section class="attachment-side" *ngIf="selectedAttachment as selected">
+        <section class="attachment-side" *ngIf="selectedAttachment as selected" [attr.data-attachment-type]="selected.attachmentType">
           <h3>{{ selected.unitLabel }} · {{ selected.variableId }}</h3>
-          <p>Attachment type: <code>{{ isCaptureImage(selected) ? customText('am_attachment_type_capture-image', 'Photo of a page') : selected.attachmentType || 'unspecified' }}</code></p>
+          <p>Attachment type: <code>{{ isCaptureImage(selected) ? customText('am_attachment_type_capture-image', 'capture-image') : selected.attachmentType || 'unspecified' }}</code></p>
           <p class="attachment-code" id="selectedAttachmentCode">{{ selected.attachmentId }}</p>
           <div class="actions">
             <button class="ghost" type="button" (click)="copyCode(selected.attachmentId)">Copy attachment code</button>
@@ -129,6 +135,8 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
+  private requestVersion = 0;
+  private destroyed = false;
 
   @Input({ required: true }) sessionToken = "";
   @Input({ required: true }) tenantKey = "";
@@ -185,6 +193,9 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(): void {
+    this.requestVersion += 1;
+    this.busy = false;
+    this.status = "Load the workspace attachment inventory to begin.";
     this.labelTemplateOverride = null;
     this.attachments = [];
     this.selectedAttachmentId = "";
@@ -192,6 +203,9 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    this.requestVersion += 1;
+    this.busy = false;
     this.clearPreview();
   }
 
@@ -199,8 +213,10 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     if (!this.hasScope || this.busy) {
       return;
     }
-    await this.run(async () => {
-      this.attachments = await this.manager.list(this.scope());
+    await this.run(async (scope, isCurrent) => {
+      const attachments = await this.manager.list(scope);
+      if (!isCurrent()) return;
+      this.attachments = attachments;
       if (
         this.selectedAttachmentId &&
         !this.attachments.some(
@@ -243,16 +259,20 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
       this.status = "Choose a PNG or JPEG no larger than 10 MiB.";
       return;
     }
-    await this.run(async () => {
+    await this.run(async (scope, isCurrent) => {
+      const buffer = await file.arrayBuffer();
+      if (!isCurrent()) return;
+      const dataBase64 = this.arrayBufferToBase64(buffer);
       const updated = await this.manager.upload(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         {
           fileName: file.name,
           mediaType: file.type,
-          dataBase64: this.arrayBufferToBase64(await file.arrayBuffer())
+          dataBase64
         }
       );
+      if (!isCurrent()) return;
       this.replaceAttachment(updated);
       this.status = `Uploaded ${file.name}.`;
     });
@@ -264,11 +284,12 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
 
   async downloadPages(): Promise<void> {
     if (!this.hasScope || this.captureCount === 0) return;
-    await this.run(async () => {
-      const download = await this.manager.downloadPages(this.scope(), {
+    await this.run(async (scope, isCurrent) => {
+      const download = await this.manager.downloadPages(scope, {
         labelTemplate: this.labelTemplate,
         layout: this.interfaceMode.mode()
       });
+      if (!isCurrent()) return;
       downloadBlobFile({
         filename:
           download.filename || `${this.workspaceKey}-attachment-pages.pdf`,
@@ -281,13 +302,14 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   async downloadSelectedPage(
     attachment: WorkspaceAttachment
   ): Promise<void> {
-    await this.run(async () => {
+    await this.run(async (scope, isCurrent) => {
       const download = await this.manager.downloadPage(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         this.labelTemplate,
         this.interfaceMode.mode()
       );
+      if (!isCurrent()) return;
       downloadBlobFile({
         filename:
           download.filename ||
@@ -302,12 +324,13 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     attachment: WorkspaceAttachment,
     attachmentFileId: string
   ): Promise<void> {
-    await this.run(async () => {
+    await this.run(async (scope, isCurrent) => {
       const download = await this.manager.download(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         attachmentFileId
       );
+      if (!isCurrent() || this.selectedAttachmentId !== attachment.attachmentId) return;
       this.clearPreview();
       this.previewUrl = URL.createObjectURL(download.blob);
       this.status = `Previewing ${download.filename ?? attachmentFileId}.`;
@@ -321,23 +344,28 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     if (this.readOnly) {
       return;
     }
-    await this.run(async () => {
+    await this.run(async (scope, isCurrent) => {
       const updated = await this.manager.delete(
-        this.scope(),
+        scope,
         attachment.attachmentId,
         attachmentFileId
       );
+      if (!isCurrent()) return;
       this.replaceAttachment(updated);
-      this.clearPreview();
+      if (this.selectedAttachmentId === attachment.attachmentId) this.clearPreview();
       this.status = "Attachment image deleted.";
     });
   }
 
   async copyCode(attachmentId: string): Promise<void> {
+    const version = this.requestVersion;
+    const scope = this.scope();
     try {
       await navigator.clipboard.writeText(attachmentId);
+      if (version !== this.requestVersion || !this.isCurrentScope(scope)) return;
       this.status = "Attachment code copied.";
     } catch {
+      if (version !== this.requestVersion || !this.isCurrentScope(scope)) return;
       this.status = "The browser could not copy the attachment code.";
     }
   }
@@ -346,11 +374,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     return attachment.attachmentId;
   }
 
-  private scope(): {
-    sessionToken: string;
-    tenantKey: string;
-    workspaceKey: string;
-  } {
+  private scope(): AttachmentManagerScope {
     return {
       sessionToken: this.sessionToken.trim(),
       tenantKey: this.tenantKey.trim(),
@@ -358,15 +382,28 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
     };
   }
 
-  private async run(action: () => Promise<void>): Promise<void> {
+  private isCurrentScope(scope: AttachmentManagerScope): boolean {
+    const current = this.scope();
+    return !this.destroyed && scope.sessionToken === current.sessionToken &&
+      scope.tenantKey === current.tenantKey && scope.workspaceKey === current.workspaceKey;
+  }
+
+  private async run(action: (scope: AttachmentManagerScope, isCurrent: () => boolean) => Promise<void>): Promise<void> {
+    if (this.destroyed || this.busy || !this.hasScope) return;
+    const version = ++this.requestVersion;
+    const scope = this.scope();
+    const ownsOperation = (): boolean => !this.destroyed && version === this.requestVersion;
+    const isCurrent = (): boolean => ownsOperation() && this.isCurrentScope(scope);
     this.busy = true;
     try {
-      await action();
+      await action(scope, isCurrent);
     } catch (error) {
-      this.status = this.manager.describeError(error);
+      if (isCurrent()) this.status = this.manager.describeError(error);
     } finally {
-      this.busy = false;
-      this.changeDetectorRef.detectChanges();
+      if (ownsOperation()) {
+        this.busy = false;
+        this.changeDetectorRef.detectChanges();
+      }
     }
   }
 

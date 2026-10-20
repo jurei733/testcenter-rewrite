@@ -8,6 +8,7 @@ const workflow = parse(read("../../.github/workflows/rewrite-app-ci.yml"));
 const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
+const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
 function expand(command, trail = []) {
   return command.replace(/npm run ([\w:-]+)/g, (_, key) => {
     assert.ok(Object.hasOwn(scripts, key), `Missing npm script ${key}`);
@@ -21,6 +22,15 @@ const commands = [...matrix.map(item => item.command), ...Object.values(workflow
 const leaves = commands.flatMap(command => expand(command.replace(/ 2>&1 \| tee[^\n]+/g, ""))
   .split("&&").map(value => value.trim().replace(/\s+/g, " ")).filter(Boolean));
 const environmentPreludes = baseline.additional.flatMap(item => item.leaves).filter(leaf => leaf.endsWith("\\"));
+function extendsExplicitTestFiles(previous, current) {
+  const files = command => {
+    if (!command.startsWith("node --test ")) return null;
+    const paths = command.slice("node --test ".length).split(" ");
+    return paths.length && paths.every(path => /^[\w./*-]+\.test\.(?:mjs|cjs|js)$/.test(path)) ? paths : null;
+  };
+  const before = files(previous), after = files(current);
+  return Boolean(before && after && before.every(path => after.includes(path)));
+}
 for (const item of [...baseline.commands, ...baseline.additional]) test(`the complete prior ${item.check} qualification is retained`, () => {
   for (const leaf of item.leaves) {
     // Removing the first build leaves an environment-only prelude in the old
@@ -29,13 +39,27 @@ for (const item of [...baseline.commands, ...baseline.additional]) test(`the com
     const retainedPrelude = leaf.endsWith("\\") && commands.some(command => command.replace(/\s+/g, " ").includes(leaf));
     const attachedPrelude = leaves.some(value => value.endsWith(leaf) &&
       environmentPreludes.includes(value.slice(0, -leaf.length).trim()));
-    assert.ok(leaves.includes(leaf) || retainedPrelude || attachedPrelude, `Lost qualification: ${leaf}`);
+    const expandedFiles = leaves.some(value => extendsExplicitTestFiles(leaf, value));
+    assert.ok(leaves.includes(leaf) || retainedPrelude || attachedPrelude || expandedFiles, `Lost qualification: ${leaf}`);
+  }
+});
+test("coverage may add explicit tests but cannot remove files or change test-runner flags", () => {
+  const original = "node --test scripts/old.test.mjs scripts/other.test.mjs";
+  assert.equal(extendsExplicitTestFiles(original, original + " scripts/new.test.mjs"), true);
+  for (const changed of ["node --test scripts/old.test.mjs", original + " --test-skip-pattern=old",
+    original.replace("--test", "--test --test-name-pattern=new"), original + " || true", "echo " + original]) {
+    assert.equal(extendsExplicitTestFiles(original, changed), false);
   }
 });
 test("third-party actions are immutable and checkout never leaves a write credential", () => {
   const steps = [...Object.values(workflow.jobs).flatMap(job => job.steps ?? []), ...action.runs.steps];
   for (const step of steps.filter(step => step.uses && !step.uses.startsWith("./"))) {
     assert.match(step.uses, /^[\w.-]+\/[\w.-]+@[a-f0-9]{40}$/);
+    const [repository, sha] = step.uses.split("@");
+    const reference = actionVersions[repository.replace(/^actions\//, "")];
+    assert.ok(reference, `Unreviewed action ${repository}`);
+    assert.equal(sha, reference.sha); assert.equal(reference.runtime, "node24");
+    for (const input of Object.keys(step.with ?? {})) assert.ok(reference.inputs.includes(input), `Unsupported ${repository} input ${input}`);
     if (step.uses.startsWith("actions/checkout@")) assert.equal(step.with["persist-credentials"], false);
   }
   assert.deepEqual(workflow.permissions, { contents: "read" });
@@ -62,6 +86,7 @@ test("test jobs use the same-run build and cannot compile a replacement producti
   assert.equal(download.with.name, "rewrite-build-${{ github.sha }}");
   assert.equal(download.with["run-id"], undefined);
   assert.equal(download.with["github-token"], undefined);
+  assert.equal(download.with["digest-mismatch"], "error");
   assert.ok(action.runs.steps.some(step => step.run === "node scripts/ci-build-artifact.mjs restore"));
 });
 test("fast feedback is independent of the long matrix and full acceptance rejects skipped/failed groups", () => {

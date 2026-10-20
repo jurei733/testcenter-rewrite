@@ -7,6 +7,12 @@ start to final completion and **302.2 runner-minutes**. The Ops chain alone took
 2,336 seconds; PostgreSQL UI took 1,177 seconds. These are observed baseline
 times, not measurements of the new workflow.
 
+The first optimized workflow at `3e93fcee`, run `39418240190`, reaches a green
+**Fast feedback in 251 seconds (4 minutes 11 seconds)** from its first job start.
+Its full qualification fails at the changed attachment-type presentation
+expectation described in `ATTACHMENT-LIFECYCLE.md`; it cannot establish a
+successful complete runtime or release acceptance.
+
 ## Fast feedback
 
 `Fast feedback` requires the production build, development typecheck, CI policy,
@@ -36,6 +42,13 @@ feature-branch push/PR runs. More parallel jobs do not imply more test coverage.
 - Third-party Actions use immutable commit SHAs. Checkouts do not persist the
   GitHub credential. The workflow has only `contents: read`, no repository
   secrets, no privileged `pull_request_target` or `workflow_run` execution.
+  The follow-up pins official checkout 7.0.1, setup-node 7.1.0, cache 6.1.0,
+  download-artifact 8.0.2 and upload-artifact 7.0.2. Their inspected metadata
+  declares Node 24 and retains every input used here. The observed hosted runner
+  2.337.0 meets their minimum runner requirements; application jobs stay on
+  Node 22. `ci-action-versions.json` records exact commits, release/source URLs,
+  metadata hashes and accepted inputs. Artifact digest mismatch is explicitly
+  fatal in the download action, before the application-level manifest check.
 - Dependency installation uses the lockfile. The separate audit includes
   development dependencies and fails on high/critical findings. npm package
   caching retains the normal package-integrity checks, not installed modules.
@@ -65,6 +78,9 @@ Use Node 22. Run `npm run test:ci-policy`, `npm audit --audit-level=high` and
 Actionlint against the root workflow. Policy tests parse the actual workflow
 and composite action, reconcile all prior commands and validate artifact
 failures, including real corruption, stale source/lockfile and symlink cases.
+The command inventory allows additional explicit test files while still
+requiring every previous file; removing files or changing runner flags remains
+a failure. This avoids blocking ordinary test additions during iteration.
 
 To reproduce artifact reuse in a fresh checkout, first build with
 `FIRST_SLICE_XML_SCHEMA_CACHE=.ci/xml-schemas`, then run
