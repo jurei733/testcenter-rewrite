@@ -2630,6 +2630,16 @@ try {
         body: { sourcePackageId: headerOnlySource.sourcePackage.sourcePackageId }
       });
     assert.equal((await headerOnlyImportResponse.json()).importJob.status, "completed");
+    // Install before the owned check document and any Player frame exist.
+    // A late init script cannot observe a start already sent to a reused frame.
+    await page.addInitScript(() => {
+      window.addEventListener("message", event => {
+        if (event.data?.type === "vopStartCommand") {
+          window.__systemCheckLogPolicy = event.data.playerConfig?.logPolicy;
+          window.__systemCheckPlayerSessionId = event.data.sessionId;
+        }
+      });
+    });
     await page.goto(`${baseUrl}/app/system-check?ui=original`, { waitUntil: "networkidle" });
     const originalChoices = page.locator(`#originalSystemCheckStarter button[data-tenant-key='${systemCheckTenantKey}'][data-workspace-key='${systemCheckWorkspaceKey}']`);
     await originalChoices.first().waitFor();
@@ -2850,14 +2860,6 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     if (artifactDirectory) await page.screenshot({ path: resolve(artifactDirectory, "original-system-check-network-mobile.png"), fullPage: true });
     await page.setViewportSize(choiceViewport);
-    await page.addInitScript(() => {
-      window.addEventListener("message", event => {
-        if (event.data?.type === "vopStartCommand") {
-          window.__systemCheckLogPolicy = event.data.playerConfig?.logPolicy;
-          window.__systemCheckPlayerSessionId = event.data.sessionId;
-        }
-      });
-    });
     await page.locator("#syscheck-next-step").click();
     const originalUnit = page.locator("#originalSystemCheckUnit");
     await originalUnit.waitFor();

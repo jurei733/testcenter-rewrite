@@ -79,6 +79,8 @@ try {
       insecureUrl.hostname = "testcenter-proof.insecure";
       await page.goto(insecureUrl.href, { waitUntil: "networkidle" });
       assert.equal(await page.evaluate(() => window.isSecureContext), false);
+      assert.deepEqual(await page.locator("#bugReportText").allTextContents(), [],
+        "An HTTP entry must render without a global application error before submitting credentials.");
       const freshName = mode === "original"
         ? page.getByLabel("Anmeldename", { exact: true }) : page.locator("#participantLoginKey");
       assert.equal(await freshName.inputValue(), "", "Both interfaces start without a synthetic login");

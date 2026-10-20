@@ -64,7 +64,7 @@ try {
     names.push("foreign");
     await api(workspace+"/participant-roster",{rosterText:`<Testtakers><Group id="owned" label="Exit Group">${names.map(name=>`<Login mode="run-hot-return" name="${name}"><Booklet>owned-exit</Booklet></Login>`).join("")}</Group></Testtakers>`},operator);
   }
-  browser=await chromium.launch({headless:process.env.CI==="true"});
+  browser=await chromium.launch({headless:process.env.CI==="true"&&process.env.UI_SMOKE_HEADFUL!=="true"});
   for(const theme of themes) {
     await api("/api/v1/admin/application-settings",{themeName:theme},operator,"PATCH");
     for(const [screen,width,height] of screens) for(const leave of ["none","confirm","forbidden"]) for(const [progress,values] of Object.entries(cases)) {

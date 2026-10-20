@@ -35,12 +35,22 @@ export const deliverParticipantControllerTimerInterruption = async (request: Par
   }
 };
 
+// getRandomValues is available on HTTP entries where randomUUID is not.
+// These are durable command identities, independent of HTTPS-only proof of work.
+const participantNativeIdentity = (): string => {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 const documentOwners = new WeakMap<Window, string>();
 const participantNativeOwner = (window: Window): string => {
   const current = documentOwners.get(window); if (current) return current;
   const key = "testcenter-rewrite:participant-native-owner:v1";
   const handoffKey = "testcenter-rewrite:participant-native-reload:v1";
-  let owner: string = crypto.randomUUID();
+  let owner: string = participantNativeIdentity();
   try {
     const previous = window.sessionStorage.getItem(key);
     const navigation = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
@@ -281,7 +291,7 @@ export const createParticipantNativeCommands = (options: {
       const observedStatus = options.controllerStatus();
       const controllerStatus = keyword !== "terminate" && observedStatus.startsWith("TERMINATED")
         ? options.readState()?.testRun.status === "paused" ? "PAUSED" : "RUNNING" : observedStatus;
-      const id = (options.id ?? (() => crypto.randomUUID()))();
+      const id = (options.id ?? participantNativeIdentity)();
       const entry: Entry = { scope, owner, id, version: 2, keyword, args: [...args], request: {
         testRunId: scope.testRunId, contentReleaseId: scope.contentReleaseId, bookletKey: scope.bookletKey,
         deliveryId: id, keyword, arguments: [...args], controllerStatus, timeStamp: (options.now ?? Date.now)(),

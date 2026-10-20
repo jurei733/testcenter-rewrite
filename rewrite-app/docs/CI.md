@@ -7,17 +7,23 @@ start to final completion and **302.2 runner-minutes**. The Ops chain alone took
 2,336 seconds; PostgreSQL UI took 1,177 seconds. These are observed baseline
 times, not measurements of the new workflow.
 
-The first optimized workflow at `3e93fcee`, run `39418240190`, reaches a green
-**Fast feedback in 251 seconds (4 minutes 11 seconds)** from its first job start.
-Its full qualification fails at the changed attachment-type presentation
-expectation described in `ATTACHMENT-LIFECYCLE.md`; it cannot establish a
-successful complete runtime or release acceptance.
+The apparent green fast checkpoints at `3e93fcee` (251 seconds) and `7373b68a`
+(269 seconds) are **invalid qualification measurements**. Inspection of the
+actual Quick log found a failed Original HTTP login hidden by `tee`: GitHub's
+implicit `bash -e` shell returned the logger's success. The follow-up explicitly
+uses `shell: bash`, enabling `-e -o pipefail`. A subprocess regression reproduces
+the old false green and requires the exact failing upstream status, 37, to
+survive logging. Neither earlier run establishes full release acceptance.
 
 ## Fast feedback
 
 `Fast feedback` requires the production build, development typecheck, CI policy,
 dependency audit, complete unit/frontend/terminal-overlap tests and every Quick
-browser gate. It runs before the long matrix can occupy runner slots. A failure
+browser gate. Quick has 27 independently required scenario jobs, organized into
+four local command groups: entry, system-check, participant and content. Each
+scenario appears exactly once; policy reconciles the distributed commands with
+both the complete local Quick command and each group. It runs before
+the long matrix can occupy runner slots. A failure
 here prevents expensive dependent jobs, and `CI acceptance` still fails.
 For successful commits, the complete matrix, PostgreSQL, deployability and three
 Compose modes run after this checkpoint. The Docker image gate also builds from
@@ -30,10 +36,11 @@ qualification was lost. The eight serial Ops gates are independent jobs; every
 existing scenario, both camera facings, native routes/tabs, controller references,
 full browser flow, database adapter and deployment mode remains required.
 
-Expect roughly **3–6 minutes** for the fast checkpoint and **20–25 minutes** for
-complete qualification on comparable available runners. These are estimates
-from the previous job timings and new dependencies; confirm actual hosted
-timings after a complete successful new run. Queues and cold downloads add time.
+The earlier **3–6 minute** fast estimate must be measured again now that all
+Quick commands are actually required. Per-scenario sharding removes that serial
+chain. The **20–25 minute** complete estimate is also provisional; confirm actual
+hosted timings only after a completely successful run. Queues and cold downloads
+add time.
 Total compute is also reduced by removing repeated host builds and duplicate
 feature-branch push/PR runs. More parallel jobs do not imply more test coverage.
 
@@ -72,6 +79,46 @@ qualification group. Repositories requiring a single protected-branch check
 should require **CI acceptance**, not the fast checkpoint. This change does not
 alter repository branch-protection settings.
 
+## Browser qualification that preserves failures
+
+Quick runs visible Chromium in Xvfb, matching the mode used to collect the
+pinned Source visual measurements. Playwright's system dependency installation
+already installs Xvfb. `UI_SMOKE_HEADFUL=true` is respected by every Original
+Quick geometry fixture, including exit completeness. The wrapper and logger
+remain in the explicit pipefail shell; failed shard logs have distinct artifact
+names and are retained for seven days.
+
+The same unmodified Source build at `eedae41840cbe90e5547c0211da818bdf620f5aa`
+reproduces both exit-dialog renderings with the installed Chromium: visible
+height 139 at y=290.5, headless height 140 at y=290. A headless rewrite matched
+the headless Source, while the stored reference describes visible Source.
+The fix aligns browser modes and retains exact geometry/text/style assertions;
+it does not introduce pixel tolerances or remove a comparison.
+
+The newly visible HTTP initialization failure was an unconditional
+`crypto.randomUUID()` in native controller identity creation. HTTP browsers
+support `getRandomValues` but may omit `randomUUID`. Native owner and command
+delivery IDs now use CSPRNG-generated RFC 4122 v4 bytes in that case. Existing
+native UUID generation, durable retries, document ownership and HTTPS-only
+proof-of-work policy are retained. Three new actual-source tests fail before
+the fix; all four added identity cases pass afterward, including denied
+session storage and native UUID preference. The real HTTP login smoke reports
+any global initialization error before attempting credentials.
+
+The Source-aligned local follow-up passes all 36 Original player-exit cases,
+all six Rewrite exit variants and missing-chunk recovery. The Systemcheck gate
+also passes again after its incoming Player observer is installed before the
+owned check document loads; installing that observer late could miss the real
+start packet. Its `logPolicy === "disabled"` assertion is retained.
+
+Complete acceptance is still open: the newly observable exit-completeness
+pixel check differs from its Source SHA in one case (10 RGBA channels, maximum
+intensity difference 1). A fresh visible Source capture reproduces the stored
+Source hash, so the assertion remains failing pending diagnosis. The earlier
+PostgreSQL full-browser run also times out returning from a resumed Starter
+card; this is not a successful release result. The workflow must expose these
+failures and skip dependent long qualification rather than conceal them.
+
 ## Local verification
 
 Use Node 22. Run `npm run test:ci-policy`, `npm audit --audit-level=high` and
@@ -90,6 +137,15 @@ archive directory and run the same command with `restore`. Run only `:built`
 aliases against the restored outputs. The local checkpoint passed this fresh
 consumer flow and all 16 authenticated attachment-text browser cases without
 building that consumer's application.
+
+For a focused local browser iteration, build once, then run
+`npm run ci:browser:quick:entry:built` (or `system-check`, `participant`,
+`content`). Use `CI=true UI_SMOKE_HEADFUL=true` for the Source visual mode on
+a desktop; on Linux wrap the command in `xvfb-run --auto-servernum`. Keep the
+compiled frontend immutable while browsers run: development typecheck builds
+also write `dist/apps/web`, so complete typecheck and the production build
+before starting these consumers. CI already isolates those build directories
+between jobs and verifies the immutable shared archive.
 
 The complete Memory HTTP suite also passes 172/172 against the reused schema
 cache. Remote Linux/PostgreSQL/Docker qualification and actual improved timing
