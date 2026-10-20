@@ -131,8 +131,11 @@ export class OriginalApplicationSettingsController {
   }
   async deleteAsset(id:string):Promise<boolean>{
     return this.run(async owner=>{
-      await this.request(owner,"DELETE",productionApiRoutes.admin.applicationAssets+"?applicationAssetId="+encodeURIComponent(id));
+      await this.request(owner,"DELETE",productionApiRoutes.admin.applicationAssets+"?applicationAssetId="+encodeURIComponent(id),{cascadeAssignments:true});
+      // The acknowledged deletion is never replayed if the following read fails.
       this.assets=this.assets.filter(asset=>asset.applicationAssetId!==id);
+      const settings=await this.readSettings(owner);
+      this.settings=clone(settings);this.assignments=clone(settings.assetAssignments);this.accept(settings);
     },"Bild entfernt");
   }
 }

@@ -474,10 +474,16 @@ test("SQLite persists participant view settings and asset assignments across rep
   };
 
   try {
-    await createSqliteFirstSliceRepository(databasePath).saveParticipantRosterEntry(
-      rosterEntry,
-      null
-    );
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    for (const originalName of Object.values(rosterEntry.assetAssignments ?? {})) {
+      await repository.saveApplicationAsset({
+        applicationAssetId: `asset:${originalName}`, originalName,
+        mediaType: originalName.endsWith(".webp") ? "image/webp" : "image/png",
+        dataBase64: "aW1hZ2U=", byteLength: 5,
+        createdAt: rosterEntry.importedAt, updatedAt: rosterEntry.importedAt
+      });
+    }
+    await repository.saveParticipantRosterEntry(rosterEntry, null);
     assert.deepEqual(
       await createSqliteFirstSliceRepository(
         databasePath

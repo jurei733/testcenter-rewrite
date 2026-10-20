@@ -1,9 +1,39 @@
 # Testcenter parity checklist
 
+### Atomic Original assigned-image removal (2026-10-20)
+
+The Original settings adapter now explicitly requests assigned-image removal.
+The deletion, global/participant/operational bindings and audit entry commit
+together in every store. A later upload of the same filename receives a new
+identity without restoring old bindings; replacing a still-existing filename
+retains its identity. Missing/false cascade policy preserves the old in-use
+rejection. Actual pinned Source PHP and PostgreSQL DDL are verified before the
+Source build, and its foreign-key cascade executes in the PostgreSQL tests.
+Store/HTTP tests include authorization, orphan operational scopes, stale writes,
+cross-connection PostgreSQL serialization, late audit failure and failed File
+manifest commits. Original settings/controller and production-browser checks
+cover the native removal action and versioned gallery refresh.
+
+Local validation passes all 3,624 unit/frontend checks, 117 CI/reference policy
+checks and 1,843 PostgreSQL integration checks in a fresh owned database. The
+focused command passes 39 checks with PostgreSQL in approximately 4.2 seconds;
+the production administration/settings browser gate also passes. Development
+and production builds pass; initial output is 467.97 kB under the unchanged
+470 kB cap. Published parent `36113122` completes all 80 jobs in
+[run 39490598043](https://github.com/jurei733/testcenter-rewrite/actions/runs/39490598043).
+That run qualifies the parent; this slice still needs its own remote run.
+
+This closes the assigned-image deletion difference identified below. It does
+not close concurrent whole-settings replacement, wider public/participant image
+cache freshness, full Original backend authorization or complete-page visual
+acceptance. The administrator row stays partial: **29 done / 20 partial**, with
+all eight complete-page visual rows open. Fresh complete publication CI is
+required for this change.
+
 ### Source settings audit reopens administrator parity (2026-10-20)
 
-Direct inspection of pinned Source settings/assets reveals an outstanding
-assigned-image deletion difference and unqualified cross-client replacement
+Direct inspection of pinned Source settings/assets revealed an
+assigned-image deletion difference (addressed above) and unqualified cross-client replacement
 semantics. The administrator row is reopened as partial: the authoritative
 49-area matrix now has **29 done / 20 partial**. All eight complete-page visual
 acceptance rows remain open. New German settings controls, 102 Source text
@@ -8489,8 +8519,9 @@ and lets a login replace individual slots. The effective filename map survives
 all persistent roster adapters. The protected global registry, public image
 delivery, global slot defaults, Participant override precedence, and all eight
 Angular presentation targets are now implemented. Registry replacement keeps
-stable identities, and deletion refuses assets still assigned globally or by
-persisted participant and operational roster entries across workspaces.
+stable identities. Default deletion refuses assets still assigned globally or by
+persisted participant and operational roster entries across workspaces; the
+Original adapter explicitly requests the atomic cascade described above.
 
 Latest legacy-encoding alias closure: XML declarations now accept every
 XML-`EncName`-compatible IANA alias registered for ISO-8859-10/Latin-6 and

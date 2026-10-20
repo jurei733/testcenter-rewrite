@@ -75,12 +75,19 @@ export async function runOriginalApplicationSettingsSmoke(page,api,{artifacts}){
  await root.locator('mat-select[data-asset-slot="loginIllustration"]').click();await page.getByRole('option',{name:filename,exact:true}).click();
  await saveSettings(page.locator('#originalSettingsSaveAssignments'));
  settings=(await api('/api/v1/system/application-settings')).applicationSettings;assert.equal(settings.assetAssignments.loginIllustration,filename);assert.equal(settings.globalWarningText,'Owned future warning');
- await card.getByRole('button',{name:'Bild entfernen',exact:true}).click();await root.getByRole('alert').filter({hasText:'Das Bild ist noch zugeordnet.'}).waitFor();
- assert.ok((await api('/api/v1/admin/application-assets')).items.some(asset=>asset.originalName===filename));
- await root.locator('mat-select[data-asset-slot="loginIllustration"]').click();await page.getByRole('option',{name:'Keines',exact:true}).click();
- await saveSettings(page.locator('#originalSettingsSaveAssignments'));await card.getByRole('button',{name:'Bild entfernen',exact:true}).click();await card.waitFor({state:'detached'});
+ const originalAsset=(await api('/api/v1/admin/application-assets')).items.find(asset=>asset.originalName===filename);
+ const legacy=await api('/api/v1/admin/application-assets?applicationAssetId='+encodeURIComponent(originalAsset.applicationAssetId),undefined,'DELETE',409);
+ assert.equal(legacy.error,'application_asset_in_use');
+ const deletion=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/application-assets'&&response.request().method()==='DELETE');
+ await card.getByRole('button',{name:'Bild entfernen',exact:true}).click();assert.equal((await deletion).status(),200);await card.waitFor({state:'detached'});await root.waitFor();
+ settings=(await api('/api/v1/system/application-settings')).applicationSettings;assert.equal(settings.assetAssignments.loginIllustration,undefined);assert.equal(settings.globalWarningText,'Owned future warning');
+ await root.locator('#originalSettingsAssetFile').setInputFiles({name:filename,mimeType:'image/png',buffer:bytes});await card.waitFor();await root.waitFor();
+ const reuploaded=(await api('/api/v1/admin/application-assets')).items.find(asset=>asset.originalName===filename);assert.notEqual(reuploaded.applicationAssetId,originalAsset.applicationAssetId);
+ assert.equal((await api('/api/v1/system/application-settings')).applicationSettings.assetAssignments.loginIllustration,undefined);
+ assert.ok((await card.locator('img').getAttribute('src')).includes(encodeURIComponent(reuploaded.applicationAssetId+':'+reuploaded.updatedAt)));
+ await card.getByRole('button',{name:'Bild entfernen',exact:true}).click();await card.waitFor({state:'detached'});
  assert.equal((await api('/api/v1/admin/application-assets')).items.some(asset=>asset.originalName===filename),false);
- console.log('original_settings=real-image-upload-eight-slots-save-in-use-guard-unassign-and-delete:passed');
+ console.log('original_settings=real-image-upload-eight-slots-legacy-guard-native-cascade-and-no-reupload-resurrection:passed');
  await api('/api/v1/admin/application-settings',before,'PATCH');await page.reload({waitUntil:'domcontentloaded'});await root.waitFor();
  await page.locator('[data-cy="superadmin-tabs:users"]').click();await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
 }

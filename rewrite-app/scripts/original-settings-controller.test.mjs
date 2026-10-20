@@ -73,3 +73,15 @@ test('local calendar day/hour conversion uses the selected local date and valida
  assert.equal(new Date(originalWarningExpiration('2099-07-12','')).getHours(),0);assert.equal(originalWarningExpiration('','13'),null);
  assert.throws(()=>originalWarningExpiration('2099-02-31','13'));
 });
+
+test('Source deletion requests the explicit cascade and refreshes accepted assignments without replay after a read failure',async()=>{
+ let deleted=false,reads=0;const f=fixture((call,server)=>{
+  if(call.method==='DELETE'){assert.deepEqual(call.body,{cascadeAssignments:true});deleted=true;return{};}
+  if(call.path===productionApiRoutes.admin.applicationAssets)return{items:[]};
+  if(deleted){reads++;throw{error:'owned_refresh_failure'};}
+  return{applicationSettings:clone(server)};
+ });
+ await f.controller.connect('owned');f.controller.assets=[{applicationAssetId:'owned',originalName:'owned.png'}];
+ assert.equal(await f.controller.deleteAsset('owned'),false);assert.equal(reads,1);assert.deepEqual(f.controller.assets,[]);
+ assert.equal(f.calls.filter(call=>call.method==='DELETE').length,1);
+});

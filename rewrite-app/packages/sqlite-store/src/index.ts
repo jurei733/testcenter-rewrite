@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
@@ -1865,6 +1867,13 @@ export const createSqliteFirstSliceStorage = (
   try { applyMigrations(database); }
   catch (error) { database.close(); throw error; }
 
+  const assetNames=()=> (database.prepare("SELECT original_name FROM application_assets").all() as Array<{original_name:string}>).map(row=>({originalName:row.original_name}));
+  const withAssetWrite=<Result>(mutation:()=>Result):Result=>{
+    database.exec("BEGIN IMMEDIATE");
+    try{const result=mutation();database.exec("COMMIT");return result;}
+    catch(error){return rollbackAfterFailure(database,error);}
+  };
+
   const repository: FirstSliceRepository = {
     async getApplicationSettings() {
       const row = database
@@ -1881,6 +1890,8 @@ export const createSqliteFirstSliceStorage = (
       return mapApplicationSettings(row);
     },
     async saveApplicationSettings(settings) {
+      return withAssetWrite(()=>{
+        validateApplicationAssetReferences(settings.assetAssignments,assetNames());
       database
         .prepare(
           `INSERT INTO application_settings (
@@ -1920,6 +1931,7 @@ export const createSqliteFirstSliceStorage = (
           settings.updatedAt,
           settings.updatedByAdminUserId
         );
+      });
     },
     async listApplicationAssets() {
       const rows = database
@@ -1958,7 +1970,11 @@ export const createSqliteFirstSliceStorage = (
           .get(originalName) as Record<string, unknown> | undefined
       );
     },
-    async saveApplicationAsset(applicationAsset) {
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      return withAssetWrite(()=>{
+        const existing=replaceByOriginalName?mapApplicationAsset(database.prepare("SELECT * FROM application_assets WHERE original_name=?").get(applicationAsset.originalName) as Record<string,unknown>|undefined):null;
+        if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+
       database
         .prepare(
           `INSERT INTO application_assets (
@@ -1981,8 +1997,29 @@ export const createSqliteFirstSliceStorage = (
           applicationAsset.createdAt,
           applicationAsset.updatedAt
         );
+        return { applicationAsset, replaced: Boolean(existing) };
+      });
+    },
+    async mutateApplicationAssetDeletion(input) {
+      return withAssetWrite(()=>{
+        const asset=mapApplicationAsset(database.prepare("SELECT * FROM application_assets WHERE application_asset_id = ?").get(input.applicationAssetId) as Record<string,unknown>|undefined);
+        const settings=mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key = 'global'").get() as Record<string,unknown>|undefined);
+        const roster=(database.prepare("SELECT * FROM participant_roster_entries").all() as Record<string,unknown>[]).map(row=>mapParticipantRosterEntry(row)!).map(row=>({...row,assetAssignments:row.assetAssignments??{}}));
+        const operational=(database.prepare("SELECT tenant_id,workspace_id,candidates_json FROM operational_login_migration_candidates").all() as Array<{tenant_id:string;workspace_id:string;candidates_json:string}>).map(row=>({tenantId:row.tenant_id,workspaceId:row.workspace_id,candidates:JSON.parse(row.candidates_json) as OperationalLoginMigrationCandidate[]}));
+        const scopes=(database.prepare("SELECT w.tenant_id,w.workspace_id,w.workspace_key,t.tenant_key FROM workspaces w JOIN tenants t ON t.tenant_id=w.tenant_id").all() as Array<{tenant_id:string;workspace_id:string;workspace_key:string;tenant_key:string}>).map(row=>({tenantId:row.tenant_id,workspaceId:row.workspace_id,workspaceKey:row.workspace_key,tenantKey:row.tenant_key}));
+        const effect=prepareApplicationAssetDeletion(input,{asset,settings,roster,operational,scopes});if(!effect)return null;
+        if(effect.settings)database.prepare("UPDATE application_settings SET asset_assignments_json=?,updated_at=?,updated_by_admin_user_id=? WHERE settings_key='global'").run(JSON.stringify(effect.settings.assetAssignments),effect.settings.updatedAt,effect.settings.updatedByAdminUserId);
+        for(const row of effect.roster)database.prepare("UPDATE participant_roster_entries SET asset_assignments_json=? WHERE participant_roster_entry_id=?").run(JSON.stringify(row.assetAssignments),row.participantRosterEntryId);
+        for(const group of effect.operational)database.prepare("UPDATE operational_login_migration_candidates SET candidates_json=? WHERE tenant_id=? AND workspace_id=?").run(JSON.stringify(group.candidates),group.tenantId,group.workspaceId);
+        database.prepare("DELETE FROM application_assets WHERE application_asset_id=?").run(effect.asset.applicationAssetId);
+        const audit=effect.auditEvent;
+        database.prepare("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES(?,?,?,?,?,?,?) ON CONFLICT(admin_audit_event_id) DO UPDATE SET details_json=excluded.details_json").run(audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details));
+        return effect.asset;
+      });
     },
     async deleteApplicationAsset(applicationAssetId) {
+      return withAssetWrite(()=>{
+
       return (
         database
           .prepare(
@@ -1990,6 +2027,7 @@ export const createSqliteFirstSliceStorage = (
           )
           .run(applicationAssetId).changes > 0
       );
+      });
     },
     async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
       const rows = database
@@ -3183,6 +3221,9 @@ export const createSqliteFirstSliceStorage = (
       workspaceId,
       candidates
     ) {
+      return withAssetWrite(()=>{
+        const assets=assetNames();
+        for(const candidate of candidates)validateApplicationAssetReferences(candidate.assetAssignments,assets);
       database
         .prepare(
           `INSERT INTO operational_login_migration_candidates (
@@ -3193,6 +3234,7 @@ export const createSqliteFirstSliceStorage = (
             updated_at = excluded.updated_at`
         )
         .run(tenantId, workspaceId, JSON.stringify(candidates), new Date().toISOString());
+      });
     },
     async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
       const row = database
@@ -3209,6 +3251,8 @@ export const createSqliteFirstSliceStorage = (
         : String(row.password_hash);
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
+      return withAssetWrite(()=>{
+        validateApplicationAssetReferences(participantRosterEntry.assetAssignments,assetNames());
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
@@ -3261,6 +3305,7 @@ export const createSqliteFirstSliceStorage = (
           JSON.stringify(participantRosterEntry.assetAssignments ?? {}),
           participantRosterEntry.importedAt
         );
+      });
     },
     async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
       return mapParticipantLoginAttempt(

@@ -184,6 +184,7 @@ import {
   type UploadApplicationAssetResponse,
   type ListApplicationAssetsResponse,
   type DeleteApplicationAssetResponse,
+  type DeleteApplicationAssetRequest,
   type UploadAttachmentFileRequest,
   type UploadAttachmentFileResponse,
   type UpdateParticipantReviewRequest,
@@ -5198,10 +5199,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
+        const deletion = await readOptionalRequestJsonBody<DeleteApplicationAssetRequest>();
         const { dataBase64: _dataBase64, ...applicationAsset } =
           await services.applicationSettings.deleteApplicationAsset({
             sessionToken,
-            applicationAssetId
+            applicationAssetId,
+            cascadeAssignments:deletion?.cascadeAssignments
           });
         sendJson<DeleteApplicationAssetResponse>(response, 200, {
           applicationAsset

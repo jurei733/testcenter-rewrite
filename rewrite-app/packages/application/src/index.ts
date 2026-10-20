@@ -1,3 +1,7 @@
+import { FirstSliceError } from "./first-slice-error.js";
+export { FirstSliceError } from "./first-slice-error.js";
+export { prepareApplicationAssetDeletion, validateApplicationAssetReferences } from "./application-asset-mutation.js";
+export type { ApplicationAssetDeletionInput, ApplicationAssetDeletionContext, ApplicationAssetAssignmentRow } from "./application-asset-mutation.js";
 import { evaluateAdaptiveStates, buildParticipantDebugSnapshot } from "@testcenter-rewrite-app/contracts/participant-debug-runtime";
 import { evaluateParticipantDebugConditions, parseParticipantDebugConditionElement } from "@testcenter-rewrite-app/contracts/participant-debug-condition";
 import { ParticipantRunCommandApplicationError } from "./participant-run-commands.js";
@@ -1173,6 +1177,7 @@ export type ApplicationSettingsPort = {
   deleteApplicationAsset(input: {
     sessionToken: string;
     applicationAssetId: string;
+    cascadeAssignments?: boolean;
   }): Promise<ApplicationAsset>;
 };
 
@@ -1193,23 +1198,6 @@ export type FirstSlicePorts = {
   systemCheck: SystemCheckPort;
 };
 
-export class FirstSliceError extends Error {
-  readonly statusCode: number;
-  readonly errorCode: string;
-  readonly details: unknown;
-
-  constructor(
-    statusCode: number,
-    errorCode: string,
-    message: string,
-    details?: unknown
-  ) {
-    super(message);
-    this.statusCode = statusCode;
-    this.errorCode = errorCode;
-    this.details = details ?? null;
-  }
-}
 
 export const firstSliceUseCases = {
   getApplicationSettings: "GetApplicationSettings",
@@ -1346,8 +1334,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
   getApplicationAssetByOriginalName(
     originalName: string
   ): Promise<ApplicationAsset | null>;
-  saveApplicationAsset(applicationAsset: ApplicationAsset): Promise<void>;
+  saveApplicationAsset(applicationAsset: ApplicationAsset, replaceByOriginalName?: boolean): Promise<{ applicationAsset: ApplicationAsset; replaced: boolean }>;
   deleteApplicationAsset(applicationAssetId: string): Promise<boolean>;
+  mutateApplicationAssetDeletion(input: import("./application-asset-mutation.js").ApplicationAssetDeletionInput): Promise<ApplicationAsset | null>;
   listAttachmentFilesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -26822,28 +26811,23 @@ export const createFirstSliceServices = (
         );
         requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
         const normalized = normalizeApplicationAssetInput(input);
-        const existing = await repository.getApplicationAssetByOriginalName(
-          normalized.originalName
-        );
         const timestamp = now();
-        const applicationAsset: ApplicationAsset = {
-          applicationAssetId:
-            existing?.applicationAssetId ?? `asset:${idGenerator()}`,
-          ...normalized,
-          createdAt: existing?.createdAt ?? timestamp,
-          updatedAt: timestamp
+        const candidate: ApplicationAsset = {
+          applicationAssetId: `asset:${idGenerator()}`,
+          ...normalized, createdAt: timestamp, updatedAt: timestamp
         };
-        await repository.saveApplicationAsset(applicationAsset);
+        // Resolve filename identity under the same registry lock as deletion.
+        const { applicationAsset, replaced } = await repository.saveApplicationAsset(candidate, true);
         await recordAdminAuditEvent({
           eventType: "application_asset_uploaded",
           actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' ${existing ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
+          summary: `Platform admin '${currentSession.adminUser.username}' ${replaced ? "replaced" : "uploaded"} application asset '${applicationAsset.originalName}'.`,
           details: {
             applicationAssetId: applicationAsset.applicationAssetId,
             originalName: applicationAsset.originalName,
             mediaType: applicationAsset.mediaType,
             byteLength: applicationAsset.byteLength,
-            replaced: Boolean(existing)
+            replaced
           }
         });
         return applicationAsset;
@@ -26855,100 +26839,16 @@ export const createFirstSliceServices = (
           now()
         );
         requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
-        const applicationAsset = await repository.getApplicationAssetById(
-          input.applicationAssetId.trim()
-        );
-        if (!applicationAsset) {
-          throw new FirstSliceError(
-            404,
-            "application_asset_not_found",
-            "The requested application asset was not found."
-          );
-        }
-        const applicationSettings = await repository.getApplicationSettings();
-        const assignedSlots = Object.entries(
-          applicationSettings?.assetAssignments ?? {}
-        ).flatMap(([slot, originalName]) =>
-          originalName === applicationAsset.originalName ? [slot] : []
-        );
-        const tenants = await repository.listTenants();
-        const scopedWorkspaces = (
-          await Promise.all(
-            tenants.map(async tenant =>
-              (await repository.listWorkspacesByTenantId(tenant.tenantId)).map(
-                workspace => ({ tenant, workspace })
-              )
-            )
-          )
-        ).flat();
-        const rosterReferences = (
-          await Promise.all(
-            scopedWorkspaces.map(async ({ tenant, workspace }) => {
-              const [participants, operationalLogins] = await Promise.all([
-                repository.listParticipantRosterEntriesByWorkspace(
-                  tenant.tenantId,
-                  workspace.workspaceId
-                ),
-                repository.listOperationalLoginMigrationCandidatesByWorkspace(
-                  tenant.tenantId,
-                  workspace.workspaceId
-                )
-              ]);
-              return [
-                ...participants.map(entry => ({
-                  source: "participant" as const,
-                  loginKey: entry.loginKey,
-                  assetAssignments: entry.assetAssignments ?? {}
-                })),
-                ...operationalLogins.map(entry => ({
-                  source: "operational" as const,
-                  loginKey: entry.loginKey,
-                  assetAssignments: entry.assetAssignments ?? {}
-                }))
-              ].flatMap(entry => {
-                const slots = Object.entries(entry.assetAssignments).flatMap(
-                  ([slot, originalName]) =>
-                    originalName === applicationAsset.originalName ? [slot] : []
-                );
-                return slots.length > 0
-                  ? [
-                      {
-                        tenantKey: tenant.tenantKey,
-                        workspaceKey: workspace.workspaceKey,
-                        loginKey: entry.loginKey,
-                        source: entry.source,
-                        slots
-                      }
-                    ]
-                  : [];
-              });
-            })
-          )
-        ).flat();
-        if (assignedSlots.length > 0 || rosterReferences.length > 0) {
-          throw new FirstSliceError(
-            409,
-            "application_asset_in_use",
-            `Application asset '${applicationAsset.originalName}' is still assigned.`,
-            {
-              assignedSlots,
-              rosterReferenceCount: rosterReferences.length,
-              rosterReferences: rosterReferences.slice(0, 50)
-            }
-          );
-        }
-        await repository.deleteApplicationAsset(
-          applicationAsset.applicationAssetId
-        );
-        await recordAdminAuditEvent({
-          eventType: "application_asset_deleted",
-          actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' deleted application asset '${applicationAsset.originalName}'.`,
-          details: {
-            applicationAssetId: applicationAsset.applicationAssetId,
-            originalName: applicationAsset.originalName
-          }
+        if(input.cascadeAssignments!==undefined&&typeof input.cascadeAssignments!=="boolean")throw new FirstSliceError(
+          400,"application_asset_deletion_policy_invalid","cascadeAssignments must be a boolean.");
+        const applicationAsset=await repository.mutateApplicationAssetDeletion({
+          applicationAssetId:input.applicationAssetId.trim(),cascadeAssignments:input.cascadeAssignments===true,
+          auditEvent:{adminAuditEventId:idGenerator(),eventType:"application_asset_deleted",
+            actorAdminUserId:currentSession.adminUser.adminUserId,subjectAdminUserId:null,occurredAt:now(),
+            summary:"Platform administrator deleted an application asset.",
+            details:{applicationAssetId:input.applicationAssetId}}
         });
+        if(!applicationAsset)throw new FirstSliceError(404,"application_asset_not_found","The requested application asset was not found.");
         return applicationAsset;
       },
       async updateApplicationSettings(input) {

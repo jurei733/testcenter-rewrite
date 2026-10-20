@@ -1,4 +1,6 @@
 import {
+  prepareApplicationAssetDeletion,
+  validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
   hasActiveSourcePackageReplacement,
   transitionParticipantPresence,
@@ -129,6 +131,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return state.applicationSettings;
     },
     async saveApplicationSettings(settings) {
+      validateApplicationAssetReferences(settings.assetAssignments,Array.from(state.applicationAssets.values()));
       state.applicationSettings = { ...settings };
     },
     async listApplicationAssets() {
@@ -144,11 +147,37 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         ) ?? null
       );
     },
-    async saveApplicationAsset(applicationAsset) {
+    async saveApplicationAsset(applicationAsset, replaceByOriginalName=false) {
+      const existing=replaceByOriginalName?Array.from(state.applicationAssets.values()).find(asset=>asset.originalName===applicationAsset.originalName):null;
+      if(existing)applicationAsset={...applicationAsset,applicationAssetId:existing.applicationAssetId,createdAt:existing.createdAt};
+
       state.applicationAssets.set(
         applicationAsset.applicationAssetId,
         applicationAsset
       );
+      return { applicationAsset, replaced: Boolean(existing) };
+    },
+    async mutateApplicationAssetDeletion(input) {
+      const scopes=Array.from(state.workspacesByScope.values()).map(workspace=>({...workspace,
+        tenantKey:Array.from(state.tenants.values()).find(tenant=>tenant.tenantId===workspace.tenantId)?.tenantKey??workspace.tenantId}));
+      const effect=prepareApplicationAssetDeletion(input,{
+        asset:state.applicationAssets.get(input.applicationAssetId)??null,settings:state.applicationSettings,
+        roster:Array.from(state.participantRosterEntries.values()).map(row=>({...row,assetAssignments:row.assetAssignments??{}})),
+        operational:Array.from(state.operationalLoginMigrationCandidates.entries()).map(([key,candidates])=>{
+          const scope=scopes.find(scope=>scope.tenantId+"::"+scope.workspaceId===key);
+          if(scope)return {...scope,candidates};
+          const parts=key.split("::");if(parts.length!==2)throw Error("Invalid stored operational asset scope.");
+          return {tenantId:parts[0]!,workspaceId:parts[1]!,candidates};
+        }),scopes
+      });
+      if(!effect)return null;
+      if(effect.settings)state.applicationSettings=effect.settings;
+      for(const row of effect.roster){const previous=state.participantRosterEntries.get(row.participantRosterEntryId)!;
+        state.participantRosterEntries.set(row.participantRosterEntryId,{...previous,assetAssignments:row.assetAssignments});}
+      for(const group of effect.operational)state.operationalLoginMigrationCandidates.set(group.tenantId+"::"+group.workspaceId,group.candidates);
+      state.applicationAssets.delete(effect.asset.applicationAssetId);
+      state.adminAuditEvents.set(effect.auditEvent.adminAuditEventId,effect.auditEvent);
+      return effect.asset;
     },
     async deleteApplicationAsset(applicationAssetId) {
       return state.applicationAssets.delete(applicationAssetId);
@@ -640,6 +669,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       workspaceId,
       candidates
     ) {
+      for (const candidate of candidates) validateApplicationAssetReferences(candidate.assetAssignments,Array.from(state.applicationAssets.values()));
       state.operationalLoginMigrationCandidates.set(
         `${tenantId}::${workspaceId}`,
         candidates
@@ -653,6 +683,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
     },
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
+      validateApplicationAssetReferences(participantRosterEntry.assetAssignments,Array.from(state.applicationAssets.values()));
       state.participantRosterEntries.set(
         participantRosterEntry.participantRosterEntryId,
         participantRosterEntry

@@ -10,6 +10,17 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test("focused asset iteration retains mandatory unit and real PostgreSQL qualification", () => {
+  const suites = ["scripts/application-asset-cascade.test.mjs", "scripts/application-asset-cascade-api.test.mjs"];
+  const postgres = read("./run-postgres-integration.mjs");
+  for (const suite of suites) {
+    assert.ok(scripts["test:unit:built"].split(/\s+/).includes(suite));
+    assert.ok(postgres.includes(JSON.stringify(suite)));
+    assert.ok(scripts["test:application-assets:built"].split(/\s+/).includes(suite));
+  }
+  assert.equal(scripts["test:application-assets"], "npm run build:core && npm run test:application-assets:built");
+  assert.ok(scripts["test:application-assets:built"].includes("scripts/original-settings-controller.test.mjs"));
+});
 function expand(command, trail = []) {
   return command.replace(/npm run ([\w:-]+)/g, (_, key) => {
     assert.ok(Object.hasOwn(scripts, key), `Missing npm script ${key}`);

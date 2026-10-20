@@ -6,7 +6,7 @@ The Original Systemverwaltung settings tab now loads its German Allgemein and
 Bildersetzungen forms, with the pinned Source grouping/order/labels/defaults for
 all 102 text replacements, separate general/text/image-assignment saves, warning
 calendar day/hour, public notices, audience themes and the eight asset slots.
-The existing protected settings/assets API is unchanged. New settings actions
+The existing protected settings/assets API retains its default behavior. New settings actions
 capture the administrator before any asynchronous work, including FileReader;
 retired replies cannot apply the global title/theme or dispatch a later write.
 Separate saves read current settings and retain the required title/warning fields,
@@ -14,12 +14,14 @@ unknown custom-text overrides and unsaved edits in the other editor. The existin
 full-map endpoint still has no concurrent merge/CAS contract; cross-client races
 between that read and replacement write are not qualified as Source equivalence.
 
-Nine focused tests cover the complete Source catalog, authored whitespace and
+Focused tests cover the complete Source catalog, authored whitespace and
 empty-to-default input, separate drafts/saves, retry, retired reads and file reads,
 and local date/hour conversion. The real production Angular/owned-SQLite browser
 gate saves general/legal/theme/warning fields, all three editor categories, uploads
-an actual image, assigns/unassigns it, checks the existing in-use rejection and
-deletes it. It also proves live title/theme updates and retains twelve settings
+an actual image, checks all eight slots and the legacy in-use rejection, then
+uses the native Original removal action to clear its assignments and delete it.
+Reuploading the same filename receives a new identity, does not restore deleted
+assignments and uses a versioned gallery URL. It also proves live title/theme updates and retains twelve settings
 captures plus the twelve administration captures across three themes and both
 viewports. These captures are diagnostic; whole-page pixel acceptance remains open.
 A direct unchanged Source capture exposed Rewrite's inherited 12-pixel column gap
@@ -34,9 +36,18 @@ The twelve local paired neutral captures still have nonzero pixel differences;
 the narrow outer navigation is offset by 45 pixels and other header/control states
 remain to be aligned. No exact full-page image acceptance is claimed.
 
-The existing in-use asset guard remains authoritative: assigned or roster-referenced
-images require unassignment before deletion. Original backend deletion cascades
-assignments, so that behavior remains a functional difference. Persistent notices
+The Original adapter explicitly requests `cascadeAssignments: true`; absent or
+false retains the existing 409 in-use policy for other callers. Every store now
+commits the catalog deletion, global/participant/operational bindings and deletion
+audit together. PostgreSQL uses a schema-scoped transaction lock shared by catalog
+and assignment writers; SQLite uses `BEGIN IMMEDIATE`; File uses its existing
+serialized manifest commit. A queued stale PostgreSQL writer cannot restore the
+deleted reference or replace its password. Source SQL/DDL is pinned by full-file
+hashes and executed against actual PostgreSQL. Late audit/manifest failures roll
+back the complete mutation. Reupload retains a new identity; replacement of an
+existing filename keeps its identity and creation timestamp under the same lock.
+Public/participant image-cache freshness beyond the gallery, concurrent whole-map
+settings replacement and full Original backend qualification remain open. Persistent notices
 still need the Original toast presentation. Non-platform workspace administration,
 full paired-page qualification and the other formal parity requirements remain open;
 this slice does not close a full-page row. The administrator capability is reopened
