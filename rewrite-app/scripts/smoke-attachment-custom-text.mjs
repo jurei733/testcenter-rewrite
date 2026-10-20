@@ -9,6 +9,14 @@ import { PDFDocument } from "pdf-lib";
 import QRCode from "qrcode";
 import ts from "typescript";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
+import { createSmokeRouteFailureGate } from "./smoke-route-failure-gate.mjs";
+
+const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+const within = async (promise, description) => {
+  let timeout;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timeout = setTimeout(() => reject(Error(description)), 15_000); })]); }
+  finally { clearTimeout(timeout); }
+};
 
 // Real operator login, production Angular, owned SQLite, actual scoped downloads.
 // This checks text/transport semantics, not complete Original page geometry.
@@ -73,6 +81,16 @@ try {
   await api(`${scope}/attachments/${encodeURIComponent(attachment.attachmentId)}/files`, {
     fileName: "own.png", mediaType: "image/png", dataBase64: (await QRCode.toBuffer("owned-photo")).toString("base64")
   });
+  const otherWorkspaceKey = "owned-attachment-other", otherScope = `/api/v1/tenants/demo-tenant/workspaces/${otherWorkspaceKey}`;
+  await api("/api/v1/tenants/demo-tenant/workspaces", { workspaceKey: otherWorkspaceKey, displayName: "Other owned attachment scope" });
+  const otherSource = await api(otherScope + "/source-packages", { fileName: "owned.json", mediaType: "application/json", contentStructure: content });
+  const otherImport = await api(otherScope + "/import-jobs", { sourcePackageId: otherSource.sourcePackage.sourcePackageId });
+  await api(`${otherScope}/content-releases/${otherImport.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-attachment-text" });
+  await api(otherScope + "/participant-roster", { rosterText: [{ loginKey: "own-other", groupKey: "own-other-group", bookletKey: booklet.bookletKey }] });
+  await api("/api/v1/participant/starter:launch", { tenantKey: "demo-tenant", workspaceKey: otherWorkspaceKey,
+    loginKey: "own-other", groupKey: "own-other-group", bookletKey: booklet.bookletKey });
+  const otherAttachment = (await api(otherScope + "/attachments")).items[0];
+  assert.ok(otherAttachment); assert.notEqual(otherAttachment.attachmentId, attachment.attachmentId);
   const cases = [
     { name: "defaults", global: {}, local: {} },
     { name: "global", global: Object.fromEntries(Object.keys(defaults).map(key => [key, "Global " + key])), local: {} },
@@ -88,7 +106,8 @@ try {
     await api("/api/v1/admin/application-settings", { customTexts: global }, "PATCH");
     const username = `own-attachment-${item.name}`, initialPassword = "owned-attachment-initial", password = "owned-attachment-password";
     await api("/api/v1/admin/users", { username, password: initialPassword, customTexts: local,
-      roleAssignments: [{ role: "group_monitor", tenantKey: "demo-tenant", workspaceKey, groupKey: "own-group" }] });
+      roleAssignments: [{ role: "group_monitor", tenantKey: "demo-tenant", workspaceKey, groupKey: "own-group" },
+        { role: "group_monitor", tenantKey: "demo-tenant", workspaceKey: otherWorkspaceKey, groupKey: "own-other-group" }] });
     const adminToken = token;
     token = (await api("/api/v1/admin/auth/sign-in", { username, password: initialPassword })).sessionToken;
     await api("/api/v1/admin/auth/password", { password }, "POST");
@@ -106,9 +125,46 @@ try {
       await page.locator("#loadAttachmentsButton").click();
       const row = page.locator(`.attachment-row[data-attachment-id="${attachment.attachmentId}"]`);
       await row.waitFor(); assert.equal(await page.locator(".attachment-row").count(), 1);
+      if (item.name === "defaults") {
+        const arrived = deferred(), release = deferred(), gate = createSmokeRouteFailureGate();
+        const endpoint = `${baseUrl}${scope}/attachments`;
+        const handler = gate.wrap("old-workspace-attachment-list", async route => {
+          const response = await route.fetch();
+          try {
+            assert.equal(response.status(), 200);
+            assert.deepEqual((await response.json()).items.map(item => item.attachmentId), [attachment.attachmentId]);
+            arrived.resolve(); await release.promise; await route.fulfill({ response });
+          } finally { await response.dispose(); }
+        });
+        let primary;
+        await page.route(endpoint, handler);
+        try {
+          await page.locator("#loadAttachmentsButton").click();
+          await within(arrived.promise, "The exact old-workspace inventory request never arrived");
+          await page.locator("#monitorWorkspaceKey").fill(otherWorkspaceKey);
+          await page.locator("#monitorApplyScopeButton").click();
+          await page.locator("#attachmentEmptyState").waitFor();
+          assert.equal(await page.locator("#loadAttachmentsButton").isEnabled(), true,
+            "Changing workspace must release the old request's loading state before its reply");
+          await page.locator("#loadAttachmentsButton").click();
+          await page.locator(`.attachment-row[data-attachment-id="${otherAttachment.attachmentId}"]`).waitFor();
+          release.resolve(); await gate.settle(); gate.assertHealthy();
+          await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+          assert.equal(await row.count(), 0, "The late first-workspace list must not replace the second workspace");
+          assert.equal(await page.locator(".attachment-row").count(), 1);
+          assert.equal(await page.locator(".attachment-row").getAttribute("data-attachment-id"), otherAttachment.attachmentId);
+        } catch (error) { primary = error; }
+        finally { gate.beginCleanup(); release.resolve(); await gate.settle(); await page.unroute(endpoint, handler); }
+        const failure = gate.failure(primary); if (failure) throw failure;
+        await page.locator("#monitorWorkspaceKey").fill(workspaceKey); await page.locator("#monitorApplyScopeButton").click();
+        await page.locator("#loadAttachmentsButton").click(); await row.waitFor();
+        process.stdout.write(`attachment_scope=${mode}/${width}:passed\n`);
+      }
       await row.click();
       const expected = (key, rewrite) => local[key] ?? global[key] ?? "";
       const text = (key, rewrite) => expected(key, rewrite) || (mode === "original" ? defaults[key] : rewrite);
+      assert.equal(await page.locator('.attachment-side[data-attachment-type="capture-image"] code').textContent(),
+        text("am_attachment_type_capture-image", "capture-image"));
       assert.equal(await page.locator("#openAttachmentCaptureButton").textContent(), text("am_capture_image", "Open camera capture"));
       assert.equal(await page.locator(".attachment-file-actions .danger").textContent(), text("am_button_delete_attachment", "Delete"));
       const template = local.am_page_template_label ?? global.am_page_template_label ?? "";

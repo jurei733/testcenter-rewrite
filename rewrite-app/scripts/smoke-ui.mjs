@@ -25696,9 +25696,8 @@ try {
     .filter({ hasText: "participant-photo" });
   await clickVisibleAttachmentRow(captureImageAttachmentRow);
   await attachmentManager
-    .locator(".attachment-side")
+    .locator('.attachment-side[data-attachment-type="capture-image"]')
     .filter({ hasText: "participant-photo" })
-    .filter({ hasText: "capture-image" })
     .waitFor();
   assert.equal(
     await attachmentManager.locator(".attachment-layout").evaluate(element =>
