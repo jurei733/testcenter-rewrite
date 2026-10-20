@@ -1,11 +1,13 @@
 # CI iteration and complete acceptance
 
-The reference successful run is
+The historical workflow-reported green run is
 [`39187723764`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39187723764)
 at `d39d8d46`, measured from its 38 actual jobs: **42.9 minutes** from first job
 start to final completion and **302.2 runner-minutes**. The Ops chain alone took
 2,336 seconds; PostgreSQL UI took 1,177 seconds. These are observed baseline
-times, not measurements of the new workflow.
+times, not measurements of the new workflow. Its Quick log at job
+`117853584730` also contains the masked HTTP login failure described below.
+The 38 green job conclusions therefore do not establish complete acceptance.
 
 The apparent green fast checkpoints at `3e93fcee` (251 seconds) and `7373b68a`
 (269 seconds) are **invalid qualification measurements**. Inspection of the
@@ -13,7 +15,9 @@ actual Quick log found a failed Original HTTP login hidden by `tee`: GitHub's
 implicit `bash -e` shell returned the logger's success. The follow-up explicitly
 uses `shell: bash`, enabling `-e -o pipefail`. A subprocess regression reproduces
 the old false green and requires the exact failing upstream status, 37, to
-survive logging. Neither earlier run establishes full release acceptance.
+survive logging. The older workflow's explicit pipefail *inner* bash was also
+insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
+Neither earlier run establishes full release acceptance.
 
 ## Fast feedback
 
