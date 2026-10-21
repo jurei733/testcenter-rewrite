@@ -98,7 +98,16 @@ try{
   assert.equal((await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===secondId)
     .roleAssignments.find(role=>role.workspaceId===beta.workspaceId).accessMode,"read_write",
     "Renaming discards the unsaved checkbox draft without submitting it.");
+  const retainedRead=row.getByRole('checkbox',{name:'Nur Lesen',exact:true});
+  const retainedInput=await retainedRead.elementHandle();
+  assert.equal(await retainedRead.isChecked(),false,'Source retains the unsaved visual row after clearing selection.');
+  await retainedRead.check();
+  assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
+  assert.equal((await api('/api/v1/admin/users')).items.find(item=>item.adminUser.adminUserId===secondId)
+    .roleAssignments.find(role=>role.workspaceId===beta.workspaceId).accessMode,'read_write');
   await page.locator(`[data-workspace-id="${beta.workspaceId}"]`).click();
+  await page.waitForFunction(element=>!element.isConnected,retainedInput);
+  await row.locator('input[type="checkbox"]:checked').nth(1).waitFor();
   assert.equal(await row.getByRole("checkbox",{name:"Lesen und Schreiben",exact:true}).isChecked(),true);
   await page.locator('[data-cy="delete-workspace"]').click();
   const password=page.locator("#globalConfirmationPasswordInput");await password.waitFor();
@@ -146,6 +155,11 @@ try{
   assert.equal(await page.locator('[data-cy="delete-user"]').isDisabled(),true);
   assert.equal(await page.locator('[data-cy="change-superadmin"]').isDisabled(),true);
   assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
+  assert.equal(await unsavedCreatedAccess.isChecked(),true);
+  await unsavedCreatedAccess.uncheck();
+  assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
+  assert.equal((await api('/api/v1/admin/users')).items.find(item=>item.adminUser.adminUserId===created.adminUser.adminUserId)
+    .roleAssignments.some(role=>role.workspaceId===alpha.workspaceId),false,'Editing a retained row has no save owner.');
   await page.locator(`[data-admin-id="${created.adminUser.adminUserId}"]`).click();
   assert.equal(await unsavedCreatedAccess.isChecked(),false);
   await page.locator('[data-cy="change-superadmin"]').click();

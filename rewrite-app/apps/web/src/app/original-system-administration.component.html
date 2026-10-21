@@ -111,10 +111,10 @@
                 @let workspaceId = row.workspaceId;
                 <mat-checkbox [attr.data-cy]="section === 'users' ? 'workspace-' + workspaceId + '-role-ro' : 'workspace-role-ro' + i"
                   aria-label="Nur Lesen" matTooltip="Nur Lesen" [disabled]="directory.busy"
-                  [checked]="directory.access(adminId,workspaceId) !== ''" (change)="directory.togglePermission(adminId,workspaceId,'RO')" />
+                  [checked]="row.access !== ''" (change)="directory.togglePermissionRow(row,'RO')" />
                 <mat-checkbox [attr.data-cy]="section === 'users' ? 'workspace-' + workspaceId + '-role-rw' : 'workspace-role-rw' + i"
                   aria-label="Lesen und Schreiben" matTooltip="Lesen und Schreiben" [disabled]="directory.busy"
-                  [checked]="directory.access(adminId,workspaceId) === 'RW'" (change)="directory.togglePermission(adminId,workspaceId,'RW')" />
+                  [checked]="row.access === 'RW'" (change)="directory.togglePermissionRow(row,'RW')" />
               </mat-cell>
             </ng-container>
             <ng-container matColumnDef="label"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">{{ section === 'users' ? 'Arbeitsbereich' : 'Admins' }}</mat-header-cell>
@@ -125,6 +125,8 @@
         </div>
       </div>
     }
-    @if (directory.notice) { <p id="originalAdministrationNotice" role="status">{{ directory.notice }}</p> }
+
   </mat-tab-nav-panel>
 </section>
+
+<app-original-toast-container />

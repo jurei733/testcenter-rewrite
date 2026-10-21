@@ -7,6 +7,7 @@ import { MatDivider } from "@angular/material/divider";
 import { MatMenu, MatMenuTrigger } from "@angular/material/menu";
 import { MatProgressBar } from "@angular/material/progress-bar";
 import { MatSort, MatSortHeader, type Sort } from "@angular/material/sort";
+import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell,
   MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from "@angular/material/table";
 import { MatTabNav, MatTabLink, MatTabNavPanel } from "@angular/material/tabs";
@@ -28,6 +29,8 @@ import type { OriginalWorkspace } from "./original-administration-controller";
 import { OriginalAdministrationSurfaceStylesComponent } from "./original-administration-surface-styles.component";
 import { OriginalAdministrationEditorComponent, type OriginalAdministrationEditorData } from "./original-administration-editor.component";
 import { OriginalParticipantLogoutDialogComponent } from "./original-participant-logout-dialog.component";
+import { OriginalToastService } from "./original-toast.service";
+import { OriginalToastContainerComponent } from "./original-toast-container.component";
 import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers";
 
 // IQB Testcenter 19 Superadmin tables and header (MIT), using the Rewrite's
@@ -37,7 +40,7 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
   imports:[OriginalApplicationSettingsComponent,RouterLink,RouterLinkActive,MatButton,MatFabButton,MatIconButton,MatCheckbox,MatDivider,
     MatMenu,MatMenuTrigger,MatProgressBar,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,
     MatCellDef,MatCell,MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTabNav,MatTabLink,MatTabNavPanel,
-    MatToolbar,MatTooltip,OriginalOverlayStylesComponent,OriginalAdministrationIconComponent,OriginalAdministrationSurfaceStylesComponent],
+    MatToolbar,MatTooltip,OriginalOverlayStylesComponent,OriginalAdministrationIconComponent,OriginalAdministrationSurfaceStylesComponent,OriginalToastContainerComponent],
   templateUrl:"./original-system-administration.component.html",
   styleUrls:["./original-login-theme.scss","./original-system-administration.component.css"]
 })
@@ -54,6 +57,9 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   private readonly dialogs = inject(MatDialog);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly router = inject(Router);
+  private readonly toasts = inject(OriginalToastService);
+  private readonly snackBar = inject(MatSnackBar);
+  private lastNotice = "";
   private editor: MatDialogRef<OriginalAdministrationEditorComponent> | null = null;
   private logout: MatDialogRef<OriginalParticipantLogoutDialogComponent> | null = null;
   private confirmationId: number | null = null;
@@ -76,8 +82,21 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   readonly directory = new OriginalAdministrationController(
     (method,path,body,token)=>this.request.request("Systemverwaltung",method,path,body,{quiet:true,headers:{authorization:`Bearer ${token}`}}),
     ()=>({token:this.state.ops.adminSessionToken.trim(),adminUserId:this.view.currentAdminUserId}),
-    ()=>{if(!this.destroyed)this.changed.markForCheck();}
+    ()=>{if(!this.destroyed){this.showNotice();this.changed.markForCheck();}}
   );
+  private showNotice(): void {
+    const notice=this.directory.notice;
+    if (!notice) { this.lastNotice=""; return; }
+    if (this.directory.busy || notice===this.lastNotice) return;
+    this.lastNotice=notice;
+    if (notice==="Arbeitsbereich hinzugefügt" || notice==="Arbeitsbereich geändert" || notice==="Arbeitsbereich gelöscht" ||
+      (notice==="Zugriffsrechte geändert" && this.section==="workspaces")) {
+      this.snackBar.open(notice==="Arbeitsbereich gelöscht"?"Arbeitsbereich(e) gelöscht":notice,
+        notice==="Arbeitsbereich gelöscht"?"Fehler":"",{duration:1000});
+    } else if (notice!=="Administrator:in hinzugefügt") {
+      this.toasts.show(notice==="Superadmin-Status geändert"?"Status geändert":notice);
+    }
+  }
 
   ngOnChanges(): void {
     // The token is an input so a new administrator cannot inherit a mounted
@@ -115,13 +134,15 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   private direction(sort: Sort): number { return sort.direction==="desc"?-1:1; }
   readonly trackUser = (_index:number,row:AdminUserDirectoryItem): string => row.adminUser.adminUserId;
   readonly trackWorkspace = (_index:number,row:OriginalWorkspace): string => row.workspaceId;
-  readonly trackPermission = (_index:number,row:{adminUserId:string;workspaceId:string}): string => JSON.stringify([row.adminUserId,row.workspaceId]);
-  get permissionRows(): Array<{label:string;adminUserId:string;workspaceId:string}> {
-    const rows = this.section==="users"
-      ?this.directory.selectedAdmin?this.workspaces.map(workspace=>({label:workspace.displayName,workspaceId:workspace.workspaceId,adminUserId:this.directory.selectedAdminId})):[]
-      :this.directory.selectedWorkspace?this.users.map(user=>({label:user.adminUser.username,adminUserId:user.adminUser.adminUserId,workspaceId:this.directory.selectedWorkspaceId})):[];
+  // Source recreates permission rows on owner selection, while checkbox edits
+  // keep the same row. Reusing a previously clicked overflow cell on re-selection
+  // also reuses its internal scroll position on narrow screens.
+  readonly trackPermission = (_index:number,row:{adminUserId:string;workspaceId:string}): string =>
+    JSON.stringify([this.directory.permissionViewEpoch,row.adminUserId,row.workspaceId]);
+  get permissionRows() {
+    const rows = this.directory.permissionRows(this.section==="users"?"users":"workspaces");
     if(this.permissionSort.direction)rows.sort((a,b)=>this.direction(this.permissionSort)*(this.permissionSort.active==="selectCheckbox"
-      ?this.directory.access(a.adminUserId,a.workspaceId).localeCompare(this.directory.access(b.adminUserId,b.workspaceId)):a.label.localeCompare(b.label)));
+      ?a.access.localeCompare(b.access):a.label.localeCompare(b.label)));
     return rows;
   }
   sortUsers(sort: Sort): void { this.userSort=sort; }
@@ -129,7 +150,7 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
   sortPermissions(sort: Sort): void { this.permissionSort=sort; }
   choose(section: AdministrationSection): void {
     if(this.directory.busy)return;
-    this.directory.clearSelection();this.section=section;this.sectionSelected.emit(section);
+    this.directory.clearSelection(false);this.section=section;this.sectionSelected.emit(section);
   }
   private openEditor(kind: OriginalAdministrationEditorData["kind"], name = ""): void {
     if(this.destroyed || this.directory.busy || this.editor)return;

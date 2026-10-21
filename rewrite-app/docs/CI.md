@@ -19,6 +19,45 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Confirmed directory mutation qualification
+
+The next directory comparison retains all 84 previous views and adds confirmed
+role/name changes, retained-row edits and owner re-selection: **120 exact pairs
+plus 120 independent Source repeats**. Only two narrowly validated Source PATCH
+fixtures are writable; candidate actions use the real protected API. Every
+candidate journey restores its owned starting name/platform role. An unrelated
+dirty workspace permission must remain unsaved after the confirmed action.
+
+A first actual Source probe found 4,854 desktop role and 2,982 rename pixels
+changed in the candidate; all Source repeats were exact. The product now retains
+the prior visible permission rows without a save owner, clears them on session
+replacement/destruction and restores saved rights on re-selection. Temporary
+Source Toast/Material notifications replace the permanent success paragraph.
+The first complete local comparison isolated three 670-pixel mobile re-selection
+differences. Direct geometry proves the reused candidate cell had `scrollLeft=24`
+where Source had `0`. A permission-view generation now recreates rows on owner
+selection and retains them during checkbox edits/selection clearing. All three
+mobile re-selections now measure zero internal scroll in both builds.
+
+Final production validation passes **120 exact pairs / 120 independent repeats**;
+all **360 actual native PNG proofs** independently verify. The 24 Source fixture
+writes are narrowly checked and their bodies/secrets are excluded from evidence.
+All **34 controller, 1,966 frontend and 154 CI policy cases** pass, as do typecheck,
+production build, Source byte verification and Actionlint. The complete protected
+native administration/settings journey also passes, including retained-row edits,
+actual role/name acknowledgements, wrong-password preservation, all 102 text
+fields, eight image slots, reset/session gates and logout. Re-selection explicitly
+waits for the retained DOM node to detach and the new saved checked state; the
+initial immediate assertion correctly exposed that fresh view's asynchronous
+rendering. No fixed delay or automatic scenario retry is added. A fresh Linux head
+remains required; `375ea6de` qualifies the preceding 84-state dialog change.
+
+For local iteration, `npm run typecheck` currently also writes a development web
+build. Run it before production build and browser qualification; otherwise it
+replaces the browser's input during capture. An accidentally overlapping local
+capture was explicitly terminated and excluded. The final production comparison
+ran only after typecheck and production build completed, with no concurrent build.
+
 ## Current directory/dialog checkpoint
 
 Published `2dc47c98` completes [run 39608434842](https://github.com/jurei733/testcenter-rewrite/actions/runs/39608434842)

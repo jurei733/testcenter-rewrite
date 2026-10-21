@@ -20,13 +20,18 @@ The Source system-check welcome view retains a 1280px content toolbar on a 1280p
 
 ## Paired administration directories and dialogs
 
-The directory family now compares **84 complete viewports and 84 independent
+The directory family now compares **120 complete viewports and 120 independent
 Source repeats**: three themes, 1280/390 by 844 pixels, both tables, initial and
 selected rows, dirty rights, re-selecting the same dirty row, and role/name dialogs
-with empty, invalid and valid fields. All previous 36 baseline scenes remain.
-Source authority stays at its separate origin with read-only controlled DTOs;
-candidate contexts inherit only an actual protected UI sign-in. No dialog submit
-or Source backend authentication is simulated by this visual gate.
+with empty, invalid and valid fields. Confirmed changes, retained-row edits and
+owner re-selection are included; all previous 84 views remain.
+Source authority stays at its separate origin. Controlled DTO fixtures allow only
+owned role/name PATCH requests with the exact fake Source token and body; unknown
+writes still fail. Source's actual frontend performs each request, reload and
+selection reset. Candidate contexts inherit only an actual protected UI sign-in
+and submit their changes to the protected API. Before each candidate journey,
+owned setup restores the same initial name and platform role. Neither Source
+fixture authority nor setup credentials enter candidate browser storage.
 
 Sixteen pinned DAO/service/component/template/CSS files establish directory and
 dialog contracts, including name minimum length, empty initial rename state,
@@ -53,11 +58,46 @@ rename with an empty field, applies its three-character name minimum and restore
 the native workspace field width/paragraph. Selecting an already selected row
 preserves pending rights, matching Source CDK selection behavior. The expanded
 local wrapper passes all **84 pairs/repeats**, with 252 physical frame proofs and
-16 Source files. Fresh Linux qualification of this expanded scope remains required.
+16 Source files. Published `375ea6de` also passes all 84 pairs/repeats on Linux,
+job `119275166669` in [run 39615271572](https://github.com/jurei733/testcenter-rewrite/actions/runs/39615271572).
+Its directory ZIP `12352322630` has SHA256
+`8fbe0fbc53af8149461185944bd5026f86a4843d1bea372a4f93b931517bac14`;
+all 252 actual PNG records independently verify white pixels, exact restoration
+and stable visible hashes. The same-run Source producer is
+`76f7b776b4e26cb9a449f029daf58ffcb6ca5442`. Its full matrix is still running.
+The later mutation expansion passes its final production wrapper at **120 exact
+pairs and 120 exact Source repeats**. All 360 actual clear/visible PNG records
+independently verify, with 24 narrowly owned Source fixture writes. This local
+run uses the remembered Source producer manifest and still needs a fresh Linux
+head; the preceding 84-state CI cannot qualify the expanded mutation scope.
 
-Submitted mutations, other dialogs, transient/error/pending states, Source's
-retained permission rows after selection clears, backend authorization and
-locale-specific database collation remain open. No broad parity row closes.
+The first submitted-mutation probe reproduced Source exactly but found 4,854
+pixels different after desktop role acknowledgement and 2,982 after rename.
+The candidate emptied Source's retained right-hand rows and left a permanent
+success paragraph. The implementation now keeps a session-scoped visual snapshot
+without staging rights, restores saved rights on selection and uses Source's
+Toast/Material snackbar presentations. Native API assertions check that confirming
+the role/name never submits the unrelated dirty permission. Retained-row edits
+cannot reveal Save or dispatch writes; session replacement and destruction clear
+all retained rows.
+
+The first full 120-state local comparison additionally found exactly 670 mobile
+pixels different after user re-selection in each theme. Source reproduced all
+120 views exactly. Checkbox geometry showed the reused candidate cell content
+24 pixels left of Source after a prior native click. An isolated unchanged-build
+probe directly records `cell.scrollLeft=24` in the candidate and `0` in Source.
+Selection now creates a new
+permission-view generation, matching Source's recreated rows, while ordinary
+checkbox edits and clearing selection retain the same view and focus. Native
+metadata includes checkbox/host/cell bounds and internal scroll offsets. The
+final rebuilt production comparison passes all 120 views/repeats. All three
+mobile user re-selections record `scrollLeft=0` in Source, candidate and repeat.
+No pixel mask, tolerance, layout override, timer change or scenario retry was used.
+
+Other submitted actions/dialogs, transient notification pixels, error/pending
+states, locale-specific name ordering and Source backend authorization remain
+outside this measured scope. These comparisons do not close the broad visual
+acceptance rows.
 
 ## Same-run settings comparison
 
