@@ -7,6 +7,7 @@ import {join, resolve} from 'node:path';
 import {chromium} from 'playwright';
 import {captureStableViewport} from './stable-viewport-capture.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
+import {captureViewportRepaintDiagnostic,captureSurfaceBackgroundDiagnostic} from './viewport-repaint-diagnostic.mjs';
 
 const scratch = await mkdtemp(join(tmpdir(), 'owned-viewport-control-'));
 const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR
@@ -85,4 +86,33 @@ test('capture-side layout changes remain fatal instead of becoming a new baselin
       document.querySelector('canvas').style.width = '90px';
     })), measure, join(artifacts, 'resized.png')), /must preserve the actual viewport/);
   });
+});
+
+test('an isolated full-viewport repaint restores native content and cannot waive one changed pixel',async()=>{
+ await withViewport(async(page,measure)=>{
+  const before=await page.screenshot({fullPage:false});
+  const html=await page.content(),geometry=await measure();
+  const restored=await captureViewportRepaintDiagnostic(page,measure,join(artifacts,'repaint-restored'));
+  assert.equal(restored.hiddenFrame.nonWhitePixels,0);assert.equal(restored.rootStyleRestored,true);
+  assert.equal((await compareScreenshots(page,before,restored.bytes)).differingPixels,0);
+  assert.equal(await page.content(),html);assert.deepEqual(await measure(),geometry);
+  await page.evaluate(()=>{const c=document.querySelector('canvas').getContext('2d');c.fillStyle='red';c.fillRect(12,15,1,1);});
+  const backgrounds=await captureSurfaceBackgroundDiagnostic(page,measure,'body','transparent',join(artifacts,'background-changed'));
+  assert.equal((await compareScreenshots(page,before,backgrounds.changed.bytes)).differingPixels,1);
+  assert.equal((await compareScreenshots(page,before,backgrounds.restored.bytes)).differingPixels,1);
+  const changed=await captureViewportRepaintDiagnostic(page,measure,join(artifacts,'repaint-changed'));
+  const comparison=await compareScreenshots(page,before,changed.bytes);assert.equal(comparison.differingPixels,1);
+  assert.deepEqual(comparison.bounds,{left:12,top:15,right:13,bottom:16});
+ });
+});
+
+test('failed diagnostic captures restore the original surface attribute before propagating the error',async()=>{
+ await withViewport(async(page,measure)=>{
+  const before=await page.content();
+  const failing={evaluate:(...args)=>page.evaluate(...args),screenshot:async()=>{throw Error('Owned diagnostic capture failure');}};
+  await assert.rejects(captureSurfaceBackgroundDiagnostic(failing,measure,'body','transparent',join(artifacts,'failed-background')),/Owned diagnostic capture failure/);
+  assert.equal(await page.content(),before);
+  await assert.rejects(captureViewportRepaintDiagnostic(failing,measure,join(artifacts,'failed-repaint')),/Owned diagnostic capture failure/);
+  assert.equal(await page.content(),before);
+ });
 });

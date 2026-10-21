@@ -19,7 +19,84 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Independent console qualification jobs
+
+The former `ui-participant-console` job serialized eight independent browser
+commands. They now run in five isolated jobs: Source/runtime timer, Debug,
+console loading/context compatibility, command completion, and native route/tabs.
+The timer reference still precedes its runtime check. Each job restores the same
+verified production build and runs at most two commands; no browsers compete for
+native focus within the same runner. A policy test reconciles all eight prior
+leaf commands exactly once across these shards. All remain required through the
+existing matrix aggregate and final acceptance; no check is replaced by Fast
+feedback. The 28 fast/extended scenarios and their four-slot extended limit stay
+unchanged. This increases the full matrix from 81 to 85 jobs and adds setup cost;
+actual wall-time and compute effects require a completed new run.
+
+Timer failure evidence moves to its actual timer job. The isolated Debug job
+retains only its JSON/PNG evidence for seven days, with SQLite scratch stores
+outside the uploaded directory. The console loading upload stays scoped to its
+own job. Failure isolation also allows the other checks to execute after an
+earlier console check fails, instead of losing the remaining serial coverage.
+
 ## Settings renderer and immutable exit baseline
+
+### Observe all native Player inputs before freezing exit state
+
+The actual `97a534a0` Linux exit failure in job `119076685007` compares a
+first acknowledged packet with field clocks ending in 541 against a later
+stored packet ending in 545. Its retained trace has two successful POSTs and
+three distinct Player-log entries, with the same authored answer. This alone
+cannot distinguish multiple native input events from duplicate processing.
+
+The exit gate now observes actual trusted input events inside the owned Player
+and its corresponding parent-window state notifications. Their ordered values
+must match exactly. Unique accepted Player log IDs and their original
+notification timestamps must match that notification stream, so choosing the
+last acknowledgement cannot conceal duplicated message processing. After all
+observed inputs have been handled and the real drainer is saved, the complete
+stored response must equal the last actual acknowledged packet, including every
+field clock. All later immutable cancellation/forbidden-exit assertions remain.
+
+A mandatory native control holds the first successful answer ACK, performs real
+End/Space/Backspace input to restore the exact same authored bytes, then releases
+the ACK. It requires a separate later acknowledgement with newer field clocks.
+The complete local exit gate passes all 36 Original presentations, six Rewrite
+presentations and the fallback flows. Its ordinary fills actually emit three
+trusted input events and three corresponding Player notifications, usually
+coalesced into one save acknowledgement. The held case observes five inputs,
+five notifications and two acknowledgements with different field clocks.
+Linux validation of the new observers is
+still required; the original trace does not yet prove which input path produced
+its three notifications. The strengthened gate must expose that distinction.
+
+### Isolated retained-paint diagnostics
+
+Raw Linux images from `7b6090b7` distinguish an overhanging glyph from a
+possibly retained pixel: `(39,440)` is white in the current General-bottom
+view, but a failing Rewrite capture keeps the exact yellow LCD pixel present
+at that coordinate beside the earlier warning label. Source's Images capture
+sometimes retains the same pixel even though the label has moved. This is
+stronger evidence than calling every differing pixel a current heading edge;
+it suggests retained paint but does not yet prove the renderer's cause.
+
+After each Primar/1280 General-bottom baseline, a separate diagnostic records
+complete visible-heading/ancestor computed styles and font faces. It tests the
+actual Source root background color with an A/B/A restoration, then witnesses a
+fully cleared native viewport and a restored rendering. Original baseline PNGs
+and their zero-tolerance verdicts have already been recorded and are never
+replaced. A separate decoder compares the diagnostic Source, Rewrite and
+independent Source-repeat images only after all baseline documents are closed.
+These comparisons do not qualify acceptance. Root/surface style attributes and
+layout must be restored, including when capture fails. Native scrollbar fade
+may change during these diagnostics and remains visible in their own pixels.
+
+Five mandatory headed-browser controls now include successful restoration,
+restoration after a failed diagnostic, and a genuinely changed canvas pixel
+that remains a one-pixel mismatch after both diagnostic procedures. No expected
+Source image is passed to either procedure; no threshold, mask, renderer flag
+or baseline-preparation change is introduced. Actual Linux diagnostic evidence
+is still required before changing the capture method or production CSS.
 
 ### Atomic settings edits alongside the pipeline gates
 
@@ -112,7 +189,8 @@ fail rather than qualifying a Rewrite result. No repeated image replaces the
 original reference. Local validation passes all 24 Rewrite comparisons and all
 24 Source repeats, with 18 independently witnessed phase documents. Linux
 repeatability is still unproven and is the purpose of this diagnostic. The
-81-job matrix, 19 Source tasks and zero-tolerance comparator remain unchanged.
+81-job matrix, 19 Source tasks and zero-tolerance comparator were unchanged at
+that checkpoint.
 
 A local temporal control proves that the unchanged Source's first mobile date
 field image can differ by eight pixels from its next five images, with identical
@@ -138,7 +216,8 @@ actual headed-browser controls cover a paint change after the first image,
 continuously changing pixels and capture-side layout mutation; these controls
 are mandatory before the administration Source family, with their artifacts
 retained alongside it. All 122 CI policy checks and Actionlint pass. The other
-Source tasks, 81-job matrix and full-acceptance requirements remain unchanged.
+Source tasks, 81-job matrix and full-acceptance requirements were unchanged at
+that checkpoint.
 Fresh Linux qualification is required; no broad parity row is closed.
 
 The complete 81-job response for parent `6d87316a` records **78 successful /

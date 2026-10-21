@@ -11,6 +11,7 @@ import {waitForMaterialTabs} from './material-tab-ready.mjs';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
 import {captureStableViewport} from './stable-viewport-capture.mjs';
+import {captureViewportRepaintDiagnostic,readHeadingPaintEvidence,captureSurfaceBackgroundDiagnostic} from './viewport-repaint-diagnostic.mjs';
 
 assert.equal(process.env.UI_SMOKE_HEADFUL, 'true');
 assert.ok(!process.env.UI_SMOKE_BROWSER_CHANNEL, 'Source and Rewrite use the lockfile Chromium.');
@@ -46,6 +47,7 @@ const apiServer = spawn(process.execPath, ['--input-type=module', '-e',
 const apiClosed = new Promise(done => apiServer.once('close', done));
 let browser;
 const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [];
+const repaintImages={}, repaintComparisons={}, sourcePaintEvidence={};
 const options = width => ({viewport: {width, height: 844}, deviceScaleFactor: 1,
   locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light'});
 async function capture(page, kind, theme, width) {
@@ -161,6 +163,32 @@ async function capture(page, kind, theme, width) {
         }
       }
     }
+    // Preserve every baseline first. The next Images state starts in a new
+    // document, so a diagnostic repaint never prepares another baseline here.
+    if(theme==='Primar'&&width===1280&&name==='general'&&position==='bottom'){
+      const evidence=await readHeadingPaintEvidence(page);
+      if(kind==='source')sourcePaintEvidence[key]=evidence;
+      const sourceRoot=sourcePaintEvidence[key].headings[0].chain.find(item=>item.tag==='TC-ROOT');
+      assert.ok(sourceRoot,'The actual Source root background owner is required.');
+      const background=await captureSurfaceBackgroundDiagnostic(page,measure,
+        kind==='rewrite'?'app-original-system-administration':'tc-root',sourceRoot.styles['background-color'],
+        join(artifacts,'diagnostic-background-'+kind+'-'+key));
+      await writeFile(join(artifacts,'diagnostic-background-'+kind+'-'+key+'.json'),JSON.stringify({diagnosticOnly:true,
+        initialBackground:background.initialBackground,sourceBackground:background.sourceBackground,
+        changed:await compareScreenshots(page,bytes,background.changed.bytes),
+        restored:await compareScreenshots(page,bytes,background.restored.bytes),
+        originalSourceToChanged:await compareScreenshots(page,states[key].source.bytes,background.changed.bytes),
+        originalSourceToRestored:await compareScreenshots(page,states[key].source.bytes,background.restored.bytes)
+      },null,2));
+      const diagnostic=await captureViewportRepaintDiagnostic(page,measure,join(artifacts,'diagnostic-repaint-'+kind+'-'+key));
+      (repaintImages[key]??={})[kind]=diagnostic.bytes;
+      await writeFile(join(artifacts,'diagnostic-repaint-'+kind+'-'+key+'.json'),JSON.stringify({diagnosticOnly:true,
+        evidence,hiddenFrame:diagnostic.hiddenFrame,rootStyleRestored:diagnostic.rootStyleRestored,paintDiagnostics:diagnostic.paintDiagnostics,
+        baselineToRepaint:await compareScreenshots(page,bytes,diagnostic.bytes),
+        originalSourceToRepaint:await compareScreenshots(page,states[key].source.bytes,diagnostic.bytes)
+      },null,2));
+      assert.deepEqual(await measure(),geometry,'Diagnostic rendering must leave the baseline layout intact.');
+    }
     }
   }
 }
@@ -237,6 +265,14 @@ try {
       await context.close();
     }
   }
+  const decoder=await browser.newPage();
+  await decoder.goto(base+'/api/v1/system/application-settings',{waitUntil:'domcontentloaded'});
+  for(const[key,images]of Object.entries(repaintImages)){
+    repaintComparisons[key]={diagnosticOnly:true,
+      sourceToRewrite:await compareScreenshots(decoder,images.source,images.rewrite),
+      sourceToRepeat:await compareScreenshots(decoder,images.source,images['source-repeat'])};
+  }
+  await decoder.close();
   assert.equal(Object.keys(states).length, 24);
   for (const [key, state] of Object.entries(states)) {
     assert.ok(state.source && state.rewrite, 'Every case requires actual Source and actual Rewrite screenshots.');
@@ -250,7 +286,7 @@ try {
 } finally {
   await writeFile(join(artifacts, 'settings.json'), JSON.stringify({source: originalBrowserSource, manifest,
     scope: 'Unchanged Source frontend on read-only API fixtures versus Rewrite with a real protected SQLite session; no Source backend authorization proof.',
-    states: comparisons, referenceReproducibility, documentDiagnostics, errors, unknown}, null, 2));
+    states: comparisons, referenceReproducibility, documentDiagnostics, repaintDiagnostics:repaintComparisons, errors, unknown}, null, 2));
   await browser?.close(); apiServer.kill('SIGTERM');
   await raceWithSmokeDeadline(apiClosed, 10000, () => { apiServer.kill('SIGKILL'); throw Error('Owned API shutdown timed out.'); });
   await new Promise(done => sourceServer.close(done));

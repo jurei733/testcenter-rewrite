@@ -190,6 +190,23 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
   assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
 });
+test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
+  const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
+  const shards=matrix.filter(item=>names.includes(item.check));
+  assert.deepEqual(shards.map(item=>item.check),names);
+  const prior=baseline.commands.find(item=>item.check==="ui-participant-console").leaves;
+  const actual=shards.flatMap(item=>expand(item.command).split("&&").map(value=>value.trim()));
+  assert.equal(actual.length,8);assert.equal(new Set(actual).size,8);
+  assert.deepEqual([...actual].sort(),[...prior].sort());
+  for(const item of shards){assert.equal(item.playwright,true);assert.ok(item.command.split("&&").length<=2);}
+  assert.ok(workflow.jobs.acceptance.needs.includes("verify-memory-sqlite"));
+  const timer=workflow.jobs["verify-memory-sqlite"].steps.find(step=>step.name==="Retain failed controller timer diagnostics");
+  assert.equal(timer.if,"failure() && matrix.check == 'ui-controller-timer'");
+  const debug=workflow.jobs["verify-memory-sqlite"].steps.find(step=>step.name==="Retain failed console debug evidence");
+  assert.equal(debug.if,"failure() && matrix.check == 'ui-console-debug'");
+  assert.equal(debug.with.path.trim(),"${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.png");
+  assert.equal(debug.with["retention-days"],7);
+});
 test("atomic settings regressions remain mandatory for both local and PostgreSQL acceptance", () => {
   assert.ok(scripts["test:unit:built"].includes("scripts/application-settings-mutation.test.mjs"));
   const postgres=readFileSync(new URL("./run-postgres-integration.mjs",import.meta.url),"utf8");
