@@ -1,36 +1,13 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
-import {captureStableViewport} from './stable-viewport-capture.mjs';
+import {sampleStableViewport} from './stable-viewport-capture.mjs';
+import {repaintNativeViewport} from './native-viewport-repaint.mjs';
 
 /** Separate evidence only: never supplies pixels to a baseline comparison. */
 export async function captureViewportRepaintDiagnostic(page, measure, path) {
-  const geometry=await measure();
-  const rootStyle=await page.evaluate(()=>document.documentElement.getAttribute('style'));
-  let hidden;
-  try {
-    await page.evaluate(style=>document.documentElement.setAttribute('style',(style===null?'':style+';')+'opacity:0!important'),rootStyle);
-    await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-    hidden=await page.screenshot({fullPage:false});
-    await writeFile(path+'.hidden.png',hidden);
-  } finally {
-    await page.evaluate(style=>{
-      if(style===null)document.documentElement.removeAttribute('style');else document.documentElement.setAttribute('style',style);
-    },rootStyle);
-  }
-  assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('style')),rootStyle,
-    'Diagnostic repaint must restore the exact root style attribute.');
-  assert.deepEqual(await measure(),geometry,'Diagnostic repaint must restore the actual baseline geometry.');
-  const hiddenFrame=await page.evaluate(async png=>{
-    const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
-    const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
-    const context=canvas.getContext('2d');context.drawImage(image,0,0);
-    const data=context.getImageData(0,0,canvas.width,canvas.height).data;let nonWhitePixels=0;
-    for(let i=0;i<data.length;i+=4)if(data[i]!==255||data[i+1]!==255||data[i+2]!==255||data[i+3]!==255)nonWhitePixels++;
-    return{width:canvas.width,height:canvas.height,nonWhitePixels};
-  },hidden.toString('base64'));
-  assert.equal(hiddenFrame.nonWhitePixels,0,'The diagnostic must witness a fully cleared native viewport before restoring it.');
-  const capture=await captureStableViewport(page,measure,path+'.png');
-  return{...capture,hiddenFrame,rootStyleRestored:true};
+  const refresh=await repaintNativeViewport(page,measure,path+'.hidden.png');
+  const capture=await sampleStableViewport(page,measure,path+'.png',refresh.geometry);
+  return{...capture,hiddenFrame:refresh.hiddenFrame,rootStyleRestored:refresh.rootStyleRestored};
 }
 
 /** Read complete paint styles before an isolated diagnostic; no DOM writes. */
@@ -66,7 +43,7 @@ export async function captureSurfaceBackgroundDiagnostic(page,measure,selector,c
   try{
     await page.evaluate(({selector,color,style})=>document.querySelector(selector).setAttribute('style',
       (style===null?'':style+';')+'background-color:'+color+'!important'),{selector,color,style:initial.style});
-    changed=await captureStableViewport(page,measure,path+'.source-background.png');
+    changed=await sampleStableViewport(page,measure,path+'.source-background.png',geometry);
   }finally{
     await page.evaluate(({selector,style})=>{const element=document.querySelector(selector);
       if(style===null)element.removeAttribute('style');else element.setAttribute('style',style);
@@ -74,6 +51,6 @@ export async function captureSurfaceBackgroundDiagnostic(page,measure,selector,c
   }
   assert.equal(await page.evaluate(selector=>document.querySelector(selector).getAttribute('style'),selector),initial.style);
   assert.deepEqual(await measure(),geometry,'A/B/A background diagnostics must preserve the actual baseline layout.');
-  const restored=await captureStableViewport(page,measure,path+'.restored-background.png');
+  const restored=await sampleStableViewport(page,measure,path+'.restored-background.png',geometry);
   return{initialBackground:initial.color,sourceBackground:color,changed,restored};
 }

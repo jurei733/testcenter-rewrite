@@ -41,6 +41,41 @@ earlier console check fails, instead of losing the remaining serial coverage.
 
 ## Settings renderer and immutable exit baseline
 
+### Fresh native paint before every settings comparison
+
+The Linux diagnostic at `94a7bb25`, job `119087970080`, preserves the failing
+baseline while proving that the restored Primar/1280 General-bottom rendering
+is exact across Source, Rewrite and an independent Source document. All three
+complete RGBA hashes are
+`be48eb5d24ed75c1573ee6c92599c803913e99fcc5686dbafe6feeac4f765bcd`.
+The Source baseline itself changes two pixels after its witnessed full redraw;
+Rewrite changes six. The background A/B/A test is not reversible and does not
+justify changing product CSS. The artifact ZIP digest is
+`878f9e63dd0dd6f304af26f5cc5f5972451dd3983e9320b43c3686b5c5fa48d0`.
+This proves the fresh rendering for that view, not the remaining 23 views.
+
+The same reference-independent native repaint now precedes every settings
+baseline in both builds and the Source-repeat series. It records the original
+geometry and exact root style attribute, witnesses a fully cleared opaque white
+viewport, restores the root attribute, verifies unchanged geometry, and then
+requires three equal complete visible PNGs. Each cleared frame and its SHA256
+are retained separately. The hidden frame is never returned as a baseline.
+Neither the repaint nor steady-frame sampling receives an expected image;
+the final comparison still checks every RGBA channel with zero tolerance.
+Diagnostic A/B/A sampling remains separately labelled and cannot replace a
+baseline verdict. Original source files and the production application are
+unchanged.
+
+All 24 local Source/Rewrite comparisons and all 24 independent Source repeats
+pass. All 72 capture records prove the fully cleared native frame, restored
+root attribute and three steady visible frames, with hashes checked against
+the retained PNGs. Six mandatory headed controls retain paint-change and
+never-steady rejection, restore styles after failure, reject geometry changes
+even during the hidden frame, and preserve a genuinely changed pixel as an
+exact one-pixel difference after the actual baseline capture method. Fresh
+Linux qualification of all 24 views and repeats remains required; no broad
+full-page parity row is closed by the single-view diagnostic or local result.
+
 ### Observe all native Player inputs before freezing exit state
 
 The actual `97a534a0` Linux exit failure in job `119076685007` compares a
