@@ -2,7 +2,7 @@
   "version": 1,
   "repository": "iqb-berlin/testcenter",
   "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
-  "scope": "Read-only Source directory DTOs, ordering, permission controls, name and role dialogs; not Source backend authentication.",
+  "scope": "Source directory DTOs, ordering, permission controls, dialogs and narrowly owned name/role mutation fixtures; not Source backend authentication.",
   "files": [
     {
       "path": "backend/src/dao/SuperAdminDAO.class.php",

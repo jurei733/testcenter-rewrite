@@ -44,7 +44,7 @@ const apiServer = spawn(process.execPath, ['--input-type=module', '-e',
 });
 const apiClosed = new Promise(done => apiServer.once('close', done));
 let browser;
-const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [];
+const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [], sourceWrites = [];
 const options = width => ({viewport: {width, height: 844}, deviceScaleFactor: 1,
   locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light'});
 
@@ -58,11 +58,11 @@ async function snapshot(page, key, kind) {
   const measure = () => page.evaluate(() => {
     const box = element => {const r = element.getBoundingClientRect(), s = getComputedStyle(element);
       return {tag: element.tagName, text: element.textContent.trim(), x:r.x, y:r.y, width:r.width, height:r.height,
-        font:s.font, padding:s.padding, boxSizing:s.boxSizing};};
+        font:s.font, padding:s.padding, boxSizing:s.boxSizing,scrollLeft:element.scrollLeft};};
     return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},
       tables:[...document.querySelectorAll('mat-table')].map(table => ({...box(table),
         rows:[...table.querySelectorAll('mat-header-row,mat-row')].map(box)})),
-      checkboxes:[...document.querySelectorAll('input[type="checkbox"]')].map(input => ({checked:input.checked,disabled:input.disabled})),
+      checkboxes:[...document.querySelectorAll('input[type="checkbox"]')].map(input => ({...box(input),checked:input.checked,disabled:input.disabled, parent:box(input.closest('mat-checkbox')),cell:box(input.closest('mat-cell'))})),
       dialogs:[...document.querySelectorAll('mat-dialog-container')].map(dialog => ({...box(dialog),
         fields:[...dialog.querySelectorAll('h1,p,mat-form-field,input,button')].map(element => ({...box(element),
           disabled:element.disabled??null,placeholder:element.getAttribute('placeholder'),
@@ -131,7 +131,18 @@ try {
       },{theme,sourceOrigin:sourceBase,adminId:users.find(user=>user.name==='demo-admin').id});
       await context.route(sourceBase+'/api/**',async route=>{
         const method=route.request().method(),path=new URL(route.request().url()).pathname;let body;
-        if(method!=='GET'){unknown.push({method,path});return route.fulfill({status:403,body:'{}'});}
+        if(method!=='GET'){
+          assert.equal(route.request().headers().authtoken,'owned-directory-reference');
+          const payload=route.request().postDataJSON();
+          const user=users.find(user=>user.name==='owned-reader'),workspace=spaces.find(space=>space.item.workspaceId===alpha.workspaceId);
+          if(method==='PATCH'&&path===`/api/user/${user.id}/super-admin/on`){
+            assert.deepEqual(payload,{p:'Owned-dialog-proof-9'});user.isSuperadmin=true;
+          }else if(method==='PATCH'&&path===`/api/workspace/${workspace.id}`){
+            assert.deepEqual(payload,{name:'Beta Umbenennung'});workspace.name=payload.name;
+          }else{unknown.push({method,path});return route.fulfill({status:403,body:'{}'});}
+          sourceWrites.push({method,path});
+          return route.fulfill({status:200,contentType:'application/json',body:'null'});
+        }
         if(path==='/api/system/config')body={version:'Owned directory reference',customTexts:{},appConfig:{appTitle:before.appTitle,themeName:theme,...notices},
           veronaPlayerApiVersionMin:2,veronaPlayerApiVersionMax:6,iqbStandardResponseTypeMin:1,iqbStandardResponseTypeMax:5,xmlSchemaVersions:{},
           bruteForceProtection:[],broadcastingServiceUri:'',fileServiceUri:'',passwordMinLength:0,passwordPattern:''};
@@ -152,6 +163,14 @@ try {
       const page=await context.newPage();await page.bringToFront();
       page.on('pageerror',error=>errors.push({theme,width,error:String(error)}));
       for(const kind of ['source','rewrite','source-repeat'])for(const tab of ['users','workspaces']) {
+        users.find(user=>user.name==='owned-reader').isSuperadmin=false;
+        spaces.find(space=>space.item.workspaceId===alpha.workspaceId).name='Alpha Bereich';
+        if(kind==='rewrite'){
+          const user=(await api('/api/v1/admin/users')).items.find(user=>user.adminUser.adminUserId===reader.adminUserId);
+          for(const role of user.roleAssignments.filter(role=>role.role==='platform_admin'))
+            await api(`/api/v1/admin/users/${reader.adminUserId}/role-assignments/${role.roleAssignmentId}`,{confirmationPassword:'demo-admin-password'},'DELETE');
+          await api('/api/v1/tenants/owned-directory/workspaces/alpha',{displayName:'Alpha Bereich'},'PATCH');
+        }
         await page.goto('about:blank');
         const previous=await page.evaluate(()=>performance.timeOrigin);
         await page.goto(kind==='rewrite'?base+'/app/ops?ui=original&adminSection='+tab:sourceBase+'/#/superadmin/'+tab,{waitUntil:'networkidle'});
@@ -187,18 +206,46 @@ try {
         await snapshot(page,key+'-dialog-valid',kind);
         await page.locator('mat-dialog-container').getByRole('button',{name:'Abbrechen',exact:true}).click();
         await page.locator('mat-dialog-container').waitFor({state:'detached'});
+        await page.locator(tab==='users'?'[data-cy="change-superadmin"]':'[data-cy="rename-workspace"]').click();
+        await page.locator('mat-dialog-container input').fill(tab==='users'?(kind==='rewrite'?'demo-admin-password':'Owned-dialog-proof-9'):'Beta Umbenennung');
+        await page.locator('mat-dialog-container button[type="submit"]:enabled').click();
+        await page.locator('mat-dialog-container').waitFor({state:'detached'});
+        await page.locator(tab==='users'?'[data-cy="change-superadmin"]:disabled':'[data-cy="rename-workspace"]:disabled').waitFor();
+        if(tab==='users'){
+          await page.locator('[data-cy="toast-text-0"]').getByText('Status geändert',{exact:true}).waitFor();
+          await page.locator('[data-cy="toast-action-0"]').click();
+        }
+        await page.locator('mat-snack-bar-container').waitFor({state:'detached'});
+        if(kind==='rewrite'){
+          const saved=(await api('/api/v1/admin/users')).items.find(user=>user.adminUser.adminUserId===reader.adminUserId);
+          assert.equal(saved.roleAssignments.some(role=>role.role==='platform_admin'),tab==='users');
+          assert.equal(saved.roleAssignments.find(role=>role.workspaceId===alpha.workspaceId).accessMode,'read_only',
+            'Confirming the name or platform role must not submit the unsaved workspace permission.');
+          if(tab==='workspaces')assert.equal((await api('/api/v1/tenants/owned-directory/workspaces')).items
+            .find(workspace=>workspace.workspaceId===alpha.workspaceId).displayName,'Beta Umbenennung');
+        }
+        assert.equal(await page.locator('[data-cy="save"]').count(),0);
+        await snapshot(page,key+'-acknowledged',kind);
+        await page.locator('mat-table').nth(1).locator('mat-row').filter({hasText:tab==='users'?'Alpha Bereich':'owned-reader'})
+          .locator('input[type="checkbox"]').first().click();
+        assert.equal(await page.locator('[data-cy="save"]').count(),0);
+        await snapshot(page,key+'-acknowledged-edited',kind);
+        await table.locator('mat-row').filter({hasText:tab==='users'?'owned-reader':'Beta Umbenennung'}).click();
+        await page.waitForFunction(expected=>document.querySelectorAll('mat-table')[1]?.querySelectorAll('mat-row').length===expected,tab==='users'?spaces.length:users.length);
+        await snapshot(page,key+'-acknowledged-reselected',kind);
       }
       await context.close();
     }
   }
-  assert.equal(Object.keys(comparisons).length,84);assert.equal(Object.keys(referenceReproducibility).length,84);
+  assert.equal(Object.keys(comparisons).length,120);assert.equal(Object.keys(referenceReproducibility).length,120);
+  assert.equal(sourceWrites.length,24);
   assert.deepEqual(errors,[]);assert.deepEqual(unknown,[]);
   assert.deepEqual(Object.entries(comparisons).filter(([,v])=>v.differingPixels),[], 'Every full directory viewport must match Source.');
   assert.deepEqual(Object.entries(referenceReproducibility).filter(([,v])=>v.differingPixels),[], 'Source must reproduce every viewport.');
 }finally{
   await writeFile(join(artifacts,'directory.json'),JSON.stringify({source:originalBrowserSource,directoryReference:originalDirectoryReference,manifest,
-    scope:'Unchanged Source frontend with read-only fixtures derived from protected candidate setup; real candidate UI authentication. No Source backend authorization proof.',
-    comparisons,referenceReproducibility,documentDiagnostics,errors,unknown},null,2));
+    scope:'Unchanged Source frontend with owned, narrowly controlled role/name mutation fixtures; real candidate UI authentication and protected writes. No Source backend authorization proof.',
+    comparisons,referenceReproducibility,documentDiagnostics,sourceWrites,errors,unknown},null,2));
   await browser?.close();apiServer.kill('SIGTERM');
   await raceWithSmokeDeadline(apiClosed,10000,()=>{apiServer.kill('SIGKILL');throw Error('Owned API shutdown timed out.');});
   await new Promise(done=>sourceServer.close(done));await verifyOriginalBuild(root);

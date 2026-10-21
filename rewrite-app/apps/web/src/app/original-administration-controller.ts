@@ -9,6 +9,7 @@ import type { Tenant, WorkspaceDirectoryItem } from "@testcenter-rewrite-app/dom
 export type OriginalWorkspace = WorkspaceDirectoryItem & { tenantKey: string };
 export type OriginalWorkspaceAccess = "" | "RO" | "RW";
 export type OriginalPermissionChange = { adminUserId: string; workspaceId: string; access: OriginalWorkspaceAccess };
+export type OriginalPermissionRow = OriginalPermissionChange & { label: string };
 export type OriginalAdministrationTransport = <T>(method: string, path: string, body: unknown,
   sessionToken: string) => Promise<T>;
 type Owner = { epoch: number; token: string };
@@ -34,6 +35,7 @@ export class OriginalAdministrationController {
   tenants: Tenant[] = [];
   selectedAdminId = "";
   selectedWorkspaceId = "";
+  permissionViewEpoch = 0;
   busy = false;
   problem = "";
   problemCode = "";
@@ -42,6 +44,7 @@ export class OriginalAdministrationController {
   private epoch = 0;
   private token = "";
   private destroyed = false;
+  private retainedPermissions: { section: "users" | "workspaces"; rows: OriginalPermissionRow[] } | null = null;
 
   constructor(private readonly transport: OriginalAdministrationTransport,
     private readonly currentSession: () => { token: string; adminUserId: string },
@@ -84,7 +87,7 @@ export class OriginalAdministrationController {
   async connect(token: string): Promise<boolean> {
     this.epoch++; this.token = token; this.busy = false;
     this.admins = []; this.workspaces = []; this.tenants = [];
-    this.clearSelection(); this.problem = ""; this.problemCode = ""; this.notice = ""; this.changed();
+    this.clearSelection(false); this.problem = ""; this.problemCode = ""; this.notice = ""; this.changed();
     return this.run(async owner => {
       const [users, tenants] = await Promise.all([
         this.request<ListAdminUsersResponse>(owner,"GET",productionApiRoutes.admin.listUsers),
@@ -102,19 +105,47 @@ export class OriginalAdministrationController {
 
   destroy(): void {
     this.destroyed = true; this.epoch++; this.token = "";
-    this.admins = []; this.workspaces = []; this.tenants = []; this.busy = false; this.clearSelection();
+    this.admins = []; this.workspaces = []; this.tenants = []; this.busy = false; this.clearSelection(false);
   }
 
-  clearSelection(): void { this.selectedAdminId = ""; this.selectedWorkspaceId = ""; this.changes.clear(); }
+  clearSelection(retainRows = true): void {
+    const section = this.selectedAdminId ? "users" : this.selectedWorkspaceId ? "workspaces" : null;
+    if (!retainRows) this.retainedPermissions = null;
+    else if (section) this.retainedPermissions = {section, rows:this.permissionRows(section)};
+    this.selectedAdminId = ""; this.selectedWorkspaceId = ""; this.changes.clear();
+  }
+  permissionRows(section: "users" | "workspaces"): OriginalPermissionRow[] {
+    if (section === "users" && this.selectedAdminId) return this.workspaces.map(workspace=>({
+      label:workspace.displayName,workspaceId:workspace.workspaceId,adminUserId:this.selectedAdminId,
+      access:this.access(this.selectedAdminId,workspace.workspaceId)}));
+    if (section === "workspaces" && this.selectedWorkspaceId) return this.admins.map(user=>({
+      label:user.adminUser.username,adminUserId:user.adminUser.adminUserId,workspaceId:this.selectedWorkspaceId,
+      access:this.access(user.adminUser.adminUserId,this.selectedWorkspaceId)}));
+    return this.retainedPermissions?.section === section ? [...this.retainedPermissions.rows] : [];
+  }
+  togglePermissionRow(row: OriginalPermissionRow, control: "RO" | "RW"): void {
+    if (this.busy) return;
+    if (this.selectedAdminId || this.selectedWorkspaceId) {
+      if ((this.selectedAdminId && row.adminUserId !== this.selectedAdminId) ||
+        (this.selectedWorkspaceId && row.workspaceId !== this.selectedWorkspaceId)) return;
+      this.togglePermission(row.adminUserId,row.workspaceId,control);
+    }
+    else if (this.retainedPermissions?.rows.includes(row)) {
+      // Source keeps these visual rows after clearing selection. They no longer
+      // own a save target; editing them must never stage or dispatch a write.
+      row.access = control === "RW" ? row.access === "RW" ? "RO" : "RW" : row.access ? "" : "RO";
+      this.changed();
+    }
+  }
   selectAdmin(id: string): void {
     if (this.busy || !this.admins.some(item=>item.adminUser.adminUserId===id)) return;
     if (this.selectedAdminId === id) return;
-    this.clearSelection(); this.selectedAdminId = id; this.changed();
+    this.clearSelection(); this.selectedAdminId = id; this.permissionViewEpoch++; this.changed();
   }
   selectWorkspace(id: string): void {
     if (this.busy || !this.workspaces.some(item=>item.workspaceId===id)) return;
     if (this.selectedWorkspaceId === id) return;
-    this.clearSelection(); this.selectedWorkspaceId = id; this.changed();
+    this.clearSelection(); this.selectedWorkspaceId = id; this.permissionViewEpoch++; this.changed();
   }
 
   get selectedAdmin(): AdminUserDirectoryItem | undefined {
@@ -202,7 +233,7 @@ export class OriginalAdministrationController {
     if (adminUserId===this.currentSession().adminUserId) return false;
     return this.run(async owner => {
       await this.request(owner,"DELETE",resolveRoutePath(productionApiRoutes.admin.deleteUser,{adminUserId}),{confirmationPassword});
-      this.admins = this.admins.filter(item=>item.adminUser.adminUserId!==adminUserId); this.clearSelection();
+      this.clearSelection(); this.admins = this.admins.filter(item=>item.adminUser.adminUserId!==adminUserId);
     }, "Administrator:in gelöscht");
   }
 
@@ -247,9 +278,9 @@ export class OriginalAdministrationController {
     return this.run(async owner => {
       await this.request(owner,"DELETE",resolveRoutePath(productionApiRoutes.workspace.deleteWorkspace,
         {tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey}),{confirmation:workspace.workspaceKey,confirmationPassword});
+      this.clearSelection();
       this.workspaces = this.workspaces.filter(item=>item.workspaceId!==workspaceId);
       this.admins = this.admins.map(item=>({...item,roleAssignments:item.roleAssignments.filter(role=>role.workspaceId!==workspaceId)}));
-      this.clearSelection();
     }, "Arbeitsbereich gelöscht");
   }
 }

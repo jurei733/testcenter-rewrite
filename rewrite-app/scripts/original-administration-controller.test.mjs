@@ -36,11 +36,39 @@ for (const owner of ['admin','workspace']) test(`selecting the same ${owner} aga
  const select=id=>owner==='admin'?f.controller.selectAdmin(id):f.controller.selectWorkspace(id);
  const id=owner==='admin'?'other':'ws-a';select(id);
  f.controller.togglePermission('other','ws-a','RW');
- const draft=[...f.controller.changes],changes=f.changed.length;select(id);
+ const draft=[...f.controller.changes],changes=f.changed.length,epoch=f.controller.permissionViewEpoch;select(id);
  assert.deepEqual([...f.controller.changes],draft);assert.equal(f.controller.access('other','ws-a'),'RW');
  assert.equal(f.changed.length,changes);assert.deepEqual(f.calls,[]);
+ assert.equal(f.controller.permissionViewEpoch,epoch,'Repeated selection keeps the existing focused row.');
  select(owner==='admin'?'self':'ws-b');assert.equal(f.controller.changes.size,0);
  assert.equal(f.controller.access('other','ws-a'),'RO');
+});
+for (const section of ['users','workspaces']) test(`${section}: cleared selection retains visual draft rows without staging or saving them`,async()=>{
+ const f=fixture(()=>{throw Error('A retained visual row has no mutation owner');});
+ f.controller.admins=[admin('self'),admin('other',[role()])];
+ const select=()=>section==='users'?f.controller.selectAdmin('other'):f.controller.selectWorkspace('ws-a');
+ select();f.controller.togglePermission('other','ws-a','RW');
+ const expected=f.controller.permissionRows(section),epoch=f.controller.permissionViewEpoch;f.controller.clearSelection();
+ assert.equal(f.controller.permissionViewEpoch,epoch,'Clearing selection retains the actual permission view.');
+ assert.deepEqual(f.controller.permissionRows(section),expected);assert.equal(f.controller.changes.size,0);
+ const row=f.controller.permissionRows(section).find(row=>row.adminUserId==='other'&&row.workspaceId==='ws-a');
+ assert.equal(row.access,'RW');f.controller.togglePermissionRow(row,'RO');assert.equal(row.access,'');
+ assert.equal(f.controller.changes.size,0);assert.equal(await f.controller.savePermissions(),false);assert.deepEqual(f.calls,[]);
+ select();assert.equal(f.controller.permissionRows(section).find(row=>row.adminUserId==='other'&&row.workspaceId==='ws-a').access,'RO');
+ assert.equal(f.controller.permissionViewEpoch,epoch+1,'Selecting the owner again creates fresh Source permission rows.');
+ if(section==='users')f.controller.selectAdmin('self');else f.controller.selectWorkspace('ws-b');
+ f.controller.togglePermissionRow(row,'RW');assert.equal(f.controller.changes.size,0,'An old row cannot stage rights for the newly selected owner.');
+ f.controller.clearSelection(false);assert.deepEqual(f.controller.permissionRows(section),[]);
+});
+test('a replacement session and destruction clear every retained permission label and draft',async()=>{
+ const f=fixture(call=>call.path===productionApiRoutes.admin.listUsers?{items:[admin('replacement')]}:
+   call.path===productionApiRoutes.platform.listTenants?{items:[]}:{items:[]});
+ f.controller.selectAdmin('other');f.controller.togglePermission('other','ws-a','RW');f.controller.clearSelection();
+ assert.ok(f.controller.permissionRows('users').length);f.session.token='replacement';await f.controller.connect('replacement');
+ assert.deepEqual(f.controller.permissionRows('users'),[]);assert.deepEqual(f.controller.permissionRows('workspaces'),[]);
+ f.controller.admins=[admin('other')];f.controller.workspaces=[workspace()];f.controller.selectAdmin('other');
+ f.controller.clearSelection();assert.ok(f.controller.permissionRows('users').length);f.controller.destroy();
+ assert.deepEqual(f.controller.permissionRows('users'),[]);
 });
 for (const captured of sourceReference.sources) {
  const reference={};new Function("exports",ts.transpileModule(`export class Source {${captured.handler}}`,{
