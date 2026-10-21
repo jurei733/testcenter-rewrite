@@ -7,10 +7,14 @@ with 79 successful jobs, including the corrected exact Player-exit checks,
 PostgreSQL, deployment and the other Source families. Administration reference
 and final acceptance fail. All 24 administration views complete; Linux finds
 one to four differing pixels at heading ink edges in several captures, while
-the local comparison is exact. The failure remains fatal. The follow-up aligns
-the scoped h2/h4 box model with Source and records heading geometry and computed
-font styles for diagnosis; resolution requires a new Linux run. No parity row
-is closed: **29 done / 20 partial**, with all eight broad visual rows open.
+the local comparison is exact. The failure remains fatal. Follow-up `b5430c6d`
+also fails that family in run `39542338492`, despite matching heading box models.
+Its actual Linux text/layout rectangles are equal. The next change aligns the
+remaining inherited color scheme and literal heading whitespace with Source;
+all 24 local pairs and all 15 captured heading text/style records match. Separate
+diagnostic parent-box renders retain the original baseline and fatal verdict.
+Resolution still requires a new Linux run. No parity row is closed:
+**29 done / 20 partial**, with all eight broad visual rows open.
 
 ### Paired settings pages and acknowledged exit baseline (2026-10-20)
 

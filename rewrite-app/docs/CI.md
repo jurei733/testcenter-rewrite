@@ -32,6 +32,20 @@ to resolve the Linux difference. Per-image diagnostics now retain the actual
 heading text, layout/text rectangles and font/box styles, without increasing
 the reference tolerance or including these verbose diagnostics in capture logs.
 
+Follow-up `b5430c6d` in run `39542338492` still fails the administration family
+with the same one-to-four-pixel pattern; the heading box model is therefore not
+a demonstrated explanation. Its actual Linux geometry and text ranges match,
+with inherited `color-scheme: light` versus `normal` and Source heading text
+whitespace remaining different. The next change matches those Source values.
+If the baseline still differs, a separately labelled diagnostic temporarily
+copies Source heading-parent box models into the owned Rewrite page, captures
+the result, and restores the original inline styles/layout. Its pixels and
+verdict never replace the actual baseline comparison or qualify acceptance.
+An isolated local corruption control changes exactly one captured RGBA pixel:
+the baseline fails with one pixel while its separate diagnostic has zero, and
+the command still exits 1 after restoring the page. The unchanged local family
+passes all 24 pairs with equal hashes; all 15 heading text/style records match.
+
 The administration Source family adds 24 exact viewport comparisons in one
 lockfile Chromium: both settings tabs, initial/bottom views, three themes and
 desktop/mobile. It retains the existing 18 Source tasks and runs independently
@@ -75,6 +89,28 @@ packages or accepting a framework-major upgrade from `npm audit fix --force`.
 Successful historical audits remain observations at their recorded time.
 
 ## Fast feedback
+
+For a settings renderer iteration, compile the current Rewrite once with
+`npm run build`. With the unchanged pinned Source checkout already compiled,
+the following runs only the paired administration family. It retains all 24
+pixel comparisons, Source manifest checks and actual protected Rewrite login;
+it does not run the other families, databases or complete acceptance. Use the
+actual absolute Source browser directory and a fresh evidence directory:
+
+```sh
+export GITHUB_SHA="$(git rev-parse HEAD)"
+node scripts/original-browser-reference.mjs pack /absolute/path/to/unchanged-original
+UI_SMOKE_HEADFUL=true \
+ORIGINAL_BROWSER_REFERENCE_ROOT=/absolute/path/to/unchanged-original/frontend/dist/testcenter-frontend/browser \
+ORIGINAL_BROWSER_CAPTURE_DIR=/absolute/path/to/new/administration-evidence \
+node scripts/original-browser-reference.mjs capture administration
+```
+
+The wrapper manages the child commit and fixture environment. On headless Linux,
+prefix the final command with `xvfb-run --auto-servernum`. It logs a short task
+status and evidence path; complete measurements remain in `index.json` and the
+per-image JSON/PNG artifacts, including heading diagnostics. This focused local
+route supplements the unchanged mandatory CI matrix.
 
 For local asset/settings iterations, `npm run test:application-assets` builds
 only the TypeScript core and runs catalog/assignment rollback, real protected
