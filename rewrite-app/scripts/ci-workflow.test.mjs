@@ -143,8 +143,29 @@ for (const item of [...baseline.commands, ...baseline.additional]) test(`the com
     const attachedPrelude = leaves.some(value => value.endsWith(leaf) &&
       environmentPreludes.includes(value.slice(0, -leaf.length).trim()));
     const expandedFiles = leaves.some(value => extendsExplicitTestFiles(leaf, value));
-    assert.ok(leaves.includes(leaf) || retainedPrelude || attachedPrelude || expandedFiles, `Lost qualification: ${leaf}`);
+    // Keep the immutable baseline's complete development build. Only relocate
+    // its output so type checking cannot overwrite a production browser input.
+    const isolatedDevelopmentBuild = leaf === 'ng build rewrite-app-web --configuration development' &&
+      leaves.includes(leaf + ' --output-path dist/typecheck-development');
+    assert.ok(leaves.includes(leaf) || retainedPrelude || attachedPrelude || expandedFiles || isolatedDevelopmentBuild, `Lost qualification: ${leaf}`);
   }
+});
+test('local type checking emits no frontend and CI retains the full isolated development build', () => {
+  assert.equal(scripts['typecheck'], 'npm run typecheck:core && npm run typecheck:web');
+  assert.equal(scripts['typecheck:web'], 'ngc -p apps/web/tsconfig.app.json --noEmit');
+  const core = baseline.commands.find(item=>item.check==='typecheck').leaves[0];
+  assert.equal(scripts['typecheck:core'], core);
+  assert.equal(scripts['typecheck:ci'], 'npm run typecheck:core && ng build rewrite-app-web --configuration development --output-path dist/typecheck-development');
+  assert.ok(workflow.jobs.typecheck.steps.some(step=>step.run==='npm run typecheck:ci'));
+  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/angular-typecheck.test.mjs'));
+  const config=JSON.parse(read('../apps/web/tsconfig.json'));
+  assert.equal(config.angularCompilerOptions.strictTemplates,true);
+  assert.equal(config.angularCompilerOptions.strictInjectionParameters,true);
+  const angular=JSON.parse(read('../angular.json')).projects['rewrite-app-web'].architect.build;
+  assert.equal(angular.options.tsConfig,'apps/web/tsconfig.app.json');
+  assert.equal(angular.defaultConfiguration,'production');
+  assert.equal(scripts['build:web'],'ng build rewrite-app-web');
+  assert.ok(scripts.build.split(' && ').includes('npm run build:web'));
 });
 test("coverage may add explicit tests but cannot remove files or change test-runner flags", () => {
   const original = "node --test scripts/old.test.mjs scripts/other.test.mjs";
