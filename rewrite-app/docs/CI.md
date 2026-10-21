@@ -23,6 +23,16 @@ Neither earlier run establishes full release acceptance.
 
 ### Steady native viewport capture
 
+The administration task also repeats every Source view in a third, independent
+document after the actual Source/Rewrite series. All original comparisons and
+images remain unchanged. Source-to-Source comparisons run only after the full
+repeat series and are recorded separately; non-reproducible reference images
+fail rather than qualifying a Rewrite result. No repeated image replaces the
+original reference. Local validation passes all 24 Rewrite comparisons and all
+24 Source repeats, with 18 independently witnessed phase documents. Linux
+repeatability is still unproven and is the purpose of this diagnostic. The
+81-job matrix, 19 Source tasks and zero-tolerance comparator remain unchanged.
+
 A local temporal control proves that the unchanged Source's first mobile date
 field image can differ by eight pixels from its next five images, with identical
 layout measurements and no UI input or DOM mutation. This is not evidence that

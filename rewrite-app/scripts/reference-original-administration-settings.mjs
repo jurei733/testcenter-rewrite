@@ -45,7 +45,7 @@ const apiServer = spawn(process.execPath, ['--input-type=module', '-e',
 });
 const apiClosed = new Promise(done => apiServer.once('close', done));
 let browser;
-const states = {}, comparisons = {}, errors = [], unknown = [];
+const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [];
 const options = width => ({viewport: {width, height: 844}, deviceScaleFactor: 1,
   locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light'});
 async function capture(page, kind, theme, width) {
@@ -216,11 +216,23 @@ try {
       });
       const current = await context.newPage(); await current.bringToFront();
       current.on('pageerror', error => errors.push({url: current.url(), theme, width, error: String(error)}));
-      for (const kind of ['source', 'rewrite']) {
-        await current.goto(kind === 'source' ? sourceBase + '/#/superadmin/settings' : base + '/app/ops?ui=original&adminSection=settings', {waitUntil: 'networkidle'});
+      for (const kind of ['source', 'rewrite', 'source-repeat']) {
+        const previousOrigin = await current.evaluate(() => performance.timeOrigin);
+        await current.goto(kind === 'rewrite' ? base + '/app/ops?ui=original&adminSection=settings' : sourceBase + '/#/superadmin/settings', {waitUntil: 'networkidle'});
+        const actualOrigin = await current.evaluate(() => performance.timeOrigin);
+        assert.notEqual(actualOrigin, previousOrigin, 'Each build/repeated Source phase requires an actual new document.');
+        documentDiagnostics.push({theme, width, kind, previousOrigin, actualOrigin});
         if (kind === 'rewrite') assert.equal(await current.evaluate(() => localStorage.getItem('iqb-tc-a')), null,
           'Source fixture authentication must never be installed at the protected Rewrite origin.');
         await capture(current, kind, theme, width);
+      }
+      // Compare repeated Source only after its complete series. The original
+      // Source/Rewrite verdict and screenshots have already been recorded.
+      for (const [key, state] of Object.entries(states)) {
+        if (!key.startsWith(theme + '-' + width + '-')) continue;
+        assert.ok(state['source-repeat'], 'An independent repeated Source document is required.');
+        referenceReproducibility[key] = await compareScreenshots(current, state.source.bytes, state['source-repeat'].bytes);
+        console.log('source_settings_reproducibility=' + key + ': ' + referenceReproducibility[key].differingPixels + ' differing pixels');
       }
       await context.close();
     }
@@ -233,10 +245,12 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(unknown, []);
   assert.deepEqual(Object.entries(comparisons).filter(([, value]) => value.differingPixels).map(([key, value]) => ({key, ...value})), [],
     'Every complete initial/bottom settings viewport must match the unchanged Source exactly.');
+  assert.deepEqual(Object.entries(referenceReproducibility).filter(([, value]) => value.differingPixels).map(([key, value]) => ({key, ...value})), [],
+    'The unchanged Source reference must reproduce its own complete viewports across independent documents.');
 } finally {
   await writeFile(join(artifacts, 'settings.json'), JSON.stringify({source: originalBrowserSource, manifest,
     scope: 'Unchanged Source frontend on read-only API fixtures versus Rewrite with a real protected SQLite session; no Source backend authorization proof.',
-    states: comparisons, errors, unknown}, null, 2));
+    states: comparisons, referenceReproducibility, documentDiagnostics, errors, unknown}, null, 2));
   await browser?.close(); apiServer.kill('SIGTERM');
   await raceWithSmokeDeadline(apiClosed, 10000, () => { apiServer.kill('SIGKILL'); throw Error('Owned API shutdown timed out.'); });
   await new Promise(done => sourceServer.close(done));
