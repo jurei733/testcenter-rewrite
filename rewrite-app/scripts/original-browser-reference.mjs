@@ -158,7 +158,10 @@ export async function captureOriginalReference(family) {
       const data = JSON.parse(await readFile(join(directory, item.output), "utf8"));
       const capture = { task: item.name, success: child.status === 0, data: measurementOnly(data) };
       captures.push(capture);
-      console.log(`SOURCE_REFERENCE_CAPTURE ${JSON.stringify(capture)}`);
+      // Keep complete measurements in index.json; large geometry trees otherwise
+      // turn one log line into hundreds of kilobytes and obscure actual failures.
+      console.log(`SOURCE_REFERENCE_CAPTURE ${JSON.stringify({task: capture.task,
+        success: capture.success, output: item.name + '/' + item.output})}`);
     } catch (error) { failures.push({ task: item.name, error: error.message }); }
   }
   await verifyOriginalBuild(root);

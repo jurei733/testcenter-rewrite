@@ -1,4 +1,4 @@
-:host { display:flex; flex-direction:column; flex:1; min-height:0; color:var(--mat-sys-on-surface); background:white; font:16px 'Nunito Sans',sans-serif; }
+:host { display:flex; flex-direction:column; flex:1; min-height:0; color-scheme:light; color:var(--mat-sys-on-surface); background:white; font:16px 'Nunito Sans',sans-serif; }
 app-original-overlay-styles { display:none; }
 mat-toolbar { display:flex; justify-content:space-between; position:relative; flex:0 0 auto; padding:8px 24px; background:var(--secondary); color:white; }
 mat-toolbar .side { height:100%; display:flex; align-items:center; }

@@ -95,6 +95,8 @@ async function capture(page, kind, theme, width) {
           const range = document.createRange(); range.selectNodeContents(element);
           const style = getComputedStyle(element);
           return {...read(element), textRange: range.getBoundingClientRect().toJSON(),
+            parentBoxes: [element.parentElement, element.parentElement.parentElement].map(parent => ({
+              tag: parent.tagName, boxSizing: getComputedStyle(parent).boxSizing})),
             styles: Object.fromEntries(['font', 'line-height', 'letter-spacing', 'box-sizing', 'overflow',
               'white-space', 'word-spacing', 'text-rendering', 'font-kerning', 'color-scheme']
               .map(key => [key, style.getPropertyValue(key)]))};
@@ -116,6 +118,32 @@ async function capture(page, kind, theme, width) {
       comparisons[key] = {geometry: {source: states[key].source.geometry, rewrite: geometry},
         ...await compareScreenshots(page, states[key].source.bytes, bytes)};
       console.log('paired_original_settings=' + key + ': ' + comparisons[key].differingPixels + ' differing pixels');
+      // Diagnostic-only Rewrite render: never replace the baseline image or its verdict.
+      if (comparisons[key].differingPixels && theme === 'Primar' && name === 'general') {
+        const originals = await page.evaluate(parents => {
+          const changed = new Map();
+          [...document.querySelectorAll('h2,h4')].forEach((heading, index) => {
+            [heading.parentElement, heading.parentElement.parentElement].forEach((parent, level) => {
+              if (!changed.has(parent)) changed.set(parent, parent.getAttribute('style'));
+              parent.style.boxSizing = parents[index].parentBoxes[level].boxSizing;
+            });
+          });
+          window.__ownedHeadingDiagnosticRestore = () => changed.forEach((style, element) => {
+            if (style === null) element.removeAttribute('style'); else element.setAttribute('style', style);
+          });
+          return changed.size;
+        }, states[key].source.geometry.headingDiagnostics);
+        try {
+          const image = await page.screenshot({path: join(artifacts, 'diagnostic-parent-boxes-' + key + '.png'), fullPage: false});
+          await writeFile(join(artifacts, 'diagnostic-parent-boxes-' + key + '.json'), JSON.stringify({
+            diagnosticOnly: true, changedContainers: originals,
+            ...await compareScreenshots(page, states[key].source.bytes, image)
+          }, null, 2));
+        } finally {
+          await page.evaluate(() => { window.__ownedHeadingDiagnosticRestore(); delete window.__ownedHeadingDiagnosticRestore; });
+          assert.deepEqual(await measure(), geometry, 'Diagnostic rendering must restore the actual baseline layout.');
+        }
+      }
     }
     }
   }
