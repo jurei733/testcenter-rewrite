@@ -388,8 +388,20 @@ jobs:
           - check: shutdown
             command: npm run smoke:shutdown:sqlite:built
             playwright: false
+          - check: ui-controller-timer
+            command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built
+            playwright: true
+          - check: ui-console-debug
+            command: npm run smoke:ui:participant-debug:built
+            playwright: true
           - check: ui-participant-console
-            command: npm run reference:ui:original-controller-timer:built && npm run smoke:ui:participant-controller-timer:built && npm run smoke:ui:participant-debug:built && npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built && npm run smoke:ui:participant-command-completion:built && npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
+            command: npm run smoke:ui:participant-console-loading:built && npm run smoke:ui:participant-console-context-compat:built
+            playwright: true
+          - check: ui-participant-command-completion
+            command: npm run smoke:ui:participant-command-completion:built
+            playwright: true
+          - check: ui-participant-native-routes
+            command: npm run smoke:ui:participant-native-route:built && npm run smoke:ui:participant-native-tabs:built
             playwright: true
           - check: ui-review-readiness
             command: npm run smoke:ui:review-readiness:built
@@ -492,8 +504,18 @@ jobs:
             ${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.png
           if-no-files-found: warn
           retention-days: 7
+      - name: Retain failed console debug evidence
+        if: failure() && matrix.check == 'ui-console-debug'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: participant-console-debug-evidence
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Retain failed controller timer diagnostics
-        if: failure() && matrix.check == 'ui-participant-console'
+        if: failure() && matrix.check == 'ui-controller-timer'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: controller-timer-diagnostics

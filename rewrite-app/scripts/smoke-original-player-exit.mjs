@@ -154,12 +154,27 @@ try {
       // Real trusted Player input, then compare the exact stored packet.
       const answer=`Own ${key}\n Ω  exact whitespace  `;
       const answerPath=resolveRoutePath(productionApiRoutes.participant.saveProgress,{testRunId:runId});
-      const answered=page.waitForResponse(response=>{
+      await frame.locator("#demoPlayerAnswer").evaluate(input=>{
+        window.__ownedExitNativeAnswerInputs=[];
+        input.addEventListener("input",event=>window.__ownedExitNativeAnswerInputs.push({value:input.value,trusted:event.isTrusted,inputType:event.inputType}));
+      });
+      await page.evaluate(()=>{
+        window.__ownedExitNativeAnswerPackets=[];
+        window.addEventListener("message",event=>{
+          if(event.source!==document.querySelector("#participantVeronaPlayerFrame")?.contentWindow||event.data?.type!=="vopStateChangedNotification")return;
+          window.__ownedExitNativeAnswerPackets.push({value:event.data.unitState?.dataParts?.answer,log:event.data.log});
+        });
+      });
+      const matchesAnswer=response=>{
         if(new URL(response.url()).pathname!==answerPath||response.request().method()!=="POST")return false;
         const packet=response.request().postDataJSON();
         return packet?.responseUnitKey==="unit-intro"&&typeof packet.unitResponse==="string"&&packet.unitResponse.includes(JSON.stringify(answer).slice(1,-1));
-      });
-      let acknowledgedPacket;
+      };
+      const answerAcknowledgements=[];
+      const observeAnswerAck=response=>{if(matchesAnswer(response))answerAcknowledgements.push(response);};
+      page.on("response",observeAnswerAck);
+      const answered=page.waitForResponse(matchesAnswer);
+      let acknowledgedPacket,firstAcknowledgedPacket;
       const holdAnswerAck=key==="Primar-desktop-header-forbidden";
       const committed=Promise.withResolvers(),releaseAck=Promise.withResolvers(),answerRoutes=createSmokeRouteFailureGate();
       let browserAcknowledged=false,answerFailure,held=false;
@@ -181,22 +196,48 @@ try {
           await raceWithSmokeDeadline(committed.promise,10000,()=>{throw Error("Owned answer was not committed before its held ACK.");});
           const visible=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
           assert.ok(visible.testRun.unitResponses["unit-intro"]?.includes(JSON.stringify(answer).slice(1,-1)));
+          // Actual trusted edits restore the same authored bytes while the
+          // first ACK is still held. The later packet/clocks must be retained.
+          await frame.locator("#demoPlayerAnswer").press("End");
+          await frame.locator("#demoPlayerAnswer").press("Space");
+          await frame.locator("#demoPlayerAnswer").press("Backspace");
           const clientSaveStatus=(await page.locator("#participantVeronaSaveStatus").textContent()).trim();
           assert.notEqual(clientSaveStatus,"saved");assert.equal(browserAcknowledged,false);
           states[key].heldAnswerAck={storedBeforeBrowserAck:true,clientSaveStatus,browserAcknowledged};
           releaseAck.resolve();
         }
         const answerAcknowledgement=await answered;assert.equal(answerAcknowledgement.status(),200);
-        await answerAcknowledgement.finished();acknowledgedPacket=answerAcknowledgement.request().postDataJSON().unitResponse;
+        await answerAcknowledgement.finished();firstAcknowledgedPacket=answerAcknowledgement.request().postDataJSON().unitResponse;
       }catch(error){answerFailure=error;}
       finally{
         releaseAck.resolve();await answerRoutes.settle();
         if(holdAnswerAck)await page.unroute(base+answerPath,heldAnswerRoute);
       }
       const answerError=answerRoutes.failure(answerFailure);if(answerError)throw answerError;
+      const nativeInputs=await frame.locator("#demoPlayerAnswer").evaluate(()=>window.__ownedExitNativeAnswerInputs);
+      assert.ok(nativeInputs.length>0&&nativeInputs.every(event=>event.trusted),'The observed answer edits must all be actual trusted input.');
+      await page.waitForFunction(count=>window.__ownedExitNativeAnswerPackets.length===count,nativeInputs.length);
+      const playerPackets=await page.evaluate(()=>window.__ownedExitNativeAnswerPackets);
+      assert.deepEqual(playerPackets.map(packet=>packet.value),nativeInputs.map(event=>event.value),
+        'Every actual native input must produce exactly its corresponding owned Player packet.');
       // A database read can see a write before the browser receives its ACK.
       // Take the immutable cancellation baseline only after the actual drainer settles.
       await page.waitForFunction(()=>document.querySelector("#participantVeronaSaveStatus")?.textContent.trim()==="saved");
+      for(const response of answerAcknowledgements){assert.equal(response.status(),200);await response.finished();}
+      page.off("response",observeAnswerAck);
+      assert.ok(answerAcknowledgements.length>0);
+      const acceptedPackets=answerAcknowledgements.map(response=>response.request().postDataJSON());
+      acknowledgedPacket=acceptedPackets.at(-1).unitResponse;
+      const sourceLogs=new Map(acceptedPackets.flatMap(packet=>(packet.logs??[]).flatMap(batch=>batch.entries??[]))
+        .filter(entry=>entry.key==="DEMO_ANSWER_CHANGED").map(entry=>[entry.clientEntryId,entry]));
+      assert.equal(sourceLogs.size,playerPackets.length,'A native Player message must not be processed twice.');
+      assert.deepEqual([...sourceLogs.values()].map(entry=>entry.timeStamp),playerPackets.flatMap(packet=>packet.log.map(entry=>entry.timeStamp)));
+      if(holdAnswerAck){
+        assert.ok(nativeInputs.filter(event=>event.value===answer).length>=2);
+        assert.ok(acceptedPackets.length>=2,'The queued later answer must be acknowledged separately after the held first ACK.');
+        assert.notEqual(acknowledgedPacket,firstAcknowledgedPacket,'Actual later input must retain its newer field clocks.');
+      }
+      states[key].nativeAnswer={nativeInputs,playerPackets,acknowledgedResponses:acceptedPackets.map(packet=>packet.unitResponse)};
       for(let attempt=0;attempt<100;attempt++) {
         current=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
         if(current.testRun.unitResponses["unit-intro"]?.includes(JSON.stringify(answer).slice(1,-1)))break;
