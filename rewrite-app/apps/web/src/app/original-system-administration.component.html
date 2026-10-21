@@ -107,7 +107,6 @@
           <mat-table [dataSource]="permissionRows" [trackBy]="trackPermission" matSort (matSortChange)="sortPermissions($event)">
             <ng-container matColumnDef="selectCheckbox"><mat-header-cell *matHeaderCellDef mat-sort-header class="table-header">Read | Write</mat-header-cell>
               <mat-cell *matCellDef="let row; let i=index">
-                @let adminId = row.adminUserId;
                 @let workspaceId = row.workspaceId;
                 <mat-checkbox [attr.data-cy]="section === 'users' ? 'workspace-' + workspaceId + '-role-ro' : 'workspace-role-ro' + i"
                   aria-label="Nur Lesen" matTooltip="Nur Lesen" [disabled]="directory.busy"

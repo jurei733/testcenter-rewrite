@@ -111,6 +111,13 @@ try{
   assert.equal(await row.getByRole("checkbox",{name:"Lesen und Schreiben",exact:true}).isChecked(),true);
   await page.locator('[data-cy="delete-workspace"]').click();
   const password=page.locator("#globalConfirmationPasswordInput");await password.waitFor();
+  assert.equal((await page.locator('#globalConfirmationMessage > p').first().textContent()).trim(),'Arbeitsbereich "ZZZ Beta geändert" löschen?');
+  assert.equal((await page.locator('#globalConfirmationConfirmButton').textContent()).trim(),'Arbeitsbereich(e) löschen');
+  await password.fill('123456');await page.locator('#globalConfirmationConfirmButton:disabled').waitFor();
+  await password.fill('1234567');await page.locator('#globalConfirmationConfirmButton:enabled').waitFor();
+  await page.locator('#globalConfirmationCancelButton').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});
+  assert.equal((await api('/api/v1/tenants/owned-other-tenant/workspaces')).items.some(item=>item.workspaceId===beta.workspaceId),true);
+  await page.locator('[data-cy="delete-workspace"]').click();await password.waitFor();
   await password.fill("wrong-password");await page.locator("#globalConfirmationConfirmButton").click();
   await page.getByText("Falsches Kennwort.",{exact:true}).waitFor();
   assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.some(item=>item.workspaceId===beta.workspaceId),true);

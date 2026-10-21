@@ -19,6 +19,65 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Delete-dialog and cancellation qualification
+
+The directory comparison now retains all previous 120 views and adds four
+password/delete states per table/theme/width: **168 pairs plus 168 independent
+Source repeats**. Six password characters must leave confirmation disabled;
+seven must enable it, matching the pinned Source form. A valid cancellation must
+send no candidate write, add no Source write and preserve both owned records.
+Request evidence records only methods/paths, without bodies or authorization.
+
+The first focused probe finds three workspace-delete differences while Source
+reproduces all 28 views exactly: 4,963 pixels empty/invalid and 4,783 valid. The
+product now uses Source's actual question and plural action label. An unused
+Angular template variable is also removed; production build and no-emit typecheck
+pass. All 1,966 frontend cases, 159 CI policy cases and the full protected native
+administration/settings flow pass, including exact question/action copy, the
+six/seven-character boundary, valid cancellation, wrong-password retention and
+confirmed deletion cascades.
+
+The first full comparison correctly aborts at the old adult/mobile user
+re-selection state after 140 exact pairs/repeats: twelve Source image hashes
+alternate between two values. Failure diagnostics now retain first/last actual
+sampled PNGs, hashes, geometry and focus/animation metadata without promoting a
+baseline. All six real headed controls pass, including an alternating canvas
+that still fails at exactly twelve samples with matching diagnostic image hashes.
+The fresh full production comparison passes **168 pairs / 168 Source repeats**,
+with **504 independently checked native records**, 24 Source fixture writes and
+exactly twelve confirmed candidate UI writes. No cancellation dispatches a write.
+The initial Source instability is not structurally proved fixed and remains
+fatal on recurrence. A fresh Linux head is still required for this expansion.
+
+Published `405915b5` already passes its preceding **120 exact pairs/repeats** on
+Linux, job `119289360211` in [run 39619514441](https://github.com/jurei733/testcenter-rewrite/actions/runs/39619514441).
+Directory ZIP `12353948715` has SHA256
+`b86bcc69e95bc7a5a77e56e4ebba99671d9325f929aa9544de41c01b3df91e0c`;
+all 360 actual clear/visible PNG proofs independently verify. Its actual Source
+producer is `37679a57eef6775d3943deb0ee90e1948c47604a`; six headed paint controls pass.
+That run's typecheck job `119288890923` proves all 159 policy cases and all four
+actual compiler controls on Linux, then successfully builds development output
+at `dist/typecheck-development`. The full matrix is still running.
+
+The preceding `375ea6de` run is fully green, **86/86**, at **28:35 full / 4:14 Fast
+feedback / 408.8 runner-minutes**. Different runner conditions and expanded
+coverage prevent attributing these timings solely to workflow ordering.
+
+In the current 405915b5 matrix, run-detail job `119291243308` fails before its
+specific review tail, in the shared `participant-original-sample-package` prefix.
+The helper reports a matching Player notification, but the subsequent real API
+predicate times out with `required-text-field` empty. The original sample's run
+has exactly two successful save-progress POSTs (both HTTP 200, at 14:55:29.627Z
+and 14:55:35.736Z); final state revision is 3. There is no demonstrated transport
+failure or server 5xx. The current log does not retain those request/ACK bodies or
+the real sample's native input/Start-command sequence, so it cannot distinguish
+Player startup/reset, message correlation, capture and save-order causes.
+The existing helper retries up to three times and matches any serialized unit
+state containing the text; it does not check message source/session. No new retry,
+timeout increase or product workaround has been added. The failure remains fatal
+and needs a correlated original-sample input/message/save/ACK probe. This failed
+full matrix cannot be treated as green merely because directory/typecheck pass.
+
 ## Non-emitting local type checks and isolated CI development output
 
 `npm run typecheck` now runs the unchanged core project type check plus the real

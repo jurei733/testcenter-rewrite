@@ -20,11 +20,14 @@ The Source system-check welcome view retains a 1280px content toolbar on a 1280p
 
 ## Paired administration directories and dialogs
 
-The directory family now compares **120 complete viewports and 120 independent
+The directory family now compares **168 complete viewports and 168 independent
 Source repeats**: three themes, 1280/390 by 844 pixels, both tables, initial and
 selected rows, dirty rights, re-selecting the same dirty row, and role/name dialogs
 with empty, invalid and valid fields. Confirmed changes, retained-row edits and
-owner re-selection are included; all previous 84 views remain.
+owner re-selection are included. Delete dialogs add empty, invalid six-character,
+valid seven-character and cancelled states for both tables; all previous 120
+views remain. Native request observers require cancellation to send no mutable
+candidate request, and the owned user/workspace must still exist.
 Source authority stays at its separate origin. Controlled DTO fixtures allow only
 owned role/name PATCH requests with the exact fake Source token and body; unknown
 writes still fail. Source's actual frontend performs each request, reload and
@@ -64,12 +67,19 @@ Its directory ZIP `12352322630` has SHA256
 `8fbe0fbc53af8149461185944bd5026f86a4843d1bea372a4f93b931517bac14`;
 all 252 actual PNG records independently verify white pixels, exact restoration
 and stable visible hashes. The same-run Source producer is
-`76f7b776b4e26cb9a449f029daf58ffcb6ca5442`. Its full matrix is still running.
+`76f7b776b4e26cb9a449f029daf58ffcb6ca5442`. Its full matrix completes all 86 jobs
+at 28:35 full, 4:14 Fast feedback and 408.8 runner-minutes.
 The later mutation expansion passes its final production wrapper at **120 exact
 pairs and 120 exact Source repeats**. All 360 actual clear/visible PNG records
 independently verify, with 24 narrowly owned Source fixture writes. This local
-run uses the remembered Source producer manifest and still needs a fresh Linux
-head; the preceding 84-state CI cannot qualify the expanded mutation scope.
+run uses the remembered Source producer manifest. Published `405915b5` also
+passes the expanded 120 pairs/repeats on Linux in job `119289360211`,
+[run 39619514441](https://github.com/jurei733/testcenter-rewrite/actions/runs/39619514441).
+ZIP `12353948715` has SHA256
+`b86bcc69e95bc7a5a77e56e4ebba99671d9325f929aa9544de41c01b3df91e0c`.
+All 360 actual PNG proofs independently verify; its same-run Source producer is
+`37679a57eef6775d3943deb0ee90e1948c47604a`. All six headed fault controls pass.
+That full matrix remains active and does not qualify the later 168-state change.
 
 The first submitted-mutation probe reproduced Source exactly but found 4,854
 pixels different after desktop role acknowledgement and 2,982 after rename.
@@ -93,6 +103,33 @@ metadata includes checkbox/host/cell bounds and internal scroll offsets. The
 final rebuilt production comparison passes all 120 views/repeats. All three
 mobile user re-selections record `scrollLeft=0` in Source, candidate and repeat.
 No pixel mask, tolerance, layout override, timer change or scenario retry was used.
+
+The first delete-dialog probe reproduces all 28 Source views exactly. Only the
+three mobile workspace-delete dialog states differ in the candidate: 4,963 pixels
+for empty/invalid input and 4,783 for valid input. Source asks
+`Arbeitsbereich "Beta Umbenennung" löschen?` and labels the action
+`Arbeitsbereich(e) löschen`; the candidate had a different sentence and singular
+action label. The product now uses the actual Source copy. The expanded gate
+checks the pinned seven-character confirmation-password boundary, both valid
+cancellations and unchanged owned records without authorizing Source deletion.
+
+The first expanded local run completes 140 exact candidate pairs and 140 exact
+Source repeats, then correctly aborts on Source's adult/mobile user re-selection:
+all twelve sampled PNG hashes alternate between two values. The failure precedes
+the new delete dialog and is not a proved candidate defect. The original packet
+has hashes only, so it does not identify the changed pixels. Capture failures now
+retain the first/last actual sampled PNGs, their hashes/geometry and document
+focus/animation diagnostics, without writing a qualifying baseline. All six
+native fault controls pass, including a real alternating canvas that still fails
+after exactly twelve samples and whose diagnostic PNG bytes match those hashes.
+The same zero-tolerance/three-consecutive-frame requirement remains. The fresh
+complete production capture with these diagnostics passes all **168 pairs and
+168 Source repeats**, with exactly 24 Source fixture writes and twelve confirmed
+candidate UI writes. Every delete cancellation sends no mutable request. All
+**504 native capture records** are independently checked against their actual
+PNG bytes. This valid run does not establish that the earlier Source instability
+is structurally fixed; it remains fatal if it recurs. A fresh Linux head is still
+required for this 168-state expansion.
 
 Other submitted actions/dialogs, transient notification pixels, error/pending
 states, locale-specific name ordering and Source backend authorization remain
