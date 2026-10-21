@@ -83,7 +83,10 @@
   --bg-start: #fcf9fe;
 }
 
-* {
+/* The Original administration uses the Source/Material box model. Keep this
+   zero-specificity Rewrite reset outside that view rather than overriding
+   Material's own border-box rules with a blanket reversal inside it. */
+*:not(:where(#originalSystemAdministration, #originalSystemAdministration *)) {
   box-sizing: border-box;
 }
 

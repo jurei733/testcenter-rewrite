@@ -98,7 +98,7 @@
   overflow: unset;
 }
 // Source layout above; contain Rewrite-wide native control styling below.
-:host { display:block; font:16px 'Nunito Sans',sans-serif; color:var(--mat-sys-on-surface); }
+:host { display:inline; font:16px 'Nunito Sans',sans-serif; color:var(--mat-sys-on-surface); }
 .warning-expiration,.asset-slot-row { display:flex; flex-wrap:wrap; align-items:center; gap:20px; }
 .asset-slot-row { flex-wrap:nowrap; }
 .asset-slot-row > p { width:150px; }

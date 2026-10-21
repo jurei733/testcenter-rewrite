@@ -23,6 +23,7 @@ import { originalSettingsCustomTextCatalog } from "./original-settings-catalog";
 
 @Component({
   selector:"app-original-application-settings",standalone:true,
+  host:{id:"originalApplicationSettings","[attr.aria-busy]":"controller.busy"},
   imports:[FormsModule,CdkTextareaAutosize,MatButton,MatFabButton,MatIconButton,MatCard,MatCardHeader,MatCardTitle,MatCardImage,MatCardActions,
     MatDatepicker,MatDatepickerInput,MatDatepickerToggle,MatDivider,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,
     MatFormField,MatLabel,MatGridList,MatGridTile,MatInput,MatRadioButton,MatRadioGroup,MatSelect,MatOption,

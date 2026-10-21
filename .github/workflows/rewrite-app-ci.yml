@@ -479,8 +479,19 @@ jobs:
           playwright: ${{ matrix.playwright && 'true' || 'false' }}
       - name: Run ${{ matrix.check }}
         env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
           UI_SMOKE_CONTROLLER_TIMER_ARTIFACT_ROOT: ${{ runner.temp }}/controller-timer-diagnostics
         run: ${{ matrix.command }}
+      - name: Retain failed console loading evidence
+        if: failure() && matrix.check == 'ui-participant-console'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: participant-console-loading-evidence
+          path: |
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.json
+            ${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Retain failed controller timer diagnostics
         if: failure() && matrix.check == 'ui-participant-console'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

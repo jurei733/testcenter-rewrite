@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,14 +10,18 @@ import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite
 import { productionApiRoutes, resolveRoutePath, parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { createInactiveRuntimeSnapshotGate } from "./inactive-runtime-snapshot-gate.mjs";
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-participant-debug-"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-participant-debug-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "participant-console-loading") : scratch;
+await mkdir(artifacts, {recursive: true});
 console.log(`owned_artifacts=${artifacts}`);
-const file = join(artifacts, "owned.sqlite"), gate = createServerRequestFailureGate();
+const file = join(scratch, "owned.sqlite"), gate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
 const server = spawn(process.execPath, ["--input-type=module", "-e", `
  import { createProductionApiServer } from ${JSON.stringify(module)};
@@ -433,17 +437,34 @@ try {
     // The preceding owned phase/error routes remove their handlers on exit.
     await remotePage.route("**/application",captureApplication);
     const terminalRuntimeGate=new Promise(done=>{releaseTerminalRuntime=done;});releases.push(releaseTerminalRuntime);
-    let terminalRuntimeReads=0;
+    const terminalRuntimeCapture=createInactiveRuntimeSnapshotGate(before.participantSessionId,terminalRuntimeGate);
     const runtimePath=resolveRoutePath(productionApiRoutes.participant.getRuntimeState,{participantSessionId:before.participantSessionId});
     await remotePage.route(url=>url.pathname===runtimePath,async route=>{
-      const response=await route.fetch();terminalRuntimeReads++;
-      if(terminalRuntimeReads===1){assert.equal((await response.json()).runtimeState.participantSession.status,'signed_in');await terminalRuntimeGate;}
-      await route.fulfill({response});
+      try {
+        const response=await route.fetch();await terminalRuntimeCapture.observe(response);
+        await route.fulfill({response});
+      } catch (error) { routeErrors.push(error); await route.abort('failed').catch(() => {}); }
     });
+    // Earlier takeover cases rotate the credential. Observe a new, accepted
+    // browser request instead of replaying the fixture's initial sign-in token.
+    const credentialRead=remotePage.waitForResponse(response=>response.ok()&&response.request().method()==='GET'&&
+      new URL(response.url()).pathname.endsWith('/debug-state')&&new URL(response.url()).searchParams.get('testRunId')===runId);
+    void credentialRead.catch(()=>{});
+    await remotePage.evaluate(()=>window.tc.debug(['off']));await remotePane.waitFor({state:'detached'});
+    await remotePage.evaluate(()=>window.tc.debug());await remotePane.waitFor();
+    const currentAuthorization=await (await credentialRead).request().headerValue('authorization');assert.match(currentAuthorization,/^Bearer /);
+    const leadingActive=await remotePage.evaluate(async({path,authorization})=>{
+      const response=await fetch(path,{headers:{authorization}});
+      return {status:response.status,body:await response.json()};
+    },{path:runtimePath,authorization:currentAuthorization});
+    assert.equal(leadingActive.status,200);
+    assert.equal(leadingActive.body.runtimeState.participantSession.status,'launched');
+    assert.equal(terminalRuntimeCapture.reads,0,'A real preceding active read must not consume the terminal hold.');
+    assert.ok(terminalRuntimeCapture.leadingActiveReads>=1);
     const previousFrame=await remotePage.locator('iframe').elementHandle();assert.ok(previousFrame);
     const terminalApplicationStart=applications.length;
     const terminate=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'complete'},operator)).command;
-    await poll(()=>Promise.resolve(terminalRuntimeReads===1),'Terminal command did not hold its inactive runtime snapshot');
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads===1),'Terminal command did not hold its inactive runtime snapshot');
     await remotePage.evaluate(()=>window.tc.resume());
     await poll(async()=>{const run=await loadingRepository.getTestRunById(runId);return run.status==='running'&&(await loadingRepository.getParticipantSessionById(run.participantSessionId)).status==='launched';},'New native entry did not reactivate the terminated Run');
     await poll(()=>previousFrame.evaluate(frame=>!frame.isConnected),'New native receipt did not replace the prior Player');
@@ -451,7 +472,7 @@ try {
     await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())==='3','The newer native entry did not restore its stored answer');
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),'New native receipt did not project the active entry');
     releaseTerminalRuntime();
-    await poll(()=>Promise.resolve(terminalRuntimeReads>=2),'Late terminal runtime snapshot was not re-read for the newer entry');
+    await poll(()=>Promise.resolve(terminalRuntimeCapture.reads>=2),'Late terminal runtime snapshot was not re-read for the newer entry');
     await remotePage.unrouteAll({behavior:'wait'});
     await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
     assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
@@ -460,7 +481,9 @@ try {
     assert.deepEqual(reentered.unitResponses,before.unitResponses);assert.deepEqual(reentered.unitResponseFieldTimestamps,before.unitResponseFieldTimestamps);
     assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
     assert.deepEqual(applications.slice(terminalApplicationStart).map(value=>value.application.command.commandId),[terminate.commandId]);
-    loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads,answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
+    loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads:terminalRuntimeCapture.reads,
+      precedingActiveRuntimeReads:terminalRuntimeCapture.leadingActiveReads,heldRuntimeSnapshot:terminalRuntimeCapture.heldSnapshot,
+      answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
     checks.push('late-remote-termination-cannot-close-a-newer-native-entry');console.log('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
     const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
     for(const externalKeyword of ['resume','pause']) {
@@ -595,7 +618,8 @@ try {
       const baseline=await loadingRepository.getTestRunById(runId),start=applications.length;
       const heldRuntime=terminalDeferred(),heldView=terminalDeferred(),completeAck=terminalDeferred(),resumeAck=terminalDeferred();
       releases.push(heldRuntime.resolve,heldView.resolve,completeAck.resolve,resumeAck.resolve);
-      let runtimeReads=0,viewHeld=false,viewReleased=false,routeError;
+      const runtimeCapture=createInactiveRuntimeSnapshotGate(before.participantSessionId,heldRuntime.promise);
+      let viewHeld=false,viewReleased=false,routeError;
       const heldAcks=[],issued=[];
       const routeFailure=(route,error)=>{
         const failure=route.request().failure();
@@ -606,8 +630,7 @@ try {
         await remotePage.route('**/application',captureApplication);
         await remotePage.route(url=>url.pathname===runtimePath,async route=>{
           try {
-            const response=await route.fetch();runtimeReads++;
-            if(runtimeReads===1){assert.equal((await response.json()).runtimeState.participantSession.status,'signed_in');await heldRuntime.promise;}
+            const response=await route.fetch();await runtimeCapture.observe(response);
             await route.fulfill({response});
           } catch(error) {routeFailure(route,error);}
         });
@@ -633,7 +656,7 @@ try {
           assert.deepEqual(heldAcks.map(command=>command.commandId),issued.map(command=>command.commandId));
           completeAck.resolve();
         } else await remotePage.evaluate(()=>window.tc.terminate());
-        await poll(()=>Promise.resolve(runtimeReads===1),`${origin} termination did not hold its Starter runtime`);
+        await poll(()=>Promise.resolve(runtimeCapture.reads===1),`${origin} termination did not hold its Starter runtime`);
         await poll(async()=>/STATUS:\s*TERMINATED/.test(await remotePane.innerText()),`${origin} terminal receipt waited for its held Starter runtime`);
         await poll(async()=>!/BS:\s*live/.test(await remotePane.innerText()),`${origin} termination did not suspend new reception`);
         assert.equal(await remotePage.locator('iframe:visible').count(),0);
@@ -651,7 +674,7 @@ try {
         await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),`${origin} reopened reception did not apply a fresh Pause while views were held`);
         await waitForRemoteReceipt(following);
         heldRuntime.resolve();
-        await poll(()=>Promise.resolve(runtimeReads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
+        await poll(()=>Promise.resolve(runtimeCapture.reads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
         viewReleased=true;heldView.resolve();
         await remotePage.unrouteAll({behavior:'wait'});
         if(routeError)throw routeError;
@@ -668,7 +691,8 @@ try {
         assert.ok(applications.slice(start).every(value=>value.application.applied&&value.application.command.executedAt));
         assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
         for(const command of issued)assert.equal(acks.filter(ack=>ack.path.includes(command.commandId)).length,1);
-        loadingObservations.push({origin,testRunId:runId,applications:applications.slice(start),acceptedBeforeTermination:heldAcks,runtimeReads,
+        loadingObservations.push({origin,testRunId:runId,applications:applications.slice(start),acceptedBeforeTermination:heldAcks,runtimeReads:runtimeCapture.reads,
+          precedingActiveRuntimeReads:runtimeCapture.leadingActiveReads,heldRuntimeSnapshot:runtimeCapture.heldSnapshot,
           terminalReceptionSuspended:true,acceptedResumeIndependentOfStarter:true,receptionReopenedBeforeUnitView:true,freshPauseApplied:true,answersAndClocksPreserved:true,siblingPreserved:true});
         await remotePage.screenshot({path:join(artifacts,`${origin}-terminal-presentation-independent.png`),fullPage:true});
         const marker=`${origin}-terminal-presentation-keeps-accepted-resume-and-reception-independent`;
@@ -841,6 +865,6 @@ try {
   releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});
   await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests, loadingObservations }, null, 2));
   await browser?.close();
-  if (server.exitCode === null) { server.kill("SIGTERM"); await Promise.race([closed, delay(5_000)]); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
+  if (server.exitCode === null) { server.kill("SIGTERM"); await raceWithSmokeDeadline(closed, 5_000, () => undefined); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
   await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
 }

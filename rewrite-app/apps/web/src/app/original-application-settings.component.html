@@ -1,4 +1,3 @@
-<section id="originalApplicationSettings" [attr.aria-busy]="controller.busy">
   @if (controller.problem) { <p id="originalSettingsError" role="alert">{{ controller.problem }}</p> }
   @if (!controller.ready) {
     <p>Einstellungen werden geladen.</p>
@@ -130,4 +129,3 @@
     </mat-tab-group>
   }
   @if (controller.notice) { <p id="originalSettingsNotice" role="status">{{ controller.notice }}</p> }
-</section>
