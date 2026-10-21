@@ -57,6 +57,10 @@ export async function verifyOriginalAdministrationSource(root, reference = origi
     const bytes = await readFile(join(root,item.path));
     assert.equal(sha256(bytes), item.sha256, "Administration references must retain the actual pinned Source file.");
     assert.ok(bytes.toString("utf8").includes(item.handler), "Never substitute a rewritten permission handler for Source.");
+    for (const field of ['reloadHandler', 'mutationHandler']) {
+      assert.ok(typeof item[field] === 'string' && item[field].length > 0 && bytes.toString('utf8').includes(item[field]),
+        'Directory selection behavior must retain the actual Source mutation and reload methods.');
+    }
   }
 }
 const appCommit = () => {

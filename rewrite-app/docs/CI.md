@@ -57,6 +57,49 @@ the supervised suite retains all cases and exits normally in 106 seconds.
 This establishes the watchdog's local behavior, not the cause or resolution of
 the intermittent Linux stall. A new Linux run must provide that evidence.
 
+### Later Original-entry failure and directory selection alignment
+
+[Run 39597348420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39597348420)
+at `e353d2be` ends with 17 successful jobs, three failures and six skipped groups.
+All four Source reference families pass. The early proof-of-work browser fails
+at the Original sign-in branch's first logo-return confirmation, which prevents
+Fast feedback and therefore the later matrix from qualifying. The supervised
+loading leaf never runs in this attempt; its real Linux behavior remains unproven.
+The retained ZIP SHA256 is
+`cf3cf5ebcbc5f3074731fff21b0c08cf40b3f2aaeec328d040e9e41659e1b13c`.
+Its only screenshot is the older main browser page, whose access was rotated by
+the second actual login. Those 401 responses do not establish why the separate
+Original page failed to show its dialog. The full proof-of-work command passes
+locally, including all admin/participant/second-code challenges and the same
+Original entry/return/logout/reentry branch. No product workaround or readiness
+assumption is justified by this intermittent observation.
+
+The branch now retains an additional failure screenshot and bounded DOM/HTTP
+status evidence from the **actual Original page before its context closes**,
+with a main-flow phase label. It rethrows the original failure; no retries,
+authentication injection, skipped assertions or alternate successful path are
+introduced. Headers, response bodies and browser credential storage are excluded.
+Public API snapshots can be cached; live-job observations now use a fresh query
+and a no-cache request header before treating a stale queued response as a wait.
+
+The pinned administration fixture also captures the actual mutation and directory
+reload methods from both Source files. Same-run Source verification requires
+those excerpts and the unchanged full-file SHA256. Source clears its selection
+after acknowledged workspace rename and Superadmin-status changes; Rewrite now
+also clears selection and pending permission drafts at those successful write
+boundaries. Rejection preserves them, and an old-session acknowledgement cannot
+clear a replacement session's selection. Name order and real tenant/UUID targets
+remain intact. Native tests prove wrong-password recovery, disabled actions after
+success, re-selection and unchanged durable rights for the discarded drafts.
+
+Current local validation passes 29 administration-controller cases, 1,961 frontend
+cases, 140 CI policy cases, complete typecheck, production build and the full native
+administration/settings flow. The Source checkout remains unchanged. This is not
+whole-directory visual parity: Source can retain its prior right-table rows after
+clearing selection, while Rewrite's table currently derives from its selected
+owner. That transient display, directory/dialog/notice pixels and broader backend
+authorization still need their own paired references. No broad parity row closes.
+
 ## Measured long-journey scheduling
 
 [Run 39562001420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39562001420)
