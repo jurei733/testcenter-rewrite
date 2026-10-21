@@ -276,7 +276,8 @@
     "smoke:ui:original-administration": "npm run build && npm run smoke:ui:original-administration:built",
     "test:application-assets": "npm run build:core && npm run test:application-assets:built",
     "test:application-assets:built": "node --test scripts/application-asset-cascade.test.mjs scripts/application-asset-cascade-api.test.mjs scripts/original-settings-controller.test.mjs",
-    "reference:ui:original-administration-settings:built": "node scripts/reference-original-administration-settings.mjs"
+    "reference:ui:original-administration-settings:built": "node scripts/reference-original-administration-settings.mjs",
+    "test:browser-capture:built": "node --test scripts/stable-viewport-capture.test.mjs"
   },
   "devDependencies": {
     "@angular/build": "21.2.26",

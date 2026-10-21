@@ -81,9 +81,17 @@ try{
   assert.equal(description,expectedDescription);
   states[key].errorDescription=description;
   const address=page.url();
+  const previousOrigin=await page.evaluate(()=>performance.timeOrigin);
   await page.locator('[data-cy=close]').click();
+  // Source defers its document reload by 100ms. Cached network-idle and the old
+  // still-mounted dialog cannot witness completion of that navigation.
+  await page.waitForFunction(previous=>performance.timeOrigin!==previous,previousOrigin);
+  await page.waitForURL(address);
   await page.waitForLoadState('networkidle');
+  await page.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
   await page.locator('mat-dialog-container').waitFor();
+  states[key].reloadDiagnostics={previousOrigin,actualOrigin:await page.evaluate(()=>performance.timeOrigin)};
+  assert.notEqual(states[key].reloadDiagnostics.actualOrigin,previousOrigin);
   states[key].reloaded=await capture('reloaded');
   assert.equal(page.url(),address);
   assert.equal(states[key].reloaded.dialog.title,expectedTitle);

@@ -132,6 +132,11 @@ jobs:
           name: original-reference-${{ github.sha }}
           path: ${{ runner.temp }}/original-browser
           digest-mismatch: error
+      - name: Verify native viewport capture
+        if: matrix.family == 'administration'
+        run: xvfb-run --auto-servernum npm run test:browser-capture:built
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/original-captures
       - run: xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture ${{ matrix.family }}
         env:
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
