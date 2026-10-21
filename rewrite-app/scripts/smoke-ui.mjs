@@ -7737,8 +7737,16 @@ try {
   );
   const originalSignInContext = await browser.newContext();
   participantHttpActor.observeContext(originalSignInContext);
+  let originalSignInPage, originalSignInPhase = 'fresh-original-entry';
+  const originalSignInHttp = [];
   try {
-    const originalSignInPage = await originalSignInContext.newPage();
+    originalSignInPage = await originalSignInContext.newPage();
+    originalSignInPage.on('response', response => {
+      const path = new URL(response.url()).pathname;
+      if (!path.startsWith('/api/v1/')) return;
+      originalSignInHttp.push({path, method: response.request().method(), status: response.status()});
+      if (originalSignInHttp.length > 100) originalSignInHttp.shift();
+    });
     await originalSignInPage.goto(`${baseUrl}/app/participant?${new URLSearchParams({
       ui: "original", tenantKey, workspaceKey
     })}`, { waitUntil: "networkidle" });
@@ -7752,6 +7760,7 @@ try {
     await originalSignInPage.locator(".login-submit [matButtonIcon] svg").waitFor();
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
+    originalSignInPhase = 'signed-in-run-projection';
     await originalSignInPage.waitForFunction(
       ([sessionId, runId]) =>
         !document.querySelector("#originalParticipantLogin") &&
@@ -7761,6 +7770,7 @@ try {
     );
     // The optional layout must preserve the same durable run when returning
     // to its numbered Starter card and resuming from that card.
+    originalSignInPhase = 'first-logo-return-confirmation';
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").waitFor();
     await originalSignInPage.locator("#participantConfirmationStayButton").click();
@@ -7784,6 +7794,7 @@ try {
     await originalSignInPage.locator("#originalParticipantAccountLogin").waitFor({ state: "detached" });
     assert.equal(await originalSignInPage.locator("#originalParticipantAccountButton").evaluate(el => el === document.activeElement), true);
     const originalResumeCard = originalSignInPage.locator("#originalParticipantStarter mat-card[data-booklet-status='in_progress']");
+    originalSignInPhase = 'original-starter-card-resume';
     assert.equal(await originalResumeCard.count(), 1);
     await originalResumeCard.getByRole("button").click();
     await originalSignInPage.waitForFunction(
@@ -7802,6 +7813,7 @@ try {
       return state.sessions?.find(([id]) => id === sessionId)?.[1];
     }, participantEntrySignInSessionId);
     assert.match(originalCredentialBeforeLogout, /^[A-Za-z0-9_-]{43}$/u);
+    originalSignInPhase = 'guarded-original-logout';
     const originalStateBeforeLogout = await (await fetch(
       `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
       { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } }
@@ -7827,6 +7839,7 @@ try {
     assert.equal((await fetch(`${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
       { headers: { authorization: `Bearer ${originalCredentialBeforeLogout}` } })).status, 401);
     await originalSignInPage.locator("#originalLoginName").fill(participantEntrySignInLoginKey);
+    originalSignInPhase = 'original-reentry-preserves-the-same-run';
     await originalSignInPage.getByRole("button", { name: "Weiter", exact: true }).click();
     await originalSignInPage.waitForFunction(expectedRunId =>
       document.querySelector("#participantRouteRunId")?.textContent?.trim() === expectedRunId,
@@ -7837,6 +7850,20 @@ try {
     assert.equal(restoredOriginalState.currentRunState.testRun.testRunId, participantEntryStartedRunId);
     assert.deepEqual(restoredOriginalState.currentRunState.testRun.unitResponses,
       originalStateBeforeLogout.currentRunState.testRun.unitResponses);
+  } catch (error) {
+    // The main page is a different, now rotated-out controller. Preserve the
+    // actual failing Original document before closing its independent context.
+    if (artifactDirectory && originalSignInPage && !originalSignInPage.isClosed()) {
+      const body = await originalSignInPage.locator('body').innerText({timeout: 2000}).catch(() => '');
+      await Promise.allSettled([
+        originalSignInPage.screenshot({path: resolve(artifactDirectory, 'original-entry-failure.png'), fullPage: true, timeout: 5000}),
+        writeFile(resolve(artifactDirectory, 'original-entry-failure.json'), JSON.stringify({
+          error: String(error), phase: originalSignInPhase, url: originalSignInPage.url(),
+          http: originalSignInHttp, body: body.slice(0, 20000)
+        }, null, 2))
+      ]);
+    }
+    throw error;
   } finally {
     await originalSignInContext.close();
   }

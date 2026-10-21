@@ -80,13 +80,23 @@ try{
   directory=await api("/api/v1/admin/users");const assigned=directory.items.find(item=>item.adminUser.adminUserId===secondId).roleAssignments.find(role=>role.workspaceId===beta.workspaceId);
   assert.equal(assigned.accessMode,"read_write");assert.equal(assigned.tenantId,beta.tenantId);
   console.log("original_administration=workspace-exact-cross-tenant-write-grant:passed");
+  await row.getByRole("checkbox",{name:"Nur Lesen",exact:true}).uncheck();
+  await page.locator('[data-cy="save"]:enabled').waitFor();
+  assert.equal(await page.locator('[data-cy="save"]').isEnabled(),true);
   await page.locator('[data-cy="rename-workspace"]').click();await waitForMaterialDialog(page);
   await page.locator("#originalAdministrationName").fill("ZZZ Beta geändert");await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.find(item=>item.workspaceId===beta.workspaceId).displayName,"ZZZ Beta geändert");
   assert.equal(await page.locator('.directory-list [data-workspace-id]').last().getAttribute('data-workspace-id'),beta.workspaceId,
     "Renaming must move the actual workspace to its new global name position.");
+  assert.equal(await page.locator('[data-cy="rename-workspace"]').isDisabled(),true);
+  assert.equal(await page.locator('[data-cy="delete-workspace"]').isDisabled(),true);
+  assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
+  assert.equal((await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===secondId)
+    .roleAssignments.find(role=>role.workspaceId===beta.workspaceId).accessMode,"read_write",
+    "Renaming discards the unsaved checkbox draft without submitting it.");
   await page.locator(`[data-workspace-id="${beta.workspaceId}"]`).click();
+  assert.equal(await row.getByRole("checkbox",{name:"Lesen und Schreiben",exact:true}).isChecked(),true);
   await page.locator('[data-cy="delete-workspace"]').click();
   const password=page.locator("#globalConfirmationPasswordInput");await password.waitFor();
   await password.fill("wrong-password");await page.locator("#globalConfirmationConfirmButton").click();
@@ -117,9 +127,21 @@ try{
   assert.equal(await page.locator('.directory-list [data-admin-id]').first().getAttribute('data-admin-id'),created.adminUser.adminUserId,
     "The new administrator must precede the signed-in operator by Source name order.");
   await page.locator(`[data-admin-id="${created.adminUser.adminUserId}"]`).click();
-  await page.locator('[data-cy="change-superadmin"]').click();await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
+  const unsavedCreatedAccess=page.locator(`[data-cy="workspace-${alpha.workspaceId}-role-ro"] input`);
+  await unsavedCreatedAccess.check();
+  await page.locator('[data-cy="change-superadmin"]').click();await page.locator("#globalConfirmationPasswordInput").fill("wrong-confirmation");
+  await page.locator("#globalConfirmationConfirmButton").click();await page.getByText("Falsches Kennwort.",{exact:true}).waitFor();
+  assert.equal(await unsavedCreatedAccess.isChecked(),true,"Rejected status changes retain the selected user's draft.");
+  await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
   await page.locator("#globalConfirmationConfirmButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
-  assert.ok((await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===created.adminUser.adminUserId).roleAssignments.some(role=>role.role==="platform_admin"));
+  const promoted=(await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===created.adminUser.adminUserId);
+  assert.ok(promoted.roleAssignments.some(role=>role.role==="platform_admin"));
+  assert.equal(promoted.roleAssignments.some(role=>role.workspaceId===alpha.workspaceId),false);
+  assert.equal(await page.locator('[data-cy="delete-user"]').isDisabled(),true);
+  assert.equal(await page.locator('[data-cy="change-superadmin"]').isDisabled(),true);
+  assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
+  await page.locator(`[data-admin-id="${created.adminUser.adminUserId}"]`).click();
+  assert.equal(await unsavedCreatedAccess.isChecked(),false);
   await page.locator('[data-cy="delete-user"]').click();await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
   await page.locator("#globalConfirmationConfirmButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/admin/users")).items.some(item=>item.adminUser.adminUserId===created.adminUser.adminUserId),false);

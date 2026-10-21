@@ -176,3 +176,44 @@ test("a newly acknowledged administrator is inserted in Source name order while 
  assert.equal(await f.controller.savePermissions(),true);assert.equal(f.controller.selectedAdminId,"other");
  assert.equal(f.controller.access("other","ws-a"),"RW");assert.deepEqual(f.controller.admins.map(row=>row.adminUser.username),["aardvark","other","self"]);
 });
+
+for (const mutation of ['rename-workspace','change-superadmin']) for (const outcome of ['acknowledged','rejected','retired']) {
+ test(`${mutation}: Source clears selection and drafts only after its own successful acknowledgement (${outcome})`,async()=>{
+  const held=defer(),savedRoles=[role()];
+  const f=fixture(call=>{
+   if(call.method!=='GET')return held.promise;
+   if(call.path===productionApiRoutes.admin.listUsers)return {items:[admin('self'),admin('other',savedRoles)]};
+   if(call.path===productionApiRoutes.platform.listTenants)return {items:[{tenantKey:'a'},{tenantKey:'b'}]};
+   return {items:[workspace(call.path.includes('/a/')?'ws-a':'ws-b')]};
+  });
+  f.controller.admins=[admin('self'),admin('other',savedRoles)];
+  if(mutation==='rename-workspace')f.controller.selectWorkspace('ws-a');else f.controller.selectAdmin('other');
+  f.controller.togglePermission('other','ws-a','RW');
+  const selected=[f.controller.selectedAdminId,f.controller.selectedWorkspaceId];
+  const action=mutation==='rename-workspace'?f.controller.renameWorkspace('ws-a','Zeta renamed'):
+    f.controller.changeSuperadmin('other','owned-confirmation');
+  assert.deepEqual([f.controller.selectedAdminId,f.controller.selectedWorkspaceId],selected);
+  assert.equal(f.controller.changes.size,1);assert.equal(f.controller.busy,true);
+  if(outcome==='retired'){
+   f.session.token='replacement';await f.controller.connect('replacement');f.controller.selectWorkspace('ws-b');
+  }
+  if(outcome==='rejected')held.reject({error:'owned_rejected'});
+  else held.resolve(mutation==='rename-workspace'?{workspace:{...workspace(),displayName:'Zeta renamed'}}:
+    admin('other',[...savedRoles,{role:'platform_admin',roleAssignmentId:'platform'}]));
+  assert.equal(await action,outcome==='acknowledged');
+  assert.equal(f.calls.filter(call=>call.method!=='GET').length,1,'Discarding a draft must never submit it');
+  if(outcome==='acknowledged'){
+   assert.equal(f.controller.selectedAdminId,'');assert.equal(f.controller.selectedWorkspaceId,'');
+   assert.equal(f.controller.changes.size,0);assert.equal(f.controller.access('other','ws-a'),'RO');
+   if(mutation==='rename-workspace')assert.equal(f.controller.workspaces.find(row=>row.workspaceId==='ws-a').displayName,'Zeta renamed');
+   else assert.equal(f.controller.isSuperadmin(f.controller.admins.find(row=>row.adminUser.adminUserId==='other')),true);
+  }else if(outcome==='rejected'){
+   assert.deepEqual([f.controller.selectedAdminId,f.controller.selectedWorkspaceId],selected);
+   assert.equal(f.controller.changes.size,1);assert.equal(f.controller.access('other','ws-a'),'RW');
+  }else{
+   assert.equal(f.controller.selectedWorkspaceId,'ws-b');assert.equal(f.controller.selectedAdminId,'');
+   assert.equal(f.controller.workspaces.find(row=>row.workspaceId==='ws-a').displayName,'ws-a');
+   assert.equal(f.controller.isSuperadmin(f.controller.admins.find(row=>row.adminUser.adminUserId==='other')),false);
+  }
+ });
+}

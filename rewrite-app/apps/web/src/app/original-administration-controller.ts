@@ -193,6 +193,7 @@ export class OriginalAdministrationController {
         assignment ? resolveRoutePath(productionApiRoutes.admin.revokeRole,{adminUserId,roleAssignmentId:assignment.roleAssignmentId})
           : resolveRoutePath(productionApiRoutes.admin.assignRole,{adminUserId}),
         {confirmationPassword,...(!assignment?{role:"platform_admin"}:{})}));
+      this.clearSelection();
     }, "Superadmin-Status geändert");
   }
   async deleteUser(adminUserId: string, confirmationPassword: string): Promise<boolean> {
@@ -235,6 +236,7 @@ export class OriginalAdministrationController {
         resolveRoutePath(productionApiRoutes.workspace.updateWorkspace,{tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey}),
         {displayName:displayName.trim()});
       this.workspaces = orderWorkspaces(this.workspaces.map(item=>item.workspaceId===workspaceId?{...item,...result.workspace}:item));
+      this.clearSelection();
     }, "Arbeitsbereich geändert");
   }
   async deleteWorkspace(workspaceId: string, confirmationPassword: string): Promise<boolean> {
