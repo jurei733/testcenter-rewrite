@@ -190,6 +190,16 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
   assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
 });
+test("participant diagnostics are retained without uploading their SQLite scratch stores", () => {
+  const job = workflow.jobs["verify-memory-sqlite"];
+  const execute = job.steps.find(step => step.name === "Run ${{ matrix.check }}");
+  assert.equal(execute.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/rewrite-ui-artifacts");
+  const evidence = job.steps.find(step => step.name === "Retain failed console loading evidence");
+  assert.equal(evidence.if, "failure() && matrix.check == 'ui-participant-console'");
+  assert.equal(evidence.with["retention-days"], 7);
+  assert.equal(evidence.with.path.trim(), "${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/participant-console-loading/*.png");
+  assert.ok(scripts["test:frontend-state"].split(/\s+/).includes("scripts/inactive-runtime-snapshot-gate.test.mjs"));
+});
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
   for (const id of ["unit", "quick", "quick-extended", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {

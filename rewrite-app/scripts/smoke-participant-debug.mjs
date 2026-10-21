@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,14 +10,17 @@ import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite
 import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
+import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
-const artifacts = await mkdtemp(join(tmpdir(), "testcenter-participant-debug-"));
+const scratch = await mkdtemp(join(tmpdir(), "testcenter-participant-debug-"));
+const artifacts = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, "participant-debug") : scratch;
+await mkdir(artifacts, {recursive: true});
 console.log(`owned_artifacts=${artifacts}`);
-const file = join(artifacts, "owned.sqlite"), gate = createServerRequestFailureGate();
+const file = join(scratch, "owned.sqlite"), gate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
 const server = spawn(process.execPath, ["--input-type=module", "-e", `
  import { createProductionApiServer } from ${JSON.stringify(module)};
@@ -90,9 +93,16 @@ try {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, locale: "de-DE" });
   page = await context.newPage();
   const commandApplications = new Map();
+  const loadCompleteAcknowledgements = new Map();
   page.on("response", response => {
-    const match = new URL(response.url()).pathname.match(/^\/api\/v1\/participant\/sessions\/[^/]+\/commands\/([^/]+)\/application$/);
+    const pathname = new URL(response.url()).pathname;
+    const match = pathname.match(/^\/api\/v1\/participant\/sessions\/[^/]+\/commands\/([^/]+)\/application$/);
     if (match && response.request().method() === "POST") commandApplications.set(match[1], response);
+    const load = pathname.match(/^\/api\/v1\/participant\/test-runs\/([^/]+)\/test-logs$/);
+    if (load && response.request().method() === "POST" && response.ok() &&
+      response.request().postDataJSON()?.logs?.some(batch => batch.entries?.some(entry => entry.key === "LOADCOMPLETE"))) {
+      loadCompleteAcknowledgements.set(load[1], response);
+    }
   });
   // The real Player sandbox has an opaque origin, so only its parent owns
   // this test-only readiness flag; subsequent frames/reloads release normally.
@@ -329,8 +339,16 @@ try {
   const second = (await api(currentPath, undefined, identity.sessionToken)).currentRunState.testRun;
   assert.equal(second.bookletKey, "second"); assert.notEqual(second.testRunId, run.testRunId);
   const errorDurable = async () => ({ run: await repository.getTestRunById(second.testRunId), parent: await repository.getParticipantSessionById(identity.participantSession.participantSessionId) });
+  await poll(() => loadCompleteAcknowledgements.has(second.testRunId), "The second Player's actual load-complete write was not acknowledged");
+  await loadCompleteAcknowledgements.get(second.testRunId).finished();
+  const errorSave = page.waitForResponse(response => response.request().method() === "POST" &&
+    new URL(response.url()).pathname === `/api/v1/participant/test-runs/${second.testRunId}/save-progress` &&
+    response.request().postDataJSON()?.logs?.some(batch => batch.entries?.some(entry => entry.key === "CONTROLLER" && entry.content === "ERROR")));
+  void errorSave.catch(() => {});
   await page.frameLocator("iframe").locator("#ownedDebugError").click(); await page.locator("mat-dialog-container, #participantRuntimeErrorFallback").waitFor();
   await poll(async () => /STATUS:\s*ERROR/.test(await windowPane("main").innerText()), "Debug status did not show ERROR");
+  const errorAcknowledgement = await errorSave; assert.equal(errorAcknowledgement.status(), 200); await errorAcknowledgement.finished();
+  await page.waitForFunction(() => document.querySelector("#participantVeronaSaveStatus")?.textContent.trim() === "saved");
   const errored = await errorDurable(); await debug(["off"]); await tabs.waitFor({ state: "detached" }); await debug([]); await tabs.waitFor();
   assert.deepEqual(await errorDurable(), errored); mark("console-debug-remains-pure-after-controller-error");
   await page.screenshot({ path: join(artifacts, "debug-error.png"), fullPage: true });
@@ -352,6 +370,6 @@ try {
   releaseSnapshot?.();
   await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests }, null, 2));
   await browser?.close();
-  if (server.exitCode === null) { server.kill("SIGTERM"); await Promise.race([closed, delay(5_000)]); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
+  if (server.exitCode === null) { server.kill("SIGTERM"); await raceWithSmokeDeadline(closed, 5_000, () => undefined); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
   await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
 }

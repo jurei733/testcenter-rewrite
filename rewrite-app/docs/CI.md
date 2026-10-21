@@ -21,6 +21,45 @@ Neither earlier run establishes full release acceptance.
 
 ## Settings renderer and immutable exit baseline
 
+### Native settings structure and acknowledged participant observations
+
+Run [39549352597](https://github.com/jurei733/testcenter-rewrite/actions/runs/39549352597)
+at `ebc64f27` finishes with **79 successful / two failed jobs**: the strict
+administration reference and its dependent final acceptance. Its Source repeat
+matches 23 of 24 views; the remaining Primar 1280-pixel-wide initial images
+view differs by one pixel.
+Source/Rewrite still differs by one to four pixels. These separate failures do
+not establish a shared cause and neither can be waived by the other.
+
+The next settings change follows the actual Source DOM and cascade: the
+settings component is an inline host directly containing its tab group, and
+the Rewrite's universal border-box reset no longer applies inside the Original
+administration root. Material's own explicit box-sizing rules still apply.
+The protected production administration flow and all 24 local Source/Rewrite
+comparisons plus all 24 independent Source repeats pass. Linux qualification
+remains required, and no full-page parity row is closed by this result.
+
+Participant gates now take their immutable debug-error baseline after the
+actual second Player's LOADCOMPLETE and error-save acknowledgements. They
+still compare the complete Run and parent, including revisions, answers and
+clocks. The delayed-terminal scenario holds the first successful owned
+`signed_in` runtime snapshot, allowing a legitimate preceding `launched` read
+to finish unchanged. A real authenticated browser GET explicitly exercises
+that leading read; four helper tests reject foreign participants, failed
+responses and unexpected lifecycle states and verify that the held snapshot
+remains independent of a newer active response. The browser uses its currently
+accepted credential after takeover rather than the initial rotated token.
+The complete local console gate passes 43 checks and the debug gate 16.
+
+Both gates now honor the CI artifact directory while keeping their owned
+SQLite stores in a separate scratch directory. A failed console job retains
+only its JSON/PNG evidence for seven days; debug evidence uses the existing
+qualification upload. Shutdown cancels its unused deadline timer instead of
+keeping Node alive for five seconds after a clean API exit. The final local
+frontend-state suite passes 1,953 checks, the CI policy suite 123, Actionlint
+and the production frontend build pass. These results do not replace the
+same-commit Linux, PostgreSQL and Docker acceptance matrix.
+
 ### Steady native viewport capture
 
 The administration task also repeats every Source view in a third, independent
