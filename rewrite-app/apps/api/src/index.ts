@@ -179,6 +179,7 @@ import {
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
   type UpdateApplicationSettingsRequest,
+  type PatchOriginalApplicationSettingsRequest,
   type UpdateApplicationSettingsResponse,
   type UploadApplicationAssetRequest,
   type UploadApplicationAssetResponse,
@@ -3446,6 +3447,9 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   ) {
     return `PATCH ${productionApiRoutes.admin.updateApplicationSettings}`;
   }
+  if (method === "PATCH" && pathname === productionApiRoutes.admin.patchOriginalApplicationSettings) {
+    return `PATCH ${productionApiRoutes.admin.patchOriginalApplicationSettings}`;
+  }
 
   if (
     ["GET", "POST", "DELETE"].includes(method) &&
@@ -5126,16 +5130,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (
         request.method === "PATCH" &&
-        pathname === productionApiRoutes.admin.updateApplicationSettings
+        (pathname === productionApiRoutes.admin.updateApplicationSettings ||
+         pathname === productionApiRoutes.admin.patchOriginalApplicationSettings)
       ) {
         const sessionToken = requireBearerToken(request, response);
         if (!sessionToken) {
           return;
         }
-        const body =
-          await readApplicationSettingsRequestJsonBody<UpdateApplicationSettingsRequest>();
-        const applicationSettings =
-          await services.applicationSettings.updateApplicationSettings({
+        const originalPatch = pathname === productionApiRoutes.admin.patchOriginalApplicationSettings;
+        const body = await readApplicationSettingsRequestJsonBody<PatchOriginalApplicationSettingsRequest>();
+        const fields = {
             sessionToken,
             appTitle: body.appTitle,
             mainLogo: body.mainLogo,
@@ -5148,7 +5152,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             assetAssignments: body.assetAssignments,
             globalWarningText: body.globalWarningText,
             globalWarningExpiresAt: body.globalWarningExpiresAt
-          });
+          };
+        const applicationSettings = originalPatch
+          ? await services.applicationSettings.patchOriginalApplicationSettings(fields)
+          : await services.applicationSettings.updateApplicationSettings({...fields,appTitle:(body as UpdateApplicationSettingsRequest).appTitle});
         sendJson<UpdateApplicationSettingsResponse>(response, 200, {
           applicationSettings
         });

@@ -138,6 +138,7 @@ export const productionApiRoutes = {
     listAuditEvents: "/api/v1/admin/audit-events",
     exportAuditEventsCsv: "/api/v1/admin/audit-events.csv",
     updateApplicationSettings: "/api/v1/admin/application-settings",
+    patchOriginalApplicationSettings: "/api/v1/admin/original-interface/application-settings",
     applicationAssets: "/api/v1/admin/application-assets"
   },
   platform: {
@@ -937,6 +938,9 @@ export type UpdateApplicationSettingsRequest = {
   globalWarningText?: string | null;
   globalWarningExpiresAt?: string | null;
 };
+
+/** Source editors change only supplied fields; custom text keys merge atomically. */
+export type PatchOriginalApplicationSettingsRequest = Partial<UpdateApplicationSettingsRequest>;
 
 export type UploadApplicationAssetRequest = {
   originalName: string;

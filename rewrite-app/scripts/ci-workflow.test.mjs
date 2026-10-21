@@ -190,6 +190,11 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
   assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
 });
+test("atomic settings regressions remain mandatory for both local and PostgreSQL acceptance", () => {
+  assert.ok(scripts["test:unit:built"].includes("scripts/application-settings-mutation.test.mjs"));
+  const postgres=readFileSync(new URL("./run-postgres-integration.mjs",import.meta.url),"utf8");
+  assert.ok(postgres.includes('"scripts/application-settings-mutation.test.mjs"'));
+});
 test("participant diagnostics are retained without uploading their SQLite scratch stores", () => {
   const job = workflow.jobs["verify-memory-sqlite"];
   const execute = job.steps.find(step => step.name === "Run ${{ matrix.check }}");

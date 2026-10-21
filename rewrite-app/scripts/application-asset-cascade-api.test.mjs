@@ -53,6 +53,16 @@ for(const kind of kinds)test(kind+': protected HTTP asset cascade preserves unre
   await api(path,{cascadeAssignments:true},'DELETE',404);
   const audit=(await api('/api/v1/admin/audit-events?eventType=application_asset_deleted&limit=100')).items;
   assert.equal(audit.length,1);assert.equal(audit[0].details.cascadeAssignments,true);assert.equal(audit[0].details.clearedRosterReferenceCount,2);
+  const patchPath='/api/v1/admin/original-interface/application-settings';
+  const beforePatch=(await api('/api/v1/system/application-settings')).applicationSettings;
+  await api(patchPath,{customTexts:{gm_headline:'Unauthorized'}},'PATCH',401,null);
+  await api(patchPath,{customTexts:{gm_headline:'Forbidden'}},'PATCH',403,delegated);
+  assert.deepEqual((await api('/api/v1/system/application-settings')).applicationSettings,beforePatch);
+  await Promise.all([api(patchPath,{customTexts:{gm_headline:'  Concurrent Ω  '}},'PATCH'),api(patchPath,{customTexts:{newer:'Keep this key'}},'PATCH')]);
+  const merged=(await api('/api/v1/system/application-settings')).applicationSettings;
+  assert.deepEqual(merged.customTexts,{...beforePatch.customTexts,gm_headline:'  Concurrent Ω  ',newer:'Keep this key'});
+  for(const key of ['appTitle','globalWarningText','globalWarningExpiresAt','assetAssignments'])assert.deepEqual(merged[key],beforePatch[key]);
+
  }finally{
   if(server){const closed=new Promise(done=>server.once('close',done));server.kill('SIGTERM');await raceWithSmokeDeadline(closed,10000,()=>{server.kill('SIGKILL');throw Error('Owned API shutdown timed out.');});}
   if(pool){await pool.query('DROP SCHEMA "'+schema+'" CASCADE');await pool.end();}await rm(folder,{recursive:true,force:true});

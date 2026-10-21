@@ -1874,24 +1874,7 @@ export const createSqliteFirstSliceStorage = (
     catch(error){return rollbackAfterFailure(database,error);}
   };
 
-  const repository: FirstSliceRepository = {
-    async getApplicationSettings() {
-      const row = database
-        .prepare(
-          `SELECT app_title, main_logo, theme_name, intro_html,
-                  legal_notice_html, privacy_notice, accessibility_notice,
-                  custom_texts_json, asset_assignments_json,
-                  global_warning_text, global_warning_expires_at,
-                  updated_at, updated_by_admin_user_id
-           FROM application_settings
-           WHERE settings_key = 'global'`
-        )
-        .get() as Record<string, unknown> | undefined;
-      return mapApplicationSettings(row);
-    },
-    async saveApplicationSettings(settings) {
-      return withAssetWrite(()=>{
-        validateApplicationAssetReferences(settings.assetAssignments,assetNames());
+  const writeSettings=(settings:ApplicationSettings):void=>{
       database
         .prepare(
           `INSERT INTO application_settings (
@@ -1931,6 +1914,36 @@ export const createSqliteFirstSliceStorage = (
           settings.updatedAt,
           settings.updatedByAdminUserId
         );
+
+  };
+
+  const repository: FirstSliceRepository = {
+    async getApplicationSettings() {
+      const row = database
+        .prepare(
+          `SELECT app_title, main_logo, theme_name, intro_html,
+                  legal_notice_html, privacy_notice, accessibility_notice,
+                  custom_texts_json, asset_assignments_json,
+                  global_warning_text, global_warning_expires_at,
+                  updated_at, updated_by_admin_user_id
+           FROM application_settings
+           WHERE settings_key = 'global'`
+        )
+        .get() as Record<string, unknown> | undefined;
+      return mapApplicationSettings(row);
+    },
+    async saveApplicationSettings(settings) {
+      return withAssetWrite(()=>{validateApplicationAssetReferences(settings.assetAssignments,assetNames());writeSettings(settings);});
+    },
+    async mutateApplicationSettings(transform) {
+      return withAssetWrite(()=>{
+        const previous=mapApplicationSettings(database.prepare("SELECT * FROM application_settings WHERE settings_key='global'").get() as Record<string,unknown>|undefined);
+        const effect=transform(structuredClone(previous));
+        validateApplicationAssetReferences(effect.settings.assetAssignments,assetNames());
+        writeSettings(effect.settings);
+        const audit=effect.auditEvent;
+        database.prepare("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES(?,?,?,?,?,?,?)").run(audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details));
+        return structuredClone(effect.settings);
       });
     },
     async listApplicationAssets() {

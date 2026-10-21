@@ -21,6 +21,48 @@ Neither earlier run establishes full release acceptance.
 
 ## Settings renderer and immutable exit baseline
 
+### Atomic settings edits alongside the pipeline gates
+
+Original settings saves now use a dedicated protected partial-update contract.
+The general and assignment editors send their own fields; the text editor sends
+only its changed keys, as Source's actual `changedData` handler does. They no
+longer issue a preceding whole-settings GET for each save. The legacy endpoint
+retains its required-title/full-text-map contract and omitted-warning clearing.
+Both contracts compute their result against the latest state inside the store's
+write boundary and commit the matching audit in that same boundary. SQLite uses
+BEGIN IMMEDIATE, PostgreSQL shares the catalog/assignment advisory lock, and
+File commits one isolated manifest; no settings edit can resurrect an asset
+removed by the corresponding catalog writer.
+
+The new mandatory unit/PostgreSQL regression covers a held editor overtaken by
+another edit, combined-map limits, missing assets, exact File failure recovery,
+late SQL audit rollback and two actually blocked independent PostgreSQL writers.
+Protected HTTP checks cover concurrent key edits, missing authentication and a
+delegated administrator's denial. A hash-verified fixture retains the actual
+pinned Source controller, DAO, editor and DDL excerpts; the PostgreSQL oracle
+executes Source's real meta SQL to verify preservation of omitted keys. It does
+not claim to run the complete Source backend or its authorization stack.
+
+The full local unit checkpoint passes 3,642 tests, the focused four-store/HTTP
+checkpoint 24, and the four-store settings/Source SQL checkpoint 21. CI policy
+passes 130 checks, including Source provenance substitutions and mandatory new
+regression coverage. Typecheck, production web build and the protected native
+administration/settings browser flow pass. The latter still exercises all 102
+texts, eight image slots, legacy guards, cascade, roles and password/session
+flows. The complete Memory, File and SQLite HTTP suites each pass 172 checks.
+Same-commit remote qualification remains required.
+
+Parent `7b6090b7` in
+[run 39553564797](https://github.com/jurei733/testcenter-rewrite/actions/runs/39553564797)
+still fails administration's strict renderer gate after matching the native
+settings host and box model. The Source repeat differs by two pixels in one
+view; Source/Rewrite differs by one to four pixels. Saved Linux images show
+LCD-colored ink extending one pixel left of two headings in Source but absent
+in Rewrite, with identical measured text/layout/styles and all neighboring
+pixels equal. This narrows the observation but does not establish its cause.
+No tolerance, mask, renderer flags or diagnostic waiver are introduced, and no
+broad parity row is closed.
+
 ### Native settings structure and acknowledged participant observations
 
 Run [39549352597](https://github.com/jurei733/testcenter-rewrite/actions/runs/39549352597)

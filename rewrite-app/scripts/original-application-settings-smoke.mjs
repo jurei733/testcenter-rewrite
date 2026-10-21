@@ -10,7 +10,7 @@ export async function runOriginalApplicationSettingsSmoke(page,api,{artifacts}){
  const root=page.locator('#originalApplicationSettings[aria-busy="false"]');await root.waitFor();
  const saveSettings=async button=>{
   await page.bringToFront();await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-  const response=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/application-settings'&&response.request().method()==='PATCH');
+  const response=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/v1/admin/original-interface/application-settings'&&response.request().method()==='PATCH');
   await button.click();assert.equal((await response).status(),200);await root.waitFor();
  };
  const captures={};

@@ -134,6 +134,16 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       validateApplicationAssetReferences(settings.assetAssignments,Array.from(state.applicationAssets.values()));
       state.applicationSettings = { ...settings };
     },
+    async mutateApplicationSettings(transform) {
+      {
+        const effect=transform(structuredClone(state.applicationSettings));
+        validateApplicationAssetReferences(effect.settings.assetAssignments,Array.from(state.applicationAssets.values()));
+        const settings=structuredClone(effect.settings),audit=structuredClone(effect.auditEvent);
+        if(state.adminAuditEvents.has(audit.adminAuditEventId))throw Error("Duplicate application settings audit event.");
+        state.applicationSettings=settings;state.adminAuditEvents.set(audit.adminAuditEventId,audit);
+        return structuredClone(effect.settings);
+      }
+    },
     async listApplicationAssets() {
       return Array.from(state.applicationAssets.values());
     },
