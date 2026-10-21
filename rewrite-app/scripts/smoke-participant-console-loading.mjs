@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import { createSqliteFirstSliceRepository } from "@testcenter-rewrite-app/sqlite-store";
@@ -12,6 +12,18 @@ import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import { createInactiveRuntimeSnapshotGate } from "./inactive-runtime-snapshot-gate.mjs";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
+
+import {isSupervisedSmokeChild, runSupervisedSmoke, reportSmokePhase} from './supervised-smoke.mjs';
+
+if (!isSupervisedSmokeChild(import.meta.url)) {
+  const artifactRoot = process.env.UI_SMOKE_ARTIFACT_DIR || await mkdtemp(join(tmpdir(), 'owned-console-supervisor-'));
+  process.exitCode = await runSupervisedSmoke({entry: fileURLToPath(import.meta.url),
+    artifactDirectory: resolve(artifactRoot, 'participant-console-loading'),
+    env: {...process.env, UI_SMOKE_ARTIFACT_DIR: artifactRoot},
+    phaseTimeoutMs: 60_000, totalTimeoutMs: 480_000});
+} else {
+const reportConsolePhase = label => { console.log(label); reportSmokePhase(label); };
+const phaseStep = async (label, work) => { reportSmokePhase(label); return work(); };
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
@@ -41,6 +53,7 @@ const poll = async (predicate, message) => {
   throw Error(message);
 };
 try {
+  reportSmokePhase('owned-api-startup');
   const port = await new Promise((done, reject) => {
     const timer = setTimeout(() => reject(Error("Owned API startup timed out")), 20_000);
     server.once("message", ({ port }) => { clearTimeout(timer); done(port); });
@@ -53,6 +66,7 @@ try {
       ...(body === undefined ? {} : { "content-type": "application/json" }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     assert.ok(response.ok, `${method} ${path}: ${response.status} ${await response.clone().text()}`); return response.json();
   };
+  reportSmokePhase('owned-content-setup');
   const operator = (await api("/api/v1/admin/auth/sign-in", { username: "demo-admin", password: "demo-admin-password" })).sessionToken;
   const workspaceKey = "owned-debug", workspace = `/api/v1/tenants/demo-tenant/workspaces/${workspaceKey}`;
   await api("/api/v1/tenants/demo-tenant/workspaces", { workspaceKey, displayName: "Owned debug browser" }, operator);
@@ -79,9 +93,11 @@ try {
   const imported = await api(workspace + "/import-jobs", { sourcePackageId: source.sourcePackage.sourcePackageId }, operator);
   await api(workspace + `/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`, { activatedByActorId: "owned-debug-browser" }, operator);
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="remote-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
+  reportSmokePhase('chromium-launch');
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
   // Resume is a real controller transition even if the server Run is already
   // running: before the initial view arrives the controller itself is LOADING.
+  reportSmokePhase('loading-context');
   const loadingContext = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   const loadingPage = await loadingContext.newPage(); page = loadingPage;
   const loadingRepository = createSqliteFirstSliceRepository(file);
@@ -117,20 +133,24 @@ try {
         routeErrors.push(error);
       }
     });
-    await loadingPage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+    await phaseStep("loading-page-entry",()=>loadingPage.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" }));
+    reportSmokePhase("loading-sign-in");
     await loadingPage.locator("#originalLoginName").fill("loading-person");
     await loadingPage.getByRole("button", { name: "Weiter", exact: true }).click();
     await loadingPage.locator('#originalParticipantStarter mat-card[data-booklet-key="first"] button').click();
+    reportSmokePhase("loading-response-held");
     await poll(() => Promise.resolve(Boolean(initialRun)), "Initial loading response was not held");
     await loadingPage.waitForFunction(() => typeof window.tc?.resume === "function");
-    await loadingPage.evaluate(() => window.tc.debug());
+    await phaseStep("loading-debug-command",()=>loadingPage.evaluate(() => window.tc.debug()));
     const loadingPane = loadingPage.locator('[data-debug-window="main"]');
+    reportSmokePhase("loading-status-and-durable-log");
     await poll(async () => /STATUS:\s*LOADING/.test(await loadingPane.innerText()), "Initial controller is not LOADING");
     const controllerLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
       .filter(log => log.testRunId === initialRun.testRunId && log.logKey === "CONTROLLER").sort((a,b)=>a.timestamp-b.timestamp||a.participantTestLogId.localeCompare(b.participantTestLogId));
     await poll(async () => (await controllerLogs()).length > 0, "Initial LOADING was not persisted before any Unit");
     assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING"], "Entry fabricated RUNNING before the controller was ready");
-    await loadingPage.evaluate(() => window.tc.resume());
+    await phaseStep("loading-early-resume-command",()=>loadingPage.evaluate(() => window.tc.resume()));
+    reportSmokePhase("loading-early-resume-receipt");
     await poll(() => Promise.resolve(loadingRequests.length === 1), "Early Resume was not sent");
     assert.equal(loadingRequests[0].controllerStatus, "LOADING");
     const executionLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
@@ -139,13 +159,14 @@ try {
     await poll(async () => /STATUS:\s*RUNNING/.test(await loadingPane.innerText()), "Resume receipt did not advance the loading controller");
     assert.equal(await loadingPage.locator("iframe").count(), 0);
     const releasedLoadingAt = Date.now();
-    releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" });
+    releaseLoading(); await phaseStep("loading-release-current-view-routes",()=>loadingPage.unrouteAll({ behavior: "wait" }));
     await poll(() => Promise.resolve(loadingViews.some(view => view.fulfilled)), "No current loading view was actually delivered after Resume");
-    await loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    await phaseStep("loading-player-ready",()=>loadingPage.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor());
     const run = await loadingRepository.getTestRunById(initialRun.testRunId);
     assert.deepEqual(run.unitResponses, initialRun.unitResponses);
     assert.deepEqual(run.unitResponseFieldTimestamps, initialRun.unitResponseFieldTimestamps);
     assert.equal((await executionLogs()).filter(log => log.logKey === "CONTROLLER").length, 1);
+    reportSmokePhase("loading-completion-and-clock-proof");
     const completionLogs = async () => (await loadingRepository.listParticipantTestLogsByWorkspace(initialRun.tenantId, initialRun.workspaceId))
       .filter(log => log.testRunId === initialRun.testRunId && log.logKey === "command executed" && log.logContent === "resume");
     await poll(async () => loadingCompletions.length === 1 && (await completionLogs()).length === 1, "Early Resume completion was not persisted after its client continuation");
@@ -156,14 +177,15 @@ try {
     await poll(async () => (await controllerLogs()).length >= 2, "Ready transition was not persisted");
     assert.deepEqual((await controllerLogs()).map(log=>log.logContent), ["LOADING", "RUNNING"], "Early Resume produced a duplicate lifecycle ready state");
     loadingObservations.push({ testRunId: run.testRunId, controllerTransitions: (await executionLogs()).filter(log => log.logKey === "CONTROLLER").map(log => log.logContent), loadingViews, answersAndClocksPreserved: true });
+    reportSmokePhase("loading-success-screenshot");
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume.png"), fullPage: true });
     checks.push("early-resume-observes-loading-and-persists-the-real-controller-transition");
-    console.log("participant_console_loading=early-resume-observes-loading-and-persists-the-real-controller-transition:passed");
+    reportConsolePhase("participant_console_loading=early-resume-observes-loading-and-persists-the-real-controller-transition:passed");
   } catch (error) {
     console.error("Initial loading fixture failure:", error.stack ?? String(error));
     await loadingPage.screenshot({ path: join(artifacts, "loading-resume-failure.png"), fullPage: true }).catch(() => {});
     throw error;
-  } finally { releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
+  } finally { reportSmokePhase("loading-context-cleanup"); releaseLoading(); await loadingPage.unrouteAll({ behavior: "wait" }).catch(() => {}); await loadingContext.close(); }
   // An application receipt changes the controller before a following full
   // view arrives. Holding that view must not block the next accepted command.
   const remoteIdentity = await api(productionApiRoutes.participant.signIn, {tenantKey:"demo-tenant",workspaceKey,loginKey:"remote-person"});
@@ -202,7 +224,7 @@ try {
     await poll(()=>Promise.resolve(pausedHeld),"Remote Pause did not request its following full view");
     await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),"Remote Pause receipt did not project before its held full view");
     await remotePage.locator("#participantRoutePausedState").waitFor();
-    checks.push("remote-pause-receipt-projects-before-the-following-unit-view");console.log("participant_console_loading=remote-pause-receipt-projects-before-the-following-unit-view:passed");
+    checks.push("remote-pause-receipt-projects-before-the-following-unit-view");reportConsolePhase("participant_console_loading=remote-pause-receipt-projects-before-the-following-unit-view:passed");
     const resume=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:"resume"},operator)).command;
     await poll(async()=>(await loadingRepository.getTestRunById(runId)).status==="running","Remote Resume was blocked behind the held Pause view");
     await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),"Remote Resume receipt did not project RUNNING");
@@ -226,7 +248,7 @@ try {
     for(const keyword of ['pause','resume'])assert.equal(logs.filter(log=>log.logKey==='command executed'&&log.logContent===keyword).length,1);
 
     await remotePage.screenshot({path:join(artifacts,"remote-view-resume.png"),fullPage:true});
-    checks.push("remote-resume-overtakes-held-view-and-fences-its-late-state");console.log("participant_console_loading=remote-resume-overtakes-held-view-and-fences-its-late-state:passed");
+    checks.push("remote-resume-overtakes-held-view-and-fences-its-late-state");reportConsolePhase("participant_console_loading=remote-resume-overtakes-held-view-and-fences-its-late-state:passed");
     for(const [origin,phase,successor] of [['remote','response','remote'],['remote','request','remote'],
       ['native','response','native'],['native','request','native'],['native','request','remote']]){
       const oldResetFrame=await remotePage.locator('iframe').elementHandle();
@@ -284,7 +306,7 @@ try {
         loadingObservations.push({overlap:label,firstRequest,firstApplication,laterApplication:next,earlierApplicationHeldBeforeLaterReceipt:true,
           answersAndClocksPreserved:true,siblingPreserved:true});
         await remotePage.screenshot({path:join(artifacts,`overlap-${label}.png`),fullPage:true});
-        const marker=`overlapping-${label}-keeps-later-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+        const marker=`overlapping-${label}-keeps-later-resume`;checks.push(marker);reportConsolePhase(`participant_console_loading=${marker}:passed`);
       }finally{releaseFirst();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
     await remotePage.route("**/application",captureApplication);
@@ -330,7 +352,7 @@ try {
         const final=await loadingRepository.getTestRunById(runId);assert.deepEqual(final.unitResponses,baseline.unitResponses);assert.deepEqual(final.unitResponseFieldTimestamps,baseline.unitResponseFieldTimestamps);
         assert.deepEqual(await loadingRepository.getTestRunById(sibling.testRunId),siblingBefore);
         loadingObservations.push({phaseErrorOrigin:origin,pauseRequest,resumeRequest,newerErrorPreserved:true,immediateResumeRetainedDialog:true,answersAndClocksPreserved:true});
-        const marker=`immediate-${origin}-phase-yields-to-newer-error-and-fresh-native-resume`;checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+        const marker=`immediate-${origin}-phase-yields-to-newer-error-and-fresh-native-resume`;checks.push(marker);reportConsolePhase(`participant_console_loading=${marker}:passed`);
       }finally{releasePause();releaseResume();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
     const overlaps=['native','remote'].flatMap(origin=>[false,true].flatMap(initialPaused=>['pause','resume'].flatMap(later=>[false,true].map(lock=>({origin,initialPaused,later,lock})))));
@@ -431,7 +453,7 @@ try {
         await poll(async()=>(await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').inputValue())===answer,'The renewed Player did not restore the exact trusted answer');
         await remotePage.waitForFunction(()=>typeof window.tc?.debug==='function');await remotePage.evaluate(()=>window.tc.debug());await remotePane.waitFor();
         await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').fill('3');await poll(async()=>JSON.parse(parseVeronaUnitResponse((await loadingRepository.getTestRunById(runId)).unitResponses['first-unit']).unitState.dataParts.answer)[0].value==='3','The terminal phase fixture did not settle its answer reset');before=await loadingRepository.getTestRunById(runId);
-        const label=`forced-${scenario.origin}-terminal-held-continuation-${scenario.noop?'noop-'+scenario.noop:scenario.later?(scenario.initialPaused?'paused':'running')+'-later-'+scenario.later+(scenario.lock?'-lock':''):'fresh-resume'}`;checks.push(label);console.log(`participant_console_loading=${label}:passed`);
+        const label=`forced-${scenario.origin}-terminal-held-continuation-${scenario.noop?'noop-'+scenario.noop:scenario.later?(scenario.initialPaused?'paused':'running')+'-later-'+scenario.later+(scenario.lock?'-lock':''):'fresh-resume'}`;checks.push(label);reportConsolePhase(`participant_console_loading=${label}:passed`);
       }finally{observation.finalRun=await loadingRepository.getTestRunById(runId);observation.body=await remotePage.locator('body').innerText().catch(()=> '');releaseAnswer();releaseRuntime();releaseAck();releaseStateEffect();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});}
     }
     // The preceding owned phase/error routes remove their handlers on exit.
@@ -484,7 +506,7 @@ try {
     loadingObservations.push({testRunId:runId,remoteApplications:applications,acknowledgements:acks,terminalRuntimeReads:terminalRuntimeCapture.reads,
       precedingActiveRuntimeReads:terminalRuntimeCapture.leadingActiveReads,heldRuntimeSnapshot:terminalRuntimeCapture.heldSnapshot,
       answersAndClocksPreserved:true,siblingPreserved:true,newerEntryRetained:true});
-    checks.push('late-remote-termination-cannot-close-a-newer-native-entry');console.log('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
+    checks.push('late-remote-termination-cannot-close-a-newer-native-entry');reportConsolePhase('participant_console_loading=late-remote-termination-cannot-close-a-newer-native-entry:passed');
     const terminalDeferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
     for(const externalKeyword of ['resume','pause']) {
     if((await loadingRepository.getTestRunById(runId)).status==='paused') {
@@ -559,7 +581,7 @@ try {
         sameRunReceptionRestored:true,answersAndClocksPreserved:true,siblingPreserved:externalKeyword!=='pause',
         siblingAnswersAndClocksPreserved:true,siblingChangedOnlyByItsOwnAcceptedCommand:externalKeyword==='pause',ownedSiblingFixtureRestoredForLaterGroups:externalKeyword==='pause'});
       await remotePage.screenshot({path:join(artifacts,`external-${externalKeyword}-reception.png`),fullPage:true});
-      const marker=externalKeyword==='pause'?'a-newer-paused-entry-restores-reception-despite-sibling-parent-transitions':'an-external-same-run-entry-restores-the-rendered-controller-reception';checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+      const marker=externalKeyword==='pause'?'a-newer-paused-entry-restores-reception-despite-sibling-parent-transitions':'an-external-same-run-entry-restores-the-rendered-controller-reception';checks.push(marker);reportConsolePhase(`participant_console_loading=${marker}:passed`);
     }catch(error){await remotePage.screenshot({path:join(artifacts,`external-${externalKeyword}-failure.png`),fullPage:true}).catch(()=>{});throw error;}
     finally{runtimeRequest.resolve();await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});if(!externalPage.isClosed())await externalPage.close();}
     }
@@ -606,7 +628,7 @@ try {
     assert.deepEqual(applications.map(value=>value.application.command.executionSequence),applications.map((_,index)=>index+1));
     assert.equal(acks.length,applications.length);assert.ok(acks.every(ack=>ack.body.testRunId===runId));
     loadingObservations.push({testRunId:runId,gotoApplications:applications.slice(gotoApplicationStart),answersAndClocksPreserved:true,siblingPreserved:true,formerUnitRetiredBeforeTargetView:true});
-    checks.push('remote-goto-retires-the-former-unit-and-keeps-following-commands-live');console.log('participant_console_loading=remote-goto-retires-the-former-unit-and-keeps-following-commands-live:passed');
+    checks.push('remote-goto-retires-the-former-unit-and-keeps-following-commands-live');reportConsolePhase('participant_console_loading=remote-goto-retires-the-former-unit-and-keeps-following-commands-live:passed');
 
     await remotePage.unrouteAll({behavior:'wait'});
     for(const origin of ['remote','native']) {
@@ -696,7 +718,7 @@ try {
           terminalReceptionSuspended:true,acceptedResumeIndependentOfStarter:true,receptionReopenedBeforeUnitView:true,freshPauseApplied:true,answersAndClocksPreserved:true,siblingPreserved:true});
         await remotePage.screenshot({path:join(artifacts,`${origin}-terminal-presentation-independent.png`),fullPage:true});
         const marker=`${origin}-terminal-presentation-keeps-accepted-resume-and-reception-independent`;
-        checks.push(marker);console.log(`participant_console_loading=${marker}:passed`);
+        checks.push(marker);reportConsolePhase(`participant_console_loading=${marker}:passed`);
       } finally {
         heldRuntime.resolve();viewReleased=true;heldView.resolve();completeAck.resolve();resumeAck.resolve();
         await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});
@@ -718,7 +740,7 @@ try {
   const start = async key => { await page.locator(`#originalParticipantStarter mat-card[data-booklet-key="${key}"] button`).click(); await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor(); await page.waitForFunction(() => typeof window.tc?.debug === "function"); };
   const repository = createSqliteFirstSliceRepository(file);
   const native = async (keyword, args = []) => page.evaluate(({keyword,args})=>window.tc[keyword](args),{keyword,args});
-  const mark = name => { checks.push(name); console.log(`participant_console_loading=${name}:passed`); };
+  const mark = name => { checks.push(name); reportConsolePhase(`participant_console_loading=${name}:passed`); };
   const allMethods = () => page.waitForFunction(()=>['debug','pause','resume','terminate','goto'].every(key=>typeof window.tc?.[key]==='function'));
   const pane = () => page.locator('[data-debug-window="main"]');
   await allMethods(); await native('pause'); await native('debug'); await delay(150);
@@ -862,9 +884,12 @@ try {
   await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, routeErrors: routeErrors.map(String), requests, nativeRequests, progressRequests, loadingObservations, body: await page?.locator("body").innerText().catch(() => "") }, null, 2));
   throw error;
 } finally {
-  releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});
+  reportSmokePhase("final-route-cleanup"); releaseSnapshot?.(); for(const release of releases)release(); await page?.unrouteAll({behavior:"wait"}).catch(() => {});
   await writeFile(join(artifacts, "debug.json"), JSON.stringify({ checks, errors, requests, nativeRequests, progressRequests, loadingObservations }, null, 2));
-  await browser?.close();
+  reportSmokePhase("final-browser-close"); await browser?.close();
+  reportSmokePhase("final-owned-api-close");
   if (server.exitCode === null) { server.kill("SIGTERM"); await raceWithSmokeDeadline(closed, 5_000, () => undefined); if (server.exitCode === null) { server.kill("SIGKILL"); await closed; } }
   await closed; gate.assertHealthy(); console.log("owned_api=shutdown");
+}
+
 }
