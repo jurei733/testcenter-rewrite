@@ -30,6 +30,18 @@ const fixture = handler => {
 // Original checkout before producing its browser build. Ordinary unit jobs need
 // no unrelated checkout or network access to execute that real Source method.
 const sourceReference=JSON.parse(readFileSync(new URL("./fixtures/original-administration-permissions.json",import.meta.url),"utf8"));
+for (const owner of ['admin','workspace']) test(`selecting the same ${owner} again retains the Source permission draft without a reload`,()=>{
+ const f=fixture(()=>{throw Error('Selection must not dispatch a write');});
+ f.controller.admins=[admin('self'),admin('other',[role()])];
+ const select=id=>owner==='admin'?f.controller.selectAdmin(id):f.controller.selectWorkspace(id);
+ const id=owner==='admin'?'other':'ws-a';select(id);
+ f.controller.togglePermission('other','ws-a','RW');
+ const draft=[...f.controller.changes],changes=f.changed.length;select(id);
+ assert.deepEqual([...f.controller.changes],draft);assert.equal(f.controller.access('other','ws-a'),'RW');
+ assert.equal(f.changed.length,changes);assert.deepEqual(f.calls,[]);
+ select(owner==='admin'?'self':'ws-b');assert.equal(f.controller.changes.size,0);
+ assert.equal(f.controller.access('other','ws-a'),'RO');
+});
 for (const captured of sourceReference.sources) {
  const reference={};new Function("exports",ts.transpileModule(`export class Source {${captured.handler}}`,{
    compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}

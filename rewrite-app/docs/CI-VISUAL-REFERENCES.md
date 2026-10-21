@@ -18,36 +18,46 @@ Quick failures also upload the explicit browser artifact directory, alongside th
 
 The Source system-check welcome view retains a 1280px content toolbar on a 1280px Linux desktop; narrow views legitimately reserve a native 15px scrollbar. The rewrite now uses the Source fixed window/header/footer with scrolling inside the routed content instead of a window scrollbar that narrowed the desktop view. Login geometry capture additionally records the original entry/header/footer bounds for diagnosing the remaining Linux login discrepancies without inferring coordinates from rewrite output.
 
-## Paired administration directories
+## Paired administration directories and dialogs
 
-The additional directory family compares 36 complete viewports: three themes,
-1280/390 by 844 pixels, Admins/Arbeitsbereiche and initial/selected/dirty-rights
-states. It derives read-only Source DTOs from owned protected setup, with separate
-Source numeric IDs and actual candidate tenant/UUID identities. The unchanged
-Source DAO's global ordering, DTOs, service URLs, component fields, templates and
-CSS are pinned by eight complete file hashes and actual excerpts. The Source
-producer verifies those files before building; consumers verify the same-run
-build manifest and every compiled file before and after capture.
+The directory family now compares **84 complete viewports and 84 independent
+Source repeats**: three themes, 1280/390 by 844 pixels, both tables, initial and
+selected rows, dirty rights, re-selecting the same dirty row, and role/name dialogs
+with empty, invalid and valid fields. All previous 36 baseline scenes remain.
+Source authority stays at its separate origin with read-only controlled DTOs;
+candidate contexts inherit only an actual protected UI sign-in. No dialog submit
+or Source backend authentication is simulated by this visual gate.
 
-Candidate contexts inherit only an actual protected UI sign-in. Fixture authority
-is restricted to the separate Source origin, where non-GET and unknown requests
-fail. All phases and tabs use actual new documents, including Source repeats;
-changing only Source's hash route is insufficient. Both builds use the same
-native window and zero-tolerance full RGBA comparison, with fresh native paint,
-exact style/layout restoration and three equal visible frames. Six mandatory
-paint/layout/one-pixel controls run in this family as well as settings.
+Sixteen pinned DAO/service/component/template/CSS files establish directory and
+dialog contracts, including name minimum length, empty initial rename state,
+optional confirmation content and action-specific role titles. Empty Source CSS
+files are still checked by their complete hash; missing excerpts are accepted
+only for genuinely empty files. The producer verifies actual Source bytes before
+building, and consumers verify the same-run compiled manifest before/after capture.
+All tabs/builds/repeats use genuine new documents. Full native RGBA comparison has
+zero tolerance, witnessed fresh paint, exact restoration and three equal visible
+frames. Both settings and directory families require all six native fault controls.
 
-Local qualification passes all 36 pairs and 36 independent Source repeats.
-All 108 capture records independently match their retained cleared/visible PNG
-hashes, fully white cleared pixels and three steady frames. The actual CI capture
-wrapper also runs locally with the remembered Source producer manifest; this
-remains local evidence and does not replace a new same-head Linux qualification.
-The full matrix grows from 85 to 86 jobs. No prior Source/browser check is removed.
+Published `2dc47c98` passes its earlier **36 pairs and 36 repeats on Linux** in
+[run 39608434842](https://github.com/jurei733/testcenter-rewrite/actions/runs/39608434842),
+job `119251331451`. Evidence ZIP `12348678771` has SHA256
+`dcad5f9185668c9ecf528d866a0eef8a3dfa429088272e09b9287513902ea6d5`.
+All 108 physical clear/visible frame proofs independently verify against PNGs;
+its actual same-run Source producer is `892fde4ab3351ef4156ef0708fd4fff3f2e9475e`.
+That full 86-job run is green. It does not certify the later dialog changes.
 
-These scenes exclude submitted mutations, dialogs, transient notices, Source's
-retained permission rows after clearing selection, backend authorization and
-locale-specific database collation. Those require further paired evidence; no
-broad full-page parity row is closed by these 36 baseline scenes.
+The first dialog probe found 43,107 differing pixels in the desktop role dialog
+and 25,131 in workspace rename; Source reproduced its own dialogs exactly.
+Rewrite now uses Source's set/revoke title and optional-content layout, starts
+rename with an empty field, applies its three-character name minimum and restores
+the native workspace field width/paragraph. Selecting an already selected row
+preserves pending rights, matching Source CDK selection behavior. The expanded
+local wrapper passes all **84 pairs/repeats**, with 252 physical frame proofs and
+16 Source files. Fresh Linux qualification of this expanded scope remains required.
+
+Submitted mutations, other dialogs, transient/error/pending states, Source's
+retained permission rows after selection clears, backend authorization and
+locale-specific database collation remain open. No broad parity row closes.
 
 ## Same-run settings comparison
 

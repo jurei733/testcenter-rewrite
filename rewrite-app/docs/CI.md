@@ -19,6 +19,32 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Current directory/dialog checkpoint
+
+Published `2dc47c98` completes [run 39608434842](https://github.com/jurei733/testcenter-rewrite/actions/runs/39608434842)
+with **all 86 jobs successful**, including the directory reference, held-answer
+exit, timer and all three Compose modes. Measured job timestamps give **29:13
+full acceptance, 4:53 Fast feedback and 418.25 runner-minutes**. The earlier green
+85-job baseline was 37:40 / 3:38 / 411.0 runner-minutes: full wall time is 8:27
+shorter with broader coverage, while early feedback and compute did not improve.
+Shared-runner conditions differ; the complete change cannot be attributed solely
+to ordering. The unchanged timer fixture's prior socket reset does not recur;
+no transport failure was ignored or retried.
+
+The next UI change extends directory qualification from 36 to 84 views per build
+and independent Source repeat. Source-derived fixes restore empty rename fields,
+three-character workspace-name validation, native field sizing/paragraphs,
+set/revoke confirmation titles and omitted empty content. Re-selecting a dirty
+selected row no longer resets rights. Source initial/invalid/valid dialog states
+and this repeated-selection behavior all pass locally at zero RGBA differences.
+Sixteen complete Source files now pin these additional contracts. No previous
+baseline scene or required job is removed; the matrix remains 86 jobs.
+
+This local expansion requires fresh full CI. Existing successful 2dc results do
+not prove the new UI head or cover submitted mutations, transient notices or
+Source's retained right-table rows after clearing selection. Formal 29 done /
+20 partial and all eight broad visual rows remain unchanged.
+
 ## Directory family and bounded Compose JSON polling
 
 A fifth Source family adds 36 directory viewports and 36 independent repeats,

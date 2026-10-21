@@ -108,10 +108,12 @@ export class OriginalAdministrationController {
   clearSelection(): void { this.selectedAdminId = ""; this.selectedWorkspaceId = ""; this.changes.clear(); }
   selectAdmin(id: string): void {
     if (this.busy || !this.admins.some(item=>item.adminUser.adminUserId===id)) return;
+    if (this.selectedAdminId === id) return;
     this.clearSelection(); this.selectedAdminId = id; this.changed();
   }
   selectWorkspace(id: string): void {
     if (this.busy || !this.workspaces.some(item=>item.workspaceId===id)) return;
+    if (this.selectedWorkspaceId === id) return;
     this.clearSelection(); this.selectedWorkspaceId = id; this.changed();
   }
 

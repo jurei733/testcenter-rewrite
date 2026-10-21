@@ -2,7 +2,7 @@
   "version": 1,
   "repository": "iqb-berlin/testcenter",
   "commit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
-  "scope": "Read-only Source directory DTOs, global ordering, headings and permission controls; not Source backend authentication.",
+  "scope": "Read-only Source directory DTOs, ordering, permission controls, name and role dialogs; not Source backend authentication.",
   "files": [
     {
       "path": "backend/src/dao/SuperAdminDAO.class.php",
@@ -64,6 +64,58 @@
       "sha256": "0d47c20183f076e2570d66dbdea141bedfed5d738a5fafdf63beb1170b5c2343",
       "excerpts": [
         ".mat-mdc-fab {\n  margin: 2px;\n}\n\n.mat-column-selectCheckbox {\n  max-width: 120px !important;\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.ts",
+      "sha256": "28a2db13187acb18bf092a6efd5667eaefad7f6244cf61b201c9373823060c6b",
+      "excerpts": [
+        "import { MAT_DIALOG_DATA } from '@angular/material/dialog';\nimport { Component, Inject } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './editworkspace.component.html',\n    styleUrls: ['./editworkspace.component.css'],\n    standalone: false\n})\nexport class EditworkspaceComponent {\n  editworkspaceform = new FormGroup({\n    name: new FormControl('', [Validators.required, Validators.minLength(3)])\n  });\n\n  constructor(\n    @Inject(MAT_DIALOG_DATA) public data: string\n  ) { }\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.html",
+      "sha256": "9bff725d7979d6811aae1d8e2b5ab87670a7d214c0fe0cb8dbe1dda53fb80a80",
+      "excerpts": [
+        "<form [formGroup]=\"editworkspaceform\">\n  <h1 mat-dialog-title>Arbeitsbereich \"{{data}}\" ändern</h1>\n\n  <mat-dialog-content>\n    <p>\n      <mat-form-field>\n        <input matInput formControlName=\"name\" placeholder=\"Name\" [value]=\"data\">\n      </mat-form-field>\n    </p>\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button type=\"submit\" [mat-dialog-close]=\"editworkspaceform\" [disabled]=\"editworkspaceform.invalid\">Speichern</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n\n</form>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/editworkspace/editworkspace.component.css",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "excerpts": []
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.ts",
+      "sha256": "a01d813ed01c83fb75aed55756015cfa9a7f06f39b3db34bf56dc127f4189a00",
+      "excerpts": [
+        "import { Component } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './newworkspace.component.html',\n    styleUrls: ['./newworkspace.component.css'],\n    standalone: false\n})\nexport class NewworkspaceComponent {\n  newworkspaceform = new FormGroup({\n    name: new FormControl('', [Validators.required, Validators.minLength(3)])\n  });\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.html",
+      "sha256": "c027f52b920a15a606573ddb4dbe609acd86610d2d387262a6f582620113bd0d",
+      "excerpts": [
+        "<form [formGroup]=\"newworkspaceform\">\n  <h1 mat-dialog-title>Neuer Arbeitsbereich</h1>\n\n  <mat-dialog-content>\n    <p>\n      <mat-form-field>\n        <input matInput formControlName=\"name\" placeholder=\"Name\">\n      </mat-form-field>\n    </p>\n    <div>\n      <p>Nach dem Anlegen des Arbeitsbereiches können Sie die Zugriffsrechte zuweisen.\n      </p>\n    </div>\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button type=\"submit\" [mat-dialog-close]=\"newworkspaceform\" [disabled]=\"newworkspaceform.invalid\">Speichern</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n\n</form>\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/workspaces/newworkspace/newworkspace.component.css",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "excerpts": []
+    },
+    {
+      "path": "frontend/src/app/superadmin/confirm-with-password/confirm-with-password.component.ts",
+      "sha256": "34e926ff6eb8e7f30860aacaf6dcdbd85f2785ce0974bed25770b8c97029780d",
+      "excerpts": [
+        "import { MAT_DIALOG_DATA } from '@angular/material/dialog';\nimport { Component, EventEmitter, Inject } from '@angular/core';\nimport { FormGroup, Validators, FormControl } from '@angular/forms';\n\n@Component({\n    templateUrl: './confirm-with-password.component.html',\n    standalone: false\n})\n\nexport class ConfirmWithPasswordComponent {\n  passwordform = new FormGroup({\n    pw: new FormControl('', [Validators.required, Validators.minLength(7)])\n  });\n\n  errorMessage = '';\n\n  readonly passwordSubmit = new EventEmitter<string>();\n\n  // `content` and `confirmText` are optional: callers that only need a title (plus the fixed\n  // \"please re-enter your password\" wording and default \"Bestätigen\") can omit both.\n  constructor(\n    @Inject(MAT_DIALOG_DATA) public data: { title: string; content?: string; confirmText?: string }\n  ) {}\n\n  submit(): void {\n    if (this.passwordform.invalid) {\n      return;\n    }\n    this.errorMessage = '';\n    this.passwordSubmit.emit(this.passwordform.get('pw')?.value ?? '');\n  }\n\n  clearError(): void {\n    this.errorMessage = '';\n  }\n}\n"
+      ]
+    },
+    {
+      "path": "frontend/src/app/superadmin/confirm-with-password/confirm-with-password.component.html",
+      "sha256": "86934bc9775f7c7cab4ee92e01a1e9dcea22ac1ad76fa6726199ad688587c3a0",
+      "excerpts": [
+        "<form data-cy=\"dialog-change-superadmin\" [formGroup]=\"passwordform\" (ngSubmit)=\"submit()\" autocomplete=\"off\">\n  <h1 mat-dialog-title>{{data.title}}</h1>\n\n  <mat-dialog-content>\n    @if (data.content) {\n      <p>{{data.content}}</p>\n    }\n    <div>\n      <p>Bitte geben Sie zur Sicherheit Ihr eigenes Kennwort noch einmal ein.</p>\n    </div>\n    <p>\n      <mat-form-field>\n        <input data-cy=\"dialog-change-superadmin-pw\" matInput type=\"password\" formControlName=\"pw\" placeholder=\"Kennwort\" autocomplete=\"new-password\"\n               (input)=\"clearError()\">\n      </mat-form-field>\n    </p>\n    @if (errorMessage) {\n      <tc-alert data-cy=\"dialog-change-superadmin-error\" level=\"error\" [text]=\"errorMessage\"></tc-alert>\n    }\n  </mat-dialog-content>\n\n  <mat-dialog-actions>\n    <button mat-raised-button data-cy=\"pw-submit\" type=\"submit\" [disabled]=\"passwordform.invalid\">{{data.confirmText || 'Bestätigen'}}</button>\n    <button mat-raised-button [mat-dialog-close]=\"false\">Abbrechen</button>\n  </mat-dialog-actions>\n</form>\n"
       ]
     }
   ]
