@@ -4,8 +4,24 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, verifyOriginalSettingsPatchSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
+import { verifyOriginalBuild, verifyOriginalDirectorySource, originalDirectoryReference, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, verifyOriginalSettingsPatchSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
+for (const change of ['none', 'revision', 'bytes', 'excerpt', 'path', 'missing-file']) test(`directory Source provenance rejects substituted tables or DTOs: ${change}`, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'original-directory-policy-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const reference = structuredClone(originalDirectoryReference);
+  for (const file of reference.files) {
+    const source = file.excerpts.join('\n'); file.sha256 = digest(source);
+    await mkdir(join(root, file.path, '..'), {recursive: true}); await writeFile(join(root, file.path), source);
+  }
+  if (change === 'revision') reference.commit = 'a'.repeat(40);
+  if (change === 'bytes') await writeFile(join(root, reference.files[0].path), 'changed DAO');
+  if (change === 'excerpt') reference.files[0].excerpts[0] = 'select replacement order by tenant';
+  if (change === 'path') reference.files[0].path = '../outside.php';
+  if (change === 'missing-file') reference.files.pop();
+  if (change === 'none') await verifyOriginalDirectorySource(root, reference);
+  else await assert.rejects(verifyOriginalDirectorySource(root, reference));
+});
 for (const change of ["none", "revision", "path", "bytes", "delete", "scope", "tables", "foreign-key"]) test(`asset deletion Source oracle rejects substituted provenance or SQL: ${change}`, async t => {
   const root = await mkdtemp(join(tmpdir(), "original-asset-policy-")); t.after(() => rm(root, { recursive: true, force: true }));
   const reference = { originalCommit: originalBrowserSource.commit, deleteSql: "delete from assets where id = :id",
@@ -81,9 +97,15 @@ for (const change of ["corrupt", "extra", "missing", "symlink", "directory-link"
   await assert.rejects(verifyOriginalBuild(f.root));
 });
 test("capture tasks cover each renderer family without duplicate tasks or a rewrite driver", async () => {
-  assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter", "administration"]);
+  assert.deepEqual(Object.keys(originalReferenceTasks), ["entry", "dialogs", "starter", "administration", "directory"]);
   const tasks = Object.values(originalReferenceTasks).flat();
-  assert.equal(tasks.length, 19); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.equal(tasks.length, 20); assert.equal(new Set(tasks.map(task => task.name)).size, tasks.length);
+  assert.deepEqual(tasks.map(task => task.name).filter(name => name !== 'directory').sort(), [
+    'system-check-welcome', 'login', 'insecure-participant', 'insecure-admin', 'header-login', 'header-admin', 'header-starter',
+    'exit', 'completeness', 'legacy-completeness', 'runtime', 'runtime-contract', 'version-missing', 'version-unsupported',
+    'starter', 'paused', 'paused-locked', 'advisories', 'settings'
+  ].sort(), 'The new directory family cannot replace any of the prior 19 Source tasks');
+  assert.deepEqual(originalReferenceTasks.directory, [{name: 'directory', script: 'reference-original-administration-directory.mjs', environment: {}, output: 'directory.json'}]);
   for (const task of tasks) {
     assert.match(task.script, /^reference-original-[\w-]+\.mjs$/);
     await readFile(new URL(task.script, import.meta.url));

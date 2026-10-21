@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [entry, dialogs, starter, administration]
+        family: [entry, dialogs, starter, administration, directory]
     defaults:
       run:
         working-directory: rewrite-app
@@ -133,7 +133,7 @@ jobs:
           path: ${{ runner.temp }}/original-browser
           digest-mismatch: error
       - name: Verify native viewport capture
-        if: matrix.family == 'administration'
+        if: matrix.family == 'administration' || matrix.family == 'directory'
         run: xvfb-run --auto-servernum npm run test:browser-capture:built
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/original-captures

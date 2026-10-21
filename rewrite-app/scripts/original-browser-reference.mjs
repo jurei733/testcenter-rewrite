@@ -48,6 +48,21 @@ export async function verifyOriginalSettingsPatchSource(root, reference=original
   assert.equal(reference.table,reference.files[3].excerpt);
 }
 const originalAdministrationReference = JSON.parse(await readFile(new URL("./fixtures/original-administration-permissions.json", import.meta.url), "utf8"));
+export const originalDirectoryReference = JSON.parse(await readFile(new URL('./fixtures/original-directory-source.json', import.meta.url), 'utf8'));
+export async function verifyOriginalDirectorySource(root, reference = originalDirectoryReference) {
+  assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
+  assert.equal(reference.commit, originalBrowserSource.commit);
+  const paths = ['backend/src/dao/SuperAdminDAO.class.php', 'frontend/src/app/superadmin/backend.service.ts',
+    ...['users', 'workspaces'].flatMap(name => ['ts', 'html', 'css'].map(ext => `frontend/src/app/superadmin/${name}/${name}.component.${ext}`))];
+  assert.deepEqual(reference.files.map(item => item.path), paths);
+  for (const item of reference.files) {
+    const bytes = await readFile(join(root, item.path));
+    assert.equal(sha256(bytes), item.sha256, 'Directory contracts must retain the unchanged Source bytes.');
+    assert.ok(Array.isArray(item.excerpts) && item.excerpts.length > 0);
+    for (const excerpt of item.excerpts) assert.ok(typeof excerpt === 'string' && excerpt.length > 0 && bytes.toString('utf8').includes(excerpt),
+      'Never substitute directory DTOs, ordering or table templates for the actual Source.');
+  }
+}
 export async function verifyOriginalAdministrationSource(root, reference = originalAdministrationReference) {
   assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
   assert.equal(reference.commit, originalBrowserSource.commit);
@@ -75,6 +90,7 @@ export async function verifyOriginalSource(root) {
   assert.equal(sha256(lock), originalBrowserSource.frontendLockSha256, "Original dependencies must retain their pinned lockfile.");
   assert.equal(Number(process.versions.node.split(".")[0]), 22);
   await verifyOriginalAdministrationSource(root);
+  await verifyOriginalDirectorySource(root);
   await verifyOriginalSettingsSource(root);
   await verifyOriginalAssetDeletionSource(root);
   await verifyOriginalSettingsPatchSource(root);
@@ -141,6 +157,9 @@ export const originalReferenceTasks = {
   ],
   administration: [
     task("settings", "reference-original-administration-settings.mjs", {}, "settings.json")
+  ],
+  directory: [
+    task('directory', 'reference-original-administration-directory.mjs', {}, 'directory.json')
   ]
 };
 function measurementOnly(value) {

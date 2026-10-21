@@ -186,7 +186,7 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(upload.with["include-hidden-files"], true, "The official compiled assets include .browserslistrc; its digest must survive upload.");
   const consumer = workflow.jobs["original-browser-reference"];
   assert.deepEqual(consumer.needs, ["build", "original-reference-build"]);
-  assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter", "administration"]);
+  assert.deepEqual(consumer.strategy.matrix.family, ["entry", "dialogs", "starter", "administration", "directory"]);
   const runtime = consumer.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
   assert.equal(runtime.with.prebuilt, "true", "Paired Source/Rewrite pages require the verified same-run application build.");
   assert.equal(runtime.with.playwright, "true");
@@ -202,7 +202,7 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
 test("administration reference requires real browser paint and layout negative controls", () => {
   const consumer = workflow.jobs["original-browser-reference"];
   const control = consumer.steps.find(step => step.name === "Verify native viewport capture");
-  assert.equal(control.if, "matrix.family == 'administration'");
+  assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
   assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
@@ -246,6 +246,13 @@ test("the required loading leaf has independent fatal phase and total deadlines"
   assert.ok(source.includes('process.exitCode = await runSupervisedSmoke('));
   assert.ok(source.includes('phaseTimeoutMs: 60_000, totalTimeoutMs: 480_000'));
   assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/supervised-smoke.test.mjs'));
+});
+test('Compose JSON readiness keeps its absolute request/body deadline and real subprocess controls', () => {
+  const source=read('./smoke-compose-postgres.mjs');
+  assert.ok(source.includes("import {pollSmokeJson} from './poll-smoke-json.mjs'"));
+  assert.ok(source.includes('const pollJson = url => pollSmokeJson(url, {fetcher: fetch,'));
+  assert.ok(source.includes("console.log('compose_json_phase='+JSON.stringify(phase))"));
+  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/poll-smoke-json.test.mjs'));
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);

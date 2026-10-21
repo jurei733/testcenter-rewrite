@@ -1,6 +1,6 @@
 # Original browser reference qualification
 
-CI renders the unmodified official Original frontend at the exact Source revision and lockfile in `scripts/fixtures/original-browser-source.json`. The producer packages only its compiled browser files with an app-commit manifest and individual SHA-256 digests. Each capture family verifies every file before and after rendering. The four families run independently and remain required for complete CI acceptance. The first three retain their 18 existing tasks; the administration family adds a paired settings task.
+CI renders the unmodified official Original frontend at the exact Source revision and lockfile in `scripts/fixtures/original-browser-source.json`. The producer packages only its compiled browser files with an app-commit manifest and individual SHA-256 digests. Each capture family verifies every file before and after rendering. The five families run independently and remain required for complete CI acceptance. The first three retain their 18 existing tasks; the administration family retains paired settings, and the directory family adds a twentieth task without replacing any previous Source task.
 
 Quick checks reuse committed, measured Linux reference coordinates instead of waiting for the Source capture jobs. This preserves independent feedback and all existing text, behavior, geometry and close-button pixel comparisons. The profile accepts only Linux x64, Node 22, lockfile Playwright 1.59.1, visible Chromium 147.0.7727.15 and the pinned Source revision. Other renderers cannot silently consume it. Mac retains its original references. The historical behavioral reference revision remains unchanged; the visual profile records its own newer Source provenance separately.
 
@@ -17,6 +17,37 @@ Validation at this change: 1,914 frontend tests, 99 CI policy tests, workflow ac
 Quick failures also upload the explicit browser artifact directory, alongside the complete failure log, for seven days. The shared browser flow and variant/exit gates write diagnostics there while keeping their SQLite fixture stores in a separate scratch directory. Persistent event-stream pages establish readiness through document, exact Run and completed resume assertions; they do not wait for global network idleness. Opaque controller frames are rendered before native radio input, preserving checked-state and saved-response assertions.
 
 The Source system-check welcome view retains a 1280px content toolbar on a 1280px Linux desktop; narrow views legitimately reserve a native 15px scrollbar. The rewrite now uses the Source fixed window/header/footer with scrolling inside the routed content instead of a window scrollbar that narrowed the desktop view. Login geometry capture additionally records the original entry/header/footer bounds for diagnosing the remaining Linux login discrepancies without inferring coordinates from rewrite output.
+
+## Paired administration directories
+
+The additional directory family compares 36 complete viewports: three themes,
+1280/390 by 844 pixels, Admins/Arbeitsbereiche and initial/selected/dirty-rights
+states. It derives read-only Source DTOs from owned protected setup, with separate
+Source numeric IDs and actual candidate tenant/UUID identities. The unchanged
+Source DAO's global ordering, DTOs, service URLs, component fields, templates and
+CSS are pinned by eight complete file hashes and actual excerpts. The Source
+producer verifies those files before building; consumers verify the same-run
+build manifest and every compiled file before and after capture.
+
+Candidate contexts inherit only an actual protected UI sign-in. Fixture authority
+is restricted to the separate Source origin, where non-GET and unknown requests
+fail. All phases and tabs use actual new documents, including Source repeats;
+changing only Source's hash route is insufficient. Both builds use the same
+native window and zero-tolerance full RGBA comparison, with fresh native paint,
+exact style/layout restoration and three equal visible frames. Six mandatory
+paint/layout/one-pixel controls run in this family as well as settings.
+
+Local qualification passes all 36 pairs and 36 independent Source repeats.
+All 108 capture records independently match their retained cleared/visible PNG
+hashes, fully white cleared pixels and three steady frames. The actual CI capture
+wrapper also runs locally with the remembered Source producer manifest; this
+remains local evidence and does not replace a new same-head Linux qualification.
+The full matrix grows from 85 to 86 jobs. No prior Source/browser check is removed.
+
+These scenes exclude submitted mutations, dialogs, transient notices, Source's
+retained permission rows after clearing selection, backend authorization and
+locale-specific database collation. Those require further paired evidence; no
+broad full-page parity row is closed by these 36 baseline scenes.
 
 ## Same-run settings comparison
 

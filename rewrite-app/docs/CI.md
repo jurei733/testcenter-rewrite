@@ -19,6 +19,63 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Directory family and bounded Compose JSON polling
+
+A fifth Source family adds 36 directory viewports and 36 independent repeats,
+retaining the previous 19 Source tasks and every required aggregate. Eight pinned
+DAO/service/component/template/CSS files establish the read-only DTO and rendering
+contracts. Both directory and settings jobs require the six native capture fault
+controls. Full job count is now 86. Local raw directory captures pass all 36 pairs
+and repeats, with 108 independently checked native clear/style/steady-frame proofs;
+actual Linux qualification remains required. Mutation/dialog/notice/stale-row and
+full Original backend authorization scope stays open.
+
+At `3cc27b63`, run `39603287361`, the supervised console job `119235173455`
+passes all 43 loading and five compatibility cases on Linux. The previous
+one-hour stall does not recur. This does not make the whole run green: Compose
+Demo job `119235172733` exits with Node code 13 at its first readiness poll, and
+timer job `119235173471` fails in scenario before cleanup with a `route.fetch`
+socket hang-up. The failed timer POST does not appear in its retained API log;
+no timer packet/receipt was captured. Another Player-exit case times out at its
+held-ack browser predicate. None of these errors is ignored or retried here.
+
+The Compose polling loop's wall-clock condition did not bound its individual
+HTTP request or body parse. Its new helper keeps a referenced absolute 40-second
+deadline through request, response headers and JSON completion; timeout aborts
+that request and fails with its phase. It cancels the timer after success and
+still retries temporary non-ready responses within the same existing overall
+limit. Phase logs contain only path, attempt, phase and status, without headers
+or response content. Readiness/config/schema assertions remain unchanged.
+
+Real subprocess controls reproduce Node exit 13 with a handle-free stuck request
+or JSON promise, and require the bounded helper to reach normal failure and
+finally cleanup. Owned HTTP controls hold actual headers or partial JSON, verify
+abort, and return success only after real 503/503/200 readiness. A successful
+subprocess must exit without waiting for its old 60-second timer. These prove
+local liveness and error propagation; the precise cause of the observed Compose
+hang and the complete Docker result still require Linux evidence. Docker is
+unavailable in this local environment.
+
+### Held-answer route lifetime
+
+The Player-exit failure at `119235172984` has retained trace ZIP SHA256
+`a89090a3b9a11d1c4bc36904e3063a5b8ec61af653918b5378ca93f432a85d92`.
+Its held-ACK scenario removes network interception at monotonic time 22,286.719;
+the successor save starts at 22,288.751 and never receives a response. The first
+ACK has already succeeded. This pinpoints premature fixture retirement during
+Chromium's transition to ordinary dispatch; it does not establish a domain save
+failure or justify weakening the immutable answer/clock assertions.
+
+The fixture now keeps its route installed until every actual trusted input has
+its corresponding Player packet and the real save drainer reports saved after
+all acknowledgements. It then retires the route and freezes the exact last
+acknowledged bytes. An additional assertion requires both held and successor
+packets to traverse the still-installed route and exactly match the actual
+acknowledgements. Native input/log correlation, differing-clock control,
+byte-for-byte saved-state comparisons, all exit variants and failure propagation
+remain unchanged. No replay, timeout increase or product behavior change is used.
+Failure snapshots now retain save status and native packet count as well.
+
 ## Bounded loading qualification and observed queue timing
 
 [Run 39567637347](https://github.com/jurei733/testcenter-rewrite/actions/runs/39567637347)

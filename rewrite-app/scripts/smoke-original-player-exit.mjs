@@ -174,14 +174,16 @@ try {
       const observeAnswerAck=response=>{if(matchesAnswer(response))answerAcknowledgements.push(response);};
       page.on("response",observeAnswerAck);
       const answered=page.waitForResponse(matchesAnswer);
-      let acknowledgedPacket,firstAcknowledgedPacket;
+      let acknowledgedPacket,firstAcknowledgedPacket,nativeInputs,playerPackets;
       const holdAnswerAck=key==="Primar-desktop-header-forbidden";
       const committed=Promise.withResolvers(),releaseAck=Promise.withResolvers(),answerRoutes=createSmokeRouteFailureGate();
       let browserAcknowledged=false,answerFailure,held=false;
+      const routedAnswerPackets=[];
       void committed.promise.catch(()=>{});
       void answered.then(()=>{browserAcknowledged=true;},()=>{});
       const heldAnswerRoute=answerRoutes.wrap("answer committed before browser acknowledgement",async route=>{
         const packet=route.request().postDataJSON();
+        if(typeof packet?.unitResponse==="string"&&packet.unitResponse.includes(JSON.stringify(answer).slice(1,-1)))routedAnswerPackets.push(packet);
         if(held||typeof packet?.unitResponse!=="string"||!packet.unitResponse.includes(JSON.stringify(answer).slice(1,-1)))return route.continue();
         held=true;
         try{
@@ -208,25 +210,34 @@ try {
         }
         const answerAcknowledgement=await answered;assert.equal(answerAcknowledgement.status(),200);
         await answerAcknowledgement.finished();firstAcknowledgedPacket=answerAcknowledgement.request().postDataJSON().unitResponse;
+        nativeInputs=await frame.locator("#demoPlayerAnswer").evaluate(()=>window.__ownedExitNativeAnswerInputs);
+        assert.ok(nativeInputs.length>0&&nativeInputs.every(event=>event.trusted),'The observed answer edits must all be actual trusted input.');
+        await page.waitForFunction(count=>window.__ownedExitNativeAnswerPackets.length===count,nativeInputs.length);
+        playerPackets=await page.evaluate(()=>window.__ownedExitNativeAnswerPackets);
+        assert.deepEqual(playerPackets.map(packet=>packet.value),nativeInputs.map(event=>event.value),
+          'Every actual native input must produce exactly its corresponding owned Player packet.');
+        // Retire interception only after ALL native notifications and the
+        // successor ACK have settled. Removing it after the first held ACK
+        // races Chromium's transition back to ordinary network dispatch.
+        await page.waitForFunction(()=>document.querySelector("#participantVeronaSaveStatus")?.textContent.trim()==="saved");
+        for(const response of answerAcknowledgements){assert.equal(response.status(),200);await response.finished();}
       }catch(error){answerFailure=error;}
       finally{
         releaseAck.resolve();await answerRoutes.settle();
         if(holdAnswerAck)await page.unroute(base+answerPath,heldAnswerRoute);
       }
       const answerError=answerRoutes.failure(answerFailure);if(answerError)throw answerError;
-      const nativeInputs=await frame.locator("#demoPlayerAnswer").evaluate(()=>window.__ownedExitNativeAnswerInputs);
-      assert.ok(nativeInputs.length>0&&nativeInputs.every(event=>event.trusted),'The observed answer edits must all be actual trusted input.');
-      await page.waitForFunction(count=>window.__ownedExitNativeAnswerPackets.length===count,nativeInputs.length);
-      const playerPackets=await page.evaluate(()=>window.__ownedExitNativeAnswerPackets);
-      assert.deepEqual(playerPackets.map(packet=>packet.value),nativeInputs.map(event=>event.value),
-        'Every actual native input must produce exactly its corresponding owned Player packet.');
       // A database read can see a write before the browser receives its ACK.
       // Take the immutable cancellation baseline only after the actual drainer settles.
-      await page.waitForFunction(()=>document.querySelector("#participantVeronaSaveStatus")?.textContent.trim()==="saved");
-      for(const response of answerAcknowledgements){assert.equal(response.status(),200);await response.finished();}
       page.off("response",observeAnswerAck);
       assert.ok(answerAcknowledgements.length>0);
       const acceptedPackets=answerAcknowledgements.map(response=>response.request().postDataJSON());
+      if(holdAnswerAck){
+        assert.ok(routedAnswerPackets.length>=2,'The forced successor must traverse the still-installed owned answer route.');
+        assert.deepEqual(routedAnswerPackets.map(packet=>packet.unitResponse),acceptedPackets.map(packet=>packet.unitResponse),
+          'Every acknowledged packet, including the successor, must precede route retirement.');
+        states[key].heldAnswerAck.successorRoutedBeforeRemoval=true;
+      }
       acknowledgedPacket=acceptedPackets.at(-1).unitResponse;
       const sourceLogs=new Map(acceptedPackets.flatMap(packet=>(packet.logs??[]).flatMap(batch=>batch.entries??[]))
         .filter(entry=>entry.key==="DEMO_ANSWER_CHANGED").map(entry=>[entry.clientEntryId,entry]));
@@ -390,7 +401,9 @@ try {
       status:document.querySelector("#participantRouteStatus")?.textContent,
       busy:document.querySelector(".page")?.classList.contains("is-busy"),
       globalError:document.querySelector(".status-banner.is-error")?.textContent,
-      playerStatus:document.querySelector("#participantVeronaPlayerStatus")?.textContent
+      playerStatus:document.querySelector("#participantVeronaPlayerStatus")?.textContent,
+      saveStatus:document.querySelector("#participantVeronaSaveStatus")?.textContent,
+      nativePacketCount:window.__ownedExitNativeAnswerPackets?.length
     }));
   });
   await diagnostic("packet",()=>writeFile(join(artifacts,"failure.json"),JSON.stringify({key:activeKey,error:String(error),snapshot,network:activeNetwork},null,2)));
