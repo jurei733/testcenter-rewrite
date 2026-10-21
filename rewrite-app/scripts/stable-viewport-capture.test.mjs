@@ -47,8 +47,9 @@ const paint = (page, color) => page.evaluate(color => {
 const observe = (page, afterImage) => ({
   evaluate: (...args) => page.evaluate(...args),
   screenshot: async options => {
+    const visible=await page.evaluate(()=>getComputedStyle(document.documentElement).opacity!=="0");
     const bytes = await page.screenshot(options);
-    await afterImage(); return bytes;
+    if(visible)await afterImage(); return bytes;
   }
 });
 
@@ -58,7 +59,9 @@ test('a paint change after the first real image settles independently of a refer
     const capture = await captureStableViewport(observe(page, async () => {
       if (++count === 1) await paint(page, 'red');
     }), measure, join(artifacts, 'settled.png'));
-    assert.ok(count >= 4, 'The first image and two subsequent red images cannot qualify three equal frames.');
+    assert.ok(count >= 4, 'The first visible image and two subsequent red images cannot qualify three equal frames.');
+    assert.equal(capture.paintDiagnostics.nativeRepaint.hiddenFrame.nonWhitePixels,0);
+    assert.equal(capture.paintDiagnostics.nativeRepaint.rootStyleRestored,true);
     const hashes = capture.paintDiagnostics.pngFrameSha256;
     assert.notEqual(hashes[0], hashes.at(-1));
     assert.equal(new Set(hashes.slice(-3)).size, 1);
@@ -101,6 +104,8 @@ test('an isolated full-viewport repaint restores native content and cannot waive
   assert.equal((await compareScreenshots(page,before,backgrounds.changed.bytes)).differingPixels,1);
   assert.equal((await compareScreenshots(page,before,backgrounds.restored.bytes)).differingPixels,1);
   const changed=await captureViewportRepaintDiagnostic(page,measure,join(artifacts,'repaint-changed'));
+  const baseline=await captureStableViewport(page,measure,join(artifacts,'fresh-baseline-changed.png'));
+  assert.equal((await compareScreenshots(page,before,baseline.bytes)).differingPixels,1);
   const comparison=await compareScreenshots(page,before,changed.bytes);assert.equal(comparison.differingPixels,1);
   assert.deepEqual(comparison.bounds,{left:12,top:15,right:13,bottom:16});
  });
@@ -114,5 +119,25 @@ test('failed diagnostic captures restore the original surface attribute before p
   assert.equal(await page.content(),before);
   await assert.rejects(captureViewportRepaintDiagnostic(failing,measure,join(artifacts,'failed-repaint')),/Owned diagnostic capture failure/);
   assert.equal(await page.content(),before);
+  await assert.rejects(captureStableViewport(failing,measure,join(artifacts,'failed-baseline.png')),/Owned diagnostic capture failure/);
+  assert.equal(await page.content(),before);
+ });
+});
+
+test('a layout change during the cleared frame cannot become the restored baseline',async()=>{
+ await withViewport(async(page,measure)=>{
+  const style=await page.evaluate(()=>document.documentElement.getAttribute('style'));
+  let changed=false;
+  const changing={evaluate:(...args)=>page.evaluate(...args),screenshot:async options=>{
+    const bytes=await page.screenshot(options);
+    if(!changed&&await page.evaluate(()=>getComputedStyle(document.documentElement).opacity==='0')){
+      changed=true;await page.evaluate(()=>document.querySelector('canvas').style.width='90px');
+    }
+    return bytes;
+  }};
+  const path=join(artifacts,'cleared-layout-change.png');
+  await assert.rejects(captureStableViewport(changing,measure,path),/Native repaint must preserve the actual viewport/);
+  assert.equal(changed,true);assert.equal(await page.evaluate(()=>document.documentElement.getAttribute('style')),style);
+  await assert.rejects(readFile(path),{code:'ENOENT'});
  });
 });
