@@ -19,6 +19,27 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Non-emitting local type checks and isolated CI development output
+
+`npm run typecheck` now runs the unchanged core project type check plus the real
+Angular compiler with `--noEmit` and the app's existing strict TypeScript,
+template and dependency-injection settings. It does not replace the production
+web files. `npm run typecheck:ci` retains the complete earlier development build,
+with identical inputs/options apart from `--output-path dist/typecheck-development`.
+The required production build, style/bundle checks, all test groups and aggregate
+dependencies remain. The immutable historical coverage baseline is preserved;
+its policy accepts only this exact development-output relocation.
+
+Four actual compiler subprocess controls accept a valid component, reject
+TypeScript, template and injection errors with nonzero exit, and prove that
+existing output survives without new emitted files. All **159 CI policy cases**
+pass. The real app passes both commands; a paired local measurement observes
+**13.473 seconds** for the no-emit path and **16.986 seconds** for the isolated full
+development build. All **184 production files remain byte-identical after each**.
+This single local comparison depends on cache/host conditions and does not
+establish a Linux CI latency improvement. CI intentionally retains the full
+existing build qualification, adding the compiler fault controls.
+
 ## Confirmed directory mutation qualification
 
 The next directory comparison retains all 84 previous views and adds confirmed
@@ -52,11 +73,11 @@ initial immediate assertion correctly exposed that fresh view's asynchronous
 rendering. No fixed delay or automatic scenario retry is added. A fresh Linux head
 remains required; `375ea6de` qualifies the preceding 84-state dialog change.
 
-For local iteration, `npm run typecheck` currently also writes a development web
-build. Run it before production build and browser qualification; otherwise it
-replaces the browser's input during capture. An accidentally overlapping local
-capture was explicitly terminated and excluded. The final production comparison
-ran only after typecheck and production build completed, with no concurrent build.
+At that checkpoint, the old `npm run typecheck` also wrote a development web
+build. An accidentally overlapping local capture was explicitly terminated and
+excluded. The final production comparison ran only after typecheck and production
+build completed. The later no-emit local type check and isolated CI output above
+remove that output collision; explicit production builds still precede consumers.
 
 ## Current directory/dialog checkpoint
 
@@ -848,10 +869,11 @@ For a focused local browser iteration, build once, then run
 `npm run ci:browser:quick:entry:built` (or `system-check`, `participant`,
 `content`). Use `CI=true UI_SMOKE_HEADFUL=true` for the Source visual mode on
 a desktop; on Linux wrap the command in `xvfb-run --auto-servernum`. Keep the
-compiled frontend immutable while browsers run: development typecheck builds
-also write `dist/apps/web`, so complete typecheck and the production build
-before starting these consumers. CI already isolates those build directories
-between jobs and verifies the immutable shared archive.
+compiled frontend immutable while browsers run: complete the production build
+before starting consumers. Local `typecheck` now emits no frontend and CI's full
+development check writes `dist/typecheck-development`; neither replaces this
+production input. CI also isolates build directories between jobs and verifies
+the immutable shared archive.
 
 The complete Memory HTTP suite also passes 172/172 against the reused schema
 cache. Remote Linux/PostgreSQL/Docker qualification and actual improved timing

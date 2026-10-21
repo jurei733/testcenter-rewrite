@@ -543,6 +543,12 @@ npm run build
 npm run start:api
 ```
 
+`npm run typecheck` checks the core projects and Angular's strict templates and
+injection types without emitting a frontend. The complete CI development build
+remains available as `npm run typecheck:ci`, writing to
+`dist/typecheck-development` so it cannot replace `dist/apps/web` during browser
+checks. The production build remains a required CI gate.
+
 For a durable one-command local app start, run:
 
 ```bash
