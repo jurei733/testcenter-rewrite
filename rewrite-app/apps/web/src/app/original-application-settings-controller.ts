@@ -1,5 +1,5 @@
 import { productionApiRoutes, type ApplicationAssetSummary, type GetApplicationSettingsResponse,
-  type ListApplicationAssetsResponse, type UpdateApplicationSettingsRequest,
+  type ListApplicationAssetsResponse, type PatchOriginalApplicationSettingsRequest,
   type UpdateApplicationSettingsResponse, type UploadApplicationAssetRequest,
   type UploadApplicationAssetResponse } from "@testcenter-rewrite-app/contracts";
 import { defaultApplicationSettings, type ApplicationAssetSlotName, type ApplicationSettings } from "@testcenter-rewrite-app/domain";
@@ -76,11 +76,8 @@ export class OriginalApplicationSettingsController {
   private async readSettings(owner:Owner):Promise<ApplicationSettings>{
     return (await this.request<GetApplicationSettingsResponse>(owner,"GET",productionApiRoutes.system.getApplicationSettings)).applicationSettings;
   }
-  private async patch(owner:Owner,latest:ApplicationSettings,input:Partial<UpdateApplicationSettingsRequest>):Promise<ApplicationSettings>{
-    // The existing full-map endpoint requires appTitle and treats omitted warning
-    // fields as clearing them. Separate Source editors must preserve those fields.
-    const response=await this.request<UpdateApplicationSettingsResponse>(owner,"PATCH",productionApiRoutes.admin.updateApplicationSettings,
-      {appTitle:latest.appTitle,globalWarningText:latest.globalWarningText,globalWarningExpiresAt:latest.globalWarningExpiresAt,...input});
+  private async patch(owner:Owner,input:PatchOriginalApplicationSettingsRequest):Promise<ApplicationSettings>{
+    const response=await this.request<UpdateApplicationSettingsResponse>(owner,"PATCH",productionApiRoutes.admin.patchOriginalApplicationSettings,input);
     this.settings=clone(response.applicationSettings);this.accept(response.applicationSettings);return response.applicationSettings;
   }
   get generalDirty():boolean{return JSON.stringify(this.general)!==JSON.stringify(this.generalBaseline);}
@@ -90,7 +87,7 @@ export class OriginalApplicationSettingsController {
     const draft=clone(this.general);
     return this.run(async owner=>{
       const {warningDay,warningHour,...fields}=draft;
-      await this.patch(owner,await this.readSettings(owner),{...fields,
+      await this.patch(owner,{...fields,
         globalWarningExpiresAt:originalWarningExpiration(warningDay,warningHour)});
       this.resetGeneral();
     },"Konfigurationsdaten der Anwendung gespeichert");
@@ -109,8 +106,7 @@ export class OriginalApplicationSettingsController {
   async saveCustomTexts():Promise<boolean>{
     if(!this.customTextChanges.size)return false;const changes=Object.fromEntries(this.customTextChanges);
     return this.run(async owner=>{
-      const latest=await this.readSettings(owner);
-      await this.patch(owner,latest,{customTexts:{...latest.customTexts,...changes}});
+      await this.patch(owner,{customTexts:changes});
       for(const key of Object.keys(changes))this.customTextChanges.delete(key);
     },"Textersetzungen gespeichert");
   }
@@ -120,7 +116,7 @@ export class OriginalApplicationSettingsController {
   }
   async saveAssignments():Promise<boolean>{
     const assignments=clone(this.assignments);
-    return this.run(async owner=>{await this.patch(owner,await this.readSettings(owner),{assetAssignments:assignments});},"Zuordnungen aktualisiert");
+    return this.run(async owner=>{await this.patch(owner,{assetAssignments:assignments});},"Zuordnungen aktualisiert");
   }
   async uploadAsset(read:()=>Promise<UploadApplicationAssetRequest>):Promise<boolean>{
     return this.run(async owner=>{

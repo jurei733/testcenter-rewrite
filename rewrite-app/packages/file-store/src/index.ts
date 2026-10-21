@@ -818,6 +818,16 @@ const createFileRepository = (
         state.applicationSettings = { ...settings };
       });
     },
+    async mutateApplicationSettings(transform) {
+      return mutate(state => {
+        const effect=transform(structuredClone(state.applicationSettings));
+        if(state.adminAuditEvents[effect.auditEvent.adminAuditEventId])throw Error("Duplicate application settings audit event.");
+        validateApplicationAssetReferences(effect.settings.assetAssignments,Object.values(state.applicationAssets));
+        state.applicationSettings=structuredClone(effect.settings);
+        state.adminAuditEvents[effect.auditEvent.adminAuditEventId]=structuredClone(effect.auditEvent);
+        return structuredClone(effect.settings);
+      });
+    },
     async listApplicationAssets() {
       const state = await getState();
       return Object.values(state.applicationAssets);

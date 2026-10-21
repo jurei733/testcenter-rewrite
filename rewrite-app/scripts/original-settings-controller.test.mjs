@@ -18,7 +18,7 @@ const fixture=(handler)=>{
  const session={token:'owned'},calls=[],accepted=[],server={...clone(defaultApplicationSettings),customTexts:{gm_headline:'Stored title',unknown:'  retained  '},globalWarningText:'warning',globalWarningExpiresAt:'2099-12-23T14:00:00.000Z'};
  const controller=new Controller(async(method,path,body,token)=>{
   const call={method,path,body,token};calls.push(call);if(handler)return handler(call,server);
-  if(method==='PATCH'){Object.assign(server,body);return{applicationSettings:clone(server)};}
+  if(method==='PATCH'){assert.equal(path,productionApiRoutes.admin.patchOriginalApplicationSettings);const texts=body.customTexts?{...server.customTexts,...body.customTexts}:server.customTexts;Object.assign(server,body,{customTexts:texts});return{applicationSettings:clone(server)};}
   return path===productionApiRoutes.admin.applicationAssets?{items:[]}:{applicationSettings:clone(server)};
  },()=>session.token,value=>accepted.push(value),()=>{});return{controller,session,calls,accepted,server};
 };
@@ -35,6 +35,8 @@ test('separate custom-text save preserves the latest title, warning, unknown ove
  assert.equal(f.server.appTitle,'Changed elsewhere');assert.equal(f.server.globalWarningText,'warning');assert.equal(f.server.globalWarningExpiresAt,'2099-12-23T14:00:00.000Z');
  assert.deepEqual(f.server.customTexts,{gm_headline:'  Authored\n title ',unknown:'  retained  ',newer:'Newer override'});
  assert.equal(f.controller.general.appTitle,'Unsaved local');assert.equal(f.controller.generalDirty,true);assert.equal(f.controller.customTextChanges.size,0);
+ const mutations=f.calls.filter(c=>c.method==='PATCH');assert.equal(mutations.length,1);assert.deepEqual(mutations[0].body,{customTexts:{gm_headline:'  Authored\n title '}});
+ assert.equal(f.calls.filter(c=>c.method==='GET').length,2,'Saving must not first read a whole map that can become stale.');
 });
 test('the Source editor turns an empty edit into its default while keeping whitespace authored',async()=>{
  const f=fixture();await f.controller.connect('owned');f.controller.setCustomText('gm_headline','');
@@ -51,12 +53,12 @@ test('general and assignment writes leave the other editor maps out of their rep
  const f=fixture();await f.controller.connect('owned');f.controller.general.appTitle='Saved';assert.equal(await f.controller.saveGeneral(),true);
  const general=f.calls.find(c=>c.method==='PATCH').body;assert.equal(Object.hasOwn(general,'customTexts'),false);assert.equal(Object.hasOwn(general,'assetAssignments'),false);
  f.controller.setAssignment('logo','owned.png');await f.controller.saveAssignments();const body=f.calls.filter(c=>c.method==='PATCH').at(-1).body;
- assert.deepEqual(body.assetAssignments,{logo:'owned.png'});assert.equal(Object.hasOwn(body,'customTexts'),false);assert.equal(body.globalWarningText,'warning');
+ assert.deepEqual(body.assetAssignments,{logo:'owned.png'});assert.equal(Object.hasOwn(body,'customTexts'),false);assert.equal(Object.hasOwn(body,'globalWarningText'),false);assert.equal(Object.hasOwn(body,'appTitle'),false);
 });
-test('a retired read cannot apply settings or dispatch the next mutation',async()=>{
- const held=defer();let hold=false;const f=fixture((call,server)=>call.method==='GET'&&hold?held.promise:call.path===productionApiRoutes.admin.applicationAssets?{items:[]}:{applicationSettings:clone(server)});
- await f.controller.connect('owned');f.controller.general.appTitle='changed';hold=true;const save=f.controller.saveGeneral();f.session.token='replacement';f.controller.destroy();held.resolve({applicationSettings:clone(f.server)});
- assert.equal(await save,false);assert.equal(f.calls.some(c=>c.method==='PATCH'),false);assert.equal(f.accepted.length,1);
+test('a retired save acknowledgement cannot apply settings or replace the current editor',async()=>{
+ const held=defer();const f=fixture((call,server)=>call.method==='PATCH'?held.promise:call.path===productionApiRoutes.admin.applicationAssets?{items:[]}:{applicationSettings:clone(server)});
+ await f.controller.connect('owned');f.controller.general.appTitle='changed';const save=f.controller.saveGeneral();f.session.token='replacement';f.controller.destroy();held.resolve({applicationSettings:{...clone(f.server),appTitle:'retired acknowledgement'}});
+ assert.equal(await save,false);assert.equal(f.calls.filter(c=>c.method==='PATCH').length,1);assert.equal(f.accepted.length,1);assert.equal(f.controller.settings.appTitle,defaultApplicationSettings.appTitle);
 });
 test('a file read owns its original session and cannot upload under a replacement login',async()=>{
  const held=defer(),f=fixture();await f.controller.connect('owned');const upload=f.controller.uploadAsset(()=>held.promise);

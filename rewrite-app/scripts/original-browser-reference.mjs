@@ -33,6 +33,20 @@ export async function verifyOriginalSettingsSource(root, reference = originalSet
   assert.equal(sha256(await readFile(join(root,catalog.path))), catalog.sha256,
     "Settings labels, defaults and ordering must come from the pinned Source catalog.");
 }
+const originalSettingsPatchReference = JSON.parse(await readFile(new URL("../test-fixtures/original-testcenter/current-settings-patch-reference.json", import.meta.url), "utf8"));
+export async function verifyOriginalSettingsPatchSource(root, reference=originalSettingsPatchReference) {
+  assert.equal(reference.originalCommit, originalBrowserSource.commit);
+  const paths=["backend/src/controller/SystemController.class.php","backend/src/dao/DAO.class.php",
+    "frontend/src/app/superadmin/settings/edit-custom-texts.component.ts","scripts/database/full.sql"];
+  assert.deepEqual(reference.files.map(file=>file.path),paths);
+  for(const file of reference.files){
+    const bytes=await readFile(join(root,file.path));assert.equal(sha256(bytes),file.sha256,"Settings patch evidence must retain the pinned Source file bytes.");
+    assert.ok(typeof file.excerpt==="string"&&file.excerpt.length>0&&bytes.toString("utf8").includes(file.excerpt),"Execute or inspect actual Source excerpts, never substituted handlers.");
+  }
+  assert.deepEqual(Object.keys(reference.sql),["read","insert","update"]);
+  for(const query of Object.values(reference.sql))assert.ok(reference.files[1].excerpt.includes(query));
+  assert.equal(reference.table,reference.files[3].excerpt);
+}
 const originalAdministrationReference = JSON.parse(await readFile(new URL("./fixtures/original-administration-permissions.json", import.meta.url), "utf8"));
 export async function verifyOriginalAdministrationSource(root, reference = originalAdministrationReference) {
   assert.equal(reference.version, 1); assert.equal(reference.repository, originalBrowserSource.repository);
@@ -59,6 +73,7 @@ export async function verifyOriginalSource(root) {
   await verifyOriginalAdministrationSource(root);
   await verifyOriginalSettingsSource(root);
   await verifyOriginalAssetDeletionSource(root);
+  await verifyOriginalSettingsPatchSource(root);
 }
 async function filesUnder(root, directory = root) {
   assert.ok((await lstat(directory)).isDirectory(), "Reference paths must be real directories, never links.");

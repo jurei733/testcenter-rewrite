@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
+import { verifyOriginalBuild, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, verifyOriginalSettingsPatchSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
 for (const change of ["none", "revision", "path", "bytes", "delete", "scope", "tables", "foreign-key"]) test(`asset deletion Source oracle rejects substituted provenance or SQL: ${change}`, async t => {
   const root = await mkdtemp(join(tmpdir(), "original-asset-policy-")); t.after(() => rm(root, { recursive: true, force: true }));
@@ -106,4 +106,16 @@ for(const changed of [false,true]) test(`settings catalog matches the unchanged 
  await mkdir(join(root,"definitions/testtaker"),{recursive:true});await writeFile(join(root,path),changed?"changed":source);
  const reference={originalCommit:originalBrowserSource.commit,files:[{path,source,sha256:digest(source)}]};
  if(changed)await assert.rejects(verifyOriginalSettingsSource(root,reference));else await verifyOriginalSettingsSource(root,reference);
+});
+
+for(const change of ['none','bytes','excerpt','sql','revision','path'])test('settings patch Source oracle rejects substituted handlers, provenance or SQL: '+change,async t=>{
+ const root=await mkdtemp(join(tmpdir(),'original-settings-patch-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const reference=JSON.parse(await readFile(new URL('../test-fixtures/original-testcenter/current-settings-patch-reference.json',import.meta.url),'utf8'));
+ for(const file of reference.files){const source=file.excerpt;await mkdir(join(root,file.path,'..'),{recursive:true});await writeFile(join(root,file.path),source);file.sha256=digest(source);}
+ if(change==='bytes')await writeFile(join(root,reference.files[0].path),'Changed controller');
+ if(change==='excerpt')reference.files[2].excerpt='this.backendService.setCustomTexts({entireMap:true})';
+ if(change==='sql')reference.sql.update='delete from meta';
+ if(change==='revision')reference.originalCommit='a'.repeat(40);
+ if(change==='path')reference.files[0].path='../outside.php';
+ if(change==='none')await verifyOriginalSettingsPatchSource(root,reference);else await assert.rejects(verifyOriginalSettingsPatchSource(root,reference));
 });

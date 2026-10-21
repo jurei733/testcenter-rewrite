@@ -1790,23 +1790,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   };
   const assetNames=async(client:PoolClient)=> (await client.query<{original_name:string}>("SELECT original_name FROM application_assets")).rows.map(row=>({originalName:row.original_name}));
 
-  return {
-    async getApplicationSettings() {
-      return one(
-        `SELECT app_title, main_logo, theme_name, intro_html,
-                legal_notice_html, privacy_notice, accessibility_notice,
-                custom_texts_json, asset_assignments_json,
-                global_warning_text, global_warning_expires_at,
-                updated_at, updated_by_admin_user_id
-         FROM application_settings
-         WHERE settings_key = 'global'`,
-        [],
-        mapApplicationSettings
-      );
-    },
-    async saveApplicationSettings(settings) {
-      return withAssetWrite(async client=>{
-        validateApplicationAssetReferences(settings.assetAssignments,await assetNames(client));
+  const writeSettings=async(client:PoolClient,settings:ApplicationSettings):Promise<void>=>{
       await client.query(
         `INSERT INTO application_settings (
           settings_key, app_title, main_logo, theme_name, intro_html,
@@ -1845,6 +1829,35 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.updatedByAdminUserId
         ]
       );
+
+  };
+
+  return {
+    async getApplicationSettings() {
+      return one(
+        `SELECT app_title, main_logo, theme_name, intro_html,
+                legal_notice_html, privacy_notice, accessibility_notice,
+                custom_texts_json, asset_assignments_json,
+                global_warning_text, global_warning_expires_at,
+                updated_at, updated_by_admin_user_id
+         FROM application_settings
+         WHERE settings_key = 'global'`,
+        [],
+        mapApplicationSettings
+      );
+    },
+    async saveApplicationSettings(settings) {
+      return withAssetWrite(async client=>{validateApplicationAssetReferences(settings.assetAssignments,await assetNames(client));await writeSettings(client,settings);});
+    },
+    async mutateApplicationSettings(transform) {
+      return withAssetWrite(async client=>{
+        const previous=mapApplicationSettings((await client.query("SELECT * FROM application_settings WHERE settings_key='global'")).rows[0]);
+        const effect=transform(structuredClone(previous));
+        validateApplicationAssetReferences(effect.settings.assetAssignments,await assetNames(client));
+        await writeSettings(client,effect.settings);
+        const audit=effect.auditEvent;
+        await client.query("INSERT INTO admin_audit_events(admin_audit_event_id,event_type,actor_admin_user_id,subject_admin_user_id,occurred_at,summary,details_json) VALUES($1,$2,$3,$4,$5,$6,$7)",[audit.adminAuditEventId,audit.eventType,audit.actorAdminUserId,audit.subjectAdminUserId,audit.occurredAt,audit.summary,JSON.stringify(audit.details)]);
+        return structuredClone(effect.settings);
       });
     },
     async listApplicationAssets() {

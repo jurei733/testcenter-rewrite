@@ -1161,6 +1161,7 @@ export type ApplicationSettingsPort = {
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
+  patchOriginalApplicationSettings(input: Partial<Omit<Parameters<ApplicationSettingsPort["updateApplicationSettings"]>[0], "sessionToken">> & {sessionToken:string}): Promise<ApplicationSettings>;
   listApplicationAssets(input: {
     sessionToken: string;
   }): Promise<ApplicationAsset[]>;
@@ -1202,6 +1203,7 @@ export type FirstSlicePorts = {
 export const firstSliceUseCases = {
   getApplicationSettings: "GetApplicationSettings",
   updateApplicationSettings: "UpdateApplicationSettings",
+  patchOriginalApplicationSettings: "PatchOriginalApplicationSettings",
   listAttachments: "ListAttachments",
   getAttachment: "GetAttachment",
   uploadAttachmentFile: "UploadAttachmentFile",
@@ -1327,6 +1329,8 @@ export type FirstSliceServices = FirstSlicePorts & {
 export type FirstSliceRepository = ParticipantAccessRepository & {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
+  /** Read, validate assets, and commit settings plus audit in one shared write boundary. */
+  mutateApplicationSettings(transform: (previous: ApplicationSettings | null) => {settings:ApplicationSettings; auditEvent:AdminAuditEvent}): Promise<ApplicationSettings>;
   listApplicationAssets(): Promise<ApplicationAsset[]>;
   getApplicationAssetById(
     applicationAssetId: string
@@ -26768,6 +26772,159 @@ export const createFirstSliceServices = (
   };
 
 
+  const updateApplicationSettings = async (
+    input: Parameters<ApplicationSettingsPort["patchOriginalApplicationSettings"]>[0], originalPatch=false
+  ):Promise<ApplicationSettings> => {
+    const currentSession = await requireActiveAdminSession(
+      repository,
+      input.sessionToken,
+      now()
+    );
+    requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+    return repository.mutateApplicationSettings(previous => {
+      const previousSettings = previous ?? defaultApplicationSettings;
+      const updatedSettings: ApplicationSettings = {
+        appTitle: originalPatch && input.appTitle === undefined ? previousSettings.appTitle : normalizeApplicationTitle(input.appTitle),
+        mainLogo:
+          input.mainLogo === undefined
+            ? previousSettings.mainLogo
+            : normalizeApplicationLogo(input.mainLogo),
+        themeName:
+          input.themeName === undefined
+            ? previousSettings.themeName
+            : normalizeApplicationTheme(input.themeName),
+        introHtml:
+          input.introHtml === undefined
+            ? previousSettings.introHtml
+            : normalizeApplicationContentHtml(input.introHtml, "intro"),
+        legalNoticeHtml:
+          input.legalNoticeHtml === undefined
+            ? previousSettings.legalNoticeHtml
+            : normalizeApplicationContentHtml(
+                input.legalNoticeHtml,
+                "legal_notice"
+              ),
+        privacyNotice:
+          input.privacyNotice === undefined
+            ? previousSettings.privacyNotice
+            : normalizeApplicationContentHtml(
+                input.privacyNotice,
+                "privacy_notice"
+              ),
+        accessibilityNotice:
+          input.accessibilityNotice === undefined
+            ? previousSettings.accessibilityNotice
+            : normalizeApplicationContentHtml(
+                input.accessibilityNotice,
+                "accessibility_notice"
+              ),
+        customTexts:
+          input.customTexts === undefined
+            ? previousSettings.customTexts
+            : normalizeApplicationCustomTexts(originalPatch ? {...previousSettings.customTexts,...normalizeApplicationCustomTexts(input.customTexts)} : input.customTexts),
+        assetAssignments: input.assetAssignments === undefined ? previousSettings.assetAssignments :
+          Object.fromEntries(Object.entries(input.assetAssignments).map(([slot,originalName]) => {
+            if (!(applicationAssetSlotNames as readonly string[]).includes(slot) || typeof originalName !== "string" || !originalName.trim()) {
+              throw new FirstSliceError(400,"application_asset_assignment_invalid",`Application asset assignment '${slot}' is invalid.`);
+            }
+            return [slot, originalName.trim()];
+          })),
+        globalWarningText: originalPatch && input.globalWarningText === undefined ? previousSettings.globalWarningText : normalizeGlobalWarningText(input.globalWarningText),
+        globalWarningExpiresAt: originalPatch && input.globalWarningExpiresAt === undefined ? previousSettings.globalWarningExpiresAt : normalizeGlobalWarningExpiration(input.globalWarningExpiresAt),
+        updatedAt: now(),
+        updatedByAdminUserId: currentSession.adminUser.adminUserId
+      };
+      const changedCustomTextKeys = [
+        ...new Set([
+          ...Object.keys(previousSettings.customTexts),
+          ...Object.keys(updatedSettings.customTexts)
+        ])
+      ].filter(
+        key =>
+          previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
+      );
+      const changedAssetAssignmentSlots = applicationAssetSlotNames.filter(
+        slot =>
+          previousSettings.assetAssignments[slot] !==
+          updatedSettings.assetAssignments[slot]
+      );
+      const auditEvent:AdminAuditEvent = {
+        adminAuditEventId:idGenerator(),subjectAdminUserId:null,occurredAt:now(),
+        eventType: "application_settings_updated",
+        actorAdminUserId: currentSession.adminUser.adminUserId,
+        summary: `Platform admin '${currentSession.adminUser.username}' updated application settings.`,
+        details: {
+          previousAppTitle: previousSettings.appTitle,
+          nextAppTitle: updatedSettings.appTitle,
+          previousThemeName: previousSettings.themeName,
+          nextThemeName: updatedSettings.themeName,
+          introHtmlChanged:
+            previousSettings.introHtml !== updatedSettings.introHtml,
+          previousIntroHtmlBytes: Buffer.byteLength(
+            previousSettings.introHtml,
+            "utf8"
+          ),
+          nextIntroHtmlBytes: Buffer.byteLength(
+            updatedSettings.introHtml,
+            "utf8"
+          ),
+          legalNoticeHtmlChanged:
+            previousSettings.legalNoticeHtml !==
+            updatedSettings.legalNoticeHtml,
+          previousLegalNoticeHtmlBytes: Buffer.byteLength(
+            previousSettings.legalNoticeHtml,
+            "utf8"
+          ),
+          nextLegalNoticeHtmlBytes: Buffer.byteLength(
+            updatedSettings.legalNoticeHtml,
+            "utf8"
+          ),
+          privacyNoticeChanged:
+            previousSettings.privacyNotice !== updatedSettings.privacyNotice,
+          previousPrivacyNoticeBytes: Buffer.byteLength(
+            previousSettings.privacyNotice,
+            "utf8"
+          ),
+          nextPrivacyNoticeBytes: Buffer.byteLength(
+            updatedSettings.privacyNotice,
+            "utf8"
+          ),
+          accessibilityNoticeChanged:
+            previousSettings.accessibilityNotice !==
+            updatedSettings.accessibilityNotice,
+          previousAccessibilityNoticeBytes: Buffer.byteLength(
+            previousSettings.accessibilityNotice,
+            "utf8"
+          ),
+          nextAccessibilityNoticeBytes: Buffer.byteLength(
+            updatedSettings.accessibilityNotice,
+            "utf8"
+          ),
+          previousCustomLogo:
+            previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+          nextCustomLogo:
+            updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+          previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
+          nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
+          changedCustomTextKeys,
+          previousAssetAssignmentCount: Object.keys(
+            previousSettings.assetAssignments
+          ).length,
+          nextAssetAssignmentCount: Object.keys(updatedSettings.assetAssignments)
+            .length,
+          changedAssetAssignmentSlots,
+          previousGlobalWarningText: previousSettings.globalWarningText,
+          nextGlobalWarningText: updatedSettings.globalWarningText,
+          previousGlobalWarningExpiresAt:
+            previousSettings.globalWarningExpiresAt,
+          nextGlobalWarningExpiresAt:
+            updatedSettings.globalWarningExpiresAt
+        }
+      };
+      return {settings:updatedSettings,auditEvent};
+    });
+  };
+
   return {
     applicationSettings: {
       async getApplicationSettings() {
@@ -26851,189 +27008,8 @@ export const createFirstSliceServices = (
         if(!applicationAsset)throw new FirstSliceError(404,"application_asset_not_found","The requested application asset was not found.");
         return applicationAsset;
       },
-      async updateApplicationSettings(input) {
-        const currentSession = await requireActiveAdminSession(
-          repository,
-          input.sessionToken,
-          now()
-        );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
-        const previousSettings =
-          (await repository.getApplicationSettings()) ?? defaultApplicationSettings;
-        const updatedSettings: ApplicationSettings = {
-          appTitle: normalizeApplicationTitle(input.appTitle),
-          mainLogo:
-            input.mainLogo === undefined
-              ? previousSettings.mainLogo
-              : normalizeApplicationLogo(input.mainLogo),
-          themeName:
-            input.themeName === undefined
-              ? previousSettings.themeName
-              : normalizeApplicationTheme(input.themeName),
-          introHtml:
-            input.introHtml === undefined
-              ? previousSettings.introHtml
-              : normalizeApplicationContentHtml(input.introHtml, "intro"),
-          legalNoticeHtml:
-            input.legalNoticeHtml === undefined
-              ? previousSettings.legalNoticeHtml
-              : normalizeApplicationContentHtml(
-                  input.legalNoticeHtml,
-                  "legal_notice"
-                ),
-          privacyNotice:
-            input.privacyNotice === undefined
-              ? previousSettings.privacyNotice
-              : normalizeApplicationContentHtml(
-                  input.privacyNotice,
-                  "privacy_notice"
-                ),
-          accessibilityNotice:
-            input.accessibilityNotice === undefined
-              ? previousSettings.accessibilityNotice
-              : normalizeApplicationContentHtml(
-                  input.accessibilityNotice,
-                  "accessibility_notice"
-                ),
-          customTexts:
-            input.customTexts === undefined
-              ? previousSettings.customTexts
-              : normalizeApplicationCustomTexts(input.customTexts),
-          assetAssignments:
-            input.assetAssignments === undefined
-              ? previousSettings.assetAssignments
-              : Object.fromEntries(
-                  await Promise.all(
-                    Object.entries(input.assetAssignments).map(
-                      async ([slot, originalName]) => {
-                        if (
-                          !(applicationAssetSlotNames as readonly string[]).includes(
-                            slot
-                          ) ||
-                          typeof originalName !== "string" ||
-                          !originalName.trim()
-                        ) {
-                          throw new FirstSliceError(
-                            400,
-                            "application_asset_assignment_invalid",
-                            `Application asset assignment '${slot}' is invalid.`
-                          );
-                        }
-                        const normalizedName = originalName.trim();
-                        if (
-                          !(await repository.getApplicationAssetByOriginalName(
-                            normalizedName
-                          ))
-                        ) {
-                          throw new FirstSliceError(
-                            400,
-                            "application_asset_assignment_missing",
-                            `Application asset '${normalizedName}' does not exist.`
-                          );
-                        }
-                        return [slot, normalizedName] as const;
-                      }
-                    )
-                  )
-                ),
-          globalWarningText: normalizeGlobalWarningText(
-            input.globalWarningText
-          ),
-          globalWarningExpiresAt: normalizeGlobalWarningExpiration(
-            input.globalWarningExpiresAt
-          ),
-          updatedAt: now(),
-          updatedByAdminUserId: currentSession.adminUser.adminUserId
-        };
-        await repository.saveApplicationSettings(updatedSettings);
-        const changedCustomTextKeys = [
-          ...new Set([
-            ...Object.keys(previousSettings.customTexts),
-            ...Object.keys(updatedSettings.customTexts)
-          ])
-        ].filter(
-          key =>
-            previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
-        );
-        const changedAssetAssignmentSlots = applicationAssetSlotNames.filter(
-          slot =>
-            previousSettings.assetAssignments[slot] !==
-            updatedSettings.assetAssignments[slot]
-        );
-        await recordAdminAuditEvent({
-          eventType: "application_settings_updated",
-          actorAdminUserId: currentSession.adminUser.adminUserId,
-          summary: `Platform admin '${currentSession.adminUser.username}' updated application settings.`,
-          details: {
-            previousAppTitle: previousSettings.appTitle,
-            nextAppTitle: updatedSettings.appTitle,
-            previousThemeName: previousSettings.themeName,
-            nextThemeName: updatedSettings.themeName,
-            introHtmlChanged:
-              previousSettings.introHtml !== updatedSettings.introHtml,
-            previousIntroHtmlBytes: Buffer.byteLength(
-              previousSettings.introHtml,
-              "utf8"
-            ),
-            nextIntroHtmlBytes: Buffer.byteLength(
-              updatedSettings.introHtml,
-              "utf8"
-            ),
-            legalNoticeHtmlChanged:
-              previousSettings.legalNoticeHtml !==
-              updatedSettings.legalNoticeHtml,
-            previousLegalNoticeHtmlBytes: Buffer.byteLength(
-              previousSettings.legalNoticeHtml,
-              "utf8"
-            ),
-            nextLegalNoticeHtmlBytes: Buffer.byteLength(
-              updatedSettings.legalNoticeHtml,
-              "utf8"
-            ),
-            privacyNoticeChanged:
-              previousSettings.privacyNotice !== updatedSettings.privacyNotice,
-            previousPrivacyNoticeBytes: Buffer.byteLength(
-              previousSettings.privacyNotice,
-              "utf8"
-            ),
-            nextPrivacyNoticeBytes: Buffer.byteLength(
-              updatedSettings.privacyNotice,
-              "utf8"
-            ),
-            accessibilityNoticeChanged:
-              previousSettings.accessibilityNotice !==
-              updatedSettings.accessibilityNotice,
-            previousAccessibilityNoticeBytes: Buffer.byteLength(
-              previousSettings.accessibilityNotice,
-              "utf8"
-            ),
-            nextAccessibilityNoticeBytes: Buffer.byteLength(
-              updatedSettings.accessibilityNotice,
-              "utf8"
-            ),
-            previousCustomLogo:
-              previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
-            nextCustomLogo:
-              updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
-            previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
-            nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
-            changedCustomTextKeys,
-            previousAssetAssignmentCount: Object.keys(
-              previousSettings.assetAssignments
-            ).length,
-            nextAssetAssignmentCount: Object.keys(updatedSettings.assetAssignments)
-              .length,
-            changedAssetAssignmentSlots,
-            previousGlobalWarningText: previousSettings.globalWarningText,
-            nextGlobalWarningText: updatedSettings.globalWarningText,
-            previousGlobalWarningExpiresAt:
-              previousSettings.globalWarningExpiresAt,
-            nextGlobalWarningExpiresAt:
-              updatedSettings.globalWarningExpiresAt
-          }
-        });
-        return updatedSettings;
-      }
+      updateApplicationSettings: input => updateApplicationSettings(input),
+      patchOriginalApplicationSettings: input => updateApplicationSettings(input,true)
     },
     attachments: {
       async listAttachments(input) {
