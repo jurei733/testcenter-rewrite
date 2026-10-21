@@ -1,5 +1,17 @@
 # Testcenter parity checklist
 
+### Linux settings reference qualification (2026-10-21)
+
+Published `6f7b0239` finishes [run 39503613658](https://github.com/jurei733/testcenter-rewrite/actions/runs/39503613658)
+with 79 successful jobs, including the corrected exact Player-exit checks,
+PostgreSQL, deployment and the other Source families. Administration reference
+and final acceptance fail. All 24 administration views complete; Linux finds
+one to four differing pixels at heading ink edges in several captures, while
+the local comparison is exact. The failure remains fatal. The follow-up aligns
+the scoped h2/h4 box model with Source and records heading geometry and computed
+font styles for diagnosis; resolution requires a new Linux run. No parity row
+is closed: **29 done / 20 partial**, with all eight broad visual rows open.
+
 ### Paired settings pages and acknowledged exit baseline (2026-10-20)
 
 The new required administration reference family compares 24 complete visible

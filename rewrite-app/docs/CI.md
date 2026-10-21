@@ -21,6 +21,17 @@ Neither earlier run establishes full release acceptance.
 
 ## Settings renderer and immutable exit baseline
 
+Run [39503613658](https://github.com/jurei733/testcenter-rewrite/actions/runs/39503613658)
+at `6f7b0239` completes with **79 successful / two failed jobs**. The corrected
+Player-exit gate passes on Linux. The new administration reference fails its
+strict pixel comparison, which correctly also fails final acceptance: all 24
+views finish, but several Linux captures differ by one to four pixels at the
+outer ink edge of headings. Local captures remain exact. The follow-up restores
+Source's content-box model for the scoped h2/h4 headings; it is not yet proven
+to resolve the Linux difference. Per-image diagnostics now retain the actual
+heading text, layout/text rectangles and font/box styles, without increasing
+the reference tolerance or including these verbose diagnostics in capture logs.
+
 The administration Source family adds 24 exact viewport comparisons in one
 lockfile Chromium: both settings tabs, initial/bottom views, three themes and
 desktop/mobile. It retains the existing 18 Source tasks and runs independently

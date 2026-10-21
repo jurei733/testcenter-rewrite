@@ -91,6 +91,14 @@ async function capture(page, kind, theme, width) {
           font: style.font, padding: style.padding, margin: style.margin, display: style.display, boxSizing: style.boxSizing, flex: style.flex, minWidth: style.minWidth, letterSpacing: style.letterSpacing};};
       const upload = document.querySelector('.image-gallery-panel button');
       return {viewport: {width: innerWidth, height: innerHeight, dpr: devicePixelRatio},
+        headingDiagnostics: [...document.querySelectorAll('h2,h4')].map(element => {
+          const range = document.createRange(); range.selectNodeContents(element);
+          const style = getComputedStyle(element);
+          return {...read(element), textRange: range.getBoundingClientRect().toJSON(),
+            styles: Object.fromEntries(['font', 'line-height', 'letter-spacing', 'box-sizing', 'overflow',
+              'white-space', 'word-spacing', 'text-rendering', 'font-kerning', 'color-scheme']
+              .map(key => [key, style.getPropertyValue(key)]))};
+        }),
         themes: [...document.querySelectorAll('.theme-config,.theme-config mat-radio-button,.theme-config label,.theme-config .theme-preview,.theme-config p')].map(read),
         tabs: [...document.querySelectorAll('[role="tab"]')].map(element => {
           const rect = element.getBoundingClientRect(); return {text: element.textContent.trim(),
