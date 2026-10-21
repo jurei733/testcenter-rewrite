@@ -10,6 +10,7 @@ import {originalBrowserSource, verifyOriginalBuild} from './original-browser-ref
 import {waitForMaterialTabs} from './material-tab-ready.mjs';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
 import {compareScreenshots} from './exact-rgba-comparison.mjs';
+import {captureStableViewport} from './stable-viewport-capture.mjs';
 
 assert.equal(process.env.UI_SMOKE_HEADFUL, 'true');
 assert.ok(!process.env.UI_SMOKE_BROWSER_CHANNEL, 'Source and Rewrite use the lockfile Chromium.');
@@ -90,13 +91,23 @@ async function capture(page, kind, theme, width) {
         return {text: element.textContent, x: rect.x, y: rect.y, width: rect.width, height: rect.height,
           font: style.font, padding: style.padding, margin: style.margin, display: style.display, boxSizing: style.boxSizing, flex: style.flex, minWidth: style.minWidth, letterSpacing: style.letterSpacing};};
       const upload = document.querySelector('.image-gallery-panel button');
+      const dateInput = document.querySelector('[data-cy="admin-setting-set-date"]');
+      const dateField = dateInput?.closest('mat-form-field');
       return {viewport: {width: innerWidth, height: innerHeight, dpr: devicePixelRatio},
+        dateDiagnostics: dateField ? [dateInput, dateField, dateField.parentElement,
+          dateField.querySelector('.mat-mdc-text-field-wrapper'), dateField.querySelector('.mat-mdc-form-field-infix')].map(read) : [],
         headingDiagnostics: [...document.querySelectorAll('h2,h4')].map(element => {
           const range = document.createRange(); range.selectNodeContents(element);
           const style = getComputedStyle(element);
           return {...read(element), textRange: range.getBoundingClientRect().toJSON(),
-            parentBoxes: [element.parentElement, element.parentElement.parentElement].map(parent => ({
-              tag: parent.tagName, boxSizing: getComputedStyle(parent).boxSizing})),
+            parentBoxes: (() => {
+              const parents = []; let parent = element.parentElement;
+              for (let depth = 0; parent && depth < 5; depth++, parent = parent.parentElement) {
+                parents.push({tag: parent.tagName, classes: parent.className,
+                  boxSizing: getComputedStyle(parent).boxSizing});
+              }
+              return parents;
+            })(),
             styles: Object.fromEntries(['font', 'line-height', 'letter-spacing', 'box-sizing', 'overflow',
               'white-space', 'word-spacing', 'text-rendering', 'font-kerning', 'color-scheme']
               .map(key => [key, style.getPropertyValue(key)]))};
@@ -108,24 +119,28 @@ async function capture(page, kind, theme, width) {
         }), upload: upload ? {button: read(upload), icon: read(upload.querySelector('mat-icon')),
           label: read(upload.querySelector('.mdc-button__label'))} : null};
     });
-    const geometry = await measure();
-    await writeFile(join(artifacts, kind + '-' + key + '.json'), JSON.stringify(geometry, null, 2));
-    const bytes = await page.screenshot({path: join(artifacts, kind + '-' + key + '.png'), fullPage: false});
-    assert.deepEqual(await measure(), geometry, 'Taking the image must preserve the actual viewport and navigation layout.');
+    const {geometry, bytes, paintDiagnostics} = await captureStableViewport(page, measure,
+      join(artifacts, kind + '-' + key + '.png'));
+    await writeFile(join(artifacts, kind + '-' + key + '.json'), JSON.stringify({...geometry, paintDiagnostics}, null, 2));
     (states[key] ??= {})[kind] = {geometry, bytes};
     if (kind === 'rewrite') {
       assert.ok(states[key].source, 'A real Source screenshot is required first.');
       comparisons[key] = {geometry: {source: states[key].source.geometry, rewrite: geometry},
         ...await compareScreenshots(page, states[key].source.bytes, bytes)};
       console.log('paired_original_settings=' + key + ': ' + comparisons[key].differingPixels + ' differing pixels');
-      // Diagnostic-only Rewrite render: never replace the baseline image or its verdict.
-      if (comparisons[key].differingPixels && theme === 'Primar' && name === 'general') {
+      // Run diagnostics after the General series; Images starts in a fresh document.
+      // A diagnostic repaint must not affect a subsequent baseline in this document.
+      if (comparisons[key].differingPixels && theme === 'Primar' && name === 'general' && position === 'bottom') {
         const originals = await page.evaluate(parents => {
           const changed = new Map();
           [...document.querySelectorAll('h2,h4')].forEach((heading, index) => {
-            [heading.parentElement, heading.parentElement.parentElement].forEach((parent, level) => {
-              if (!changed.has(parent)) changed.set(parent, parent.getAttribute('style'));
-              parent.style.boxSizing = parents[index].parentBoxes[level].boxSizing;
+            let parent = heading.parentElement;
+            parents[index].parentBoxes.forEach(source => {
+              if (!parent) return;
+              const target = parent; parent = parent.parentElement;
+              if (target.tagName !== source.tag) return;
+              if (!changed.has(target)) changed.set(target, target.getAttribute('style'));
+              target.style.boxSizing = source.boxSizing;
             });
           });
           window.__ownedHeadingDiagnosticRestore = () => changed.forEach((style, element) => {
@@ -134,9 +149,10 @@ async function capture(page, kind, theme, width) {
           return changed.size;
         }, states[key].source.geometry.headingDiagnostics);
         try {
-          const image = await page.screenshot({path: join(artifacts, 'diagnostic-parent-boxes-' + key + '.png'), fullPage: false});
+          const {bytes: image, paintDiagnostics} = await captureStableViewport(page, measure,
+            join(artifacts, 'diagnostic-parent-boxes-' + key + '.png'));
           await writeFile(join(artifacts, 'diagnostic-parent-boxes-' + key + '.json'), JSON.stringify({
-            diagnosticOnly: true, changedContainers: originals,
+            diagnosticOnly: true, changedContainers: originals, paintDiagnostics,
             ...await compareScreenshots(page, states[key].source.bytes, image)
           }, null, 2));
         } finally {
@@ -174,31 +190,39 @@ try {
     await page.locator('#adminSignInButton').click(); const browserToken = (await (await signedIn).json()).sessionToken;
     assert.notEqual(browserToken, token); await page.locator('#originalSystemAdministration[aria-busy="false"]').waitFor();
     const storageState = await login.storageState(); await login.close();
-    for (const width of [1280, 390]) for (const kind of ['source', 'rewrite']) {
-      const context = await browser.newContext({...options(width), ...(kind === 'rewrite' ? {storageState} : {})});
-      if (kind === 'source') {
-        await context.addInitScript(theme => localStorage.setItem('iqb-tc-a', JSON.stringify({token: 'owned-settings-reference',
-          displayName: 'Owned Admin', loginName: 'demo-admin', groupLabel: '', id: 1, flags: [], customTexts: {},
-          claims: {superAdmin: [{id: '1', label: 'Systemverwaltung', type: 'superAdmin', flags: {}, workspaceId: '', description: ''}]},
-          viewSettings: {theme}})), theme);
-        await context.route(sourceBase + '/api/**', async route => {
-          const method = route.request().method(), path = new URL(route.request().url()).pathname; let body;
-          if (method !== 'GET') { unknown.push({method, path}); return route.fulfill({status: 403, body: '{}'}); }
-          if (path === '/api/system/config') body = {version: 'Owned settings reference', customTexts: {},
-            appConfig: {appTitle: before.appTitle, themeName: theme, ...notices}, veronaPlayerApiVersionMin: 2,
-            veronaPlayerApiVersionMax: 6, iqbStandardResponseTypeMin: 1, iqbStandardResponseTypeMax: 5, xmlSchemaVersions: {},
-            bruteForceProtection: [], broadcastingServiceUri: '', fileServiceUri: '', passwordMinLength: 0, passwordPattern: ''};
-          else if (path === '/api/sys-check-mode') body = false;
-          else if (path === '/api/asset-assignments') body = {};
-          else if (path === '/api/assets') body = [];
-          else { unknown.push({method, path}); return route.fulfill({status: 404, body: '{}'}); }
-          await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(body)});
-        });
-      }
+    for (const width of [1280, 390]) {
+      // Render both builds in the same native window/surface and viewport.
+      // The real Rewrite sign-in belongs to its origin; Source gets only its own fixture key.
+      const context = await browser.newContext({...options(width), storageState});
+      await context.addInitScript(({theme, sourceOrigin}) => {
+        if (location.origin !== sourceOrigin) return;
+        localStorage.setItem('iqb-tc-a', JSON.stringify({token: 'owned-settings-reference',
+        displayName: 'Owned Admin', loginName: 'demo-admin', groupLabel: '', id: 1, flags: [], customTexts: {},
+        claims: {superAdmin: [{id: '1', label: 'Systemverwaltung', type: 'superAdmin', flags: {}, workspaceId: '', description: ''}]},
+        viewSettings: {theme}}));
+      }, {theme, sourceOrigin: sourceBase});
+      await context.route(sourceBase + '/api/**', async route => {
+        const method = route.request().method(), path = new URL(route.request().url()).pathname; let body;
+        if (method !== 'GET') { unknown.push({method, path}); return route.fulfill({status: 403, body: '{}'}); }
+        if (path === '/api/system/config') body = {version: 'Owned settings reference', customTexts: {},
+          appConfig: {appTitle: before.appTitle, themeName: theme, ...notices}, veronaPlayerApiVersionMin: 2,
+          veronaPlayerApiVersionMax: 6, iqbStandardResponseTypeMin: 1, iqbStandardResponseTypeMax: 5, xmlSchemaVersions: {},
+          bruteForceProtection: [], broadcastingServiceUri: '', fileServiceUri: '', passwordMinLength: 0, passwordPattern: ''};
+        else if (path === '/api/sys-check-mode') body = false;
+        else if (path === '/api/asset-assignments') body = {};
+        else if (path === '/api/assets') body = [];
+        else { unknown.push({method, path}); return route.fulfill({status: 404, body: '{}'}); }
+        await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(body)});
+      });
       const current = await context.newPage(); await current.bringToFront();
-      current.on('pageerror', error => errors.push({kind, theme, width, error: String(error)}));
-      await current.goto(kind === 'source' ? sourceBase + '/#/superadmin/settings' : base + '/app/ops?ui=original&adminSection=settings', {waitUntil: 'networkidle'});
-      await capture(current, kind, theme, width); await context.close();
+      current.on('pageerror', error => errors.push({url: current.url(), theme, width, error: String(error)}));
+      for (const kind of ['source', 'rewrite']) {
+        await current.goto(kind === 'source' ? sourceBase + '/#/superadmin/settings' : base + '/app/ops?ui=original&adminSection=settings', {waitUntil: 'networkidle'});
+        if (kind === 'rewrite') assert.equal(await current.evaluate(() => localStorage.getItem('iqb-tc-a')), null,
+          'Source fixture authentication must never be installed at the protected Rewrite origin.');
+        await capture(current, kind, theme, width);
+      }
+      await context.close();
     }
   }
   assert.equal(Object.keys(states).length, 24);

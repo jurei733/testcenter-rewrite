@@ -11,10 +11,28 @@ the local comparison is exact. The failure remains fatal. Follow-up `b5430c6d`
 also fails that family in run `39542338492`, despite matching heading box models.
 Its actual Linux text/layout rectangles are equal. The next change aligns the
 remaining inherited color scheme and literal heading whitespace with Source;
-all 24 local pairs and all 15 captured heading text/style records match. Separate
-diagnostic parent-box renders retain the original baseline and fatal verdict.
+all 24 local pairs and all 15 captured heading text/style records match. However,
+`6d87316a` also fails administration in run `39543317146`. Its separate parent-box
+diagnostic exactly matches desktop navigation; a Theming edge pixel remains.
+The follow-up restores only the proven Source text-container box models and
+moves diagnostics after the General series, before the fresh Images document.
 Resolution still requires a new Linux run. No parity row is closed:
 **29 done / 20 partial**, with all eight broad visual rows open.
+
+The subsequent local capture control shows eight Source pixels changing between
+its first image and the next five, without input or changed layout. A reference-
+independent barrier now requires three identical complete images and unchanged
+geometry before recording either build; the final RGBA comparison remains
+exact. Both builds share the same native page per theme/width, with origin-
+scoped fixture authentication and a real protected Rewrite sign-in. All 24
+local pairs and all 48 stability records pass, as do three real-browser negative
+controls, 122 policy checks, Actionlint and the protected administration/settings
+flow. Source window overflow ownership and Material text boxes are aligned.
+These are bounded local observations; current Linux qualification remains open.
+The full parent response also exposes a separate missing-version Source reload
+race (78 successful/three failed jobs overall). That reference now waits for a
+new document, exact unit route and recreated frame. All twelve local version
+cases pass with those witnesses; its original content/URL assertions remain.
 
 ### Paired settings pages and acknowledged exit baseline (2026-10-20)
 

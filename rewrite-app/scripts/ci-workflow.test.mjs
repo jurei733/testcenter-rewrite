@@ -182,6 +182,14 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(evidence.with["retention-days"], 30, "Source images and raw measurements must survive the review window.");
   assert.ok(consumer.steps.some(step => step.run?.startsWith("xvfb-run --auto-servernum node scripts/original-browser-reference.mjs capture")));
 });
+test("administration reference requires real browser paint and layout negative controls", () => {
+  const consumer = workflow.jobs["original-browser-reference"];
+  const control = consumer.steps.find(step => step.name === "Verify native viewport capture");
+  assert.equal(control.if, "matrix.family == 'administration'");
+  assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
+  assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
+  assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
+});
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);
   for (const id of ["unit", "quick", "quick-extended", "verify-memory-sqlite", "verify-postgres", "verify-postgres-ui", "deployability", "docker-compose-release-smoke"]) {

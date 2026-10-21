@@ -21,6 +21,54 @@ Neither earlier run establishes full release acceptance.
 
 ## Settings renderer and immutable exit baseline
 
+### Steady native viewport capture
+
+A local temporal control proves that the unchanged Source's first mobile date
+field image can differ by eight pixels from its next five images, with identical
+layout measurements and no UI input or DOM mutation. This is not evidence that
+all prior Linux edge pixels have the same cause. Capture now measures first,
+waits for rendering frames, and requires three consecutive identical complete
+PNG byte streams. Every image must retain the original geometry; twelve
+unsuccessful attempts fail. The helper receives no reference or Rewrite image,
+so it cannot choose a frame to match the other build. Initial changed images
+and frame hashes are retained; the final Source/Rewrite comparison still checks
+every RGBA pixel with zero tolerance.
+
+Both builds now use the same native page/viewport at each theme/width. Actual
+protected Rewrite UI login supplies only its own origin's storage. Source's
+fixture key is installed only at its separate origin, and its absence is
+asserted at the Rewrite origin. This reduces visual-context creation from
+twelve to six without removing any view. Source's body/window overflow owner
+and text-container box models are restored in the scoped administration view.
+
+The full local wrapper passes all 24 pairs, with 48 records proving three equal
+frames. The real protected administration/settings flow also passes. Three
+actual headed-browser controls cover a paint change after the first image,
+continuously changing pixels and capture-side layout mutation; these controls
+are mandatory before the administration Source family, with their artifacts
+retained alongside it. All 122 CI policy checks and Actionlint pass. The other
+Source tasks, 81-job matrix and full-acceptance requirements remain unchanged.
+Fresh Linux qualification is required; no broad parity row is closed.
+
+The complete 81-job response for parent `6d87316a` records **78 successful /
+three failed jobs**, including final acceptance. Besides administration,
+the dialogs family fails its missing-version task: the immediate reload check
+observes `#/t/1` instead of the restored `#/t/1/u/1`. Actual Source defers
+`window.location.href = '/'` by 100 ms, so the old document's already-complete
+network-idle state and still-visible dialog cannot prove reload completion.
+The reference now requires a different `performance.timeOrigin`, the exact
+original unit URL, and the recreated owned iframe before measuring the new
+dialog. Existing URL/title/iframe/error assertions stay intact. Raw reload
+diagnostics retain the two origins without changing the historical renderer
+profile. Job-list inspection must request all pages (here `per_page=100`);
+the connector's first-page job list alone does not prove complete acceptance.
+All twelve local missing/unsupported Source cases pass, each with a different
+document origin, the exact restored route and one recreated iframe. A separate
+two-state corruption control after stable capture keeps the initial image exact,
+changes one bottom-image RGBA pixel, and still exits 1 even though its diagnostic
+image is exact. Neither the stability barrier nor diagnostics can waive a
+changed baseline pixel.
+
 Run [39503613658](https://github.com/jurei733/testcenter-rewrite/actions/runs/39503613658)
 at `6f7b0239` completes with **79 successful / two failed jobs**. The corrected
 Player-exit gate passes on Linux. The new administration reference fails its
@@ -45,6 +93,23 @@ An isolated local corruption control changes exactly one captured RGBA pixel:
 the baseline fails with one pixel while its separate diagnostic has zero, and
 the command still exits 1 after restoring the page. The unchanged local family
 passes all 24 pairs with equal hashes; all 15 heading text/style records match.
+
+Run `39543317146` at `6d87316a` still fails administration, so matching the
+heading whitespace/color scheme also does not establish a Linux fix. Its
+separate parent-box diagnostic exactly matches the desktop initial Source,
+while one Theming edge pixel remains at the bottom on desktop/mobile. The
+follow-up restores Source's content-box only for the Material text-label and
+content spans. An exploratory wider tab-container reset was not retained. Eight
+local pixels at the date-field corners also appeared with the narrow change;
+comparison with the earlier exact captures shows Source changing in one run
+and Rewrite in the other. This does not establish a product-style regression.
+A focused eight-view capture with actual date-field geometry/styles recorded
+is exact, and the date input/container measurements match apart from the outer
+flex row's box-sizing. The fixture now retains these measurements rather than
+inferring a layout or timing cause from the pixels alone. Parent diagnostics now
+record up to five ancestors, run only after the General bottom baseline, and
+precede the mandatory fresh Images document. This keeps diagnostic repaints
+from changing later baseline pixels in the same document.
 
 The administration Source family adds 24 exact viewport comparisons in one
 lockfile Chromium: both settings tabs, initial/bottom views, three themes and
