@@ -19,6 +19,44 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Bounded loading qualification and observed queue timing
+
+[Run 39567637347](https://github.com/jurei733/testcenter-rewrite/actions/runs/39567637347)
+at `92433154` confirms the four longest extended checks actually start together
+immediately after Fast feedback. The 20-check extended queue finishes in
+**24:11**, compared with **33:51** in the preceding green run: an observed 9:40
+reduction. Shared-runner conditions differ, so this is not isolated proof that
+ordering alone caused the entire improvement. Fast feedback is 4:21 in this run.
+
+The complete run is **not green**: 83 jobs succeed, loading/compatibility job
+`119115511589` is cancelled after its 60-minute deadline and final acceptance
+correctly fails. Its only scenario output is the artifact directory; it never
+reports the first loading case. No retained failure images are available because
+the old upload condition excludes cancellation. The 83 successful jobs finish
+by 32:12 from the first start; that is not a complete-acceptance time.
+
+The loading leaf now runs under an independent Node supervisor. Main-flow phase
+messages record startup, content, browser launch, initial LOADING/Resume/held-view
+steps, completed cases and final cleanup. A phase without progress fails after
+60 seconds; an absolute eight-minute bound remains even if phase messages keep
+arriving. The child exit status remains authoritative: normal failure status
+37 is preserved, and any watchdog expiry returns failure. No retry or successful
+fallback is introduced and no existing behavioral assertion is removed.
+
+Before timeout termination, the parent atomically writes `supervision.json`
+containing only owned entry/phase/process metadata. It snapshots descendants of
+its own child, including detached Chromium-style children, sends TERM, and uses
+PID plus process start time for forceful escalation. Independent-process tests
+prove a blocked child event loop cannot stop evidence, phase and total limits
+are fatal, detached children are stopped and an unrelated sentinel survives.
+Environment, request bodies, credentials and scratch SQLite stores are excluded.
+The existing narrowly scoped seven-day JSON/PNG upload also runs on cancellation.
+
+The unmodified loading suite and the supervised loading suite both pass locally;
+the supervised suite retains all cases and exits normally in 106 seconds.
+This establishes the watchdog's local behavior, not the cause or resolution of
+the intermittent Linux stall. A new Linux run must provide that evidence.
+
 ## Measured long-journey scheduling
 
 [Run 39562001420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39562001420)
