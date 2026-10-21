@@ -18,16 +18,22 @@ export type OriginalAdministrationEditorData = {
   selector:"app-original-administration-editor",standalone:true,
   imports:[ReactiveFormsModule,MatButton,MatDialogActions,MatDialogContent,MatDialogTitle,MatFormField,MatInput,MatLabel,MatError],
   template:`
-    <form [formGroup]="form" (ngSubmit)="submit()" [attr.aria-busy]="busy">
+    <form [formGroup]="form" (ngSubmit)="submit()" [attr.aria-busy]="busy"
+      [class.workspace-name-form]="data.kind === 'create-workspace' || data.kind === 'rename-workspace'">
       <h1 mat-dialog-title>{{ title }}</h1>
       <mat-dialog-content>
-        @if (data.kind !== 'reset-password') {
+        @if (data.kind === 'create-user') {
           <mat-form-field>
-            @if (data.kind === 'create-user') { <mat-label>Name</mat-label> }
+            <mat-label>Name</mat-label>
             <input matInput id="originalAdministrationName" data-cy="new-user-name" formControlName="name"
               placeholder="Name" autocomplete="off" [readonly]="busy" />
             @if (form.controls.name.hasError('minlength')) { <mat-error>Mindestlänge für den Namen ist 3 Zeichen.</mat-error> }
           </mat-form-field>
+        } @else if (data.kind === 'create-workspace' || data.kind === 'rename-workspace') {
+          <p><mat-form-field>
+            <input matInput id="originalAdministrationName" data-cy="new-user-name" formControlName="name"
+              placeholder="Name" autocomplete="off" [readonly]="busy" />
+          </mat-form-field></p>
         }
         @if (hasPassword) {
           <mat-form-field>
@@ -49,7 +55,7 @@ export type OriginalAdministrationEditorData = {
           (click)="dialog.close(false)">Abbrechen</button>
       </mat-dialog-actions>
     </form>`,
-  styles:[`mat-form-field { width:100%; } [role=alert] { color:var(--mat-sys-error); }`]
+  styles:[`form:not(.workspace-name-form) mat-form-field { width:100%; } [role=alert] { color:var(--mat-sys-error); }`]
 })
 export class OriginalAdministrationEditorComponent {
   readonly data = inject<OriginalAdministrationEditorData>(MAT_DIALOG_DATA);
@@ -59,8 +65,8 @@ export class OriginalAdministrationEditorComponent {
   private destroyed = false;
   readonly hasPassword = this.data.kind==="create-user" || this.data.kind==="reset-password";
   readonly form = new FormGroup({
-    name:new FormControl(this.data.name ?? "",{nonNullable:true,
-      validators:this.data.kind==="reset-password"?[]:[Validators.required,...(this.data.kind==="create-user"?[Validators.minLength(3)]:[])]}),
+    name:new FormControl(this.data.kind==="rename-workspace"?"":this.data.name ?? "",{nonNullable:true,
+      validators:this.data.kind==="reset-password"?[]:[Validators.required,Validators.minLength(3)]}),
     password:new FormControl("",{nonNullable:true,validators:this.hasPassword
       ?[Validators.required,control=>this.app.getAdminPasswordViolation(control.value)===null?null:{passwordPolicy:true}]:[]})
   });

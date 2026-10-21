@@ -50,7 +50,8 @@ const options = width => ({viewport: {width, height: 844}, deviceScaleFactor: 1,
 
 async function snapshot(page, key, kind) {
   await page.evaluate(() => document.fonts.ready);
-  await page.locator('[data-cy="header"] h1').click(); await page.mouse.move(0, 0);
+  if (!await page.locator('mat-dialog-container').count()) await page.locator('[data-cy="header"] h1').click();
+  await page.mouse.move(0, 0);
   await page.waitForFunction(() => !document.querySelector('.mat-ripple-element:not(.mat-radio-persistent-ripple)') &&
     document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
       .every(animation => !animation.pending && animation.playState !== 'running'));
@@ -62,6 +63,10 @@ async function snapshot(page, key, kind) {
       tables:[...document.querySelectorAll('mat-table')].map(table => ({...box(table),
         rows:[...table.querySelectorAll('mat-header-row,mat-row')].map(box)})),
       checkboxes:[...document.querySelectorAll('input[type="checkbox"]')].map(input => ({checked:input.checked,disabled:input.disabled})),
+      dialogs:[...document.querySelectorAll('mat-dialog-container')].map(dialog => ({...box(dialog),
+        fields:[...dialog.querySelectorAll('h1,p,mat-form-field,input,button')].map(element => ({...box(element),
+          disabled:element.disabled??null,placeholder:element.getAttribute('placeholder'),
+          value:element.tagName==='INPUT'&&element.type!=='password'?element.value:undefined}))})),
       buttons:[...document.querySelectorAll('mat-tab-nav-panel button')].map(button => ({...box(button),disabled:button.disabled}))};
   });
   const result = await captureStableViewport(page, measure, join(artifacts, kind+'-'+key+'.png'));
@@ -166,11 +171,27 @@ try {
         else await target.locator('input[type="checkbox"]').first().uncheck();
         await page.locator('[data-cy="save"]:enabled').waitFor();
         await snapshot(page,key+'-draft',kind);
+        await table.locator('mat-row').filter({hasText:tab==='users'?'owned-reader':'Alpha Bereich'}).click();
+        await page.locator('[data-cy="save"]:enabled').waitFor();
+        await snapshot(page,key+'-draft-reselected',kind);
+        await page.locator(tab==='users'?'[data-cy="change-superadmin"]':'[data-cy="rename-workspace"]').click();
+        await page.locator('mat-dialog-container').waitFor();
+        await snapshot(page,key+'-dialog',kind);
+        const editor=page.locator('mat-dialog-container'),input=editor.locator('input');
+        assert.equal(await input.inputValue(),'','The pinned Source opens these dialogs without a prefilled field.');
+        await input.fill('ab');
+        await editor.locator('button[type="submit"]:disabled').waitFor();
+        await snapshot(page,key+'-dialog-invalid',kind);
+        await input.fill(tab==='users'?'Owned-dialog-proof-9':'Beta Umbenennung');
+        await editor.locator('button[type="submit"]:enabled').waitFor();
+        await snapshot(page,key+'-dialog-valid',kind);
+        await page.locator('mat-dialog-container').getByRole('button',{name:'Abbrechen',exact:true}).click();
+        await page.locator('mat-dialog-container').waitFor({state:'detached'});
       }
       await context.close();
     }
   }
-  assert.equal(Object.keys(comparisons).length,36);assert.equal(Object.keys(referenceReproducibility).length,36);
+  assert.equal(Object.keys(comparisons).length,84);assert.equal(Object.keys(referenceReproducibility).length,84);
   assert.deepEqual(errors,[]);assert.deepEqual(unknown,[]);
   assert.deepEqual(Object.entries(comparisons).filter(([,v])=>v.differingPixels),[], 'Every full directory viewport must match Source.');
   assert.deepEqual(Object.entries(referenceReproducibility).filter(([,v])=>v.differingPixels),[], 'Source must reproduce every viewport.');

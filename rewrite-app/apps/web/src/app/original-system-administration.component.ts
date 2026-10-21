@@ -163,7 +163,8 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
       :kind==="delete-user"?`Soll Administrator:in "${user!.adminUser.username}" gelöscht werden?`
       :`Soll der Superadmin-Status von "${user!.adminUser.username}" geändert werden?`;
     const pending=this.confirmation.confirm({title,message,confirmLabel,cancelLabel:"Abbrechen",
-      originalPasswordDialog:{title,message,confirmLabel},passwordSubmit:async password=>{
+      originalPasswordDialog:{title:kind==="superadmin"?`Superadmin-Status ${this.directory.isSuperadmin(user!)?'entziehen':'setzen'}`:title,
+        message:kind==="superadmin"?"":message,confirmLabel},passwordSubmit:async password=>{
         if(this.destroyed || this.connectedToken!==token || this.sessionToken.trim()!==token)return "The administrator session changed. Cancel and review the operation again.";
         const result=kind==="delete-workspace"?await this.directory.deleteWorkspace(workspace!.workspaceId,password)
           :kind==="delete-user"?await this.directory.deleteUser(user!.adminUser.adminUserId,password)

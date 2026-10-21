@@ -84,6 +84,9 @@ try{
   await page.locator('[data-cy="save"]:enabled').waitFor();
   assert.equal(await page.locator('[data-cy="save"]').isEnabled(),true);
   await page.locator('[data-cy="rename-workspace"]').click();await waitForMaterialDialog(page);
+  assert.equal(await page.locator('#originalAdministrationName').inputValue(),'');
+  await page.locator('#originalAdministrationName').fill('ab');
+  await page.locator('#originalAdministrationEditorSave:disabled').waitFor();
   await page.locator("#originalAdministrationName").fill("ZZZ Beta geändert");await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.find(item=>item.workspaceId===beta.workspaceId).displayName,"ZZZ Beta geändert");
@@ -110,6 +113,8 @@ try{
   assert.equal((await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===secondId).roleAssignments.some(role=>role.workspaceId===beta.workspaceId),false);
   console.log("original_administration=confirmed-workspace-delete-cascades-membership:passed");
   await page.locator('[data-cy="add-workspace"]').click();await waitForMaterialDialog(page);
+  await page.locator('#originalAdministrationName').fill('ab');
+  await page.locator('#originalAdministrationEditorSave:disabled').waitFor();
   await page.locator("#originalAdministrationName").fill("AAA Neuer Original-Bereich");await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   const tenants=await api("/api/v1/platform/tenants");assert.ok(tenants.items.some(item=>item.tenantKey==="original-interface"));
@@ -130,6 +135,7 @@ try{
   const unsavedCreatedAccess=page.locator(`[data-cy="workspace-${alpha.workspaceId}-role-ro"] input`);
   await unsavedCreatedAccess.check();
   await page.locator('[data-cy="change-superadmin"]').click();await page.locator("#globalConfirmationPasswordInput").fill("wrong-confirmation");
+  assert.equal((await page.locator('#globalConfirmationTitle').textContent()).trim(),'Superadmin-Status setzen');
   await page.locator("#globalConfirmationConfirmButton").click();await page.getByText("Falsches Kennwort.",{exact:true}).waitFor();
   assert.equal(await unsavedCreatedAccess.isChecked(),true,"Rejected status changes retain the selected user's draft.");
   await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
@@ -142,6 +148,12 @@ try{
   assert.equal(await page.locator('.directory-permissions [data-cy="save"]').count(),0);
   await page.locator(`[data-admin-id="${created.adminUser.adminUserId}"]`).click();
   assert.equal(await unsavedCreatedAccess.isChecked(),false);
+  await page.locator('[data-cy="change-superadmin"]').click();
+  await page.locator('#globalConfirmationPasswordInput').waitFor();
+  assert.equal((await page.locator('#globalConfirmationTitle').textContent()).trim(),'Superadmin-Status entziehen');
+  await page.locator('#globalConfirmationCancelButton').click();await page.locator('mat-dialog-container').waitFor({state:'detached'});
+  assert.ok((await api('/api/v1/admin/users')).items.find(item=>item.adminUser.adminUserId===created.adminUser.adminUserId)
+    .roleAssignments.some(role=>role.role==='platform_admin'),'Cancelling the revoke dialog must preserve the acknowledged role.');
   await page.locator('[data-cy="delete-user"]').click();await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
   await page.locator("#globalConfirmationConfirmButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
   assert.equal((await api("/api/v1/admin/users")).items.some(item=>item.adminUser.adminUserId===created.adminUser.adminUserId),false);

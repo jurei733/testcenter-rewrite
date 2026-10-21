@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { verifyOriginalBuild, verifyOriginalDirectorySource, originalDirectoryReference, verifyOriginalAdministrationSource, verifyOriginalSettingsSource, verifyOriginalAssetDeletionSource, verifyOriginalSettingsPatchSource, originalBrowserSource, originalReferenceTasks, originalCaptureEnvironment } from "./original-browser-reference.mjs";
 const digest = text => createHash("sha256").update(text).digest("hex");
-for (const change of ['none', 'revision', 'bytes', 'excerpt', 'path', 'missing-file']) test(`directory Source provenance rejects substituted tables or DTOs: ${change}`, async t => {
+for (const change of ['none', 'revision', 'bytes', 'excerpt', 'missing-excerpt', 'path', 'missing-file']) test(`directory Source provenance rejects substituted tables or DTOs: ${change}`, async t => {
   const root = await mkdtemp(join(tmpdir(), 'original-directory-policy-'));
   t.after(() => rm(root, {recursive: true, force: true}));
   const reference = structuredClone(originalDirectoryReference);
@@ -17,6 +17,7 @@ for (const change of ['none', 'revision', 'bytes', 'excerpt', 'path', 'missing-f
   if (change === 'revision') reference.commit = 'a'.repeat(40);
   if (change === 'bytes') await writeFile(join(root, reference.files[0].path), 'changed DAO');
   if (change === 'excerpt') reference.files[0].excerpts[0] = 'select replacement order by tenant';
+  if (change === 'missing-excerpt') reference.files[0].excerpts = [];
   if (change === 'path') reference.files[0].path = '../outside.php';
   if (change === 'missing-file') reference.files.pop();
   if (change === 'none') await verifyOriginalDirectorySource(root, reference);
