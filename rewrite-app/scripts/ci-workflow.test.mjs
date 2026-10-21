@@ -96,6 +96,23 @@ test("the early browser set is bounded and retains real authentication, isolatio
   assert.deepEqual(workflow.jobs["quick-extended"].needs,["build","fast-feedback"]);
   assert.ok(!workflow.jobs["fast-feedback"].needs.includes("quick-extended"));
 });
+test("extended dispatch avoids the measured long tail without adding slots or dropping journeys", () => {
+  const recorded = JSON.parse(read("./fixtures/ci-browser-timings.json"));
+  const extended = workflow.jobs["quick-extended"].strategy;
+  const current = extended.matrix.include.map(item => item.check);
+  const weights = recorded.secondsByCheck;
+  assert.deepEqual([...current].sort(), Object.keys(weights).sort());
+  assert.deepEqual([...recorded.previousOrder].sort(), [...current].sort());
+  assert.ok(Object.values(weights).every(value => Number.isInteger(value) && value > 0));
+  const duration = order => {
+    const slots = Array(extended["max-parallel"]).fill(0);
+    for (const check of order) slots[slots.indexOf(Math.min(...slots))] += weights[check];
+    return Math.max(...slots);
+  };
+  assert.equal(extended["max-parallel"], 4);
+  assert.ok(duration(current) <= duration(recorded.previousOrder) - 300,
+    "Keep at least five minutes of the recorded four-slot queue improvement; this is not an actual CI timing guarantee");
+});
 test("a green early checkpoint cannot certify missing, cancelled or failed extended qualification", () => {
   const gate = workflow.jobs.acceptance;
   const results = Object.fromEntries(gate.needs.map(name=>[name,{result:"success"}]));

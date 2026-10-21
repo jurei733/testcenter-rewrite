@@ -81,9 +81,12 @@ try{
   assert.equal(assigned.accessMode,"read_write");assert.equal(assigned.tenantId,beta.tenantId);
   console.log("original_administration=workspace-exact-cross-tenant-write-grant:passed");
   await page.locator('[data-cy="rename-workspace"]').click();await waitForMaterialDialog(page);
-  await page.locator("#originalAdministrationName").fill("Beta geändert");await page.locator("#originalAdministrationEditorSave").click();
+  await page.locator("#originalAdministrationName").fill("ZZZ Beta geändert");await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
-  assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.find(item=>item.workspaceId===beta.workspaceId).displayName,"Beta geändert");
+  assert.equal((await api("/api/v1/tenants/owned-other-tenant/workspaces")).items.find(item=>item.workspaceId===beta.workspaceId).displayName,"ZZZ Beta geändert");
+  assert.equal(await page.locator('.directory-list [data-workspace-id]').last().getAttribute('data-workspace-id'),beta.workspaceId,
+    "Renaming must move the actual workspace to its new global name position.");
+  await page.locator(`[data-workspace-id="${beta.workspaceId}"]`).click();
   await page.locator('[data-cy="delete-workspace"]').click();
   const password=page.locator("#globalConfirmationPasswordInput");await password.waitFor();
   await password.fill("wrong-password");await page.locator("#globalConfirmationConfirmButton").click();
@@ -97,18 +100,22 @@ try{
   assert.equal((await api("/api/v1/admin/users")).items.find(item=>item.adminUser.adminUserId===secondId).roleAssignments.some(role=>role.workspaceId===beta.workspaceId),false);
   console.log("original_administration=confirmed-workspace-delete-cascades-membership:passed");
   await page.locator('[data-cy="add-workspace"]').click();await waitForMaterialDialog(page);
-  await page.locator("#originalAdministrationName").fill("Neuer Original-Bereich");await page.locator("#originalAdministrationEditorSave").click();
+  await page.locator("#originalAdministrationName").fill("AAA Neuer Original-Bereich");await page.locator("#originalAdministrationEditorSave").click();
   await page.locator("mat-dialog-container").waitFor({state:"detached"});
   const tenants=await api("/api/v1/platform/tenants");assert.ok(tenants.items.some(item=>item.tenantKey==="original-interface"));
   const originalWorkspaces=(await api("/api/v1/tenants/original-interface/workspaces")).items;
-  assert.deepEqual(originalWorkspaces.map(item=>item.displayName),["Neuer Original-Bereich"]);
+  assert.deepEqual(originalWorkspaces.map(item=>item.displayName),["AAA Neuer Original-Bereich"]);
+  assert.equal(await page.locator('.directory-list [data-workspace-id]').first().getAttribute('data-workspace-id'),originalWorkspaces[0].workspaceId,
+    "The flat directory must insert a new name before existing entries in other tenants.");
   console.log("original_administration=workspace-name-only-create-in-owned-container:passed");
   await page.locator('[data-cy="superadmin-tabs:users"]').click();
   await page.locator('[data-cy="add-user"]').click();await waitForMaterialDialog(page);
-  await page.locator("#originalAdministrationName").fill("new-original-admin");
+  await page.locator("#originalAdministrationName").fill("aaa-new-original-admin");
   await page.locator("#originalAdministrationPassword").fill("New-original-password-9!");
   await page.locator("#originalAdministrationEditorSave").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});
-  const created=(await api("/api/v1/admin/users")).items.find(item=>item.adminUser.username==="new-original-admin");assert.ok(created);
+  const created=(await api("/api/v1/admin/users")).items.find(item=>item.adminUser.username==="aaa-new-original-admin");assert.ok(created);
+  assert.equal(await page.locator('.directory-list [data-admin-id]').first().getAttribute('data-admin-id'),created.adminUser.adminUserId,
+    "The new administrator must precede the signed-in operator by Source name order.");
   await page.locator(`[data-admin-id="${created.adminUser.adminUserId}"]`).click();
   await page.locator('[data-cy="change-superadmin"]').click();await page.locator("#globalConfirmationPasswordInput").fill("demo-admin-password");
   await page.locator("#globalConfirmationConfirmButton").click();await page.locator("mat-dialog-container").waitFor({state:"detached"});

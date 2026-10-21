@@ -1,5 +1,49 @@
 # Testcenter parity checklist
 
+### Current settings and directory checkpoint (2026-10-21)
+
+Published `8935ff5e` passes the complete Linux administration settings reference
+in [run 39562001420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39562001420),
+job `119096077885`: **24 exact Source/Rewrite viewports and 24 exact independent
+Source repeats** across all three themes, both widths and both tabs/scroll states.
+All six headed capture controls pass. The downloaded evidence ZIP has SHA256
+`3fd0715c08e9a42c88bc5ba93b191d6bc5845a49d2ed429bf98e182cacbc6c9f`;
+all 72 per-image records verify the actual cleared native frame, exact root-style
+restoration and three equal visible frames against their retained PNG hashes.
+Capture now clears retained browser paint before restoring the unmodified view.
+The final full-viewport RGBA comparison remains zero tolerance; no mask or
+reference-guided image selection is used. The earlier heading/background guesses
+and steady-only captures below are historical, superseded observations.
+
+Original settings now use a dedicated protected partial-update contract, with
+per-key custom-text merge against current state inside each store's write boundary.
+Settings, asset validation and the matching audit commit atomically in Memory,
+File, SQLite and PostgreSQL. The old endpoint retains its existing full-map and
+omitted-warning semantics. Native saves no longer pre-read and replace a stale
+whole settings map. Late audit/manifest rollback, combined-map limits and two
+actually queued independent PostgreSQL writers are covered. The pinned Original
+meta SQL executes in its own PostgreSQL oracle. The old concurrent-map warning
+below describes the earlier implementation and is superseded by this contract.
+
+The next directory change follows Source's `SuperAdminDAO` global name-ordered
+queries: flatten workspaces across their actual tenant scopes, then order names;
+inserted administrators/workspaces and renamed workspaces keep that initial order.
+Regression cases verify the real tenant/UUID and role target after reordering,
+including a saved cross-tenant permission and subsequent rename/create. Local
+validation passes 23 controller cases, 1,955 frontend cases, typecheck, production
+build and the full protected administration/settings browser flow. Whole-directory
+pixel comparisons, locale-specific ordering, every dialog/edited/notice state,
+non-platform administration and complete Original backend authorization remain
+unproven. This does not close a broad visual row or certify the new directory
+change's remote build. The published `8935ff5e` baseline finishes all 85 jobs
+successfully, including complete acceptance; the next directory head still
+requires its own full CI.
+
+Formal status remains **29 done / 20 partial**, with all eight broad visual rows
+open. The bounded settings renderer gate is now proven on Linux; that result
+must not be used as complete System administration or whole-product acceptance.
+
+
 ### Linux settings reference qualification (2026-10-21)
 
 Published `6f7b0239` finishes [run 39503613658](https://github.com/jurei733/testcenter-rewrite/actions/runs/39503613658)
