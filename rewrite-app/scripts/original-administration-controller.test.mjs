@@ -57,7 +57,7 @@ test("loading the flat directory keeps every workspace's real tenant and ignores
   f.session.token="new-token";await f.controller.connect("new-token");
   first.resolve({items:[admin("old-private-directory")]});assert.equal(await old,false);
   assert.deepEqual(f.controller.admins.map(a=>a.adminUser.username),["replacement"]);
-  assert.deepEqual(f.controller.workspaces.map(w=>w.tenantKey),["b","a"]);
+  assert.deepEqual(f.controller.workspaces.map(w=>w.tenantKey),["a","b"]);
   assert.equal(f.controller.busy,false);assert.equal(f.controller.problem,"");
   assert.ok(f.calls.filter(c=>c.path.includes('/workspaces')).every(c=>c.token==="new-token"));
 });
@@ -104,7 +104,7 @@ test("workspace creation uses its dedicated container, never the last selected t
   assert.equal(f.calls[0].body.tenantKey,originalAdministrationTenantKey);
   assert.equal(f.calls[1].path,`/api/v1/tenants/${originalAdministrationTenantKey}/workspaces`);
   assert.deepEqual(f.calls[1].body,{workspaceKey:"owned-workspace-key",displayName:"Neuer Bereich"});
-  assert.equal(f.controller.workspaces.at(-1).tenantKey,originalAdministrationTenantKey);
+  assert.equal(f.controller.workspaces.find(item=>item.workspaceId==="new").tenantKey,originalAdministrationTenantKey);
 });
 
 test("a concurrently created Original container is read back only on a genuine conflict",async()=>{
@@ -137,4 +137,42 @@ test("the existing API's own-password reset remains available without persisting
   assert.equal(f.calls[0].path,"/api/v1/admin/users/self/password");
   assert.equal(f.calls[0].body.password,"own-new-secret");
   assert.equal(JSON.stringify(f.controller).includes("own-new-secret"),false);
+});
+
+test("global Source name order survives cross-tenant loading, creation and rename without changing scope identity",async()=>{
+ const a={...workspace("alpha-id","tenant-a"),tenantKey:"a",displayName:"alpha"};
+ const b={...workspace("beta-id","tenant-b"),tenantKey:"b",displayName:"beta"};
+ const z={...workspace("zeta-id","tenant-b"),tenantKey:"b",displayName:"zeta"};
+ const f=fixture(call=>{
+  if(call.path===productionApiRoutes.admin.listUsers)return{items:[admin("reader",[role("read_only","alpha-id")]),admin("self")]};
+  if(call.path===productionApiRoutes.platform.listTenants)return{items:[{tenantKey:"b",status:"active"},{tenantKey:"a",status:"active"},{tenantKey:originalAdministrationTenantKey,status:"active"}]};
+  if(call.method==="GET")return{items:call.path.includes('/b/')?[b,z]:call.path.includes('/a/')?[a]:[]};
+  if(call.method==="POST"&&call.path.endsWith("/role-assignments"))return admin("reader",[role("read_write","alpha-id")]);
+  if(call.method==="POST")return{workspace:{...workspace("created-id",originalAdministrationTenantKey),displayName:call.body.displayName}};
+  if(call.method==="PATCH")return{workspace:{...z,displayName:call.body.displayName}};
+ });
+ await f.controller.connect("owned-token");
+ assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["alpha","beta","zeta"]);
+ assert.deepEqual(f.controller.workspaces.map(row=>row.tenantKey),["a","b","b"]);
+ f.controller.selectAdmin("reader");f.controller.togglePermission("reader","alpha-id","RW");
+ assert.equal(await f.controller.savePermissions(),true);
+ const access=f.calls.find(call=>call.method==="POST"&&call.path.endsWith("/role-assignments"));
+ assert.equal(access.path,"/api/v1/admin/users/reader/role-assignments");
+ assert.deepEqual([access.body.tenantKey,access.body.workspaceKey],["a","alpha-id"]);
+ f.controller.selectWorkspace("zeta-id");
+ await f.controller.renameWorkspace("zeta-id","aardvark");
+ assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["aardvark","alpha","beta"]);
+ const renamed=f.calls.find(call=>call.method==="PATCH");assert.equal(renamed.path,"/api/v1/tenants/b/workspaces/zeta-id");
+ assert.equal(f.controller.access("reader","alpha-id"),"RW");assert.equal(f.controller.changes.size,0);
+ assert.equal(await f.controller.createWorkspace("aa-first"),true);
+ assert.deepEqual(f.controller.workspaces.map(row=>row.displayName),["aa-first","aardvark","alpha","beta"]);
+ assert.equal(f.controller.workspaces[0].tenantKey,originalAdministrationTenantKey);
+});
+test("a newly acknowledged administrator is inserted in Source name order while role receipts keep the same owner",async()=>{
+ const f=fixture(call=>call.method==="POST"&&call.path===productionApiRoutes.admin.createUser?admin(call.body.username):admin("other",[role("read_write")]));
+ assert.equal(await f.controller.createUser("aardvark","Owned-password-9!"),true);
+ assert.deepEqual(f.controller.admins.map(row=>row.adminUser.username),["aardvark","other","self"]);
+ f.controller.selectAdmin("other");f.controller.togglePermission("other","ws-a","RW");
+ assert.equal(await f.controller.savePermissions(),true);assert.equal(f.controller.selectedAdminId,"other");
+ assert.equal(f.controller.access("other","ws-a"),"RW");assert.deepEqual(f.controller.admins.map(row=>row.adminUser.username),["aardvark","other","self"]);
 });

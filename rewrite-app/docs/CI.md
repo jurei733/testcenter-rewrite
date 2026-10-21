@@ -19,6 +19,29 @@ survive logging. The older workflow's explicit pipefail *inner* bash was also
 insufficient because the *outer* `tee` pipeline still used implicit `bash -e`.
 Neither earlier run establishes full release acceptance.
 
+## Measured long-journey scheduling
+
+[Run 39562001420](https://github.com/jurei733/testcenter-rewrite/actions/runs/39562001420)
+at `8935ff5e` finishes **all 85 jobs successfully**, including final acceptance.
+Actual job timestamps measure **3:38 to Fast feedback, 37:40 to full completion,
+and 411.0 runner-minutes**. This establishes the split-console workflow's green
+baseline; it is slower overall than the earlier 33:40 / 399.3 runner-minute run
+at `36113122`, with five additional jobs and stronger capture/exit coverage.
+
+The longest extended scenarios started near the end: activation/roster warnings
+846 seconds, JSON roster 716, exit completeness 616, and Verona Player 428.
+The 20 extended rows now start in descending measured-duration order. The eight
+early scenarios, all leaf commands, four-slot limit, separate native browser
+runners and complete acceptance dependencies remain unchanged. Recorded per-job
+seconds and the old ordering live in `scripts/fixtures/ci-browser-timings.json`.
+
+A four-slot queue simulation over those same measured durations falls from
+1,638 to 1,311 seconds, **5:27 (20%) of that isolated queue**. This is a scheduling
+estimate, not measured CI acceleration: GitHub's shared runner availability,
+setup and unrelated jobs can change the actual dispatch order and critical path.
+A completed run of the new head is required to measure its real effect. No extra
+runner concurrency or reduced scope is used to obtain the estimate.
+
 ## Independent console qualification jobs
 
 The former `ui-participant-console` job serialized eight independent browser
@@ -31,7 +54,7 @@ leaf commands exactly once across these shards. All remain required through the
 existing matrix aggregate and final acceptance; no check is replaced by Fast
 feedback. The 28 fast/extended scenarios and their four-slot extended limit stay
 unchanged. This increases the full matrix from 81 to 85 jobs and adds setup cost;
-actual wall-time and compute effects require a completed new run.
+the completed 85-job baseline and its timing are recorded above.
 
 Timer failure evidence moves to its actual timer job. The isolated Debug job
 retains only its JSON/PNG evidence for seven days, with SQLite scratch stores
@@ -73,8 +96,10 @@ the retained PNGs. Six mandatory headed controls retain paint-change and
 never-steady rejection, restore styles after failure, reject geometry changes
 even during the hidden frame, and preserve a genuinely changed pixel as an
 exact one-pixel difference after the actual baseline capture method. Fresh
-Linux qualification of all 24 views and repeats remains required; no broad
-full-page parity row is closed by the single-view diagnostic or local result.
+Linux run `39562001420` also passes all 24 views and 24 repeats, all six
+controls and all 72 capture proofs (artifact `12328985234`, SHA256
+`3fd0715c08e9a42c88bc5ba93b191d6bc5845a49d2ed429bf98e182cacbc6c9f`).
+No broad full-page parity row is closed by this bounded settings result.
 
 ### Observe all native Player inputs before freezing exit state
 

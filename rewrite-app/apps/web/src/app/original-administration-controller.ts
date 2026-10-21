@@ -19,6 +19,10 @@ export const originalAdministrationTenantKey = "original-interface";
 const newWorkspaceKey = (): string => "workspace-" + [...crypto.getRandomValues(new Uint8Array(16))]
   .map(value => value.toString(16).padStart(2, "0")).join("");
 const permissionKey = (adminUserId: string, workspaceId: string): string => JSON.stringify([adminUserId, workspaceId]);
+// Source's flat directory queries order by name, across every workspace scope.
+const orderWorkspaces = (rows:OriginalWorkspace[]):OriginalWorkspace[] => rows.sort((a,b)=>a.displayName.localeCompare(b.displayName));
+const orderAdmins = (rows:AdminUserDirectoryItem[]):AdminUserDirectoryItem[] => rows.sort((a,b)=>a.adminUser.username.localeCompare(b.adminUser.username));
+
 
 /** Presentation adapter over the existing authenticated production API.
  * Every continuation owns its session, including the next write in a batch.
@@ -92,7 +96,7 @@ export class OriginalAdministrationController {
           resolveRoutePath(productionApiRoutes.workspace.listWorkspaces,{tenantKey:tenant.tenantKey}));
         workspaces.push(...result.items.map(workspace=>({...workspace,tenantKey:tenant.tenantKey})));
       }
-      this.admins = users.items; this.tenants = tenants.items; this.workspaces = workspaces;
+      this.admins = orderAdmins([...users.items]); this.tenants = tenants.items; this.workspaces = orderWorkspaces(workspaces);
     }, "");
   }
 
@@ -143,7 +147,7 @@ export class OriginalAdministrationController {
   }
   private applyAdmin(item: AdminUserDirectoryItem): void {
     const index = this.admins.findIndex(existing=>existing.adminUser.adminUserId===item.adminUser.adminUserId);
-    this.admins = index<0 ? [...this.admins,item] : this.admins.map((old,i)=>i===index?item:old);
+    this.admins = orderAdmins(index<0 ? [...this.admins,item] : this.admins.map((old,i)=>i===index?item:old));
   }
   async savePermissions(): Promise<boolean> {
     const edits = [...this.changes.values()].map(edit=>({...edit}));
@@ -219,7 +223,7 @@ export class OriginalAdministrationController {
       const result = await this.request<CreateWorkspaceResponse>(owner,"POST",
         resolveRoutePath(productionApiRoutes.workspace.createWorkspace,{tenantKey:tenant.tenantKey}),
         {workspaceKey:this.makeWorkspaceKey(),displayName:displayName.trim()});
-      this.workspaces = [...this.workspaces,{...result.workspace,tenantKey:tenant.tenantKey,latestFileModificationAt:null}];
+      this.workspaces = orderWorkspaces([...this.workspaces,{...result.workspace,tenantKey:tenant.tenantKey,latestFileModificationAt:null}]);
       this.clearSelection();
     }, "Arbeitsbereich hinzugefügt");
   }
@@ -230,7 +234,7 @@ export class OriginalAdministrationController {
       const result = await this.request<UpdateWorkspaceResponse>(owner,"PATCH",
         resolveRoutePath(productionApiRoutes.workspace.updateWorkspace,{tenantKey:workspace.tenantKey,workspaceKey:workspace.workspaceKey}),
         {displayName:displayName.trim()});
-      this.workspaces = this.workspaces.map(item=>item.workspaceId===workspaceId?{...item,...result.workspace}:item);
+      this.workspaces = orderWorkspaces(this.workspaces.map(item=>item.workspaceId===workspaceId?{...item,...result.workspace}:item));
     }, "Arbeitsbereich geändert");
   }
   async deleteWorkspace(workspaceId: string, confirmationPassword: string): Promise<boolean> {
