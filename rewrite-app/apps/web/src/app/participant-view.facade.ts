@@ -3288,7 +3288,23 @@ export class ParticipantViewFacade {
   }
 
   private async returnToStarterWithConfirmation(): Promise<void> {
-    const initialState = this.readCurrentRunState();
+    let initialState = this.readCurrentRunState();
+    if (!initialState) {
+      // Resume projects its authorized Run before the Unit context finishes
+      // loading. Keep that visible controller's click until its context arrives.
+      const run = this.consoleRun;
+      const sessionId = this.runtime.participantSessionId.trim();
+      const lifecycle = this.viewLifecycleSequence;
+      if (!run || run.testRunId !== this.runtime.testRunId ||
+          run.participantSessionId !== sessionId || run.status === "completed") return;
+      const { testRunId, currentUnitKey, status } = run;
+      await this.refreshCurrentStateInternal(true);
+      if (this.viewLifecycleSequence !== lifecycle || this.runtime.participantSessionId.trim() !== sessionId ||
+          this.runtime.testRunId !== testRunId) return;
+      initialState = this.readCurrentRunState();
+      if (!initialState || initialState.testRun.testRunId !== testRunId ||
+          initialState.currentUnit.unitKey !== currentUnitKey || initialState.testRun.status !== status) return;
+    }
     if (!initialState) return;
     const testRunId = initialState.testRun.testRunId;
     const currentUnitKey = initialState.currentUnit.unitKey;
