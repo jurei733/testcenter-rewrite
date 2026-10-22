@@ -1,5 +1,60 @@
 # Optional Original UI
 
+### Protected workspace-file replacement (2026-10-22)
+
+`POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/replacements`
+is a dedicated byte-carrying replacement entry point. It retains the existing
+filename server-side and rejects filename/content-structure overrides. Source's
+overwrite constraints are derived from the unchanged pinned `Workspace`,
+`ResourceFile`, `FileData` and `Version` implementations: typed identity and
+ASCII-normalized file ID remain, Verona module ID is case-sensitive, patch
+upgrades/downgrades remain valid within the same identity, and zero/missing
+module versions use Source's legacy filename guess, including `V4` names.
+Encoded bytes and XML validate before reservation; missing/ambiguous Unit
+dependencies reject without changing files, lineage, jobs or releases.
+
+A deterministic application probe exposes an early race: another write can
+change the existing source after its first read but before the population
+snapshot. The old preflight can then compare stale identity while reserving
+against the newer revision. Its before-snapshot control fails before the fix.
+The protected path now compares that captured source revision before planning;
+the existing store CAS still rejects a later edit immediately before reservation.
+Both controls require the concurrent bytes to remain and no replacement,
+lineage, import or release to be added.
+
+Another real probe demonstrates that a valid standalone Player replacement
+previously becomes `rejected` with `source_document_runtime_structure_invalid`:
+canonical import expects a Booklet release. Valid independent Unit and ordinary
+resource replacements now reserve the accepted file and lineage together,
+without fabricating an import job/release. Their typed response has a nullable
+`importJob`. The next real Booklet compilation initially fails in all three
+local stores because old and new Unit revisions appear ambiguous. Automatic
+dependency resolution and live-reference reads now choose current non-rejected
+revisions rather than treating immutable history as competing live files.
+The subsequent snapshot must contain the exact new Player HTML and Unit bytes;
+existing releases and historical downloads remain immutable.
+
+Protected HTTP cases pass in Memory, File, SQLite and owned PostgreSQL. They
+cover no-auth/RO/monitor/foreign-workspace denial, absent/invalid bodies, type/ID/
+module changes, malformed XML, DOCTYPE and invalid byte encoding, exact UTF-16
+replacement/download, valid zero-byte binary replacement, independent Unit/
+Player acceptance, missing-Player rejection, superseded-file rejection and
+subsequent actual runtime hydration. Seven pure identity controls include
+Unicode distinctions, module case and filename fallback. The full local unit
+sequence passes **121 + 322 + 1,269 + 1,992 = 3,704** cases without skips or
+cancellations. Production build passes; four native strict-XML journeys
+(Rewrite/Original, desktop/mobile) additionally exercise the new protected
+endpoint against the actual Original-19 XSD profile, rejecting missing-schema
+replacements without a write and accepting/downloading exact UTF-16 bytes.
+The owned PostgreSQL cluster is stopped afterwards.
+
+This is additional backend behavior, not the complete Original file workflow.
+First upload and ZIP member materialization, Source's complete reports and
+dependency revalidation/automatic activation, physical delete semantics and
+the real four-tab renderer remain open. Current pages still show the generic
+console. No visual row closes: **29 done / 20 partial, all eight broad visual
+rows open**.
+
 ### Original workspace files reference (2026-10-22)
 
 The current Original mode still renders the general Rewrite workspace/content

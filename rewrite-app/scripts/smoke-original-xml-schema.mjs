@@ -103,6 +103,31 @@ try {
       assert.equal(stored.sourcePackageDetail.sourcePackage.status, "accepted");
       const rejectedStored = await api(`${path}/source-packages/${rejected.importJob.sourcePackageId}`);
       assert.equal(rejectedStored.sourcePackageDetail.sourcePackage.status, "rejected");
+      const fileId = accepted.importJob.sourcePackageId;
+      const fileRoute = `${path}/files/${fileId}/replacements`;
+      const catalogBefore = await api(`${path}/files`);
+      const historyBefore = await api(`${path}/activity-events?limit=500`);
+      const invalidReplacement = await fetch(`${baseUrl}${fileRoute}`, {method:"POST",
+        headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
+        body:JSON.stringify({mediaType:"application/xml",sourceDocument:schemaSource("VALID.SCHEMA",false)})});
+      assert.equal(invalidReplacement.status,400);
+      const invalidBody = await invalidReplacement.json();
+      assert.equal(invalidBody.error,"workspace_file_validation_failed");
+      assert.ok(invalidBody.details.diagnostics.some(item=>item.code==="testcenter_xml_schema_reference_missing"));
+      assert.deepEqual(await api(`${path}/files`),catalogBefore);
+      assert.deepEqual(await api(`${path}/activity-events?limit=500`),historyBefore);
+      const replacementSource = schemaSource("VALID.SCHEMA",true).replace("Owned strict browser check","Protected replacement Ω");
+      const replacementBytes = Buffer.concat([Buffer.from([255,254]),
+        Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+replacementSource,'utf16le')]);
+      const replaced = await api(fileRoute,{mediaType:"application/xml",sourceDocument:'data:application/xml;base64,'+replacementBytes.toString('base64')});
+      assert.equal(replaced.importJob.status,"completed",JSON.stringify(replaced.importJob.diagnostics));
+      assert.equal(replaced.replacementSourcePackage.fileName,"VALID.SCHEMA.xml");
+      assert.equal((await api(`${path}/files`)).items.find(item=>item.fileName==="VALID.SCHEMA.xml").metadata.label,"Protected replacement Ω");
+      const currentDownload = await fetch(`${baseUrl}${path}/source-packages/${replaced.replacementSourcePackage.sourcePackageId}/download`,{headers:{authorization:`Bearer ${token}`}});
+      assert.equal(currentDownload.status,200);assert.deepEqual(Buffer.from(await currentDownload.arrayBuffer()),replacementBytes);
+      const historical = await fetch(`${baseUrl}${path}/source-packages/${fileId}/download`,{headers:{authorization:`Bearer ${token}`}});
+      assert.equal(historical.status,200);assert.equal(await historical.text(),schemaSource("VALID.SCHEMA",true));
+      console.log(`strict_file_replacement=${fixture}:passed`);
       await page.screenshot({ path: join(root, `strict-xsd-${fixture}.png`), fullPage: true });
       assert.deepEqual(errors, []); await context.close();
       console.log(`strict_xsd=${fixture}:passed`);

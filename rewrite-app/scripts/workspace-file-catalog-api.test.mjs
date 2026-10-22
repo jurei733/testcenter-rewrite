@@ -8,6 +8,44 @@ import {pathToFileURL} from 'node:url';
 import {Pool} from 'pg';
 import test from 'node:test';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
+import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
+import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
+
+test('workspace file preflight and reservation both reject an intervening source edit', async t => {
+  for (const phase of ['before-snapshot', 'before-reservation']) await t.test(phase, async () => {
+    const base = createInMemoryFirstSliceRepository(), stamp = '2026-10-22T12:00:00.000Z';
+    const tenant = {tenantId:'owned-tenant',tenantKey:'owned',displayName:'Owned',status:'active',createdAt:stamp};
+    const workspace = {workspaceId:'owned-workspace',tenantId:tenant.tenantId,workspaceKey:'owned',displayName:'Owned',status:'active',createdAt:stamp};
+    await base.saveTenant(tenant); await base.saveWorkspace({tenantKey:'owned',workspaceKey:'owned',workspace});
+    const source = {sourcePackageId:'owned-source',tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,
+      fileName:'owned.xml',mediaType:'application/xml',contentStructure:null,status:'uploaded',uploadedAt:stamp,
+      sourceDocument:'<Booklet><Metadata><Id>OLD</Id></Metadata><Units><Unit id="U"/></Units></Booklet>'};
+    const changed = {...source,sourceDocument:source.sourceDocument.replace('OLD','CONCURRENT')};
+    await base.saveSourcePackage(source);
+    let changedOnce = false, reservations = 0;
+    const change = async () => {if (!changedOnce) {changedOnce=true; await base.saveSourcePackage(changed);}};
+    const repository = {...base,
+      listSourcePackagesByWorkspace:async(...args)=>{
+        if (phase==='before-snapshot') await change();
+        return base.listSourcePackagesByWorkspace(...args);
+      },
+      reserveSourcePackageReplacement:async input=>{
+        reservations++; if (phase==='before-reservation') await change();
+        return base.reserveSourcePackageReplacement(input);
+      }
+    };
+    const services = createFirstSliceServices({repository,xmlSchemaProfile:'legacy-compatibility'});
+    await assert.rejects(services.contentIntake.replaceWorkspaceFile({tenantKey:'owned',workspaceKey:'owned',
+      sourcePackageId:source.sourcePackageId,mediaType:'application/xml',sourceDocument:source.sourceDocument}),
+      error=>error.errorCode==='source_package_replacement_conflict');
+    assert.equal(changedOnce,true);
+    assert.equal(reservations,phase==='before-snapshot'?0:1);
+    assert.deepEqual(await base.listSourcePackagesByWorkspace(tenant.tenantId,workspace.workspaceId),[changed]);
+    assert.deepEqual(await base.listWorkspaceActivityEventsByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+    assert.deepEqual(await base.listImportJobsByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+    assert.deepEqual(await base.listContentReleasesByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+  });
+});
 
 const kinds=['memory','file','sqlite',...(process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:[])];
 for(const kind of kinds)test(kind+': complete protected file catalog preserves bytes, metadata, read-only scope and immutable history',async()=>{
@@ -109,6 +147,89 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     const oldDownload=await fetch(base+scope+'/source-packages/'+created[1].sourcePackageId+'/download',{
       headers:{authorization:'Bearer '+token}});
     assert.equal(oldDownload.status,200);assert.equal(await oldDownload.text(),fixtures[1][1]);
+    // The dedicated loose-file preflight retains the stored filename and
+    // Source identity. The canonical replacement API above remains available.
+    const replaceFile=id=>scope+'/files/'+id+'/replacements';
+    let latest=replacement.replacementSourcePackage;
+    const validDocument=xml('Booklet','booklet','<Units><Unit id="UNIT"/></Units>','<Label>Geschützt Ω</Label>');
+    const replacementBytes=Buffer.concat([Buffer.from([255,254]),Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+validDocument,'utf16le')]);
+    const validBody={mediaType:'application/xml',sourceDocument:'data:application/xml;base64,'+replacementBytes.toString('base64')};
+    const snapshot=async()=>({files:await api(scope+'/files'),sources:await api(scope+'/source-packages?limit=500'),
+      activity:await api(scope+'/activity-events?limit=500'),imports:await api(scope+'/import-jobs?limit=500'),
+      releases:await api(scope+'/content-releases?limit=500')});
+    const retained=await snapshot();
+    await api(replaceFile(latest.sourcePackageId),validBody,'POST',401,null);
+    await api(replaceFile(latest.sourcePackageId),validBody,'POST',403,readOnly);
+    await api(replaceFile(latest.sourcePackageId),validBody,'POST',403,monitor);
+    await api('/api/v1/tenants/demo-tenant/workspaces/demo-workspace/files/'+latest.sourcePackageId+'/replacements',validBody,'POST',404);
+    for(const sourceDocument of [xml('Booklet','OTHER','<Units><Unit id="UNIT"/></Units>'),
+      xml('Unit','BOOKLET','<Definition player="catalog-player@1.2.9"/>')]) {
+      await api(replaceFile(latest.sourcePackageId),{...validBody,sourceDocument},'POST',409);
+    }
+    for(const body of [null,[],{...validBody,fileName:'renamed.xml'},
+      {...validBody,contentStructure:{bookletEntries:[]}}, {...validBody,sourceDocument:null}, {...validBody,mediaType:7}]) {
+      await api(replaceFile(latest.sourcePackageId),body,'POST',400);
+    }
+    const malformed=await api(replaceFile(latest.sourcePackageId),{...validBody,sourceDocument:'<Booklet><Metadata>'},'POST',400);
+    assert.equal(malformed.error,'workspace_file_validation_failed');
+    const entity=await api(replaceFile(latest.sourcePackageId),{...validBody,sourceDocument:
+      '<!DOCTYPE Booklet [<!ENTITY private SYSTEM "file:///OWNED_PRIVATE_PATH">]><Booklet><Metadata><Id>BOOKLET</Id></Metadata></Booklet>'},'POST',400);
+    assert.equal(entity.error,'workspace_file_validation_failed');
+    const changedModule=player.replace('"catalog-player"','"Catalog-player"');
+    const moduleProblem=await api(replaceFile(created[4].sourcePackageId),{mediaType:'text/html',sourceDocument:changedModule},'POST',409);
+    assert.equal(moduleProblem.error,'workspace_file_module_id_mismatch');
+    const invalidBytes=await api(replaceFile(created[5].sourcePackageId),{mediaType:'application/octet-stream',sourceDocument:'data:application/octet-stream;base64,%%%'},'POST',400);
+    assert.equal(invalidBytes.error,'workspace_file_document_invalid');
+    assert.deepEqual(await snapshot(),retained,'Rejected preflight must not reserve files, lineage, jobs or releases.');
+    const protectedReplacement=await api(replaceFile(latest.sourcePackageId),validBody,'POST',201);
+    assert.equal(protectedReplacement.importJob.status,'completed',JSON.stringify(protectedReplacement.importJob.diagnostics));
+    assert.equal(protectedReplacement.replacementSourcePackage.fileName,'booklet.xml');
+    const replacedDownload=await fetch(base+scope+'/source-packages/'+protectedReplacement.replacementSourcePackage.sourcePackageId+'/download',{headers:{authorization:'Bearer '+token}});
+    assert.equal(replacedDownload.status,200);assert.deepEqual(Buffer.from(await replacedDownload.arrayBuffer()),replacementBytes);
+    assert.equal(protectedReplacement.stagedContentRelease.runtimeSnapshot.playerEntries.find(
+      item=>item.playerKey==='catalog-player@1.2.9')?.html,player);
+    assert.equal((await api(scope+'/files')).items.find(item=>item.fileName==='booklet.xml').metadata.label,'Geschützt Ω');
+    const superseded=await snapshot();
+    await api(replaceFile(latest.sourcePackageId),validBody,'POST',409);
+    assert.deepEqual(await snapshot(),superseded,'An obsolete file ID must not create a second replacement branch.');
+    const historical=await fetch(base+scope+'/source-packages/'+latest.sourcePackageId+'/download',{headers:{authorization:'Bearer '+token}});
+    assert.equal(historical.status,200);assert.equal(await historical.text(),replacement.replacementSourcePackage.sourceDocument);
+    const importsBeforeIndependent=await api(scope+'/import-jobs?limit=500');
+    const releasesBeforeIndependent=await api(scope+'/content-releases?limit=500');
+    const emptyResource=await api(replaceFile(created[5].sourcePackageId),{mediaType:'application/octet-stream',sourceDocument:'data:application/octet-stream;base64,'},'POST',201);
+    assert.equal(emptyResource.replacementSourcePackage.status,'accepted');assert.equal(emptyResource.importJob,null);
+    const emptyDownload=await fetch(base+scope+'/source-packages/'+emptyResource.replacementSourcePackage.sourcePackageId+'/download',{headers:{authorization:'Bearer '+token}});
+    assert.equal(emptyDownload.status,200);assert.equal((await emptyDownload.arrayBuffer()).byteLength,0);
+    const changedPlayer=player.replace('"1.2.9"','"1.2.10"');
+    const independentPlayer=await api(replaceFile(created[4].sourcePackageId),{mediaType:'text/html',sourceDocument:changedPlayer},'POST',201);
+    assert.equal(independentPlayer.replacementSourcePackage.status,'accepted');
+    assert.equal(independentPlayer.importJob,null);assert.equal(independentPlayer.stagedContentRelease,null);
+    const changedUnit=Buffer.from(unit.toString('utf16le').replace('private-unit-body','private-unit-body-replaced'),'utf16le');
+    const independentUnit=await api(replaceFile(created[2].sourcePackageId),{
+      mediaType:'application/xml',sourceDocument:'data:application/xml;base64,'+changedUnit.toString('base64')
+    },'POST',201);
+    assert.equal(independentUnit.replacementSourcePackage.status,'accepted');
+    assert.equal(independentUnit.importJob,null);assert.equal(independentUnit.stagedContentRelease,null);
+    assert.deepEqual(await api(scope+'/import-jobs?limit=500'),importsBeforeIndependent,'Independent valid files must not manufacture a failed Booklet import.');
+    assert.deepEqual(await api(scope+'/content-releases?limit=500'),releasesBeforeIndependent,'Immutable prior releases must not be rewritten by a loose-file replacement.');
+    for(const [source,bytes]of[[independentPlayer.replacementSourcePackage,Buffer.from(changedPlayer)],
+      [independentUnit.replacementSourcePackage,changedUnit]]){
+      const response=await fetch(base+scope+'/source-packages/'+source.sourcePackageId+'/download',{headers:{authorization:'Bearer '+token}});
+      assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);
+    }
+    const beforeMissingDependency=await snapshot();
+    const missingUnit=changedUnit.toString('utf16le').replace('catalog-player@1.2.9','catalog-player@9.8.7');
+    const missingDependency=await api(replaceFile(independentUnit.replacementSourcePackage.sourcePackageId),{
+      mediaType:'application/xml',sourceDocument:'data:application/xml;base64,'+Buffer.from(missingUnit,'utf16le').toString('base64')
+    },'POST',409);
+    assert.equal(missingDependency.error,'workspace_file_dependencies_unresolved');
+    assert.deepEqual(await snapshot(),beforeMissingDependency);
+    const recompiled=await api(replaceFile(protectedReplacement.replacementSourcePackage.sourcePackageId),validBody,'POST',201);
+    assert.equal(recompiled.importJob.status,'completed',JSON.stringify(recompiled.importJob.diagnostics));
+    assert.equal(recompiled.stagedContentRelease.runtimeSnapshot.playerEntries.find(item=>item.playerKey==='catalog-player@1.2.9')?.html,changedPlayer,
+      'A subsequent Booklet snapshot must bind the actual new independently accepted Player.');
+    assert.ok(JSON.stringify(recompiled.stagedContentRelease.runtimeSnapshot).includes('private-unit-body-replaced'),
+      'A subsequent Booklet snapshot must hydrate the actual new independently accepted Unit.');
     for(const [key,reference,fileName,expected]of[
       ['owned-patch-version','catalog-player@1.2.8','custom-player.html','completed'],
       ['owned-wrong-version','catalog-player@1.3.0','catalog-player-1.3.html','failed']
