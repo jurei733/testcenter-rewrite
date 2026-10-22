@@ -1,5 +1,61 @@
 # CI iteration and complete acceptance
 
+## Current Linux failures and qualified corrections (2026-10-22)
+
+The full `b9713c2b` [run 39769124218](https://github.com/jurei733/testcenter-rewrite/actions/runs/39769124218)
+finishes with **82 successful jobs, three failures and one cancellation**. The
+aggregate correctly rejects the two failed tests and the cancelled prerequisite.
+Measured from actual job starts/completions, full time is **48:02**, Fast feedback
+**13:01**, and consumed runner time **545.1 minutes**. These results do not prove
+an overall pipeline speedup. The earlier local 39.4% improvement applies only to
+the 52-case label phase below. Console-loading now passes all 43 loading and five
+compatibility cases on Linux, with both owned APIs shut down; this is
+non-recurrence, not an established cause/fix of its preceding timeout.
+
+Native routes pass their seven cases before native tabs fail after document
+load at a global `networkidle` wait. The old evidence does not identify the
+outstanding connection. The driver now waits for DOM content and all five actual
+native command bindings. An independent owned browser fixture must reject a
+missing binding and accept complete bindings while a real background request
+remains pending. This follows Playwright's
+[explicit readiness guidance](https://playwright.dev/docs/api/class-page#page-wait-for-load-state).
+All existing Run/answer/clock, tab ownership, exact journal replay and ACK checks
+remain. The fresh full focused shard passes seven route and twelve tab cases;
+the latter includes two additional driver controls. Failure upload is limited to
+one bounded public JSON containing fixed check labels, error class and own-origin
+request method/path. No error payloads, bodies, headers, queries, foreign URLs,
+screenshots or private SQLite scratch directory are uploaded by this new step.
+Two privacy/bounds controls include planted credential/query/error secrets.
+
+Original exit fails its final confirmed return after held Resume context: an
+absent Unit answer becomes `''`. Cancellation already preserves the exact state.
+The retained trace proves that a log-only save has drained before the foreground
+fallback unconditionally writes the unchanged empty draft. The fallback now
+compares the draft with the effective saved/ephemeral response; actual changes,
+including intentional clearing, still save exact bytes. Original's unchanged
+`setupUnitDataPartsBuffer` and `closeAllBuffers` implementations at the pinned
+source confirm that closing an empty buffer sends no answer update. Four of nine
+new actual-method controls fail before the fix; all nine then pass. The native
+Resume case now explicitly waits for the real log-only ACK before confirming
+return, retaining its exact absent-answer assertion. Fresh production qualification
+passes **37 Original exit cases, the missing-bundle fallback and six Rewrite
+cases**, with owned API shutdown. All **1,992 frontend cases** and strict local
+typechecking pass. These results require fresh Linux qualification.
+
+The cancelled runtime-error-contract job never starts its application test:
+browser dependency installation spends about 19.5 minutes in APT mirror fetching
+until the existing 20-minute job bound. Browser setup now installs and verifies
+APT's 20-second HTTP/HTTPS connection/data-inactivity timeouts and two failed-file
+retries before the unchanged full Playwright dependency installer. These are
+[transport bounds](https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-https.1.html),
+not a global step deadline or test retries. Repositories, TLS verification and
+signature checks remain. A subprocess control executes the actual composite
+script with owned non-root shims, verifies all effective settings, propagates
+denied writes and ineffective configuration, and excludes a planted proxy secret.
+It makes no claim to qualify real Linux package installation. All **180 CI policy
+controls**, workflow actionlint and whitespace checks pass locally. No assertion,
+scenario, required prerequisite or existing deadline is removed or relaxed.
+
 ## Run selected CI checks locally
 
 From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,

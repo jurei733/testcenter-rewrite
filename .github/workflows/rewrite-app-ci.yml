@@ -515,6 +515,14 @@ jobs:
             ${{ runner.temp }}/rewrite-ui-artifacts/participant-debug/*.png
           if-no-files-found: warn
           retention-days: 7
+      - name: Retain scoped native tab failure evidence
+        if: (failure() || cancelled()) && matrix.check == 'ui-participant-native-routes'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: participant-native-tabs-evidence
+          path: ${{ runner.temp }}/rewrite-ui-artifacts/participant-native-tabs/public-failure.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Retain failed controller timer diagnostics
         if: failure() && matrix.check == 'ui-controller-timer'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

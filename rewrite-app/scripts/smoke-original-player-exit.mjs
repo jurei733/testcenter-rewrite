@@ -359,6 +359,12 @@ try {
       assert.equal(resumed.testRun.testRunId,initial.testRun.testRunId);assert.equal(resumed.testRun.status,"running");
       await page.locator("#participantApplicationLogoButton").click();
       assert.equal(writes.length,1);assert.equal(await page.locator("#participantConfirmationBackdrop").count(),0);
+      const resumedLogsSaved=page.waitForResponse(response=>{
+        if(new URL(response.url()).pathname!==`/api/v1/participant/test-runs/${initial.testRun.testRunId}/save-progress`||response.request().method()!=="POST")return false;
+        const packet=response.request().postDataJSON();
+        return packet?.responseOnly===true&&!Object.hasOwn(packet,"unitResponse")&&
+          packet.logs?.some(batch=>batch.entries?.some(entry=>entry.key==="PLAYER"&&entry.content==="RUNNING"));
+      });
       holding=false;release.resolve();
       await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
       await page.locator("#participantConfirmationContinueButton").waitFor();
@@ -368,6 +374,10 @@ try {
       const retained=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
       assert.equal(retained.testRun.testRunId,resumed.testRun.testRunId);assert.equal(retained.testRun.status,"running");
       assert.deepEqual(retained.testRun.unitResponses,resumed.testRun.unitResponses);
+      // Force the log-only batch to finish before the confirmed return. An
+      // empty answer must stay absent even when no foreground batch remains.
+      const logsAck=await resumedLogsSaved;assert.equal(logsAck.status(),200);await logsAck.finished();
+      await page.waitForFunction(()=>document.querySelector("#participantVeronaSaveStatus")?.textContent.trim()==="saved");
       await page.locator("#participantApplicationLogoButton").click();
       const returned=page.waitForResponse(r=>new URL(r.url()).pathname===returnPath&&r.request().method()==="POST");
       await page.locator("#participantConfirmationContinueButton").click();assert.equal((await returned).status(),200);

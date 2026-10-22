@@ -18,6 +18,16 @@ runs:
     - shell: bash
       working-directory: rewrite-app
       run: npm ci --no-audit --no-fund
+    - name: Bound browser dependency mirror waits
+      if: inputs.playwright == 'true'
+      shell: bash
+      run: |
+        printf '%s\n' \
+          'Acquire::http::Timeout "20";' \
+          'Acquire::https::Timeout "20";' \
+          'Acquire::Retries "2";' \
+          | sudo tee /etc/apt/apt.conf.d/80-testcenter-ci-network >/dev/null
+        apt-config dump | node -e 'const config=require("node:fs").readFileSync(0,"utf8").split(/\r?\n/).map(line=>line.toLowerCase()); for(const line of ["Acquire::http::Timeout \"20\";","Acquire::https::Timeout \"20\";","Acquire::Retries \"2\";"]) if(!config.includes(line.toLowerCase())) throw Error("CI APT network bounds are not effective");'
     - if: inputs.playwright == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:

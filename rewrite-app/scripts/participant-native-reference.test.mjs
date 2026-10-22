@@ -61,6 +61,29 @@ const declaration=ast.statements.find(ts.isClassDeclaration),method=declaration.
 const {createParticipantSaveBarriers}=await import(emit(readFileSync(new URL('../apps/web/src/app/participant-save-barrier.ts',import.meta.url),'utf8')));
 const {load}=await import(emit('export const load=(hasMeaningfulVeronaResponse,parseVeronaUnitResponse,createParticipantSaveBarriers)=>{const listParticipantSaveOutboxEntriesForRun=()=>[];return class Actual { veronaSaveBarriers=createParticipantSaveBarriers(); '+method.getText(ast)+' };};'));
 const Actual=load(hasMeaningfulVeronaResponse,parseVeronaUnitResponse,createParticipantSaveBarriers);
+const draftMembers = ['saveCurrentDraftBeforeCompleteInternal', 'effectiveUnitResponse'].map(name => {
+ const member=declaration.members.find(value=>value.name?.getText(ast)===name);assert.ok(member);return member.getText(ast);
+});
+const {ForegroundDraft}=await import(emit('export class ForegroundDraft {'+draftMembers.join('\n')+'}'));
+for(const [name,input,expected]of[
+ ['an untouched unanswered Unit',{draft:'',saved:undefined},[]],
+ ['an unchanged opaque saved answer',{draft:'Exact Ω  ',saved:'Exact Ω  '},[]],
+ ['an unchanged genuine empty Verona report',{draft:'{"kind":"verona_unit_state","version":1,"unitState":{"dataParts":{"answer":""}}}',saved:'{"kind":"verona_unit_state","version":1,"unitState":{"dataParts":{"answer":""}}}'},[]],
+ ['a log-only settlement over an untouched Unit',{draft:'',saved:undefined,settled:{testRunId:'run',unitKey:'unit',response:''}},[]],
+ ['a changed manual draft',{draft:'  New Ω\n ',saved:'Old'},[['running','unit','  New Ω\n ']]],
+ ['an intentional clear of an existing answer',{draft:'',saved:'Old'},[['running','unit','']]],
+ ['a changed paused draft',{draft:'Paused Ω',saved:'Old',status:'paused'},[['paused','unit','Paused Ω']]],
+ ['an already settled genuine Player answer',{draft:'New',saved:'Old',settled:{testRunId:'run',unitKey:'unit',response:'New'}},[]],
+ ['an unchanged non-saving ephemeral answer',{draft:'Transient Ω',saved:undefined,ephemeral:'Transient Ω'},[]]
+])test('foreground draft save preserves '+name,async()=>{
+ const value=new ForegroundDraft(),writes=[];
+ value.runtime={testRunId:'run',currentUnitKey:'unit',currentUnitResponse:input.draft};
+ value.player={canSaveProgress:true,runStatus:input.status??'running'};
+ value.ephemeralUnitResponses=new Map(input.ephemeral===undefined?[]:[['run',new Map([['unit',input.ephemeral]])]]);
+ value.readCurrentRunState=()=>({testRun:{testRunId:'run',unitResponses:input.saved===undefined?{}:{unit:input.saved}},currentUnit:{unitKey:'unit'}});
+ value.saveProgressInternal=async(...args)=>{writes.push(args);};
+ await value.saveCurrentDraftBeforeCompleteInternal(input.settled??null);assert.deepEqual(writes,expected);
+});
 for(const [name,player,response,saved,expected] of [
  ['untouched empty Player shell',{},'{"kind":"verona_unit_state","version":1,"unitState":{}}',undefined,0],
  ['unchanged trusted saved response',{},'{"kind":"verona_unit_state","version":1,"unitState":{"responseProgress":"complete"}}','{"kind":"verona_unit_state","version":1,"unitState":{"responseProgress":"complete"}}',0],
