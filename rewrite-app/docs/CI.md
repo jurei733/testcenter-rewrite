@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+## Prefer the existing HTTPS archive after a measured package stall (2026-10-22)
+
+The `3cb179b8` [run 39779073869](https://github.com/jurei733/testcenter-rewrite/actions/runs/39779073869)
+ends with **18 successful, three failed and six skipped jobs**. The full unit
+suite, all five Source reference jobs and seven early browser rows succeed.
+Original-login never reaches its application test: the complete browser
+installer exits **124 after 305,121 ms**, correctly bounded by GNU timeout.
+Fast feedback and acceptance reject the failed prerequisite. The larger matrix
+is skipped; its unexecuted cases cannot qualify. Elapsed time **12:22** and
+**69.1 runner-minutes** therefore describe a failed early run, not a faster
+complete 86-job qualification.
+
+The retained log locates the delay in fetching about 25.9 MB of packages from
+the Azure archive, including font acquisitions spread across several minutes.
+Transport inactivity bounds do not guarantee a short whole installation, and
+the new total deadline alone does not fix the mirror behavior. The pinned runner's
+[mirror source](https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/scripts/build/configure-apt-sources.sh)
+already contains the HTTPS Ubuntu archive and security archive behind Azure.
+Browser setup now promotes those same existing HTTPS archives to priorities
+one/two, retaining Azure as priority three. No archive is added or removed;
+source suites, signature verification, TLS verification and the complete
+dependency installer remain. APT's
+[documented priority order](https://manpages.debian.org/trixie/apt/apt-transport-mirror.1.en.html)
+tries the lowest number first rather than merely trusting line order.
+
+The transformation accepts only the known three-archive runner profile and
+fails closed on changed hosts, credential-bearing URLs, duplicate/missing
+archives, extra options or unrecognized priorities. It prepares a temporary
+file before the root installation, then verifies the installed bytes. This
+avoids reading through a pipe while tee truncates the same input file. Five
+controls qualify transformation/idempotence and malformed profiles; a real
+composite-shell control with owned shims preserves preparation status 37,
+denied-install status 51 and verification failure, without root/system writes.
+All **186 portable policy controls** pass locally; the two actual-Linux controls
+remain explicit macOS skips. The previous head already passes both on Linux
+(182/182, zero skips). Real mirror selection and overall speed require the next
+head's complete Linux run; no test retry or deadline increase is introduced.
+
 ## Current Linux failures and qualified corrections (2026-10-22)
 
 The full `b9713c2b` [run 39769124218](https://github.com/jurei733/testcenter-rewrite/actions/runs/39769124218)

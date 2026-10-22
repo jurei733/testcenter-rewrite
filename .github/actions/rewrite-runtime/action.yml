@@ -18,6 +18,13 @@ runs:
     - shell: bash
       working-directory: rewrite-app
       run: npm ci --no-audit --no-fund
+    - name: Prefer existing official HTTPS Ubuntu archive
+      if: inputs.playwright == 'true'
+      shell: bash
+      run: |
+        node rewrite-app/scripts/ci-apt-mirrors.mjs > "${RUNNER_TEMP}/rewrite-apt-mirrors.txt"
+        sudo install -m 644 "${RUNNER_TEMP}/rewrite-apt-mirrors.txt" /etc/apt/apt-mirrors.txt
+        cmp --silent "${RUNNER_TEMP}/rewrite-apt-mirrors.txt" /etc/apt/apt-mirrors.txt
     - name: Bound browser dependency mirror waits
       if: inputs.playwright == 'true'
       shell: bash

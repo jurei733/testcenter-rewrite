@@ -12,6 +12,42 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('browser archive preference stages before root installation and preserves preparation/install/verification failures', () => {
+  const step = action.runs.steps.find(step => step.name === 'Prefer existing official HTTPS Ubuntu archive');
+  assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
+  assert.ok(action.runs.steps.indexOf(step) < action.runs.steps.findIndex(value => value.run?.includes('playwright install')));
+  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/ci-apt-mirrors.test.mjs'));
+  const directory = mkdtempSync(join(tmpdir(), 'owned-archive-preference-'));
+  const destination = join(directory, 'installed');
+  try {
+    writeFileSync(join(directory, 'node'), `#!/bin/sh
+      [ "$#" = 1 ] && [ "$1" = rewrite-app/scripts/ci-apt-mirrors.mjs ] || exit 65
+      [ "$OWNED_MIRROR_PREPARE_FAIL" != 1 ] || exit 37
+      printf 'https://archive.ubuntu.com/ubuntu/\\tpriority:1\\n'
+    `);
+    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
+      [ "$#" = 5 ] && [ "$1" = install ] && [ "$2" = -m ] && [ "$3" = 644 ] && [ "$4" = "$RUNNER_TEMP/rewrite-apt-mirrors.txt" ] && [ "$5" = /etc/apt/apt-mirrors.txt ] || exit 65
+      [ "$OWNED_MIRROR_INSTALL_FAIL" != 1 ] || exit 51
+      cp "$4" "$OWNED_MIRROR_DESTINATION"
+    `);
+    writeFileSync(join(directory, 'cmp'), `#!/bin/sh
+      [ "$#" = 3 ] && [ "$1" = --silent ] && [ "$2" = "$RUNNER_TEMP/rewrite-apt-mirrors.txt" ] && [ "$3" = /etc/apt/apt-mirrors.txt ] || exit 65
+      [ "$OWNED_MIRROR_VERIFY_FAIL" != 1 ] || exit 1
+      /usr/bin/cmp -s "$2" "$OWNED_MIRROR_DESTINATION"
+    `);
+    for (const name of ['node', 'sudo', 'cmp']) chmodSync(join(directory, name), 0o755);
+    const run = env => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
+      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, RUNNER_TEMP: directory,
+        OWNED_MIRROR_DESTINATION: destination, ...env}
+    });
+    assert.equal(run({}).status, 0);
+    const retained = readFileSync(destination, 'utf8');
+    assert.equal(run({OWNED_MIRROR_PREPARE_FAIL: '1'}).status, 37);
+    assert.equal(readFileSync(destination, 'utf8'), retained);
+    assert.equal(run({OWNED_MIRROR_INSTALL_FAIL: '1'}).status, 51);
+    assert.equal(run({OWNED_MIRROR_VERIFY_FAIL: '1'}).status, 1);
+  } finally { rmSync(directory, {recursive: true, force: true}); }
+});
 test('browser setup bounds APT mirror stalls, verifies effective configuration and preserves installer checks', () => {
   const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
   assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');

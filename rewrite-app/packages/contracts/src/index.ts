@@ -191,6 +191,7 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     getWorkspaceFileCatalog: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
+    replaceWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/replacements",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
     downloadSourcePackage:
@@ -430,6 +431,12 @@ export type SourcePackageBatchDeletionIssue = {
 };
 
 export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
+
+export type ReplaceWorkspaceFileRequest = {
+  mediaType: string;
+  sourceDocument: NonNullable<CreateSourcePackageRequest['sourceDocument']>;
+};
+export type ReplaceWorkspaceFileResponse = Omit<ReplaceSourcePackageResponse, 'importJob'> & {importJob: ImportJob | null};
 
 export type ActivateContentReleaseRequest = {
   activatedByActorId: string;

@@ -59,21 +59,22 @@ const translated = (value: unknown): string => {
 };
 
 function inspect(input: WorkspaceCatalogInput): {
-  metadata: WorkspaceCatalogFile['metadata']; references: WorkspaceFileReference[];
+  metadata: WorkspaceCatalogFile['metadata']; references: WorkspaceFileReference[]; moduleId: string;
 } {
   const metadata: WorkspaceCatalogFile['metadata'] = {
     identifier: sourceUpper(input.resourceIdentifier ?? input.fileName.split(/[\\/]/).at(-1) ?? input.fileName),
     label: '', description: '', participantCount: null, veronaVersion: null, moduleVersion: null
   };
   const references: WorkspaceFileReference[] = [];
-  if (input.sourceText === null || input.fileType === 'Package') return { metadata, references };
+  let moduleId = '';
+  if (input.sourceText === null || input.fileType === 'Package') return { metadata, references, moduleId };
   if (input.fileType === 'Resource') {
-    if (!/\.html$/i.test(input.fileName)) return {metadata, references};
+    if (!/\.html$/i.test(input.fileName)) return {metadata, references, moduleId};
     // HTML is data here: no document/window, script execution or URL fetching.
     // The established Player validator supplies the normalized resource ID.
     let document;
     try { document = new DOMParser({ onError() {} }).parseFromString(input.sourceText, 'text/html'); }
-    catch { return { metadata, references }; }
+    catch { return { metadata, references, moduleId }; }
     const scripts = document.getElementsByTagName('script');
     let jsonLd: string | undefined;
     for (let i = 0; i < scripts.length; i++) if (scripts.item(i)?.getAttribute('type') === 'application/ld+json') {
@@ -93,6 +94,7 @@ function inspect(input: WorkspaceCatalogInput): {
           metadata.veronaVersion = typeof value.specVersion === 'string' ? value.specVersion
             : typeof value.apiVersion === 'string' ? value.apiVersion : null;
           const id = typeof value.id === 'string' ? value.id : typeof value['@id'] === 'string' ? value['@id'] : '';
+          moduleId = id;
           if (!metadata.label && id) metadata.label = id + (metadata.moduleVersion ? '-' + metadata.moduleVersion : '');
         }
       } catch { /* Invalid metadata remains the responsibility of real import validation. */ }
@@ -102,6 +104,7 @@ function inspect(input: WorkspaceCatalogInput): {
       for (let i = 0; i < tags.length; i++) {
         const tag = tags.item(i);
         if (tag?.getAttribute('name') !== 'application-name') continue;
+        moduleId = tag.getAttribute('content') ?? '';
         metadata.label = document.getElementsByTagName('title').item(0)?.textContent ?? '';
         metadata.description = tag.getAttribute('data-description') ?? '';
         metadata.moduleVersion = tag.getAttribute('data-version') || null;
@@ -111,17 +114,20 @@ function inspect(input: WorkspaceCatalogInput): {
         break;
       }
     }
-    return { metadata, references };
+    if (!metadata.moduleVersion && input.resourceIdentifier) {
+      moduleId = input.resourceIdentifier.replace(/-\d+\.\d+$/, '');
+    }
+    return { metadata, references, moduleId };
   }
   // External entity declarations never enter the metadata parser. Rejected or
   // malformed XML stays listable without exposing any raw document or secrets.
-  if (/<!DOCTYPE\b/i.test(input.sourceText)) return { metadata, references };
+  if (/<!DOCTYPE\b/i.test(input.sourceText)) return { metadata, references, moduleId };
   let invalid = false, root: Element | null = null;
   try {
     root = new DOMParser({ onError() { invalid = true; } })
       .parseFromString(input.sourceText, 'application/xml')?.documentElement;
-  } catch { return { metadata, references }; }
-  if (invalid || !root || root.tagName !== input.fileType) return { metadata, references };
+  } catch { return { metadata, references, moduleId }; }
+  if (invalid || !root || root.tagName !== input.fileType) return { metadata, references, moduleId };
   const header = first(root, 'Metadata');
   const identifier = text(first(header, 'Id'));
   if (identifier && identifier !== '0') metadata.identifier = sourceId(identifier);
@@ -162,7 +168,7 @@ function inspect(input: WorkspaceCatalogInput): {
       }
     }
   }
-  return { metadata, references };
+  return { metadata, references, moduleId };
 }
 
 /** Lightweight complete current-file read model. Import status and validation
@@ -218,4 +224,30 @@ export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[]): Work
   }
   items.sort((a, b) => a.fileName.localeCompare(b.fileName) || a.sourcePackageId.localeCompare(b.sourcePackageId));
   return { items, totalCount: items.length, dependencySizesCalculated };
+}
+
+/** Identity-only projection for Source's overwrite guard, without raw data.
+ * XML files have no module version in Source FileData; patch labels do not
+ * affect compatibility, while Verona module IDs remain case-sensitive.
+ */
+export function workspaceFileReplacementIdentity(input: WorkspaceCatalogInput) {
+  const {metadata, moduleId: inspectedModuleId} = inspect(input);
+  let moduleId = inspectedModuleId, identifier = metadata.identifier, version = '';
+  if (input.fileType === 'Resource' && /\.html$/i.test(input.fileName)) {
+    const integer = (value: string | undefined) => Number.parseInt(value ?? '', 10) || 0;
+    const parsed = (metadata.moduleVersion ?? '').split(/[.-]/);
+    let major = integer(parsed[0]), minor = integer(parsed[1]), patch = integer(parsed[2]), label = parsed[3] ?? '';
+    // ResourceFile::readVeronaMetaData falls back even for explicit 0.0.0.
+    // Preserve Version::guessFromFileName's legacy V/major-only naming rules.
+    if (!(major || minor || patch || label)) {
+      const name = input.fileName.split(/[\\/]/).at(-1) ?? input.fileName;
+      const guessed = /^(\D+?)[@V-]?((\d+)(\.\d+)?(\.\d+)?(-\S+?)?)?(.\D{3,4})?$/.exec(name);
+      moduleId = guessed?.[1] ?? '';
+      major = integer(guessed?.[3]); minor = integer(guessed?.[4]?.slice(1)); patch = integer(guessed?.[5]?.slice(1));
+      label = guessed?.[6]?.slice(1) ?? '';
+    }
+    identifier = sourceUpper(`${moduleId}-${major}.${minor}`);
+    version = major || minor || patch || label ? `${major}.${minor}.${patch}${label ? '-' + label : ''}` : '';
+  }
+  return {fileType: input.fileType, identifier, moduleId, version};
 }

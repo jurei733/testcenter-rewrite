@@ -155,6 +155,8 @@ import {
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
   type ReplaceSourcePackageRequest,
+  type ReplaceWorkspaceFileRequest,
+  type ReplaceWorkspaceFileResponse,
   type ReplaceSourcePackageResponse,
   type ReviewResponse,
   type RuntimeOperationalEvent,
@@ -2373,6 +2375,7 @@ const sourcePackageListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSourcePackages
 );
 const workspaceFileCatalogPattern = createRoutePattern(productionApiRoutes.workspace.getWorkspaceFileCatalog);
+const workspaceFileReplacementPattern = createRoutePattern(productionApiRoutes.workspace.replaceWorkspaceFile);
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
 );
@@ -2662,6 +2665,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
   ["GET", workspaceFileCatalogPattern],
+  ["POST", workspaceFileReplacementPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
   ["GET", sourcePackageDeletionReadinessPattern],
@@ -3575,6 +3579,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
     ["GET", workspaceFileCatalogPattern, productionApiRoutes.workspace.getWorkspaceFileCatalog],
+    ["POST", workspaceFileReplacementPattern, productionApiRoutes.workspace.replaceWorkspaceFile],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
       "GET",
@@ -6630,6 +6635,25 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
         const catalog = await services.workspaceAdminRead.getWorkspaceFileCatalog({tenantKey, workspaceKey});
         sendJson<GetWorkspaceFileCatalogResponse>(response, 200, catalog); return;
+      }
+      const workspaceFileReplacementMatch = workspaceFileReplacementPattern.exec(pathname);
+      if (request.method === 'POST' && workspaceFileReplacementMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceFileReplacementMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(workspaceFileReplacementMatch.groups.workspaceKey);
+        const sourcePackageId = decodeRouteGroup(workspaceFileReplacementMatch.groups.sourcePackageId);
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(response, 400, 'invalid_workspace_scope', 'tenantKey, workspaceKey and sourcePackageId are required.'); return;
+        }
+        const body = await readSourcePackageRequestJsonBody<ReplaceWorkspaceFileRequest>();
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+            Object.hasOwn(body, 'fileName') || Object.hasOwn(body, 'contentStructure') ||
+            typeof body.mediaType !== 'string' || body.sourceDocument == null) {
+          sendError(response, 400, 'workspace_file_replacement_payload_invalid',
+            'A workspace file replacement requires sourceDocument and retains the existing filename; contentStructure is not accepted.'); return;
+        }
+        const result = await services.contentIntake.replaceWorkspaceFile({tenantKey, workspaceKey, sourcePackageId,
+          mediaType: body.mediaType, sourceDocument: body.sourceDocument});
+        sendJson<ReplaceWorkspaceFileResponse>(response, 201, result); return;
       }
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
       const sourcePackageAssemblyMatch = sourcePackageAssemblyPattern.exec(pathname);
