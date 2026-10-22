@@ -1,4 +1,5 @@
 import { participantCommandExecutionRoute, type ExecuteParticipantRunCommandRequest } from "@testcenter-rewrite-app/contracts/participant-run-command";
+import type { GetWorkspaceFileCatalogResponse } from '@testcenter-rewrite-app/contracts';
 import { participantDebugStateRoute, type ParticipantDebugStateRequest, type ParticipantDebugStateResponse } from "@testcenter-rewrite-app/contracts/participant-debug";
 import { participantNativeCommandRoute, participantCommandCompletionRoute, type ParticipantCommandCompletionRequest, participantControllerContextRoute, type ParticipantControllerContext, type ParticipantNativeCommandRequest, type ParticipantNativeCommandResponse } from "@testcenter-rewrite-app/contracts/participant-native-command";
 import { participantControllerTimerInterruptionRoute, type ParticipantControllerTimerInterruptionRequest } from "@testcenter-rewrite-app/contracts/participant-native-command";
@@ -2371,6 +2372,7 @@ const sourcePackageAssemblyPattern = createRoutePattern(
 const sourcePackageListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSourcePackages
 );
+const workspaceFileCatalogPattern = createRoutePattern(productionApiRoutes.workspace.getWorkspaceFileCatalog);
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
 );
@@ -2659,6 +2661,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageCreatePattern],
   ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
+  ["GET", workspaceFileCatalogPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
   ["GET", sourcePackageDeletionReadinessPattern],
@@ -3571,6 +3574,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.assembleSourcePackages
     ],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
+    ["GET", workspaceFileCatalogPattern, productionApiRoutes.workspace.getWorkspaceFileCatalog],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
       "GET",
@@ -6617,6 +6621,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      const workspaceFileCatalogMatch = workspaceFileCatalogPattern.exec(pathname);
+      if (request.method === 'GET' && workspaceFileCatalogMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceFileCatalogMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(workspaceFileCatalogMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(response, 400, 'invalid_workspace_scope', 'tenantKey and workspaceKey are required.'); return;
+        }
+        const catalog = await services.workspaceAdminRead.getWorkspaceFileCatalog({tenantKey, workspaceKey});
+        sendJson<GetWorkspaceFileCatalogResponse>(response, 200, catalog); return;
+      }
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
       const sourcePackageAssemblyMatch = sourcePackageAssemblyPattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);

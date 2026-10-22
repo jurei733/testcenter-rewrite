@@ -10,6 +10,11 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('workspace file catalog HTTP authorization and projection qualify in unit and real PostgreSQL gates', () => {
+  const suite = 'scripts/workspace-file-catalog-api.test.mjs';
+  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
+  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+});
 test("focused asset iteration retains mandatory unit and real PostgreSQL qualification", () => {
   const suites = ["scripts/application-asset-cascade.test.mjs", "scripts/application-asset-cascade-api.test.mjs"];
   const postgres = read("./run-postgres-integration.mjs");
