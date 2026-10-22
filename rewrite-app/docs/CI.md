@@ -1,5 +1,44 @@
 # CI iteration and complete acceptance
 
+## Canonical candidate regression and slow HTTPS download (2026-10-22)
+
+Published `e77c4fe5` [run 39783730393](https://github.com/jurei733/testcenter-rewrite/actions/runs/39783730393)
+ends with **17 successful, four failed and six skipped jobs**. All five Source
+reference jobs, strict Linux typechecking, **188/188 policy controls** and the
+complete **3,704 unit/frontend cases** pass. This is an early failed run: the
+extended matrix is skipped and full acceptance correctly fails.
+
+Proof-of-work exposes a real import regression. The shared resolver drops valid
+canonical standalone Unit drafts merely because importing them without a Booklet
+runtime marked their import rejected. Guided review then incorrectly loses its
+two/three-candidate ambiguity. Current-file-only filtering is now explicitly
+limited to Source loose-file operations. Canonical review retains its failed
+but valid draft candidates; accepted replacement history remains excluded.
+The actual protected API regression sequence checks two candidates, three
+candidates, stale selection rejection, exact chosen Unit runtime bytes, and a
+separate Source-mode compile excluding those rejected drafts in all four stores.
+The unchanged complete `quick/proof-of-work` browser row passes locally after the
+fix (103,908 ms), including its original ambiguity assertions.
+
+The Original-login job never reaches application startup: the full dependency
+installer exits **124 after 305,030 ms**. HTTPS archive preference is effective,
+but index downloads take **60 s for 7,936 kB (133 kB/s)** and packages **3m49s for
+25.9 MB (113 kB/s)**. Another completed Original-admin-login installer in this
+same run takes **17,986 ms**. This variability neither proves a configured cap
+nor a general speedup; selecting HTTPS alone does not establish reliability.
+
+Browser setup now logs only the preexisting numeric HTTP/HTTPS `Dl-Limit`
+values (or null when absent), never proxy configuration or URLs. It explicitly
+sets and verifies both values to APT's documented default **0 / unlimited**,
+while retaining transport inactivity/retry bounds and the complete five-minute
+installer deadline. The [APT transport manual](https://manpages.debian.org/trixie/apt/apt-transport-http.1.en.html)
+defines this setting in kB/s and explains that a nonzero cap also serializes
+server downloads. Provider/network throughput limits are unaffected. No actual
+runner cap has yet been observed. Owned shell controls exercise an explicit
+128 kB/s fixture, denied writes, ineffective values and proxy-secret exclusion;
+the real Linux APT control additionally checks merging and a later download-limit
+override. Actual new-head installation speed still requires Linux evidence.
+
 ## Prefer the existing HTTPS archive after a measured package stall (2026-10-22)
 
 The `3cb179b8` [run 39779073869](https://github.com/jurei733/testcenter-rewrite/actions/runs/39779073869)

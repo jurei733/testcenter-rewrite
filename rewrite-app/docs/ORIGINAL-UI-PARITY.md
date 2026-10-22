@@ -1,5 +1,49 @@
 # Optional Original UI
 
+### Protected first upload and same-name overwrite (2026-10-22)
+
+`POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` now accepts
+`{fileName, mediaType, sourceDocument}` for an actual loose file. A basename is
+required; paths/control characters and names over Source's 120 UTF-8-byte bound
+are rejected. Authored whitespace and zero-byte/encoded resources are preserved.
+XML uses the decoded root and actual schema/encoding validation, rather than
+trusting a MIME hint or accepting a client-supplied runtime structure. The stored
+`Unit/`, `Booklet/`, `SysCheck/`, `Testtakers/` and `Resource/` type folders allow
+a Unit and Booklet to share a basename as in Source. Same-type/same-name uploads
+invoke the protected identity/version replacement, bound to the source revision
+captured during lookup. Typed IDs retain PHP-style ASCII normalization.
+
+Missing/ambiguous dependencies and duplicate typed IDs reject before a first
+write. The actual file and `source_package_created` activity reserve together
+against the complete workspace source revision in Memory, File, SQLite and
+PostgreSQL. This uses a dedicated repository operation; the existing assembly
+operation still rejects a creation event. A changed-revision control leaves
+only the concurrent file and no orphan activity/job/release. Eight parallel
+HTTP uploads with one Unit identity produce exactly one accepted creation and
+one matching audit event in each store. Independent Unit/resource uploads do
+not fabricate jobs; Booklet, SysCheck and Testtakers follow the existing real
+importer. Booklet snapshots contain the actual uploaded Player/Unit data;
+Testtakers import actual roster assignments. Releases remain staged and need
+the existing explicit activation step.
+
+`GET .../files/:sourcePackageId/download` checks the same workspace permissions
+and returns exact current or historical bytes using the authored basename,
+including whitespace and UTF-8 filename parameters. Protected API cases cover
+all stores, UTF-16/BOM and zero-byte content, hostile payloads, RO/no-auth/monitor
+and foreign-scope denial, same-basename type folders, stale writes, duplicate
+IDs, same-name overwrite, immutable old downloads and subsequent runtime
+hydration. The four strict Original-19 XSD browser journeys additionally reject
+missing-schema first uploads without writes and accept/overwrite/download exact
+UTF-16 SysCheck bytes. The complete local unit/frontend sequence passes **121 + 322 + 1,270 + 1,992 =
+3,705** cases with no skips/cancellations, as do the production build and all
+186 portable policy controls (two real-Linux controls remain explicit macOS
+skips). These are local checks, pending the next full Linux run.
+
+This closes another backend gap, not the full Original upload UX. ZIP member
+materialization, complete Source validation reports, revalidation/automatic
+activation, physical deletion and the real four-tab renderer remain open.
+Formal status remains **29 done / 20 partial; all eight broad visual rows open**.
+
 ### Protected workspace-file replacement (2026-10-22)
 
 `POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/replacements`
@@ -28,9 +72,12 @@ canonical import expects a Booklet release. Valid independent Unit and ordinary
 resource replacements now reserve the accepted file and lineage together,
 without fabricating an import job/release. Their typed response has a nullable
 `importJob`. The next real Booklet compilation initially fails in all three
-local stores because old and new Unit revisions appear ambiguous. Automatic
+local stores because old and new Unit revisions appear ambiguous. Source-file
 dependency resolution and live-reference reads now choose current non-rejected
 revisions rather than treating immutable history as competing live files.
+Canonical console imports retain valid failed loose drafts for guided candidate
+review; a real regression found in `e77c4fe5` is corrected and exercised by the
+unchanged complete local proof-of-work browser row.
 The subsequent snapshot must contain the exact new Player HTML and Unit bytes;
 existing releases and historical downloads remain immutable.
 
@@ -49,7 +96,7 @@ replacements without a write and accepting/downloading exact UTF-16 bytes.
 The owned PostgreSQL cluster is stopped afterwards.
 
 This is additional backend behavior, not the complete Original file workflow.
-First upload and ZIP member materialization, Source's complete reports and
+The first-upload UI, ZIP member materialization, Source's complete reports and
 dependency revalidation/automatic activation, physical delete semantics and
 the real four-tab renderer remain open. Current pages still show the generic
 console. No visual row closes: **29 done / 20 partial, all eight broad visual

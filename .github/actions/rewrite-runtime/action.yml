@@ -29,12 +29,15 @@ runs:
       if: inputs.playwright == 'true'
       shell: bash
       run: |
+        apt-config dump | node -e 'const text=require("node:fs").readFileSync(0,"utf8");const limits={};for(const protocol of ["http","https"]){const match=text.match(new RegExp("^Acquire::"+protocol+"::Dl-Limit \"([0-9]{1,12})\";[ \\t]*$","mi"));limits[protocol]=match?Number(match[1]):null;}console.log(JSON.stringify({ciAptPreviousDownloadLimitKbps:limits}));'
         printf '%s\n' \
           'Acquire::http::Timeout "15";' \
           'Acquire::https::Timeout "15";' \
           'Acquire::Retries "1";' \
+          'Acquire::http::Dl-Limit "0";' \
+          'Acquire::https::Dl-Limit "0";' \
           | sudo tee /etc/apt/apt.conf.d/zz-testcenter-ci-network >/dev/null
-        apt-config dump | node -e 'const config=require("node:fs").readFileSync(0,"utf8").split(/\r?\n/).map(line=>line.toLowerCase()); for(const line of ["Acquire::http::Timeout \"15\";","Acquire::https::Timeout \"15\";","Acquire::Retries \"1\";"]) if(!config.includes(line.toLowerCase())) throw Error("CI APT network bounds are not effective");'
+        apt-config dump | node -e 'const config=require("node:fs").readFileSync(0,"utf8").split(/\r?\n/).map(line=>line.toLowerCase()); for(const line of ["Acquire::http::Timeout \"15\";","Acquire::https::Timeout \"15\";","Acquire::Retries \"1\";","Acquire::http::Dl-Limit \"0\";","Acquire::https::Dl-Limit \"0\";"]) if(!config.includes(line.toLowerCase())) throw Error("CI APT network bounds are not effective");'
     - if: inputs.playwright == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:

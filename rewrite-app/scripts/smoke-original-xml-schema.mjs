@@ -127,6 +127,26 @@ try {
       assert.equal(currentDownload.status,200);assert.deepEqual(Buffer.from(await currentDownload.arrayBuffer()),replacementBytes);
       const historical = await fetch(`${baseUrl}${path}/source-packages/${fileId}/download`,{headers:{authorization:`Bearer ${token}`}});
       assert.equal(historical.status,200);assert.equal(await historical.text(),schemaSource("VALID.SCHEMA",true));
+      const beforeUpload = await api(`${path}/files`), beforeUploadHistory = await api(`${path}/activity-events?limit=500`);
+      const invalidUpload = await fetch(`${baseUrl}${path}/files`,{method:'POST',
+        headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},
+        body:JSON.stringify({fileName:'FIRST.SCHEMA.xml',mediaType:'application/xml',sourceDocument:schemaSource('FIRST.SCHEMA',false)})});
+      assert.equal(invalidUpload.status,400);
+      assert.ok((await invalidUpload.json()).details.diagnostics.some(item=>item.code==='testcenter_xml_schema_reference_missing'));
+      assert.deepEqual(await api(`${path}/files`),beforeUpload);assert.deepEqual(await api(`${path}/activity-events?limit=500`),beforeUploadHistory);
+      const firstBytes = Buffer.concat([Buffer.from([255,254]),Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+schemaSource('FIRST.SCHEMA',true),'utf16le')]);
+      const firstBody = {fileName:'FIRST.SCHEMA.xml',mediaType:'application/xml',sourceDocument:'data:application/xml;base64,'+firstBytes.toString('base64')};
+      const firstUpload = await api(`${path}/files`,firstBody);
+      assert.equal(firstUpload.replacedSourcePackageId,null);assert.equal(firstUpload.sourcePackage.fileName,'SysCheck/FIRST.SCHEMA.xml');
+      assert.equal(firstUpload.importJob.status,'completed',JSON.stringify(firstUpload.importJob.diagnostics));
+      const sameName = await api(`${path}/files`,firstBody);
+      assert.equal(sameName.replacedSourcePackageId,firstUpload.sourcePackage.sourcePackageId);assert.equal(sameName.importJob.status,'completed');
+      for(const id of [firstUpload.sourcePackage.sourcePackageId,sameName.sourcePackage.sourcePackageId]) {
+        const bytes = await fetch(`${baseUrl}${path}/files/${id}/download`,{headers:{authorization:`Bearer ${token}`}});
+        assert.equal(bytes.status,200);assert.deepEqual(Buffer.from(await bytes.arrayBuffer()),firstBytes);
+        assert.ok(bytes.headers.get('content-disposition').includes('FIRST.SCHEMA.xml'));
+      }
+      console.log(`strict_first_upload=${fixture}:passed`);
       console.log(`strict_file_replacement=${fixture}:passed`);
       await page.screenshot({ path: join(root, `strict-xsd-${fixture}.png`), fullPage: true });
       assert.deepEqual(errors, []); await context.close();

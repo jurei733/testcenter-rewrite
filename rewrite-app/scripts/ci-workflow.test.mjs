@@ -56,6 +56,7 @@ test('browser setup bounds APT mirror stalls, verifies effective configuration a
   const directory = mkdtempSync(join(tmpdir(), 'owned-apt-policy-'));
   const capture = join(directory, 'capture.conf');
   try {
+    writeFileSync(capture, 'Acquire::http::Dl-Limit "128";\nAcquire::https::Dl-Limit "128";\n');
     writeFileSync(join(directory, 'sudo'), `#!/bin/sh
       [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/zz-testcenter-ci-network ] || exit 65
       [ "$OWNED_APT_DENY" != 1 ] || exit 51
@@ -71,7 +72,8 @@ test('browser setup bounds APT mirror stalls, verifies effective configuration a
       encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, OWNED_APT_CAPTURE: capture, ...env}
     });
     const success = run({}); assert.equal(success.status, 0, success.stderr);
-    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\n');
+    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\nAcquire::http::Dl-Limit "0";\nAcquire::https::Dl-Limit "0";\n');
+    assert.deepEqual(JSON.parse(success.stdout.trim()), {ciAptPreviousDownloadLimitKbps:{http:128,https:128}});
     const denied = run({OWNED_APT_DENY: '1'}); assert.equal(denied.status, 51);
     const ineffective = run({OWNED_APT_WRONG: '1'}); assert.equal(ineffective.status, 1);
     assert.ok(![success, denied, ineffective].some(value => (value.stdout + value.stderr).includes('OWNED_APT_SECRET')));
@@ -85,7 +87,7 @@ test('real Linux APT merges runner files before the CI bounds and rejects a late
   const parts = join(directory, 'parts'), configuration = join(directory, 'apt.conf');
   mkdirSync(parts);
   const bounds = 'zz-testcenter-ci-network';
-  const runner = 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\n';
+  const runner = 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\nAcquire::http::Dl-Limit "128";\nAcquire::https::Dl-Limit "128";\n';
   try {
     // APT_CONFIG is read before Parts. All files, including the tee target,
     // belong to this fixture; neither sudo nor the system configuration runs.
@@ -106,6 +108,10 @@ test('real Linux APT merges runner files before the CI bounds and rejects a late
     assert.equal(old.status, 1, 'The pre-fix file must be superseded by actual APT merging: ' + old.stderr);
     const qualified = run(join(parts, bounds));
     assert.equal(qualified.status, 0, qualified.stderr);
+    assert.deepEqual(JSON.parse(qualified.stdout.trim()), {ciAptPreviousDownloadLimitKbps:{http:128,https:128}});
+    writeFileSync(join(parts, 'zzzz-owned-override'), 'Acquire::https::Dl-Limit "512";\n');
+    const downloadOverride = run(join(parts,bounds));
+    assert.equal(downloadOverride.status,1,'A later effective download limit must remain fatal.');
     writeFileSync(join(parts, 'zzzz-owned-override'), 'Acquire::Retries "9";\n');
     const overridden = run(join(parts, bounds));
     assert.equal(overridden.status, 1, 'A later effective override must remain fatal.');

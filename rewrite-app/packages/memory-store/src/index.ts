@@ -126,6 +126,48 @@ const participantLoginAttemptKey = participantRosterPasswordKey;
 export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
 
+  const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
+    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    const { assembledSourcePackage, assemblyActivityEvent } = input;
+    const sourcePackages = Array.from(state.sourcePackages.values()).filter(
+      candidate =>
+        candidate.tenantId === assembledSourcePackage.tenantId &&
+        candidate.workspaceId === assembledSourcePackage.workspaceId
+    );
+    const activityEvents = Array.from(
+      state.workspaceActivityEvents.values()
+    ).filter(
+      activityEvent =>
+        activityEvent.tenantId === assembledSourcePackage.tenantId &&
+        activityEvent.workspaceId === assembledSourcePackage.workspaceId
+    );
+    if (
+      assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+      assemblyActivityEvent.workspaceId !==
+        assembledSourcePackage.workspaceId ||
+      assemblyActivityEvent.eventType !== requiredEventType ||
+      assemblyActivityEvent.subjectId !==
+        assembledSourcePackage.sourcePackageId ||
+      state.sourcePackages.has(assembledSourcePackage.sourcePackageId) ||
+      state.workspaceActivityEvents.has(assemblyActivityEvent.activityEventId) ||
+      createWorkspaceSourcePackageReferenceRevision({
+        sourcePackages,
+        activityEvents
+      }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+    ) {
+      return false;
+    }
+    state.sourcePackages.set(
+      assembledSourcePackage.sourcePackageId,
+      assembledSourcePackage
+    );
+    state.workspaceActivityEvents.set(
+      assemblyActivityEvent.activityEventId,
+      assemblyActivityEvent
+    );
+    return true;
+  };
+
   return {
     async getApplicationSettings() {
       return state.applicationSettings;
@@ -448,46 +490,10 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async saveSourcePackage(sourcePackage) {
       state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
     },
-    async reserveSourcePackageAssembly(input) {
-      const { assembledSourcePackage, assemblyActivityEvent } = input;
-      const sourcePackages = Array.from(state.sourcePackages.values()).filter(
-        candidate =>
-          candidate.tenantId === assembledSourcePackage.tenantId &&
-          candidate.workspaceId === assembledSourcePackage.workspaceId
-      );
-      const activityEvents = Array.from(
-        state.workspaceActivityEvents.values()
-      ).filter(
-        activityEvent =>
-          activityEvent.tenantId === assembledSourcePackage.tenantId &&
-          activityEvent.workspaceId === assembledSourcePackage.workspaceId
-      );
-      if (
-        assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
-        assemblyActivityEvent.workspaceId !==
-          assembledSourcePackage.workspaceId ||
-        assemblyActivityEvent.eventType !== "source_package_assembled" ||
-        assemblyActivityEvent.subjectId !==
-          assembledSourcePackage.sourcePackageId ||
-        state.sourcePackages.has(assembledSourcePackage.sourcePackageId) ||
-        state.workspaceActivityEvents.has(assemblyActivityEvent.activityEventId) ||
-        createWorkspaceSourcePackageReferenceRevision({
-          sourcePackages,
-          activityEvents
-        }) !== input.expectedWorkspaceSourcePackageReferenceRevision
-      ) {
-        return false;
-      }
-      state.sourcePackages.set(
-        assembledSourcePackage.sourcePackageId,
-        assembledSourcePackage
-      );
-      state.workspaceActivityEvents.set(
-        assemblyActivityEvent.activityEventId,
-        assemblyActivityEvent
-      );
-      return true;
-    },
+    reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
+      assemblyActivityEvent:input.createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
     async reserveSourcePackageReplacement(input) {
       const { replacementSourcePackage, replacementActivityEvent } = input;
       const sourcePackages = Array.from(state.sourcePackages.values()).filter(

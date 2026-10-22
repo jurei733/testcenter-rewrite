@@ -47,6 +47,27 @@ test('workspace file preflight and reservation both reject an intervening source
   });
 });
 
+test('a first-upload reservation rejects a changed workspace without orphan files or audit entries',async()=>{
+  const base=createInMemoryFirstSliceRepository(),stamp='2026-10-22T12:00:00.000Z';
+  const tenant={tenantId:'upload-tenant',tenantKey:'owned',displayName:'Owned',status:'active',createdAt:stamp};
+  const workspace={workspaceId:'upload-workspace',tenantId:tenant.tenantId,workspaceKey:'owned',displayName:'Owned',status:'active',createdAt:stamp};
+  await base.saveTenant(tenant);await base.saveWorkspace({tenantKey:'owned',workspaceKey:'owned',workspace});
+  const concurrent={sourcePackageId:'other-source',tenantId:tenant.tenantId,workspaceId:workspace.workspaceId,
+    fileName:'Resource/other.txt',mediaType:'text/plain',sourceDocument:'other',contentStructure:null,status:'accepted',uploadedAt:stamp};
+  let reservations=0;
+  const repository={...base,reserveWorkspaceFileUpload:async input=>{
+    reservations++;await base.saveSourcePackage(concurrent);return base.reserveWorkspaceFileUpload(input);
+  }};
+  const services=createFirstSliceServices({repository,xmlSchemaProfile:'legacy-compatibility'});
+  await assert.rejects(services.contentIntake.uploadWorkspaceFile({tenantKey:'owned',workspaceKey:'owned',
+    fileName:'new.txt',mediaType:'text/plain',sourceDocument:'new'}),error=>error.errorCode==='workspace_file_upload_conflict');
+  assert.equal(reservations,1);
+  assert.deepEqual(await base.listSourcePackagesByWorkspace(tenant.tenantId,workspace.workspaceId),[concurrent]);
+  assert.deepEqual(await base.listWorkspaceActivityEventsByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+  assert.deepEqual(await base.listImportJobsByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+  assert.deepEqual(await base.listContentReleasesByWorkspace(tenant.tenantId,workspace.workspaceId),[]);
+});
+
 const kinds=['memory','file','sqlite',...(process.env.FIRST_SLICE_STORE==='postgres'?['postgres']:[])];
 for(const kind of kinds)test(kind+': complete protected file catalog preserves bytes, metadata, read-only scope and immutable history',async()=>{
   const folder=await mkdtemp(join(tmpdir(),'owned-file-catalog-'));
@@ -158,6 +179,7 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       activity:await api(scope+'/activity-events?limit=500'),imports:await api(scope+'/import-jobs?limit=500'),
       releases:await api(scope+'/content-releases?limit=500')});
     const retained=await snapshot();
+    await api(scope+'/files',{fileName:'readonly.txt',mediaType:'text/plain',sourceDocument:'x'},'POST',403,readOnly);
     await api(replaceFile(latest.sourcePackageId),validBody,'POST',401,null);
     await api(replaceFile(latest.sourcePackageId),validBody,'POST',403,readOnly);
     await api(replaceFile(latest.sourcePackageId),validBody,'POST',403,monitor);
@@ -230,6 +252,53 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       'A subsequent Booklet snapshot must bind the actual new independently accepted Player.');
     assert.ok(JSON.stringify(recompiled.stagedContentRelease.runtimeSnapshot).includes('private-unit-body-replaced'),
       'A subsequent Booklet snapshot must hydrate the actual new independently accepted Unit.');
+    // The canonical console still offers valid loose drafts whose Booklet
+    // import failed. Source-file compilation uses only current accepted files.
+    await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:'owned-candidate-review',displayName:'Candidate review'},'POST',201);
+    const reviewScope='/api/v1/tenants/demo-tenant/workspaces/owned-candidate-review';
+    const reviewCreate=async(fileName,mediaType,sourceDocument)=>(await api(reviewScope+'/source-packages',{
+      fileName,mediaType,sourceDocument
+    },'POST',201)).sourcePackage;
+    const reviewBook=await reviewCreate('Booklet.xml','application/xml',fixtures[1][1]);
+    const reviewUnit=await reviewCreate('Unit.xml','application/xml',fixtures[2][1]);
+    await reviewCreate('Player.html','text/html',player);
+    const copyBody='data:application/xml;base64,'+Buffer.from(unit.toString('utf16le').replace('private-unit-body','CANONICAL_CHOSEN'),'utf16le').toString('base64');
+    const newestBody='data:application/xml;base64,'+Buffer.from(unit.toString('utf16le').replace('private-unit-body','CANONICAL_NEWEST'),'utf16le').toString('base64');
+    const copied=await api(reviewScope+'/source-packages/'+reviewUnit.sourcePackageId+'/replacements',{
+      fileName:'Unit-copy.xml',mediaType:'application/xml',sourceDocument:copyBody
+    },'POST',201);
+    assert.equal(copied.importJob.status,'failed','A canonical standalone Unit has no Booklet runtime; its valid source remains reviewable.');
+    const firstReview=await api(reviewScope+'/import-jobs',{sourcePackageId:reviewBook.sourcePackageId},'POST',201);
+    const firstChoice=firstReview.importJob.diagnostics.find(item=>item.code==='source_document_workspace_dependency_ambiguous');
+    assert.ok(firstChoice,JSON.stringify(firstReview.importJob));
+    assert.deepEqual(firstChoice.details.candidateSourcePackages.map(item=>item.sourcePackageId).sort(),
+      [reviewUnit.sourcePackageId,copied.replacementSourcePackage.sourcePackageId].sort());
+    const newest=await api(reviewScope+'/source-packages/'+copied.replacementSourcePackage.sourcePackageId+'/replacements',{
+      fileName:'Unit-newest.xml',mediaType:'application/xml',sourceDocument:newestBody
+    },'POST',201);
+    assert.equal(newest.importJob.status,'failed');
+    const stale=await api(reviewScope+'/import-jobs',{sourcePackageId:reviewBook.sourcePackageId,
+      dependencySourcePackageIds:[copied.replacementSourcePackage.sourcePackageId],
+      dependencySelectionRevision:firstChoice.details.dependencySelectionRevision
+    },'POST',201);
+    assert.ok(stale.importJob.diagnostics.some(item=>item.code==='source_document_workspace_dependency_selection_stale'));
+    const refreshed=await api(reviewScope+'/import-jobs',{sourcePackageId:reviewBook.sourcePackageId},'POST',201);
+    const refreshedChoice=refreshed.importJob.diagnostics.find(item=>item.code==='source_document_workspace_dependency_ambiguous');
+    assert.equal(refreshedChoice.details.candidateSourcePackages.length,3);
+    const guided=await api(reviewScope+'/import-jobs',{sourcePackageId:reviewBook.sourcePackageId,
+      dependencySourcePackageIds:[copied.replacementSourcePackage.sourcePackageId],
+      dependencySelectionRevision:refreshedChoice.details.dependencySelectionRevision
+    },'POST',201);
+    assert.equal(guided.importJob.status,'completed',JSON.stringify(guided.importJob.diagnostics));
+    assert.ok(JSON.stringify(guided.stagedContentRelease.runtimeSnapshot).includes('CANONICAL_CHOSEN'));
+    assert.ok(!JSON.stringify(guided.stagedContentRelease.runtimeSnapshot).includes('CANONICAL_NEWEST'));
+    const sourceMode=await api(reviewScope+'/files/'+reviewBook.sourcePackageId+'/replacements',{
+      mediaType:'application/xml',sourceDocument:fixtures[1][1]
+    },'POST',201);
+    assert.equal(sourceMode.importJob.status,'completed',JSON.stringify(sourceMode.importJob.diagnostics));
+    assert.ok(JSON.stringify(sourceMode.stagedContentRelease.runtimeSnapshot).includes('private-unit-body'));
+    assert.ok(!JSON.stringify(sourceMode.stagedContentRelease.runtimeSnapshot).includes('CANONICAL_CHOSEN'));
+    assert.ok(!JSON.stringify(sourceMode.stagedContentRelease.runtimeSnapshot).includes('CANONICAL_NEWEST'));
     for(const [key,reference,fileName,expected]of[
       ['owned-patch-version','catalog-player@1.2.8','custom-player.html','completed'],
       ['owned-wrong-version','catalog-player@1.3.0','catalog-player-1.3.html','failed']
@@ -253,6 +322,92 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       if(expected==='failed')assert.ok(imported.importJob.diagnostics.some(item=>item.code==='source_document_player_version_mismatch'),
         'A matching filename cannot bypass the real Player metadata version check.');
     }
+    // Source first upload: typed folders, actual bytes and immutable runtime.
+    await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:'owned-upload',displayName:'First upload'},'POST',201);
+    const uploadScope='/api/v1/tenants/demo-tenant/workspaces/owned-upload';
+    const upload=(fileName,mediaType,sourceDocument,status=201,credential=token)=>
+      api(uploadScope+'/files',{fileName,mediaType,sourceDocument},'POST',status,credential);
+    const uploadSnapshot=async()=>({files:await api(uploadScope+'/files'),sources:await api(uploadScope+'/source-packages?limit=500'),
+      activity:await api(uploadScope+'/activity-events?limit=500'),imports:await api(uploadScope+'/import-jobs?limit=500'),
+      releases:await api(uploadScope+'/content-releases?limit=500')});
+    const emptyUpload=await uploadSnapshot();
+    await upload('shared.xml','application/xml',fixtures[2][1],401,null);
+    await upload('shared.xml','application/xml',fixtures[2][1],403,readOnly);
+    await upload('shared.xml','application/xml',fixtures[2][1],403,monitor);
+    await upload('shared.xml','application/xml',fixtures[2][1],409);
+    for(const name of ['../bad.txt','nested/bad.txt','nested\\bad.txt','bad\u0000.txt','bad\n.txt','..','', 'ä'.repeat(61)])
+      await upload(name,'text/plain','x',400);
+    for(const body of [null,[],{fileName:'x.txt',mediaType:7,sourceDocument:'x'},
+      {fileName:'x.txt',mediaType:'text/plain',sourceDocument:{}},
+      {fileName:'x.txt',mediaType:'text/plain',sourceDocument:'x',contentStructure:{}},
+      {fileName:'x.txt',mediaType:'text/plain'}]) await api(uploadScope+'/files',body,'POST',400);
+    for(const sourceDocument of ['<unknown/>','<Unit>','<!DOCTYPE Unit><Unit/>','data:application/xml;base64,%%%'])
+      await upload('bad.xml','application/xml',sourceDocument,400);
+    await upload('members.zip','application/zip','data:application/zip;base64,UEsDBA==',400);
+    assert.deepEqual(await uploadSnapshot(),emptyUpload,'Rejected uploads leave no files, jobs, releases or activity.');
+    const uploadedPlayer=await upload('custom-player.html','text/html',player);
+    assert.equal(uploadedPlayer.sourcePackage.fileName,'Resource/custom-player.html');
+    assert.equal(uploadedPlayer.sourcePackage.status,'accepted');assert.equal(uploadedPlayer.importJob,null);
+    const uploadedUnit=await upload('shared.xml','application/zip',fixtures[2][1]);
+    assert.equal(uploadedUnit.sourcePackage.fileName,'Unit/shared.xml','XML root overrides an untrusted ZIP MIME hint.');
+    assert.equal(uploadedUnit.sourcePackage.status,'accepted');assert.equal(uploadedUnit.importJob,null);
+    const uploadedBook=await upload('shared.xml','application/xml',fixtures[1][1]);
+    assert.equal(uploadedBook.sourcePackage.fileName,'Booklet/shared.xml');
+    assert.equal(uploadedBook.importJob.status,'completed',JSON.stringify(uploadedBook.importJob.diagnostics));
+    assert.equal(uploadedBook.stagedContentRelease.status,'staged');
+    assert.equal(uploadedBook.stagedContentRelease.runtimeSnapshot.playerEntries.find(value=>value.playerKey==='catalog-player@1.2.9')?.html,player);
+    assert.ok(JSON.stringify(uploadedBook.stagedContentRelease.runtimeSnapshot).includes('private-unit-body'));
+    const uploadedCheck=await upload('check.xml','application/xml',fixtures[3][1]);
+    assert.equal(uploadedCheck.importJob.status,'completed',JSON.stringify(uploadedCheck.importJob.diagnostics));
+    const uploadedPeople=await upload('people.xml','application/xml',xml('Testtakers','UPLOAD-PEOPLE',
+      '<Group id="upload-group"><Login name="upload-user" pw="upload-password"><Booklet>BOOKLET</Booklet></Login></Group>'));
+    assert.equal(uploadedPeople.importJob.status,'completed',JSON.stringify(uploadedPeople.importJob.diagnostics));
+    assert.ok(uploadedPeople.participantRosterImport);
+    const beforeDuplicate=await uploadSnapshot();
+    await upload('different.xml','application/xml',fixtures[2][1],409);
+    await upload('shared.xml','application/xml',xml('Unit','DIFFERENT','<Definition player="catalog-player@1.2.9">changed-id</Definition>'),409);
+    assert.deepEqual(await uploadSnapshot(),beforeDuplicate);
+    const uploadedEmpty=await upload('empty.bin','application/octet-stream','');
+    const authoredName='  '+'ä'.repeat(56)+'.txt  ';
+    assert.equal(Buffer.byteLength(authoredName),120);
+    const uploadedSpaces=await upload(authoredName,'text/plain','  \n  ');
+    assert.equal(uploadedSpaces.sourcePackage.fileName,'Resource/'+authoredName);
+    const overwritten=await upload('shared.xml','application/xml','data:application/xml;base64,'+changedUnit.toString('base64'));
+    assert.equal(overwritten.replacedSourcePackageId,uploadedUnit.sourcePackage.sourcePackageId);
+    assert.equal(overwritten.sourcePackage.fileName,'Unit/shared.xml');assert.equal(overwritten.importJob,null);
+    const reuploadedBook=await upload('shared.xml','application/zip',fixtures[1][1]);
+    assert.equal(reuploadedBook.replacedSourcePackageId,uploadedBook.sourcePackage.sourcePackageId);
+    assert.equal(reuploadedBook.importJob.status,'completed',JSON.stringify(reuploadedBook.importJob.diagnostics));
+    assert.ok(JSON.stringify(reuploadedBook.stagedContentRelease.runtimeSnapshot).includes('private-unit-body-replaced'));
+    for(const [source,bytes,name]of[[uploadedUnit.sourcePackage,unit,'shared.xml'],
+      [overwritten.sourcePackage,changedUnit,'shared.xml'],[uploadedEmpty.sourcePackage,Buffer.alloc(0),'empty.bin'],
+      [uploadedSpaces.sourcePackage,Buffer.from('  \n  '),authoredName]]) {
+      const route=uploadScope+'/files/'+source.sourcePackageId+'/download';
+      await api(route,undefined,'GET',401,null);
+      const response=await fetch(base+route,{headers:{authorization:'Bearer '+token}});
+      assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);
+      const disposition=response.headers.get('content-disposition');
+      assert.ok(disposition.includes(encodeURIComponent(name)) || disposition.includes('"'+name+'"'),disposition);
+      assert.ok(!disposition.includes('Unit/'));
+      await api(scope+'/files/'+source.sourcePackageId+'/download',undefined,'GET',404);
+    }
+    const uploadCatalog=await api(uploadScope+'/files');
+    assert.equal(uploadCatalog.totalCount,7);assert.ok(!uploadCatalog.items.some(value=>value.sourcePackageId===uploadedUnit.sourcePackage.sourcePackageId));
+    const raceBefore=await uploadSnapshot();
+    const raceDocument=xml('Unit','ATOMIC-RACE','<Definition player="catalog-player@1.2.9">atomic-race</Definition>');
+    const raceResults=await Promise.all(Array.from({length:8},(_,i)=>fetch(base+uploadScope+'/files',{
+      method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},
+      body:JSON.stringify({fileName:'race-'+i+'.xml',mediaType:'application/xml',sourceDocument:raceDocument})
+    }).then(async response=>({status:response.status,body:await response.json()}))));
+    assert.equal(raceResults.filter(value=>value.status===201).length,1,JSON.stringify(raceResults));
+    assert.ok(raceResults.every(value=>[201,409].includes(value.status)),JSON.stringify(raceResults));
+    const raced=await uploadSnapshot();assert.equal(raced.files.totalCount,8);
+    const winner=raceResults.find(value=>value.status===201).body.sourcePackage;
+    assert.equal(raced.activity.items.length,raceBefore.activity.items.length+1);
+    assert.equal(raced.activity.items.filter(({activityEvent:value})=>value.eventType==='source_package_created' && value.subjectId===winner.sourcePackageId).length,1);
+    assert.deepEqual(raced.imports,raceBefore.imports);assert.deepEqual(raced.releases,raceBefore.releases);
+    assert.ok(!JSON.stringify(raced.files).includes('upload-password'));
+
     if(kind==='memory'){
       for(let i=0;i<1001;i++)await api(scope+'/source-packages',{
         fileName:'owned-resource-'+i+'.txt',mediaType:'text/plain',sourceDocument:'x'
