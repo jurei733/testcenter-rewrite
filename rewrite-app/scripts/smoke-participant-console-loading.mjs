@@ -12,6 +12,7 @@ import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import { createInactiveRuntimeSnapshotGate } from "./inactive-runtime-snapshot-gate.mjs";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
+import { settleFailedSmokeRoute, qualifySmokeRouteFailureSettlement } from "./smoke-route-failure.mjs";
 
 import {isSupervisedSmokeChild, runSupervisedSmoke, reportSmokePhase, reportSmokeObservation} from './supervised-smoke.mjs';
 
@@ -95,6 +96,8 @@ try {
   await api(workspace + "/participant-roster", { rosterText: '<Testtakers><Group id="owned"><Login mode="run-hot-return" name="debug-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="loading-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login><Login mode="run-hot-return" name="remote-person"><Booklet>first</Booklet><Booklet>second</Booklet></Login></Group></Testtakers>' }, operator);
   reportSmokePhase('chromium-launch');
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  await qualifySmokeRouteFailureSettlement(browser, base);
+  reportConsolePhase("participant_console_loading=cancelled-fetch-route-settles-and-unexpected-fetch-still-fails:passed");
   // Resume is a real controller transition even if the server Run is already
   // running: before the initial view arrives the controller itself is LOADING.
   reportSmokePhase('loading-context');
@@ -647,10 +650,10 @@ try {
       const runtimeCapture=createInactiveRuntimeSnapshotGate(before.participantSessionId,heldRuntime.promise);
       let viewHeld=false,viewReleased=false,routeError;
       const heldAcks=[],issued=[];
-      const routeFailure=(route,error)=>{
-        const failure=route.request().failure();
-        if(failure&&/abort|cancel/i.test(failure.errorText))loadingObservations.push({cancelledTerminalView:failure.errorText});
-        else routeError=error;
+      const routeFailure=async(route,error)=>{
+        const outcome=await settleFailedSmokeRoute(route,error);
+        if(outcome.cancelled)loadingObservations.push({cancelledTerminalView:outcome.cancelled});
+        if(outcome.error)routeError=outcome.error;
       };
       try {
         reportSmokeObservation(`terminal-independent-${origin}:install-held-routes`);
@@ -659,14 +662,14 @@ try {
           try {
             const response=await route.fetch();await runtimeCapture.observe(response);
             await route.fulfill({response});
-          } catch(error) {routeFailure(route,error);}
+          } catch(error) {await routeFailure(route,error);}
         });
         await remotePage.route('**/current-state?*',async route=>{
           try {
             const response=await route.fetch(),data=await response.json();
             if(!viewReleased&&data.currentRunState.testRun.status==='running'){viewHeld=true;await heldView.promise;}
             await route.fulfill({response});
-          } catch(error) {routeFailure(route,error);}
+          } catch(error) {await routeFailure(route,error);}
         });
         if(origin==='remote') {
           await remotePage.route('**/commands/*/acknowledgement',async route=>{
@@ -676,7 +679,7 @@ try {
               assert.ok(command.acknowledgedAt);heldAcks.push(command);
               await (command.commandType==='complete'?completeAck.promise:resumeAck.promise);
               await route.fulfill({response});
-            } catch(error) {routeFailure(route,error);}
+            } catch(error) {await routeFailure(route,error);}
           });
           for(const commandType of ['complete','resume'])issued.push((await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType},operator)).command);
           await poll(()=>{if(routeError)throw routeError;return Promise.resolve(heldAcks.length===2);},'Both remote commands were not accepted before termination');

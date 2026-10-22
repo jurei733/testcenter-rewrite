@@ -1,5 +1,40 @@
 # CI iteration and complete acceptance
 
+
+## Resolve a cancelled-route cleanup stall (2026-10-22)
+
+The native file-view publication `25425aa3` passes its new required browser row,
+the five Source reference families, unit and policy jobs in
+[run 39797255399](https://github.com/jurei733/testcenter-rewrite/actions/runs/39797255399).
+Its participant-console job `119891749999` fails the existing 60-second phase
+watchdog while awaiting `unrouteAll({behavior:'wait'})` after the native terminal
+case. This run cannot qualify complete acceptance; other useful jobs continue.
+
+A caught fetch/JSON failure before `fulfill` returned from its callback without
+settling Playwright's separate route-handling promise. The terminal handlers now
+explicitly abort that route. Only an observed browser cancellation is expected;
+unexpected fetch errors and abort failures remain fatal. An already handled
+route does not hide the original error. The phase/total watchdogs, durable
+answer/clock assertions, command receipts and complete CI prerequisites remain.
+
+The existing browser job now also exercises real Chromium cancellation and an
+unexpected injected pre-fulfill error. It verifies both route drain
+and error retention under five-second bounds, using its existing browser/API.
+An independent negative control removes only the abort: the callback returns,
+but real Playwright cleanup still hangs and the control rejects at its deadline.
+Restoring the abort passes both cases. This does not add a CI job, dependency
+installation, retry, ignored assertion or longer timeout.
+
+The unmodified local browser journey can pass, confirming that one replay alone
+cannot diagnose this intermittent cleanup failure. The repaired journey passes
+all **44 phase markers**, including its new control. The final replay after a
+fresh clean TypeScript core build also passes all 44 markers and shuts down its
+owned API. All **186 portable policy controls**, Actionlint and whitespace
+checks pass; the two real-Linux controls remain explicit macOS skips. The new
+head still requires its own Linux qualification. This is a reliability fix; no
+whole-pipeline speedup is inferred from an early failed run or a local replay.
+
+
 ## Full Linux checkpoint at d4e592cf (2026-10-22)
 
 Published `d4e592cf` [run 39790219381](https://github.com/jurei733/testcenter-rewrite/actions/runs/39790219381)
