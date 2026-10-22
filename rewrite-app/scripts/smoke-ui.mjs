@@ -7807,6 +7807,7 @@ try {
         document.querySelector("#participantRouteStatus")?.textContent?.trim() === "running",
       [participantEntrySignInSessionId, participantEntryStartedRunId]
     );
+    originalSignInPhase = 'resumed-logo-return-confirmation';
     await originalSignInPage.locator("#participantApplicationLogoButton").click();
     await originalSignInPage.locator("#participantConfirmationContinueButton").click();
     await originalSignInPage.locator("#originalParticipantStarter").waitFor();
@@ -20232,12 +20233,14 @@ try {
   await restorePlatformAdminSession();
   logStep("participant-current-unit-labels");
   await runParticipantUnitLabelSmoke({ browser, baseUrl,
+    caseConcurrency: headful ? 1 : 2,
     tenantKey: `${tenantKey}-unit-labels`, workspaceKey: `${workspaceKey}-unit-labels`,
     sendJson: sendSmokeJson, createZip: createStoredZipBuffer,
     unitDocument: testControllerUnitDocuments.find(document => document.unitKey === "CY-Unit.Sample-101").content,
     playerDocument: testControllerPlayerDocument, operatorToken: smokeAdminSessionToken
   });
   await runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
+    caseConcurrency: headful ? 1 : 2,
     tenantKey: `${tenantKey}-current-booklet-config`, workspaceKey: `${workspaceKey}-current-booklet-config`,
     sendJson: sendSmokeJson, createZip: createStoredZipBuffer, operatorToken: smokeAdminSessionToken
   });

@@ -106,7 +106,7 @@ try {
     const imported=await api(`${workspace}/import-jobs`,{sourcePackageId:source.sourcePackage.sourcePackageId},operatorToken);
     await api(`${workspace}/content-releases/${imported.stagedContentRelease.contentReleaseId}/activate`,{activatedByActorId:"owned-player-exit"},operatorToken);
     const names=themes.flatMap(theme=>screens.map(([screen])=>loginKey(theme,screen)));
-    names.push(loginKey("Primar","desktop","rewrite"),loginKey("Primar","desktop","fallback"));
+    names.push(loginKey("Primar","desktop","rewrite"),loginKey("Primar","desktop","fallback"),loginKey("Primar","desktop","pending-resume"));
     await api(`${workspace}/participant-roster`,{rosterText:`<Testtakers><Group id="exit" label="Exit Group">${names.map(name=>`<Login mode="run-hot-return" name="${name}"><Booklet>owned-exit</Booklet></Login>`).join("")}</Group></Testtakers>`},operatorToken);
     fixtures[key]={workspaceKey,hidden,restriction};
   }
@@ -325,6 +325,61 @@ try {
       if(traceFailures)await context.tracing.stop();
       await context.close();activePage=activeContext=undefined;console.log(`original_player_exit=${key}:passed`);
     }
+  }
+  // A visible resumed controller can precede its authorized Unit context.
+  // Its real logo click must survive that response gap without an early write.
+  {
+    const key="resume-state-gap-logo",context=await browser.newContext({viewport:{width:1280,height:720},locale:"de-DE"}),page=await context.newPage();
+    await page.bringToFront();await observeExitCase(context,page,key);
+    page.on("pageerror",error=>errors.push({key,error:String(error)}));
+    await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=exit-header-none`,{waitUntil:"networkidle"});
+    await page.locator("#originalLoginName").fill(loginKey("Primar","desktop","pending-resume"));
+    const signedIn=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/participant/auth/sign-in"&&r.request().method()==="POST");
+    await page.getByRole("button",{name:"Weiter",exact:true}).click();const identity=await(await signedIn).json();
+    await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+    const currentPath=`/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
+    const initial=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
+    const returnPath=`/api/v1/participant/test-runs/${initial.testRun.testRunId}/return-to-starter`,writes=[];
+    page.on("request",r=>{if(new URL(r.url()).pathname===returnPath&&r.method()==="POST")writes.push(r.method());});
+    await page.locator("#participantApplicationLogoButton").click();
+    await page.locator("#participantConfirmationContinueButton").click();
+    const starter=page.locator("#originalParticipantStarter");await starter.waitFor();assert.equal(writes.length,1);
+    const blocked=Promise.withResolvers(),release=Promise.withResolvers(),routes=createSmokeRouteFailureGate();let holding=true;
+    const pattern=base+currentPath+"**";
+    const handler=routes.wrap("resumed Unit context after logo activation",async route=>{
+      if(holding){blocked.resolve();await release.promise;}await route.continue();
+    });
+    await page.route(pattern,handler);
+    let failure;
+    try{
+      await starter.locator("mat-card").first().getByRole("button").click();
+      await raceWithSmokeDeadline(blocked.promise,10000,()=>{throw Error("Resume did not request its authorized Unit context.");});
+      await page.waitForFunction(()=>!document.querySelector("#originalParticipantStarter")&&document.querySelector("#participantRouteStatus")?.textContent.trim()==="running");
+      const resumed=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
+      assert.equal(resumed.testRun.testRunId,initial.testRun.testRunId);assert.equal(resumed.testRun.status,"running");
+      await page.locator("#participantApplicationLogoButton").click();
+      assert.equal(writes.length,1);assert.equal(await page.locator("#participantConfirmationBackdrop").count(),0);
+      holding=false;release.resolve();
+      await page.frameLocator("iframe").locator("#demoPlayerAnswer").waitFor();
+      await page.locator("#participantConfirmationContinueButton").waitFor();
+      await page.locator("#participantConfirmationStayButton").click();
+      await page.locator("#participantConfirmationBackdrop").waitFor({state:"detached"});
+      assert.equal(writes.length,1);
+      const retained=(await api(currentPath,undefined,identity.sessionToken)).currentRunState;
+      assert.equal(retained.testRun.testRunId,resumed.testRun.testRunId);assert.equal(retained.testRun.status,"running");
+      assert.deepEqual(retained.testRun.unitResponses,resumed.testRun.unitResponses);
+      await page.locator("#participantApplicationLogoButton").click();
+      const returned=page.waitForResponse(r=>new URL(r.url()).pathname===returnPath&&r.request().method()==="POST");
+      await page.locator("#participantConfirmationContinueButton").click();assert.equal((await returned).status(),200);
+      const result=await(await returned).json();assert.equal(result.testRun.testRunId,resumed.testRun.testRunId);
+      assert.equal(result.testRun.status,"paused");assert.deepEqual(result.testRun.unitResponses,resumed.testRun.unitResponses);
+      await starter.waitFor();assert.equal(writes.length,2);
+      states[key]={heldAuthorizedState:true,noEarlyWrite:true,cancellationPreservedRun:true,confirmedReturnWrites:1};
+    }catch(error){failure=error;}
+    finally{holding=false;release.resolve();await routes.settle();await page.unroute(pattern,handler);}
+    const error=routes.failure(failure);if(error)throw error;
+    if(traceFailures)await context.tracing.stop();
+    await context.close();activePage=activeContext=undefined;console.log("original_player_exit=resume-state-gap-logo:passed");
   }
   // A missing lazy dialog bundle keeps the shared guarded action usable.
   {

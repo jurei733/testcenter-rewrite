@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
+import { runBoundedSmokeCases } from "./bounded-smoke-cases.mjs";
 
 export async function reloadParticipantUnitLabelPlayer(page, waitForPlayer) {
   // Authorized participant SSE/polling may stay active indefinitely. A quiet
@@ -14,7 +15,7 @@ export async function reloadParticipantUnitLabelPlayer(page, waitForPlayer) {
 // acceptance. No vendor markup, sandbox or synthetic Player input is changed.
 export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey,
   workspaceKey, sendJson, createZip, unitDocument, playerDocument, operatorToken = "",
-  report = console.log }) {
+  report = console.log, caseConcurrency = 1 }) {
   const { cases } = JSON.parse(await readFile(new URL(
     "../test-fixtures/original-testcenter/current-unit-label-cases.json", import.meta.url
   ), "utf8"));
@@ -59,7 +60,9 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
     }))))
   } });
   let passed = 0;
-  for (const ui of interfaces) for (const width of widths) for (const item of cases) {
+  // Every tuple has a distinct authored login and an isolated browser context.
+  const journeys=interfaces.flatMap(ui=>widths.flatMap(width=>cases.map(item=>({ui,width,item}))));
+  await runBoundedSmokeCases(journeys,caseConcurrency,async({ui,width,item})=>{
     const initialShortLabel = item.firstUnitWithoutShortLabel ? undefined : shortA;
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     try {
@@ -150,10 +153,13 @@ export async function runParticipantUnitLabelSmoke({ browser, baseUrl, tenantKey
       assert.deepEqual(errors, []);
       report(`unit_labels=${ui}/${width}/${item.key}:passed`);
       passed++;
+    } catch(error) {
+      report(`unit_labels=${ui}/${width}/${item.key}:failed`);
+      throw error;
     } finally {
       await context.close();
     }
-  }
+  });
   assert.equal(passed, cases.length * interfaces.length * widths.length);
   report(`unit_labels_cases_passed=${passed}`);
 }

@@ -6,6 +6,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { join } from "node:path";
 import { reloadParticipantUnitLabelPlayer } from "./participant-unit-label-smoke.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
+import { runBoundedSmokeCases } from "./bounded-smoke-cases.mjs";
 
 const fixtureRoot = new URL("../test-fixtures/original-testcenter/", import.meta.url);
 const loadFixture = async item => {
@@ -20,7 +21,7 @@ const loadFixture = async item => {
 // alias, real password roster and Player bytes. Synthetic label combinations
 // remain a separate gate in participant-unit-label-smoke.mjs.
 export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
-  tenantKey, workspaceKey, sendJson, createZip, operatorToken = "", artifactDirectory, report = console.log }) {
+  tenantKey, workspaceKey, sendJson, createZip, operatorToken = "", artifactDirectory, report = console.log, caseConcurrency = 1 }) {
   const corpus = JSON.parse(await readFile(new URL("corpus.json", fixtureRoot), "utf8"));
   const source = corpus.currentOriginalBookletConfigPackage;
   assert.equal(source.sourceCommit, "eedae41840cbe90e5547c0211da818bdf620f5aa");
@@ -63,7 +64,9 @@ export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
     { number: 56, header: "short", toolbar: "full", nav: "index", shorts: [undefined, "A2"] }
   ];
   let passed = 0;
-  for (const ui of ["rewrite", "original"]) for (const width of [1280, 390]) for (const item of cases) {
+  // UI/width groups reuse the exact Source roster, so groups remain serial.
+  // Within a group each case uses a different real participant account.
+  for (const ui of ["rewrite", "original"]) for (const width of [1280, 390]) await runBoundedSmokeCases(cases,caseConcurrency,async item=>{
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     try {
       const page = await context.newPage(), errors = [];
@@ -160,10 +163,13 @@ export async function runCurrentOriginalBookletConfigSmoke({ browser, baseUrl,
       assert.deepEqual(errors, []);
       report(`current_original_booklet_config=${ui}/${width}/${item.number}:passed`);
       passed++;
+    } catch(error) {
+      report(`current_original_booklet_config=${ui}/${width}/${item.number}:failed`);
+      throw error;
     } finally {
       await context.close();
     }
-  }
+  });
   assert.equal(passed, 20);
   report(`current_original_booklet_config_cases_passed=${passed}`);
 }

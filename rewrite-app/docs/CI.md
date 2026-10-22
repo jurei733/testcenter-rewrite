@@ -116,6 +116,97 @@ Player packet correspondence. The old fourth event cannot be attributed without
 its missing native input data. Neither failure is claimed fixed through
 diagnostic changes or a later pass.
 
+## Retain a real logo action during Resume context loading
+
+Published `809d9b47` run `39759195568` reveals another common-prefix failure in
+job `119762177912`: after resuming the same Starter card, clicking the logo
+never opens the expected confirmation. The actual Original document and HTTP
+evidence retain the resumed running Unit, with only the preceding
+return-to-starter POST. The other controller's repeated 401 polling is expected
+after credential rotation; it is not evidence that the actual Original page lost
+its authorization.
+
+A real protected SQLite/Chromium probe deterministically holds the resumed
+current-state response. The UI already detaches the Starter and shows `running`
+from its authorized console Run. Its logo handler accepts focus through that
+projection, but the old exit method silently returns because its full Unit state
+is still null. Releasing the actual response does not restore the lost click.
+The probe fails before the change and passes against the new production build.
+
+The exit method now reads the exact authorized Unit context for that projected
+Run before planning confirmation. Session, Run, Unit, status and view-lifecycle
+checks reject a replaced context; existing completeness/timer/leave-lock policy
+and all later confirmation/action guards remain. Eleven actual-method controls
+cover retained intent, stale replacements, invalid/completed projections,
+missing context and propagated transport failure. All **1,983 frontend cases**,
+strict no-emit typecheck and production build pass.
+
+A permanent additional native exit case holds the real context response,
+activates the actual logo, proves no early return write, then releases the
+response. Cancel must preserve the exact running Run/responses; a later explicit
+confirmation must return that same Run once. It supplements all 36 Original, six
+Rewrite and missing-bundle cases. The full production native journey passes all
+37 Original cases, six Rewrite cases and missing-bundle recovery, with owned API
+shutdown. Fresh Linux qualification remains required. This does not claim to
+explain either preceding `405915b5` sample-save or fallback-Stay failure. The
+full headed Original entry prefix also passes the actual resumed-logo, Starter,
+guarded logout and reentry sequence through `participant-entry-sign-in`,
+followed by owned API shutdown.
+
+The same `809d9b47` matrix also fails PostgreSQL UI job `119762177590` in the
+existing serial label corpus: a visible/enabled/stable radio control times out
+inside native scrolling before input. The prior main-page screenshot does not
+show that independent context. It is not a demonstrated database failure or a
+consequence of the subsequent, unpublished concurrency change. Case-specific
+failure labels now identify the actual isolated journey. This remains fatal.
+
+## Bounded parallel native label journeys
+
+The full green `375ea6de` UI log identifies two long sequential phases: 132
+seconds for Original test-controller cases and 127 seconds for current Unit
+labels/configuration. The latter contains 32 synthetic independent label
+journeys and 20 exact-current Original BookletConfig journeys. The main smoke
+now permits at most two of these isolated cases concurrently in headless mode;
+visible-browser runs remain serial. Every synthetic tuple has its own roster
+login. Current Original cases share the exact Source roster across UI/width
+variants, so those four groups remain serial; only different participant
+accounts inside one group can overlap.
+
+All existing real sign-in, Player input, persisted answer/types/clocks,
+forward/backward navigation, reload restoration, label/metadata, credential
+separation and browser-error checks remain. A failed worker stops new dispatch,
+awaits its active peer's cleanup and preserves every in-flight failure. Six
+controls cover exact-once/maximum-two execution, serial ordering, early failure,
+peer cleanup before rejection, aggregate failures and invalid/empty inputs. No
+whole scenario is retried or omitted.
+
+One paired local protected SQLite/Chromium probe executes all **52 cases in each
+mode**. Serial phases take **73.062 + 49.883 = 122.945 seconds**; bounded phases
+use **41.193 + 33.316 = 74.509 seconds**, about **39.4% lower**. Both modes
+retain the unchanged current Original fixtures and every actual response
+assertion, and the owned API shuts down cleanly. This single
+serial-then-parallel pair is sensitive to host/cache conditions and does not
+prove full Linux wall time. All **1,983 frontend cases** and **160 CI policy
+cases** pass. The complete common run-detail journey also passes locally through
+its actual review tail, exact sample save/resume and both label corpora, with
+owned API shutdown. A fresh complete Linux head is still required.
+
+The preceding published `809d9b47` directory scope passes on Linux in job
+`119759396101` of [run
+39759195568](https://github.com/jurei733/testcenter-rewrite/actions/runs/39759195568):
+**168 exact pairs / 168 independent Source repeats**. Its artifact `12418125499`
+has SHA256 `0a75227edd7ab48ee120642292229bac59d36703957a5d70d34740a28b521b13`;
+all **504 actual native image proofs** independently verify. The actual same-run
+Source producer is `dc8771cde2c19f0447689669231c4c8463476b8b`. This bounded
+reference success does not establish complete matrix acceptance or qualify the
+subsequent parallel scheduling change.
+
+The same 52 bounded-parallel native cases also pass against a fresh, owned,
+socket-only PostgreSQL database with real protected sign-in and exact saved
+response/restoration assertions. Both owned clusters are stopped afterwards.
+This is separate from the older Linux serial-radio scroll failure; it does not
+waive that failure or establish its cause.
+
 ## Non-emitting local type checks and isolated CI development output
 
 `npm run typecheck` now runs the unchanged core project type check plus the real

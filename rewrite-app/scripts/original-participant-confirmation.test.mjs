@@ -61,6 +61,51 @@ test("saved logo exit asks once, cancellation preserves the Run, and confirmatio
   f.parent.resolveOriginalConfirmation(second,true);f.parent.resolveOriginalConfirmation(second,true);
   await confirmed;assert.deepEqual(f.returns,[[false,false]]);
 });
+function pendingResumeExitFixture() {
+  const f=facadeFixture(),read=f.facade.readCurrentRunState,release=Promise.withResolvers();
+  let ready=false,refreshes=0;
+  Object.assign(f.facade.runtime,{participantSessionId:"session-a",testRunId:"run-a"});
+  f.facade.consoleRun={participantSessionId:"session-a",testRunId:"run-a",currentUnitKey:"own-unit",status:"running"};
+  f.facade.readCurrentRunState=()=>ready?read():null;
+  f.facade.refreshCurrentStateInternal=async quiet=>{assert.equal(quiet,true);refreshes++;await release.promise;ready=true;};
+  return{...f,release:()=>release.resolve(),get refreshes(){return refreshes;}};
+}
+test("a logo click after Resume retains intent until its exact authorized current Unit arrives",async()=>{
+  const f=pendingResumeExitFixture(),pending=f.facade.returnToStarterWithConfirmation();
+  assert.equal(f.refreshes,1);assert.equal(f.facade.confirmationDialog(),null);
+  f.release();await new Promise(done=>setImmediate(done));
+  const request=f.facade.confirmationDialog();assert.equal(request.title,"Return to test selection?");
+  assert.deepEqual(f.returns,[]);f.parent.resolveOriginalConfirmation(request,true);await pending;
+  assert.deepEqual(f.returns,[[false,false]]);
+});
+for(const changed of ["run","session","lifecycle","unit","status"])test(`pending Resume exit cannot act after ${changed} replacement`,async()=>{
+  const f=pendingResumeExitFixture(),pending=f.facade.returnToStarterWithConfirmation();
+  assert.equal(f.refreshes,1);
+  if(changed==="run"){f.replaceRun();f.facade.runtime.testRunId="run-b";}
+  else if(changed==="session")f.facade.runtime.participantSessionId="session-b";
+  else if(changed==="lifecycle")f.facade.viewLifecycleSequence++;
+  else if(changed==="unit")f.replaceUnit();else f.replaceStatus();
+  f.release();await pending;assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[]);
+});
+test("pending Resume exit preserves an actual state-read failure",async()=>{
+  const f=pendingResumeExitFixture(),failure=new Error("owned state transport failed");
+  f.facade.refreshCurrentStateInternal=async()=>{throw failure;};
+  await assert.rejects(f.facade.returnToStarterWithConfirmation(),error=>error===failure);
+  assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[]);
+});
+for(const changed of ["run","session","completed"])test(`a ${changed} console projection cannot initiate a pending exit read`,async()=>{
+  const f=pendingResumeExitFixture();
+  if(changed==="run")f.facade.consoleRun.testRunId="other-run";
+  else if(changed==="session")f.facade.consoleRun.participantSessionId="other-session";
+  else f.facade.consoleRun.status="completed";
+  await f.facade.returnToStarterWithConfirmation();assert.equal(f.refreshes,0);
+  assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[]);
+});
+test("a completed state read without an authorized Unit cannot open or return",async()=>{
+  const f=pendingResumeExitFixture();f.facade.refreshCurrentStateInternal=async()=>{};
+  await f.facade.returnToStarterWithConfirmation();
+  assert.equal(f.facade.confirmationDialog(),null);assert.deepEqual(f.returns,[]);
+});
 for(const scope of ["unit","testlet"])test(`Source ${scope} leave warning shares a single saved exit confirmation`,async()=>{
   const f=facadeFixture({lock:{scope,confirm:true}}),pending=f.facade.returnToStarterWithConfirmation();await Promise.resolve();
   const request=f.facade.confirmationDialog();
