@@ -116,6 +116,27 @@ Player packet correspondence. The old fourth event cannot be attributed without
 its missing native input data. Neither failure is claimed fixed through
 diagnostic changes or a later pass.
 
+## Console timeout observations without deadline renewal
+
+Published `8e90c48e` run `39762727435` fails console-loading job `119776478694`
+after its remote terminal/resume independence case passes. The independent
+supervisor correctly records a phase timeout exactly 60 seconds after that
+marker and terminates only its owned process tree. Artifact `12420036166` has
+SHA256 `ebd6bbe2bf308b03d43c42ed9b48f12c9ae212bbfe05739a5bb230b84fbff633`.
+It identifies the last completed case but cannot distinguish its final route
+cleanup from the next native Resume, Player readiness or subsequent operation.
+The failure remains fatal and its underlying cause is unproven.
+
+The supervisor now records bounded operation observations separately from phase
+progress. They never reset either the 60-second phase or eight-minute absolute
+deadline. A real child subprocess emits repeated observations while stuck;
+it still fails the original phase deadline with ordered diagnostic evidence.
+All six supervisor controls and 161 CI policy cases pass. The complete local
+production console-loading journey passes all 43 cases with the operation
+markers and owned API shutdown. This successful observation is not a structural
+fix for the earlier Linux timeout. No scenario retry, assertion removal,
+held-route relaxation or deadline increase is introduced.
+
 ## Retain a real logo action during Resume context loading
 
 Published `809d9b47` run `39759195568` reveals another common-prefix failure in

@@ -11,7 +11,7 @@ async function fixture(source, check, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'owned-supervision-test-'));
   const entry = join(directory, 'child.mjs'), evidence = join(directory, 'evidence');
   try {
-    await writeFile(entry, `import {reportSmokePhase,isSupervisedSmokeChild} from ${JSON.stringify(helper)};\n` +
+    await writeFile(entry, `import {reportSmokePhase,reportSmokeObservation,isSupervisedSmokeChild} from ${JSON.stringify(helper)};\n` +
       `if(!isSupervisedSmokeChild(import.meta.url)) throw Error('Missing exact child entry marker');\n` + source);
     const result = await runSupervisedSmoke({entry, artifactDirectory: evidence,
       env: {...process.env, OWNED_TEST_SECRET: 'must-not-be-recorded'},
@@ -48,6 +48,16 @@ test('repeated phase progress cannot postpone the absolute smoke deadline', () =
   `setInterval(()=>reportSmokePhase('active-but-never-finished'),30);`,
   (result, record) => {assert.equal(result, 1); assert.equal(record.outcome, 'total-timeout');},
   {phaseTimeoutMs: 500, totalTimeoutMs: 700}));
+
+test('operation observations preserve their order without postponing a stalled phase', () => fixture(
+  `reportSmokePhase('owned-stalled-operation');let n=0;setInterval(()=>reportSmokeObservation('owned-step:'+n++),20);`,
+  (result, record) => {
+    assert.equal(result,1);assert.equal(record.outcome,'phase-timeout');
+    assert.equal(record.phases.at(-1).phase,'owned-stalled-operation');
+    assert.ok(record.observations.length>3);
+    assert.deepEqual(record.observations.map(item=>item.observation),record.observations.map((_,i)=>'owned-step:'+i));
+    assert.ok(record.failedAt-record.phases.at(-1).at<1500,'Diagnostic activity must not keep a phase alive.');
+  }));
 
 test('timeout kills an owned detached grandchild and leaves an unrelated process running', async () => {
   const sentinel = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {stdio: 'ignore'});
