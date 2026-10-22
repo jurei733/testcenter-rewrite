@@ -30,6 +30,7 @@ export type WorkspaceCatalogFile = {
   dependencies: WorkspaceCatalogDependency[];
   unresolvedReferences: Array<WorkspaceFileReference & { candidateSourcePackageIds: string[] }>;
   totalSizeBytes: number | null;
+  validationDiagnostics?: Array<{code: string; severity: 'error' | 'warning' | 'info'; message: string}>;
 };
 export type WorkspaceFileCatalog = {
   items: WorkspaceCatalogFile[];

@@ -27044,7 +27044,7 @@ export const createFirstSliceServices = (
     assertWorkspaceFileDependencies(sourcePackage,sourcePackages,activityEvents);
     if (file.fileType==='Testtakers') await assertTenantTesttakersIdentitiesAvailable({workspace,sourcePackage});
     const independent = file.fileType==='Unit' || file.fileType==='Resource';
-    if (independent) sourcePackage.status='accepted';
+    sourcePackage.status='accepted';
     const createdActivityEvent: WorkspaceActivityEvent = {activityEventId:idGenerator(),tenantId:workspace.tenantId,
       workspaceId:workspace.workspaceId,eventType:'source_package_created',actorId:null,subjectType:'source_package',
       subjectId:sourcePackage.sourcePackageId,occurredAt:now(),summary:`Workspace file '${input.fileName}' uploaded.`,
@@ -27148,10 +27148,10 @@ export const createFirstSliceServices = (
         (newFile.fileType === 'Resource' && !/\.zip$/i.test(replacementSourcePackage.fileName));
       if (newFile.fileType==='Unit') assertWorkspaceFileDependencies(replacementSourcePackage,sourcePackages,activityEvents,
         replacedSourcePackage.sourcePackageId);
-      // Independent Source Units/resources are valid workspace files even
-      // without a Booklet release. Reserve the accepted file and lineage in
-      // the same store mutation; no fabricated import job/release is needed.
-      if (independentWorkspaceFile) replacementSourcePackage.status = 'accepted';
+      // A valid loose file is accepted in the same reservation as its lineage.
+      // The generated dependency snapshot's import status is separate from the
+      // original physical file. Independent Units/resources need no runtime job.
+      replacementSourcePackage.status = 'accepted';
     }
     if (workspaceFile) {
       assertWorkspaceFileIdentity(replacementSourcePackage,sourcePackages,activityEvents,replacedSourcePackage.sourcePackageId);
@@ -29692,7 +29692,8 @@ export const createFirstSliceServices = (
           event.eventType==='source_package_created' && event.details.intakeMode==='workspace_file' ? [event.subjectId] :
           event.eventType==='source_package_replaced' && event.details.replacementMode==='workspace_file' &&
             typeof event.details.replacementSourcePackageId==='string' ? [event.details.replacementSourcePackageId] : []));
-        return buildWorkspaceFileCatalog(selectCurrentWorkspaceFiles(sourcePackages, activityEvents)
+        const currentFiles=selectCurrentWorkspaceFiles(sourcePackages,activityEvents);
+        const catalog=buildWorkspaceFileCatalog(currentFiles
           .map(source => {
             if (sourceFileIds.has(source.sourcePackageId)) return projectWorkspaceFile(source);
             const decoded = decodePersistedSourceDocument(source);
@@ -29702,6 +29703,32 @@ export const createFirstSliceServices = (
               sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
               resourceIdentifier: readStandaloneVeronaPlayerResourceId(source)};
           }));
+        const byId=new Map(currentFiles.map(source=>[source.sourcePackageId,source]));
+        for (const file of catalog.items) {
+          const source=byId.get(file.sourcePackageId);
+          if (!source || !/\.xml$/i.test(source.fileName)) continue;
+          const decoded=decodePersistedSourceDocument(source), text=decoded ? readPersistedSourceText(source,decoded) ?? '' : '';
+          const diagnostics=[
+            ...(decoded && /^data:/i.test(source.sourceDocument ?? '') ? validateXmlEncoding(decoded.bytes,text,source.fileName,decoded.mediaType) : []),
+            ...validateTestcenterXmlSourceDocument(text,source.fileName,xmlValidationContext)
+          ];
+          // A catalog never publishes parser/XSD excerpts or roster contents.
+          // Full Source validation-report wording remains a separate contract.
+          const messages:Record<string,string>={
+            source_document_xml_malformed:'Die Datei enthält fehlerhaftes XML.',
+            source_document_xml_doctype_unsupported:'DOCTYPE-Deklarationen werden nicht akzeptiert.',
+            source_document_xml_encoding_invalid:'Die Zeichenkodierung der XML-Datei ist ungültig.',
+            testcenter_xml_schema_reference_missing:'Für diese XML-Datei fehlt die XSD-Referenz.',
+            testcenter_xml_schema_version_unsupported:'Die angegebene XML-Schemaversion wird nicht unterstützt.',
+            testcenter_xml_schema_reference_invalid:'Die XSD-Referenz ist ungültig.',
+            testcenter_xml_root_invalid:'Die Datei enthält keinen unterstützten Testcenter-XML-Typ.',
+            testcenter_xml_xsd_invalid:'Die XML-Datei entspricht nicht dem angegebenen Schema.',
+            testcenter_xml_schema_validator_unavailable:'Die XML-Schemaprüfung ist derzeit nicht verfügbar.'
+          };
+          file.validationDiagnostics=diagnostics.map(({code,severity})=>({code,severity,
+            message:messages[code]??'Die XML-Datei konnte nicht vollständig geprüft werden.'}));
+        }
+        return catalog;
       },
       async listSourcePackages(input) {
         const workspace = await requireWorkspace(

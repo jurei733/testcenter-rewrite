@@ -74,7 +74,8 @@ try {
       await page.locator("#tenantKey").fill("demo-tenant"); await page.locator("#tenantKey").dispatchEvent("change");
       await page.locator("#workspaceKey").fill(workspaceKey); await page.locator("#workspaceKey").dispatchEvent("change");
       await page.locator('[data-view-nav="content"]').click();
-      await page.locator("#xmlSchemaProfileSummary").filter({ hasText: "Original Testcenter 19: XSD reference and schema validation required" }).waitFor();
+      if(ui==='rewrite') await page.locator("#xmlSchemaProfileSummary").filter({hasText:"Original Testcenter 19: XSD reference and schema validation required"}).waitFor();
+      else await page.locator('#originalWorkspaceFiles[aria-busy="false"]').waitFor();
       assert.equal(await page.locator("html").getAttribute("data-interface-mode"), ui);
       const schemaSource = (id, withSchema) => `<SysCheck xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ${withSchema ? 'xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-syscheck-xml/18.0"' : ""}><Metadata><Id>${id}</Id><Label>Owned strict browser check</Label></Metadata><Config skipnetwork="true"><Q id="feedback" type="string" prompt="Feedback"/></Config></SysCheck>`;
       const uploadFromUi = async (name, source) => {
@@ -91,18 +92,39 @@ try {
         const result = await imported; assert.equal(result.status(), 201);
         return result.json();
       };
-      const rejected = await uploadFromUi("MISSING.SCHEMA.xml", schemaSource("MISSING.SCHEMA", false));
-      assert.equal(rejected.importJob.status, "failed");
-      assert.equal(rejected.stagedContentRelease, null);
-      assert.ok(rejected.importJob.diagnostics.some(item => item.code === "testcenter_xml_schema_reference_missing"));
-      await page.getByText("Original Testcenter SysCheck requires an XSD reference.", { exact: true }).first().waitFor();
-      const accepted = await uploadFromUi("VALID.SCHEMA.xml", schemaSource("VALID.SCHEMA", true));
-      assert.equal(accepted.importJob.status, "completed", JSON.stringify(accepted.importJob.diagnostics));
-      assert.equal(accepted.stagedContentRelease, null);
-      const stored = await api(`${path}/source-packages/${accepted.importJob.sourcePackageId}`);
-      assert.equal(stored.sourcePackageDetail.sourcePackage.status, "accepted");
-      const rejectedStored = await api(`${path}/source-packages/${rejected.importJob.sourcePackageId}`);
-      assert.equal(rejectedStored.sourcePackageDetail.sourcePackage.status, "rejected");
+      let accepted;
+      if(ui==='rewrite') {
+        const rejected = await uploadFromUi("MISSING.SCHEMA.xml",schemaSource("MISSING.SCHEMA",false));
+        assert.equal(rejected.importJob.status,"failed");assert.equal(rejected.stagedContentRelease,null);
+        assert.ok(rejected.importJob.diagnostics.some(item=>item.code==="testcenter_xml_schema_reference_missing"));
+        await page.getByText("Original Testcenter SysCheck requires an XSD reference.",{exact:true}).first().waitFor();
+        accepted=await uploadFromUi("VALID.SCHEMA.xml",schemaSource("VALID.SCHEMA",true));
+        const rejectedStored=await api(`${path}/source-packages/${rejected.importJob.sourcePackageId}`);
+        assert.equal(rejectedStored.sourcePackageDetail.sourcePackage.status,"rejected");
+      } else {
+        const nativeUpload=async(name,source,status)=>{
+          const sent=page.waitForResponse(response=>response.url().endsWith(`${path}/files`) && response.request().method()==='POST');
+          await page.locator('[data-cy="upload-file-select"]').setInputFiles({name,mimeType:'application/xml',buffer:Buffer.from(source)});
+          const response=await sent;assert.equal(response.status(),status);
+          await page.locator('[data-cy="close-upload-report"]').waitFor();
+          const result=await response.json();
+          await page.locator('[data-cy="upload-report"]').getByText(name,{exact:true}).waitFor();
+          if(status>=400)await page.locator('[data-cy="upload-report"]').getByText('Original Testcenter SysCheck requires an XSD reference.',{exact:true}).waitFor();
+          await page.locator('[data-cy="close-upload-report"]').click();return result;
+        };
+        const nativeBefore=await api(`${path}/files`),nativeHistoryBefore=await api(`${path}/activity-events?limit=500`);
+        const invalid=await nativeUpload('MISSING.SCHEMA.xml',schemaSource('MISSING.SCHEMA',false),400);
+        assert.equal(invalid.error,'workspace_file_validation_failed');
+        assert.ok(invalid.details.diagnostics.some(item=>item.code==='testcenter_xml_schema_reference_missing'));
+        assert.deepEqual(await api(`${path}/files`),nativeBefore);assert.deepEqual(await api(`${path}/activity-events?limit=500`),nativeHistoryBefore);
+        accepted=await nativeUpload('VALID.SCHEMA.xml',schemaSource('VALID.SCHEMA',true),201);
+        assert.equal(accepted.sourcePackage.fileName,'SysCheck/VALID.SCHEMA.xml');
+        await page.locator('mat-row').filter({hasText:'VALID.SCHEMA.xml'}).waitFor();
+      }
+      assert.equal(accepted.importJob.status,'completed',JSON.stringify(accepted.importJob.diagnostics));
+      assert.equal(accepted.stagedContentRelease,null);
+      const stored=await api(`${path}/source-packages/${accepted.importJob.sourcePackageId}`);
+      assert.equal(stored.sourcePackageDetail.sourcePackage.status,'accepted');
       const fileId = accepted.importJob.sourcePackageId;
       const fileRoute = `${path}/files/${fileId}/replacements`;
       const catalogBefore = await api(`${path}/files`);
@@ -121,8 +143,8 @@ try {
         Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+replacementSource,'utf16le')]);
       const replaced = await api(fileRoute,{mediaType:"application/xml",sourceDocument:'data:application/xml;base64,'+replacementBytes.toString('base64')});
       assert.equal(replaced.importJob.status,"completed",JSON.stringify(replaced.importJob.diagnostics));
-      assert.equal(replaced.replacementSourcePackage.fileName,"VALID.SCHEMA.xml");
-      assert.equal((await api(`${path}/files`)).items.find(item=>item.fileName==="VALID.SCHEMA.xml").metadata.label,"Protected replacement Ω");
+      assert.equal(replaced.replacementSourcePackage.fileName,ui==='original'?'SysCheck/VALID.SCHEMA.xml':'VALID.SCHEMA.xml');
+      assert.equal((await api(`${path}/files`)).items.find(item=>item.sourcePackageId===replaced.replacementSourcePackage.sourcePackageId).metadata.label,"Protected replacement Ω");
       const currentDownload = await fetch(`${baseUrl}${path}/source-packages/${replaced.replacementSourcePackage.sourcePackageId}/download`,{headers:{authorization:`Bearer ${token}`}});
       assert.equal(currentDownload.status,200);assert.deepEqual(Buffer.from(await currentDownload.arrayBuffer()),replacementBytes);
       const historical = await fetch(`${baseUrl}${path}/source-packages/${fileId}/download`,{headers:{authorization:`Bearer ${token}`}});

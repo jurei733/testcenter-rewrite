@@ -353,14 +353,17 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     assert.equal(uploadedUnit.sourcePackage.status,'accepted');assert.equal(uploadedUnit.importJob,null);
     const uploadedBook=await upload('shared.xml','application/xml',fixtures[1][1]);
     assert.equal(uploadedBook.sourcePackage.fileName,'Booklet/shared.xml');
+    assert.equal(uploadedBook.sourcePackage.status,'accepted');
     assert.equal(uploadedBook.importJob.status,'completed',JSON.stringify(uploadedBook.importJob.diagnostics));
     assert.equal(uploadedBook.stagedContentRelease.status,'staged');
     assert.equal(uploadedBook.stagedContentRelease.runtimeSnapshot.playerEntries.find(value=>value.playerKey==='catalog-player@1.2.9')?.html,player);
     assert.ok(JSON.stringify(uploadedBook.stagedContentRelease.runtimeSnapshot).includes('private-unit-body'));
     const uploadedCheck=await upload('check.xml','application/xml',fixtures[3][1]);
+    assert.equal(uploadedCheck.sourcePackage.status,'accepted');
     assert.equal(uploadedCheck.importJob.status,'completed',JSON.stringify(uploadedCheck.importJob.diagnostics));
     const uploadedPeople=await upload('people.xml','application/xml',xml('Testtakers','UPLOAD-PEOPLE',
       '<Group id="upload-group"><Login name="upload-user" pw="upload-password"><Booklet>BOOKLET</Booklet></Login></Group>'));
+    assert.equal(uploadedPeople.sourcePackage.status,'accepted');
     assert.equal(uploadedPeople.importJob.status,'completed',JSON.stringify(uploadedPeople.importJob.diagnostics));
     assert.ok(uploadedPeople.participantRosterImport);
     const beforeDuplicate=await uploadSnapshot();
@@ -407,6 +410,23 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
     assert.equal(raced.activity.items.filter(({activityEvent:value})=>value.eventType==='source_package_created' && value.subjectId===winner.sourcePackageId).length,1);
     assert.deepEqual(raced.imports,raceBefore.imports);assert.deepEqual(raced.releases,raceBefore.releases);
     assert.ok(!JSON.stringify(raced.files).includes('upload-password'));
+
+    // Catalog validity is independent from a canonical runtime import status.
+    // Parser excerpts and private XML content must never enter the metadata API.
+    await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey:'owned-catalog-reports',displayName:'Catalog validation'},'POST',201);
+    const reportScope='/api/v1/tenants/demo-tenant/workspaces/owned-catalog-reports';
+    const malformedReportFile=await api(reportScope+'/source-packages',{fileName:'broken.xml',mediaType:'application/xml',
+      sourceDocument:'<Unit><Metadata><Id>REPORT</Id></Metadata><Definition player="missing">PRIVATE-REPORT-SECRET<bad></Definition></Unit>'},'POST',201);
+    const reportSources=await api(reportScope+'/source-packages?limit=500'),reportEvents=await api(reportScope+'/activity-events?limit=500');
+    const reported=await api(reportScope+'/files');
+    const validation=reported.items.find(value=>value.sourcePackageId===malformedReportFile.sourcePackage.sourcePackageId).validationDiagnostics;
+    assert.ok(validation.some(value=>value.code==='source_document_xml_malformed' && value.severity==='error'),JSON.stringify(validation));
+    assert.ok(!JSON.stringify(reported).includes('PRIVATE-REPORT-SECRET'));
+    assert.ok(!JSON.stringify(reported).includes('sourceDocument'));
+    assert.deepEqual(await api(reportScope+'/source-packages?limit=500'),reportSources);
+    assert.deepEqual(await api(reportScope+'/activity-events?limit=500'),reportEvents);
+    assert.equal((await api(reportScope+'/import-jobs?limit=500')).items.length,0);
+    assert.equal((await api(reportScope+'/content-releases?limit=500')).items.length,0);
 
     if(kind==='memory'){
       for(let i=0;i<1001;i++)await api(scope+'/source-packages',{

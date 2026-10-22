@@ -3,6 +3,10 @@ import { Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
+import { InterfaceModeService } from './interface-mode.service';
+import { RewriteAppUiStateService } from './rewrite-app-ui-state.service';
+import { OriginalWorkspaceFilesComponent } from './original-workspace-files.component';
+
 import { ContentViewFacade } from "./content-view.facade";
 import { JsonPanelComponent } from "./json-panel.component";
 import { RecordCollectionComponent } from "./record-collection.component";
@@ -13,12 +17,24 @@ import { SummaryCardsComponent } from "./summary-cards.component";
   standalone: true,
   imports: [
     CommonModule,
+    OriginalWorkspaceFilesComponent,
     FormsModule,
     JsonPanelComponent,
     SummaryCardsComponent,
     RecordCollectionComponent
   ],
   template: `
+    @if (interfaceMode.mode() === 'original' && state.ops.adminSessionToken) {
+      @defer (when true) {
+        <app-original-workspace-files [sessionToken]="state.ops.adminSessionToken"
+          [tenantKey]="state.workspace.tenantKey" [workspaceKey]="state.workspace.workspaceKey" />
+      } @placeholder {
+        <p role="status">Dateien werden geladen…</p>
+      } @error {
+        <p role="alert">Die Dateiverwaltung konnte nicht geladen werden.</p>
+        <button type="button" (click)="reloadFilesView()">Erneut laden</button>
+      }
+    } @else {
     <div class="stack">
       <article class="card">
         <h2>Content Intake</h2>
@@ -523,10 +539,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Activation Guard" subtitle="Latest Block Or Readiness Summary" viewId="activationGuardView" [content]="view.content.activationGuardView"></app-json-panel>
       <app-json-panel title="Content Release Detail" subtitle="Activation Line" viewId="contentReleaseDetailView" [content]="view.content.contentReleaseDetailView"></app-json-panel>
     </div>
+    }
   `
 })
 export class ContentViewComponent implements OnInit {
   readonly view = inject(ContentViewFacade);
+  readonly interfaceMode=inject(InterfaceModeService);
+  readonly state=inject(RewriteAppUiStateService);
+
+  reloadFilesView():void {globalThis.location.reload();}
 
   ngOnInit(): void {
     this.view.init();
