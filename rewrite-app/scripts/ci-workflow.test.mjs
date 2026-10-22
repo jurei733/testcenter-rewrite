@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from "node:test";
@@ -15,13 +15,13 @@ const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
 test('browser setup bounds APT mirror stalls, verifies effective configuration and preserves installer checks', () => {
   const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
   assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
-  const install = action.runs.steps.findIndex(step => step.run === 'npx --no-install playwright install --with-deps chromium');
+  const install = action.runs.steps.findIndex(step => step.run === 'timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium');
   assert.ok(install > action.runs.steps.indexOf(step));
   const directory = mkdtempSync(join(tmpdir(), 'owned-apt-policy-'));
   const capture = join(directory, 'capture.conf');
   try {
     writeFileSync(join(directory, 'sudo'), `#!/bin/sh
-      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/80-testcenter-ci-network ] || exit 65
+      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/zz-testcenter-ci-network ] || exit 65
       [ "$OWNED_APT_DENY" != 1 ] || exit 51
       cat > "$OWNED_APT_CAPTURE"
     `);
@@ -35,10 +35,71 @@ test('browser setup bounds APT mirror stalls, verifies effective configuration a
       encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, OWNED_APT_CAPTURE: capture, ...env}
     });
     const success = run({}); assert.equal(success.status, 0, success.stderr);
-    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "2";\n');
+    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\n');
     const denied = run({OWNED_APT_DENY: '1'}); assert.equal(denied.status, 51);
     const ineffective = run({OWNED_APT_WRONG: '1'}); assert.equal(ineffective.status, 1);
     assert.ok(![success, denied, ineffective].some(value => (value.stdout + value.stderr).includes('OWNED_APT_SECRET')));
+  } finally { rmSync(directory, {recursive: true, force: true}); }
+});
+test('real Linux APT merges runner files before the CI bounds and rejects a later override', {
+  skip: process.platform !== 'linux' ? 'Real apt-config qualification requires Linux.' : false
+}, () => {
+  const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
+  const directory = mkdtempSync(join(tmpdir(), 'owned-real-apt-policy-'));
+  const parts = join(directory, 'parts'), configuration = join(directory, 'apt.conf');
+  mkdirSync(parts);
+  const bounds = 'zz-testcenter-ci-network';
+  const runner = 'Acquire::http::Timeout "15";\nAcquire::https::Timeout "15";\nAcquire::Retries "1";\n';
+  try {
+    // APT_CONFIG is read before Parts. All files, including the tee target,
+    // belong to this fixture; neither sudo nor the system configuration runs.
+    writeFileSync(configuration, `Dir::Etc::Parts "${parts}";\nDir::Etc::main "/dev/null";\n`);
+    writeFileSync(join(parts, 'zz-retries'), runner);
+    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
+      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/${bounds} ] || exit 65
+      cat > "$OWNED_REAL_APT_TARGET"
+    `);
+    chmodSync(join(directory, 'sudo'), 0o755);
+    const run = (target, script = step.run) => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH,
+        APT_CONFIG: configuration, OWNED_REAL_APT_TARGET: target}
+    });
+    const old = run(join(parts, '80-testcenter-ci-network'),
+      step.run.replaceAll('15', '20').replaceAll('Retries "1"', 'Retries "2"')
+        .replaceAll(String.raw`Retries \"1\"`, String.raw`Retries \"2\"`));
+    assert.equal(old.status, 1, 'The pre-fix file must be superseded by actual APT merging: ' + old.stderr);
+    const qualified = run(join(parts, bounds));
+    assert.equal(qualified.status, 0, qualified.stderr);
+    writeFileSync(join(parts, 'zzzz-owned-override'), 'Acquire::Retries "9";\n');
+    const overridden = run(join(parts, bounds));
+    assert.equal(overridden.status, 1, 'A later effective override must remain fatal.');
+  } finally { rmSync(directory, {recursive: true, force: true}); }
+});
+test('real Linux installer supervision preserves failures and bounds a stuck child', {
+  skip: process.platform !== 'linux' ? 'Real GNU timeout qualification requires Linux.' : false
+}, () => {
+  const installer = action.runs.steps.find(step => step.run?.includes('playwright install --with-deps chromium'));
+  assert.equal(installer.run, 'timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium');
+  const directory = mkdtempSync(join(tmpdir(), 'owned-installer-policy-'));
+  try {
+    writeFileSync(join(directory, 'npx'), `#!/bin/sh
+      [ "$1" = --no-install ] && [ "$2" = playwright ] && [ "$3" = install ] && [ "$4" = --with-deps ] && [ "$5" = chromium ] && [ "$#" = 5 ] || exit 65
+      if [ "$OWNED_INSTALL_HANG" = 1 ]; then
+        exec "$OWNED_INSTALL_NODE" -e 'process.on("SIGTERM",()=>{});setInterval(()=>{},1000);'
+      fi
+      exit "$OWNED_INSTALL_STATUS"
+    `);
+    chmodSync(join(directory, 'npx'), 0o755);
+    const run = (script, env = {}) => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+      encoding: 'utf8', timeout: 5000, env: {...process.env, PATH: directory + ':' + process.env.PATH,
+        OWNED_INSTALL_NODE: process.execPath, OWNED_INSTALL_STATUS: '0', ...env}
+    });
+    assert.equal(run(installer.run).status, 0);
+    assert.equal(run(installer.run, {OWNED_INSTALL_STATUS: '37'}).status, 37);
+    // Exercise the exact production wrapper with shortened fixture deadlines;
+    // no package installer or system mutation is launched by this control.
+    const timed = run(installer.run.replace('--kill-after=15s 5m', '--kill-after=0.2s 0.2s'), {OWNED_INSTALL_HANG: '1'});
+    assert.ok([124, 137].includes(timed.status), `Stuck installer did not fail through GNU timeout: ${timed.status}, ${timed.error}`);
   } finally { rmSync(directory, {recursive: true, force: true}); }
 });
 test('workspace file catalog HTTP authorization and projection qualify in unit and real PostgreSQL gates', () => {
