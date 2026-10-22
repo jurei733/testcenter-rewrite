@@ -4,14 +4,32 @@ import {mkdtemp, readFile, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {runSupervisedSmoke} from './supervised-smoke.mjs';
+import {runSupervisedSmoke, signalOwnedSmokeProcess} from './supervised-smoke.mjs';
 
 const helper = new URL('./supervised-smoke.mjs', import.meta.url).href;
+test('a denied owned signal is retained and cannot skip remaining process or group cleanup', () => {
+  const failures = [], calls = [];
+  const kill = (pid, name) => {
+    calls.push([pid, name]);
+    if (pid === 4102) throw Object.assign(Error('owned denial'), {code: 'EPERM'});
+    if (pid === 4103) throw Object.assign(Error('already exited'), {code: 'ESRCH'});
+  };
+  for (const pid of [4102, 4103, 4104, -4101]) signalOwnedSmokeProcess(pid, 'SIGTERM', failures, kill);
+  assert.deepEqual(calls.map(([pid]) => pid), [4102, 4103, 4104, -4101]);
+  assert.deepEqual(failures, [{pid: 4102, signal: 'SIGTERM', code: 'EPERM'}]);
+});
+
+test('cleanup rejects system and malformed process IDs before signaling', () => {
+  for (const pid of [0, 1, -1, undefined, NaN, 1.5]) {
+    assert.throws(() => signalOwnedSmokeProcess(pid, 'SIGTERM', [], () => assert.fail('No signal permitted')));
+  }
+});
+
 async function fixture(source, check, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'owned-supervision-test-'));
   const entry = join(directory, 'child.mjs'), evidence = join(directory, 'evidence');
   try {
-    await writeFile(entry, `import {reportSmokePhase,isSupervisedSmokeChild} from ${JSON.stringify(helper)};\n` +
+    await writeFile(entry, `import {reportSmokePhase,reportSmokeObservation,isSupervisedSmokeChild} from ${JSON.stringify(helper)};\n` +
       `if(!isSupervisedSmokeChild(import.meta.url)) throw Error('Missing exact child entry marker');\n` + source);
     const result = await runSupervisedSmoke({entry, artifactDirectory: evidence,
       env: {...process.env, OWNED_TEST_SECRET: 'must-not-be-recorded'},
@@ -48,6 +66,16 @@ test('repeated phase progress cannot postpone the absolute smoke deadline', () =
   `setInterval(()=>reportSmokePhase('active-but-never-finished'),30);`,
   (result, record) => {assert.equal(result, 1); assert.equal(record.outcome, 'total-timeout');},
   {phaseTimeoutMs: 500, totalTimeoutMs: 700}));
+
+test('operation observations preserve their order without postponing a stalled phase', () => fixture(
+  `reportSmokePhase('owned-stalled-operation');let n=0;setInterval(()=>reportSmokeObservation('owned-step:'+n++),20);`,
+  (result, record) => {
+    assert.equal(result,1);assert.equal(record.outcome,'phase-timeout');
+    assert.equal(record.phases.at(-1).phase,'owned-stalled-operation');
+    assert.ok(record.observations.length>3);
+    assert.deepEqual(record.observations.map(item=>item.observation),record.observations.map((_,i)=>'owned-step:'+i));
+    assert.ok(record.failedAt-record.phases.at(-1).at<1500,'Diagnostic activity must not keep a phase alive.');
+  }));
 
 test('timeout kills an owned detached grandchild and leaves an unrelated process running', async () => {
   const sentinel = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {stdio: 'ignore'});

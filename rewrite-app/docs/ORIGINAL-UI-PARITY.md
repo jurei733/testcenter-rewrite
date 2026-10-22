@@ -1,5 +1,38 @@
 # Optional Original UI
 
+### Original workspace files reference (2026-10-22)
+
+The current Original mode still renders the general Rewrite workspace/content
+console. The next required surface is Source's four-tab workspace shell and
+file administration, including grouped files, selection, dependency metadata,
+upload/replace, download, guarded batch deletion and its actual partial reports.
+The generic intake/import/release controls do not reproduce that operator flow.
+This is an open product gap, not a completed visual row.
+
+A new Source-only native reference executes the unchanged pinned Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`. It records 48 views and 48 independent
+repeats across three themes, desktop/mobile and RW/RO claims. Empty/populated
+lists, selected files, delete confirmation and cancellation are covered. Real
+Source relationship names and recursive dependency closure drive the fixture;
+Source excludes Player bytes from Unit size but includes them in Booklet size.
+The new renderer must preserve those distinctions rather than using raw upload
+sizes for every row. Fifteen complete Source files are hashed in the evidence.
+
+Initial same-page document replacement deterministically alternates two native
+shadow rasters on mobile despite equal geometry and settled dependencies. A
+visibility-only diagnostic correctly fails its white-frame proof; adding root
+visibility to opacity does not fix the alternation. No global capture algorithm
+or comparison threshold is changed. Independent native pages for the reference
+and repeat retain the unchanged white-clear, exact-style/geometry restoration
+and three-consecutive-identical-frame checks. The full Source-only corpus then
+reproduces exactly. The prior failure artifacts remain separate diagnostics.
+
+This reference uses owned API fixtures. It does not establish Source backend
+authorization, Candidate rendering or the required real file mutation workflow.
+The new helper is not yet a CI family or complete-acceptance substitute. Formal
+status remains 29 done / 20 partial, with all eight broad visual rows open.
+
+
 ### Current settings and directory checkpoint (2026-10-21)
 
 Published `8935ff5e` passes the complete Linux administration settings reference

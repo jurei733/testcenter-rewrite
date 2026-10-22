@@ -10,6 +10,18 @@ export const isSupervisedSmokeChild = url => process.env[childMarker] === url;
 export function reportSmokePhase(phase) {
   if (process.connected) process.send({type: 'owned-smoke-phase', phase: String(phase).slice(0, 200)});
 }
+// Operation breadcrumbs are evidence, not progress: they never reset a deadline.
+export function reportSmokeObservation(observation) {
+  if (process.connected) process.send({type: 'owned-smoke-observation', observation: String(observation).slice(0, 200)});
+}
+
+export function signalOwnedSmokeProcess(pid, name, failures, kill = process.kill) {
+  if (!Number.isSafeInteger(pid) || Math.abs(pid) <= 1) throw Error('Invalid owned smoke process ID');
+  try { kill(pid, name); }
+  catch (error) {
+    if (error.code !== 'ESRCH') failures.push({pid, signal: name, code: String(error.code ?? 'UNKNOWN').slice(0, 40)});
+  }
+}
 
 // The supervisor has its own event loop: a blocked browser evaluation, route
 // cleanup or even child Node event loop cannot prevent timeout evidence.
@@ -22,7 +34,7 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
   const directory = resolve(artifactDirectory);
   const actualEntry = await realpath(resolve(entry));
   await mkdir(directory, {recursive: true});
-  const startedAt = Date.now(), phases = [];
+  const startedAt = Date.now(), phases = [], observations = [];
   const child = spawn(process.execPath, [actualEntry], {detached: true,
     env: {...env, [childMarker]: pathToFileURL(actualEntry).href},
     stdio: ['ignore', 'inherit', 'inherit', 'ipc']});
@@ -33,7 +45,7 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
   // Record only the owned entry, phase names and process IDs, never environment,
   // credentials, request bodies or the SQLite scratch database.
   const record = {entry: actualEntry, childPid: child.pid, startedAt,
-    phaseTimeoutMs, totalTimeoutMs, phases, outcome: 'running'};
+    phaseTimeoutMs, totalTimeoutMs, phases, observations, outcome: 'running'};
   let phaseTimer, totalTimer, stopping, writes = Promise.resolve();
   const persist = () => {
     const bytes = JSON.stringify(record, null, 2) + '\n';
@@ -43,9 +55,8 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
     });
     return writes;
   };
-  const signal = (pid, name) => {
-    try { process.kill(pid, name); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-  };
+  const signalFailures = [];
+  const signal = (pid, name) => signalOwnedSmokeProcess(pid, name, signalFailures);
   const processTable = async () => {
     const {stdout} = await execute('ps', ['-A', '-o', 'pid=,ppid=,lstart='], {timeout: 2000, maxBuffer: 2 * 1024 * 1024});
     return stdout.trim().split('\n').map(line => {
@@ -72,7 +83,7 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
       record.ownedPids = [...owned];
       let evidenceError;
       try {await persist();} catch (error) {evidenceError = error;}
-      console.error(`owned_smoke_supervision=${reason}; last_phase=${phases.at(-1)?.phase}`);
+      console.error(`owned_smoke_supervision=${reason}; last_phase=${phases.at(-1)?.phase}; last_observation=${observations.at(-1)?.observation ?? 'none'}`);
       for (const pid of [...owned].reverse()) signal(pid, 'SIGTERM');
       if (child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGTERM');
       await new Promise(done => setTimeout(done, killGraceMs));
@@ -83,7 +94,17 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
         if (current.some(value => value.pid === row.pid && value.started === row.started)) signal(row.pid, 'SIGKILL');
       }
       if (child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGKILL');
-      if (evidenceError) throw evidenceError;
+      // A denied signal must not prevent cleanup of the remaining owned
+      // descendants or the owned group. Preserve the exact failure as evidence
+      // and still fail supervision after all permitted cleanup was attempted.
+      if (signalFailures.length) {
+        record.signalFailures = signalFailures;
+        try {await persist();} catch (error) {evidenceError ??= error;}
+      }
+      const cleanupErrors = signalFailures.map(failure => Error(
+        `Owned smoke cleanup ${failure.signal} pid=${failure.pid}: ${failure.code}`));
+      if (evidenceError) cleanupErrors.push(evidenceError);
+      if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'Owned smoke cleanup failed');
     })();
     return stopping;
   };
@@ -98,6 +119,11 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
   };
   child.on('message', message => {
     if (message?.type === 'owned-smoke-phase' && typeof message.phase === 'string') phase(message.phase.slice(0, 200));
+    if (!stopping && message?.type === 'owned-smoke-observation' && typeof message.observation === 'string') {
+      observations.push({observation: message.observation.slice(0, 200), at: Date.now()});
+      if (observations.length > 1000) observations.splice(0, observations.length - 1000);
+      void persist().catch(error => child.emit('error', error));
+    }
   });
   const terminated = () => {void stop('terminated').catch(error => child.emit('error', error));};
   const interrupted = () => {void stop('interrupted').catch(error => child.emit('error', error));};

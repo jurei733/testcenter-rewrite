@@ -13,7 +13,7 @@ import { createServerRequestFailureGate } from "./server-request-failure-gate.mj
 import { createInactiveRuntimeSnapshotGate } from "./inactive-runtime-snapshot-gate.mjs";
 import { raceWithSmokeDeadline } from "./smoke-deadline.mjs";
 
-import {isSupervisedSmokeChild, runSupervisedSmoke, reportSmokePhase} from './supervised-smoke.mjs';
+import {isSupervisedSmokeChild, runSupervisedSmoke, reportSmokePhase, reportSmokeObservation} from './supervised-smoke.mjs';
 
 if (!isSupervisedSmokeChild(import.meta.url)) {
   const artifactRoot = process.env.UI_SMOKE_ARTIFACT_DIR || await mkdtemp(join(tmpdir(), 'owned-console-supervisor-'));
@@ -632,10 +632,14 @@ try {
 
     await remotePage.unrouteAll({behavior:'wait'});
     for(const origin of ['remote','native']) {
+      reportSmokeObservation(`terminal-independent-${origin}:begin`);
       if((await loadingRepository.getTestRunById(runId)).status==='paused') {
+        reportSmokeObservation(`terminal-independent-${origin}:resume-preceding-paused-run`);
         await remotePage.evaluate(()=>window.tc.resume());
+        reportSmokeObservation(`terminal-independent-${origin}:await-resumed-player`);
         await remotePage.frameLocator('iframe').locator('#demoPlayerAnswer').waitFor();
       }
+      reportSmokeObservation(`terminal-independent-${origin}:await-live-reception`);
       await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),'Reception did not become live before the terminal case');
       const baseline=await loadingRepository.getTestRunById(runId),start=applications.length;
       const heldRuntime=terminalDeferred(),heldView=terminalDeferred(),completeAck=terminalDeferred(),resumeAck=terminalDeferred();
@@ -649,6 +653,7 @@ try {
         else routeError=error;
       };
       try {
+        reportSmokeObservation(`terminal-independent-${origin}:install-held-routes`);
         await remotePage.route('**/application',captureApplication);
         await remotePage.route(url=>url.pathname===runtimePath,async route=>{
           try {
@@ -677,11 +682,16 @@ try {
           await poll(()=>{if(routeError)throw routeError;return Promise.resolve(heldAcks.length===2);},'Both remote commands were not accepted before termination');
           assert.deepEqual(heldAcks.map(command=>command.commandId),issued.map(command=>command.commandId));
           completeAck.resolve();
-        } else await remotePage.evaluate(()=>window.tc.terminate());
+        } else {
+          reportSmokeObservation(`terminal-independent-${origin}:terminate-native`);
+          await remotePage.evaluate(()=>window.tc.terminate());
+        }
+        reportSmokeObservation(`terminal-independent-${origin}:await-terminal-runtime-and-reception`);
         await poll(()=>Promise.resolve(runtimeCapture.reads===1),`${origin} termination did not hold its Starter runtime`);
         await poll(async()=>/STATUS:\s*TERMINATED/.test(await remotePane.innerText()),`${origin} terminal receipt waited for its held Starter runtime`);
         await poll(async()=>!/BS:\s*live/.test(await remotePane.innerText()),`${origin} termination did not suspend new reception`);
         assert.equal(await remotePage.locator('iframe:visible').count(),0);
+        reportSmokeObservation(`terminal-independent-${origin}:resume-with-runtime-held`);
         if(origin==='remote')resumeAck.resolve();else await remotePage.evaluate(()=>window.tc.resume());
         await poll(async()=>{
           const run=await loadingRepository.getTestRunById(runId);
@@ -691,13 +701,17 @@ try {
         await poll(async()=>/STATUS:\s*RUNNING/.test(await remotePane.innerText()),`${origin} Resume did not project before its Unit view`);
         await poll(async()=>/BS:\s*live/.test(await remotePane.innerText()),`${origin} Resume did not reopen reception before its Unit view`);
         // The held ACK routes are only needed for the two preaccepted receipts.
+        reportSmokeObservation(`terminal-independent-${origin}:retire-held-ack-route`);
         await remotePage.unroute('**/commands/*/acknowledgement');
+        reportSmokeObservation(`terminal-independent-${origin}:apply-following-pause`);
         const following=(await api(workspace+`/monitor/open-runs/${runId}/commands`,{commandType:'pause'},operator)).command;issued.push(following);
         await poll(async()=>/STATUS:\s*PAUSED/.test(await remotePane.innerText()),`${origin} reopened reception did not apply a fresh Pause while views were held`);
         await waitForRemoteReceipt(following);
+        reportSmokeObservation(`terminal-independent-${origin}:release-and-reread-starter-runtime`);
         heldRuntime.resolve();
         await poll(()=>Promise.resolve(runtimeCapture.reads>=2),`${origin} stale Starter runtime was not reread after Resume/Pause`);
         viewReleased=true;heldView.resolve();
+        reportSmokeObservation(`terminal-independent-${origin}:drain-released-routes`);
         await remotePage.unrouteAll({behavior:'wait'});
         if(routeError)throw routeError;
         assert.equal(await remotePage.locator('#originalParticipantStarter mat-card').count(),0);
@@ -716,12 +730,15 @@ try {
         loadingObservations.push({origin,testRunId:runId,applications:applications.slice(start),acceptedBeforeTermination:heldAcks,runtimeReads:runtimeCapture.reads,
           precedingActiveRuntimeReads:runtimeCapture.leadingActiveReads,heldRuntimeSnapshot:runtimeCapture.heldSnapshot,
           terminalReceptionSuspended:true,acceptedResumeIndependentOfStarter:true,receptionReopenedBeforeUnitView:true,freshPauseApplied:true,answersAndClocksPreserved:true,siblingPreserved:true});
+        reportSmokeObservation(`terminal-independent-${origin}:success-screenshot`);
         await remotePage.screenshot({path:join(artifacts,`${origin}-terminal-presentation-independent.png`),fullPage:true});
         const marker=`${origin}-terminal-presentation-keeps-accepted-resume-and-reception-independent`;
         checks.push(marker);reportConsolePhase(`participant_console_loading=${marker}:passed`);
       } finally {
         heldRuntime.resolve();viewReleased=true;heldView.resolve();completeAck.resolve();resumeAck.resolve();
+        reportSmokeObservation(`terminal-independent-${origin}:route-cleanup-begin`);
         await remotePage.unrouteAll({behavior:'wait'}).catch(()=>{});
+        reportSmokeObservation(`terminal-independent-${origin}:route-cleanup-complete`);
       }
     }
 
