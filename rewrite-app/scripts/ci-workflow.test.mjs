@@ -226,7 +226,7 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
-  assert.equal(scripts["test:browser-capture:built"], "node --test scripts/stable-viewport-capture.test.mjs");
+  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs");
 });
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
@@ -274,6 +274,17 @@ test('Compose JSON readiness keeps its absolute request/body deadline and real s
   assert.ok(source.includes('const pollJson = url => pollSmokeJson(url, {fetcher: fetch,'));
   assert.ok(source.includes("console.log('compose_json_phase='+JSON.stringify(phase))"));
   assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/poll-smoke-json.test.mjs'));
+});
+test('the Original sample retains scoped input/message/save evidence without widening credential or store uploads',()=>{
+  const step=workflow.jobs['verify-memory-sqlite'].steps.find(step=>step.name==='Retain Original sample transport diagnostics');
+  assert.equal(step.if,'failure() || cancelled()');
+  assert.equal(step.with.path.trim(),'${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.json\n${{ runner.temp }}/rewrite-ui-artifacts/original-sample/*.png');
+  assert.equal(step.with['retention-days'],7);
+  assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/stable-viewport-capture.test.mjs'));
+  assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/original-sample-diagnostics.test.mjs'));
+  const source=read('./smoke-ui.mjs');
+  assert.ok(source.includes('originalSampleTrace = await observeOriginalSample(page)'));
+  assert.ok(source.includes('originalSampleTrace.write(resolve(artifactDirectory,"original-sample"))'));
 });
 test("test jobs use the same-run build and cannot compile a replacement production frontend", () => {
   assert.equal(workflow.jobs.build.steps.filter(step => step.run === "npm run build").length, 1);

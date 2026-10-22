@@ -44,7 +44,7 @@ const apiServer = spawn(process.execPath, ['--input-type=module', '-e',
 });
 const apiClosed = new Promise(done => apiServer.once('close', done));
 let browser;
-const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [], sourceWrites = [];
+const states = {}, comparisons = {}, referenceReproducibility = {}, documentDiagnostics = [], errors = [], unknown = [], sourceWrites = [], candidateWrites = [];
 const options = width => ({viewport: {width, height: 844}, deviceScaleFactor: 1,
   locale: 'de-DE', timezoneId: 'Europe/Berlin', colorScheme: 'light'});
 
@@ -69,7 +69,18 @@ async function snapshot(page, key, kind) {
           value:element.tagName==='INPUT'&&element.type!=='password'?element.value:undefined}))})),
       buttons:[...document.querySelectorAll('mat-tab-nav-panel button')].map(button => ({...box(button),disabled:button.disabled}))};
   });
-  const result = await captureStableViewport(page, measure, join(artifacts, kind+'-'+key+'.png'));
+  let result;
+  try { result = await captureStableViewport(page, measure, join(artifacts, kind+'-'+key+'.png')); }
+  catch (error) {
+    try {
+      await writeFile(join(artifacts,kind+'-'+key+'.failure.json'),JSON.stringify({geometry:await measure(),
+        browser:await page.evaluate(()=>({active:{tag:document.activeElement?.tagName,id:document.activeElement?.id},
+          animations:document.getAnimations().map(animation=>({name:animation.animationName??null,
+            target:animation.effect?.target?.tagName,state:animation.playState,time:animation.currentTime,
+            iterations:animation.effect?.getComputedTiming().iterations}))}))},null,2));
+    } catch { /* Preserve the actual capture failure if diagnostics also fail. */ }
+    throw error;
+  }
   await writeFile(join(artifacts, kind+'-'+key+'.json'), JSON.stringify({geometry:result.geometry,paintDiagnostics:result.paintDiagnostics},null,2));
   (states[key] ??= {})[kind] = result;
   if(kind === 'rewrite') {
@@ -162,6 +173,11 @@ try {
       });
       const page=await context.newPage();await page.bringToFront();
       page.on('pageerror',error=>errors.push({theme,width,error:String(error)}));
+      page.on('request',request=>{
+        const url=new URL(request.url());
+        if(url.origin===base&&['POST','PATCH','PUT','DELETE'].includes(request.method()))
+          candidateWrites.push({method:request.method(),path:url.pathname});
+      });
       for(const kind of ['source','rewrite','source-repeat'])for(const tab of ['users','workspaces']) {
         users.find(user=>user.name==='owned-reader').isSuperadmin=false;
         spaces.find(space=>space.item.workspaceId===alpha.workspaceId).name='Alpha Bereich';
@@ -233,19 +249,42 @@ try {
         await table.locator('mat-row').filter({hasText:tab==='users'?'owned-reader':'Beta Umbenennung'}).click();
         await page.waitForFunction(expected=>document.querySelectorAll('mat-table')[1]?.querySelectorAll('mat-row').length===expected,tab==='users'?spaces.length:users.length);
         await snapshot(page,key+'-acknowledged-reselected',kind);
+        const writesBeforeDeleteDialog=sourceWrites.length;
+        const candidateWritesBeforeDeleteDialog=candidateWrites.length;
+        await page.locator(tab==='users'?'[data-cy="delete-user"]':'[data-cy="delete-workspace"]').click();
+        const deletion=page.locator('mat-dialog-container');await deletion.waitFor();
+        assert.equal(await deletion.locator('input').inputValue(),'');
+        await deletion.locator('button[type="submit"]:disabled').waitFor();
+        await snapshot(page,key+'-delete-dialog',kind);
+        await deletion.locator('input').fill('123456');
+        await deletion.locator('button[type="submit"]:disabled').waitFor();
+        await snapshot(page,key+'-delete-dialog-invalid',kind);
+        await deletion.locator('input').fill('1234567');
+        await deletion.locator('button[type="submit"]:enabled').waitFor();
+        await snapshot(page,key+'-delete-dialog-valid',kind);
+        await deletion.getByRole('button',{name:'Abbrechen',exact:true}).click();
+        await deletion.waitFor({state:'detached'});
+        assert.equal(sourceWrites.length,writesBeforeDeleteDialog,'Cancelling a valid delete dialog must not dispatch a Source write.');
+        assert.equal(candidateWrites.length,candidateWritesBeforeDeleteDialog,'Cancelling a valid delete dialog must not dispatch any candidate write.');
+        if(kind==='rewrite'){
+          assert.ok((await api('/api/v1/admin/users')).items.some(user=>user.adminUser.adminUserId===reader.adminUserId));
+          assert.ok((await api('/api/v1/tenants/owned-directory/workspaces')).items.some(workspace=>workspace.workspaceId===alpha.workspaceId));
+        }
+        await snapshot(page,key+'-delete-dialog-cancelled',kind);
       }
       await context.close();
     }
   }
-  assert.equal(Object.keys(comparisons).length,120);assert.equal(Object.keys(referenceReproducibility).length,120);
+  assert.equal(Object.keys(comparisons).length,168);assert.equal(Object.keys(referenceReproducibility).length,168);
   assert.equal(sourceWrites.length,24);
+  assert.equal(candidateWrites.length,12,'Only the twelve confirmed role/name UI actions may write.');
   assert.deepEqual(errors,[]);assert.deepEqual(unknown,[]);
   assert.deepEqual(Object.entries(comparisons).filter(([,v])=>v.differingPixels),[], 'Every full directory viewport must match Source.');
   assert.deepEqual(Object.entries(referenceReproducibility).filter(([,v])=>v.differingPixels),[], 'Source must reproduce every viewport.');
 }finally{
   await writeFile(join(artifacts,'directory.json'),JSON.stringify({source:originalBrowserSource,directoryReference:originalDirectoryReference,manifest,
     scope:'Unchanged Source frontend with owned, narrowly controlled role/name mutation fixtures; real candidate UI authentication and protected writes. No Source backend authorization proof.',
-    comparisons,referenceReproducibility,documentDiagnostics,sourceWrites,errors,unknown},null,2));
+    comparisons,referenceReproducibility,documentDiagnostics,sourceWrites,candidateWrites,errors,unknown},null,2));
   await browser?.close();apiServer.kill('SIGTERM');
   await raceWithSmokeDeadline(apiClosed,10000,()=>{apiServer.kill('SIGKILL');throw Error('Owned API shutdown timed out.');});
   await new Promise(done=>sourceServer.close(done));await verifyOriginalBuild(root);

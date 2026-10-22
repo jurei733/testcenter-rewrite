@@ -31,6 +31,15 @@ export async function sampleStableViewport(page, measure, path, expectedGeometry
     }
     previous = bytes;
   }
-  await writeFile(path + '.unstable.json', JSON.stringify({pngFrameSha256: frames}, null, 2));
-  throw Error('Viewport pixels must stabilize in three consecutive complete captures.');
+  const failure = Error('Viewport pixels must stabilize in three consecutive complete captures.');
+  // Preserve actual sampled pixels only as diagnostics, never as a baseline.
+  // Writing evidence must not replace the original stability failure.
+  const diagnostics = await Promise.allSettled([
+    writeFile(path + '.unstable.json', JSON.stringify({geometry, pngFrameSha256:frames}, null, 2)),
+    writeFile(path + '.unstable.first.png', first),
+    writeFile(path + '.unstable.last.png', previous)
+  ]);
+  const errors = diagnostics.filter(result=>result.status==='rejected').map(result=>result.reason);
+  if (errors.length) failure.cause = new AggregateError(errors, 'Could not retain all unstable viewport diagnostics.');
+  throw failure;
 }

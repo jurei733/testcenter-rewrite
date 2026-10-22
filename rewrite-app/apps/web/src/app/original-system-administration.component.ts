@@ -179,8 +179,8 @@ export class OriginalSystemAdministrationComponent implements OnChanges, OnDestr
     if(this.destroyed || this.directory.busy || this.confirmationId!==null || (kind==="delete-workspace"?!workspace:!user))return;
     const title=kind==="delete-workspace"?"Löschen von Arbeitsbereichen"
       :kind==="delete-user"?"Löschen von Administrator:innen":"Superadmin-Status ändern";
-    const confirmLabel=kind==="delete-workspace"?"Arbeitsbereich löschen":kind==="delete-user"?"Administrator:in löschen":"Bestätigen";
-    const message=kind==="delete-workspace"?`Soll Arbeitsbereich "${workspace!.displayName}" gelöscht werden?`
+    const confirmLabel=kind==="delete-workspace"?"Arbeitsbereich(e) löschen":kind==="delete-user"?"Administrator:in löschen":"Bestätigen";
+    const message=kind==="delete-workspace"?`Arbeitsbereich "${workspace!.displayName}" löschen?`
       :kind==="delete-user"?`Soll Administrator:in "${user!.adminUser.username}" gelöscht werden?`
       :`Soll der Superadmin-Status von "${user!.adminUser.username}" geändert werden?`;
     const pending=this.confirmation.confirm({title,message,confirmLabel,cancelLabel:"Abbrechen",

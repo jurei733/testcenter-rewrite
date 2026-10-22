@@ -15,6 +15,7 @@ import { originalParticipantCustomTextDefaults, parseVeronaUnitResponse } from "
 import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contracts/participant-response-capture";
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { drainSmokeResponse } from "./drain-smoke-response.mjs";
+import { observeOriginalSample } from "./original-sample-diagnostics.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
@@ -421,6 +422,7 @@ for (const [input, output] of [[child.stdout, process.stdout], [child.stderr, pr
 
 let browser;
 let page;
+let originalSampleTrace;
 let successMessage = "";
 
 try {
@@ -17656,6 +17658,7 @@ try {
     )?.validationWarnings,
     []
   );
+  originalSampleTrace = await observeOriginalSample(page);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey: originalSampleTenantKey,
@@ -17743,6 +17746,8 @@ try {
       .inputValue(),
     originalSampleResponse
   );
+  if (artifactDirectory) await originalSampleTrace.write(resolve(artifactDirectory,"original-sample"));
+  originalSampleTrace.stop();originalSampleTrace=undefined;
   stopAfter("participant-verona-player");
 
   logStep("participant-original-booklet-config");
@@ -26323,6 +26328,14 @@ try {
 } catch (error) {
   if (!(error instanceof UiSmokeEarlyExit)) {
     process.stderr.write(`UI smoke failure at ${page?.url() ?? "unopened page"}: ${String(error?.stack ?? error)}\n`);
+    if(originalSampleTrace){
+      try{
+        const directory=resolve(artifactDirectory??await mkdtemp(resolve(tmpdir(),"original-sample-failure-")),"original-sample");
+        await originalSampleTrace.write(directory);
+        await page.locator("#participantVeronaPlayerFrame").screenshot({path:resolve(directory,"player.png"),timeout:2000});
+      }catch(diagnosticError){process.stderr.write(`Original sample diagnostic unavailable: ${String(diagnosticError)}\n`);}
+      finally{originalSampleTrace.stop();}
+    }
     if (page && !page.isClosed()) {
       const inputEvents = await Promise.all(page.frames().map(frame => frame.locator("html").evaluate(() =>
         window.__ownedVeronaInputEvents ?? null, undefined, { timeout: 1_000 }).catch(() => null)));
