@@ -80,6 +80,15 @@ transport speed gain over that image; the independent whole-installer deadline
 bounds a stall that transport settings alone cannot bound. The two real Linux
 controls and actual package installation still need the next head's qualification.
 
+At `627b5466`, the real Linux APT merge control passes, including both negative
+cases. The GNU-timeout control stops its owned TERM-resistant child in 422 ms,
+but its assertion initially expects a numeric shell status only. Bash can exec
+its final command, so Node instead reports `status: null, signal: SIGKILL` when
+the timeout group is killed. The follow-up accepts exactly that native fatal
+signal or numeric 124/137 and still rejects spawn errors, success and all other
+statuses/signals. This corrects the control's process-result interpretation;
+it does not weaken the real installer bound or qualify that failed matrix.
+
 ## Run selected CI checks locally
 
 From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,

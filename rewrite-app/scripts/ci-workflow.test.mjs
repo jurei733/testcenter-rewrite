@@ -99,7 +99,11 @@ test('real Linux installer supervision preserves failures and bounds a stuck chi
     // Exercise the exact production wrapper with shortened fixture deadlines;
     // no package installer or system mutation is launched by this control.
     const timed = run(installer.run.replace('--kill-after=15s 5m', '--kill-after=0.2s 0.2s'), {OWNED_INSTALL_HANG: '1'});
-    assert.ok([124, 137].includes(timed.status), `Stuck installer did not fail through GNU timeout: ${timed.status}, ${timed.error}`);
+    // Bash may exec its final command. GNU timeout's group KILL then appears
+    // as a native signal rather than a shell's numeric 128 + SIGKILL status.
+    const status = timed.status ?? (timed.signal === 'SIGKILL' ? 137 : null);
+    assert.equal(timed.error, undefined);
+    assert.ok([124, 137].includes(status), `Stuck installer did not fail through GNU timeout: ${timed.status}, ${timed.signal}`);
   } finally { rmSync(directory, {recursive: true, force: true}); }
 });
 test('workspace file catalog HTTP authorization and projection qualify in unit and real PostgreSQL gates', () => {
