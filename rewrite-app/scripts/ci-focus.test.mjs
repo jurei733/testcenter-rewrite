@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'yaml';
 import { executeFocus, focusChecks, parseFocusCommand, planFocus } from './ci-focus.mjs';
@@ -11,6 +12,7 @@ import { executeFocus, focusChecks, parseFocusCommand, planFocus } from './ci-fo
 const workflow = parse(readFileSync(new URL('../../.github/workflows/rewrite-app-ci.yml', import.meta.url), 'utf8'));
 const scripts = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).scripts;
 const checks = focusChecks(workflow, scripts);
+const cli = fileURLToPath(new URL('./ci-focus.mjs', import.meta.url));
 
 test('every actual Quick, qualification and memory/SQLite shard has an executable focused plan', () => {
   const actual = ['quick', 'quick-extended', 'verify-memory-sqlite']
@@ -74,7 +76,7 @@ test('workflow shell expansions and arbitrary environment writes are rejected in
 });
 
 test('the actual CLI plan builds nothing and exports no inherited credential values', () => {
-  const result = spawnSync(process.execPath, [new URL('./ci-focus.mjs', import.meta.url).pathname,
+  const result = spawnSync(process.execPath, [cli,
     '--plan', 'ui-participant-console'], { encoding: 'utf8',
     env: { ...process.env, FIRST_SLICE_POSTGRES_URL: 'owned-focus-secret-must-not-appear' } });
   assert.equal(result.status, 0, result.stderr);
@@ -92,7 +94,7 @@ test('the actual CLI preserves a failing npm child status and does not dispatch 
       const script=process.argv[3];
       appendFileSync(${JSON.stringify(calls)},JSON.stringify(script)+'\\n');
       process.exitCode=script==='build'?0:37;`);
-    const result = spawnSync(process.execPath, [new URL('./ci-focus.mjs', import.meta.url).pathname,
+    const result = spawnSync(process.execPath, [cli,
       'ui-participant-console', 'original-login'], { encoding: 'utf8',
       env: { ...process.env, npm_execpath: npm, UI_SMOKE_HEADFUL: 'false' } });
     assert.equal(result.status, 37, result.stderr);

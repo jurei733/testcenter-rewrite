@@ -39,8 +39,25 @@ cleanup; its underlying host cause is not established by a later passing run.
 Cleanup now attempts every remaining owned descendant/group even after a denied
 signal, records only PID/signal/error-code evidence and still fails. Two added
 controls verify denied-signal continuation and rejection of system/malformed
-PIDs. All 172 CI policy controls subsequently pass. This does not resolve the
+PIDs. All 175 CI policy controls subsequently pass. This does not resolve the
 separate Linux console-operation timeout from run `39762727435`.
+
+Diagnostic persistence now keeps one active atomic write and one pending latest
+snapshot. Previously, every IPC phase/observation queued another fully serialized
+copy behind the previous write; bounded record arrays did not bound that backlog.
+A slow-writer control sends 20,000 updates while the first write is held and
+requires just the first and latest snapshot, with no 20,000-copy serialization
+queue. Write errors still reject their callers; a later cleanup write can retain
+final evidence. Neither diagnostic observations nor coalesced writes renew a
+phase or total deadline, and no assertion or scenario is removed.
+
+All jobs now request `ubuntu-24.04`, matching the previously qualified baseline,
+and the locked Chromium cache key includes that OS version. This prevents an
+implicit OS-major change or cross-version browser-cache reuse during GitHub's
+[October 19–November 19 migration of `ubuntu-latest` to Ubuntu 26.04](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/).
+The hosted image still receives GitHub's regular 24.04 image updates. Moving to
+26.04 requires an explicit pipeline change and fresh qualification. The existing
+console timeout is not attributed to an OS change without evidence.
 
 The historical workflow-reported green run is
 [`39187723764`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39187723764)

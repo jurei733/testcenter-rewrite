@@ -196,6 +196,13 @@ test("PR code runs once per update while main, merge queue and manual runs remai
   for (const event of ["push", "pull_request"]) assert.ok(workflow.on[event].paths.includes(".github/actions/**"));
   assert.equal(workflow.concurrency["cancel-in-progress"], true);
 });
+test('same-run build and visual consumers retain the qualified OS and an OS-specific browser cache', () => {
+  assert.deepEqual([...new Set(Object.values(workflow.jobs).map(job => job['runs-on']))], ['ubuntu-24.04']);
+  const cache = action.runs.steps.find(step => step.uses?.startsWith('actions/cache@'));
+  assert.equal(cache.with.key,
+    "${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}");
+  assert.equal(cache.with['restore-keys'], undefined, 'Never fall back to another OS or locked Chromium version');
+});
 test("Linux source reference uses an unchanged commit-pinned Original and same-run verified artifact", () => {
   const source = JSON.parse(read("./fixtures/original-browser-source.json"));
   const producer = workflow.jobs["original-reference-build"];

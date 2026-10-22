@@ -30,7 +30,7 @@ concurrency:
 jobs:
   build:
     name: Shared production build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -55,7 +55,7 @@ jobs:
 
   typecheck:
     name: verify-memory-sqlite (typecheck)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -70,7 +70,7 @@ jobs:
 
   original-reference-build:
     name: Pinned Original browser build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,7 +108,7 @@ jobs:
   original-browser-reference:
     name: Original browser reference (${{ matrix.family }})
     needs: [build, original-reference-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -151,7 +151,7 @@ jobs:
 
   dependencies:
     name: Dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -164,7 +164,7 @@ jobs:
   unit:
     name: verify-memory-sqlite (unit)
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -181,7 +181,7 @@ jobs:
   quick:
     name: verify-memory-sqlite (ui-quick-${{ matrix.check }})
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       UI_SMOKE_HEADFUL: "true"
@@ -243,7 +243,7 @@ jobs:
   quick-extended:
     name: verify-memory-sqlite (ui-qualification-${{ matrix.check }})
     needs: [build, fast-feedback]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       UI_SMOKE_HEADFUL: "true"
@@ -344,7 +344,7 @@ jobs:
     name: Fast feedback
     if: always()
     needs: [build, typecheck, dependencies, unit, quick]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require the fast qualification set
@@ -356,7 +356,7 @@ jobs:
   verify-memory-sqlite:
     needs: [build, fast-feedback]
     name: verify-memory-sqlite (${{ matrix.check }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     defaults:
       run:
@@ -539,7 +539,7 @@ jobs:
 
   verify-postgres:
     needs: [build, fast-feedback]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
@@ -586,7 +586,7 @@ jobs:
 
   verify-postgres-ui:
     needs: [build, fast-feedback]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
@@ -621,7 +621,7 @@ jobs:
   deployability:
     needs: [build, fast-feedback]
     name: Deployability preflight
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
       run:
@@ -641,7 +641,7 @@ jobs:
 
   docker-image-runtime-smoke:
     name: Docker image runtime smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
       run:
@@ -663,7 +663,7 @@ jobs:
   docker-compose-release-smoke:
     needs: [build, fast-feedback]
     name: Compose Postgres smoke (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
@@ -700,7 +700,7 @@ jobs:
     name: CI acceptance
     if: always()
     needs: [build, original-reference-build, original-browser-reference, typecheck, dependencies, unit, quick, quick-extended, verify-memory-sqlite, verify-postgres, verify-postgres-ui, deployability, docker-image-runtime-smoke, docker-compose-release-smoke]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every qualification group
