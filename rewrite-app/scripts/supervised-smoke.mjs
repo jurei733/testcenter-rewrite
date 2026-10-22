@@ -23,6 +23,22 @@ export function signalOwnedSmokeProcess(pid, name, failures, kill = process.kill
   }
 }
 
+export function createSmokeEvidenceWriter(snapshot, write) {
+  let pending = false, active;
+  return () => {
+    pending = true;
+    if (!active) {
+      active = Promise.resolve().then(async () => {
+        while (pending) {
+          pending = false;
+          await write(snapshot());
+        }
+      }).finally(() => { active = undefined; });
+    }
+    return active;
+  };
+}
+
 // The supervisor has its own event loop: a blocked browser evaluation, route
 // cleanup or even child Node event loop cannot prevent timeout evidence.
 export async function runSupervisedSmoke({entry, artifactDirectory, env = process.env,
@@ -46,15 +62,13 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
   // credentials, request bodies or the SQLite scratch database.
   const record = {entry: actualEntry, childPid: child.pid, startedAt,
     phaseTimeoutMs, totalTimeoutMs, phases, observations, outcome: 'running'};
-  let phaseTimer, totalTimer, stopping, writes = Promise.resolve();
-  const persist = () => {
-    const bytes = JSON.stringify(record, null, 2) + '\n';
-    writes = writes.catch(() => {}).then(async () => {
-      const temporary = join(directory, 'supervision.json.tmp');
-      await writeFile(temporary, bytes); await rename(temporary, join(directory, 'supervision.json'));
-    });
-    return writes;
-  };
+  let phaseTimer, totalTimer, stopping;
+  // Keep one active write and one pending snapshot. A burst of child IPC must
+  // not queue thousands of serialized copies while storage is slower than IPC.
+  const persist = createSmokeEvidenceWriter(() => JSON.stringify(record, null, 2) + '\n', async bytes => {
+    const temporary = join(directory, 'supervision.json.tmp');
+    await writeFile(temporary, bytes); await rename(temporary, join(directory, 'supervision.json'));
+  });
   const signalFailures = [];
   const signal = (pid, name) => signalOwnedSmokeProcess(pid, name, signalFailures);
   const processTable = async () => {

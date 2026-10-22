@@ -4,9 +4,39 @@ import {mkdtemp, readFile, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {runSupervisedSmoke, signalOwnedSmokeProcess} from './supervised-smoke.mjs';
+import {runSupervisedSmoke, signalOwnedSmokeProcess, createSmokeEvidenceWriter} from './supervised-smoke.mjs';
 
 const helper = new URL('./supervised-smoke.mjs', import.meta.url).href;
+test('a burst of evidence changes keeps one active write and the latest pending snapshot', async () => {
+  let value = 0, snapshots = 0, release;
+  const writes = [];
+  const persist = createSmokeEvidenceWriter(() => { snapshots++; return value; }, async bytes => {
+    writes.push(bytes);
+    if (writes.length === 1) await new Promise(done => { release = done; });
+  });
+  const finished = persist();
+  await Promise.resolve();
+  for (value = 1; value <= 20_000; value++) assert.equal(persist(), finished);
+  value = 20_000;
+  assert.equal(snapshots, 1, 'A blocked disk must not queue 20,000 serialized diagnostic documents');
+  release(); await finished;
+  assert.deepEqual(writes, [0, 20_000]);
+  assert.equal(snapshots, 2);
+});
+
+test('an evidence write failure stays fatal for its callers and a later cleanup write can recover', async () => {
+  let attempts = 0;
+  const failure = Error('owned evidence write denied');
+  const writes = [];
+  const persist = createSmokeEvidenceWriter(() => 'latest-owned-evidence', async bytes => {
+    if (++attempts === 1) throw failure;
+    writes.push(bytes);
+  });
+  await assert.rejects(persist(), error => error === failure);
+  await persist();
+  assert.deepEqual(writes, ['latest-owned-evidence']);
+});
+
 test('a denied owned signal is retained and cannot skip remaining process or group cleanup', () => {
   const failures = [], calls = [];
   const kill = (pid, name) => {
