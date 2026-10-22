@@ -45,16 +45,40 @@ typechecking pass. These results require fresh Linux qualification.
 The cancelled runtime-error-contract job never starts its application test:
 browser dependency installation spends about 19.5 minutes in APT mirror fetching
 until the existing 20-minute job bound. Browser setup now installs and verifies
-APT's 20-second HTTP/HTTPS connection/data-inactivity timeouts and two failed-file
-retries before the unchanged full Playwright dependency installer. These are
+APT's 15-second HTTP/HTTPS connection/data-inactivity timeouts and one failed-file
+retry before the full Playwright dependency installer. These are
 [transport bounds](https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-https.1.html),
-not a global step deadline or test retries. Repositories, TLS verification and
+not a global step deadline or test retries. The installer additionally runs under
+GNU timeout: five minutes, TERM, then at most fifteen seconds until KILL. Its own
+nonzero status remains unchanged; timeout is fatal. Repositories, TLS verification and
 signature checks remain. A subprocess control executes the actual composite
 script with owned non-root shims, verifies all effective settings, propagates
 denied writes and ineffective configuration, and excludes a planted proxy secret.
-It makes no claim to qualify real Linux package installation. All **180 CI policy
-controls**, workflow actionlint and whitespace checks pass locally. No assertion,
-scenario, required prerequisite or existing deadline is removed or relaxed.
+It makes no claim to qualify real Linux package installation. All **180 portable
+CI policy controls**, workflow actionlint and whitespace checks pass locally.
+Two additional actual-Linux controls are explicitly skipped on macOS and required
+on Linux: real APT file merging (including old-file and later-override negative
+controls), and the real GNU timeout wrapper preserving status 37 and bounding an
+owned stuck installer. They change no system configuration or package state.
+No application assertion, scenario or required prerequisite is removed or relaxed.
+
+The first published setup implementation at `ddced4f8` fails its effective-value
+check before browser installation. [Run 39777718361](https://github.com/jurei733/testcenter-rewrite/actions/runs/39777718361)
+finishes with **six successful, fifteen failed and six skipped jobs**. Thirteen
+browser jobs fail in this common setup; Fast feedback and acceptance correctly
+reject their prerequisites. The production/Source builds, dependency audit,
+Docker runtime and full **3,694 unit/frontend cases** succeed. No browser test
+passes through the failed setup and this is not complete qualification.
+
+The actual runner image is `ubuntu-24.04` version `20261012.334.1`. Its pinned
+[configure-apt.sh](https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/scripts/build/configure-apt.sh)
+installs `zz-retries` with 15-second/one-retry bounds. The initial
+`80-testcenter-ci-network` file therefore cannot apply the proposed 20-second/
+two-retry values. The corrected file sorts after that runner file and retains
+the stricter 15-second/one-retry profile. This does not itself establish a new
+transport speed gain over that image; the independent whole-installer deadline
+bounds a stall that transport settings alone cannot bound. The two real Linux
+controls and actual package installation still need the next head's qualification.
 
 ## Run selected CI checks locally
 
