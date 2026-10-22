@@ -1,4 +1,6 @@
 import { FirstSliceError } from "./first-slice-error.js";
+import { buildWorkspaceFileCatalog, selectCurrentWorkspaceFiles, normalizeWorkspacePlayerResourceId } from './workspace-file-catalog.js';
+import type { WorkspaceFileCatalog } from '@testcenter-rewrite-app/domain';
 export { FirstSliceError } from "./first-slice-error.js";
 export { prepareApplicationAssetDeletion, validateApplicationAssetReferences } from "./application-asset-mutation.js";
 export type { ApplicationAssetDeletionInput, ApplicationAssetDeletionContext, ApplicationAssetAssignmentRow } from "./application-asset-mutation.js";
@@ -457,6 +459,7 @@ export type WorkspaceAdminReadPort = {
     sortDirection?: "asc" | "desc";
     limit?: number;
   }): Promise<WorkspaceSourcePackageListResult>;
+  getWorkspaceFileCatalog(input: { tenantKey: string; workspaceKey: string }): Promise<WorkspaceFileCatalog>;
   exportSourcePackagesCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1250,6 +1253,7 @@ export const firstSliceUseCases = {
   getSourcePackageDetail: "GetSourcePackageDetail",
   getSourcePackageDeletionReadiness: "GetSourcePackageDeletionReadiness",
   listSourcePackages: "ListSourcePackages",
+  getWorkspaceFileCatalog: "GetWorkspaceFileCatalog",
   exportSourcePackagesCsv: "ExportSourcePackagesCsv",
   createSourcePackage: "CreateSourcePackage",
   assembleSourcePackages: "AssembleSourcePackages",
@@ -3979,17 +3983,7 @@ const readStandaloneTestcenterFileIdentity = (
 
 const inferVeronaPlayerResourceIdFromFileName = (
   fileName: string
-): string | null => {
-  const baseName = fileName.split(/[\\/]/).at(-1) ?? fileName;
-  const stem = baseName.replace(/\.html?$/i, "");
-  const versionedName = stem.match(
-    /^(.+?)[@-](\d+)\.(\d+)(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/
-  );
-  if (!versionedName?.[1]) {
-    return null;
-  }
-  return `${versionedName[1]}-${Number.parseInt(versionedName[2] ?? "", 10)}.${Number.parseInt(versionedName[3] ?? "", 10)}`;
-};
+): string | null => normalizeWorkspacePlayerResourceId(fileName);
 
 const readVeronaPlayerResourceId = (
   playerHtml: string,
@@ -16567,7 +16561,8 @@ const collectLooseSourcePackageDependencyReferences = (
     const definition =
       xmlChildrenNamed(root, "DefinitionRef")[0] ??
       xmlChildrenNamed(root, "Definition")[0];
-    addReference(definition?.getAttribute("player"));
+    const playerReference = definition?.getAttribute("player");
+    addReference(playerReference ? normalizeWorkspacePlayerResourceId(playerReference) ?? playerReference : null);
     if (definition && xmlElementLocalName(definition) === "DefinitionRef") {
       addReference(
         ["href", "path", "src", "uri", "file", "fileName", "filename"]
@@ -18320,7 +18315,7 @@ const findZipUnitPlayerEntry = (
   playerKey: string,
   manifestResources: Map<string, XmlManifestResource>
 ): ZipEntry | null => {
-  return (
+  const exact = (
     findZipUnitReferencedEntry(
       manifestExtraction,
       unitEntry,
@@ -18334,6 +18329,13 @@ const findZipUnitPlayerEntry = (
       manifestResources
     )
   );
+  if (exact) return exact;
+  const normalized = normalizeWorkspacePlayerResourceId(playerKey);
+  if (!normalized || normalized === playerKey) return null;
+  // Source identifies stored Players by module + major/minor. Use that same
+  // identifier for ZIP hydration and metadata validation, after exact aliases.
+  return findZipUnitReferencedEntry(manifestExtraction, unitEntry, normalized, manifestResources) ??
+    findZipUnitReferencedEntry(manifestExtraction, unitEntry, `${normalized}.html`, manifestResources);
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -29368,6 +29370,24 @@ export const createFirstSliceServices = (
               activityEvents
             })
         });
+      },
+      async getWorkspaceFileCatalog(input) {
+        const workspace = await requireWorkspace(repository, input.tenantKey, input.workspaceKey);
+        const [sourcePackages, activityEvents] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(workspace.tenantId, workspace.workspaceId),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+        // Assemblies and replaced immutable revisions stay available through
+        // canonical history/download APIs, but are not current loose files.
+        return buildWorkspaceFileCatalog(selectCurrentWorkspaceFiles(sourcePackages, activityEvents)
+          .map(source => {
+            const decoded = decodePersistedSourceDocument(source);
+            return {sourcePackageId: source.sourcePackageId, fileName: source.fileName,
+              fileType: classifyWorkspaceSourcePackage(source, decoded), status: source.status,
+              uploadedAt: source.uploadedAt, fileSizeBytes: decoded?.bytes.byteLength ?? null,
+              sourceText: decoded ? readPersistedSourceText(source, decoded) : null,
+              resourceIdentifier: readStandaloneVeronaPlayerResourceId(source)};
+          }));
       },
       async listSourcePackages(input) {
         const workspace = await requireWorkspace(

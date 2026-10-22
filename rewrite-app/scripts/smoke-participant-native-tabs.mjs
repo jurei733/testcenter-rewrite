@@ -1,7 +1,7 @@
 import { observeParticipantCommandCompletions, assertNativeCommandCompletion } from "./participant-command-completion-smoke-observer.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -12,12 +12,14 @@ import { parseVeronaUnitResponse } from "@testcenter-rewrite-app/contracts";
 import { localDemoSourcePackage } from "../apps/api/dist/apps/api/src/local-demo-bootstrap.js";
 import { createServerRequestFailureGate } from "./server-request-failure-gate.mjs";
 import { verifyParticipantNativeCrashRecovery } from "./participant-native-crash-smoke.mjs";
+import {waitForParticipantNativeTabReady, verifyNativeTabReadiness, nativeTabFailureEvidence} from './participant-native-tab-readiness.mjs';
 
 // Actual production bundles, authenticated SQLite API and trusted Verona input.
 // Source formatter/parser/config contracts are verified separately against pinned excerpts.
 const root = resolve(process.env.UI_SMOKE_FRONTEND_ROOT || ".");
 await access(join(root, "dist/apps/web/browser/index.html"));
 const artifacts = await mkdtemp(join(tmpdir(), "testcenter-native-tabs-"));
+const publicEvidence = process.env.UI_SMOKE_ARTIFACT_DIR ? resolve(process.env.UI_SMOKE_ARTIFACT_DIR, 'participant-native-tabs') : artifacts;
 console.log(`owned_artifacts=${artifacts}`);
 const file = join(artifacts, "owned.sqlite"), gate = createServerRequestFailureGate();
 const module = pathToFileURL(resolve("apps/api/dist/apps/api/src/index.js")).href;
@@ -32,6 +34,7 @@ const server = spawn(process.execPath, ["--input-type=module", "-e", `
 gate.observeStream(server.stdout); gate.observeStream(server.stderr);
 const closed = new Promise(done => server.once("close", done));
 const errors = [], checks = [], nativeRequests = [], observations = [], releases = [], pages = [];
+const pendingRequests = new Map();
 let browser, page;
 const poll = async (predicate, message) => {
   const deadline = Date.now() + 20_000;
@@ -65,14 +68,20 @@ try {
   await api(workspace + "/participant-roster", { rosterText: `<Testtakers><Group id="owned">${["tabs-person", "native-crash-queued", "native-crash-committed"].map(name => `<Login mode="run-hot-return" name="${name}"><Booklet>first</Booklet><Booklet>second</Booklet></Login>`).join("")}</Group></Testtakers>` }, operator);
   const repository = createSqliteFirstSliceRepository(file);
   const mark = name => { checks.push(name); console.log(`participant_native_tabs=${name}:passed`); };
-  const track = (target, label) => { pages.push(target); target.on("request", request => {
+  const track = (target, label) => { const active = new Set(); pages.push(target); target.on("request", request => {
+    active.add(request);
+    pendingRequests.set(request, label);
     if (new URL(request.url()).pathname.endsWith("/native-commands")) nativeRequests.push({ label, request: request.postDataJSON() });
-  }); target.on("pageerror", error => errors.push(String(error))); };
+  }); const finished = request => {active.delete(request); pendingRequests.delete(request);};
+    target.on('requestfinished', finished); target.on('requestfailed', finished);
+    target.on('close', () => {for (const request of active) pendingRequests.delete(request); active.clear();});
+    target.on("pageerror", error => errors.push(String(error))); };
   await verifyParticipantNativeCrashRecovery({ base, workspaceKey, api, repository, artifacts, track, mark, observations });
   browser = await chromium.launch({ headless: process.env.CI === "true" && process.env.UI_SMOKE_HEADFUL !== "true" });
+  await verifyNativeTabReadiness(browser, base, mark);
   page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "de-DE" });
   track(page, "source");
-  await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "networkidle" });
+  await page.goto(`${base}/app/participant?ui=original&tenantKey=demo-tenant&workspaceKey=${workspaceKey}`, { waitUntil: "domcontentloaded" });
   // Real RouterLinks establish a preceding route for actual browser Back/Forward.
   await page.locator("#applicationPrivacyNoticeLink").click();
   await page.getByRole("link", { name: "Back to participant entry", exact: true }).click();
@@ -82,7 +91,7 @@ try {
   const currentPath = `/api/v1/participant/sessions/${identity.participantSession.participantSessionId}/current-state`;
   const read = async runId => (await api(currentPath + (runId ? `?testRunId=${runId}` : ""), undefined, identity.sessionToken)).currentRunState.testRun;
   const native = (keyword, args = []) => page.evaluate(({ keyword, args }) => window.tc[keyword](args), { keyword, args });
-  const methods = () => page.waitForFunction(() => ["debug", "pause", "resume", "terminate", "goto"].every(key => typeof window.tc?.[key] === "function"));
+  const methods = () => waitForParticipantNativeTabReady(page);
   const player = () => page.frameLocator("iframe").locator("#demoPlayerAnswer");
   const journal = () => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith("testcenter-rewrite:participant-native-command:v1:")).map(key => JSON.parse(localStorage.getItem(key))));
   const emptyJournal = () => poll(async () => (await journal()).length === 0, "The native journal was not drained");
@@ -96,7 +105,7 @@ try {
   const ownerKey = "testcenter-rewrite:participant-native-owner:v1";
   const ownerOf = target => target.evaluate(key => sessionStorage.getItem(key), ownerKey);
   const journalOf = target => target.evaluate(prefix => Object.keys(localStorage).filter(key => key.startsWith(prefix)).map(key => JSON.parse(localStorage.getItem(key))), prefix);
-  const allMethods = target => target.waitForFunction(() => ["debug", "pause", "resume", "terminate", "goto"].every(key => typeof window.tc?.[key] === "function"));
+  const allMethods = waitForParticipantNativeTabReady;
   const unavailable = route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "owned_temporarily_unavailable" }) });
   await context.route("**/native-commands", unavailable);
   await native("pause"); await poll(async () => (await journal()).some(entry => entry.prepared), "Source intent was not prepared");
@@ -111,7 +120,7 @@ try {
     return copy;
   };
   const clone = await openCopy("clone"), cloneEntry = new URL(entry); cloneEntry.searchParams.set("ui", "rewrite");
-  await clone.goto(cloneEntry.href, { waitUntil: "networkidle" }); await allMethods(clone);
+  await clone.goto(cloneEntry.href, { waitUntil: "domcontentloaded" }); await allMethods(clone);
   assert.notEqual(await ownerOf(clone), sourceOwner, "A real cloned sessionStorage reused the source tab's native owner");
   await delay(1200);
   assert.deepEqual(nativeRequests.filter(item => item.label === "clone"), [], "The new tab replayed another tab's native intent");
@@ -125,7 +134,7 @@ try {
   await clone.evaluate(() => window.tc.goto(["2"]));
   await poll(async () => (await journalOf(clone)).some(entry => entry.owner === cloneOwner && entry.prepared), "Clone intent was not prepared");
   const own = (await journalOf(clone)).find(entry => entry.owner === cloneOwner), beforeReload = nativeRequests.length;
-  await clone.reload({ waitUntil: "networkidle" }); await allMethods(clone); await delay(1200);
+  await clone.reload({ waitUntil: "domcontentloaded" }); await allMethods(clone); await delay(1200);
   assert.equal(await ownerOf(clone), cloneOwner); assert.equal(await clone.evaluate(() => opener), null);
   const afterReload = nativeRequests.slice(beforeReload).filter(item => item.label === "clone");
   assert.ok(afterReload.length > 0); for (const item of afterReload) assert.deepEqual(item.request, own.request);
@@ -152,7 +161,7 @@ try {
   await page.reload({ waitUntil: "commit" });
   const sourceBeforeReload = nativeRequests.length;
   await context.unroute("**/native-commands", unavailable);
-  await page.waitForLoadState("networkidle"); await methods();
+  await methods();
   await poll(async () => (await read(first.testRunId)).status === "paused", "Source reload did not deliver its retained pause"); await emptyJournal();
   assert.equal(await ownerOf(page), sourceOwner);
   const sourceReplay = nativeRequests.slice(sourceBeforeReload).filter(item => item.label === "source");
@@ -177,7 +186,7 @@ try {
   await early.goto(entry, { waitUntil: "commit" }); await poll(() => Promise.resolve(heldBootstraps > 0), "The copied tab's bootstrap was not held");
   assert.equal(await early.evaluate(() => typeof window.tc), "undefined");
   await early.reload({ waitUntil: "commit" }); await poll(() => Promise.resolve(heldBootstraps > 1), "The pre-bootstrap reload was not held");
-  releaseBootstrap(); await early.waitForLoadState("networkidle"); await allMethods(early); await early.unroute("**/main-*.js", heldBootstrap); await delay(1200);
+  releaseBootstrap(); await allMethods(early); await early.unroute("**/main-*.js", heldBootstrap); await delay(1200);
   assert.notEqual(await ownerOf(early), sourceOwner); assert.equal(await early.evaluate(() => opener), null);
   assert.deepEqual(nativeRequests.filter(item => item.label === "early-reload"), [], "Reload before bootstrap adopted the copied owner");
   assert.deepEqual((await journalOf(early)).find(entry => entry.id === resume.id), resume);
@@ -195,6 +204,9 @@ try {
   mark("source-retry-retains-trusted-answers-clocks-and-the-selected-run");
   assert.deepEqual(errors, []);
 } catch (error) {
+  await mkdir(publicEvidence, {recursive: true});
+  const origin = page ? new URL(page.url()).origin : '';
+  await writeFile(join(publicEvidence, 'public-failure.json'), JSON.stringify(nativeTabFailureEvidence(error, checks, pendingRequests, origin), null, 2));
   await page?.screenshot({ path: join(artifacts, "failure.png"), fullPage: true }).catch(() => {});
   await writeFile(join(artifacts, "failure.json"), JSON.stringify({ error: String(error), stack: error.stack, checks, errors, nativeRequests,
     body: await page?.locator("body").innerText().catch(() => "") }, null, 2)); throw error;

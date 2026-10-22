@@ -1,3 +1,5 @@
+export type { WorkspaceFileRelationship, WorkspaceFileReference, WorkspaceCatalogDependency,
+  WorkspaceCatalogFile, WorkspaceFileCatalog } from './workspace-file-catalog.js';
 export type TenantStatus = "active" | "suspended";
 export type WorkspaceStatus = "active" | "archived";
 export type AdminUserStatus = "active" | "disabled";

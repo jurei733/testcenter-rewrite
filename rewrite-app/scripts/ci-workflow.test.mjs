@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
@@ -10,6 +12,47 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('browser setup bounds APT mirror stalls, verifies effective configuration and preserves installer checks', () => {
+  const step = action.runs.steps.find(step => step.name === 'Bound browser dependency mirror waits');
+  assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
+  const install = action.runs.steps.findIndex(step => step.run === 'npx --no-install playwright install --with-deps chromium');
+  assert.ok(install > action.runs.steps.indexOf(step));
+  const directory = mkdtempSync(join(tmpdir(), 'owned-apt-policy-'));
+  const capture = join(directory, 'capture.conf');
+  try {
+    writeFileSync(join(directory, 'sudo'), `#!/bin/sh
+      [ "$1" = tee ] && [ "$2" = /etc/apt/apt.conf.d/80-testcenter-ci-network ] || exit 65
+      [ "$OWNED_APT_DENY" != 1 ] || exit 51
+      cat > "$OWNED_APT_CAPTURE"
+    `);
+    writeFileSync(join(directory, 'apt-config'), `#!/bin/sh
+      [ "$1" = dump ] || exit 65
+      if [ "$OWNED_APT_WRONG" = 1 ]; then printf 'Acquire::http::Timeout "120";\\n'; else cat "$OWNED_APT_CAPTURE"; fi
+      printf 'Acquire::http::Proxy "http://owned:OWNED_APT_SECRET@proxy";\\n'
+    `);
+    for (const name of ['sudo', 'apt-config']) chmodSync(join(directory, name), 0o755);
+    const run = env => spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
+      encoding: 'utf8', env: {...process.env, PATH: directory + ':' + process.env.PATH, OWNED_APT_CAPTURE: capture, ...env}
+    });
+    const success = run({}); assert.equal(success.status, 0, success.stderr);
+    assert.equal(readFileSync(capture, 'utf8'), 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "2";\n');
+    const denied = run({OWNED_APT_DENY: '1'}); assert.equal(denied.status, 51);
+    const ineffective = run({OWNED_APT_WRONG: '1'}); assert.equal(ineffective.status, 1);
+    assert.ok(![success, denied, ineffective].some(value => (value.stdout + value.stderr).includes('OWNED_APT_SECRET')));
+  } finally { rmSync(directory, {recursive: true, force: true}); }
+});
+test('workspace file catalog HTTP authorization and projection qualify in unit and real PostgreSQL gates', () => {
+  const suite = 'scripts/workspace-file-catalog-api.test.mjs';
+  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
+  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+});
+test('native tab failures retain only scoped public metadata without private scratch stores or body dumps', () => {
+  const upload = workflow.jobs['verify-memory-sqlite'].steps.find(step => step.name === 'Retain scoped native tab failure evidence');
+  assert.equal(upload.if, "(failure() || cancelled()) && matrix.check == 'ui-participant-native-routes'");
+  assert.equal(upload.with.path, '${{ runner.temp }}/rewrite-ui-artifacts/participant-native-tabs/public-failure.json');
+  assert.equal(upload.with['retention-days'], 7);
+  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/participant-native-tab-evidence.test.mjs'));
+});
 test("focused asset iteration retains mandatory unit and real PostgreSQL qualification", () => {
   const suites = ["scripts/application-asset-cascade.test.mjs", "scripts/application-asset-cascade-api.test.mjs"];
   const postgres = read("./run-postgres-integration.mjs");

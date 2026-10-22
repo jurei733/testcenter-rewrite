@@ -1,4 +1,5 @@
 import type {
+  WorkspaceFileCatalog,
   AdminAuditEvent,
   AdminAuditEventType,
   AdminRole,
@@ -189,6 +190,7 @@ export const productionApiRoutes = {
     assembleSourcePackages:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
+    getWorkspaceFileCatalog: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
     downloadSourcePackage:
@@ -1307,6 +1309,7 @@ export type ReplaceSourcePackageResponse = {
   participantRosterImport?: ParticipantRosterImportSummary;
 };
 
+export type GetWorkspaceFileCatalogResponse = WorkspaceFileCatalog;
 export type ListSourcePackagesResponse = {
   items: WorkspaceSourcePackageListItem[];
   filteredCount: number;

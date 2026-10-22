@@ -32,6 +32,58 @@ authorization, Candidate rendering or the required real file mutation workflow.
 The new helper is not yet a CI family or complete-acceptance substitute. Formal
 status remains 29 done / 20 partial, with all eight broad visual rows open.
 
+### Workspace file read model and Player binding (2026-10-22)
+
+A protected `GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` now
+provides the complete current canonical loose-file catalog. It does not inherit
+the generic source-list's 500-row bound or fetch each raw document into the
+browser. Metadata includes authored ID/label/description, named-Login count and
+Player versions. Typed recursive relationships preserve Source's distinction:
+Unit size excludes Player bytes, Booklet size includes them, and
+Testtakers/SysCheck/resources retain their own sizes. The exact 1,000-file boundary
+and Source's uncomputed-size state above it are explicit; files are still listed.
+Missing and ambiguous typed references remain visible. Import status is not
+rewritten and no Source validation report is synthesized by this read model.
+
+The read uses canonical immutable replacement/assembly history. Generated
+dependency archives and superseded revisions are excluded from the current
+loose-file view, while historical downloads keep their exact bytes. Canonical
+rejected-replacement policy is retained here. Source's full invalid-upload,
+replace/delete lifecycle, ZIP member materialization, automatic validation/
+activation and real four-tab renderer remain required work. The generic console
+still renders at the current workspace/content routes; this backend preparation
+does not close a visual row or claim the whole Original operator flow.
+
+The actual replacement test first fails in Memory, File and SQLite because
+workspace dependency selection cannot resolve `catalog-player@1.2.9` to Source's
+stored module/major/minor identity. A second before-fix probe proves that merely
+normalizing the loose lookup is insufficient: import can report `completed`
+while the requested Player HTML is absent from its immutable runtime. Both the
+loose-file lookup and ZIP Player hydration/validation now share the normalization,
+retaining existing exact aliases first. Regression assertions inspect the actual
+Player bytes, allow a different patch in the same major/minor line and reject a
+wrong minor even when its filename matches. Existing metadata identity/version
+checks are preserved; a successful status alone cannot satisfy this test.
+
+Ten pure controls cover metadata whitespace/encoding-independent structure,
+recursive distinct relationships, ambiguous/missing IDs, secret exclusion,
+malformed/DOCTYPE inputs, Player language preference and current canonical
+history. ID casing preserves Source's PHP
+[`strtoupper`](https://www.php.net/manual/en/function.strtoupper.php) behavior:
+ASCII letters change case while Unicode ID distinctions remain. Real protected
+HTTP cases pass in Memory, File, SQLite and an owned
+socket-only PostgreSQL cluster, which is stopped afterwards. They verify UTF-16
+bytes and labels, downloads, replacement history, actual Player bindings,
+version rejection, RO access, foreign-workspace/monitor denial and unchanged
+canonical lists/activity after reads. A real 1,007-file Memory API case remains
+complete when the generic list returns 500. The tests are mandatory in unit and
+PostgreSQL CI; they establish Candidate API behavior, not Original backend
+authorization.
+
+The final full local unit sequence passes 121 + 315 + 1,266 + 1,983 tests, all
+without skips or cancellations. Production build, all four native strict-XML
+journeys (Rewrite/Original mode, desktop/mobile) and 176 CI policy checks pass.
+
 
 ### Current settings and directory checkpoint (2026-10-21)
 

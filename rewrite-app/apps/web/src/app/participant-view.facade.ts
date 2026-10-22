@@ -4461,6 +4461,17 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const currentState = this.readCurrentRunState();
+    if (currentState?.testRun.testRunId === this.runtime.testRunId.trim() &&
+        currentState.currentUnit.unitKey === currentUnitKey &&
+        this.runtime.currentUnitResponse === this.effectiveUnitResponse(currentState, currentUnitKey)) {
+      // Closing an empty Source response buffer sends no data update. An
+      // unchanged shell must not manufacture '' merely because log flushing
+      // happened to finish before this foreground action. Real edits/clears
+      // still differ from the saved (or non-saving ephemeral) response.
+      return;
+    }
+
     await this.saveProgressInternal(
       player.runStatus === "paused" ? "paused" : "running",
       currentUnitKey,
