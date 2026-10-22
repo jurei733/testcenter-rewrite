@@ -15,6 +15,14 @@ export function reportSmokeObservation(observation) {
   if (process.connected) process.send({type: 'owned-smoke-observation', observation: String(observation).slice(0, 200)});
 }
 
+export function signalOwnedSmokeProcess(pid, name, failures, kill = process.kill) {
+  if (!Number.isSafeInteger(pid) || Math.abs(pid) <= 1) throw Error('Invalid owned smoke process ID');
+  try { kill(pid, name); }
+  catch (error) {
+    if (error.code !== 'ESRCH') failures.push({pid, signal: name, code: String(error.code ?? 'UNKNOWN').slice(0, 40)});
+  }
+}
+
 // The supervisor has its own event loop: a blocked browser evaluation, route
 // cleanup or even child Node event loop cannot prevent timeout evidence.
 export async function runSupervisedSmoke({entry, artifactDirectory, env = process.env,
@@ -47,9 +55,8 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
     });
     return writes;
   };
-  const signal = (pid, name) => {
-    try { process.kill(pid, name); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-  };
+  const signalFailures = [];
+  const signal = (pid, name) => signalOwnedSmokeProcess(pid, name, signalFailures);
   const processTable = async () => {
     const {stdout} = await execute('ps', ['-A', '-o', 'pid=,ppid=,lstart='], {timeout: 2000, maxBuffer: 2 * 1024 * 1024});
     return stdout.trim().split('\n').map(line => {
@@ -87,7 +94,17 @@ export async function runSupervisedSmoke({entry, artifactDirectory, env = proces
         if (current.some(value => value.pid === row.pid && value.started === row.started)) signal(row.pid, 'SIGKILL');
       }
       if (child.exitCode === null && child.signalCode === null) signal(-child.pid, 'SIGKILL');
-      if (evidenceError) throw evidenceError;
+      // A denied signal must not prevent cleanup of the remaining owned
+      // descendants or the owned group. Preserve the exact failure as evidence
+      // and still fail supervision after all permitted cleanup was attempted.
+      if (signalFailures.length) {
+        record.signalFailures = signalFailures;
+        try {await persist();} catch (error) {evidenceError ??= error;}
+      }
+      const cleanupErrors = signalFailures.map(failure => Error(
+        `Owned smoke cleanup ${failure.signal} pid=${failure.pid}: ${failure.code}`));
+      if (evidenceError) cleanupErrors.push(evidenceError);
+      if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'Owned smoke cleanup failed');
     })();
     return stopping;
   };

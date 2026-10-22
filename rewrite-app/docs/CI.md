@@ -1,5 +1,47 @@
 # CI iteration and complete acceptance
 
+## Run selected CI checks locally
+
+From `rewrite-app`, `npm run ci:focus -- --list` lists the actual Quick,
+extended-qualification and memory/SQLite workflow shards, plus `policy`,
+`typecheck` and `unit`. Select one or several, for example:
+
+```sh
+npm run ci:focus -- --plan ui-participant-console original-login
+npm run ci:focus -- ui-participant-console original-login
+npm run ci:focus -- policy typecheck
+```
+
+The runner reads `.github/workflows/rewrite-app-ci.yml` on each invocation and
+keeps every command in the selected shard, including the second console
+compatibility check and the third front-camera attachment check. It performs
+one fresh production build before selected build-dependent checks; policy and
+no-emit type checking need none. There is no stale-build bypass. A failing build
+or test stops the sequence and preserves its status. Per-command elapsed times
+are printed for actual local measurements. No arbitrary shell input is accepted;
+the runner executes existing npm scripts with separate arguments. Headed Quick
+checks use `xvfb-run` on Linux. Install the normal locked dependencies, Chromium
+and its host libraries first, as for existing standalone smoke scripts.
+
+This is a focused local check, explicitly marked `completeAcceptance: false`.
+It does not replace PostgreSQL, Docker/Compose, unchanged-Original references,
+the remaining workflow shards or the full CI acceptance gate. Local platform and
+fixture environment still matter. Listing/planning launches no build or test
+and does not export inherited environment values. Nine controls cover complete
+workflow enumeration, command ordering, one-build reuse, failure propagation,
+unknown selections, shell injection, secret-free planning and the exact failure
+status from an actual npm-child subprocess. A real focused invocation freshly
+builds production and passes all 43 loading and five context-compatibility cases,
+with both owned APIs shut down.
+
+The first full control run exposed a native `kill EPERM` during supervised
+cleanup; its underlying host cause is not established by a later passing run.
+Cleanup now attempts every remaining owned descendant/group even after a denied
+signal, records only PID/signal/error-code evidence and still fails. Two added
+controls verify denied-signal continuation and rejection of system/malformed
+PIDs. All 172 CI policy controls subsequently pass. This does not resolve the
+separate Linux console-operation timeout from run `39762727435`.
+
 The historical workflow-reported green run is
 [`39187723764`](https://github.com/jurei733/testcenter-rewrite/actions/runs/39187723764)
 at `d39d8d46`, measured from its 38 actual jobs: **42.9 minutes** from first job

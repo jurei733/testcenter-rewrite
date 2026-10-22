@@ -4,9 +4,27 @@ import {mkdtemp, readFile, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {runSupervisedSmoke} from './supervised-smoke.mjs';
+import {runSupervisedSmoke, signalOwnedSmokeProcess} from './supervised-smoke.mjs';
 
 const helper = new URL('./supervised-smoke.mjs', import.meta.url).href;
+test('a denied owned signal is retained and cannot skip remaining process or group cleanup', () => {
+  const failures = [], calls = [];
+  const kill = (pid, name) => {
+    calls.push([pid, name]);
+    if (pid === 4102) throw Object.assign(Error('owned denial'), {code: 'EPERM'});
+    if (pid === 4103) throw Object.assign(Error('already exited'), {code: 'ESRCH'});
+  };
+  for (const pid of [4102, 4103, 4104, -4101]) signalOwnedSmokeProcess(pid, 'SIGTERM', failures, kill);
+  assert.deepEqual(calls.map(([pid]) => pid), [4102, 4103, 4104, -4101]);
+  assert.deepEqual(failures, [{pid: 4102, signal: 'SIGTERM', code: 'EPERM'}]);
+});
+
+test('cleanup rejects system and malformed process IDs before signaling', () => {
+  for (const pid of [0, 1, -1, undefined, NaN, 1.5]) {
+    assert.throws(() => signalOwnedSmokeProcess(pid, 'SIGTERM', [], () => assert.fail('No signal permitted')));
+  }
+});
+
 async function fixture(source, check, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'owned-supervision-test-'));
   const entry = join(directory, 'child.mjs'), evidence = join(directory, 'evidence');
