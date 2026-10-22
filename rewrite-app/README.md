@@ -335,6 +335,19 @@ It is intentionally separate from `rewrite-spike/`:
 
 ### Protected standalone workspace files
 
+In authenticated **Original** mode, Content now opens the native grouped file
+view, with its own workspace header, upload report, byte-preserving downloads,
+selection/dependency highlighting and guarded partial deletion. The workspace
+name and RW/RO role come from the actual protected scope. Scope changes/logout
+invalidate pending actions; missing view code shows an explicit Reload action.
+The full four-tab shell, the other native workspace pages, complete upload/
+validation behavior, ZIP extraction and automatic activation remain open.
+Run `npm run smoke:ui:original-workspace-files` for the complete owned browser
+journey, or select `verify/ui-original-workspace-files` through
+`npm run ci:focus -- --list`. This is functional qualification, not a full-page
+Original pixel-match claim.
+
+
 `POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` accepts
 `{fileName, mediaType, sourceDocument}` for a loose file (string content or a
 byte-preserving data URL). Names are basenames, up to 120 UTF-8 bytes. Files are

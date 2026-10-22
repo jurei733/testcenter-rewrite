@@ -1,0 +1,205 @@
+<app-original-overlay-styles />
+<app-original-workspace-file-surface-styles />
+<div id="originalWorkspaceFileFrame">
+  <mat-toolbar data-cy="header" id="originalWorkspaceFileHeader">
+    <div class="side">
+      <button mat-icon-button class="account-button" aria-label="Nutzerinformationen"
+        data-cy="account-button" [matMenuTriggerFor]="accountMenu" #account="matMenuTrigger">
+        <mat-icon originalWorkspaceFileIcon name="person" />
+      </button>
+      <mat-menu #accountMenu="matMenu" class="original-workspace-account-menu">
+        <div class="heading"><div>Nutzerinformationen</div>
+          <button mat-icon-button aria-label="Nutzerinformationen schließen"
+            (click)="account.closeMenu()"><mat-icon originalWorkspaceFileIcon name="close" /></button>
+        </div>
+        <dl><dt>Anmeldename:</dt><dd>{{app.operatorAccountUsername}}</dd>
+          <dt>Gruppe:</dt><dd></dd><dt>Berechtigung:</dt>
+          <dd>Verwaltung des Arbeitsbereichs</dd>
+          <dt>Version:</dt><dd>{{app.ops.buildRef}}</dd>
+        </dl><mat-divider />
+        <button mat-button id="globalAdminSignOutButton" class="logout-button"
+          data-cy="logout-button" (click)="$event.stopPropagation(); confirmLogout(account)">Abmelden</button>
+      </mat-menu>
+    </div>
+    <div class="center"><h1>{{title}}</h1></div>
+    <div class="side logo"><a routerLink="/workspace" aria-label="Gehe zur Startseite">
+      <img id="applicationLogo" data-cy="logo" alt="Logo der Anwendung"
+        matTooltip="Zur Startseite" [src]="settings.assetUrl('logo',settings.settings().mainLogo)" />
+    </a></div>
+  </mat-toolbar>
+  <div class="workspace-files-view">
+<section id="originalWorkspaceFiles" class="columnhost"
+  [attr.aria-busy]="controller.busy">
+  <div class="filelist">
+    @if (controller.busy) { <mat-progress-bar mode="indeterminate" /> }
+    @if (controller.problem) {
+      <p role="alert">{{controller.problem}}</p>
+      <button mat-raised-button [disabled]="controller.busy"
+        (click)="controller.refresh()">Erneut laden</button>
+    }
+    <mat-accordion class="example-headers-align" [multi]="true">
+      @for (type of fileTypes; track type) {
+        @if (controller.rows(type).length) {
+          <mat-expansion-panel [expanded]="true">
+            <mat-expansion-panel-header>
+              <mat-panel-title class="table-header">{{labels[type]}}</mat-panel-title>
+              <mat-panel-description>
+                <span>{{controller.rows(type).length}} Datei{{controller.rows(type).length === 1 ? '' : 'en'}}</span>
+                @if (invalid(type)) { <span>, davon {{invalid(type)}} Fehlerhaft</span> }
+                @if (type === 'Testtakers') { <span>, {{participants}} Teilnehmer</span> }
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            <mat-table matSort [dataSource]="controller.rows(type)"
+              [trackBy]="trackFile" (matSortChange)="sort($event)">
+              <ng-container matColumnDef="checked">
+                <mat-header-cell *matHeaderCellDef class="checkboxcell">
+                  <mat-checkbox [attr.data-cy]="'files-checkAll-'+type"
+                    [disabled]="controller.busy"
+                    (change)="controller.checkAll(type,$event.checked)" />
+                </mat-header-cell>
+                <mat-cell *matCellDef="let file" class="checkboxcell">
+                  <mat-checkbox [attr.data-cy]="'files-checkbox-'+file.metadata.identifier"
+                    [checked]="file.isChecked" [disabled]="controller.busy"
+                    (change)="controller.check(file,$event.checked)" />
+                </mat-cell>
+              </ng-container>
+              <ng-container matColumnDef="name">
+                <mat-header-cell *matHeaderCellDef class="namecell"
+                  mat-sort-header>Dateiname</mat-header-cell>
+                <mat-cell *matCellDef="let file" class="namecell">
+                  <div class="file-report">
+                    <button mat-button [attr.data-cy]="file.name"
+                      (click)="download(file)">{{file.name}}</button>
+                    <span class="vertical-align-middle">
+                      @if (errors(file).length) {
+                        <mat-icon originalWorkspaceFileIcon class="report-error"
+                          name="error" />
+                      } @else if (warnings(file).length || neverUsed(file)) {
+                        <mat-icon originalWorkspaceFileIcon class="report-warning"
+                          name="warning" />
+                      }
+                    </span>
+                    <mat-card class="full-file-report" appearance="raised">
+                      @if (file.metadata.label || file.metadata.identifier) {
+                        <mat-card-header><mat-card-title>
+                          {{file.metadata.label}}
+                          @if (file.metadata.identifier !== file.name.toUpperCase()) {
+                            <span [style.color]="file.metadata.label ? 'silver' : ''">#{{file.metadata.identifier}}</span>
+                          }
+                        </mat-card-title><mat-card-subtitle>
+                          {{file.metadata.description}}
+                        </mat-card-subtitle></mat-card-header>
+                      }
+                      <mat-card-content>
+                        @if (file.metadata.participantCount) {
+                          <app-original-workspace-file-notice level="info"
+                            [text]="file.metadata.participantCount+' Teilnehmer definiert'" />
+                        }
+                        @if (neverUsed(file)) {
+                          <app-original-workspace-file-notice level="warning"
+                            [text]="file.fileType+' is never used.'" />
+                        }
+                        @for (message of errors(file); track $index) {
+                          <app-original-workspace-file-notice level="error" [text]="message" />
+                        }
+                        @for (message of warnings(file); track $index) {
+                          <app-original-workspace-file-notice level="warning" [text]="message" />
+                        }
+                      </mat-card-content>
+                    </mat-card>
+                  </div>
+                </mat-cell>
+              </ng-container>
+              <ng-container matColumnDef="modificationTime">
+                <mat-header-cell *matHeaderCellDef class="datecell"
+                  mat-sort-header> Letzte Änderung</mat-header-cell>
+                <mat-cell *matCellDef="let file" class="datecell">
+                  {{formatDate(file.uploadedAt)}}
+                </mat-cell>
+              </ng-container>
+              <ng-container matColumnDef="size">
+                <mat-header-cell *matHeaderCellDef mat-sort-header>
+                  Volle Größe</mat-header-cell>
+                <mat-cell *matCellDef="let file" style="white-space:nowrap">
+                  @if (controller.busy) { <mat-spinner [diameter]="25" /> }
+                  @else { {{size(file.totalSizeBytes)}} }
+                </mat-cell>
+              </ng-container>
+              <mat-header-row *matHeaderRowDef="displayedColumns" />
+              <mat-row *matRowDef="let file; columns:displayedColumns"
+                [class.selected-row]="controller.selectedRowId === file.sourcePackageId"
+                [class.isDependency]="controller.dependencyRowIds.includes(file.sourcePackageId)"
+                (click)="selectRow($event,file)" />
+            </mat-table>
+          </mat-expansion-panel>
+        }
+      }
+    </mat-accordion>
+  </div>
+  <div class="sidebar">
+    <div class="buttons">
+      <button mat-raised-button data-cy="delete-files"
+        matTooltip="Markierte Dateien löschen" matTooltipPosition="above"
+        [disabled]="!controller.canWrite || controller.busy || !controller.selected.length"
+        (click)="deleteFiles()">
+        @if (!controller.busy) { <mat-icon originalWorkspaceFileIcon name="delete" /> }
+        @else { <mat-spinner [diameter]="15" /> }
+        Löschen
+      </button>
+      <button mat-raised-button data-cy="upload-files"
+        matTooltip="Dateien hochladen/aktualisieren" matTooltipPosition="above"
+        [disabled]="!controller.canWrite || controller.busy || !!controller.uploads.length"
+        (click)="hiddenfileinput.click()">
+        <mat-icon originalWorkspaceFileIcon name="upload" /> Hochladen
+      </button>
+    </div>
+    <input #hiddenfileinput type="file" name="fileforvo" multiple hidden
+      data-cy="upload-file-select" [disabled]="!controller.canWrite || controller.busy"
+      (change)="chooseFiles($event)" />
+    @if (controller.uploads.length) {
+      <mat-card appearance="raised">
+        <mat-card-header><mat-card-title>Upload-Report</mat-card-title></mat-card-header>
+        <mat-card-content data-cy="upload-report">
+          @for (upload of controller.uploads; track $index) {
+            <h2 class="subheading-2" [class.success]="upload.status === 'completed'"
+              [class.error]="upload.status === 'error'">{{upload.name}}</h2>
+            @if (upload.status === 'uploading' || upload.status === 'queued') {
+              <mat-progress-bar mode="indeterminate" />
+            } @else {
+              <app-original-workspace-file-notice
+                [level]="upload.status === 'error' ? 'error' : 'success'"
+                [text]="upload.message" />
+            }
+          }
+        </mat-card-content>
+        <mat-card-actions>
+          @if (!controller.busy) {
+            <button mat-raised-button data-cy="close-upload-report"
+              (click)="controller.clearUploads()">Ok</button>
+          }
+        </mat-card-actions>
+      </mat-card>
+    }
+    @if (controller.overview) {
+      @if (invalid()) {
+        <app-original-workspace-file-notice level="error"
+          [text]="invalid()+' Datei'+(invalid() === 1 ? '' : 'en')+' von '+controller.files.length+' '+(invalid() === 1 ? 'ist' : 'sind')+' nicht valide oder '+(invalid() === 1 ? 'hat' : 'haben')+' fehlende Abhängigkeiten und '+(invalid() === 1 ? 'wird' : 'werden')+' ignoriert!'" />
+      } @else if (controller.files.length) {
+        <app-original-workspace-file-notice level="success"
+          [text]="'Alle '+(controller.files.length > 1 ? controller.files.length+' ' : '')+'Dateien im Arbeitsbereich sind Valide.'" />
+      } @else {
+        <app-original-workspace-file-notice level="info"
+          text="Dieser Arbeitsbereich enthält noch keine Dateien!" />
+      }
+    }
+    <div class="supported-versions">
+      <h4>Unterstützte Hauptversionen</h4>
+      @for (entry of versions; track entry.label) {
+        <div>{{entry.label}}: {{entry.versions}}</div>
+      }
+    </div>
+  </div>
+</section>
+
+  </div>
+</div>

@@ -468,7 +468,7 @@ test("fast feedback is independent of the long matrix and full acceptance reject
   assert.match(gate.steps[0].run, /result\.result !== "success"/);
 });
 test("Ops qualification is split into independent browser jobs without dropping its authenticated full flow", () => {
-  for (const name of ["original-xml-schema", "deletion-confirmation", "delete-group-results", "admin-workspace-access", "admin-delete", "workspace-rename", "workspace-delete"]) {
+  for (const name of ["original-xml-schema", "original-workspace-files", "deletion-confirmation", "delete-group-results", "admin-workspace-access", "admin-delete", "workspace-rename", "workspace-delete"]) {
     assert.equal(matrix.find(item => item.check === "ui-" + name)?.command, `npm run smoke:ui:${name}:built`);
   }
   assert.equal(matrix.find(item => item.check === "ui-ops").command, "npm run smoke:ui:operator-auth:built");

@@ -1,5 +1,50 @@
 # CI iteration and complete acceptance
 
+## Full Linux checkpoint at d4e592cf (2026-10-22)
+
+Published `d4e592cf` [run 39790219381](https://github.com/jurei733/testcenter-rewrite/actions/runs/39790219381)
+finishes **86/86 jobs successfully**, including complete acceptance, all five
+Source families, PostgreSQL, Docker/Compose and deployment checks. Actual Linux
+logs pass **188/188 policy controls** and **121 + 322 + 1,270 + 1,992 = 3,705
+unit/frontend cases**, with no skips or cancellations. Canonical guided import
+review and both previously stalled login rows now complete.
+
+Across actual job timestamps, elapsed full time is **30:51**, Fast feedback
+**6:11**, and summed runner consumption **420.43 minutes**. The previous green
+`375ea6de` run is **28:35 / 4:14 / 408.8 minutes**; these different publications
+are observations rather than a controlled benchmark. Overall acceleration is
+still not established. The 39.4% paired label-phase result remains scoped.
+Both inspected login jobs report prior HTTP/HTTPS download limits as **null**,
+not 128. Their HTTPS package downloads reach about **4,112–6,756 kB/s**, but the
+old 113–133 kB/s episode's cause remains unproven. Explicit zero/default settings
+are configuration verification, not proof of a fixed configured throttle.
+
+This qualifies the published parent, not the native file-view changes below.
+The current-run PNG archives have not been independently downloaded/rehashed in
+this checkpoint; the mandatory current Source jobs pass, and the earlier
+independently verified pixel evidence remains separately identified.
+
+## Native workspace file gate (2026-10-22)
+
+The broad matrix gains `ui-original-workspace-files`; the historical acceptance
+prerequisites and Quick distribution remain. Its owned real API/browser checks
+use the production build and Original-19 schemas for all five loose file types,
+three themes, both widths and actual RW/RO sessions. They assert real snapshot/
+roster outcomes, exact UTF-16/empty downloads, overwritten history, selection,
+partial deletion, logout during a held download, and missing lazy-code recovery
+through an explicit user Reload. The derived focused shard runs independently.
+
+All **3,719 local unit/frontend cases**, the four strict-XSD journeys, fourteen
+native file-browser cases, protected APIs in all four stores, **186 portable CI
+policy controls** and Actionlint pass locally. Two actual-Linux controls remain
+explicit macOS skips. The 470 kB initial production budget remains: the new
+native view's first 480.67 kB build is rejected, shared date formatting is removed
+from the entry graph, and the final 468.39 kB build passes. A temporary disposable
+bundle-inspection build is not counted as qualification. Full Linux evidence for
+these new changes is still pending; do not cancel the useful parent run to
+publish an unfinished successor. Native Source file pixel comparison and the
+complete four-tab workspace still remain open.
+
 ## Canonical candidate regression and slow HTTPS download (2026-10-22)
 
 Published `e77c4fe5` [run 39783730393](https://github.com/jurei733/testcenter-rewrite/actions/runs/39783730393)

@@ -130,7 +130,7 @@
     @if (isOriginalAdminLogin) {
       <ng-container [ngTemplateOutlet]="entryHeader"></ng-container>
     }
-    @if (!isOriginalAdminLogin && !isOriginalAdministration) {
+    @if (!isOriginalAdminLogin && !isOriginalNativeOperator) {
       <section class="hero" [class.is-home-hero]="isFocusedEntryView">
         <div class="hero-panel">
           <div class="application-brand operator-brand">
@@ -240,7 +240,7 @@
         }
       </section>
     }
-    @if (!isOriginalAdminLogin && !isOriginalAdministration && (app.activeRequestLabel() || app.errorMessage())) {
+    @if (!isOriginalAdminLogin && !isOriginalNativeOperator && (app.activeRequestLabel() || app.errorMessage())) {
       <section
         class="status-banner"
         [class.is-error]="!!app.errorMessage()"
@@ -264,7 +264,7 @@
         }
       </section>
     }
-    @if (!isOriginalAdminLogin && !isOriginalAdministration) {
+    @if (!isOriginalAdminLogin && !isOriginalNativeOperator) {
       <nav class="view-nav" aria-label="Application Views">
         @for (view of app.views; track view) {
           <a
@@ -340,7 +340,7 @@
         }
       </nav>
     }
-    @if (isFocusedEntryView || isOriginalAdministration) {
+    @if (isFocusedEntryView || isOriginalNativeOperator) {
       <main class="home-stage" [class.participant-stage]="isOriginalAdminLogin">
         <router-outlet></router-outlet>
       </main>
@@ -375,7 +375,7 @@
     }
   }
 
-  @if (interfaceMode.mode() === 'original' && (isParticipantView || isOriginalAdminLogin || isOriginalAdministration)) {
+  @if (interfaceMode.mode() === 'original' && (isParticipantView || isOriginalAdminLogin || isOriginalNativeOperator)) {
     @if (isOriginalAdminLogin || (activeRouteView === 'participant' && !app.runtime.participantSessionId)) {
       @defer (when true) { <app-original-footer /> }
     }

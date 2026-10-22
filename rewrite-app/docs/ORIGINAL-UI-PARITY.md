@@ -1,5 +1,71 @@
 # Optional Original UI
 
+### Native workspace file view (2026-10-22)
+
+The published parent `d4e592cf` completes all **86 Linux jobs** in
+[run 39790219381](https://github.com/jurei733/testcenter-rewrite/actions/runs/39790219381).
+That complete CI acceptance establishes its bounded gates, not full Original
+parity and not Linux qualification of the native view introduced next.
+
+
+Authenticated Original content now mounts a separate lazy Material file view.
+It replaces the generic intake/editor controls and hides the Rewrite hero,
+diagnostic cards, live-context sidebar and footer while mounted. Its own Source
+header shows the verified workspace name and RW/RO scope, protected account menu,
+confirmed logout and logo return. Leaving the view restores the other layout.
+Grouped tables retain Source labels, native checkboxes, sorting, authored
+basenames, dates, full sizes, reverse dependency highlighting and hover cards.
+The additional Package group represents existing canonical containers; Source
+ZIP member materialization remains open.
+
+Native file selection calls the protected loose-file upload API and retains an
+itemized result before refreshing the actual catalog. It preserves raw/data-URL
+bytes, renders diagnostics as text and never executes uploaded HTML. Independent
+files need no fabricated runtime job. The first actual five-type strict browser
+journey exposes a status gap: successful dependency-snapshot imports leave their
+original Booklet/SysCheck/Testtakers records `uploaded`, although the generated
+snapshot is accepted. All prevalidated physical Source files now reserve as
+`accepted` atomically, with snapshot/runtime outcomes remaining separate.
+Canonical package creation/review keeps its existing semantics.
+
+A new controller captures the exact login, workspace and selected IDs/filenames
+for each action. Old reads, held file reads, stale confirmation callbacks and
+completed downloads cannot affect a replacement login/workspace. A refreshed read-only
+grant prevents the next upload and terminates remaining queue indicators.
+Logout/destruction clears rows, grouped caches, selection and upload results.
+Catalog reads now provide safe XML validation diagnostics independently of a
+canonical runtime-import status, without parser/XSD excerpts or XML contents.
+The native UI also shows unresolved references and unsupported Player API majors.
+This is not Source's complete validation-report wording/revalidation contract.
+
+Fourteen actual-controller cases pass. Fourteen owned production-browser cases
+cover all three themes at 1280/390 px with RW and RO sessions, all five loose
+file types under real Original-19 XSD validation, actual runtime/roster imports,
+UTF-16 and empty downloads, same-basename type folders, overwrite, cancellation
+and partial guarded deletion. A real held download returns 401 after logout and
+produces no file. An aborted actual lazy-component request exposes the explicit
+failure view; a user Reload recovers without writes or generic editor leakage.
+Four separate strict-XSD journeys retain Rewrite's canonical controls and now
+exercise Original's native chooser, including missing-schema rejection without
+writes. Production and all **3,719 unit/frontend cases** pass, with zero skips;
+protected API cases also pass in owned PostgreSQL and stop the cluster afterwards.
+
+The first build exceeds the unchanged 470 kB initial limit (480.67 kB). Bundle
+inspection identifies Angular's shared date-formatting code; native Intl date
+parts and view-local Source glyphs remove that startup cost. The final production
+entry is **468.39 kB**, including the new root-layout condition, against the
+parent's 468.16 kB. The budget is unchanged. A separate disposable diagnostic
+build used a temporary limit only to inspect its bundle graph; it is not a
+qualified production build and the configuration is restored byte-for-byte.
+
+The new `ui-original-workspace-files` workflow row is mandatory and independently
+selectable through `ci:focus`; all historical rows/commands remain required.
+This native file view has not yet passed a Source/Rewrite pixel comparison.
+The complete four-tab workspace shell and the other three native pages, batch
+upload/order/progress parity, complete reports/revalidation, ZIP members,
+automatic activation and physical deletion remain open. No broad visual row
+closes: **29 done / 20 partial; all eight broad visual rows open**.
+
 ### Protected first upload and same-name overwrite (2026-10-22)
 
 `POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` now accepts
@@ -96,7 +162,7 @@ replacements without a write and accepting/downloading exact UTF-16 bytes.
 The owned PostgreSQL cluster is stopped afterwards.
 
 This is additional backend behavior, not the complete Original file workflow.
-The first-upload UI, ZIP member materialization, Source's complete reports and
+Complete upload-queue parity, ZIP member materialization, Source's complete reports and
 dependency revalidation/automatic activation, physical delete semantics and
 the real four-tab renderer remain open. Current pages still show the generic
 console. No visual row closes: **29 done / 20 partial, all eight broad visual

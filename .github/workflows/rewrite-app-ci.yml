@@ -464,6 +464,9 @@ jobs:
           - check: ui-original-xml-schema
             command: npm run smoke:ui:original-xml-schema:built
             playwright: true
+          - check: ui-original-workspace-files
+            command: npm run smoke:ui:original-workspace-files:built
+            playwright: true
           - check: ui-deletion-confirmation
             command: npm run smoke:ui:deletion-confirmation:built
             playwright: true

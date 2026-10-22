@@ -140,6 +140,12 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.interfaceMode.mode() === "original" && this.activeRouteView === "ops" && this.app.isPlatformAdmin;
   }
 
+  get isOriginalWorkspaceFiles(): boolean {
+    return this.interfaceMode.mode()==='original' && this.activeRouteView==='content' && this.app.hasAdminSession;
+  }
+
+  get isOriginalNativeOperator(): boolean { return this.isOriginalAdministration || this.isOriginalWorkspaceFiles; }
+
   get activeRouteView(): AppView {
     this.routeVersion();
     const routeSegment = this.router.url.split("?", 1)[0]?.split("/")[1];

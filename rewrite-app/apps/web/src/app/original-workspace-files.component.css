@@ -1,0 +1,129 @@
+.mat-expansion-panel {
+  overflow: unset;
+}
+
+.selected-row {
+  background-color: #0080001a;
+}
+
+.isDependency {
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.columnhost {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: left;
+}
+
+.filelist {
+  flex: 10 0 400px;
+  margin-top: 0.7em;
+}
+
+mat-cell:first-of-type, mat-header-cell:first-of-type, mat-footer-cell:first-of-type {
+  padding-left: 0
+}
+
+.checkboxcell {
+  overflow: visible;
+  flex: 0 0 30px;
+}
+
+.namecell {
+  flex: 3 3 60px;
+}
+
+.namecell.mat-mdc-header-cell {
+  padding-left: 16px;
+}
+
+.datecell {
+  flex: 1 1 5px;
+}
+
+.sidebar {
+  flex: 10 0 200px;
+  padding-left: 1em;
+}
+
+.sidebar .buttons {
+  margin-top: 0.7em;
+  margin-bottom: 0.7em;
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+}
+
+.checkerror, .checkwarning, .checkinfo {
+  margin: 20px;
+  font-size: 0.8em;
+}
+
+.report-error {
+  color: #821324;
+}
+
+.report-warning {
+  color: silver;
+}
+
+.report-info {
+  color: blue;
+}
+
+.mat-mdc-raised-button {
+  min-width: 100px;
+  margin: 2px;
+}
+
+.file-report {
+  cursor: pointer
+}
+
+.full-file-report {
+  display: none;
+}
+
+.file-report:hover .full-file-report {
+  display: block;
+  position: absolute;
+  background: white;
+  box-shadow: 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  cursor: default;
+}
+
+.full-file-report mat-card-content {
+  max-height: 15em;
+  overflow-y: auto
+}
+
+.supported-versions {
+  margin-top: 1em;
+  color: gray;
+}
+
+.supported-versions h4 {
+  margin-bottom: 0.3em;
+}
+
+:host { display:block; min-width:0; color:var(--mat-sys-on-surface); background:white; font:16px 'Nunito Sans',sans-serif; }
+button:hover { transform:none; } button.mat-mdc-button-base:disabled { opacity:1; }
+mat-checkbox { display:inline-block; } .vertical-align-middle { display:inline-flex; vertical-align:middle; align-items:center; }
+[role=alert] { color:var(--mat-sys-error); } .subheading-2 { color:darkslategray; margin-bottom:0.7em; margin-top:1.7em; border-bottom:1px solid silver; }
+.subheading-2.success { color:green; } .subheading-2.error { color:maroon; }
+
+:host { display:flex; flex:1; flex-direction:column; min-height:0; color-scheme:light; }
+app-original-overlay-styles,app-original-workspace-file-surface-styles { display:none; }
+#originalWorkspaceFileFrame { display:flex; flex:1; flex-direction:column; min-height:0; }
+.workspace-files-view { padding:25px; overflow:auto; flex:1; min-height:0; }
+mat-toolbar { display:flex; justify-content:space-between; position:relative; flex:0 0 auto; padding:8px 24px; background:var(--secondary); color:white; }
+mat-toolbar .side { height:100%; display:flex; align-items:center; }
+mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); }
+mat-toolbar h1 { margin:0; font:400 22px/28px 'Nunito Sans'; letter-spacing:normal; white-space:nowrap; }
+.logo a,.logo img { height:100%; } .logo img { width:auto; display:block; }
+.account-button { background:white; color:var(--secondary); border-radius:12px; font-family:revert; font-weight:revert; }
