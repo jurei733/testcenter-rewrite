@@ -155,6 +155,8 @@ import {
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
   type ReplaceSourcePackageRequest,
+  type UploadWorkspaceFileRequest,
+  type UploadWorkspaceFileResponse,
   type ReplaceWorkspaceFileRequest,
   type ReplaceWorkspaceFileResponse,
   type ReplaceSourcePackageResponse,
@@ -1473,10 +1475,9 @@ const sendCsv = (
   endResponse(response, text);
 };
 
-const buildAttachmentContentDisposition = (filename: string): string => {
-  const normalizedFileName = basename(filename)
-    .replace(/[\u0000-\u001f\u007f/\\]/g, "_")
-    .trim() || "download";
+const buildAttachmentContentDisposition = (filename: string, preserveWhitespace = false): string => {
+  const safeFileName = basename(filename).replace(/[\u0000-\u001f\u007f/\\]/g, "_");
+  const normalizedFileName = (preserveWhitespace ? safeFileName : safeFileName.trim()) || "download";
   const asciiFallback = normalizedFileName
     .normalize("NFKD")
     .replace(/[^\x20-\x7e]/g, "_")
@@ -2375,6 +2376,7 @@ const sourcePackageListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSourcePackages
 );
 const workspaceFileCatalogPattern = createRoutePattern(productionApiRoutes.workspace.getWorkspaceFileCatalog);
+const workspaceFileDownloadPattern = createRoutePattern(productionApiRoutes.workspace.downloadWorkspaceFile);
 const workspaceFileReplacementPattern = createRoutePattern(productionApiRoutes.workspace.replaceWorkspaceFile);
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
@@ -2665,6 +2667,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
   ["GET", workspaceFileCatalogPattern],
+  ["POST", workspaceFileCatalogPattern],
+  ["GET", workspaceFileDownloadPattern],
   ["POST", workspaceFileReplacementPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
@@ -3579,6 +3583,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
     ["GET", workspaceFileCatalogPattern, productionApiRoutes.workspace.getWorkspaceFileCatalog],
+    ["POST", workspaceFileCatalogPattern, productionApiRoutes.workspace.uploadWorkspaceFile],
+    ["GET", workspaceFileDownloadPattern, productionApiRoutes.workspace.downloadWorkspaceFile],
     ["POST", workspaceFileReplacementPattern, productionApiRoutes.workspace.replaceWorkspaceFile],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
@@ -6636,6 +6642,22 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const catalog = await services.workspaceAdminRead.getWorkspaceFileCatalog({tenantKey, workspaceKey});
         sendJson<GetWorkspaceFileCatalogResponse>(response, 200, catalog); return;
       }
+      if (request.method === 'POST' && workspaceFileCatalogMatch?.groups) {
+        const tenantKey=decodeRouteGroup(workspaceFileCatalogMatch.groups.tenantKey);
+        const workspaceKey=decodeRouteGroup(workspaceFileCatalogMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(response,400,'invalid_workspace_scope','tenantKey and workspaceKey are required.'); return;
+        }
+        const body=await readSourcePackageRequestJsonBody<UploadWorkspaceFileRequest>();
+        if (!body || typeof body!=='object' || Array.isArray(body) || Object.hasOwn(body,'contentStructure') ||
+            typeof body.fileName!=='string' || typeof body.mediaType!=='string' || typeof body.sourceDocument!=='string') {
+          sendError(response,400,'workspace_file_upload_payload_invalid',
+            'A workspace file upload requires fileName, mediaType and string sourceDocument; contentStructure is not accepted.'); return;
+        }
+        const result=await services.contentIntake.uploadWorkspaceFile({tenantKey,workspaceKey,
+          fileName:body.fileName,mediaType:body.mediaType,sourceDocument:body.sourceDocument});
+        sendJson<UploadWorkspaceFileResponse>(response,201,result); return;
+      }
       const workspaceFileReplacementMatch = workspaceFileReplacementPattern.exec(pathname);
       if (request.method === 'POST' && workspaceFileReplacementMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceFileReplacementMatch.groups.tenantKey);
@@ -6659,7 +6681,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const sourcePackageAssemblyMatch = sourcePackageAssemblyPattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
-      const sourcePackageDownloadMatch = sourcePackageDownloadPattern.exec(pathname);
+      const workspaceFileDownloadMatch = workspaceFileDownloadPattern.exec(pathname);
+      const sourcePackageDownloadMatch = workspaceFileDownloadMatch ?? sourcePackageDownloadPattern.exec(pathname);
       const sourcePackageDeletionReadinessMatch =
         sourcePackageDeletionReadinessPattern.exec(pathname);
       const sourcePackageDeleteMatch = sourcePackageDeletePattern.exec(pathname);
@@ -6757,7 +6780,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         const body = Buffer.from(download.dataBase64, "base64");
         sendAsset(response, 200, download.mediaType, body, {
-          "content-disposition": buildAttachmentContentDisposition(download.fileName),
+          "content-disposition": buildAttachmentContentDisposition(workspaceFileDownloadMatch
+            ? download.fileName.split(/[\\/]/).at(-1) ?? download.fileName : download.fileName,
+            Boolean(workspaceFileDownloadMatch)),
           "cache-control": "private, no-store",
           "content-length": String(body.byteLength)
         });

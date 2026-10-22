@@ -191,6 +191,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     getWorkspaceFileCatalog: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
+    uploadWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files",
+    downloadWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/download",
     replaceWorkspaceFile: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files/:sourcePackageId/replacements",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
@@ -431,6 +433,13 @@ export type SourcePackageBatchDeletionIssue = {
 };
 
 export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
+
+export type UploadWorkspaceFileRequest = {fileName: string; mediaType: string; sourceDocument: string};
+export type UploadWorkspaceFileResponse = {
+  sourcePackage: SourcePackage; replacedSourcePackageId: string | null;
+  importJob: ImportJob | null; stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ReplaceSourcePackageResponse['participantRosterImport'];
+};
 
 export type ReplaceWorkspaceFileRequest = {
   mediaType: string;

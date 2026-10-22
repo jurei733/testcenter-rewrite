@@ -333,6 +333,21 @@ It is intentionally separate from `rewrite-spike/`:
 - `rewrite-spike/` proves architecture and semantics
 - `rewrite-app/` is where production-oriented code starts
 
+### Protected standalone workspace files
+
+`POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/files` accepts
+`{fileName, mediaType, sourceDocument}` for a loose file (string content or a
+byte-preserving data URL). Names are basenames, up to 120 UTF-8 bytes. Files are
+stored under their Source type folder; uploading the same typed basename uses
+identity/version-checked replacement and preserves history. Independent Units
+and resources return `importJob: null`; other typed XML follows real import and
+returns any **staged** release. Activate it through the existing activation API.
+ZIP member extraction and the Original upload UI remain open.
+`GET .../files/:sourcePackageId/download` returns exact current/historical bytes
+with the authored basename. Both endpoints require workspace access, and writes
+require write access. See [Original parity notes](docs/ORIGINAL-UI-PARITY.md) for
+validation evidence and remaining gaps.
+
 ## Phase 1 Vertical Slice
 
 The first production slice is intentionally narrow:

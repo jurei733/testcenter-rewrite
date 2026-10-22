@@ -807,6 +807,47 @@ const createFileRepository = (
     });
   };
 
+  const reserveSourcePackageWithActivity = async (input: Parameters<FirstSliceRepository['reserveSourcePackageAssembly']>[0],
+    requiredEventType: 'source_package_assembled' | 'source_package_created'): Promise<boolean> => {
+    return mutate(state => {
+      const { assembledSourcePackage, assemblyActivityEvent } = input;
+      const sourcePackages = Object.values(state.sourcePackages).filter(
+        candidate =>
+          candidate.tenantId === assembledSourcePackage.tenantId &&
+          candidate.workspaceId === assembledSourcePackage.workspaceId
+      );
+      const activityEvents = Object.values(
+        state.workspaceActivityEvents
+      ).filter(
+        activityEvent =>
+          activityEvent.tenantId === assembledSourcePackage.tenantId &&
+          activityEvent.workspaceId === assembledSourcePackage.workspaceId
+      );
+      if (
+        assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
+        assemblyActivityEvent.workspaceId !==
+          assembledSourcePackage.workspaceId ||
+        assemblyActivityEvent.eventType !== requiredEventType ||
+        assemblyActivityEvent.subjectId !==
+          assembledSourcePackage.sourcePackageId ||
+        state.sourcePackages[assembledSourcePackage.sourcePackageId] ||
+        state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] ||
+        createWorkspaceSourcePackageReferenceRevision({
+          sourcePackages,
+          activityEvents
+        }) !== input.expectedWorkspaceSourcePackageReferenceRevision
+      ) {
+        return false;
+      }
+      dirtySourcePackageIds.add(assembledSourcePackage.sourcePackageId);
+      state.sourcePackages[assembledSourcePackage.sourcePackageId] =
+        assembledSourcePackage;
+      state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] =
+        assemblyActivityEvent;
+      return true;
+    });
+  };
+
   return {
     async getApplicationSettings() {
       const state = await getState();
@@ -1220,45 +1261,10 @@ const createFileRepository = (
         state.sourcePackages[sourcePackage.sourcePackageId] = sourcePackage;
       });
     },
-    async reserveSourcePackageAssembly(input) {
-      return mutate(state => {
-        const { assembledSourcePackage, assemblyActivityEvent } = input;
-        const sourcePackages = Object.values(state.sourcePackages).filter(
-          candidate =>
-            candidate.tenantId === assembledSourcePackage.tenantId &&
-            candidate.workspaceId === assembledSourcePackage.workspaceId
-        );
-        const activityEvents = Object.values(
-          state.workspaceActivityEvents
-        ).filter(
-          activityEvent =>
-            activityEvent.tenantId === assembledSourcePackage.tenantId &&
-            activityEvent.workspaceId === assembledSourcePackage.workspaceId
-        );
-        if (
-          assemblyActivityEvent.tenantId !== assembledSourcePackage.tenantId ||
-          assemblyActivityEvent.workspaceId !==
-            assembledSourcePackage.workspaceId ||
-          assemblyActivityEvent.eventType !== "source_package_assembled" ||
-          assemblyActivityEvent.subjectId !==
-            assembledSourcePackage.sourcePackageId ||
-          state.sourcePackages[assembledSourcePackage.sourcePackageId] ||
-          state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] ||
-          createWorkspaceSourcePackageReferenceRevision({
-            sourcePackages,
-            activityEvents
-          }) !== input.expectedWorkspaceSourcePackageReferenceRevision
-        ) {
-          return false;
-        }
-        dirtySourcePackageIds.add(assembledSourcePackage.sourcePackageId);
-        state.sourcePackages[assembledSourcePackage.sourcePackageId] =
-          assembledSourcePackage;
-        state.workspaceActivityEvents[assemblyActivityEvent.activityEventId] =
-          assemblyActivityEvent;
-        return true;
-      });
-    },
+    reserveSourcePackageAssembly: input => reserveSourcePackageWithActivity(input, 'source_package_assembled'),
+    reserveWorkspaceFileUpload: input => reserveSourcePackageWithActivity({assembledSourcePackage:input.sourcePackage,
+      assemblyActivityEvent:input.createdActivityEvent,
+      expectedWorkspaceSourcePackageReferenceRevision:input.expectedWorkspaceSourcePackageReferenceRevision}, 'source_package_created'),
     async reserveSourcePackageReplacement(input) {
       return mutate(state => {
         const { replacementSourcePackage, replacementActivityEvent } = input;
