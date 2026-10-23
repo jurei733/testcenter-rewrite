@@ -1,5 +1,87 @@
 # CI iteration and complete acceptance
 
+## Verified Test-row clock versus Test-state evidence (2026-10-23)
+
+[Actual Source Oracle 40018466023](https://github.com/jurei733/testcenter-rewrite/actions/runs/40018466023)
+passes all **29** production Apache/PostgreSQL HTTP groups. Original source remains
+`eedae41840cbe90e5547c0211da818bdf620f5aa`, test mode stays off, real XSD/admin/person/
+monitor authentication is used, and owned containers/volumes retire. Independently
+downloaded artifact `12529202876` verifies ZIP SHA256
+`f9d07cc3db4b05e1c9e954d2b50df3a0086a502ac0ceb57a6a7efc409ad38f89`.
+Its complete public reports, receipt, image/runtime metadata and pinned source/script
+hashes are retained under `source-workspace-results/lock-clock` alongside the earlier
+27-check fixture. The initial Oracle 40018047489 is retained as failed: its 25 ms
+clock control assumed finer precision than the unchanged Source's Unix-second API.
+The corrected probe crosses that actual whole-second boundary and keeps the strict
+changed-time assertions. It changes no Source code, clocks or database state directly.
+
+The Source proves that lock, same-value relock and unlock move the Test-row result
+time without creating nonempty Test state or Units; an unopened Test still does
+not become a Result. Unit definition/state/log calls leave that Test-row time
+unchanged. The Rewrite now keeps `lastTestModifiedAt` separate from
+`lastTestStateAt`/`hasTestState`, persists lock time even for a non-saving mode,
+forwards same-value lock effects under the store lock, and rejects/discards forged,
+terminal-noop and superseded metadata effects. Existing JSON metadata columns make
+this additive; no new SQL migration or fabricated legacy history is introduced.
+Native group result times are Unix seconds; client response-part `ts` remains
+milliseconds. The native result projection still needs that explicit conversion.
+
+Full local unit/frontend regression passes **3,900** (121 / 324 / 1,406 / 2,049),
+full PostgreSQL passes **2,017**, and full API passes **173 each** in Memory, File
+and SQLite. The later Source-receipt regression is also covered by the final
+**88-case** focused Original-results command with PostgreSQL. Stronger exact
+reentry expectations pass 183 cases separately. CI typechecking and fresh production
+build pass, retaining **468.39 kB** under the unchanged 470 kB entry limit. These
+checks qualify the recorded implementation scopes, not full Native Results/Tests
+pages or the complete 89-job Linux acceptance.
+
+## Independent full database feedback (2026-10-23)
+
+Main run 40014001739 demonstrates that a browser cohort rejection in the fast set
+also skips the complete PostgreSQL group through `fast-feedback`. That database
+group now depends directly on successful shared build, typecheck, dependency audit
+and mandatory unit checks. It can therefore qualify the exact same-run build
+without waiting for, or being skipped by, an unrelated browser image rejection.
+Its complete serial test inventory, isolated owned schema, migration/doctor/preflight
+and protected startup smoke remain unchanged. PostgreSQL UI stays in the browser
+path, and complete acceptance still requires both database and browser groups.
+A workflow graph control checks the full transitive ancestor set, all four positive
+dependencies and the mandatory database leaves. This improves useful database
+feedback; it does not turn a failed browser/acceptance result green.
+
+## Original sample external-resource readiness (local follow-up, 2026-10-23)
+
+The failed participant-detail-review trace contains correct required-field answer
+notifications, followed by an empty value in the same document with a replaced
+input node. The unchanged Source sample definition explains that transition:
+its asynchronous external fetch appends text through `#unit.innerHTML +=`, which
+recreates the existing form controls and loses values entered before the append.
+The browser smoke now waits for the exact actual external content in `#unit`
+before its existing answer entry. Existing save/persistence/reentry assertions,
+input helper, attempts and deadlines remain unchanged; no additional input is
+synthesized. Source application/player/definition bytes remain unchanged.
+
+An actual headed control executes the existing original player HTML and sample
+definition against an owned HTTP server. Holding the real external response
+reproduces the early-input reset and changed node identity when released. The
+production readiness helper stays pending while that response is held; after
+release, one native fill preserves the exact answer. Both the existing diagnostic
+control and this causal control pass. The control remains in the mandatory native
+browser-capture group. The complete affected participant-detail-review journey also passes locally and
+closes its owned browser/API. Isolated Linux run 40015789397 passes both causal
+controls and the actual sample phase on native image `20261023.334.3`, then fails
+later at the monitor selection cleanup: a successful batch asynchronously removes
+its accepted runs after the smoke's `isEnabled()` check but before its redundant
+Clear Selection click. Verified artifact `12528963599` has ZIP SHA256
+`970a50a10f88ee1eedaa83c6d132d359d07036dbc5b2fb9438d4e42c58e2db6e`.
+The correction asserts the actual empty-selection postcondition and disabled
+Clear button instead of issuing another input. Existing cohort request/target
+assertions remain. Six existing monitor navigation/selection controls pass. The
+next isolated Linux candidate retains the same complete journey and also uploads
+its owned failure screenshot. Neither partial success nor matching package/font
+catalogs proves shared-image compatibility, full Linux acceptance or a fix for the
+unrelated missing native clicks.
+
 ## Early runner image rejection and result-state qualification (2026-10-23)
 
 [Run 40008675385](https://github.com/jurei733/testcenter-rewrite/actions/runs/40008675385)

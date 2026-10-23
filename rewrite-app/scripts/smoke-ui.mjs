@@ -16,6 +16,7 @@ import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contrac
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { drainSmokeResponse } from "./drain-smoke-response.mjs";
 import { observeOriginalSample } from "./original-sample-diagnostics.mjs";
+import { waitForOriginalSampleResource } from "./original-sample-readiness.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
@@ -17705,6 +17706,7 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(originalSampleParticipantSessionId);
+  await waitForOriginalSampleResource(originalSampleFrame, originalSampleResourceContent);
   await fillVeronaAnswerAndWaitForHost(
     originalSampleFrame,
     'input[name="required-text-field"]',
@@ -23304,9 +23306,11 @@ try {
     "A cohort go-to must resolve the selected block to each run's own first visible unit."
   );
   await page.unroute(monitorBatchCommandsRoute);
-  if (await page.locator("#clearMonitorBatchSelectionButton").isEnabled()) {
-    await page.locator("#clearMonitorBatchSelectionButton").click();
-  }
+  // Successful batch commands remove their accepted runs asynchronously. Assert
+  // that postcondition instead of racing a redundant Clear Selection click.
+  await page.locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" }).waitFor();
+  assert.equal(await page.locator("#clearMonitorBatchSelectionButton").isDisabled(), true);
   while (monitorSpeciesRouteOperations.size > 0) {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }

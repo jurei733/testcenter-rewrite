@@ -89,7 +89,7 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       const before=(await snapshot(identity)).runs[0];
       const body={deliveryId:randomUUID(),status:'running',responseOnly:true,responseUnitKey:entered.currentUnitKey,
         unitResponse:'Owned exact answer Ä/β',responseTimestamp:Date.now(),
-        originalResultState:{lastOpenedAt:'2099-01-01T00:00:00.000Z',lastTestStateAt:'2099-01-01T00:00:00.000Z',hasTestState:false}};
+        originalResultState:{lastOpenedAt:'2099-01-01T00:00:00.000Z',lastTestStateAt:'2099-01-01T00:00:00.000Z',lastTestModifiedAt:'2099-01-01T00:00:00.000Z',hasTestState:false}};
       await request('POST',path,body,undefined,401);assert.deepEqual((await snapshot(identity)).runs[0],before);
       const saved=(await request('POST',path,body,identity.sessionToken)).testRun,savedStored=(await snapshot(identity)).runs[0];
       assert.deepEqual(JSON.parse(JSON.stringify(savedStored)),saved);
@@ -102,12 +102,14 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       const stateWrittenStored=(await snapshot(identity)).runs[0];
       assert.equal(stateWritten.originalResultState.lastOpenedAt,original.lastOpenedAt);
       assert.ok(Date.parse(stateWritten.originalResultState.lastTestStateAt)>Date.parse(original.lastTestStateAt));
+      assert.equal(stateWritten.originalResultState.lastTestModifiedAt,stateWritten.originalResultState.lastTestStateAt);
       assert.deepEqual(stateWritten.unitResponses,saved.unitResponses);
       await request('POST',path,{currentUnitKey:'nonexistent-owned-unit',status:'running'},identity.sessionToken,404);
       assert.deepEqual((await snapshot(identity)).runs[0],stateWrittenStored);
       const reopened=(await resume(identity)).testRun;
       assert.ok(Date.parse(reopened.originalResultState.lastOpenedAt)>Date.parse(original.lastOpenedAt));
       assert.equal(reopened.originalResultState.lastTestStateAt,stateWritten.originalResultState.lastTestStateAt);
+      assert.equal(reopened.originalResultState.lastTestModifiedAt,reopened.originalResultState.lastOpenedAt);
       assert.deepEqual(reopened.unitResponses,saved.unitResponses);
     });
     await t.test('non-saving authenticated review opens a Test without creating saved Test state or answers',async()=>{
@@ -136,7 +138,7 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
         await resume(identity);const reopened=await snapshot(identity);
         assert.ok(Date.parse(reopened.runs[0].originalResultState.lastOpenedAt)>Date.parse(state.runs[0].originalResultState.lastOpenedAt));
         assert.deepEqual(reopened,{...state,runs:[{...state.runs[0],stateRevision:state.runs[0].stateRevision+1,
-          originalResultState:{...state.runs[0].originalResultState,lastOpenedAt:reopened.runs[0].originalResultState.lastOpenedAt}}]});
+          originalResultState:{...state.runs[0].originalResultState,lastOpenedAt:reopened.runs[0].originalResultState.lastOpenedAt,lastTestModifiedAt:reopened.runs[0].originalResultState.lastOpenedAt}}]});
       });
     }
     await t.test('concurrent fresh resume requests keep one identity and one initial artifact set',async()=>{
