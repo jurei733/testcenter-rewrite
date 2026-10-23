@@ -231,6 +231,16 @@ try{
    header:text.slice(1).split('\n')[0],unknownGroupBytes:absent.bytes.length});
  }
 
+ const reviewUnitsBefore=(await report('response','ORACLE.REVIEWS')).value;
+ const reviewGroupsBefore=groupProjection(await groups());
+ const ownedReviews=(await request('GET',`/test/${reviewTest}/unit/ORACLE.UNIT2/reviews`,{token:reviewToken})).value;
+ assert.equal(ownedReviews.length,1);assert.ok(ownedReviews[0].id>0);
+ await request('DELETE',`/test/${reviewTest}/unit/ORACLE.UNIT2/review/${ownedReviews[0].id}`,{token:reviewToken,status:204});
+ assert.deepEqual((await report('response','ORACLE.REVIEWS')).value,reviewUnitsBefore);
+ assert.deepEqual(groupProjection(await groups()),reviewGroupsBefore);
+ assert.equal((await report('review','ORACLE.REVIEWS',true)).value.length,1);
+ check('deleting a Unit review retains the saved unanswered Unit, its response export and group counts');
+
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
