@@ -1,5 +1,57 @@
 # Optional Original UI
 
+### Qualified Original result lifecycle (2026-10-23)
+
+[Source run 40002774875](https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875)
+passes all **26** real HTTP groups against unchanged pinned Original
+`eedae41840cbe90e5547c0211da818bdf620f5aa`, with production Apache,
+PostgreSQL/Redis, actual XSD uploads and administrator/person authentication.
+Test mode stays disabled; no SQL seeding, fabricated token or production patch
+is used. Source diff verification passes and owned containers/volumes retire.
+The independently downloaded artifact `12523415444` verifies ZIP SHA256
+`58a912a8a701b0094ef8c98b16b99de2614e51f462167dcfa3ecb9251a4e7902`.
+The public receipt, runtime metadata and exact source-file hashes are retained in
+[test-fixtures/original-testcenter/source-workspace-results/manifest.json](../test-fixtures/original-testcenter/source-workspace-results/manifest.json).
+
+The native Results and Tests pages must preserve these distinct rules:
+
+- No-code sign-in already returns the person token and Booklet assignments.
+- Creating a Test without opening its Booklet produces no result row. Opening
+  it produces a started Booklet with zero Units, even while Test state is `{}`.
+- The detailed Test deletion list excludes empty `{}` Test state. A stateful
+  but unopened Test can be listed there while still absent from Results.
+- A Unit definition read does not initialize a saved Unit. Raw Unit logs before
+  initialization fail with Source's actual 500 and leave zero saved Units.
+  Initializing Unit state then logging counts one Unit even without answers.
+- Two opened Booklets with one and two saved Units produce minimum 1, maximum 2,
+  total 3 and average 1.5. Count persisted Units, rather than answers or arbitrary
+  Unit-scoped log events.
+- RO selected-Test deletion returns 403 and preserves results and the detailed
+  listing. RW deletion removes only the selected Test; the other Booklet's exact
+  answer remains. The existing person token and Booklet assignment survive, so
+  launching the selected Booklet again creates a new empty Test.
+- Access to the deleted Test ID returns 403 from `IsTestOwner` before the
+  controller's 404 path. This is actual middleware behavior, not an auth bypass.
+
+The extended fixture also proves a Unit review initializes a saved Unit without
+answers or nonempty Test state. Actual response reports include both state-only
+and review-only Units with `responses: []`; a review-only Unit has null laststate.
+Four real selected CSV/JSON pairs are retained: responses, logs, legacy reviews
+and enhanced reviews. All CSVs preserve the UTF-8 BOM and semicolon dialect;
+an unknown group yields zero bytes. Legacy reviews use `category: NAME` with
+`X`/null and omit reviewer/labels. Enhanced reviews use boolean `category_NAME`,
+retain reviewer and resolve actual Unit/Booklet labels. Review text preserves
+Unicode, embedded newline, quote and semicolon. These are authored fixture data,
+not private participant records. Source review times use the configured Europe/
+Berlin display time; the current Rewrite UTC conversion needs native alignment.
+
+These are Source requirements, **not qualified Rewrite parity**. The Rewrite's
+canonical group summary currently counts all Runs and Unit response keys;
+reusing it unchanged would contradict this Oracle. Native opened-Test and saved
+Unit projection, exact test-time semantics, all four selected CSV actions and
+selected-Test deletion still require implementation/qualification. All eight
+broad visual rows and the 29 done / 20 partial count remain unchanged.
+
 ### Native report page and remaining workspace tabs (2026-10-23)
 
 Files and Systemcheck Reports are now implemented native pages. Material tab

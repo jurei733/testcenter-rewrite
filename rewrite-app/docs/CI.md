@@ -1,5 +1,46 @@
 # CI iteration and complete acceptance
 
+## Current complete-head exit fallback failure (2026-10-23)
+
+[Run 39999128704](https://github.com/jurei733/testcenter-rewrite/actions/runs/39999128704)
+for `dd8505f4` finishes with **87 successful jobs and two failures**: the Original
+player-exit leaf and the correctly failing acceptance gate. All other useful jobs
+finish; no running matrix is canceled by a branch update.
+
+The leaf passes the theme/width/exit-policy matrix and resumed state-gap case,
+then fails its deliberately missing native-dialog-module fallback. The fallback
+is visible, but the single Stay click does not dismiss it within the unchanged
+30-second bound. Playwright records a completed click at (510.55, 505), while the
+existing native event observer witnesses only the preceding logo click and no
+Stay pointer/click. Failure JSON records a visible focused document with the
+Player iframe active. This evidence does not yet establish the cause or a fix.
+No retry, synthetic click, longer timeout or weakened assertion is added.
+
+Artifact `12522716787` is independently downloaded and verifies ZIP SHA256
+`c2183e63393c71181315cef58eae5a4dddaa3ed9ae194d8ff8c2842881298afc`.
+It retains failure JSON/PNG and the complete Playwright trace. The separate
+successful Verona leaf does not explain this fallback failure, nor resolve the
+earlier missing shared-parameter input. A local complete unchanged player-exit
+journey is used for diagnosis; a pass alone will not prove a fix.
+
+## Executable Original result lifecycle baseline (2026-10-23)
+
+The isolated production Source probe now passes **26 real HTTP groups** in
+[run 40002774875](https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875).
+It qualifies created/opened/stateful Test inclusion, saved state-and-log Units
+without answers, aggregate counts, RO refusal and selected-Test deletion with
+unchanged identity/other-Booklet data. The extension retains four actual selected
+CSV/JSON pairs, including both distinct review versions and unanswered Unit rows.
+Source and owned-resource cleanup checks
+also pass. The receipt and its independently verified ZIP digest are recorded
+in [Original parity notes](ORIGINAL-UI-PARITY.md#qualified-original-result-lifecycle-2026-10-23).
+
+This isolated reference probe does not replace any of the complete application's
+89 required gates or establish Rewrite equivalence. It provides an executable
+baseline before implementing the two missing native workspace pages. In
+particular, canonical all-Run/answer-key summaries cannot stand in for the
+Original's opened-Test/persisted-Unit statistics.
+
 ## Source report denial and native input diagnostics (2026-10-23)
 
 The native Syscheck report button now follows the actual Source template for

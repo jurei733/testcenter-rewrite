@@ -1,0 +1,124 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "transport": "production Apache HTTP",
+  "checks": [
+    {
+      "name": "actual Apache readiness and version"
+    },
+    {
+      "name": "superadmin still needs an explicit workspace grant",
+      "unassignedSuperadminStatus": 404,
+      "anonymousStatus": 401
+    },
+    {
+      "name": "actual RO and RW accounts read only their assigned workspace"
+    },
+    {
+      "name": "unchanged native XSD validation and RW multipart upload"
+    },
+    {
+      "name": "complete selected and unfiltered native exports exceed 500 reports",
+      "unfiltered": 505,
+      "selected": 504,
+      "csvSha256": "874cae4252368c4d8bb6e7036de6b0fb732ddddbc4d98ee3d25d032a6bbebe90",
+      "selectedFirstTitles": [
+        "owned-source-report-389",
+        "owned-source-report-225",
+        "owned-source-report-434"
+      ],
+      "selectedLastTitles": [
+        "owned-source-report-422",
+        "owned-source-report-71",
+        "owned-source-report-388"
+      ],
+      "rawReportCarriesKeyPhrase": true
+    },
+    {
+      "name": "native statistics retain OS and browser version labels"
+    },
+    {
+      "name": "RO report deletion is denied without losing stored reports"
+    },
+    {
+      "name": "RW deletes every report of the selected Check and retains unrelated reports"
+    },
+    {
+      "name": "native result fixture uses actual XSD-validated roster and two Booklets"
+    },
+    {
+      "name": "native no-code sign-in directly establishes the real person and both Booklet assignments"
+    },
+    {
+      "name": "creating a Test without opening its Booklet creates no result row or stateful Test-Session"
+    },
+    {
+      "name": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing"
+    },
+    {
+      "name": "a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row"
+    },
+    {
+      "name": "a persisted state-and-log Unit counts without answers or a stateful Test-Session"
+    },
+    {
+      "name": "stateful Test-Session listing and opened-Booklet result listing have different inclusion rules"
+    },
+    {
+      "name": "group statistics aggregate saved Unit rows across Booklets including log-only Units",
+      "openedBooklets": 2,
+      "savedUnits": 3,
+      "minimum": 1,
+      "maximum": 2,
+      "average": 1.5
+    },
+    {
+      "name": "RO selected-Test deletion returns 403 without changing results or Test-Session listing"
+    },
+    {
+      "name": "selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test"
+    },
+    {
+      "name": "a review initializes a saved Unit without answers or nonempty Test state; it accepts subsequent actual Unit logs"
+    },
+    {
+      "name": "response exports include initialized state-only and review-only Units with empty response arrays"
+    },
+    {
+      "name": "legacy and enhanced review exports retain distinct category, reviewer and authored label contracts"
+    },
+    {
+      "name": "actual selected responses CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "7d6b47395dc72370ed288a8f0a4c1adf9bedcc2be6dc43332f86f0e6c1876c17",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"responses\";\"laststate\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected logs CSV and JSON contracts",
+      "rows": 4,
+      "csvSha256": "6f4ed5b2780e782e7b1941d3ad8c37bbf4f624dae663b1480cae66ececa800d6",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"timestamp\";\"logentry\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-legacy CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "fc7cc00919967cd09075be538978db5567679e4fb9e7592b02c7065a46ae053f",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category: accuracy\";\"category: quality\";\"reviewtime\";\"entry\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-enhanced CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "dad2bd04de70a38b2d1057a5884c4bfb8d9d7de880b8de0a182145b77b92e7cb",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category_accuracy\";\"category_quality\";\"reviewtime\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\";\"reviewer\";\"entry\";\"unitlabel\";\"bookletlabel\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "revocation is enforced against the existing signed-in token"
+    }
+  ],
+  "version": "19.0.0",
+  "success": true
+}

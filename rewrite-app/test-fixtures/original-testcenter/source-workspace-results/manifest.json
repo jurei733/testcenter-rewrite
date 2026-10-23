@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "sourceVersion": "19.0.0",
+  "probeCommit": "7332a12cc381aa5be1b5b6d74f15c20ee042f3e9",
+  "probeTree": "47d5656f8b1540de691e050c246785d676c5ae73",
+  "runId": 40002774875,
+  "jobId": 120582886243,
+  "runUrl": "https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875",
+  "artifactId": 12523415444,
+  "artifactZipSha256": "58a912a8a701b0094ef8c98b16b99de2614e51f462167dcfa3ecb9251a4e7902",
+  "transport": "unchanged production Apache HTTP; real admin/person authentication, PostgreSQL and XSD validation; TestMode false",
+  "qualification": "Source only. Does not establish Rewrite endpoint, four-store, browser, permission or visual equivalence.",
+  "checks": 26,
+  "files": {
+    "image-id.txt": "9e77b71bd11f147aa5bb5179aa342c3f511d72b56126234934b942adb997b940",
+    "logs.csv": "6f4ed5b2780e782e7b1941d3ad8c37bbf4f624dae663b1480cae66ececa800d6",
+    "logs.json": "ee61e9f5e05525eed42f4e253d6e3ca5939d3d11986e55c24ffceee65a3c8bf8",
+    "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
+    "receipt.json": "3b3d3a6aefba0ccc78e2038f4db38a4652efa8f0b1e4ed585da455bc9bf6733f",
+    "responses.csv": "7d6b47395dc72370ed288a8f0a4c1adf9bedcc2be6dc43332f86f0e6c1876c17",
+    "responses.json": "5387944fad14016c8656c820180f0a0ab0cbcf3ea55ec5c365dea36aa79710ae",
+    "reviews-enhanced.csv": "dad2bd04de70a38b2d1057a5884c4bfb8d9d7de880b8de0a182145b77b92e7cb",
+    "reviews-enhanced.json": "05693be4cf84b9e9d8fbe067a4df39ab27b46d38784763ee90b1ed616ce03f6e",
+    "reviews-legacy.csv": "fc7cc00919967cd09075be538978db5567679e4fb9e7592b02c7065a46ae053f",
+    "reviews-legacy.json": "b420bbc2a37ae24a79d668f4f85e20686b1ca1586e17edfb22fcea17469c9404"
+  },
+  "sourceFiles": {
+    "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
+    "backend/src/dao/TestDAO.class.php": "5e6050052665c9c8415297dad59c0db70be0bc24ace328e1f52e2cb0ad9ed7be",
+    "backend/src/controller/TestController.class.php": "3e1de8dd9687b9a8df5e81f0e55d2a4dd78e1c6c4cbbd8c04316ae37970ff1bb",
+    "backend/src/controller/SessionController.class.php": "06b9e45e06838e86a1865f2217c46ac281141eb04bbbe0799a8c9b0940516910",
+    "backend/src/middleware/IsTestOwner.class.php": "f2b8f79c3588801f0ddd057027682e2a554c791cae05cdf5242519a9b3b26316",
+    "backend/src/helper/ReviewCSVFormatter.php": "5db29ee7680ffa8ddf01febe71a95c0d5fc580091a4f5111ba819cc37123df2e",
+    "backend/src/helper/CSV.class.php": "77d3e0cfca1a99e37efccb49480b68d1737ea63ead252f25d18662ebe997bb84",
+    "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
+    "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
+    "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59"
+  }
+}
