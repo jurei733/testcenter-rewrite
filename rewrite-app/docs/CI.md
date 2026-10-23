@@ -1,5 +1,23 @@
 # CI iteration and complete acceptance
 
+## Qualified material-bound offline browser runtime (2026-10-24)
+
+The main workflow now selects format 3. It preserves both actual hosted image
+labels and admits consumers only after complete archive/context checks, offline
+native APT restoration and equal actual browser/font/library/Node material plus
+exact current Original Source pixels. The actual production composite passes
+one producer and eight consumers across both observed images, then a selected
+consumer rerun against the immutable original producer attempt. Independent
+evidence covers 17 package archives, 10 profiles and 80 PNGs. All mandatory
+matrix and acceptance gates remain; legacy format 2 still requires exact labels.
+See [protocol, actual qualification and limits](BROWSER-RUNTIME-V3.md).
+
+The first complete run after adoption also discovers a newly reported high
+body-parser vulnerability. Its audit fails correctly; a compatible three-record
+lock update and independent old/new scans are documented in
+[the audit evidence](DEPENDENCY-AUDIT.md). That finding does not invalidate the
+earlier isolated runtime qualification or make a failed full run green.
+
 ### Install-free full-scope security audit and targeted patches (2026-10-23)
 
 The required dependency job now audits the committed lock directly, with explicit

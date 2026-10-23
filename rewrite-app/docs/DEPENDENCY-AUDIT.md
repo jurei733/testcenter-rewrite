@@ -70,3 +70,32 @@ This records the live registry's findings at that time, not a permanent guarante
 The new lock invalidates the existing CI caches/artifacts through their ordinary
 lock digest. Browser and build artifacts must be produced again in the same run;
 no old-lock artifact or runner-image fallback is introduced.
+
+## Newly reported body-parser finding, 2026-10-24
+
+The next complete [run 40036035411](https://github.com/jurei733/testcenter-rewrite/actions/runs/40036035411)
+correctly rejects a newly reported high finding in development tooling's
+`body-parser 2.3.0`. The [upstream advisory](https://github.com/advisories/GHSA-27r3-jxmh-p828)
+identifies a process crash after trailing bytes in a compressed request and fixes
+the 2.x line in **2.4.0**. The dependency path is Angular CLI → MCP SDK → Express
+5.2.1 → body-parser. The locked API server does not use this middleware, but the
+complete audit intentionally still includes development tools.
+
+A targeted, compatible lock update selects **body-parser 2.4.0**, its required
+**iconv-lite 0.7.3** and **qs 6.16.1**. Only these three package records change;
+Express's existing `^2.2.1` range admits the fix. There is no forced update, new
+override, package.json change or lowered severity threshold.
+
+The [new qualification receipt](../scripts/fixtures/dependency-audit-body-parser-20261024.json)
+records independent old/new lock audits in owned temporary directories, under
+`NODE_ENV=production`, with explicit dev/optional inclusion and no installation.
+The exact old lock fails with one high finding; the updated lock reports zero.
+Neither control creates `node_modules` or changes its lock. A subsequent clean
+application install also reports zero. These are live findings at capture time;
+the previous zero-vulnerability receipt remains accurate for its earlier scan.
+
+With the updated lock, clean-install qualification passes **3,932 unit/frontend
+checks**, CI typechecking, fresh production build and **264 CI-policy checks**
+(one explicit GNU-timeout-only macOS skip). The initial entry remains **468.39 kB**
+under the unchanged 470 kB error budget. Full hosted acceptance must still qualify
+the newly produced artifacts and the complete updated-lock matrix independently.
