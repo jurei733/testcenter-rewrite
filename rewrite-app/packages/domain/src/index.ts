@@ -926,6 +926,9 @@ export type SystemCheckReportStatistics = {
   latestReportAt: string;
   operatingSystems: SystemCheckReportBreakdown[];
   browsers: SystemCheckReportBreakdown[];
+  /** Original report overview: exact environment labels, name + space + version. */
+  operatingSystemVersions: SystemCheckReportBreakdown[];
+  browserVersions: SystemCheckReportBreakdown[];
   overallRatings: SystemCheckReportBreakdown[];
 };
 

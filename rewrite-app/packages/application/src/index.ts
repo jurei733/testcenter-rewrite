@@ -26396,10 +26396,10 @@ export const createFirstSliceServices = (
     const reports = (await readSystemCheckReportRecords(input)).map(
       record => record.report
     );
-    const breakdown = (values: string[]): Array<{ value: string; count: number }> => {
+    const breakdown = (values: string[], trim = true): Array<{ value: string; count: number }> => {
       const counts = new Map<string, number>();
       for (const rawValue of values) {
-        const value = rawValue.trim() || "unknown";
+        const value = trim ? rawValue.trim() || "unknown" : rawValue;
         counts.set(value, (counts.get(value) ?? 0) + 1);
       }
       return Array.from(counts, ([value, count]) => ({ value, count })).sort(
@@ -26419,6 +26419,11 @@ export const createFirstSliceServices = (
       );
       return String(entry?.value ?? "unknown");
     };
+    // SysCheckReportFile::getDigest uses exact authored labels, not entry IDs.
+    // Preserve its literal separator even when either field is absent; keep
+    // the established name-only canonical distributions independently intact.
+    const originalEnvironment = (report: SystemCheckReport, label: string): string =>
+      String(report.environment.find(entry => entry.label === label)?.value ?? "");
     const byCheckId = new Map<string, SystemCheckReport[]>();
     for (const report of reports) {
       const key = report.checkId.toUpperCase();
@@ -26438,6 +26443,10 @@ export const createFirstSliceServices = (
         browsers: breakdown(
           group.map(report => entryValue(report, "environment", ["browser"], ["browser"]))
         ),
+        operatingSystemVersions: breakdown(group.map(report =>
+          originalEnvironment(report, "Betriebssystem") + " " + originalEnvironment(report, "Betriebssystemversion")), false),
+        browserVersions: breakdown(group.map(report =>
+          originalEnvironment(report, "Browser") + " " + originalEnvironment(report, "Browserversion")), false),
         overallRatings: breakdown(
           group.map(report =>
             entryValue(report, "network", ["nw-overall"], ["gesamtbewertung"])

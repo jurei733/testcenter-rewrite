@@ -28,6 +28,22 @@
     </a></div>
   </mat-toolbar>
   <div class="workspace-files-view">
+    <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+      <a mat-tab-link routerLink="/content" data-cy="Dateien" [queryParams]="{tab:'files'}"
+        queryParamsHandling="merge" [active]="tab === 'files'"><h2>Dateien</h2></a>
+      <a mat-tab-link routerLink="/content" data-cy="Systemcheck Berichte" [queryParams]="{tab:'syscheck'}"
+        queryParamsHandling="merge" [active]="tab === 'syscheck'"><h2>Systemcheck Berichte</h2></a>
+    </nav>
+    <mat-tab-nav-panel #tabPanel>
+    @if (tab === 'syscheck') {
+      @defer (when true) {
+        <app-original-system-check-reports [sessionToken]="sessionToken" [tenantKey]="tenantKey" [workspaceKey]="workspaceKey" />
+      } @placeholder { <p role="status">Berichte werden geladen…</p> }
+      @error {
+        <p role="alert">Die Berichtsverwaltung konnte nicht geladen werden.</p>
+        <button mat-raised-button (click)="reloadReports()">Erneut laden</button>
+      }
+    } @else {
 <section id="originalWorkspaceFiles" class="columnhost"
   [attr.aria-busy]="controller.busy">
   <div class="filelist">
@@ -200,6 +216,7 @@
     </div>
   </div>
 </section>
-
+    }
+    </mat-tab-nav-panel>
   </div>
 </div>

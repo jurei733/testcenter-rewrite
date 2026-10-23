@@ -1,5 +1,46 @@
 # Testcenter parity checklist
 
+### Native Systemcheck report administration (2026-10-23)
+
+The implemented workspace pages now provide real Files/Reports navigation.
+The report page adapts pinned Source's five columns, selection controls, download
+filename, deletion prompt and Material table. Its statistics read has no report
+list pagination. Download uses every captured selected Check ID; the real browser
+journey verifies all **504** selected reports from **505** actual saved reports.
+The literal Source OS/browser name-plus-space-plus-version distributions are
+additive `operatingSystemVersions` / `browserVersions` fields. Existing canonical
+name-only fields retain their behavior. Matching uses Source's exact environment
+labels; missing fields preserve the literal space instead of inventing `unknown`.
+This matches the previously executed production Apache Source Oracle's versions.
+
+Selection, downloads and single-use deletion confirmations own the exact login
+and workspace. Logout, scope replacement and component destruction reject late
+data/downloads. Revoked write permission blocks subsequent deletion requests.
+More than 100 selected Checks use bounded requests with captured IDs; a failed
+batch stops subsequent writes, retains confirmed counts, and reloads real server
+statistics. Read-only users can export; deletion is disabled and the protected
+HTTP API independently refuses it. Tab changes discard selection. Report code
+is deferred and has an explicit missing-bundle error/reload state.
+
+Local qualification: **3,854 unit/frontend cases** (121 / 324 / 1,361 / 2,048),
+**173 complete API integrations each for Memory/File/SQLite**, and **1,950
+complete PostgreSQL cases**, all without failures/skips/cancellations. The
+focused suite has **25** cases, including exact version labels and missing-field
+separators in all stores and authenticated HTTP. Fifteen controller cases
+exercise ownership, RO scope, failure/retry, exact CSV bytes, 205-Check deletion
+and partial failure. Typecheck and production pass; entry remains **468.39 kB**
+under the unchanged 470 kB limit. Owned PostgreSQL schema/cluster are retired.
+Full old native file and new report browser journeys pass independently.
+
+This still leaves native results/answers, individual Test-Session deletion and
+complete four-tab navigation open. Current canonical platform/tenant admin
+inheritance is retained; Source's explicit workspace-grant projection remains
+a separate gap. Six native report captures are diagnostic only: no paired
+Source/Rewrite pixel proof is claimed. Formal status stays **29 done / 20
+partial; all eight broad visual rows open**. A fresh complete published-head
+CI remains necessary; preceding run 39990402820 exposes an unresolved native
+Verona click-witness failure, separately recorded in `CI.md`.
+
 ### Complete selected Systemcheck report exports (2026-10-23)
 
 The next native workspace pages need Source's multi-Check report download.
@@ -28,9 +69,9 @@ Owned PostgreSQL schemas/cluster are retired. Build/typecheck pass; production
 entry remains **468.39 kB** under the unchanged 470 kB budget. Focused iteration
 uses `npm run test:system-check-reports`, with a fresh core build.
 
-This supplies the report-export prerequisite for the native workspace pages;
-it does not implement the other three pages, full four-tab navigation or selected
-Test-Session deletion. The separate actual Source HTTP Oracle and animation
+This export correction supplies the prerequisite for the native Reports page
+described above. Results/answers, full four-tab navigation and selected
+Test-Session deletion remain open. The separate actual Source HTTP Oracle and animation
 qualification are detailed at the top of `CI.md` and `ORIGINAL-UI-PARITY.md`.
 Formal status remains **29 done / 20 partial; all eight broad visual rows open**.
 
