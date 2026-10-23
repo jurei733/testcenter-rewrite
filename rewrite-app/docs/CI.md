@@ -1,5 +1,21 @@
 # CI iteration and complete acceptance
 
+### Focused group-snapshot feedback (2026-10-23)
+
+`npm run test:original-results` now also covers group snapshots and the actual
+protected pre-code login flow. It builds the core once, runs without an Angular
+build and retains every case in the full unit/PostgreSQL gates. On the owned
+local PostgreSQL qualification, the focused test process passes **129** checks in
+**3.95 seconds** after core build. This is a measured focused test duration, not
+the complete CI critical path or a hosted-runner speed guarantee. The existing
+independent PostgreSQL job and strict browser-image provenance remain unchanged.
+
+[Source run 40025829117](https://github.com/jurei733/testcenter-rewrite/actions/runs/40025829117)
+qualifies **32** production HTTP groups on unchanged pinned Original. Complete
+SHA-bound public evidence is retained with the source fixtures; see
+[the group lifecycle and remaining scope](ORIGINAL-RESULT-GROUPS.md).
+
+
 ## Verified Test-row clock versus Test-state evidence (2026-10-23)
 
 [Actual Source Oracle 40018466023](https://github.com/jurei733/testcenter-rewrite/actions/runs/40018466023)

@@ -1,4 +1,6 @@
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -34,6 +36,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -67,6 +70,7 @@ type InMemoryFirstSliceState = {
   sourcePackages: Map<string, SourcePackage>;
   importJobs: Map<string, ImportJob>;
   contentReleases: Map<string, ContentRelease>;
+  originalParticipantGroups: Map<string, OriginalParticipantGroup>;
   participantSessions: Map<string, ParticipantSession>;
   participantAccessCredentials: Map<string, ParticipantAccessCredential>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
@@ -102,6 +106,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   sourcePackages: new Map(),
   importJobs: new Map(),
   contentReleases: new Map(),
+  originalParticipantGroups: new Map(),
   participantSessions: new Map(),
   participantAccessCredentials: new Map(),
   participantRosterEntries: new Map(),
@@ -399,6 +404,7 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
       deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
+      deleteMatching(state.originalParticipantGroups, workspaceMatches);
       for (const run of state.testRuns.values()) {
         if (workspaceMatches(run)) state.participantPresence.delete(run.testRunId);
       }
@@ -706,6 +712,17 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
           participantSession.tenantId === tenantId &&
           participantSession.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalParticipantGroup(input) {
+      const candidate = prepareOriginalParticipantGroup(input);
+      if (!Array.from(state.workspacesByScope.values()).some(workspace => workspace.tenantId === candidate.tenantId && workspace.workspaceId === candidate.workspaceId)) return null;
+      const existing = Array.from(state.originalParticipantGroups.values()).find(group => group.tenantId === candidate.tenantId && group.workspaceId === candidate.workspaceId && originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+      if (existing) return structuredClone(existing);
+      state.originalParticipantGroups.set(JSON.stringify([candidate.tenantId, candidate.workspaceId, candidate.groupKey]), candidate);
+      return structuredClone(candidate);
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      return structuredClone(Array.from(state.originalParticipantGroups.values()).filter(group => group.tenantId === tenantId && group.workspaceId === workspaceId));
     },
     async saveParticipantSession(participantSession) {
       state.participantSessions.set(

@@ -1,4 +1,5 @@
 import {createWorkspaceFileRuntime, type WorkspaceFileAvailability} from "./workspace-file-runtime.js";
+export { originalParticipantGroupKeysEqual, prepareOriginalParticipantGroup } from "./original-participant-group.js";
 import type {WorkspaceFilePublicationInput} from "./workspace-file-publication.js";
 export {createWorkspaceFilePublicationRevision,prepareWorkspaceFilePublication} from "./workspace-file-publication.js";
 export {createContentReleaseActivationRevision,prepareContentReleaseActivation} from "./content-release-activation.js";
@@ -1501,6 +1502,9 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string
   ): Promise<ParticipantSession[]>;
   saveParticipantSession(participantSession: ParticipantSession): Promise<void>;
+  /** First validated credential login wins; returns null if the workspace was deleted. */
+  getOrCreateOriginalParticipantGroup(input: Omit<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup, "lastModifiedAt">): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup | null>;
+  listOriginalParticipantGroupsByWorkspace(tenantId: string, workspaceId: string): Promise<import("@testcenter-rewrite-app/domain").OriginalParticipantGroup[]>;
   listParticipantRosterEntriesByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -32077,6 +32081,18 @@ export const createFirstSliceServices = (
             );
           }
         }
+        // Source creates login_session_groups after credential/absolute-window
+        // validation, before the separate person-code step (which may fail).
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+        const requestedGroupKey = String(input.groupKey ?? "").trim();
+        const groupKey = rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
+        const originalGroup = await repository.getOrCreateOriginalParticipantGroup({
+          tenantId: workspace.tenantId, workspaceId: workspace.workspaceId,
+          groupKey, groupLabel: rosterEntry?.groupLabel ?? groupKey, createdAt: signInTimestamp
+        });
+        if (!originalGroup) {
+          throw new FirstSliceError(404, "workspace_not_found", "Participant workspace was not found.");
+        }
         const participantCode = String(input.participantCode ?? "").trim();
         const codeRequired = participantRosterRequiresCode(rosterEntry);
         if (codeRequired && !participantCode) {
@@ -32110,9 +32126,6 @@ export const createFirstSliceServices = (
           );
         }
         const effectiveParticipantCode = matchedParticipantCode ?? null;
-        const requestedGroupKey = String(input.groupKey ?? "").trim();
-        const groupKey =
-          rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
         const executionMode = resolveParticipantExecutionMode(
           rosterEntry?.executionMode
         );

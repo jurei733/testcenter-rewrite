@@ -1,6 +1,8 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -35,6 +37,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -54,6 +57,12 @@ type PostgresMigration = {
   name: string;
   sql: string;
 };
+
+const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
+  groupKey: String(row.group_key), groupLabel: String(row.group_label),
+  createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
 
 const mapTenant = (row: Row | undefined): Tenant | null =>
   row
@@ -1568,6 +1577,15 @@ const migrations: PostgresMigration[] = [
     version: 60,
     name: "original_test_result_state",
     sql: `ALTER TABLE test_runs ADD COLUMN original_result_state_json JSONB;`
+  },
+  {
+    version: 61,
+    name: "original_participant_groups",
+    sql: `CREATE TABLE IF NOT EXISTS original_participant_groups (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, group_key TEXT NOT NULL,
+      group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, group_key)
+    );`
   }
 ];
 
@@ -2496,6 +2514,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           "participant_roster_entries"
         );
         await deleteScoped("operational_login_migration_candidates");
+        await deleteScoped("original_participant_groups");
         const deletedLoginAttemptCount = await deleteScoped(
           "participant_login_attempts"
         );
@@ -3071,6 +3090,27 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [tenantId, workspaceId],
         mapParticipantSession
       );
+    },
+    async getOrCreateOriginalParticipantGroup(input) {
+      const candidate = prepareOriginalParticipantGroup(input);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Serialize absent-row creation, including collator-equivalent spellings,
+        // with other workspace mutations and deletion.
+        const workspace = await client.query("SELECT workspace_id FROM workspaces WHERE tenant_id = $1 AND workspace_id = $2 FOR UPDATE", [candidate.tenantId, candidate.workspaceId]);
+        if (!workspace.rowCount) { await client.query("ROLLBACK"); return null; }
+        const groups = (await client.query("SELECT * FROM original_participant_groups WHERE tenant_id = $1 AND workspace_id = $2", [candidate.tenantId, candidate.workspaceId])).rows.map(mapOriginalParticipantGroup);
+        const existing = groups.find(group => originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (!existing) await client.query("INSERT INTO original_participant_groups (tenant_id, workspace_id, group_key, group_label, created_at, last_modified_at) VALUES ($1, $2, $3, $4, $5, $6)",
+          [candidate.tenantId, candidate.workspaceId, candidate.groupKey, candidate.groupLabel, candidate.createdAt, candidate.lastModifiedAt]);
+        await client.query("COMMIT");
+        return existing ?? candidate;
+      } catch (error) { await client.query("ROLLBACK"); throw error; }
+      finally { client.release(); }
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      return (await pool.query("SELECT * FROM original_participant_groups WHERE tenant_id = $1 AND workspace_id = $2 ORDER BY group_key", [tenantId, workspaceId])).rows.map(mapOriginalParticipantGroup);
     },
     async saveParticipantSession(participantSession) {
       await pool.query(

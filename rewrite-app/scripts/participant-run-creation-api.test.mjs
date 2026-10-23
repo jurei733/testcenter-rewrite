@@ -62,6 +62,25 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
     const resume=(identity,expected=200)=>request('POST',resolveRoutePath(routes.participant.resumeSession,{participantSessionId:identity.participantSession.participantSessionId}),
       {bookletKey},identity.sessionToken,expected);
     const foreign=await login('foreign'),foreignBefore=await snapshot(foreign);
+    await t.test('protected credential API captures the authored group before code entry and rejects forged snapshot fields',async()=>{
+      const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
+      const importMetadata=label=>request('POST',workspace+'/participant-roster',{rosterText:JSON.stringify([{loginKey:'owned-metadata',password:'Owned-metadata-secret',
+        groupKey:'Owned.Metadata',groupLabel:label,booklets:[{id:bookletKey,codes:'AbC'}]}])},operator,201);
+      const metadata=async()=> (await repository.listOriginalParticipantGroupsByWorkspace(scope.tenantId,scope.workspaceId)).filter(group=>group.groupKey==='Owned.Metadata');
+      await importMetadata('Before code');assert.deepEqual(await metadata(),[]);
+      const input={tenantKey,workspaceKey,loginKey:'owned-metadata',password:'Owned-metadata-secret'};
+      await request('POST',routes.participant.signIn,{...input,password:'wrong'},undefined,401);assert.deepEqual(await metadata(),[]);
+      const before=Date.now();
+      await request('POST',routes.participant.signIn,{...input,groupLabel:'forged',createdAt:'2099-01-01T00:00:00.000Z',lastModifiedAt:'2099-01-01T00:00:00.000Z'},undefined,409);
+      const after=Date.now(),saved=(await metadata())[0];assert.equal(saved.groupLabel,'Before code');assert.equal(saved.lastModifiedAt,saved.createdAt);
+      assert.ok(Date.parse(saved.createdAt)>=before&&Date.parse(saved.createdAt)<=after);
+      assert.ok(!(await repository.listParticipantSessionsByWorkspace(scope.tenantId,scope.workspaceId)).some(session=>session.loginKey==='owned-metadata'));
+      await importMetadata('After import');
+      await request('POST',routes.participant.signIn,{...input,participantCode:'wrong'},undefined,400);assert.deepEqual(await metadata(),[saved]);
+      const identity=await request('POST',routes.participant.signIn,{...input,participantCode:'abc'});
+      assert.equal(identity.participantSession.participantCode,'AbC');assert.deepEqual(await metadata(),[saved]);
+      await request('POST',routes.participant.signIn,{...input,participantCode:'ABC'});assert.deepEqual(await metadata(),[saved]);
+    });
     await t.test('all three authenticated entry paths negotiate actual browser lifecycle logs without a synthetic ready state',async()=>{
       for(const path of ['resume','launch','credentials']){
         const identity=await login('browser-'+path),id=identity.participantSession.participantSessionId;

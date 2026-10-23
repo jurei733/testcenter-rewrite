@@ -359,9 +359,11 @@ validation behavior, ZIP extraction and automatic activation remain open.
 Run `npm run smoke:ui:original-workspace-files` for the complete owned browser
 journey, or select `verify/ui-original-workspace-files` through
 `npm run ci:focus -- --list`. For focused Original result export work,
-`npm run test:original-results` freshly builds the core and runs archive, Test opening/state-clock,
+`npm run test:original-results` freshly builds the core and runs archive, Test opening/state-clock, group snapshot,
 authenticated HTTP and Source-fixture regressions without an Angular build.
-These same cases remain mandatory in the complete unit/PostgreSQL gates. This is functional qualification, not a full-page
+These same cases remain mandatory in the complete unit/PostgreSQL gates. Group snapshots now preserve the first
+validated credential-login label independently of later roster imports across all
+four stores; see [lifecycle and migration details](docs/ORIGINAL-RESULT-GROUPS.md). This is functional qualification, not a full-page
 Original pixel-match claim.
 
 
