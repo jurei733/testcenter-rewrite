@@ -1,0 +1,42 @@
+[
+  {
+    "id": "PAD",
+    "attribute": "  Padded Ω  ",
+    "expected": "  Padded Ω  "
+  },
+  {
+    "id": "WHITE",
+    "attribute": "   ",
+    "expected": "   "
+  },
+  {
+    "id": "EMPTY",
+    "attribute": "",
+    "expected": ""
+  },
+  {
+    "id": "ENTITIES",
+    "attribute": "A &amp; B &quot;Q&quot; &apos;S&apos; &lt;tag&gt;",
+    "expected": "A & B \"Q\" 'S' <tag>"
+  },
+  {
+    "id": "NUMERIC",
+    "attribute": "A&#10;B&#9;C&#13;D &#x1F680;",
+    "expected": "A\nB\tC\rD 🚀"
+  },
+  {
+    "id": "LITERAL",
+    "attribute": "A\r\nB\tC\rD\nE",
+    "expected": "A B C D E"
+  },
+  {
+    "id": "GREATER",
+    "attribute": "  A > B &lt;C&gt;  ",
+    "expected": "  A > B <C>  "
+  },
+  {
+    "id": "ONCE",
+    "attribute": "&amp;lt; &amp;#10; &amp;amp;",
+    "expected": "&lt; &#10; &amp;"
+  }
+]

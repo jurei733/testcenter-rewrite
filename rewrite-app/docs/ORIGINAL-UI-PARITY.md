@@ -1,5 +1,17 @@
 # Optional Original UI
 
+### Authored group labels and actual empty-label failure (2026-10-24)
+
+The native XML parser, import and both SQL stores now retain exact parsed group
+labels, including padding and whitespace-only values. An empty native label keeps
+the Original's observed login failure instead of inventing a group-key label.
+Four-store and protected HTTP controls cover preservation, failure and repair;
+the unchanged production Source Oracle now qualifies 41 HTTP groups. The new
+monitor-first evidence also confirms a remaining lifecycle requirement. See
+[exact label semantics and evidence](ORIGINAL-RESULT-GROUPS.md). Native Results/
+Tests pages, monitor-login creation and the eight broad visual rows remain open;
+the formal ledger stays **27 done / 22 partial**.
+
 ### Group snapshot foundation (2026-10-23)
 
 First validated participant credentials now capture a server-owned group label

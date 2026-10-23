@@ -25475,8 +25475,8 @@ export const createFirstSliceServices = (
           existingEntry?.executionMode ??
           defaultParticipantExecutionMode,
         groupKey: parsedEntry.groupKey,
-        ...(parsedEntry.groupLabel?.trim()
-          ? { groupLabel: parsedEntry.groupLabel.trim() }
+        ...(typeof parsedEntry.groupLabel === "string"
+          ? { groupLabel: parsedEntry.groupLabel }
           : {}),
         bookletKey: parsedEntry.bookletKey,
         ...(parsedEntry.bookletKeys?.length
@@ -32025,6 +32025,13 @@ export const createFirstSliceServices = (
           );
         }
         const signInTimestamp = now();
+        // Original accepts the XML attribute but stores an empty label as NULL.
+        // Its Login construction then fails before checking the password. Keep
+        // that invalid stored metadata visible; never invent a group-key label.
+        if (rosterEntry?.groupLabel === "") {
+          assertParticipantAccessWindow(rosterEntry, signInTimestamp);
+          throw new FirstSliceError(500, "original_group_label_invalid", "The imported Original group label is empty.");
+        }
         if (requireLoginPassword || rosterEntry?.passwordRequired) {
           const loginAttempt = await repository.getParticipantLoginAttempt(
             workspace.tenantId,
