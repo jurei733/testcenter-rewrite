@@ -376,29 +376,31 @@ try{
  // A roster replacement alone does not update an already-created Login session.
  await uploadIdentity('oracle.identity','Replacement group label');
  identityStats=(await groups()).find(row=>row.groupName===identityGroup);assert.ok(identityStats);
- const casePerson=await groupLogin(identityLogin);assert.equal(casePerson.token,identityPerson.token);
+ const casePerson=await groupLogin(identityLogin);assert.ok(casePerson.token!==identityPerson.token,'A successful person reentry rotates its bearer token');
+ const casePersonTest=Number((await request('PUT','/test',{token:casePerson.token,body:{bookletName:'ORACLE.BOOK.A'},status:201})).value);assert.equal(casePersonTest,identityTest);
  identityStats=(await groups()).find(row=>row.groupName.toLowerCase()===identityGroup.toLowerCase());
  identitySession=(await sessions()).find(row=>row.loginName===identityLogin);
  assert.equal(identityStats.groupName,'oracle.identity');assert.equal(identityStats.groupLabel,'  Identity original Ω  ');
  assert.equal(identitySession.groupName,identityGroup);assert.equal(identitySession.groupLabel,'  Identity original Ω  ');
- check('case-equivalent group reentry updates result group spelling but Test listing retains snapshot spelling',{samePersonToken:true,result:identityStats,testSession:identitySession});
+ check('case-equivalent group reentry updates result group spelling but Test listing retains snapshot spelling',{personIdentityRetained:true,personTokenRotated:true,testId:casePersonTest,result:identityStats,testSession:identitySession});
  await uploadIdentity('ORACLE.MOVED','  Moved current Ω  ');
  assert.ok((await groups()).some(row=>row.groupName.toLowerCase()===identityGroup.toLowerCase()));
- const movedPerson=await groupLogin(identityLogin);assert.equal(movedPerson.token,identityPerson.token);
+ const movedPerson=await groupLogin(identityLogin);assert.ok(movedPerson.token!==casePerson.token,'A successful moved-group reentry rotates its bearer token');
+ const movedPersonTest=Number((await request('PUT','/test',{token:movedPerson.token,body:{bookletName:'ORACLE.BOOK.A'},status:201})).value);assert.equal(movedPersonTest,identityTest);
  const movedGroups=await groups();assert.ok(!movedGroups.some(row=>row.groupName.toLowerCase()===identityGroup.toLowerCase()));
  const moved=movedGroups.find(row=>row.groupName==='ORACLE.MOVED');assert.equal(moved.groupLabel,'  Moved current Ω  ');assert.equal(moved.bookletsStarted,1);assert.equal(moved.numUnitsTotal,1);
  identitySession=(await sessions()).find(row=>row.loginName===identityLogin);assert.equal(identitySession.groupName,'ORACLE.MOVED');assert.equal(identitySession.bookletLabel,'Owned booklet A');
- check('successful reentry moves existing person Tests to the current Login group without recreating person or Test',{samePersonToken:true,testId:identityTest,result:moved,testSession:identitySession});
+ check('successful reentry moves existing person Tests to the current Login group without recreating person or Test',{personIdentityRetained:true,personTokenRotated:true,testId:movedPersonTest,result:moved,testSession:identitySession});
  await request('DELETE',root+'/responses',{token:users.RW.token,body:{groups:[identityGroup]},status:200});
- await request('GET','/test/'+identityTest,{token:identityPerson.token});
+ await request('GET','/test/'+identityTest,{token:movedPerson.token});
  assert.equal((await groups()).find(row=>row.groupName==='ORACLE.MOVED').numUnitsTotal,1);
  check('deleting a former group snapshot retains the person and Test already moved to another group');
  await request('DELETE',root+'/responses',{token:users.RO.token,body:{groups:['ORACLE.MOVED']},status:403});
- await request('GET','/test/'+identityTest,{token:identityPerson.token});
+ await request('GET','/test/'+identityTest,{token:movedPerson.token});
  await request('DELETE',root+'/responses',{token:users.RW.token,body:{groups:['ORACLE.MOVED']},status:200});
- await request('GET','/test/'+identityTest,{token:identityPerson.token,status:401});
+ await request('GET','/test/'+identityTest,{token:movedPerson.token,status:403});
  assert.ok(!(await groups()).some(row=>row.groupName==='ORACLE.MOVED'));
- check('native whole-group deletion requires RW and invalidates the moved person token and all its Tests',{readOnlyDeleteStatus:403,deletedPersonTestStatus:401});
+ check('native whole-group deletion requires RW and invalidates the moved person token and all its Tests',{readOnlyDeleteStatus:403,deletedPersonTestStatus:403});
 
  }
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
