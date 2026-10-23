@@ -27,8 +27,9 @@ Original-19 runtime journey passes all 27 Memory/File/SQLite cases; PostgreSQL
 runs it within its complete group. Typecheck, production build and Actionlint
 pass. CI policy passes 227 cases with one explicitly Linux-only GNU timeout
 case skipped on macOS. Initial production entry remains 468.39 kB. The owned
-PostgreSQL schema/cluster are retired. These results are local; the separately
-running full Linux qualification for the published CI migration remains pending.
+PostgreSQL schema/cluster are retired. These results are local. Published CI
+migration `44233b4b` subsequently passes all 89 Linux jobs in run `39977337416`;
+this additional detail correction still requires its own publication qualification.
 
 The separate participant matrix and global Unit detail still require their own
 complete multi-assignment semantics. Full four-tab workspace, reports, ZIP,

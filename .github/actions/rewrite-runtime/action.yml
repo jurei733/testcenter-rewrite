@@ -7,6 +7,12 @@ inputs:
   playwright:
     description: Install Chromium and its system libraries
     default: "false"
+  build-attempt:
+    description: Exact build producer attempt from needs.build.outputs.attempt
+    default: ""
+  browser-system-attempt:
+    description: Exact browser package producer attempt from its needs output
+    default: ""
 runs:
   using: composite
   steps:
@@ -23,7 +29,7 @@ runs:
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
       with:
         digest-mismatch: error
-        name: browser-system-${{ github.sha }}
+        name: browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}
         path: ${{ runner.temp }}/browser-system
     - name: Verify and install browser system packages offline
       if: inputs.playwright == 'true'
@@ -31,6 +37,7 @@ runs:
       working-directory: rewrite-app
       env:
         CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
+        CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ inputs.browser-system-attempt }}
       run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore
     - if: inputs.playwright == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -45,7 +52,7 @@ runs:
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         digest-mismatch: error
-        name: rewrite-build-${{ github.sha }}
+        name: rewrite-build-${{ github.sha }}-${{ inputs.build-attempt }}
         path: ${{ runner.temp }}/rewrite-build
     - if: inputs.prebuilt == 'true'
       shell: bash

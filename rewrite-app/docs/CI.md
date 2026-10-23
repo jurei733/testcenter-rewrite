@@ -1,5 +1,78 @@
 # CI iteration and complete acceptance
 
+## Bind partial reruns to the successful producer (2026-10-23)
+
+[GitHub reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
+retain the original event commit. A selected consumer can have a newer attempt
+than its still-successful producer. Previously, the browser manifest compared
+against the consumer attempt, so that partial rerun would fail. Full reruns
+would also collide with existing immutable artifact names, as described by
+[upload-artifact](https://github.com/actions/upload-artifact#not-uploading-to-the-same-artifact).
+
+All build, browser-package, Source-reference and diagnostic artifacts now retain
+an explicit producing-attempt suffix. Successful producers expose that attempt
+as a job output. Every consumer explicitly selects its producer's output through
+its actual `needs` dependency. No lookup by latest artifact, overwrite, cross-run
+request or fallback is added. Earlier diagnostic and reference evidence remains
+intact when a later attempt uploads its own files.
+
+Browser restore validates that the referenced attempt is a canonical positive
+safe integer no newer than the consumer. It then requires that exact producing
+attempt in the unchanged manifest comparison. Commit, workflow run, lock/module,
+Node/architecture, runner image, full initial inventory, actual package identities,
+bytes and final dpkg/font oracle checks remain exact. A missing/wrong/future
+attempt or changed base still fails before privileged installation. Expired
+artifacts or a changed runner base require fresh producers; old runs keep their
+old workflow code.
+
+[Linux probe 39982638354](https://github.com/jurei733/testcenter-rewrite/actions/runs/39982638354)
+uses the actual production composite. Initial attempt 1 passes all **232 policy
+cases**, four native Debian/APT controls, the offline restore in **8.685 s** and
+all seven headed Chromium capture controls. A real **consumer-only attempt 2**
+retains the successful producer's original execution and output. Its log proves
+`producerRunAttempt=1 / consumerRunAttempt=2`; offline restore passes in **10.115 s**
+with the identical dpkg/font oracle, then all **7/7** headed controls pass. No
+producer is rebuilt for that partial rerun. Re-executing the producer and its
+dependent consumer in **attempt 3** also passes: **232 policy cases**, four native
+controls, exact `producerRunAttempt=3 / consumerRunAttempt=3`, offline restore in
+**16.816 s** and all **7/7** headed controls. The artifact listing independently
+retains both producer-attempt names: IDs `12514500993` (attempt 1) and
+`12513759146` (attempt 3). The older immutable artifact is not overwritten.
+GitHub's rerun API requires the current-attempt job record; a prior-attempt job ID
+returns 403, so rerun targets are resolved from the current job listing.
+
+Local policy passes **231 cases / one explicit Linux-only GNU-timeout macOS
+skip**, with no failures. Actionlint and diff checks pass. Every original scenario
+and all 89 complete-workflow jobs remain. Actual shared-build/Source-reference
+consumers and complete acceptance still require the final head's full Linux run;
+the bounded native probe does not replace that qualification.
+
+## Complete package-migration qualification (2026-10-23)
+
+Published `44233b4b` completes
+[run 39977337416](https://github.com/jurei733/testcenter-rewrite/actions/runs/39977337416)
+with **89/89 successful jobs**, including every Original reference family,
+store integration, browser, Docker and deployment gate. The shared producer,
+offline native APT qualification and all actual browser consumers pass.
+The downloaded artifact `12512395326` is independently rechecked: all 17
+package sizes, SHA256 values, unique safe cache names and real Debian control
+identities agree (25,937,806 package bytes). ZIP SHA256 is
+`9fd7c9e6c80555894dd6b2553093e0951836e02d5858437b0d36f866bbf8e0e8`.
+
+Observed elapsed time is **34:10**, with **4:39 Fast feedback** and **409.82
+runner-minutes**. Across all 64 comparable browser setup steps, median setup is
+**29 s**, versus **37 s** in the preceding run. This setup observation does not
+establish a controlled complete speedup: the preceding failed run finished in
+28:48 and used 411.27 runner-minutes, while queuing and journey timings differ.
+Long repeated browser prefixes and the four-slot extended queue remain the main
+throughput target. The new 32-case navigation observation below is separate from
+this already-published run.
+
+Full Linux acceptance of this commit does not establish complete product parity.
+The formal status remains 29 done / 20 partial, with all eight broad visual rows
+open. The newly added prestart Booklet detail test and navigation change still
+require their own publication qualification.
+
 ## Remove an idle-network barrier from functional label checks (2026-10-23)
 
 Completed Linux qualification job `120497596787` in

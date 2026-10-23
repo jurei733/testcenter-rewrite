@@ -79,6 +79,15 @@ export async function nativeContext(root,env=process.env){
     playwrightVersion:JSON.parse(await readFile(deps.packagePath,'utf8')).version,requested:deps.packages};
 }
 
+// A partial GitHub re-run retains a successful producer's job output. Require
+// that exact attempt, not the consumer's newer attempt or a guessed fallback.
+export function expectedProducerContext(consumer,producerAttempt){
+  const valid=value=>typeof value==='string'&&/^[1-9][0-9]*$/.test(value)&&Number.isSafeInteger(Number(value));
+  assert(valid(consumer.runAttempt)&&valid(producerAttempt)&&Number(producerAttempt)<=Number(consumer.runAttempt),
+    'Invalid browser system producer attempt');
+  return {...consumer,runAttempt:producerAttempt};
+}
+
 export function validateManifest(value,expected,before){
   assert(value?.version===2&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
   assert(value.beforeInventory===before,'Browser system initial dpkg inventory mismatch');
@@ -152,7 +161,9 @@ async function configureApt(staging){
 
 export async function browserSystem(mode,root,directory){
   assert(['pack','restore'].includes(mode),'Expected pack or restore');
-  const started=Date.now(),context=await nativeContext(root),before=inventory();parseInventory(before);
+  const started=Date.now(),consumer=await nativeContext(root);
+  const context=mode==='restore'?expectedProducerContext(consumer,process.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT):consumer;
+  const before=inventory();parseInventory(before);
   const report=(phase,values={})=>console.log(JSON.stringify({ciBrowserSystem:{mode,phase,elapsedMs:Date.now()-started,...values}}));
   report('base_verified',{inventorySha256:sha(before),imageVersion:context.imageVersion});
   if(mode==='pack'){
@@ -191,7 +202,8 @@ export async function browserSystem(mode,root,directory){
   }else if(mode==='restore'){
     const verified=await verifyArtifact(directory,context,before);
     const installStarted=Date.now();
-    report('offline_install',{packages:verified.paths.length,bytes:verified.bytes});
+    report('offline_install',{packages:verified.paths.length,bytes:verified.bytes,
+      producerRunAttempt:context.runAttempt,consumerRunAttempt:consumer.runAttempt});
     // APT requires its original cache basenames even for explicit local files
     // under --no-download. Preserve the producer's actual names, not a second
     // implementation of APT's epoch/version escaping rules.
