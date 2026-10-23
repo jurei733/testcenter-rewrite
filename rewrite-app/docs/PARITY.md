@@ -1,5 +1,40 @@
 # Testcenter parity checklist
 
+### Additional Booklet monitor details before start (2026-10-23)
+
+The monitor summary already counts every assigned Booklet, but its detail lookup
+used only the roster's primary Booklet. A later native Booklet therefore appears
+in the summary and starter while its detail endpoint returns 404 until launch.
+The detail now uses the same complete, deduplicated assignment keys as the summary.
+Its roster-only Unit calculation is explicitly scoped to the selected Booklet;
+a Unit shared with another assigned Booklet is not counted twice on that page.
+
+The regression first reproduces the actual missing `LIVE.B` detail in the
+Original-19 native runtime journey. It verifies summary/detail agreement before
+launch, one roster expectation for a shared Unit, unchanged stored Runs, and the
+transition to one existing Run after launch in every store. A protected HTTP
+case covers canonical two-Booklet assignments, repeated preset variants,
+primary-only assignments, excluded Review logins, unassigned-Booklet 404 and
+unauthenticated 401. Unit counts include only the selected Booklet. Its owned
+storage/schema avoids inheriting a demo administrator password changed by an
+earlier API test. This is an application detail-consistency correction, not a
+new native workspace page or complete Original backend authorization proof.
+
+Fresh qualification passes **3,814 unit/frontend cases**, **173 complete API
+integrations each in Memory, File and SQLite**, and the complete **1,941-case
+PostgreSQL group**, all without failures, skips or cancellations. The native
+Original-19 runtime journey passes all 27 Memory/File/SQLite cases; PostgreSQL
+runs it within its complete group. Typecheck, production build and Actionlint
+pass. CI policy passes 227 cases with one explicitly Linux-only GNU timeout
+case skipped on macOS. Initial production entry remains 468.39 kB. The owned
+PostgreSQL schema/cluster are retired. These results are local; the separately
+running full Linux qualification for the published CI migration remains pending.
+
+The separate participant matrix and global Unit detail still require their own
+complete multi-assignment semantics. Full four-tab workspace, reports, ZIP,
+revalidation/deletion and Source/Rewrite file pixels remain open. Formal status
+remains **29 done / 20 partial; all eight broad visual rows open**.
+
 ### Canonical and native Syscheck boundary (2026-10-23)
 
 The complete Linux run for `347b0746` exposes one common regression in Memory,
