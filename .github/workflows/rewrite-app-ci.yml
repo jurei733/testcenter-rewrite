@@ -168,7 +168,7 @@ jobs:
 
   original-browser-reference:
     name: Original browser reference (${{ matrix.family }})
-    needs: [build, original-reference-build]
+    needs: [build, original-reference-build, browser-system-dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -241,7 +241,7 @@ jobs:
 
   quick:
     name: verify-memory-sqlite (ui-quick-${{ matrix.check }})
-    needs: build
+    needs: [build, browser-system-dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -303,7 +303,7 @@ jobs:
 
   quick-extended:
     name: verify-memory-sqlite (ui-qualification-${{ matrix.check }})
-    needs: [build, fast-feedback]
+    needs: [build, fast-feedback, browser-system-dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -415,7 +415,7 @@ jobs:
           node -e 'for (const [name, result] of Object.entries(JSON.parse(process.env.RESULTS))) { if (result.result !== "success") { console.error(name + ": " + result.result); process.exitCode = 1; } }'
 
   verify-memory-sqlite:
-    needs: [build, fast-feedback]
+    needs: [build, fast-feedback, browser-system-dependencies]
     name: verify-memory-sqlite (${{ matrix.check }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -657,7 +657,7 @@ jobs:
           npm run smoke:startup:postgres:built
 
   verify-postgres-ui:
-    needs: [build, fast-feedback]
+    needs: [build, fast-feedback, browser-system-dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
