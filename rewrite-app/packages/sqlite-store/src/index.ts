@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -2010,6 +2012,15 @@ export const createSqliteFirstSliceStorage = (
     }
   };
 
+  const readActivationState=(tenantId:string,workspaceId:string)=>{
+    const scope=[tenantId,workspaceId];
+    return {
+      contentReleases:database.prepare("SELECT * FROM content_releases WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapContentRelease(row)).filter((value):value is ContentRelease=>value!==null),
+      participantSessions:database.prepare("SELECT * FROM participant_sessions WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapParticipantSession(row)).filter((value):value is ParticipantSession=>value!==null),
+      testRuns:database.prepare("SELECT * FROM test_runs WHERE tenant_id=? AND workspace_id=?").all(...scope).map(row=>mapTestRun(row)).filter((value):value is TestRun=>value!==null)
+    };
+  };
+
   const repository: FirstSliceRepository = {
     async getApplicationSettings() {
       const row = database
@@ -3091,6 +3102,22 @@ export const createSqliteFirstSliceStorage = (
       return rows
         .map(row => mapContentRelease(row))
         .filter(Boolean) as ContentRelease[];
+    },
+    async getContentReleaseActivationRevision(tenantId,workspaceId) {
+      return createContentReleaseActivationRevision(readActivationState(tenantId,workspaceId));
+    },
+    async commitContentReleaseActivation(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try{
+        const workspace=database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id=? AND workspace_id=?").get(input.tenantId,input.workspaceId);
+        const occupied=database.prepare("SELECT activity_event_id FROM workspace_activity_events WHERE activity_event_id=?").get(input.activityEvent.activityEventId);
+        const prepared=prepareContentReleaseActivation(input,{...readActivationState(input.tenantId,input.workspaceId),workspaceExists:!!workspace,eventIdAvailable:!occupied});
+        if(!prepared){database.exec("ROLLBACK");return false;}
+        for(const release of prepared.contentReleases)database.prepare("UPDATE content_releases SET status=?,activated_at=? WHERE content_release_id=?").run(release.status,release.activatedAt,release.contentReleaseId);
+        const event=prepared.activityEvent;
+        database.prepare("INSERT INTO workspace_activity_events (activity_event_id,tenant_id,workspace_id,event_type,actor_id,subject_type,subject_id,occurred_at,summary,details_json) VALUES (?,?,?,?,?,?,?,?,?,?)").run(event.activityEventId,event.tenantId,event.workspaceId,event.eventType,event.actorId,event.subjectType,event.subjectId,event.occurredAt,event.summary,JSON.stringify(event.details));
+        database.exec("COMMIT");return true;
+      }catch(error){return rollbackAfterFailure(database,error);}
     },
     async saveContentRelease(contentRelease) {
       database

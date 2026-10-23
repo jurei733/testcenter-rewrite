@@ -1,4 +1,6 @@
 import {
+  createContentReleaseActivationRevision,
+  prepareContentReleaseActivation,
   prepareApplicationAssetDeletion,
   validateApplicationAssetReferences,
   createWorkspaceSourcePackageReferenceRevision,
@@ -630,6 +632,29 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
           contentRelease.tenantId === tenantId &&
           contentRelease.workspaceId === workspaceId
       );
+    },
+    async getContentReleaseActivationRevision(tenantId, workspaceId) {
+
+      const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===tenantId && value.workspaceId===workspaceId;
+      return createContentReleaseActivationRevision({contentReleases:Array.from(state.contentReleases.values()).filter(scoped),
+          participantSessions:Array.from(state.participantSessions.values()).filter(scoped),
+          testRuns:Array.from(state.testRuns.values()).filter(scoped)});
+    },
+    async commitContentReleaseActivation(input) {
+
+        const scoped=(value:{tenantId:string;workspaceId:string})=>value.tenantId===input.tenantId && value.workspaceId===input.workspaceId;
+        const prepared=prepareContentReleaseActivation(input,{
+          workspaceExists:Array.from(state.workspacesByScope.values()).some(scoped),
+          eventIdAvailable:!state.workspaceActivityEvents.has(input.activityEvent.activityEventId),
+          contentReleases:Array.from(state.contentReleases.values()).filter(scoped),
+          participantSessions:Array.from(state.participantSessions.values()).filter(scoped),
+          testRuns:Array.from(state.testRuns.values()).filter(scoped)
+        });
+        if(!prepared)return false;
+        for(const release of prepared.contentReleases)state.contentReleases.set(release.contentReleaseId,release);
+        state.workspaceActivityEvents.set(prepared.activityEvent.activityEventId,prepared.activityEvent);
+        return true;
+
     },
     async saveContentRelease(contentRelease) {
       state.contentReleases.set(contentRelease.contentReleaseId, contentRelease);

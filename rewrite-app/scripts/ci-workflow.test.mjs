@@ -407,6 +407,11 @@ test("atomic settings regressions remain mandatory for both local and PostgreSQL
   const postgres=readFileSync(new URL("./run-postgres-integration.mjs",import.meta.url),"utf8");
   assert.ok(postgres.includes('"scripts/application-settings-mutation.test.mjs"'));
 });
+test("release activation transaction regressions remain mandatory for local and PostgreSQL acceptance", () => {
+  assert.ok(scripts["test:unit:built"].split(/\s+/).includes("scripts/content-release-activation.test.mjs"));
+  const postgres = readFileSync(new URL("./run-postgres-integration.mjs", import.meta.url), "utf8");
+  assert.ok(postgres.includes('"scripts/content-release-activation.test.mjs"'));
+});
 test("participant diagnostics are retained without uploading their SQLite scratch stores", () => {
   const job = workflow.jobs["verify-memory-sqlite"];
   const execute = job.steps.find(step => step.name === "Run ${{ matrix.check }}");
