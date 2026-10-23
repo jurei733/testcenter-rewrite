@@ -263,6 +263,45 @@ try{
  assert.equal((await report('review','ORACLE.REVIEWS',true)).value.length,1);
  check('deleting a Unit review retains the saved unanswered Unit, its response export and group counts');
 
+
+ {
+ // Group labels freeze at credential login, even before a person code exists.
+ const groupRoster=(groupName,label,loginName,code='')=>`<Group id="${groupName}" label="${label}"><Login name="${loginName}" pw="owned-group-secret" mode="run-hot-return"><Booklet${code?' codes="'+code+'"':''}>ORACLE.BOOK.A</Booklet></Login></Group>`;
+ const uploadGroups=async(body,file)=>{
+  const form=new FormData();form.append('fileforvo[]',new Blob([xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/>'+body)],{type:'application/xml'}),file);
+  await request('POST',root+'/file',{token:users.RW.token,body:form,status:201});
+ };
+ const groupLogin=async name=>(await request('PUT','/session/login',{body:{name,password:'owned-group-secret'}})).value;
+ const openGroupTest=async person=>{
+  const testId=Number((await request('PUT','/test',{token:person.token,body:{bookletName:'ORACLE.BOOK.A'},status:201})).value);
+  await request('GET','/test/'+testId,{token:person.token});return testId;
+ };
+ await uploadGroups(groupRoster('ORACLE.SNAPSHOT','Before code','owned-source-coded-group','abc'),'snapshot.xml');
+ const codeLogin=await groupLogin('owned-source-coded-group');assert.ok(codeLogin.flags.includes('codeRequired'));
+ assert.ok(!(await groups()).some(row=>row.groupName==='ORACLE.SNAPSHOT'));
+ await uploadGroups(groupRoster('ORACLE.SNAPSHOT','After roster import','owned-source-coded-group','abc'),'snapshot.xml');
+ const codedPerson=(await request('PUT','/session/person',{token:codeLogin.token,body:{code:'abc'}})).value;
+ await openGroupTest(codedPerson);
+ const frozen=(await groups()).find(row=>row.groupName==='ORACLE.SNAPSHOT');
+ assert.equal(frozen.groupLabel,'Before code');assert.equal(frozen.bookletsStarted,1);
+ check('credential login freezes group label before person code; later roster import does not rewrite the snapshot', {groupName:frozen.groupName,groupLabel:frozen.groupLabel,codeRequired:true,reimportedLabel:'After roster import'});
+ const collations=[['ORACLE.COLL.Caf\u00e9','Case first','owned-source-coll-a'],['ORACLE.COLL.CAF\u00c9','Case later','owned-source-coll-b'],['ORACLE.COLL.Cafe\u0301','Composed later','owned-source-coll-c'],['ORACLE.COLL.Cafe','Accent distinct','owned-source-coll-d']].map(row=>row.map(value=>value.replace(/\\u([0-9a-f]{4})/gi,(_,hex)=>String.fromCharCode(parseInt(hex,16)))));
+ await uploadGroups(collations.map(([name,label,login])=>groupRoster(name,label,login)).join(''),'collation.xml');
+ for(const [, ,name]of collations)await openGroupTest(await groupLogin(name));
+ const collated=(await groups()).filter(row=>row.groupName.startsWith('ORACLE.COLL.'));
+ assert.equal(collated.length,2);
+ assert.deepEqual(collated.map(row=>[row.groupLabel,row.bookletsStarted]).sort(),[['Accent distinct',1],['Case first',3]]);
+ check('production german2_ci merges case and Unicode composition, retains first group label and distinguishes accents',{groups:collated.map(row=>({groupName:row.groupName,groupLabel:row.groupLabel,bookletsStarted:row.bookletsStarted}))});
+ await request('DELETE',root+'/responses',{token:users.RW.token,body:{groups:['ORACLE.SNAPSHOT']},status:200});
+ assert.ok(!(await groups()).some(row=>row.groupName==='ORACLE.SNAPSHOT'));
+ const freshCodeLogin=await groupLogin('owned-source-coded-group');assert.ok(freshCodeLogin.flags.includes('codeRequired'));
+ const freshPerson=(await request('PUT','/session/person',{token:freshCodeLogin.token,body:{code:'abc'}})).value;
+ await openGroupTest(freshPerson);
+ const recreated=(await groups()).find(row=>row.groupName==='ORACLE.SNAPSHOT');
+ assert.equal(recreated.groupLabel,'After roster import');assert.equal(recreated.bookletsStarted,1);
+ check('whole-group result deletion removes the snapshot and next login captures the current authored label',{groupName:recreated.groupName,groupLabel:recreated.groupLabel});
+
+ }
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
