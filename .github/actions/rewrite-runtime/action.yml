@@ -16,15 +16,26 @@ inputs:
   browser-system-image-version:
     description: Exact runner image from the browser package producer
     default: ""
+  browser-system-profile-format:
+    description: Exact authenticated producer profile format; legacy defaults to 2
+    default: "2"
+  browser-system-material-sha256:
+    description: Exact producer material digest for mandatory v3 verification
+    default: ""
+  browser-material-label:
+    description: Unique caller matrix cell label for owned public diagnostics
+    default: single
 runs:
   using: composite
   steps:
-    - name: Reject incompatible browser runner before installation
+    - name: Validate browser producer metadata before installation
       if: inputs.playwright == 'true'
       shell: bash
       working-directory: ${{ github.workspace }}
       env:
         CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ inputs.browser-system-image-version }}
+        CI_BROWSER_SYSTEM_FORMAT: ${{ inputs.browser-system-profile-format }}
+        CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ inputs.browser-system-material-sha256 }}
       run: bash rewrite-app/scripts/ci-browser-cohort.sh check
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
@@ -41,6 +52,16 @@ runs:
         digest-mismatch: error
         name: browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}
         path: ${{ runner.temp }}/browser-system
+    - if: inputs.playwright == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
+    - name: Download locked Chromium before v3 runtime verification
+      if: inputs.playwright == 'true' && inputs.browser-system-profile-format == '3'
+      shell: bash
+      working-directory: rewrite-app
+      run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
     - name: Verify and install browser system packages offline
       if: inputs.playwright == 'true'
       shell: bash
@@ -48,13 +69,11 @@ runs:
       env:
         CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
         CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT: ${{ inputs.browser-system-attempt }}
+        CI_BROWSER_SYSTEM_FORMAT: ${{ inputs.browser-system-profile-format }}
+        CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ inputs.browser-system-image-version }}
+        CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256: ${{ inputs.browser-system-material-sha256 }}
       run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore
-    - if: inputs.playwright == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-${{ runner.arch }}-ubuntu-24.04-playwright-${{ hashFiles('rewrite-app/package-lock.json') }}
-    - if: inputs.playwright == 'true'
+    - if: inputs.playwright == 'true' && inputs.browser-system-profile-format == '2'
       shell: bash
       working-directory: rewrite-app
       run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
@@ -70,3 +89,11 @@ runs:
       env:
         CI_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-build
       run: node scripts/ci-build-artifact.mjs restore
+    - name: Retain owned runtime material diagnostics
+      if: always() && inputs.playwright == 'true' && inputs.browser-system-profile-format == '3'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: browser-material-${{ github.job }}-${{ inputs.browser-material-label }}-${{ github.sha }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/browser-material-*/
+        if-no-files-found: ignore
+        retention-days: 7

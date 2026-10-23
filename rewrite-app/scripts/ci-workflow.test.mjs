@@ -36,12 +36,20 @@ test('every actual browser consumer waits for the authenticated same-run package
  assert.equal(restore.if,download.if);assert.equal(restore.env.CI_BROWSER_SYSTEM_DIR,download.with.path);
  assert.equal(restore.run,'timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore');
  assert.ok(action.runs.steps.indexOf(download)<action.runs.steps.indexOf(restore));
- assert.ok(action.runs.steps.indexOf(restore)<action.runs.steps.findIndex(step=>step.run?.includes('playwright install')));
+ const v3=action.runs.steps.find(step=>step.name==='Download locked Chromium before v3 runtime verification');
+ const legacy=action.runs.steps.find(step=>step.run?.includes('playwright install')&&step.if==="inputs.playwright == 'true' && inputs.browser-system-profile-format == '2'");
+ assert.ok(action.runs.steps.indexOf(download)<action.runs.steps.indexOf(v3));
+ assert.ok(action.runs.steps.indexOf(v3)<action.runs.steps.indexOf(restore));
+ assert.ok(action.runs.steps.indexOf(restore)<action.runs.steps.indexOf(legacy));
+ assert.equal(v3.if,"inputs.playwright == 'true' && inputs.browser-system-profile-format == '3'");
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_FORMAT,'${{ inputs.browser-system-profile-format }}');
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,'${{ inputs.browser-system-image-version }}');
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256,'${{ inputs.browser-system-material-sha256 }}');
  assert.ok(!action.runs.steps.some(step=>/apt-get|--with-deps|\/etc\/apt|sudo/.test(step.run??'')));
 });
-test('an incompatible browser cohort fails before Node setup, npm, build and browser artifact downloads',()=>{
+test('legacy incompatible cohorts and malformed v3 metadata fail before setup while v3 requires later material verification',()=>{
  const first=action.runs.steps[0];
- assert.equal(first.name,'Reject incompatible browser runner before installation');
+ assert.equal(first.name,'Validate browser producer metadata before installation');
  assert.equal(first.if,"inputs.playwright == 'true'");
  assert.equal(first['working-directory'],'${{ github.workspace }}');
  assert.equal(first.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,'${{ inputs.browser-system-image-version }}');
@@ -115,7 +123,7 @@ test('the actual browser restore and Chromium commands preserve every nonzero ch
   writeFileSync(join(directory,'node'),'#!/bin/sh\n[ "$#" = 2 ] && [ "$1" = scripts/ci-browser-system.mjs ] && [ "$2" = restore ] || exit 65\n[ "$CI_BROWSER_SYSTEM_DIR" = "$OWNED_PACKAGE_DIRECTORY" ] || exit 66\nexit "$OWNED_STATUS"\n');
   writeFileSync(join(directory,'npx'),'#!/bin/sh\n[ "$#" = 4 ] && [ "$1" = --no-install ] && [ "$2" = playwright ] && [ "$3" = install ] && [ "$4" = chromium ] || exit 65\nexit "$OWNED_STATUS"\n');
   for(const name of ['timeout','node','npx'])chmodSync(join(directory,name),0o755);
-  const scripts=action.runs.steps.filter(step=>step.run?.startsWith('timeout '));assert.equal(scripts.length,2);
+  const scripts=action.runs.steps.filter(step=>step.run?.startsWith('timeout '));assert.equal(scripts.length,3);
   for(const step of scripts)for(const status of [0,37,51,100]){
    const result=spawnSync('bash',['--noprofile','--norc','-e','-o','pipefail','-c',step.run],{encoding:'utf8',
     env:{...process.env,PATH:directory+':'+process.env.PATH,CI_BROWSER_SYSTEM_DIR:directory,OWNED_PACKAGE_DIRECTORY:directory,OWNED_STATUS:String(status)}});
@@ -424,7 +432,7 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
-  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs");
+  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs scripts/ci-browser-material-capture.test.mjs");
 });
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
@@ -550,4 +558,25 @@ test('native Systemcheck reports retain their real browser journey in required w
  assert.equal(scripts['smoke:ui:original-system-check-reports:built'],'node scripts/smoke-original-system-check-reports.mjs');
  assert.ok(scripts['test:frontend-state'].split(/\s+/).includes('scripts/original-system-check-reports-controller.test.mjs'));
  assert.equal(matrix.find(item=>item.check==='ui-original-workspace-files')?.command,'npm run smoke:ui:original-workspace-files:built');
+});
+
+test('all v3 consumers use exact immutable producer format and digest and cannot bypass offline material verification',()=>{
+ const producer=workflow.jobs['browser-system-dependencies'];
+ assert.equal(producer.outputs['profile-format'],'${{ steps.packages.outputs.profile-format }}');
+ assert.equal(producer.outputs['material-sha256'],'${{ steps.packages.outputs.material-sha256 }}');
+ const pack=producer.steps.find(step=>step.id==='packages');assert.equal(pack.env.CI_BROWSER_SYSTEM_FORMAT,'3');
+ assert.ok(producer.steps.findIndex(step=>step.run?.includes('playwright install chromium'))<producer.steps.indexOf(pack));
+ for(const [name,job]of Object.entries(workflow.jobs))for(const step of job.steps??[]){
+  if(step.uses!=='./.github/actions/rewrite-runtime'||!step.with?.playwright||step.with.playwright==='false')continue;
+  assert.equal(step.with['browser-system-profile-format'],'${{ needs.browser-system-dependencies.outputs.profile-format }}',name);
+  assert.equal(step.with['browser-system-material-sha256'],'${{ needs.browser-system-dependencies.outputs.material-sha256 }}',name);
+  assert.equal(step.with['browser-material-label'],'${{ strategy.job-index }}',name);
+ }
+ const qualification=workflow.jobs['browser-system-qualification'];
+ const restore=qualification.steps.find(step=>step.run?.includes('ci-browser-system.mjs restore'));
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_FORMAT,'${{ needs.browser-system-dependencies.outputs.profile-format }}');
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION,'${{ needs.browser-system-dependencies.outputs.image-version }}');
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256,'${{ needs.browser-system-dependencies.outputs.material-sha256 }}');
+ assert.ok(qualification.steps.findIndex(step=>step.run?.includes('playwright install chromium'))<qualification.steps.indexOf(restore));
+ assert.equal(action.inputs['browser-system-profile-format'].default,'2');
 });

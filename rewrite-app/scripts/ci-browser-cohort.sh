@@ -16,6 +16,18 @@ case "${1:-}" in
     valid_version "${CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION:-}" || {
       printf '%s\n' 'Missing or invalid producer browser image version.' >&2; exit 1;
     }
+    case "${CI_BROWSER_SYSTEM_FORMAT-2}" in
+      2) ;;
+      3)
+        [[ "${CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || {
+          printf '%s\n' 'Missing or invalid producer browser material digest.' >&2; exit 1;
+        }
+        printf 'Browser v3 producer metadata validated: producer=%s consumer=%s; actual material verification remains mandatory.\n' \
+          "$CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION" "$ImageVersion"
+        exit 0
+        ;;
+      *) printf '%s\n' 'Unsupported browser system profile format.' >&2; exit 1 ;;
+    esac
     if [[ "$ImageVersion" != "$CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION" ]]; then
       printf 'Browser runner image cohort mismatch: producer=%s consumer=%s. No dependencies or browser packages installed.\n' \
         "$CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION" "$ImageVersion" >&2
