@@ -1,3 +1,4 @@
+import {waitForFiniteDocumentAnimations} from './finite-animation-ready.mjs';
 import {waitForMaterialTabs} from './material-tab-ready.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -21,7 +22,7 @@ export async function runOriginalApplicationSettingsSmoke(page,api,{artifacts}){
    await page.reload({waitUntil:'domcontentloaded'});await root.waitFor();
    for(const tab of ['Allgemein','Bildersetzungen']){
     await root.getByRole('tab',{name:tab,exact:true}).click();await waitForMaterialTabs(page);await page.evaluate(()=>document.fonts.ready);
-    await page.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished)));
+    await waitForFiniteDocumentAnimations(page);
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
     captures[theme+'-'+width+'-'+tab]=await root.evaluate(root=>{
      const measure=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return{text:e.textContent.trim(),x:r.x,y:r.y,width:r.width,height:r.height,font:s.font,gap:s.gap,padding:s.padding,boxSizing:s.boxSizing}};

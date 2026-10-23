@@ -532,6 +532,8 @@ export type ContentReleaseListQuery = {
 
 export type SystemCheckReportListQuery = {
   checkId?: string;
+  /** Union of selected check IDs; HTTP accepts repeated checkId parameters. */
+  checkIds?: string[];
   limit?: number;
 };
 

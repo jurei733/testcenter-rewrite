@@ -1,5 +1,77 @@
 # CI iteration and complete acceptance
 
+## Current finite-animation readiness and actual leaf rerun (2026-10-23)
+
+Published `8e3d709c` first finishes
+[run 39983754190](https://github.com/jurei733/testcenter-rewrite/actions/runs/39983754190)
+with 87 successful jobs and two failures: the headed administration settings
+smoke rejects a canceled Animation's `finished` Promise, and acceptance correctly
+rejects that prerequisite. The downloaded diagnostic ZIP `12516775131` verifies
+SHA256 `411fad6b515d051d8b7b4587108e4b23105ddd9c3eb2af78b5897c725b1d6b02`.
+The stack identifies the finite-animation Promise barrier after both first-width
+Primar captures. This is a browser animation cancellation, not an API fetch error.
+
+A real Chromium negative control reproduces the old barrier's AbortError when
+an existing effect is canceled. Settings readiness now observes the document's
+current finite effects. Finished/idle effects and the previously excluded infinite
+decoration permit readiness; a running or paused finite effect continues to block.
+A replacement effect must finish too. A paused effect times out, and inspection
+errors remain fatal. No animation is canceled by the helper, assertion skipped,
+retry added, deadline increased or qualifying pixel comparison relaxed.
+
+All **13** current native capture controls pass locally. The full protected
+administration smoke passes its real directory/settings/asset/password/logout
+flow and twelve theme/viewport diagnostic captures, then closes its owned API.
+[Corrected native probe 39988853413](https://github.com/jurei733/testcenter-rewrite/actions/runs/39988853413)
+passes 232 preceding Linux policy cases, four real Debian/APT controls, offline
+restore in 8.375 s and all **13/13** headed browser controls. An initial isolated
+probe rejects the extended command because its exact control inventory still
+lists only the two earlier files; the expected inventory is extended, retaining
+every previous control. Local current policy passes **233 / one explicit
+GNU-timeout-only macOS skip**, with zero failures; Actionlint and diff checks pass.
+
+A deliberately targeted rerun of the failed administration leaf also exercises
+the already-published producer-attempt protocol against the real full workflow.
+Attempt 2 restores `browser-system-…-1` and `rewrite-build-…-1`; logs bind
+`producerRunAttempt=1 / consumerRunAttempt=2`, and the same build manifest verifies.
+The full old administration leaf passes on that rerun, demonstrating that the
+animation defect is intermittent. Acceptance then passes: all **89 distinct
+executed gates** succeed without rebuilding successful producers or other leaves.
+This does not qualify the new animation correction; its final publication still
+requires a complete new-head run. Failure artifacts from attempt 1 remain intact.
+
+The completed-run API additionally exposes two alias rows for that matrix leaf
+with queued outer state, null runner and copied completed steps. The parent run
+is terminal success, the actual leaf is successful and all 89 unique executed
+gates are present. These duplicate metadata rows must not trigger another rerun.
+
+## Full selected Systemcheck exports and actual Source baseline (2026-10-23)
+
+The Original workspace report page downloads every report of all marked Checks.
+The Rewrite's export previously injected the ordinary 100-record list default
+and accepted only the first `checkId`. The new all-store regression first
+reproduces 100 exported rows instead of 505. Exports now retain the complete
+selected union; explicit limits apply after selection. Lists retain their page
+bounds. Empty/malformed selections and protected RO/foreign-scope cases qualify
+in the mandatory unit and PostgreSQL groups. `npm run test:system-check-reports`
+provides a fresh-core focused iteration path.
+
+Local application qualification passes **3,836 unit/frontend cases**, **173 full
+API cases each in Memory/File/SQLite**, and the complete **1,949-case PostgreSQL
+group**, with no failures/skips/cancellations. Owned PostgreSQL resources are
+retired. Build/typecheck pass; initial production entry stays at **468.39 kB**
+under the unchanged 470 kB budget.
+
+A separate unmodified Source production Docker/Apache Oracle passes all nine
+bounded groups in
+[run 39988533872](https://github.com/jurei733/testcenter-rewrite/actions/runs/39988533872),
+including real RW/RO grants, 505/504 full/selected reports, version-aware statistics,
+selected deletion and token-bound revocation. Its independently verified receipt
+and exact remaining permission/model differences are at the top of
+`ORIGINAL-UI-PARITY.md`. The probe workflow is isolated from the production branch;
+it does not replace any required application/Source gate or establish full
+Source/Rewrite authorization equivalence.
+
 ## Bind partial reruns to the successful producer (2026-10-23)
 
 [GitHub reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)

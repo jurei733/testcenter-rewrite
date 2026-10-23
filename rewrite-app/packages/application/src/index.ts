@@ -634,24 +634,28 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<SystemCheckReport[]>;
   exportSystemCheckReportsCsv(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string>;
   exportSystemCheckReportsJson(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string>;
   getSystemCheckReportStatistics(input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
   }): Promise<SystemCheckReportStatistics[]>;
 };
 
@@ -26325,6 +26329,7 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<Array<{ activityEventId: string; report: SystemCheckReport }>> => {
     const workspace = await requireWorkspace(
@@ -26333,7 +26338,15 @@ export const createFirstSliceServices = (
       input.workspaceKey
     );
     const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
-    const normalizedCheckId = input.checkId?.trim().toUpperCase();
+    if (input.checkIds !== undefined && (!Array.isArray(input.checkIds) ||
+      input.checkIds.some(id => typeof id !== "string" || !id.trim()))) {
+      throw new FirstSliceError(400, "system_check_report_check_ids_invalid",
+        "System-check report filters must contain nonempty check IDs.");
+    }
+    // Source distinguishes no filter from an explicitly empty selection.
+    const keys = [...(input.checkId?.trim() ? [input.checkId] : []), ...(input.checkIds ?? [])];
+    const selectedCheckIds = input.checkIds === undefined && keys.length === 0 ? null
+      : new Set(keys.map(key => key.trim().toUpperCase()));
     const events = await repository.listWorkspaceActivityEventsByWorkspace(
       workspace.tenantId,
       workspace.workspaceId
@@ -26351,8 +26364,8 @@ export const createFirstSliceServices = (
       })
       .filter(
         record =>
-          !normalizedCheckId ||
-          record.report.checkId.toUpperCase() === normalizedCheckId
+          selectedCheckIds === null ||
+          selectedCheckIds.has(record.report.checkId.toUpperCase())
       )
       .sort((left, right) =>
         right.report.createdAt.localeCompare(left.report.createdAt)
@@ -26364,6 +26377,7 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<SystemCheckReport[]> => {
     const records = await readSystemCheckReportRecords({
@@ -26377,6 +26391,7 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
   }): Promise<SystemCheckReportStatistics[]> => {
     const reports = (await readSystemCheckReportRecords(input)).map(
       record => record.report
@@ -26436,9 +26451,10 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string> => {
-    const reports = await readSystemCheckReports(input);
+    const reports = (await readSystemCheckReportRecords(input)).map(record => record.report);
     const baseHeaders = [
       "Titel",
       "SysCheck-Id",
@@ -26487,9 +26503,10 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
+    checkIds?: string[];
     limit?: number;
   }): Promise<string> => {
-    const reports = await readSystemCheckReports(input);
+    const reports = (await readSystemCheckReportRecords(input)).map(record => record.report);
     return `${JSON.stringify(
       reports.map(legacySystemCheckReportDocument),
       null,
