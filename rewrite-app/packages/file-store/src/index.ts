@@ -15,6 +15,8 @@ import {
 import { dirname, join } from "node:path";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -53,6 +55,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -85,6 +88,7 @@ type PersistedFirstSliceState = {
   sourcePackages: Record<string, SourcePackage>;
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
+  originalParticipantGroups: Record<string, OriginalParticipantGroup>;
   participantSessions: Record<string, ParticipantSession>;
   participantAccessCredentials: Record<string, ParticipantAccessCredential>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
@@ -142,6 +146,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   sourcePackages: {},
   importJobs: {},
   contentReleases: {},
+  originalParticipantGroups: {},
   participantSessions: {},
   participantAccessCredentials: {},
   participantRosterEntries: {},
@@ -1153,6 +1158,7 @@ const createFileRepository = (
           value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
         deleteMatching(state.participantRunCommands, workspaceMatches);
       deleteMatching(state.participantProgressDeliveries, workspaceMatches);
+        deleteMatching(state.originalParticipantGroups, workspaceMatches);
         for (const run of Object.values(state.testRuns)) {
           if (workspaceMatches(run)) delete state.participantPresence[run.testRunId];
         }
@@ -1503,6 +1509,24 @@ const createFileRepository = (
           participantSession.tenantId === tenantId &&
           participantSession.workspaceId === workspaceId
       );
+    },
+    async getOrCreateOriginalParticipantGroup(input) {
+      return enqueueMutation(async () => {
+        const state = await getState();
+        const candidate = prepareOriginalParticipantGroup(input);
+        if (!Object.values(state.workspacesByScope).some(workspace => workspace.tenantId === candidate.tenantId && workspace.workspaceId === candidate.workspaceId)) return null;
+        const existing = Object.values(state.originalParticipantGroups).find(group => group.tenantId === candidate.tenantId && group.workspaceId === candidate.workspaceId && originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (existing) return structuredClone(existing);
+        const next = { ...state, originalParticipantGroups: { ...state.originalParticipantGroups,
+          [JSON.stringify([candidate.tenantId, candidate.workspaceId, candidate.groupKey])]: candidate } };
+        await persistState(next);
+        cachePromise = Promise.resolve(next);
+        return structuredClone(candidate);
+      });
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return structuredClone(Object.values(state.originalParticipantGroups).filter(group => group.tenantId === tenantId && group.workspaceId === workspaceId));
     },
     async saveParticipantSession(participantSession) {
       await mutate(state => {

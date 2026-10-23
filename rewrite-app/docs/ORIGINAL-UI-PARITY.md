@@ -1,5 +1,18 @@
 # Optional Original UI
 
+### Group snapshot foundation (2026-10-23)
+
+First validated participant credentials now capture a server-owned group label
+and clock before the separate person-code step, across all four stores. Later
+roster imports and repeated sign-ins preserve that snapshot; invalid credentials
+cannot create it. Atomic creation, Unicode comparison, durable failure and scoped
+cleanup controls are covered by the focused result suite and mandatory unit/PG
+gates. See [lifecycle, migrations and remaining scope](ORIGINAL-RESULT-GROUPS.md).
+Native result tables, selected-Test and whole-group deletion semantics,
+monitor-login creation and broad visual proof remain partial. The formal ledger
+stays **27 done / 22 partial**, with all eight broad visual rows open.
+
+
 ### Test-row clock and saved Test state stay distinct (2026-10-23)
 
 Actual unmodified production Source Oracle 40018466023 passes 29 HTTP groups,

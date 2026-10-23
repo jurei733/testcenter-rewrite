@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  originalParticipantGroupKeysEqual,
+  prepareOriginalParticipantGroup,
   createContentReleaseActivationRevision,
   prepareContentReleaseActivation,
   prepareWorkspaceFilePublication,
@@ -37,6 +39,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  OriginalParticipantGroup,
   ParticipantTestLog,
   ParticipantRunCommand,
   ParticipantProgressDelivery,
@@ -58,6 +61,12 @@ type SqliteMigration = {
 type WorkspaceRow = Workspace & {
   tenant_key: string;
 };
+
+const mapOriginalParticipantGroup = (row: Record<string, unknown>): OriginalParticipantGroup => ({
+  tenantId: String(row.tenant_id), workspaceId: String(row.workspace_id),
+  groupKey: String(row.group_key), groupLabel: String(row.group_label),
+  createdAt: String(row.created_at), lastModifiedAt: String(row.last_modified_at)
+});
 
 const mapTenant = (row: Record<string, unknown> | undefined): Tenant | null =>
   row
@@ -1634,6 +1643,15 @@ const sqliteMigrations: SqliteMigration[] = [
     version: 66,
     name: "original_test_result_state",
     sql: `ALTER TABLE test_runs ADD COLUMN original_result_state_json TEXT;`
+  },
+  {
+    version: 67,
+    name: "original_participant_groups",
+    sql: `CREATE TABLE IF NOT EXISTS original_participant_groups (
+      tenant_id TEXT NOT NULL, workspace_id TEXT NOT NULL, group_key TEXT NOT NULL,
+      group_label TEXT NOT NULL, created_at TEXT NOT NULL, last_modified_at TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, workspace_id, group_key)
+    );`
   }
 ];
 
@@ -2661,6 +2679,7 @@ export const createSqliteFirstSliceStorage = (
           deletedTestLogCount: deleteScoped("participant_test_logs")
         };
         deleteScoped("operational_login_migration_candidates");
+        deleteScoped("original_participant_groups");
         counts.deletedWorkspaceCount = Number(
           database
             .prepare(
@@ -3231,6 +3250,23 @@ export const createSqliteFirstSliceStorage = (
       return rows
         .map(row => mapParticipantSession(row))
         .filter(Boolean) as ParticipantSession[];
+    },
+    async getOrCreateOriginalParticipantGroup(input) {
+      const candidate = prepareOriginalParticipantGroup(input);
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const workspace = database.prepare("SELECT workspace_id FROM workspaces WHERE tenant_id = ? AND workspace_id = ?").get(candidate.tenantId, candidate.workspaceId);
+        if (!workspace) { database.exec("ROLLBACK"); return null; }
+        const groups = database.prepare("SELECT * FROM original_participant_groups WHERE tenant_id = ? AND workspace_id = ?").all(candidate.tenantId, candidate.workspaceId).map(mapOriginalParticipantGroup);
+        const existing = groups.find(group => originalParticipantGroupKeysEqual(group.groupKey, candidate.groupKey));
+        if (!existing) database.prepare("INSERT INTO original_participant_groups (tenant_id, workspace_id, group_key, group_label, created_at, last_modified_at) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(candidate.tenantId, candidate.workspaceId, candidate.groupKey, candidate.groupLabel, candidate.createdAt, candidate.lastModifiedAt);
+        database.exec("COMMIT");
+        return existing ?? candidate;
+      } catch (error) { return rollbackAfterFailure(database, error); }
+    },
+    async listOriginalParticipantGroupsByWorkspace(tenantId, workspaceId) {
+      return database.prepare("SELECT * FROM original_participant_groups WHERE tenant_id = ? AND workspace_id = ? ORDER BY group_key").all(tenantId, workspaceId).map(mapOriginalParticipantGroup);
     },
     async saveParticipantSession(participantSession) {
       database

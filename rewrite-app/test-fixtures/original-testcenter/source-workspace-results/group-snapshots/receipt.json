@@ -1,0 +1,167 @@
+{
+  "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
+  "testMode": false,
+  "transport": "production Apache HTTP",
+  "checks": [
+    {
+      "name": "actual Apache readiness and version"
+    },
+    {
+      "name": "superadmin still needs an explicit workspace grant",
+      "unassignedSuperadminStatus": 404,
+      "anonymousStatus": 401
+    },
+    {
+      "name": "actual RO and RW accounts read only their assigned workspace"
+    },
+    {
+      "name": "unchanged native XSD validation and RW multipart upload"
+    },
+    {
+      "name": "complete selected and unfiltered native exports exceed 500 reports",
+      "unfiltered": 505,
+      "selected": 504,
+      "csvSha256": "c8a9ec86b2eadc23bce0ad8a8abeb4983eeaa5a4dd9c3fbb2737d91eba531bed",
+      "selectedFirstTitles": [
+        "owned-source-report-323",
+        "owned-source-report-486",
+        "owned-source-report-15"
+      ],
+      "selectedLastTitles": [
+        "owned-source-report-88",
+        "owned-source-report-495",
+        "owned-source-report-473"
+      ],
+      "rawReportCarriesKeyPhrase": true
+    },
+    {
+      "name": "native statistics retain OS and browser version labels"
+    },
+    {
+      "name": "RO report deletion is denied without losing stored reports"
+    },
+    {
+      "name": "RW deletes every report of the selected Check and retains unrelated reports"
+    },
+    {
+      "name": "native result fixture uses actual XSD-validated roster and two Booklets"
+    },
+    {
+      "name": "native no-code sign-in directly establishes the real person and both Booklet assignments"
+    },
+    {
+      "name": "creating a Test without opening its Booklet creates no result row or stateful Test-Session"
+    },
+    {
+      "name": "opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing"
+    },
+    {
+      "name": "locking and same-value relocking advance Test time without nonempty Test state or Unit rows",
+      "openedTime": 1792790446,
+      "lockedTime": 1792790448,
+      "relockedTime": 1792790449,
+      "unlockedTime": 1792790450,
+      "unopenedRemainedAbsent": true,
+      "emptyStateRemainedAbsent": true
+    },
+    {
+      "name": "a definition read does not create a saved Unit; pre-initialization logs are rejected without a Unit row"
+    },
+    {
+      "name": "actual Unit definition/state/log writes leave Test-level result time unchanged",
+      "testTime": 1792790450
+    },
+    {
+      "name": "a persisted state-and-log Unit counts without answers or a stateful Test-Session"
+    },
+    {
+      "name": "stateful Test-Session listing and opened-Booklet result listing have different inclusion rules"
+    },
+    {
+      "name": "group statistics aggregate saved Unit rows across Booklets including log-only Units",
+      "openedBooklets": 2,
+      "savedUnits": 3,
+      "minimum": 1,
+      "maximum": 2,
+      "average": 1.5
+    },
+    {
+      "name": "RO selected-Test deletion returns 403 without changing results or Test-Session listing"
+    },
+    {
+      "name": "selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test"
+    },
+    {
+      "name": "a review initializes a saved Unit without answers or nonempty Test state; it accepts subsequent actual Unit logs"
+    },
+    {
+      "name": "response exports include initialized state-only and review-only Units with empty response arrays"
+    },
+    {
+      "name": "legacy and enhanced review exports retain distinct category, reviewer and authored label contracts"
+    },
+    {
+      "name": "actual selected responses CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "e8a37be34446d3e9d11199d2bab30ed9c590986005b20ee781b6fe7b697d1be2",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"responses\";\"laststate\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected logs CSV and JSON contracts",
+      "rows": 4,
+      "csvSha256": "addc85e5619c9211a01f489e2f8806e3674b9e1fab0100c628ebeb7f8f21e633",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"timestamp\";\"logentry\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-legacy CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "da987f788e6490d8bdc96bd8dba6975ba71a2e4e288c1cf36b6605072cb22744",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category: accuracy\";\"category: quality\";\"reviewtime\";\"entry\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "actual selected reviews-enhanced CSV and JSON contracts",
+      "rows": 2,
+      "csvSha256": "dbd86b12626bf4415dd29e9ee7ff8aebda2c7ba8be055fc913645a06824d04fa",
+      "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category_accuracy\";\"category_quality\";\"reviewtime\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\";\"reviewer\";\"entry\";\"unitlabel\";\"bookletlabel\"",
+      "unknownGroupBytes": 0
+    },
+    {
+      "name": "deleting a Unit review retains the saved unanswered Unit, its response export and group counts"
+    },
+    {
+      "name": "credential login freezes group label before person code; later roster import does not rewrite the snapshot",
+      "groupName": "ORACLE.SNAPSHOT",
+      "groupLabel": "Before code",
+      "codeRequired": true,
+      "reimportedLabel": "After roster import"
+    },
+    {
+      "name": "production german2_ci merges case and Unicode composition, retains first group label and distinguishes accents",
+      "groups": [
+        {
+          "groupName": "ORACLE.COLL.Cafe",
+          "groupLabel": "Accent distinct",
+          "bookletsStarted": 1
+        },
+        {
+          "groupName": "ORACLE.COLL.Café",
+          "groupLabel": "Case first",
+          "bookletsStarted": 3
+        }
+      ]
+    },
+    {
+      "name": "whole-group result deletion removes the snapshot and next login captures the current authored label",
+      "groupName": "ORACLE.SNAPSHOT",
+      "groupLabel": "After roster import"
+    },
+    {
+      "name": "revocation is enforced against the existing signed-in token"
+    }
+  ],
+  "version": "19.0.0",
+  "success": true
+}

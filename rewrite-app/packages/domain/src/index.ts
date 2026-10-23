@@ -1099,6 +1099,16 @@ export type WorkspaceAttachment = {
   lastModified: number | null;
 };
 
+/** Original login_session_groups snapshot; independent of imported rosters and person sessions. */
+export type OriginalParticipantGroup = {
+  tenantId: string;
+  workspaceId: string;
+  groupKey: string;
+  groupLabel: string;
+  createdAt: string;
+  lastModifiedAt: string;
+};
+
 export type ParticipantSession = {
   participantSessionId: string;
   tenantId: string;

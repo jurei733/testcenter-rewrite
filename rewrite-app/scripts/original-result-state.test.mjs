@@ -8,8 +8,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {Pool} from 'pg';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
-import {createSqliteFirstSliceStorage,SQLITE_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/sqlite-store';
-import {createPostgresFirstSliceStorage,POSTGRES_FIRST_SLICE_SCHEMA_VERSION} from '@testcenter-rewrite-app/postgres-store';
+import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
+import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
 test('actual unchanged Source keeps lock clocks separate from saved Test state and uses whole-second native result times',async()=>{
  const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/lock-clock/',import.meta.url);
  const manifest=JSON.parse(await readFile(new URL('manifest.json',root),'utf8'));
@@ -163,15 +163,16 @@ for(const kind of kinds)test(`${kind}: Original result evidence separates opened
     control=null;
    }
   });
-  if(['sqlite','postgres'].includes(kind))await t.test('upgrading the previous schema retains legacy answers without fabricating result timestamps',async()=>{
+  if(['sqlite','postgres'].includes(kind))await t.test('upgrading the schema before Original result metadata retains legacy answers without fabricating result timestamps',async()=>{
    const legacyId=id+'-legacy',before=await repository.getTestRunById(legacyId);await storage.shutdown();
-   const version=kind==='sqlite'?SQLITE_FIRST_SLICE_SCHEMA_VERSION:POSTGRES_FIRST_SLICE_SCHEMA_VERSION;
+   // This historical fixture predates result metadata, independently of later migrations.
+   const version=kind==='sqlite'?66:60;
    if(kind==='sqlite'){
     control=new DatabaseSync(file);control.exec('ALTER TABLE test_runs DROP COLUMN original_result_state_json');
-    control.prepare('DELETE FROM schema_migrations WHERE version = ?').run(version);control.close();control=null;
+    control.prepare('DELETE FROM schema_migrations WHERE version >= ?').run(version);control.close();control=null;
    }else{
     control=new Pool({connectionString:url.toString()});await control.query('ALTER TABLE test_runs DROP COLUMN original_result_state_json');
-    await control.query('DELETE FROM schema_migrations WHERE version = $1',[version]);await control.end();control=null;
+    await control.query('DELETE FROM schema_migrations WHERE version >= $1',[version]);await control.end();control=null;
    }
    await open();assert.deepEqual(await repository.getTestRunById(legacyId),before);
   });
