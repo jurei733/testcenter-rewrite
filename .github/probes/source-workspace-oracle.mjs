@@ -168,6 +168,69 @@ try{
  assert.deepEqual((await groups()).map(row=>row.bookletsStarted),[1]);
  check('selected-Test deletion retains the same person token, unrelated Booklet answer and assignment; relaunch creates a new empty Test');
 
+ // Retain actual Source report schemas and row inclusion before implementing
+ // the remaining native Results downloads. Everything below is authored data.
+ const reviewRoster=xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/><Group id="ORACLE.REVIEWS" label="Owned review group"><Login name="owned-source-reviewer" pw="owned-source-reviewer-secret" mode="run-trial"><Booklet>ORACLE.BOOK.B</Booklet></Login></Group>');
+ const reviewForm=new FormData();reviewForm.append('fileforvo[]',new Blob([reviewRoster],{type:'application/xml'}),'reviews.xml');
+ await request('POST',root+'/file',{token:users.RW.token,body:reviewForm,status:201});
+ const reviewLogin=(await request('PUT','/session/login',{body:{name:'owned-source-reviewer',password:'owned-source-reviewer-secret'}})).value;
+ assert.ok(reviewLogin.token && !reviewLogin.flags.includes('codeRequired'));
+ const reviewToken=reviewLogin.token;
+ const reviewTest=Number((await request('PUT','/test',{token:reviewToken,body:{bookletName:'ORACLE.BOOK.B'},status:201})).value);
+ await request('GET','/test/'+reviewTest,{token:reviewToken});
+ await request('PUT',`/test/${reviewTest}/unit/ORACLE.UNIT2/review`,{token:reviewToken,status:201,
+  body:{priority:2,categories:'quality accuracy',entry:'Owned Unit review Ω\n"; exact',reviewer:'Owned Reviewer Ω',
+   userAgent:'Owned Oracle browser',page:2,pagelabel:'Owned page',originalUnitId:'ORACLE.UNIT2'}});
+ await request('PUT',`/test/${reviewTest}/review`,{token:reviewToken,status:201,
+  body:{priority:1,categories:'accuracy',entry:'Owned Booklet review Ω',reviewer:'Owned Reviewer Ω',userAgent:'Owned Oracle browser'}});
+ await request('PUT',`/test/${reviewTest}/unit/ORACLE.UNIT2/log`,{token:reviewToken,status:201,
+  body:[{key:'OWNED_REVIEW',content:'review-initialized Unit',timeStamp:Date.now()}]});
+ assert.deepEqual(groupProjection(await groups()).find(row=>row.groupName==='ORACLE.REVIEWS'),
+  {groupName:'ORACLE.REVIEWS',bookletsStarted:1,min:1,max:1,total:1,average:1});
+ assert.deepEqual((await sessions()).map(row=>row.bookletName),['ORACLE.BOOK.B']);
+ check('a review initializes a saved Unit without answers or nonempty Test state; it accepts subsequent actual Unit logs');
+ const report=async(type,group,newVersion=false,accept='application/json')=>request('GET',
+  root+'/report/'+type+'?dataIds='+encodeURIComponent(group)+'&useNewVersion='+newVersion,{token:ro,accept});
+ const responseRows=(await report('response','ORACLE.GROUP')).value;
+ assert.equal(responseRows.length,2);
+ assert.deepEqual(responseRows.map(row=>row.unitname),['ORACLE.UNIT','ORACLE.UNIT2']);
+ assert.deepEqual(responseRows[0].responses.map(row=>({id:row.id,content:row.content,responseType:row.responseType})),
+  [{id:'owned',content:'Exact retained answer Ω',responseType:'owned'}]);
+ assert.deepEqual(responseRows[1].responses,[]);
+ assert.deepEqual(JSON.parse(responseRows[1].laststate),{PRESENTATION_PROGRESS:'some'});
+ const reviewResponses=(await report('response','ORACLE.REVIEWS')).value;
+ assert.equal(reviewResponses.length,1);assert.deepEqual(reviewResponses[0].responses,[]);
+ assert.equal(reviewResponses[0].laststate,null);
+ check('response exports include initialized state-only and review-only Units with empty response arrays');
+ const legacy=(await report('review','ORACLE.REVIEWS')).value;
+ const enhanced=(await report('review','ORACLE.REVIEWS',true)).value;
+ assert.equal(legacy.length,2);assert.equal(enhanced.length,2);
+ assert.ok(legacy.every(row=>row.groupname==='ORACLE.REVIEWS' && !Object.hasOwn(row,'reviewer') && !Object.hasOwn(row,'unitlabel')));
+ assert.ok(legacy.every(row=>row['category: accuracy']==='X'));
+ const newUnit=enhanced.find(row=>row.unitname==='ORACLE.UNIT2');assert.ok(newUnit);
+ assert.equal(newUnit.category_accuracy,true);assert.equal(newUnit.category_quality,true);
+ assert.equal(newUnit.reviewer,'Owned Reviewer Ω');assert.equal(newUnit.unitlabel,'Owned second unit');
+ assert.equal(newUnit.bookletlabel,'Owned booklet B');assert.equal(newUnit.entry,'Owned Unit review Ω\n"; exact');
+ const newBook=enhanced.find(row=>row.unitname==='');assert.ok(newBook);
+ assert.equal(newBook.category_quality,false);assert.equal(newBook.unitlabel,'');
+ check('legacy and enhanced review exports retain distinct category, reviewer and authored label contracts');
+ const reportDirectory=process.env.SOURCE_ORACLE_ARTIFACT_DIR;await mkdir(reportDirectory,{recursive:true});
+ for(const [type,newVersion,name,group]of [
+  ['response',false,'responses','ORACLE.GROUP'],['log',false,'logs','ORACLE.GROUP'],
+  ['review',false,'reviews-legacy','ORACLE.REVIEWS'],['review',true,'reviews-enhanced','ORACLE.REVIEWS']]){
+  const json=(await report(type,group,newVersion)).value;
+  assert.ok(Array.isArray(json) && json.length>0 && json.every(row=>row.groupname===group));
+  const csv=await report(type,group,newVersion,'text/csv');assert.ok(csv.bytes.subarray(0,3).equals(Buffer.from([239,187,191])));
+  assert.match(csv.headers.get('content-type'),/^text\/csv/);
+  const text=csv.bytes.toString('utf8');assert.ok(text.includes('"groupname";"loginname";"code";"bookletname"'));
+  const absent=await report(type,'OWNED.NO.SUCH.GROUP',newVersion,'text/csv');assert.equal(absent.bytes.length,0);
+  if(type==='review')assert.equal(text.includes('"reviewer"'),newVersion);
+  await writeFile(join(reportDirectory,name+'.csv'),csv.bytes);
+  await writeFile(join(reportDirectory,name+'.json'),JSON.stringify(json,null,2)+'\n');
+  check('actual selected '+name+' CSV and JSON contracts',{rows:json.length,csvSha256:createHash('sha256').update(csv.bytes).digest('hex'),
+   header:text.slice(1).split('\n')[0],unknownGroupBytes:absent.bytes.length});
+ }
+
  await request('PATCH','/user/'+users.RO.id+'/workspaces',{token,body:{ws:[{id:ownedId,role:''}]}});
  await request('GET',overview,{token:ro,status:404});
  check('revocation is enforced against the existing signed-in token');
