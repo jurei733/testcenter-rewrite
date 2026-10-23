@@ -1,5 +1,19 @@
 # CI iteration and complete acceptance
 
+## Independent full database feedback (2026-10-23)
+
+Main run 40014001739 demonstrates that a browser cohort rejection in the fast set
+also skips the complete PostgreSQL group through `fast-feedback`. That database
+group now depends directly on successful shared build, typecheck, dependency audit
+and mandatory unit checks. It can therefore qualify the exact same-run build
+without waiting for, or being skipped by, an unrelated browser image rejection.
+Its complete serial test inventory, isolated owned schema, migration/doctor/preflight
+and protected startup smoke remain unchanged. PostgreSQL UI stays in the browser
+path, and complete acceptance still requires both database and browser groups.
+A workflow graph control checks the full transitive ancestor set, all four positive
+dependencies and the mandatory database leaves. This improves useful database
+feedback; it does not turn a failed browser/acceptance result green.
+
 ## Original sample external-resource readiness (local follow-up, 2026-10-23)
 
 The failed participant-detail-review trace contains correct required-field answer

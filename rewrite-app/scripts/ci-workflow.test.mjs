@@ -488,6 +488,7 @@ test("test jobs use the same-run build and cannot compile a replacement producti
     const job = workflow.jobs[id];
     if (id === "unit") assert.equal(job.needs, "build");
     else if(id === "quick") assert.deepEqual(job.needs,["build","browser-system-dependencies"]);
+    else if(id === "verify-postgres") assert.deepEqual(job.needs,["build","typecheck","dependencies","unit"]);
     else if(["quick-extended","verify-memory-sqlite","verify-postgres-ui"].includes(id)) assert.deepEqual(job.needs,["build","fast-feedback","browser-system-dependencies"]);
     else assert.deepEqual(job.needs, ["build", "fast-feedback"]);
     const setup = job.steps.find(step => step.uses === "./.github/actions/rewrite-runtime");
@@ -500,6 +501,21 @@ test("test jobs use the same-run build and cannot compile a replacement producti
   assert.equal(download.with["github-token"], undefined);
   assert.equal(download.with["digest-mismatch"], "error");
   assert.ok(action.runs.steps.some(step => step.run === "node scripts/ci-build-artifact.mjs restore"));
+});
+test('full PostgreSQL feedback is gated by all non-browser fast checks and remains reachable after a browser cohort rejection',()=>{
+  const postgres=workflow.jobs['verify-postgres'];
+  assert.deepEqual(postgres.needs,['build','typecheck','dependencies','unit']);
+  const ancestors=new Set();
+  const visit=id=>{for(const name of [workflow.jobs[id].needs??[]].flat()){
+    if(!ancestors.has(name)){ancestors.add(name);visit(name);}
+  }};visit('verify-postgres');
+  for(const id of ['quick','fast-feedback','browser-system-dependencies','browser-system-qualification','original-browser-reference'])
+    assert.equal(ancestors.has(id),false,id+' must not fence the actual database group.');
+  assert.equal(postgres.if,undefined,'Use normal failure gating for every required non-browser dependency.');
+  assert.ok(postgres.steps.some(step=>step.run==='npm run test:integration:postgres:built'));
+  assert.ok(postgres.steps.some(step=>step.name==='Run protected Postgres startup smoke'));
+  assert.ok(workflow.jobs.acceptance.needs.includes('verify-postgres'));
+  assert.ok(workflow.jobs.acceptance.needs.includes('verify-postgres-ui'));
 });
 test("fast feedback is independent of the long matrix and full acceptance rejects skipped/failed groups", () => {
   assert.deepEqual(workflow.jobs["fast-feedback"].needs, ["build", "typecheck", "dependencies", "unit", "quick"]);
