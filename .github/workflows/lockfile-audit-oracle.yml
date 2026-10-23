@@ -1,0 +1,27 @@
+name: Complete lockfile audit without installation
+on:
+  push:
+    branches:
+      - codex/lockfile-audit-20261023
+permissions:
+  contents: read
+concurrency:
+  group: audit-oracle-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Audit the complete locked dependency graph without installation
+        run: npm audit --package-lock-only --include=dev --include=optional
+          --audit-level=high
+        working-directory: rewrite-app
