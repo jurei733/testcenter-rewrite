@@ -4,7 +4,7 @@ import {mkdtemp,readFile,rm,writeFile,symlink,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import test from 'node:test';
-import {commandFailure,lockedBrowserDependencies,nativeContext,parseInventory,stageAptCache,validateManifest,verifyArtifact} from './ci-browser-system.mjs';
+import {commandFailure,expectedProducerContext,lockedBrowserDependencies,nativeContext,parseInventory,stageAptCache,validateManifest,verifyArtifact} from './ci-browser-system.mjs';
 
 const hash=body=>createHash('sha256').update(body).digest('hex');
 test('package-manager status remains fatal without exposing raw configuration or credential-bearing errors',()=>{
@@ -38,6 +38,34 @@ test('a package snapshot is bound to the exact run, attempt, checkout, lock, Nod
     const manifest=structuredClone(f.manifest);manifest.context[field]=field==='requested'?['other']:String(manifest.context[field])+'changed';
     assert.throws(()=>validateManifest(manifest,f.context,f.before),/workflow\/lock\/image mismatch/);
   }
+});
+test('a partial rerun validates the exact successful producer output without changing the consumer identity',()=>{
+ const f=fixture(),consumer={...f.context,runAttempt:'3'},before=structuredClone(consumer);
+ const expected=expectedProducerContext(consumer,'1');
+ assert.deepEqual(expected,f.context);assert.deepEqual(consumer,before);
+ assert.deepEqual(validateManifest(f.manifest,expected,f.before),{files:[f.entry.file],bytes:f.bytes.length});
+ // A different successful attempt is not interchangeable with the referenced one.
+ assert.throws(()=>validateManifest(f.manifest,expectedProducerContext(consumer,'2'),f.before),/workflow\/lock\/image mismatch/);
+ for(const field of ['commit','runId','lockSha256','imageVersion','nativeDepsSha256']){
+  const wrong=structuredClone(f.manifest);wrong.context[field]+='changed';
+  assert.throws(()=>validateManifest(wrong,expected,f.before),/workflow\/lock\/image mismatch/);
+ }
+});
+test('missing, noncanonical, unsafe or future producer attempts fail rather than guessing another artifact',()=>{
+ const f=fixture();
+ for(const attempt of [undefined,null,1,'','0','-1','01','1.0','1e0','1\n','2','9007199254740992','1;echo owned'])
+  assert.throws(()=>expectedProducerContext(f.context,attempt),/Invalid browser system producer attempt/);
+ for(const attempt of [undefined,'01','9007199254740992'])
+  assert.throws(()=>expectedProducerContext({...f.context,runAttempt:attempt},'1'),/Invalid browser system producer attempt/);
+});
+test('a rerun still verifies every package byte and rejects an artifact from a different referenced attempt',async()=>{
+ await withArtifact(async(f,directory)=>{
+  const consumer={...f.context,runAttempt:'4'};
+  await verifyArtifact(directory,expectedProducerContext(consumer,'1'),f.before,()=>f.entry);
+  await assert.rejects(verifyArtifact(directory,expectedProducerContext(consumer,'2'),f.before,()=>assert.fail('Attempt mismatch must fail before native inspection.')),/workflow\/lock\/image mismatch/);
+  await writeFile(join(directory,f.entry.file),Buffer.alloc(f.bytes.length));
+  await assert.rejects(verifyArtifact(directory,expectedProducerContext(consumer,'1'),f.before,()=>assert.fail('Corrupt rerun bytes must fail before native inspection.')),/digest\/size mismatch/);
+ });
 });
 test('empty snapshots are valid only when every requested package was already installed and no dpkg row changes',()=>{
   const f=fixture();f.manifest.packages=[];f.context.requested=['libbase'];f.manifest.context=structuredClone(f.context);

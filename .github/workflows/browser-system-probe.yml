@@ -9,6 +9,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   packages:
+    outputs:
+      attempt: ${{ github.run_attempt }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
@@ -26,7 +28,7 @@ jobs:
           CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/browser-system
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: browser-system-${{ github.sha }}
+          name: browser-system-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/browser-system/
           if-no-files-found: error
           retention-days: 1
@@ -47,4 +49,5 @@ jobs:
       - uses: ./.github/actions/rewrite-runtime
         with:
           playwright: "true"
+          browser-system-attempt: ${{ needs.packages.outputs.attempt }}
       - run: xvfb-run --auto-servernum npm run test:browser-capture:built

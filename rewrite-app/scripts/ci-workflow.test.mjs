@@ -18,7 +18,7 @@ test('every actual browser consumer waits for the authenticated same-run package
  assert.deepEqual(consumers.map(([name])=>name).sort(),['original-browser-reference','quick','quick-extended','verify-memory-sqlite','verify-postgres-ui'].sort());
  for(const [name,job]of consumers)assert.ok(job.needs.includes('browser-system-dependencies'),name);
  const download=action.runs.steps.find(step=>step.name==='Restore authenticated same-run browser system packages');
- assert.equal(download.if,"inputs.playwright == 'true'");assert.equal(download.with.name,'browser-system-${{ github.sha }}');
+ assert.equal(download.if,"inputs.playwright == 'true'");assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ inputs.browser-system-attempt }}');
  assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
  const restore=action.runs.steps.find(step=>step.name==='Verify and install browser system packages offline');
  assert.equal(restore.if,download.if);assert.equal(restore.env.CI_BROWSER_SYSTEM_DIR,download.with.path);
@@ -26,6 +26,32 @@ test('every actual browser consumer waits for the authenticated same-run package
  assert.ok(action.runs.steps.indexOf(download)<action.runs.steps.indexOf(restore));
  assert.ok(action.runs.steps.indexOf(restore)<action.runs.steps.findIndex(step=>step.run?.includes('playwright install')));
  assert.ok(!action.runs.steps.some(step=>/apt-get|--with-deps|\/etc\/apt|sudo/.test(step.run??'')));
+});
+test('reruns retain exact producer attempts and immutable evidence without a cross-run artifact lookup',()=>{
+ for(const id of ['build','browser-system-dependencies','original-reference-build'])
+  assert.equal(workflow.jobs[id].outputs.attempt,'${{ github.run_attempt }}');
+ for(const [id,job]of Object.entries(workflow.jobs))for(const step of job.steps??[]){
+  if(step.uses?.startsWith('actions/upload-artifact@')){
+   assert.ok(step.with.name.endsWith('-${{ github.run_attempt }}'),id+': '+step.with.name);
+   assert.notEqual(step.with.overwrite,true,'Evidence from earlier attempts must remain immutable.');
+  }
+  if(step.uses!=='./.github/actions/rewrite-runtime')continue;
+  const needs=Array.isArray(job.needs)?job.needs:[job.needs];
+  if(step.with?.prebuilt==='true'){
+   assert.ok(needs.includes('build'),id);
+   assert.equal(step.with['build-attempt'],'${{ needs.build.outputs.attempt }}',id);
+  }
+  if(step.with?.playwright&&step.with.playwright!=='false'){
+   assert.ok(needs.includes('browser-system-dependencies'),id);
+   assert.equal(step.with['browser-system-attempt'],'${{ needs.browser-system-dependencies.outputs.attempt }}',id);
+  }
+ }
+ const restore=action.runs.steps.find(step=>step.name==='Verify and install browser system packages offline');
+ assert.equal(restore.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,'${{ inputs.browser-system-attempt }}');
+ const direct=workflow.jobs['browser-system-qualification'].steps.find(step=>step.run?.endsWith('ci-browser-system.mjs restore'));
+ assert.equal(direct.env.CI_BROWSER_SYSTEM_PRODUCER_ATTEMPT,'${{ needs.browser-system-dependencies.outputs.attempt }}');
+ assert.equal(action.inputs['build-attempt'].default,'');
+ assert.equal(action.inputs['browser-system-attempt'].default,'');
 });
 test('the actual browser restore and Chromium commands preserve every nonzero child status',()=>{
  const directory=mkdtempSync(join(tmpdir(),'owned-offline-browser-status-'));
@@ -68,8 +94,8 @@ test('same-run browser system qualification is mandatory and retains independent
   assert.ok(consumer.steps.some(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built'));
   const upload=producer.steps.find(step=>step.uses?.startsWith('actions/upload-artifact@'));
   const download=consumer.steps.find(step=>step.uses?.startsWith('actions/download-artifact@'));
-  assert.equal(upload.with.name,'browser-system-${{ github.sha }}');assert.equal(upload.with['retention-days'],1);
-  assert.equal(download.with.name,upload.with.name);assert.equal(download.with['digest-mismatch'],'error');
+  assert.equal(upload.with.name,'browser-system-${{ github.sha }}-${{ github.run_attempt }}');assert.equal(upload.with['retention-days'],1);
+  assert.equal(download.with.name,'browser-system-${{ github.sha }}-${{ needs.browser-system-dependencies.outputs.attempt }}');assert.equal(download.with['digest-mismatch'],'error');
   assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
   const setup=consumer.steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
   assert.equal(setup.with.prebuilt,'true');assert.equal(setup.with.playwright,undefined);
@@ -305,7 +331,7 @@ test("Linux source reference uses an unchanged commit-pinned Original and same-r
   assert.equal(runtime.with.prebuilt, "true", "Paired Source/Rewrite pages require the verified same-run application build.");
   assert.equal(runtime.with.playwright, "true");
   const download = consumer.steps.find(step => step.uses?.startsWith("actions/download-artifact@"));
-  assert.equal(download.with.name, "original-reference-${{ github.sha }}");
+  assert.equal(download.with.name, "original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}");
   assert.equal(download.with["digest-mismatch"], "error");
   assert.equal(download.with["run-id"], undefined); assert.equal(download.with["github-token"], undefined);
   assert.equal(consumer.env.UI_SMOKE_HEADFUL, "true");
@@ -396,8 +422,8 @@ test("test jobs use the same-run build and cannot compile a replacement producti
     assert.equal(setup.with.prebuilt, "true");
   }
   for (const item of matrix) assert.ok(!/npm run (?:build|typecheck)(?:\s|$)/.test(item.command));
-  const download = action.runs.steps.find(step => step.with?.name === "rewrite-build-${{ github.sha }}");
-  assert.equal(download.with.name, "rewrite-build-${{ github.sha }}");
+  const download = action.runs.steps.find(step => step.with?.name === "rewrite-build-${{ github.sha }}-${{ inputs.build-attempt }}");
+  assert.equal(download.with.name, "rewrite-build-${{ github.sha }}-${{ inputs.build-attempt }}");
   assert.equal(download.with["run-id"], undefined);
   assert.equal(download.with["github-token"], undefined);
   assert.equal(download.with["digest-mismatch"], "error");
