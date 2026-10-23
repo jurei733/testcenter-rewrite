@@ -38,3 +38,26 @@ test('malformed, duplicate, unsorted, stale-digest or edited Source profiles fai
  }
  assert.throws(()=>canonicalMaterial({bad:undefined}));assert.throws(()=>canonicalMaterial({bad:Infinity}));
 });
+
+test('actual eight-host cross-image material and Source pixels retain exact independent evidence without granting production admission',async()=>{
+ const root=new URL('./fixtures/browser-material-cohorts-20261023/',import.meta.url);
+ const read=async name=>readFile(new URL(name,root));
+ const manifest=JSON.parse(await read('manifest.json'));
+ assert.equal(manifest.runId,40030001971);assert.equal(manifest.commit,'3d8cb50d1ab677c849404a05e5ce064ab135401b');
+ assert.equal(manifest.productionAdmission,false);assert.equal(manifest.jobs.length,8);
+ assert.ok(manifest.jobs.every(job=>job.status==='completed'&&job.conclusion==='success'));
+ assert.deepEqual(manifest.observedImages,{'20261012.334.1':7,'20261023.334.3':1});
+ for(const [name,sha]of Object.entries(manifest.files)){assert.match(name,/^[a-z0-9][a-z0-9.-]*$/);assert.equal(hash(await read(name)),sha,name);}
+ const older=JSON.parse(await read('older-profile.json')),newer=JSON.parse(await read('newer-profile.json'));
+ const result=compareDiagnosticProfiles(older,newer);assert.equal(result.materialEqual,true);assert.equal(result.sameImageVersion,false);assert.equal(result.productionAdmission,false);
+ assert.equal(older.material.files.length,591);assert.deepEqual(older.material.files,newer.material.files);
+ const receipt=JSON.parse(await read('verified-comparison.json'));
+ assert.equal(receipt.materialSha256,older.materialSha256);assert.equal(receipt.pngFilesCompared,64);assert.equal(receipt.nativePackageCount,17);assert.equal(receipt.observations.length,8);
+ for(const view of receipt.views){assert.equal(view.observedMatchingFiles,16);assert.equal(view.independentlyDecoded,true);assert.equal(hash(await read(view.name+'.png')),view.pngSha256);assert.equal(older.material.views.find(row=>row.name===view.name).pixelSha256,view.pixelSha256);}
+ const oldNative=JSON.parse(await read('older-native-manifest.json')),newNative=JSON.parse(await read('newer-native-manifest.json'));
+ assert.deepEqual(oldNative.context,older.context);assert.deepEqual(newNative.context,newer.context);
+ assert.equal(oldNative.beforeInventory,newNative.beforeInventory);assert.equal(oldNative.afterInventory,newNative.afterInventory);
+ assert.equal(oldNative.packages.length,17);
+ const sorted=rows=>[...rows].sort((a,b)=>a.name.localeCompare(b.name,'en'));
+ assert.deepEqual(sorted(oldNative.packages),sorted(newNative.packages));
+});

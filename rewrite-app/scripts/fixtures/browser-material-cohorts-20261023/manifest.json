@@ -1,0 +1,126 @@
+{
+  "runId": 40030001971,
+  "commit": "3d8cb50d1ab677c849404a05e5ce064ab135401b",
+  "tree": "74ced26121e5a335410b581105adb7a532de30c3",
+  "codeTree": "76e85805da16accfc73b6b2ad9bad6702a6ed078",
+  "artifacts": [
+    {
+      "sample": 6,
+      "artifact": 12535140249,
+      "sha256": "f48131d50cb5942966422d0b58bc7f868562aff1634b9b83774b62c85cc21646",
+      "members": 18
+    },
+    {
+      "sample": 4,
+      "artifact": 12534696311,
+      "sha256": "e3c34a11e18a1e65efd7288f7ac4ec8280ff5c103586c0129a25889e397c152d",
+      "members": 18
+    },
+    {
+      "sample": 7,
+      "artifact": 12534088770,
+      "sha256": "919704e16734f2ef80a8ab1e4fd2a5506ae7df7605a9250c85bfc5df5c29f5f2",
+      "members": 18
+    },
+    {
+      "sample": 1,
+      "artifact": 12533859355,
+      "sha256": "7b88759d6421d68f775d089c5b97e80c554c24dc3de5fe99459082a11ffd214c",
+      "members": 18
+    },
+    {
+      "sample": 5,
+      "artifact": 12533808470,
+      "sha256": "1281ee2838ed6ed1331c0613019972af066b7383bacd18452ff0ceba6048cb8d",
+      "members": 18
+    },
+    {
+      "sample": 8,
+      "artifact": 12533734776,
+      "sha256": "29e4d20a9fac47823341c63d8513f37e8c449d5efeb403d67fe3b6b319f59af3",
+      "members": 18
+    },
+    {
+      "sample": 2,
+      "artifact": 12533454206,
+      "sha256": "7dab49ab3c3e268f581ab9fc7732566f6981ad196ec15ca63cbbe88b107747c8",
+      "members": 18
+    },
+    {
+      "sample": 3,
+      "artifact": 12533374454,
+      "sha256": "d1922a9e56ac42b1012c032ef3100139cd8cfebfc3e54185ce27ed861c0c3737",
+      "members": 18
+    }
+  ],
+  "jobs": [
+    {
+      "id": 120675624413,
+      "sample": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624583,
+      "sample": 2,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624617,
+      "sample": 7,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624700,
+      "sample": 5,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624725,
+      "sample": 6,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624790,
+      "sample": 8,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624820,
+      "sample": 3,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 120675624840,
+      "sample": 4,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "qualification": "diagnostic-only",
+  "productionAdmission": false,
+  "selectedOlderSample": 1,
+  "selectedNewerSample": 5,
+  "observedImages": {
+    "20261012.334.1": 7,
+    "20261023.334.3": 1
+  },
+  "files": {
+    "desktop-empty.png": "cca874f3e7c6ac2b53f571605a4e1470eacf5e0cbdcfcb73ebb14cff9299c0b8",
+    "desktop-input.png": "c1023a35792748c290a456d66f234b2879670ab9ab65db0ad6e40a8a69140f1d",
+    "mobile-empty.png": "e287c8e4428510367b813c03d2d44246dd34f8a849b13f11e27bb382c9e899bf",
+    "mobile-input.png": "bfe2a0bd26c99657a0c53b64595a49d5471c266845c0ac373e3e1de87489fcd6",
+    "newer-native-manifest.json": "6aff03f22c66003072caa2e2266db6a5acde3460afc82797d569659affafa2a6",
+    "newer-profile.json": "f740c203b48dc2d45ec710d2672299da2382ede820925e1618c6810933445b3a",
+    "older-native-manifest.json": "83753bb2604d983cf3a09dc724c8a1f6a175567965a03944572ea69a94a8ec42",
+    "older-profile.json": "a9b121441ad7bcf917a8e75dba83b42ea6e1a4deed76c716602bfbb1902fe3df",
+    "verified-comparison.json": "ed5bcbf7e42577852a9d94abbe5c719e75d3511b8d3e8a8f86ac0609cc15048b"
+  },
+  "scope": "Eight native Ubuntu24 APT oracles,591 material rows per host,17 authenticated package bytes/identities and64 exact PNGs across both observed labels. Four actual current Source6.0.5 desktop/mobile form states, each repeated in fresh contexts. Not production admission or a cross-image offline restore proof."
+}

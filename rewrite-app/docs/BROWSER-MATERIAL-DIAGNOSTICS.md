@@ -41,12 +41,33 @@ found two differing antialiasing pixels in a native range control after form
 entry, despite stable individual frames and the existing full repaint. That
 observation is not treated as Linux qualification or hidden by tolerance. The
 headed diagnostic control explicitly runs on Linux; cross-host repeatability
-must still be proven on actual hosted images. The five platform-independent
+must still be proven on actual hosted images. The platform-independent
 controls validate current Source bytes, non-image workflow binding, changed
 font/browser/runtime/pixel rejection, malformed profile rejection and explicit
 `productionAdmission: false` even when profiles match.
 
 ## Qualification boundary
+
+
+[Actual eight-host run 40030001971](https://github.com/jurei733/testcenter-rewrite/actions/runs/40030001971)
+now passes **8/8** jobs on both observed image versions. Independent artifact
+ZIP size/digest verification, profile/native-manifest validation and actual PNG
+byte comparison confirm identical material hash
+`3ed8f406b90ce68ebbbf15af3a0773c97fe4223771772302686e456e1d0a9a77`.
+Each profile has **591 logical file entries** (including aliases for browser
+libraries), with 933,512,684 bytes hashed. Native package before/after inventories
+and all **17** authenticated package identities/byte hashes also match. All
+**64** actual PNGs are identical by view across fresh contexts and hosts; one
+canonical PNG per view is independently decoded and checked against its exact
+RGBA hash. Representative full older/newer profiles, native manifests, four PNGs,
+all eight artifact/job provenance records and the comparison receipt are retained
+under `scripts/fixtures/browser-material-cohorts-20261023` with SHA256s.
+
+This proves the selected material/render observations for those actual hosts and
+this exact lock/script/browser/source combination. It does not yet qualify a
+version-3 restore/admission implementation; the required version-2 production
+image binding remains in place.
+
 
 The isolated eight-host workflow records actual observed image labels and retains
 profiles, Source screenshots and each native APT manifest. It does not select or
