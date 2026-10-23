@@ -58,6 +58,7 @@ jobs:
   browser-system-dependencies:
     outputs:
       attempt: ${{ github.run_attempt }}
+      image-version: ${{ steps.cohort.outputs.image-version }}
     name: Authenticated browser system packages
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -68,6 +69,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Record exact browser producer image
+        id: cohort
+        run: bash scripts/ci-browser-cohort.sh record
       - uses: ./.github/actions/rewrite-runtime
       - name: Qualify native Debian archive inspection without installation
         run: node --test scripts/ci-browser-system-linux.test.mjs
@@ -97,6 +101,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Reject incompatible browser runner before installation
+        env:
+          CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ needs.browser-system-dependencies.outputs.image-version }}
+        run: bash scripts/ci-browser-cohort.sh check
       - uses: ./.github/actions/rewrite-runtime
         with:
           prebuilt: "true"
@@ -198,6 +206,7 @@ jobs:
           build-attempt: ${{ needs.build.outputs.attempt }}
           playwright: "true"
           browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}
@@ -298,6 +307,7 @@ jobs:
           build-attempt: ${{ needs.build.outputs.attempt }}
           playwright: "true"
           browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
       - name: Run Quick browser gates
         shell: bash
         env:
@@ -400,6 +410,7 @@ jobs:
           build-attempt: ${{ needs.build.outputs.attempt }}
           playwright: "true"
           browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
       - name: Run Quick browser gates
         shell: bash
         env:
@@ -571,6 +582,7 @@ jobs:
           build-attempt: ${{ needs.build.outputs.attempt }}
           playwright: ${{ matrix.playwright && 'true' || 'false' }}
           browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
       - name: Run ${{ matrix.check }}
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/rewrite-ui-artifacts
@@ -708,6 +720,7 @@ jobs:
           build-attempt: ${{ needs.build.outputs.attempt }}
           playwright: "true"
           browser-system-attempt: ${{ needs.browser-system-dependencies.outputs.attempt }}
+          browser-system-image-version: ${{ needs.browser-system-dependencies.outputs.image-version }}
       - run: npm run smoke:ui:postgres:built
 
   deployability:

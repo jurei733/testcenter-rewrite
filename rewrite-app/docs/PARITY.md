@@ -1,5 +1,21 @@
 # Testcenter parity checklist
 
+### Original Test clocks: persisted foundation, native pages still partial (2026-10-23)
+
+Optional server-owned evidence now separates opening a Test, saving Test-wide state
+and saving a Unit. Opening/reopening records a server time without rewriting answer
+clocks; response-only writes and raw logs do not move the Test-state time. A real
+same-unit state write does, even when its value stays unchanged. Non-saving review
+mode records opening without saved state. Client-supplied evidence is ignored;
+stale controller effects, denied scope and late SQL audit failures cannot leave
+partial clock updates. All four stores preserve the evidence, and both SQL schema
+upgrades retain exact legacy answers without fabricating past times. Focused tests
+and protected HTTP controls qualify this foundation. It is not yet a complete
+Original group/result projection, selected-Test deletion, native Results/Tests UI
+or paired-page visual proof. The formal ledger stays **27 done / 22 partial**,
+with all eight broad visual rows open.
+
+
 ### Saved unanswered Units in the Original result archive (2026-10-23)
 
 Unchanged production Source [run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342)

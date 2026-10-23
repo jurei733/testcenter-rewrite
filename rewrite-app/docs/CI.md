@@ -1,5 +1,47 @@
 # CI iteration and complete acceptance
 
+## Early runner image rejection and result-state qualification (2026-10-23)
+
+[Run 40008675385](https://github.com/jurei733/testcenter-rewrite/actions/runs/40008675385)
+on `4af7dcc5` is terminal: **79 successful / 10 failed jobs**. Eight browser
+consumers reject the exact runner-image binding before browser installation:
+producer `20261012.334.1`, consumer `20261023.334.3`. The complete base dpkg
+inventory hashes match, which does not establish image/font/browser equivalence.
+The separate participant-detail-review failure retains trusted input/change
+observations followed by empty player answer state; its cause is unresolved.
+The mandatory acceptance job fails. The full PostgreSQL and PostgreSQL UI jobs
+succeed. No overall green or missing-click fix is inferred.
+
+The package producer now advertises its validated exact image version as a job
+output. Every actual browser consumer and the independent offline qualification
+reject another image **before Node setup, npm installation or artifact downloads**.
+The version travels through an environment variable rather than interpolated
+shell code. Missing/malformed metadata fails without being echoed or evaluated;
+partial reruns keep the successful producer's exact output. This cheap rejection
+never replaces authenticated artifacts, exact run/attempt/lock/image binding,
+package hashes, full dpkg inventories or final native font checks. It reduces
+wasted setup on an incompatible runner; it does not make mixed images compatible
+or prove a reduction in successful full-run time. The real shell controls
+reproduce the observed rollout mismatch and cover malformed/injected values,
+missing outputs, same-image success and preservation of earlier step outputs.
+
+Result-state work adds optional server-owned opening/Test-state evidence to all
+four stores, with SQLite migration 66 and PostgreSQL migration 60. Legacy rows
+remain unknown rather than receiving invented historical timestamps. The required
+unit group passes **3,895 cases** (121 / 324 / 1,401 / 2,049), and the complete
+real local PostgreSQL group passes **2,011 cases**. Two subsequently added protected
+API scenarios also pass independently on SQLite and PostgreSQL (nine API cases
+per invocation). They cover ignored forged metadata, authorization, response-only
+and log-only writes, exact delivery replay, same-unit Test-state writes, rejected
+navigation rollback, reopening and non-saving review mode. The fresh-core focused
+command now includes those API controls and passes **83 cases** with PostgreSQL.
+The complete policy group passes **244**, with one explicit GNU-timeout-only
+macOS skip and no failure. CI typechecking and the fresh production build pass;
+entry remains **468.39 kB**, under the unchanged 470 kB limit. Full new-head Linux
+acceptance remains required. Native Results/Tests pages and the formal partial
+parity rows remain open.
+
+
 ## Current local export/isolation qualification (2026-10-23)
 
 Complete local qualification passes **3,866 unit/frontend cases**
@@ -54,8 +96,8 @@ read filters event types before decoding details, preserving existing unfiltered
 callers. File storage retains its normal whole-snapshot read.
 
 `npm run test:original-results` performs a fresh core build and the complete
-archive regression, including actual protected HTTP and verified Source report
-fixtures. It needs no Angular/browser build. `FIRST_SLICE_STORE=postgres` with
+archive and result-state regressions, including actual protected HTTP creation/clock
+controls and verified Source report fixtures. It needs no Angular/browser build. `FIRST_SLICE_STORE=postgres` with
 an owned database adds the actual PostgreSQL cases. This focused path supplements
 the unchanged mandatory unit/PostgreSQL gates and complete 89-job acceptance.
 No timing comparison or overall acceleration is inferred from its small scope.

@@ -13,9 +13,19 @@ inputs:
   browser-system-attempt:
     description: Exact browser package producer attempt from its needs output
     default: ""
+  browser-system-image-version:
+    description: Exact runner image from the browser package producer
+    default: ""
 runs:
   using: composite
   steps:
+    - name: Reject incompatible browser runner before installation
+      if: inputs.playwright == 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        CI_BROWSER_SYSTEM_EXPECTED_IMAGE_VERSION: ${{ inputs.browser-system-image-version }}
+      run: bash rewrite-app/scripts/ci-browser-cohort.sh check
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 22

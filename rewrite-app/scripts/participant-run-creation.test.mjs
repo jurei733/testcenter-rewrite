@@ -81,7 +81,10 @@ for (const kind of kinds) test(`${kind}: fresh Run, activation and initial artif
       const state = await snapshot(f); assertComplete(state, run);
       assert.deepEqual(state.parent, { ...f.parent, status: 'launched' });
       if (kind !== 'memory') assert.deepEqual(JSON.parse(JSON.stringify(await snapshot(f, await create()))), JSON.parse(JSON.stringify(state)));
-      const before = await snapshot(f); await f.launch(); assert.deepEqual(await snapshot(f), before);
+      const before = await snapshot(f); await f.launch(); const reopened = await snapshot(f);
+      assert.ok(reopened.runs[0].originalResultState.lastOpenedAt);
+      assert.deepEqual(reopened, {...before,runs:[{...before.runs[0],stateRevision:before.runs[0].stateRevision+1,
+        originalResultState:{...before.runs[0].originalResultState,lastOpenedAt:reopened.runs[0].originalResultState.lastOpenedAt}}]});
     });
     await t.test('browser lifecycle entry reserves the same atomic artifacts without a premature RUNNING; log-only deliveries preserve the Run and deduplicate by client entry', async () => {
       const f = await fixture(), run = await f.service.participantRuntime.launch({ participantSessionId:f.id,bookletKey:'owned',controllerLifecycle:'browser-v1' });

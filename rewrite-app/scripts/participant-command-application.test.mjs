@@ -69,7 +69,7 @@ for (const kind of kinds.filter(kind => kind === "sqlite" || kind === "postgres"
             ? "json_extract(command_json, '$.effectsDeferred') = 1 AND json_extract(command_json, '$.executedAt') IS NULL"
             : "command_json->>'effectsDeferred' = 'true' AND command_json->>'executedAt' IS NULL"})`);
       }
-      await execute("ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json; ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json");
+      await execute("ALTER TABLE test_runs DROP COLUMN original_result_state_json; ALTER TABLE test_runs DROP COLUMN controller_dispatches_json; ALTER TABLE test_runs DROP COLUMN state_revision; ALTER TABLE test_runs DROP COLUMN controller_entry_json; DROP TABLE participant_progress_deliveries; ALTER TABLE test_runs DROP COLUMN response_field_timestamps_json; ALTER TABLE test_runs DROP COLUMN shared_parameter_timestamps_json");
       await execute(`DELETE FROM schema_migrations WHERE version >= ${applicationVersion}`);
       if (kind === "sqlite") await execute(`CREATE TRIGGER owned_application_upgrade_failure BEFORE INSERT ON schema_migrations
         WHEN NEW.version = ${applicationVersion} BEGIN SELECT RAISE(ABORT, 'owned application upgrade failure'); END`);

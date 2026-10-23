@@ -25278,6 +25278,7 @@ export const createFirstSliceServices = (
           activityEvents: [...timerEffects.flatMap(effect => effect.activityEvents), ...(projected?.activityEvents ?? [])],
           ...(projected?.controllerEntryActive !== undefined ? { controllerEntryActive: projected.controllerEntryActive } :
             activation ? { controllerEntryActive: true } : {}),
+          ...(activation ? {originalResultOpenedAt: timestamp} : {}),
           ...(participantSession ? { participantSession } : {}), ...(projected?.commandInput ? { commandInput: projected.commandInput } : {}) };
       });
     } catch (error) {
@@ -26801,6 +26802,7 @@ export const createFirstSliceServices = (
       locked: false,
       currentUnitKey: null,
       unitResponses: {},
+      originalResultState: {lastOpenedAt: null, lastTestStateAt: null, hasTestState: false},
       unlockedTestletKeys: [],
       monitorNavigationUnlocked: false,
       testletTimers: {},
@@ -26869,7 +26871,9 @@ export const createFirstSliceServices = (
             bookletAssignmentKey: freshRun.bookletAssignmentKey, currentUnitKey: freshRun.currentUnitKey, bookletSource } }));
         return { testRun: freshRun,
           testLogs: executionMode.saveResponses ? buildParticipantTestLogs({ testRun: freshRun, batches: [{ entries }] }) : [],
-          activityEvents, controllerEntryActive: true, ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
+          activityEvents, controllerEntryActive: true, originalResultOpenedAt: activatedAt,
+          ...(entries.length ? {originalResultTestStateAt: activatedAt} : {}),
+          ...(activation.activated ? { participantSession: activation.participantSession } : {}) };
       });
     } catch (error) {
       if (error instanceof ParticipantControllerActivationError) throw new FirstSliceError(error.statusCode, error.errorCode, error.message);
@@ -33825,6 +33829,7 @@ export const createFirstSliceServices = (
         const participantSession = after.effect.participantSession ?? before.effect.participantSession;
         return { testRun: effectiveRun,
           testLogs: [...before.effect.testLogs, ...participantTestLogs, ...after.effect.testLogs], activityEvents,
+          ...(executionMode.saveResponses && (hasCurrentUnitKeyInput || testStateEntries.length) ? {originalResultTestStateAt: timestamp} : {}),
           ...(deliveryId && payloadSha256 ? { progressDelivery: {
             testRunId, participantSessionId: context.testRun.participantSessionId,
             tenantId: context.testRun.tenantId, workspaceId: context.testRun.workspaceId,

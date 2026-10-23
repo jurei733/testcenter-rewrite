@@ -3,7 +3,7 @@ import { prepareParticipantRunMutation, type ParticipantRunMutationContext,
   type ParticipantRunMutationEffect } from "./participant-run-mutation.js";
 
 export type ParticipantAssignmentRunCreationEffect = Pick<ParticipantRunMutationEffect,
-  "testRun" | "participantSession" | "testLogs" | "activityEvents" | "controllerEntryActive">;
+  "testRun" | "participantSession" | "testLogs" | "activityEvents" | "controllerEntryActive" | "originalResultOpenedAt" | "originalResultTestStateAt">;
 export type ParticipantAssignmentRunInitializer = (
   context: ParticipantRunMutationContext
 ) => ParticipantAssignmentRunCreationEffect;
