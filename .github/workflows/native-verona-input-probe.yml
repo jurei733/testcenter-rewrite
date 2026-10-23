@@ -1,0 +1,41 @@
+name: Native Verona input reproduction
+on:
+  push:
+    branches: [codex/verona-native-input-probe-20261023]
+permissions:
+  contents: read
+concurrency:
+  group: native-verona-input-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm run build
+      - name: Install locked native Chromium for isolated reproduction
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install --with-deps chromium
+      - name: Reproduce exact shared-parameter input with native diagnostics
+        shell: bash
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-verona-input
+        run: |
+          mkdir -p "$UI_SMOKE_ARTIFACT_DIR"
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 10m xvfb-run --auto-servernum node scripts/probe-native-verona-input.mjs 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/native-input.log"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: native-verona-input-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-verona-input/
+          if-no-files-found: error
+          retention-days: 1
