@@ -16,6 +16,7 @@ import { mergeCapturedVeronaUnitResponse } from "@testcenter-rewrite-app/contrac
 import { createParticipantHttpTestActor } from "./participant-http-test-actor.mjs";
 import { drainSmokeResponse } from "./drain-smoke-response.mjs";
 import { observeOriginalSample } from "./original-sample-diagnostics.mjs";
+import { waitForOriginalSampleResource } from "./original-sample-readiness.mjs";
 import { matchesVeronaSavedResponse } from "./verona-save-response-match.mjs";
 import { matchesParticipantRunRequest } from "./participant-run-request-match.mjs";
 import { captureResultGroupSnapshot, assertGroupDeletionMatchesSnapshot,
@@ -17705,6 +17706,7 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(originalSampleParticipantSessionId);
+  await waitForOriginalSampleResource(originalSampleFrame, originalSampleResourceContent);
   await fillVeronaAnswerAndWaitForHost(
     originalSampleFrame,
     'input[name="required-text-field"]',

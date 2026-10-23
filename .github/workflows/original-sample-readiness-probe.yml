@@ -1,0 +1,52 @@
+name: Original sample resource readiness
+on:
+  push:
+    branches: [codex/original-sample-readiness-20261023]
+permissions:
+  contents: read
+concurrency:
+  group: original-sample-readiness-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  actual-linux-readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rewrite-app
+        shell: bash
+    env:
+      CI: "true"
+      UI_SMOKE_HEADFUL: "true"
+      FIRST_SLICE_XML_SCHEMA_CACHE: ${{ github.workspace }}/rewrite-app/.ci/xml-schemas
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - name: Qualify this probe's exact native image with authenticated APT
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/readiness-native-packages
+        run: timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack
+      - name: Install locked Chromium
+        run: timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium
+      - name: Build the exact candidate
+        run: npm run build
+      - name: Execute unchanged Source with held real resource response
+        run: xvfb-run --auto-servernum node --test scripts/original-sample-diagnostics.test.mjs 2>&1 | tee "$RUNNER_TEMP/readiness-control.log"
+      - name: Execute the entire affected journey without retries or assertion changes
+        env:
+          UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/readiness-browser
+        run: xvfb-run --auto-servernum npm run smoke:ui:participant-detail-review:built 2>&1 | tee "$RUNNER_TEMP/readiness-full-journey.log"
+      - name: Retain owned public diagnostics and exact native manifest
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: original-sample-readiness-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/readiness-control.log
+            ${{ runner.temp }}/readiness-full-journey.log
+            ${{ runner.temp }}/readiness-native-packages/manifest.json
+            ${{ runner.temp }}/readiness-browser/original-sample/
+          if-no-files-found: warn
+          retention-days: 7
