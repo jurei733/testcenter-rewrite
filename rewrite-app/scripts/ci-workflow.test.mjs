@@ -12,6 +12,27 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('same-run browser system qualification is mandatory without changing existing browser installers or fast feedback',()=>{
+  const producer=workflow.jobs['browser-system-dependencies'],consumer=workflow.jobs['browser-system-qualification'];
+  assert.equal(producer['runs-on'],'ubuntu-24.04');assert.equal(consumer['runs-on'],'ubuntu-24.04');
+  assert.deepEqual(consumer.needs,['build','browser-system-dependencies']);
+  assert.ok(producer.steps.some(step=>step.run==='timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack'));
+  assert.ok(producer.steps.some(step=>step.run==='node --test scripts/ci-browser-system-linux.test.mjs'));
+  assert.ok(consumer.steps.some(step=>step.run==='timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs restore'));
+  assert.ok(consumer.steps.some(step=>step.run==='timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium'));
+  assert.ok(consumer.steps.some(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built'));
+  const upload=producer.steps.find(step=>step.uses?.startsWith('actions/upload-artifact@'));
+  const download=consumer.steps.find(step=>step.uses?.startsWith('actions/download-artifact@'));
+  assert.equal(upload.with.name,'browser-system-${{ github.sha }}');assert.equal(upload.with['retention-days'],1);
+  assert.equal(download.with.name,upload.with.name);assert.equal(download.with['digest-mismatch'],'error');
+  assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
+  const setup=consumer.steps.find(step=>step.uses==='./.github/actions/rewrite-runtime');
+  assert.equal(setup.with.prebuilt,'true');assert.equal(setup.with.playwright,undefined);
+  for(const id of ['browser-system-dependencies','browser-system-qualification']){
+    assert.ok(workflow.jobs.acceptance.needs.includes(id));assert.ok(!workflow.jobs['fast-feedback'].needs.includes(id));
+  }
+  assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/ci-browser-system.test.mjs'));
+});
 test('browser archive preference stages before root installation and preserves preparation/install/verification failures', () => {
   const step = action.runs.steps.find(step => step.name === 'Prefer existing official HTTPS Ubuntu archive');
   assert.equal(step.if, "inputs.playwright == 'true'"); assert.equal(step.shell, 'bash');
