@@ -639,7 +639,7 @@ jobs:
           retention-days: 7
 
   verify-postgres:
-    needs: [build, fast-feedback]
+    needs: [build, typecheck, dependencies, unit]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:

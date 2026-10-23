@@ -25279,6 +25279,7 @@ export const createFirstSliceServices = (
           ...(projected?.controllerEntryActive !== undefined ? { controllerEntryActive: projected.controllerEntryActive } :
             activation ? { controllerEntryActive: true } : {}),
           ...(activation ? {originalResultOpenedAt: timestamp} : {}),
+          ...(projected?.originalResultModifiedAt !== undefined ? {originalResultModifiedAt: projected.originalResultModifiedAt} : {}),
           ...(participantSession ? { participantSession } : {}), ...(projected?.commandInput ? { commandInput: projected.commandInput } : {}) };
       });
     } catch (error) {
@@ -32455,6 +32456,7 @@ export const createFirstSliceServices = (
               details: { testletKey: timerKey, durationSeconds: nextRun.testletTimers?.[timerKey]?.durationSeconds ?? command.remainingSeconds,
                 expiresAt: nextRun.testletTimers?.[timerKey]?.expiresAt ?? null, currentUnitKey: nextRun.currentUnitKey, restoredByMonitor: reopened } });
             return { testRun: nextRun, controllerDispatch: input.controllerDispatch,
+              ...(["lock_test", "unlock_test"].includes(command.commandType) ? {originalResultModifiedAt: executedAt} : {}),
               testLogs: mode.saveResponses ? buildParticipantTestLogs({ testRun: nextRun, batches: [{ entries: logs }] }) : [],
               activityEvents, ...(terminal || ["pause", "resume", "goto"].includes(command.commandType)
                 ? { controllerEntryActive: !terminal, participantSession: { ...participantSession, status: terminal ? "signed_in" as const : "launched" as const } } : {}) };
@@ -35233,6 +35235,7 @@ export const createFirstSliceServices = (
           };
           return {
             testRun: effectiveNextTestRun, testLogs, activityEvents,
+            ...(["lock_test", "unlock_test"].includes(commandType) ? {originalResultModifiedAt: issuedAt} : {}),
             ...(nextParticipantSession !== participantSession ? { participantSession: nextParticipantSession } : {}),
             ...(commandInput ? { commandInput } : {})
           };

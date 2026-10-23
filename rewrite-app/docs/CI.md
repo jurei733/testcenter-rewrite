@@ -1,5 +1,43 @@
 # CI iteration and complete acceptance
 
+## Independent full database feedback (2026-10-23)
+
+Main run 40014001739 demonstrates that a browser cohort rejection in the fast set
+also skips the complete PostgreSQL group through `fast-feedback`. That database
+group now depends directly on successful shared build, typecheck, dependency audit
+and mandatory unit checks. It can therefore qualify the exact same-run build
+without waiting for, or being skipped by, an unrelated browser image rejection.
+Its complete serial test inventory, isolated owned schema, migration/doctor/preflight
+and protected startup smoke remain unchanged. PostgreSQL UI stays in the browser
+path, and complete acceptance still requires both database and browser groups.
+A workflow graph control checks the full transitive ancestor set, all four positive
+dependencies and the mandatory database leaves. This improves useful database
+feedback; it does not turn a failed browser/acceptance result green.
+
+## Original sample external-resource readiness (local follow-up, 2026-10-23)
+
+The failed participant-detail-review trace contains correct required-field answer
+notifications, followed by an empty value in the same document with a replaced
+input node. The unchanged Source sample definition explains that transition:
+its asynchronous external fetch appends text through `#unit.innerHTML +=`, which
+recreates the existing form controls and loses values entered before the append.
+The browser smoke now waits for the exact actual external content in `#unit`
+before its existing answer entry. Existing save/persistence/reentry assertions,
+input helper, attempts and deadlines remain unchanged; no additional input is
+synthesized. Source application/player/definition bytes remain unchanged.
+
+An actual headed control executes the existing original player HTML and sample
+definition against an owned HTTP server. Holding the real external response
+reproduces the early-input reset and changed node identity when released. The
+production readiness helper stays pending while that response is held; after
+release, one native fill preserves the exact answer. Both the existing diagnostic
+control and this causal control pass. The control remains in the mandatory native
+browser-capture group. The complete affected participant-detail-review journey also passes locally and
+closes its owned browser/API. Isolated Linux run 40015789397 executes the same
+causal control and full journey with authenticated native packages on its own
+exact image. This is not shared-package compatibility proof or full Linux
+acceptance, and it does not fix the unrelated missing native clicks.
+
 ## Early runner image rejection and result-state qualification (2026-10-23)
 
 [Run 40008675385](https://github.com/jurei733/testcenter-rewrite/actions/runs/40008675385)

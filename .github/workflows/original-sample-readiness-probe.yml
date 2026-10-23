@@ -48,5 +48,6 @@ jobs:
             ${{ runner.temp }}/readiness-full-journey.log
             ${{ runner.temp }}/readiness-native-packages/manifest.json
             ${{ runner.temp }}/readiness-browser/original-sample/
+            ${{ runner.temp }}/readiness-browser/failure.png
           if-no-files-found: warn
           retention-days: 7

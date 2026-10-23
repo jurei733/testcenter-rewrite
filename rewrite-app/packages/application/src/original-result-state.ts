@@ -1,7 +1,7 @@
 import { defaultParticipantExecutionMode, participantExecutionModeDefinitions } from "@testcenter-rewrite-app/domain";
 import type { OriginalTestResultState, TestRun } from '@testcenter-rewrite-app/domain';
 
-const testFields = ['status','pauseSource','locked','currentUnitKey','bookletStates','bookletStateOverrides',
+const testFields = ['status','pauseSource','currentUnitKey','bookletStates','bookletStateOverrides',
   'unlockedTestletKeys','monitorNavigationUnlocked','testletTimers','lockedTestletKeys','lockedUnitKeys','sharedParameters'] as const;
 const fieldValue = (run: TestRun, key: typeof testFields[number]): unknown => {
   if (['locked','monitorNavigationUnlocked'].includes(key)) return run[key] ?? false;
@@ -18,13 +18,13 @@ const time = (value: unknown): string => {
  * Unit answers, Unit logs/reviews and Run.updatedAt alone do not advance the
  * Original's Test timestamp. Legacy unknown evidence is never fabricated. */
 export function withOriginalResultState(previous: TestRun, projected: TestRun,
-  input: {openedAt?: string; testStateAt?: string} = {}): TestRun {
+  input: {openedAt?: string; testStateAt?: string; modifiedAt?: string} = {}): TestRun {
   const before = previous.originalResultState;
   if (before !== undefined && (!before || typeof before !== 'object' || Array.isArray(before) ||
     before.hasTestState !== undefined && typeof before.hasTestState !== 'boolean')) {
     throw Error('Invalid persisted Original result evidence.');
   }
-  for (const field of ['lastOpenedAt','lastTestStateAt'] as const) {
+  for (const field of ['lastOpenedAt','lastTestStateAt','lastTestModifiedAt'] as const) {
     if (before?.[field] !== undefined && before[field] !== null) time(before[field]);
   }
   const openedAt = input.openedAt === undefined ? undefined : time(input.openedAt);
@@ -35,13 +35,16 @@ export function withOriginalResultState(previous: TestRun, projected: TestRun,
   if (stateAt !== undefined && !saveState) throw Error('A non-saving execution mode cannot persist Original Test state.');
   if (stateAt === undefined && saveState && before !== undefined && testFields.some(key =>
     JSON.stringify(fieldValue(previous, key)) !== JSON.stringify(fieldValue(projected, key)))) stateAt = time(projected.updatedAt);
+  const modifiedAt = input.modifiedAt !== undefined ? time(input.modifiedAt) :
+    stateAt ?? openedAt ?? ((previous.locked ?? false) !== (projected.locked ?? false) ? time(projected.updatedAt) : undefined);
   const result = {...projected};
-  if (before === undefined && openedAt === undefined && stateAt === undefined) {
+  if (before === undefined && openedAt === undefined && stateAt === undefined && modifiedAt === undefined) {
     delete result.originalResultState;
     return result;
   }
   const evidence: OriginalTestResultState = {...before,
     ...(openedAt === undefined ? {} : {lastOpenedAt: openedAt}),
-    ...(stateAt === undefined ? {} : {lastTestStateAt: stateAt, hasTestState: true})};
+    ...(stateAt === undefined ? {} : {lastTestStateAt: stateAt, hasTestState: true}),
+    ...(modifiedAt === undefined ? {} : {lastTestModifiedAt: modifiedAt})};
   return {...result, originalResultState: evidence};
 }

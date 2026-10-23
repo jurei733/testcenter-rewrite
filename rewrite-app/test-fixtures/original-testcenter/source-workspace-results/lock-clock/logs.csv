@@ -1,0 +1,5 @@
+﻿"groupname";"loginname";"code";"bookletname";"unitname";"originalUnitId";"timestamp";"logentry"
+"ORACLE.GROUP";"owned-source-participant";"";"ORACLE.BOOK.B";"ORACLE.UNIT";"ORACLE.UNIT";"1792786965871";"PRESENTATION_PROGRESS = some"
+"ORACLE.GROUP";"owned-source-participant";"";"ORACLE.BOOK.B";"ORACLE.UNIT2";"ORACLE.UNIT2";"1792786965937";"PRESENTATION_PROGRESS = some"
+"ORACLE.GROUP";"owned-source-participant";"";"ORACLE.BOOK.B";"ORACLE.UNIT2";"ORACLE.UNIT2";"1792786965969";"OWNED = ""second log-only unit"""
+"ORACLE.GROUP";"owned-source-participant";"";"ORACLE.BOOK.B";"";"";"1792786965735";"CURRENT_UNIT_ID : ""ORACLE.UNIT2"""

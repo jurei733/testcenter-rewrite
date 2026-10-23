@@ -131,7 +131,7 @@ export const prepareParticipantRunCommandApplication = (
   }
   if (effect.terminationNoop !== undefined && (effect.terminationNoop !== true || !command.effectsDeferred ||
       !["complete", "complete_and_lock"].includes(command.commandType) || effect.controllerDispatch !== undefined ||
-      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.participantSession !== undefined ||
+      effect.controllerEntryActive !== undefined || effect.originalResultOpenedAt !== undefined || effect.originalResultTestStateAt !== undefined || effect.originalResultModifiedAt !== undefined || effect.participantSession !== undefined ||
       JSON.stringify(effect.testRun) !== JSON.stringify(testRun) || effect.activityEvents.length > 0 ||
       effect.testLogs.some(log => log.logKey !== "command executed"))) {
     throw new Error("A terminal early return cannot change its Run, parent, entry, dispatch highwater or state artifacts.");
@@ -153,11 +153,11 @@ export const prepareParticipantRunCommandApplication = (
     throw new Error("A participant command effect cannot cross its immutable parent scope.");
   }
   if (participantControllerDispatchSuperseded(testRun, effect.controllerDispatch)) {
-    effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive; delete effect.originalResultOpenedAt; delete effect.originalResultTestStateAt;
+    effect.testRun = testRun; delete effect.participantSession; delete effect.controllerEntryActive; delete effect.originalResultOpenedAt; delete effect.originalResultTestStateAt; delete effect.originalResultModifiedAt;
     effect.testLogs = effect.testLogs.filter(log => log.logKey === "command executed"); effect.activityEvents = []; effect.superseded = true;
   }
   effect.testRun = withOriginalResultState(testRun, effect.testRun,
-    {openedAt: effect.originalResultOpenedAt, testStateAt: effect.originalResultTestStateAt});
+    {openedAt: effect.originalResultOpenedAt, testStateAt: effect.originalResultTestStateAt, modifiedAt: effect.originalResultModifiedAt});
   effect.testRun = withParticipantRunRevision(testRun,
     withParticipantControllerDispatch(testRun, withParticipantControllerEntry(testRun, effect.testRun, effect.controllerEntryActive), effect.controllerDispatch));
   const appliedCommand = { ...command, executedAt, executionSequence, ...(effect.terminationNoop ? { terminationNoop: true as const } : {}),
