@@ -28,19 +28,23 @@ test('native overview loads complete statistics rather than a report page and do
  assert.ok(f.calls.every(call=>call.method==='GET' && call.token==='owned-token'));
  assert.ok(f.calls.every(call=>!call.path.includes('limit=')));assert.equal(f.calls.length,2);
 });
-test('read-only and foreign grants allow selection/download but cannot capture a deletion',async()=>{
- for(const roles of [[role('a','read_only')],[role('b')],[{role:'study_monitor'}],[]]){
-  const f=fixture(normal,scope('a','owned-token',roles));await f.controller.connect();f.controller.checkAll();
-  assert.equal(f.controller.selected.size,1);assert.equal(f.controller.canWrite,false);assert.equal(f.controller.captureDeletion(),null);
-  let read=0;const result=await f.controller.download(async()=>{read++;return new Blob(['owned']);});
-  assert.equal(read,1);assert.equal(await result.blob.text(),'owned');assert.equal(f.controller.selected.size,0);
-  assert.equal(f.calls.filter(call=>call.method==='DELETE').length,0);
- }
+test('a read-only reader captures Source confirmation; authoritative 403 preserves rows and selection for export',async()=>{
+ const f=fixture(call=>{if(call.method==='DELETE')throw {statusCode:403,message:'Protected read-only denial.'};return normal(call);},scope('a','owned-token',[role('a','read_only')]));
+ await f.controller.connect();f.controller.checkAll();const rows=f.controller.rows;
+ const confirmation=f.controller.captureDeletion();assert.ok(confirmation);
+ assert.equal(await confirmation.confirm(),false);assert.equal(await confirmation.confirm(),false);
+ assert.equal(f.calls.filter(call=>call.method==='DELETE').length,1);
+ assert.deepEqual(f.calls.find(call=>call.method==='DELETE').body,{checkIds:['CHECK.A'],confirmation:'a'});
+ assert.equal(f.controller.rows,rows);assert.equal(f.controller.selected.size,1);assert.equal(f.controller.busy,false);
+ assert.equal(f.controller.problem,'Protected read-only denial.');assert.equal(f.controller.notice,'');assert.equal(f.calls.length,3,'A rejected request must not clear/refetch the unchanged table.');
+ const result=await f.controller.download(async()=>new Blob(['owned']));assert.equal(await result.blob.text(),'owned');assert.equal(f.controller.selected.size,0);
 });
-test('only the resolved workspace grants and already-qualified canonical administrators enable deletion',async()=>{
+test('cached role metadata cannot replace an authoritative server refusal',async()=>{
  for(const roles of [[role()],[{role:'tenant_admin',tenantId:'tenant-a'}],[{role:'platform_admin'}]]){
-  const f=fixture(normal,scope('a','owned-token',roles));await f.controller.connect();f.controller.checkAll();
-  assert.equal(f.controller.canWrite,true);assert.ok(f.controller.captureDeletion());
+  const f=fixture(call=>{if(call.method==='DELETE')throw {statusCode:403,message:'Grant was revoked at the server.'};return normal(call);},scope('a','owned-token',roles));
+  await f.controller.connect();f.controller.checkAll();assert.equal(await f.controller.captureDeletion().confirm(),false);
+  assert.equal(f.calls.filter(call=>call.method==='DELETE').length,1);assert.equal(f.controller.rows.length,1);
+  assert.equal(f.controller.selected.size,1);assert.equal(f.controller.problem,'Grant was revoked at the server.');
  }
 });
 test('workspace change and replacement login reject late overview/statistics without mixing owners',async()=>{
@@ -53,9 +57,9 @@ test('workspace change and replacement login reject late overview/statistics wit
   assert.equal(f.controller.problem,'');assert.equal(f.controller.selected.size,0);
  }
 });
-test('a mismatched resolved workspace never exposes report rows or enables writing',async()=>{
+test('a mismatched resolved workspace never exposes report rows or allows a confirmation',async()=>{
  const f=fixture(call=>normal(call,[row('FOREIGN')],'b'));await f.controller.connect();
- assert.deepEqual(f.controller.rows,[]);assert.equal(f.controller.overview,null);assert.equal(f.controller.canWrite,false);assert.ok(f.controller.problem);
+ assert.deepEqual(f.controller.rows,[]);assert.equal(f.controller.overview,null);assert.equal(f.controller.captureDeletion(),null);assert.ok(f.controller.problem);
 });
 test('individual/master selection uses current check IDs and an empty selection cannot broaden a download',async()=>{
  const f=fixture(call=>normal(call,[row('A'),row('B')]));await f.controller.connect();
@@ -96,10 +100,10 @@ test('delete confirmation is immutable and single-use even when selection change
  assert.equal(await deletion.confirm(),false);assert.equal(f.calls.filter(call=>call.method==='DELETE').length,1);
  assert.equal(f.controller.notice,'3 Berichte erfolgreich gelöscht.');assert.equal(f.controller.selected.size,0);
 });
-test('old confirmation cannot delete after logout, scope replacement, permission loss or destruction',async()=>{
- for(const transition of ['logout','workspace','permission','destroy']){
+test('old confirmation cannot send a deletion after logout, scope replacement or destruction',async()=>{
+ for(const transition of ['logout','workspace','destroy']){
   const f=fixture();await f.controller.connect();f.controller.checkAll();const captured=f.controller.captureDeletion();
-  if(transition==='destroy')f.controller.destroy();else f.setScope(transition==='logout'?scope('a',''):transition==='workspace'?scope('b'):scope('a','owned-token',[role('a','read_only')]));
+  if(transition==='destroy')f.controller.destroy();else f.setScope(transition==='logout'?scope('a',''):scope('b'));
   assert.equal(await captured.confirm(),false);assert.equal(f.calls.filter(call=>call.method==='DELETE').length,0);
  }
 });
@@ -118,17 +122,20 @@ test('a later deletion failure stops remaining batches, preserves confirmed succ
  assert.equal(writes,2);assert.equal(f.controller.rows.length,105);assert.equal(f.controller.notice,'100 Berichte erfolgreich gelöscht.');
  assert.equal(f.controller.problem,'Second batch refused.');assert.equal(f.controller.busy,false);assert.equal(f.controller.selected.size,0);
 });
-test('permission loss during a held deletion blocks subsequent writes, while a late response cannot contaminate another workspace',async()=>{
+test('an authoritative permission loss stops later batches, while a late response cannot contaminate another workspace',async()=>{
  for(const transition of ['permission','workspace']){
-  const wait=held(),rows=Array.from({length:101},(_,i)=>row('CHECK.'+i));
-  const f=fixture(call=>call.method==='DELETE'?wait.promise:normal(call,rows));await f.controller.connect();f.controller.checkAll();
+  const wait=held(),rows=Array.from({length:205},(_,i)=>row('CHECK.'+i));let attempts=0;
+  const f=fixture(call=>{
+   if(call.method==='DELETE'){if(++attempts===1)return wait.promise;throw {statusCode:403,message:'Protected revoked permission.'};}
+   return normal(call,attempts?rows.slice(100):rows);
+  });await f.controller.connect();f.controller.checkAll();
   const deleting=f.controller.captureDeletion().confirm();
   f.setScope(transition==='permission'?scope('a','owned-token',[role('a','read_only')]):scope('b'));
-  if(transition==='workspace'){f.controller.destroy();}
+  if(transition==='workspace')f.controller.destroy();
   wait.resolve({deletion:{deletedCount:100}});assert.equal(await deleting,false);
-  assert.equal(f.calls.filter(call=>call.method==='DELETE').length,1);assert.equal(f.controller.canWrite,false);
+  assert.equal(attempts,transition==='permission'?2:1);
   if(transition==='workspace'){assert.equal(f.controller.notice,'');assert.deepEqual(f.controller.rows,[]);}
-  else{assert.equal(f.controller.notice,'100 Berichte erfolgreich gelöscht.');assert.match(f.controller.problem,/Berechtigung/);}
+  else{assert.equal(f.controller.notice,'100 Berichte erfolgreich gelöscht.');assert.equal(f.controller.problem,'Protected revoked permission.');assert.equal(f.controller.rows.length,105);assert.equal(f.controller.selected.size,0);}
  }
 });
 test('failed refresh after an accepted deletion cannot retain stale counts or a destructive selection',async()=>{
@@ -141,4 +148,14 @@ test('failed refresh after an accepted deletion cannot retain stale counts or a 
  assert.deepEqual(f.controller.rows,[]);assert.equal(f.controller.selected.size,0);assert.equal(f.controller.captureDeletion(),null);
  assert.equal(f.controller.notice,'501 Berichte erfolgreich gelöscht.');assert.equal(f.controller.problem,'Protected statistics refresh failed.');
  assert.equal(f.controller.busy,false);
+});
+test('an accepted zero-count batch still refreshes concurrent deletion results after a later refusal',async()=>{
+ const rows=Array.from({length:205},(_,i)=>row('CHECK.'+i));let attempts=0;
+ const f=fixture(call=>{
+  if(call.method==='DELETE'){if(++attempts===1)return {deletion:{deletedCount:0}};throw {statusCode:403,message:'Permission revoked.'};}
+  return normal(call,attempts?rows.slice(100):rows);
+ });
+ await f.controller.connect();f.controller.checkAll();assert.equal(await f.controller.captureDeletion().confirm(),false);
+ assert.equal(attempts,2);assert.equal(f.controller.rows.length,105);assert.equal(f.controller.selected.size,0);
+ assert.equal(f.controller.notice,'0 Berichte erfolgreich gelöscht.');assert.equal(f.controller.problem,'Permission revoked.');
 });

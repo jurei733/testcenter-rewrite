@@ -13,7 +13,6 @@ import {OriginalSystemCheckReportsController} from './original-system-check-repo
 import {OriginalParticipantConfirmationDialogComponent} from './original-participant-confirmation-dialog.component';
 import {OriginalWorkspaceFileIconComponent} from './original-workspace-file-icon.component';
 import {RewriteAppApiService} from './rewrite-app-api.service';
-import {RewriteAppOperatorAccessService} from './rewrite-app-operator-access.service';
 import {RewriteAppShellRequestService} from './rewrite-app-shell-request.service';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 
@@ -32,7 +31,6 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  private readonly state=inject(RewriteAppUiStateService);
  private readonly request=inject(RewriteAppShellRequestService);
  private readonly api=inject(RewriteAppApiService);
- private readonly access=inject(RewriteAppOperatorAccessService);
  private readonly changed=inject(ChangeDetectorRef);
  private readonly dialogs=inject(MatDialog);
  private readonly snacks=inject(MatSnackBar);
@@ -43,7 +41,7 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
  readonly columns=['selectCheckbox','syscheckLabel','number','details-os','details-browser'];
  readonly controller=new OriginalSystemCheckReportsController((method,path,body,token)=>
   this.request.request('Systemcheck Berichte',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
-  ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
+  ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey}),
   ()=>{if(!this.destroyed){this.data.data=this.controller.rows;this.changed.markForCheck();}});
  @ViewChild(MatSort) set sort(value:MatSort){this.data.sort=value;}
  constructor(){
