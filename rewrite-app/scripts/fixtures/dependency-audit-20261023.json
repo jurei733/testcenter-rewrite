@@ -1,0 +1,88 @@
+{
+  "success": true,
+  "node": "v22.23.3",
+  "results": [
+    {
+      "stage": "before",
+      "exitCode": 1,
+      "durationMs": 624,
+      "nodeModulesCreated": false,
+      "nodeEnv": "production",
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 1,
+        "high": 2,
+        "critical": 0,
+        "total": 3
+      },
+      "dependencies": {
+        "prod": 93,
+        "dev": 536,
+        "optional": 155,
+        "peer": 29,
+        "peerOptional": 0,
+        "total": 629
+      }
+    },
+    {
+      "stage": "after",
+      "exitCode": 0,
+      "durationMs": 520,
+      "nodeModulesCreated": false,
+      "nodeEnv": "production",
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "dependencies": {
+        "prod": 93,
+        "dev": 540,
+        "optional": 155,
+        "peer": 29,
+        "peerOptional": 0,
+        "total": 633
+      }
+    }
+  ],
+  "capturedAt": "2026-10-23T21:31:38.351653+00:00",
+  "npmVersion": "10.9.9",
+  "predecessor": "8114900b2d05ddb1f7f5f441c502dade9d3e0ed2",
+  "failingHostedRun": 40026815045,
+  "failingHostedJob": 120664953225,
+  "command": "npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json",
+  "advisories": [
+    "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+    "https://github.com/advisories/GHSA-rxp7-6hxx-x8q5"
+  ],
+  "lockSha256Before": "f85577e50467ae48f0804b514fea4801ee58a4b36bf1c7a138a47b55d879e3b0",
+  "lockSha256After": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+  "qualification": "Owned temporary workspace manifests and lockfiles only; no node_modules or install/cache steps; NODE_ENV=production with explicit dev/optional inclusion. Actual live registry findings at capture time, not a permanent security guarantee.",
+  "hostedQualification": {
+    "runId": 40027715625,
+    "jobId": 120667977769,
+    "probeCommit": "8413d5de4f35a12beb87e183e089d183f2f20b96",
+    "probeTree": "67f4f87dad8d2c6b8e75175772e848da1cab3989",
+    "qualifiedCodeTree": "deec58dea01b976ee4cb722c3f45996a94a312e0",
+    "branch": "codex/lockfile-audit-20261023",
+    "status": "completed",
+    "conclusion": "success",
+    "node": "22.23.3",
+    "npm": "10.9.9",
+    "startedAt": "2026-10-23T21:34:11Z",
+    "completedAt": "2026-10-23T21:34:20Z",
+    "auditStepStartedAt": "2026-10-23T21:34:16.6176343Z",
+    "auditFoundZeroAt": "2026-10-23T21:34:17.5267581Z",
+    "auditOutput": "found 0 vulnerabilities",
+    "packageManagerCache": false,
+    "nodeModulesInstalled": false,
+    "jobDurationSeconds": 9,
+    "auditObservedSeconds": 0.91,
+    "scope": "Exact revised dependency job copied from the main workflow; isolated Linux job only, not complete acceptance",
+    "jobDurationDefinition": "GitHub job started_at to completed_at, including final runner cleanup"
+  }
+}

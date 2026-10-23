@@ -12,6 +12,18 @@ const action = parse(read("../../.github/actions/rewrite-runtime/action.yml"));
 const scripts = JSON.parse(read("../package.json")).scripts;
 const baseline = JSON.parse(read("./fixtures/ci-coverage-baseline.json"));
 const actionVersions = JSON.parse(read("./fixtures/ci-action-versions.json"));
+test('dependency audit skips installation while preserving the complete locked graph and high-severity gate',()=>{
+ const audit=workflow.jobs.dependencies;
+ assert.ok(!audit.steps.some(step=>step.uses==='./.github/actions/rewrite-runtime'||/npm (?:ci|install|update)|audit fix|--force|--omit/.test(step.run??'')));
+ const setup=audit.steps.find(step=>step.uses?.startsWith('actions/setup-node@'));
+ assert.equal(setup.with['node-version'],22);assert.equal(setup.with['package-manager-cache'],false);
+ const check=audit.steps.find(step=>step.run?.startsWith('npm audit '));
+ assert.equal(check['working-directory'],'rewrite-app');
+ assert.equal(check.run,'npm audit --package-lock-only --include=dev --include=optional --audit-level=high');
+ assert.notEqual(check['continue-on-error'],true);assert.notEqual(audit['continue-on-error'],true);
+ assert.ok(workflow.jobs['verify-postgres'].needs.includes('dependencies'));
+ assert.ok(action.runs.steps.some(step=>step.run==='npm ci --no-audit --no-fund'));
+});
 test('every actual browser consumer waits for the authenticated same-run package producer',()=>{
  const consumers=Object.entries(workflow.jobs).filter(([,job])=>job.steps?.some(step=>
   step.uses==='./.github/actions/rewrite-runtime' && step.with?.playwright && step.with.playwright!=='false'));

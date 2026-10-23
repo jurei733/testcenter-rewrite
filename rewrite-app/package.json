@@ -294,7 +294,7 @@
   "devDependencies": {
     "@angular/build": "21.2.26",
     "@angular/cdk": "20.2.14",
-    "@angular/cli": "21.2.26",
+    "@angular/cli": "21.2.28",
     "@angular/common": "21.2.25",
     "@angular/compiler": "21.2.25",
     "@angular/compiler-cli": "21.2.25",
