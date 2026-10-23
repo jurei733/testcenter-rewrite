@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
-import {chmod,lstat,mkdir,mkdtemp,readFile,readdir,writeFile} from 'node:fs/promises';
+import {constants} from 'node:fs';
+import {chmod,copyFile,lstat,mkdir,mkdtemp,readFile,readdir,writeFile} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {preferOfficialUbuntuArchive} from './ci-apt-mirrors.mjs';
@@ -79,15 +80,18 @@ export async function nativeContext(root,env=process.env){
 }
 
 export function validateManifest(value,expected,before){
-  assert(value?.version===1&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
+  assert(value?.version===2&&JSON.stringify(value.context)===JSON.stringify(expected),'Browser system workflow/lock/image mismatch');
   assert(value.beforeInventory===before,'Browser system initial dpkg inventory mismatch');
   assert(/^[a-f0-9]{64}$/.test(value.fontInventorySha256??''),'Invalid native font inventory digest');
   const initial=parseInventory(value.beforeInventory),after=parseInventory(value.afterInventory);
   assert(Array.isArray(value.packages)&&value.packages.length<=128,'Invalid browser package list');
-  const files=new Set(),identities=new Set();let bytes=0;
+  const files=new Set(),cacheNames=new Set(),identities=new Set();let bytes=0;
   for(const entry of value.packages){
     assert(entry&&/^[a-f0-9]{64}$/.test(entry.sha256??'')&&entry.file===entry.sha256+'.deb'&&
       Number.isSafeInteger(entry.bytes)&&entry.bytes>0&&entry.bytes<=maxBytes,'Invalid browser package artifact');
+    assert(typeof entry.cacheFileName==='string'&&Buffer.byteLength(entry.cacheFileName)<=255&&
+      /^[a-z0-9][A-Za-z0-9+_.%~-]*\.deb$/.test(entry.cacheFileName)&&!cacheNames.has(entry.cacheFileName),'Invalid or duplicate APT cache filename');
+    cacheNames.add(entry.cacheFileName);
     assert(/^[a-z0-9][a-z0-9+.-]*$/.test(entry.name??'')&&/^[A-Za-z0-9:~+._-]+$/.test(entry.version??'')&&
       ['amd64','all'].includes(entry.arch),'Invalid browser package identity');
     const id=entry.name+':'+entry.arch;
@@ -121,7 +125,16 @@ export async function verifyArtifact(directory,expected,before,inspect=inspectPa
     const actual=inspect(path);
     assert(actual.name===entry.name&&actual.version===entry.version&&actual.arch===entry.arch,'Debian package metadata mismatch');
   }
-  return {manifest,paths:files.map(file=>join(directory,file)),bytes};
+  return {manifest,directory,paths:files.map(file=>join(directory,file)),bytes};
+}
+
+export async function stageAptCache(verified,cache){
+  const info=await lstat(cache);assert(info.isDirectory()&&!info.isSymbolicLink()&&(await readdir(cache)).length===0,'APT cache must be a new empty directory');
+  for(const entry of verified.manifest.packages){
+    const path=join(cache,entry.cacheFileName);
+    await copyFile(join(verified.directory,entry.file),path,constants.COPYFILE_EXCL);
+    const bytes=await regular(path,entry.bytes);assert(bytes.length===entry.bytes&&sha(bytes)===entry.sha256,'Staged APT cache digest/size mismatch');
+  }
 }
 
 async function configureApt(staging){
@@ -160,7 +173,7 @@ export async function browserSystem(mode,root,directory){
       if(['partial','lock'].includes(file))continue;
       assert(file.endsWith('.deb'),'Unexpected downloaded package member');
       const path=join(cache,file),bytes=await regular(path,maxBytes),sha256=sha(bytes),name=sha256+'.deb';
-      packages.push({file:name,sha256,bytes:bytes.length,...inspectPackage(path)});
+      packages.push({file:name,cacheFileName:file,sha256,bytes:bytes.length,...inspectPackage(path)});
       await writeFile(join(directory,name),bytes,{flag:'wx'});
     }
     // This is the ordinary native APT oracle, using the authenticated cache.
@@ -169,7 +182,7 @@ export async function browserSystem(mode,root,directory){
     report('native_apt_oracle',{downloadMs,packages:packages.length});
     install(['apt-get',...options,...cacheOptions,'install','-y','--no-remove','--no-install-recommends','--no-download',...context.requested]);
     assert(native('dpkg',['--audit']).trim()==='','Native APT left incomplete package operations');
-    const manifest={version:1,context,beforeInventory:before,afterInventory:inventory(),fontInventorySha256:fontDigest(),packages,
+    const manifest={version:2,context,beforeInventory:before,afterInventory:inventory(),fontInventorySha256:fontDigest(),packages,
       timings:{downloadMs,aptInstallMs:Date.now()-installStarted}};
     validateManifest(manifest,context,before);
     await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest)+'\n',{flag:'wx'});
@@ -179,11 +192,16 @@ export async function browserSystem(mode,root,directory){
     const verified=await verifyArtifact(directory,context,before);
     const installStarted=Date.now();
     report('offline_install',{packages:verified.paths.length,bytes:verified.bytes});
-    // Keep native APT's Pre-Depends/configuration ordering. An empty private
-    // cache, --no-download and the network namespace exclude other payloads.
+    // APT requires its original cache basenames even for explicit local files
+    // under --no-download. Preserve the producer's actual names, not a second
+    // implementation of APT's epoch/version escaping rules.
     const cache=await mkdtemp(join(dirname(directory),'browser-system-offline-'));await chmod(cache,0o755);
+    await stageAptCache(verified,cache);
+    const sources=join(cache,'sources'),lists=join(cache,'lists');await mkdir(sources);await mkdir(lists);
     install(['unshare','--net','--',...(verified.paths.length
       ? ['/usr/bin/apt-get',...authenticatedAptOptions,'-o','Dir::Cache::archives='+cache,
+        '-o','Dir::Etc::sourcelist=/dev/null','-o','Dir::Etc::sourceparts='+sources,'-o','Dir::State::lists='+lists,
+        '-o','Dir::Cache::pkgcache=','-o','Dir::Cache::srcpkgcache=',
         '-o','Dpkg::Options::=--force-confdef','-o','Dpkg::Options::=--force-confold',
         'install','-y','--no-remove','--no-install-recommends','--no-download',...verified.paths]
       : ['/usr/bin/dpkg','--audit'])]);

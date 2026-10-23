@@ -17,9 +17,9 @@ async function ownedArtifact(action){
     const archive=join(root,'fixture.deb');
     execFileSync('/usr/bin/dpkg-deb',['--build',source,archive],{stdio:'pipe'});
     const body=await readFile(archive),sha256=digest(body),entry={name:'owned-browser-fixture',version:'2:1.9+dfsg-1',arch:'all',
-      file:sha256+'.deb',sha256,bytes:body.length};
+      file:sha256+'.deb',cacheFileName:'owned-browser-fixture_2%3a1.9+dfsg-1_all.deb',sha256,bytes:body.length};
     const context={requested:['owned-browser-fixture']},before='base\t1.0\tamd64\tii \n';
-    const manifest={version:1,context,beforeInventory:before,afterInventory:before+'owned-browser-fixture\t2:1.9+dfsg-1\tall\tii \n',
+    const manifest={version:2,context,beforeInventory:before,afterInventory:before+'owned-browser-fixture\t2:1.9+dfsg-1\tall\tii \n',
       fontInventorySha256:'a'.repeat(64),packages:[entry]};
     const save=async()=>writeFile(join(directory,'manifest.json'),JSON.stringify(manifest));
     await writeFile(join(directory,entry.file),body);await save();
