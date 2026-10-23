@@ -275,11 +275,14 @@ export async function browserSystem(mode,root,directory){
       : ['/usr/bin/dpkg','--audit'])]);
     assert(native('dpkg',['--audit']).trim()===''&&inventory()===verified.manifest.afterInventory,'Offline dpkg result differs from native APT');
     assert(fontDigest()===verified.manifest.fontInventorySha256,'Offline native font inventory differs from native APT');
+    const offlineInstallMs=Date.now()-installStarted;let materialCaptureMs=0;
     if(format===3){
+      const captureStarted=Date.now();
       const observed=await collectRuntimeMaterial(root,consumer,verified.manifest.afterInventory,directory);
       report('material_verified',verifyRuntimeObservation(observed,consumer,verified.manifest,policy));
+      materialCaptureMs=Date.now()-captureStarted;
     }
-    console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,offlineInstallMs:Date.now()-installStarted,
+    console.log(JSON.stringify({ciBrowserSystem:{mode,elapsedMs:Date.now()-started,offlineInstallMs,materialCaptureMs,
       packages:verified.paths.length,bytes:verified.bytes,inventorySha256:sha(inventory())}}));
   }else throw Error('Expected pack or restore');
 }

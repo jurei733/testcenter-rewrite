@@ -1,9 +1,8 @@
 # Browser runtime admission, format 3
 
-The version-3 path is implemented for isolated qualification. It is not yet a
-claim that the main workflow or the complete Original parity suite passes.
-The previous eight-host material experiment proves the selected file/render
-observations; it does not replace the new producer-to-offline-consumer proof.
+The version-3 path passed actual isolated qualification and is selected by the
+main workflow. This is not a claim that the complete Original parity suite passes.
+The preceding diagnostic experiment remains separate from production admission.
 
 ## Provenance and required checks
 
@@ -59,12 +58,38 @@ No Source editing, clock freezing, pixel tolerance or expected-image-driven
 recapture is added. Diagnostic historical evidence remains explicitly scoped;
 it is not a full-page or full functional equivalence claim.
 
-## Required qualification before main adoption
+## Actual qualification
 
 The isolated workflow exercises the actual composite action, not an alternate
 restore implementation. One actual native producer serves eight fresh consumers.
-The evidence must include successful offline restoration and material verification
-on at least one actual opposite-image host, while retaining both observed labels.
+Run [40034252270](https://github.com/jurei733/testcenter-rewrite/actions/runs/40034252270)
+passed all nine jobs. Its producer used `20261012.334.1`; consumers 4 and 6
+actually used `20261023.334.3`. All eight consumers restored offline and verified
+the producer material SHA256
+`00a1cb4898589f1653fa7b953fe6ebc94b3fd0aab0ae0b06bc32a2c7411f1195`.
+Both observed labels remain recorded independently.
 Every consumer then executes real archive-inspection/tamper controls and actual
 Source capture controls. All mandatory production matrix groups, source pinning,
 build/artifact bindings, high-severity audit and final acceptance remain intact.
+
+A selected rerun of consumer 4 also passed as job `120691974419`: consumer
+attempt 2 downloaded the same immutable attempt-1 package artifact `12535783284`.
+The producer was reused, not rerun. The original eight consumers plus that
+selected rerun are distinct executions; GitHub's copied attempt-2 job records
+for other jobs do not count as additional executions.
+
+The retained [receipt](../scripts/fixtures/browser-runtime-v3-20261024/receipt.json)
+binds the exact probe commit/tree, all artifact digests, original job conclusions,
+10 measured contexts, representative raw profiles and the complete producer
+manifest. Independent local verification checked all 17 actual Debian archives,
+including their control metadata; all 80 captured PNGs were byte-identical by
+view, and all four RGBA hashes were independently decoded with PNG CRC/filter
+validation. The four canonical PNGs equal the earlier retained diagnostic PNGs
+byte for byte, so the receipt references those files instead of duplicating them.
+
+The isolated probe exercised code tree
+`183d3f87507045580731c19124a8355f8684aaca`. The subsequent runtime edit only
+separates `offlineInstallMs` from `materialCaptureMs` in reporting; the isolated
+consumer totals (20.3–46.6 seconds, plus a 25.3-second selected rerun) include
+both operations. Admission predicates are unchanged. The full main workflow
+must still qualify the final published tree and all application journeys.

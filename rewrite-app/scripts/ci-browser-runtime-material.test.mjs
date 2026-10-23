@@ -110,3 +110,34 @@ test('the actual early v3 command validates raw immutable metadata without grant
  assert.notEqual(run({CI_BROWSER_SYSTEM_FORMAT:'2'}).status,0,'Legacy images still require exact equality.');
  assert.notEqual(run({ImageVersion:'20261012.334.1',CI_BROWSER_SYSTEM_EXPECTED_MATERIAL_SHA256:''}).status,0,'Matching labels cannot replace the v3 digest.');
 });
+
+test('actual offline cross-image and partial-rerun evidence binds raw producer packages, observed contexts and exact Source pixels',async()=>{
+ const root=new URL('./fixtures/browser-runtime-v3-20261024/',import.meta.url);
+ const read=name=>readFile(new URL(name,root));
+ const receipt=JSON.parse(await read('receipt.json'));
+ assert.equal(receipt.runId,40034252270);assert.equal(receipt.probe.codeTree,'183d3f87507045580731c19124a8355f8684aaca');
+ assert.equal(receipt.fullOriginalParity,false);assert.equal(receipt.jobs.length,9);
+ assert.ok(receipt.jobs.every(j=>j.status==='completed'&&j.conclusion==='success'));
+ for(const [name,digest]of Object.entries(receipt.files)){assert.match(name,/^[a-z0-9.-]+$/);assert.equal(hash(await read(name)),digest,name);}
+ const manifest=JSON.parse(await read('producer-manifest.json'));
+ const policy={format:3,collectorSha256:manifest.runtimeMaterial.material.scriptSha256,materialSha256:receipt.materialSha256};
+ const result=validateManifest(manifest,manifest.context,manifest.beforeInventory,policy);
+ assert.equal(result.files.length,17);assert.equal(result.bytes,25937806);
+ assert.equal(receipt.packageArtifact.id,12535783284);assert.equal(receipt.partialRerun.reusedArtifact,receipt.packageArtifact.id);
+ const opposite=JSON.parse(await read('opposite-consumer-profile.json')),rerun=JSON.parse(await read('rerun-consumer-profile.json'));
+ for(const [profile,identity]of [[manifest.runtimeMaterial,'producer'],[opposite,'4-attempt-1'],[rerun,'4-attempt-2']]){
+  const observation=receipt.observations.find(row=>row.identity===identity);
+  assert.deepEqual(profile.context,observation.context);
+  verifyRuntimeObservation(profile,observation.context,manifest,policy);
+ }
+ assert.equal(manifest.context.imageVersion,'20261012.334.1');assert.equal(opposite.context.imageVersion,'20261023.334.3');
+ assert.equal(manifest.context.runAttempt,'1');assert.equal(rerun.context.runAttempt,'2');
+ assert.equal(receipt.partialRerun.producerAttempt,1);assert.equal(receipt.partialRerun.consumerAttempt,2);assert.equal(receipt.partialRerun.conclusion,'success');
+ assert.equal(receipt.observations.length,10);assert.equal(receipt.observations.filter(o=>o.context.imageVersion==='20261023.334.3').length,2);
+ assert.equal(receipt.pngFilesCompared,80);assert.equal(receipt.independentDebianControlMetadataVerified,true);
+ for(const view of receipt.views){
+  assert.equal(view.observedMatchingFiles,20);assert.equal(view.independentlyDecoded,true);
+  assert.equal(hash(await read('../browser-material-cohorts-20261023/'+view.name+'.png')),view.pngSha256);
+  assert.deepEqual(manifest.runtimeMaterial.material.views.find(v=>v.name===view.name),{name:view.name,width:view.width,height:view.height,pixelSha256:view.pixelSha256});
+ }
+});
