@@ -2,6 +2,14 @@
 
 ## Shared authenticated browser-system packages (2026-10-23)
 
+Parent `b74d789e` completes
+[run 39972857422](https://github.com/jurei733/testcenter-rewrite/actions/runs/39972857422)
+with **87 successful and two failed jobs**. All existing application, Source,
+store, Docker and deployment gates pass, including the canonical Syscheck fix.
+The first offline prototype and acceptance fail; the corrected round trips below
+establish the prerequisite for migration without treating that parent as green
+complete acceptance. Its useful jobs finish before the next publication.
+
 The Linux round trips in [probe 39975668866](https://github.com/jurei733/testcenter-rewrite/actions/runs/39975668866)
 and [probe 39976348906](https://github.com/jurei733/testcenter-rewrite/actions/runs/39976348906)
 pass on independent Ubuntu 24.04 runners. The producer installs the locked
