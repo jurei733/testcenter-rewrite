@@ -1,5 +1,64 @@
 # CI iteration and complete acceptance
 
+## Shared native-package qualification (2026-10-23)
+
+Repeated browser-system downloads are being replaced only after a separate
+native Linux round trip proves the resulting environment. Two new required
+jobs prepare and qualify a same-run package artifact; the existing 87 jobs and
+their installers remain unchanged during this qualification stage. Fast feedback
+does not depend on the new jobs. Complete acceptance requires both, bringing
+the proposed workflow to 89 jobs. This preparation is not a measured overall
+speedup or evidence that the offline installation has already passed Linux.
+
+The producer reads the 33 Chromium/tools packages from the actual lockfile
+installation's Ubuntu 24.04 x64 Playwright profile. It downloads through normal
+authenticated APT indexes with the existing official archive preference and
+transport bounds, explicitly rejects unauthenticated/insecure repositories, and
+records a native APT installation as the oracle. No base packages may be removed.
+`--download-only`, `--no-download`, `--no-remove` and fatal update errors follow
+the [APT command contracts](https://manpages.debian.org/bookworm/apt/apt-get.8.en.html).
+Individual files use SHA256-derived basenames instead of an extracted archive.
+
+The fresh consumer checks commit, run ID/attempt, lockfile, Playwright native
+dependency bytes, Node/architecture, exact hosted image and initial dpkg inventory.
+Every artifact member must be declared, regular, bounded and hash/size matched;
+the actual `dpkg-deb` reader must agree on package/version/architecture. Symlinks,
+extra files, duplicate identities, omitted changes and mismatched initial state
+remain fatal. Native APT orders the verified local packages, retaining its
+Pre-Depends/configuration rules; an empty private archive cache, `--no-download`
+and a new network namespace exclude other payloads. Installation must reproduce
+the producer's complete dpkg inventory and native font-catalog digest. Privileged
+commands use absolute paths, noninteractive environment and nonprompting sudo.
+Native failures retain their exit status without attaching potentially private
+raw `apt-config` output to errors. Phase/timing records contain only scoped
+public counts, inventory hashes and the runner image version.
+
+The producer also runs three real Debian-archive inspection controls without
+installing fixture packages. After restoring the offline environment, the fresh
+consumer installs only locked Chromium and runs the existing actual headed
+capture controls. Artifacts use the current run, strict download digest checks,
+one-day retention and no cross-run fallback. Both native jobs still require their
+first Linux proof. Local qualification passes 222 portable policy controls with
+the two existing real-Linux controls explicitly skipped on macOS; Actionlint and
+diff checks pass. Migration of other browser consumers and a controlled complete
+pipeline speed comparison remain subsequent work.
+
+## Native/canonical Systemcheck correction (2026-10-23)
+
+The `347b0746` Linux run finds the same canonical Systemcheck identity regression
+in all four store integrations and the compatibility gate. Native resolution now
+requires a native upload/replacement audit marker. Existing corpus assertions
+remain unchanged, and a mixed canonical/native case now runs in the early unit
+gate. Locally, all 3,814 unit/frontend cases, 172 complete API integrations each
+for Memory/File/SQLite and the complete 1,940-case PostgreSQL integration group
+pass without failures/skips/cancellations. Fresh production stays at 468.39 kB;
+the Systemcheck browser prefix through report saving and the complete native-file
+browser matrix pass. Owned browser/API/PostgreSQL fixtures are stopped.
+
+That Linux run also confirms all three Compose modes pass with the bounded
+readiness-attempt fix. Other useful jobs continue before the next publication;
+the run must not be described as green complete acceptance.
+
 
 ## Atomic release activation (2026-10-23)
 
