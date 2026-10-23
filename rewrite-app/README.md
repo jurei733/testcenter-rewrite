@@ -1,5 +1,17 @@
 # Testcenter Rewrite App
 
+The Original workspace now exposes the implemented **Dateien** and
+**Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
+versions, select multiple Checks, download their complete CSV, and confirm
+selected deletion. Read-only users can export but cannot delete. Requests,
+confirmations and downloads belong to the exact signed-in workspace; changing
+tabs drops report selection. `?tab=syscheck` restores the report tab on reload.
+The two other Original tabs, results/answers and individual test deletion, are
+still missing. The current two-tab surface is not complete four-tab or visual
+parity. Run `npm run smoke:ui:original-system-check-reports` for the real protected
+SQLite/browser journey, or `npm run test:system-check-reports` for fresh-core
+all-store export/statistics tests. See `docs/ORIGINAL-UI-PARITY.md` for scope.
+
 The source-backed implementation priorities and current original-product gaps are
 tracked in [`docs/PARITY.md`](./docs/PARITY.md).
 

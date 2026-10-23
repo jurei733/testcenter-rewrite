@@ -3,7 +3,9 @@ import {MatButton,MatIconButton} from '@angular/material/button';
 import {MatDivider} from '@angular/material/divider';
 import {MatMenu,MatMenuTrigger} from '@angular/material/menu';
 import {MatToolbar} from '@angular/material/toolbar';
-import {Router,RouterLink} from '@angular/router';
+import {Router,RouterLink,ActivatedRoute} from '@angular/router';
+import {MatTabNav,MatTabLink,MatTabNavPanel} from '@angular/material/tabs';
+import {OriginalSystemCheckReportsComponent} from './original-system-check-reports.component';
 import {AppShellFacade} from './app-shell.facade';
 import {OriginalOverlayStylesComponent} from './original-overlay-styles.component';
 import {OriginalParticipantLogoutDialogComponent} from './original-participant-logout-dialog.component';
@@ -30,7 +32,7 @@ import {ApplicationSettingsService} from './application-settings.service';
 import {RewriteAppUiStateService} from './rewrite-app-ui-state.service';
 
 @Component({selector:'app-original-workspace-files',standalone:true,
- imports:[RouterLink,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
+ imports:[RouterLink,MatTabNav,MatTabLink,MatTabNavPanel,OriginalSystemCheckReportsComponent,MatToolbar,MatMenu,MatMenuTrigger,MatDivider,MatIconButton,OriginalOverlayStylesComponent,OriginalWorkspaceFileSurfaceStylesComponent,MatButton,MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle,MatCardContent,MatCardActions,
    MatCheckbox,MatAccordion,MatExpansionPanel,MatExpansionPanelHeader,MatExpansionPanelTitle,MatExpansionPanelDescription,
    MatProgressBar,MatProgressSpinner,MatSort,MatSortHeader,MatTable,MatColumnDef,MatHeaderCellDef,MatHeaderCell,MatCellDef,MatCell,
    MatHeaderRowDef,MatHeaderRow,MatRowDef,MatRow,MatTooltip,OriginalWorkspaceFileIconComponent,OriginalWorkspaceFileNoticeComponent],
@@ -48,6 +50,8 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  readonly settings=inject(ApplicationSettingsService);
  readonly app=inject(AppShellFacade);
  private readonly router=inject(Router);
+ private readonly route=inject(ActivatedRoute);
+ tab:'files'|'syscheck'='files';
  private logout:MatDialogRef<OriginalParticipantLogoutDialogComponent>|null=null;
  private readonly snacks=inject(MatSnackBar);
  private destroyed=false;
@@ -56,6 +60,10 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
    this.request.request('Dateiverwaltung',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
    ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,roles:this.access.roleAssignments}),
    ()=>{if(!this.destroyed)this.changed.markForCheck();});
+ private readonly routeChanges=this.route.queryParamMap.subscribe(params=>{
+   const next=params.get('tab')==='syscheck'?'syscheck':'files';
+   if(this.tab!==next){this.tab=next;this.deletion?.close(false);void this.controller.connect();}
+ });
  readonly fileTypes:WorkspaceFileType[]=['Testtakers','Booklet','SysCheck','Unit','Resource','Package'];
  readonly labels:Record<WorkspaceFileType,string>={Testtakers:'Teilnehmerlisten',Booklet:'Testhefte',SysCheck:'Systemcheck-Definitionen',Unit:'Units',Resource:'Ressourcen',Package:'Pakete'};
  private readonly dateFormat=new Intl.DateTimeFormat('de-DE',{
@@ -69,8 +77,9 @@ export class OriginalWorkspaceFilesComponent implements OnChanges,OnDestroy {
  readonly versions=[{label:'Teilnehmerlisten',versions:'17–18'},{label:'Testhefte',versions:'18'},
    {label:'Systemcheck-Definitionen',versions:'18'},{label:'Units',versions:'17'},{label:'Verona-Player',versions:'2–6'}];
  readonly trackFile=(_index:number,file:OriginalWorkspaceFile)=>file.sourcePackageId;
+ reloadReports():void {globalThis.location.reload();}
  ngOnChanges():void {this.deletion?.close(false);this.logout?.close(false);void this.controller.connect();}
- ngOnDestroy():void {this.destroyed=true;this.deletion?.close(false);this.logout?.close(false);this.controller.destroy();}
+ ngOnDestroy():void {this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.logout?.close(false);this.controller.destroy();}
  get title():string {
    const workspace=this.controller.overview?.workspace;
    return workspace ? `Verwaltung "${workspace.displayName}" (${this.controller.canWrite?'RW':'RO'})` : 'Verwaltung';

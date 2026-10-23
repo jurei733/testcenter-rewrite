@@ -121,6 +121,7 @@ mat-checkbox { display:inline-block; } .vertical-align-middle { display:inline-f
 app-original-overlay-styles,app-original-workspace-file-surface-styles { display:none; }
 #originalWorkspaceFileFrame { display:flex; flex:1; flex-direction:column; min-height:0; }
 .workspace-files-view { padding:25px; overflow:auto; flex:1; min-height:0; }
+mat-tab-nav-panel { display:block; padding:5px; }
 mat-toolbar { display:flex; justify-content:space-between; position:relative; flex:0 0 auto; padding:8px 24px; background:var(--secondary); color:white; }
 mat-toolbar .side { height:100%; display:flex; align-items:center; }
 mat-toolbar .center { position:absolute; left:50%; transform:translateX(-50%); }

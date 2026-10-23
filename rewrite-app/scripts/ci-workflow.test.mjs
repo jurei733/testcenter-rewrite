@@ -456,3 +456,10 @@ test("Ops qualification is split into independent browser jobs without dropping 
   }
   assert.equal(matrix.find(item => item.check === "ui-ops").command, "npm run smoke:ui:operator-auth:built");
 });
+test('native Systemcheck reports retain their real browser journey in required workspace qualification',()=>{
+ assert.equal(scripts['smoke:ui:original-workspace-files:built'],
+  'node scripts/smoke-original-workspace-files.mjs && npm run smoke:ui:original-system-check-reports:built');
+ assert.equal(scripts['smoke:ui:original-system-check-reports:built'],'node scripts/smoke-original-system-check-reports.mjs');
+ assert.ok(scripts['test:frontend-state'].split(/\s+/).includes('scripts/original-system-check-reports-controller.test.mjs'));
+ assert.equal(matrix.find(item=>item.check==='ui-original-workspace-files')?.command,'npm run smoke:ui:original-workspace-files:built');
+});

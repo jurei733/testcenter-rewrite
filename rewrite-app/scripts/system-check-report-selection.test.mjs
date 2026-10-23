@@ -44,9 +44,13 @@ for(const kind of kinds)test(kind+': selected Original Systemcheck exports retai
     checkLabel:'Owned '+checkId,title:(own?'owned-title-':'foreign-private-title-')+index,
     responses:{text:'exact Ω\n"; value',flag:false,zero:0},
     environment:[{id:'os',type:'environment',label:'Betriebssystem',value:index%2?'Linux':'Windows',warning:false},
-     {id:'browser',type:'environment',label:'Browser',value:'Chromium',warning:false}],
+     {id:'browser',type:'environment',label:'Browser',value:'Chromium',warning:false},
+     {id:'os-version',type:'environment',label:'Betriebssystemversion',value:index%2?'6':'10',warning:false},
+     {id:'browser-version',type:'environment',label:'Browserversion',value:'130',warning:false}],
     network:[],unit:[],questionnaire:[{id:'owned',type:'string',label:own&&checkId!=='CHECK.C'?'Selected question Ω':'Private unselected column',
       value:own?'selected answer':'foreign-private-value',warning:false}]};
+   if(index===504)report.environment=report.environment.map(entry=>({...entry,
+    label:entry.label==='Betriebssystem' || entry.label==='Betriebssystemversion' || entry.label==='Browserversion'?'Other '+entry.label:entry.label}));
    await repository.saveWorkspaceActivityEvent({activityEventId:randomUUID(),tenantId:tenant.tenantId,workspaceId,
     eventType:'system_check_report_saved',actorId:null,subjectType:'system_check_report',subjectId:report.systemCheckReportId,
     occurredAt:report.createdAt,summary:'Owned report fixture',details:{report}});
@@ -92,6 +96,17 @@ for(const kind of kinds)test(kind+': selected Original Systemcheck exports retai
    assert.ok(csv.includes('Selected question Ω'));
    assert.deepEqual(completeSelection[0].responses,reports.find(row=>row.title===completeSelection[0].title).responses);
    for(const value of ['CHECK.C','Private unselected column','foreign-private'])assert.ok(!csv.includes(value),value);
+  });
+  await t.test('native distributions group exact Source environment labels with versions and preserve canonical name-only fields',async()=>{
+   const stats=await selected().getSystemCheckReportStatistics({...scope,checkIds:['CHECK.A']});
+   assert.deepEqual(stats[0].operatingSystemVersions,[{value:'Windows 10',count:251},{value:'Linux 6',count:250}]);
+   assert.deepEqual(stats[0].browserVersions,[{value:'Chromium 130',count:501}]);
+   assert.deepEqual(stats[0].operatingSystems,[{value:'Windows',count:251},{value:'Linux',count:250}]);
+   assert.deepEqual(stats[0].browsers,[{value:'Chromium',count:501}]);
+   const missing=(await selected().getSystemCheckReportStatistics({...scope,checkIds:['CHECK.C']}))[0];
+   assert.deepEqual(missing.operatingSystemVersions,[{value:' ',count:1}]);
+   assert.deepEqual(missing.browserVersions,[{value:'Chromium ',count:1}]);
+   assert.deepEqual(missing.operatingSystems,[{value:'Windows',count:1}],'Canonical ID matching remains independent from exact Source labels.');
   });
   await t.test('malformed explicit selectors reject instead of silently broadening a protected read',async()=>{
    for(const checkIds of [null,'CHECK.A',[1],[''],[' '],['CHECK.A',{}]])
@@ -160,6 +175,8 @@ test('protected HTTP exports bind repeated Check selections across CSV, JSON, st
   assert.equal(await request(scope+'/exports/system-check-reports'+query,{credential:ro,accept:'text/csv'}),csv);
   const stats=await request(scope+'/system-check-reports/statistics'+query,{credential:ro});
   assert.deepEqual(stats.items.map(row=>[row.checkId,row.reportCount]),[['HTTP.A',2],['HTTP.B',1]]);
+  assert.deepEqual(stats.items[0].operatingSystemVersions,[{value:' ',count:2}]);
+  assert.deepEqual(stats.items[0].browserVersions,[{value:' ',count:2}]);
   const limited=await request(scope+'/system-check-reports'+query+'&limit=2',{credential:ro});
   assert.deepEqual(limited.items.map(row=>row.title),json.slice(0,2).map(row=>row.title));
   assert.deepEqual(await request(scope+'/exports/system-check-reports.json?checkId=MISSING',{credential:ro}),[]);

@@ -1,5 +1,41 @@
 # Optional Original UI
 
+### Native report page and remaining workspace tabs (2026-10-23)
+
+Files and Systemcheck Reports are now implemented native pages. Material tab
+pagination remains interactive on narrow viewports. The report table retains
+Source's five columns, selection, labels, CSV filename and confirmation copy.
+Adapted Source is pinned to `eedae41840cbe90e5547c0211da818bdf620f5aa`:
+
+| Source file | SHA256 |
+| --- | --- |
+| `workspace-admin/syscheck/syscheck.component.html` | `9e433930f0184e8e5ed3af2f9c33f78e3db4d3bfa6983235c58f7e590a72c628` |
+| `workspace-admin/syscheck/syscheck.component.ts` | `85848e7b7f3700f95161969a9c90cf9b0197abd7821c3fe64ab85b5ad2d8e3ff` |
+| `workspace-admin/syscheck/syscheck.component.css` | `2841c135b291d89d7c46d5d56a5506bb5c8077d03cb069bd3ee3e37e2ce0c87f` |
+| `backend/src/files/SysCheckReportFile.class.php` | `1dc05fadecedd8ee23e75cab3249fbd7b72f4a3a44d532044a0bff00e822e5d3` |
+
+Frontend paths are under `frontend/src/app/`. Source files are unchanged; the
+existing IQB MIT notice covers the adapted native templates and exact SVG glyph.
+`getDigest()` concatenates exact German environment labels with one literal
+space, including absent values. Rewrite exposes these version-aware arrays
+alongside its established canonical name-only statistics. No private report
+body/key is needed for the overview.
+
+The real headed SQLite journey passes Primar/Sekundar/Erwachsene at 1280 and
+390 px: 505 actual saves, 504 selected CSV reports with exact protected API bytes,
+versioned counts, selection reset/reload, cancel confirmation, RO export/refusal,
+held-download logout, real three-report deletion, empty workspace, and a blocked
+deferred module followed by explicit recovery. Screenshots are unaltered native
+diagnostics, not a paired Source baseline. The existing six RW and six RO file
+journeys, native uploads/downloads/deletion and file-bundle recovery still pass.
+
+Two more Original pages are missing: **Ergebnisse/Antworten** and **Tests
+löschen**. No unimplemented tabs are exposed. The full four-tab geometry,
+responsive header/table pixels, submitted/error/pending states, and native
+Source permission projection remain open. In particular, disabled RO deletion
+is an intentional UI restriction on the existing protected API; it is not proof
+of identical Source button state. All eight broad visual rows remain open.
+
 ### Actual Original workspace backend Oracle (2026-10-23)
 
 [Run 39988533872](https://github.com/jurei733/testcenter-rewrite/actions/runs/39988533872)

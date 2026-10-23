@@ -1,5 +1,50 @@
 # CI iteration and complete acceptance
 
+## Native report qualification and open Verona input failure (2026-10-23)
+
+`smoke:ui:original-workspace-files:built` now runs the complete existing file
+journey followed by `smoke:ui:original-system-check-reports:built`. The existing
+required workspace row still has its original command; no scenario is removed
+and the complete workflow retains **89** gates. The report journey can also be
+run independently for iteration. It uses actual protected SQLite, Original-19
+XSD upload, 505 real report saves, native selection/download/confirmation,
+RO/RW accounts, six theme/viewport captures, held-download logout and a real
+deferred module failure/reload. Browser cases execute serially.
+
+Local complete qualification passes **3,854 unit/frontend**, **173 API cases
+each for Memory/File/SQLite**, **1,950 PostgreSQL**, and the unchanged full native
+file journey plus the new full report journey. Policy passes **234 cases** with
+one explicit GNU-timeout-only macOS skip, zero failures. Typecheck/production
+pass, entry **468.39 kB**. Report controller ownership tests are required through
+`test:frontend-state`; version/selection cases remain in unit and full PostgreSQL.
+The qualification's owned PG schema/cluster and browser/API processes are closed.
+
+This local result does not make the published predecessor green.
+[Run 39990402820](https://github.com/jurei733/testcenter-rewrite/actions/runs/39990402820)
+for `764619b5` fails its native Verona-player leaf `120542219940` at the second
+shared-parameter Publish action: expected one trusted click for `publish-red`,
+observed zero. The first `publish-blue` action passes. Its screenshot retains the
+second definition with inherited blue/language parameters, so successful red
+publication is unproven. No assertion, native click requirement or deadline is
+relaxed, and a retry alone is not a fix. Other useful jobs are allowed to finish.
+
+Failure artifact `12518211055` is independently downloaded and verified:
+SHA256 `4a854702f6e81ed0dd3dbad6de8e518fa509b7580ee50895fc7263a1084319bc`,
+members `rewrite-ui-quick.log` and `rewrite-ui-artifacts/failure.png`. A bounded
+local reproduction uses the exact shared-parameter Player/ZIP and protected
+runtime, adding diagnostic native pointer events and frame lifecycle records.
+The bounded reproduction passes ten trials locally and in isolated Linux
+[run 39993459075](https://github.com/jurei733/testcenter-rewrite/actions/runs/39993459075):
+20 actual trusted Publish clicks, durable parameters and reload checks, with
+owned cleanup. It does not reproduce or fix the full-prefix failure. A second
+isolated probe now runs the complete original Verona journey with only native
+input/frame diagnostics injected into an owned temporary copy. The actual smoke
+source is SHA256-bound (`3e7013202716cb0dee80a6f69578fd3b1cf557a5a3abb674dd8a866949178cf2`)
+and checked unchanged; assertions, full prefix and stop boundary are retained.
+These probes and eventual complete-head qualification remain distinct from
+the report-page checks. Never infer the overall run stopped from an observation
+timeout, or cancel remaining useful jobs by moving the branch.
+
 ## Current finite-animation readiness and actual leaf rerun (2026-10-23)
 
 Published `8e3d709c` first finishes
