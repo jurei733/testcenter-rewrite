@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -80,6 +80,33 @@ test(`real ${postgres?'PostgreSQL':'SQLite'} fresh resume API rolls back failed 
       const identity=await request('POST',routes.participant.signIn,{...input,participantCode:'abc'});
       assert.equal(identity.participantSession.participantCode,'AbC');assert.deepEqual(await metadata(),[saved]);
       await request('POST',routes.participant.signIn,{...input,participantCode:'ABC'});assert.deepEqual(await metadata(),[saved]);
+    });
+    await t.test('protected XML roster HTTP retains exact labels and empty-label login failure without inventing a snapshot',async()=>{
+      const scope=await repository.getWorkspaceByScope(tenantKey,workspaceKey);
+      const cases=JSON.parse(await readFile(new URL('./fixtures/original-group-label-cases.json',import.meta.url),'utf8'));
+      for(const row of cases){
+        const loginKey='http-label-'+row.id.toLowerCase(),groupKey='HTTP.LABEL.'+row.id;
+        const document=attribute=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="${groupKey}" label="${attribute}"><Login name="${loginKey}" pw="Owned-http-label-secret" mode="run-hot-return"><Booklet>${bookletKey}</Booklet></Login></Group></Testtakers>`;
+        const upload=attribute=>request('POST',workspace+'/participant-roster',{rosterText:document(attribute)},operator,201);
+        await upload(row.attribute);
+        const roster=(await repository.listParticipantRosterEntriesByWorkspace(scope.tenantId,scope.workspaceId)).find(entry=>entry.loginKey===loginKey);
+        assert.equal(roster.groupLabel,row.expected);
+        const input={tenantKey,workspaceKey,loginKey,password:'Owned-http-label-secret',groupLabel:'Forged',createdAt:'2099-01-01T00:00:00Z'};
+        if(row.id==='EMPTY'){
+          const before=await repository.listOriginalParticipantGroupsByWorkspace(scope.tenantId,scope.workspaceId);
+          for(const password of ['Owned-http-label-secret','wrong']){
+            const failed=await request('POST',routes.participant.signIn,{...input,password},undefined,500);
+            assert.equal(failed.error,'original_group_label_invalid');
+          }
+          assert.deepEqual(await repository.listOriginalParticipantGroupsByWorkspace(scope.tenantId,scope.workspaceId),before);
+          assert.ok(!(await repository.listParticipantSessionsByWorkspace(scope.tenantId,scope.workspaceId)).some(session=>session.loginKey===loginKey));
+          await upload('  Recovered empty Ω  ');
+        }
+        await request('POST',routes.participant.signIn,input);
+        const group=(await repository.listOriginalParticipantGroupsByWorkspace(scope.tenantId,scope.workspaceId)).find(group=>group.groupKey===groupKey);
+        assert.equal(group.groupLabel,row.id==='EMPTY'?'  Recovered empty Ω  ':row.expected);
+        assert.notEqual(group.createdAt,input.createdAt);
+      }
     });
     await t.test('all three authenticated entry paths negotiate actual browser lifecycle logs without a synthetic ready state',async()=>{
       for(const path of ['resume','launch','credentials']){

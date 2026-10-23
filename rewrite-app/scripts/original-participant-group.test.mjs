@@ -2,16 +2,53 @@ import assert from 'node:assert/strict';
 import {randomUUID, createHash} from 'node:crypto';
 import {mkdtemp, rm, readFile, writeFile, rename, mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
+import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
+const originalXmlSchemaValidator=await prepareOriginalXmlSchemaValidator(resolve(process.env.FIRST_SLICE_XML_SCHEMA_CACHE || '.data/original-xml-schemas'),process.env.FIRST_SLICE_XML_SCHEMA_DOWNLOAD !== 'false');
 import test from 'node:test';
 import {Pool} from 'pg';
 import {DatabaseSync} from 'node:sqlite';
 import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
 import {compileBookletRuntimePolicy} from '@testcenter-rewrite-app/contracts';
+import {parseParticipantRosterText,parseOriginalTestcenterOperationalLogins} from '@testcenter-rewrite-app/contracts/participant-roster';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
+
+const groupLabelCases=JSON.parse(await readFile(new URL('./fixtures/original-group-label-cases.json',import.meta.url),'utf8'));
+const labelRoster=row=>`<Testtakers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/testcenter-testtaker-xml/18.0"><Metadata/><Group id="LABEL.${row.id}" label="${row.attribute}"><Login name="label-${row.id.toLowerCase()}" pw="Owned-label-secret" mode="run-hot-return"><Booklet>owned</Booklet></Login><Login name="monitor-${row.id.toLowerCase()}" pw="Owned-monitor-secret" mode="monitor-group"/></Group></Testtakers>`;
+for(const row of groupLabelCases)test(`Original XML ${row.id}: participant and operational group labels retain exact attribute values`,()=>{
+ const xml=labelRoster(row),participants=parseParticipantRosterText(xml),monitors=parseOriginalTestcenterOperationalLogins(xml);
+ assert.equal(participants.length,1);assert.equal(monitors.length,1);
+ assert.equal(participants[0].groupKey,'LABEL.'+row.id);assert.equal(participants[0].groupLabel,row.expected);
+ assert.equal(monitors[0].groupKey,'LABEL.'+row.id);assert.equal(monitors[0].groupLabel,row.expected);
+});
+
+test('actual unchanged production Source binds all eight exact XML vectors, empty-label failure/recovery and monitor-first evidence',async()=>{
+ const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/group-labels/',import.meta.url);
+ const manifest=JSON.parse(await readFile(new URL('manifest.json',root),'utf8'));
+ assert.equal(manifest.sourceCommit,'eedae41840cbe90e5547c0211da818bdf620f5aa');
+ assert.equal(manifest.probeCommit,'64a0e1e3fb6e8617342512b54a762558ab53cab3');assert.equal(manifest.runId,40038272672);
+ assert.equal(manifest.conclusion,'success');assert.equal(manifest.checks,41);assert.equal(Object.keys(manifest.files).length,11);
+ for(const [name,sha]of Object.entries(manifest.files)){
+  assert.match(name,/^[a-z0-9][a-z0-9.-]*$/);assert.equal(createHash('sha256').update(await readFile(new URL(name,root))).digest('hex'),sha,name);
+ }
+ const receipt=JSON.parse(await readFile(new URL('receipt.json',root),'utf8'));
+ assert.equal(receipt.success,true);assert.equal(receipt.testMode,false);assert.equal(receipt.checks.length,41);
+ for(const row of groupLabelCases){
+  const name=row.id==='EMPTY'?'native empty XML group label fails login before password validation and captures no snapshot':'native XML group label preserves '+row.id.toLowerCase();
+  const native=receipt.checks.find(check=>check.name===name);assert.ok(native,row.id);assert.equal(native.rawAttribute,row.attribute);
+  if(row.id==='EMPTY'){
+   assert.equal(native.validPasswordStatus,500);assert.equal(native.wrongPasswordStatus,500);assert.equal(native.recoveredLabel,'  Recovered empty Ω  ');
+  }else{
+   assert.equal(parseParticipantRosterText(labelRoster(row))[0].groupLabel,native.groupLabel,row.id+' actual Source label');
+   assert.equal(parseOriginalTestcenterOperationalLogins(labelRoster(row))[0].groupLabel,native.groupLabel,row.id+' actual Source monitor label');
+  }
+ }
+ const monitor=receipt.checks.find(check=>check.name==='native monitor credential login captures the group before any participant person exists');
+ assert.equal(monitor.groupLabel,'  Monitor first Ω  ');assert.equal(monitor.reimportedLabel,'After monitor import');
+});
 
 test('actual unchanged Source qualifies frozen pre-code labels, group collation and whole-group snapshot recreation',async()=>{
  const root=new URL('../test-fixtures/original-testcenter/source-workspace-results/group-snapshots/',import.meta.url);
@@ -45,7 +82,7 @@ for(const kind of kinds)test(`${kind}: Original group snapshot belongs to creden
    :kind==='sqlite'?await createSqliteFirstSliceStorage(file):await createPostgresFirstSliceStorage(url.toString());
   repository=storage.repository;
  };
- const service=()=>createFirstSliceServices({repository,now:()=>stamp(clock),requireLoginPassword:true});
+ const service=()=>createFirstSliceServices({repository,now:()=>stamp(clock),requireLoginPassword:true,originalXmlSchemaValidator});
  try{
   if(url){root=new Pool({connectionString:process.env.FIRST_SLICE_POSTGRES_URL});await root.query(`CREATE SCHEMA "${schema}"`);created=true;}
   await open();
@@ -99,6 +136,30 @@ for(const kind of kinds)test(`${kind}: Original group snapshot belongs to creden
    const existing=await repository.getOrCreateOriginalParticipantGroup({...first,groupLabel:'Replacement',createdAt:stamp(99)});existing.groupLabel='mutated again';
    assert.deepEqual(await list(),before);
   });
+  await t.test('native XML labels survive import, storage, credential snapshots and durable reopen, including native empty-label failure',async()=>{
+   clock=5;const expected=new Map(groupLabelCases.map(row=>[row.id,row.expected]));
+   for(const row of groupLabelCases){
+    await service().workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:'owned',rosterText:labelRoster(row)});
+    const roster=(await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId,workspace.workspaceId)).find(entry=>entry.loginKey==='label-'+row.id.toLowerCase());
+    assert.equal(roster.groupLabel,row.expected,row.id+' roster');
+    if(row.id==='EMPTY'){
+     if(kind!=='memory'){await storage.shutdown();await open();}
+     assert.equal((await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId,workspace.workspaceId)).find(entry=>entry.loginKey==='label-empty').groupLabel,'');
+     for(const password of ['Owned-label-secret','wrong'])await assert.rejects(signIn('label-empty',{password}),error=>error.statusCode===500&&error.errorCode==='original_group_label_invalid');
+     assert.ok(!(await list()).some(group=>group.groupKey==='LABEL.EMPTY'));
+     expected.set(row.id,'  Recovered empty Ω  ');
+     await service().workspaceAdminRead.importParticipantRoster({tenantKey:tenant.tenantKey,workspaceKey:'owned',rosterText:labelRoster({...row,attribute:expected.get(row.id)})});
+    }
+    await signIn('label-'+row.id.toLowerCase(),{password:'Owned-label-secret'});
+    assert.equal((await list()).find(group=>group.groupKey==='LABEL.'+row.id).groupLabel,expected.get(row.id),row.id+' snapshot');
+   }
+   if(kind!=='memory'){await storage.shutdown();await open();}
+   for(const row of groupLabelCases){
+    const roster=(await repository.listParticipantRosterEntriesByWorkspace(workspace.tenantId,workspace.workspaceId)).find(entry=>entry.loginKey==='label-'+row.id.toLowerCase());
+    assert.equal(roster.groupLabel,expected.get(row.id),row.id+' reopened roster');
+    assert.equal((await list()).find(group=>group.groupKey==='LABEL.'+row.id).groupLabel,expected.get(row.id),row.id+' reopened snapshot');
+   }
+  });
   await t.test('case-equivalent concurrent names choose one first snapshot; accents and workspaces remain distinct',async()=>{
    const input={tenantId:workspace.tenantId,workspaceId:workspace.workspaceId,groupKey:'Parallél',groupLabel:'First parallel label',createdAt:stamp(6)};
    const results=await Promise.all(Array.from({length:12},(_,i)=>repository.getOrCreateOriginalParticipantGroup({...input,groupKey:i%2?'PARALLÉL':'Parallél',groupLabel:'Label '+i,createdAt:stamp(i+6)})));
@@ -120,7 +181,7 @@ for(const kind of kinds)test(`${kind}: Original group snapshot belongs to creden
   });
   await t.test('invalid server metadata cannot partially create a group',async()=>{
    const before=await list();
-   for(const change of [{createdAt:'invalid'},{groupKey:''},{groupLabel:null}])await assert.rejects(repository.getOrCreateOriginalParticipantGroup({...first,groupKey:'invalid',...change}),TypeError);
+   for(const change of [{createdAt:'invalid'},{groupKey:''},{groupLabel:null},{groupLabel:''}])await assert.rejects(repository.getOrCreateOriginalParticipantGroup({...first,groupKey:'invalid',...change}),TypeError);
    assert.deepEqual(await list(),before);
   });
   if(['sqlite','postgres'].includes(kind))await t.test('failed SQL insert rolls back the group and permits a complete later retry',async()=>{

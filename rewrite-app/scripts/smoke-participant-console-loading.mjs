@@ -399,7 +399,9 @@ try {
           const {request,receipt}=timerInterruptions[0],timer=baseline.testletTimers[request.testletKey];
           assert.equal(receipt.applied,true);assert.equal(receipt.scope.testRunId,runId);assert.equal(request.unitKey,baseline.currentUnitKey);
           assert.equal(request.startedAt,timer.startedAt);assert.equal(request.expiresAt,timer.expiresAt);
+          assert.ok(baseline.originalResultState?.lastOpenedAt,'The entered Test must retain its Original opening evidence');
           assert.deepEqual(current,{...baseline,stateRevision:baseline.stateRevision+1,updatedAt:receipt.acceptedAt,
+            originalResultState:{...baseline.originalResultState,hasTestState:true,lastTestStateAt:receipt.acceptedAt,lastTestModifiedAt:receipt.acceptedAt},
             testletTimers:{...baseline.testletTimers,[request.testletKey]:{...timer,status:'paused',remainingSeconds:Math.min(timer.remainingSeconds,request.remainingSeconds),expiresAt:null,updatedAt:receipt.acceptedAt,endedAt:null,interruptedAtUnitKey:request.unitKey}}});
         };
         assert.equal(JSON.parse(parseVeronaUnitResponse(baseline.unitResponses['first-unit']).unitState.dataParts.answer)[0].value,answer);

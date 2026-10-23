@@ -314,12 +314,15 @@ const parseDelimitedRosterRows = (
 };
 
 const decodeXmlText = (value: string): string =>
-  value
-    .replace(/&quot;/g, "\"")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
+  value.replace(/&(?:#x([\da-fA-F]+)|#(\d+)|(amp|lt|gt|quot|apos));/g,
+    (reference, hex: string | undefined, decimal: string | undefined, name: string | undefined) => {
+      if (name) return ({ amp: "&", lt: "<", gt: ">", quot: '\"', apos: "'" } as Record<string, string>)[name] ?? reference;
+      const point = Number.parseInt(hex ?? decimal ?? "", hex ? 16 : 10);
+      const valid = point === 9 || point === 10 || point === 13 ||
+        (point >= 0x20 && point <= 0xd7ff) || (point >= 0xe000 && point <= 0xfffd) ||
+        (point >= 0x10000 && point <= 0x10ffff);
+      return Number.isInteger(point) && valid ? String.fromCodePoint(point) : reference;
+    });
 
 const parseXmlAttributes = (rawAttributes: string): Record<string, string> => {
   const attributes: Record<string, string> = {};
@@ -327,7 +330,9 @@ const parseXmlAttributes = (rawAttributes: string): Record<string, string> => {
   for (const match of rawAttributes.matchAll(
     /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
   )) {
-    attributes[match[1]] = decodeXmlText(match[2] ?? match[3] ?? "");
+    // XML normalizes literal attribute whitespace before expanding references.
+    // Numeric references to tab/newline/CR therefore remain distinct.
+    attributes[match[1]] = decodeXmlText((match[2] ?? match[3] ?? "").replace(/\r\n?/g, "\n").replace(/[\t\n]/g, " "));
   }
 
   return attributes;
@@ -635,9 +640,9 @@ const mergeParsedParticipantRosterEntries = (
       ...existingEntry,
       ...bookletAssignment,
       groupKey: entry.groupKey || existingEntry.groupKey,
-      ...(entry.groupLabel
+      ...(entry.groupLabel !== undefined && entry.groupLabel !== null
         ? { groupLabel: entry.groupLabel }
-        : existingEntry.groupLabel
+        : existingEntry.groupLabel !== undefined && existingEntry.groupLabel !== null
           ? { groupLabel: existingEntry.groupLabel }
           : {}),
       displayName: entry.displayName ?? existingEntry.displayName,
@@ -1432,10 +1437,10 @@ const findNearestXmlAssetAssignments = (
     .sort((left, right) => left.end - left.start - (right.end - right.start))[0]
     ?.value ?? {};
 
-const collectXmlRosterContextRanges = (
+const collectXmlRosterContextRangesUsing = (
   rosterText: string,
   tagNames: string,
-  ...candidateAttributeNames: string[]
+  readValue: (rawAttributes: string) => string | null
 ): XmlRosterContextRange[] => {
   const ranges: XmlRosterContextRange[] = [];
   const stack: Array<{
@@ -1446,7 +1451,7 @@ const collectXmlRosterContextRanges = (
 
   for (const match of rosterText.matchAll(
     new RegExp(
-      `<(/?)((?:[a-zA-Z_][\\w.-]*:)?(?:${tagNames}))\\b([^>]*?)(/?)>`,
+      `<(/?)((?:[a-zA-Z_][\\w.-]*:)?(?:${tagNames}))\\b((?:"[^"]*"|'[^']*'|[^'">])*)(/?)>`,
       "gi"
     )
   )) {
@@ -1464,12 +1469,7 @@ const collectXmlRosterContextRanges = (
       stack.push({
         tagName,
         start: offset,
-        value: normalizeRosterTextValue(
-          readXmlAttribute(
-            parseXmlAttributes(rawAttributes),
-            ...candidateAttributeNames
-          )
-        )
+        value: readValue(rawAttributes)
       });
       continue;
     }
@@ -1490,7 +1490,7 @@ const collectXmlRosterContextRanges = (
     }
 
     const entry = stack.splice(stackIndex, 1)[0];
-    if (!entry?.value) {
+    if (!entry || entry.value === null) {
       continue;
     }
 
@@ -1511,6 +1511,19 @@ const collectXmlRosterContextRanges = (
 
   return ranges;
 };
+
+const collectXmlRosterContextRanges = (
+  rosterText: string,
+  tagNames: string,
+  ...candidateAttributeNames: string[]
+): XmlRosterContextRange[] => collectXmlRosterContextRangesUsing(rosterText, tagNames,
+  raw => normalizeRosterTextValue(readXmlAttribute(parseXmlAttributes(raw), ...candidateAttributeNames)));
+
+// Group labels are authored strings, including explicit empty/whitespace values.
+// The native XML schema validates their presence; absence remains distinct here.
+const collectXmlGroupLabelContextRanges = (rosterText: string): XmlRosterContextRange[] =>
+  collectXmlRosterContextRangesUsing(rosterText, "group|groupRef|group-ref|class|classRef|class-ref",
+    raw => readXmlAttribute(parseXmlAttributes(raw), "groupLabel", "groupDisplayLabel", "classLabel", "displayLabel", "label") ?? null);
 
 const findNearestXmlRosterContextValue = (
   ranges: XmlRosterContextRange[],
@@ -1546,15 +1559,7 @@ const parseParticipantRosterXmlText = (
     "name",
     "label"
   );
-  const groupLabelContextRanges = collectXmlRosterContextRanges(
-    rosterText,
-    "group|groupRef|group-ref|class|classRef|class-ref",
-    "groupLabel",
-    "groupDisplayLabel",
-    "classLabel",
-    "displayLabel",
-    "label"
-  );
+  const groupLabelContextRanges = collectXmlGroupLabelContextRanges(rosterText);
   const groupAssetAssignmentRanges =
     collectXmlGroupAssetAssignmentRanges(rosterText);
   const bookletContextRanges = collectXmlRosterContextRanges(
@@ -1760,7 +1765,7 @@ const parseParticipantRosterXmlText = (
       loginKey,
       ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
-      ...(groupLabel ? { groupLabel } : {}),
+      ...(groupLabel !== null ? { groupLabel } : {}),
       ...withAdditionalBookletKeys([
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
@@ -1904,7 +1909,7 @@ const parseParticipantRosterXmlText = (
       loginKey,
       ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
-      ...(groupLabel ? { groupLabel } : {}),
+      ...(groupLabel !== null ? { groupLabel } : {}),
       ...withAdditionalBookletKeys([
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
@@ -2237,15 +2242,7 @@ export const parseOriginalTestcenterOperationalLogins = (
     "name",
     "label"
   );
-  const groupLabelContextRanges = collectXmlRosterContextRanges(
-    rosterText,
-    "group|groupRef|group-ref|class|classRef|class-ref",
-    "groupLabel",
-    "groupDisplayLabel",
-    "classLabel",
-    "displayLabel",
-    "label"
-  );
+  const groupLabelContextRanges = collectXmlGroupLabelContextRanges(rosterText);
   const groupAssetAssignmentRanges =
     collectXmlGroupAssetAssignmentRanges(rosterText);
   const validFromContextRanges = collectXmlRosterContextRanges(
@@ -2352,7 +2349,7 @@ export const parseOriginalTestcenterOperationalLogins = (
       loginKey,
       loginMode: loginMode as OriginalTestcenterOperationalLoginMode,
       groupKey,
-      ...(groupLabel ? { groupLabel } : {}),
+      ...(groupLabel !== null ? { groupLabel } : {}),
       passwordRequired: Boolean(password),
       profileIds: uniqueProfileIds,
       monitorProfiles: uniqueProfileIds.flatMap(profileId => {

@@ -3405,7 +3405,7 @@ export const createSqliteFirstSliceStorage = (
           participantRosterEntry.loginKey,
           participantRosterEntry.executionMode ?? null,
           participantRosterEntry.groupKey,
-          participantRosterEntry.groupLabel?.trim() || null,
+          participantRosterEntry.groupLabel ?? null,
           participantRosterEntry.bookletKey,
           participantRosterEntry.bookletKeys?.length
             ? JSON.stringify(participantRosterEntry.bookletKeys)

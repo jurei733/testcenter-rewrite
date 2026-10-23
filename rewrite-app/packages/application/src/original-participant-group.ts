@@ -15,7 +15,7 @@ export const prepareOriginalParticipantGroup = (input: {
   createdAt: string;
 }): OriginalParticipantGroup => {
   if ([input.tenantId, input.workspaceId, input.groupKey].some(value => typeof value !== "string" || !value.length) ||
-      typeof input.groupLabel !== "string" || typeof input.createdAt !== "string" ||
+      typeof input.groupLabel !== "string" || !input.groupLabel.length || typeof input.createdAt !== "string" ||
       !Number.isFinite(Date.parse(input.createdAt))) {
     throw new TypeError("Original participant group requires a scope, name, label and server timestamp.");
   }

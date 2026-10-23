@@ -1,5 +1,53 @@
 # Original participant group snapshots
 
+## Exact imported XML labels (2026-10-24)
+
+Native Testtakers XML now retains the parsed `Group/@label` string through the
+participant/operational parser, roster import and every store. Padded and
+whitespace-only labels remain distinct from absent values. Literal XML attribute
+whitespace follows XML normalization; numeric tab/newline/CR references remain
+those characters, character references decode once, and a quoted `>` no longer
+truncates the enclosing Group. Canonical JSON/CSV parsing and the existing
+canonical display-label normalization retain their contracts.
+
+An explicitly empty native label is retained in the roster but cannot invent a
+group-key label or a successful participant session. Actual Original accepts the
+XML, stores that label as SQL NULL, then fails Login construction with HTTP 500
+before checking the password. The Rewrite returns a typed HTTP 500 for this
+invalid stored metadata, without creating a group/person snapshot; a repaired
+roster permits the next login to capture the exact repaired label. Absolute
+access-window checks still apply. Existing snapshots are immutable and are not
+retroactively reconstructed from a later roster.
+
+[Unchanged production Source run 40038272672](https://github.com/jurei733/testcenter-rewrite/actions/runs/40038272672)
+passes **41 HTTP groups**, retaining all previous 32 controls and adding eight
+raw label vectors plus a monitor-first lifecycle control. Complete public bytes
+and their SHA-bound provenance are in
+[the new fixture manifest](../test-fixtures/original-testcenter/source-workspace-results/group-labels/manifest.json).
+The initial probe's empty-label success assumption failed against actual Source;
+the final probe asserts its observed failure, absence of a frozen bad snapshot
+and subsequent repair. Source is unchanged, test mode is off, actual XSD/upload/
+authentication are used, and owned containers/volumes retire.
+
+Local qualification passes **3,944 unit/frontend checks** and **2,072 PostgreSQL
+checks** with the implementation. The later Source-receipt-only regression also
+passes in the final **143-case** focused command across all four stores and
+protected PostgreSQL HTTP; protected SQLite HTTP is included in the complete
+unit run. Complete protected API suites additionally pass **173 checks each**
+in Memory, File and SQLite. The owned PostgreSQL database is removed and its
+initially stopped cluster is stopped again. This focused process takes
+**6.38 seconds after core build**. CI policy
+passes **264** checks with one explicit GNU-timeout-only macOS skip. Typechecking
+and fresh production build pass; the initial entry remains **468.39 kB** under
+the unchanged 470 kB limit. No schema migration is needed. These checks qualify
+the described label path, not the remaining native pages or complete hosted
+acceptance of the final tree.
+
+The monitor-first control proves that a monitor's successful credential login
+freezes the group label before any participant person exists, even after roster
+replacement. It defines the still-open Rewrite monitor-login requirement; the
+label correction alone does not implement that lifecycle.
+
 The Rewrite persists `OriginalParticipantGroup` separately from participant
 rosters, person sessions and Test runs. This is the data foundation for the
 remaining native Results and Tests pages; those pages remain partial.
@@ -84,8 +132,7 @@ HTTP checks use actual admin bootstrap, roster import and participant sign-in.
 The canonical Results cards and exports still have their existing contracts.
 They do not yet consume this snapshot as a native Original result table. The
 native group clock after selected-Test deletion, whole-group native session and
-snapshot deletion, monitor-login creation, complete Original label preservation
-through the import parser, explicit native workspace grants, individual download
+snapshot deletion, monitor-login creation, explicit native workspace grants, individual download
 routes and paired-page visual proof remain open. Existing canonical group-result
 deletion retains person sessions and is not a substitute for Original's whole-group
 session deletion. No complete group-parity claim follows from this foundation.

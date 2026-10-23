@@ -1,5 +1,23 @@
 # CI iteration and complete acceptance
 
+## Exact timer-preparation result clocks in the console gate (2026-10-24)
+
+Full [run 40037128795](https://github.com/jurei733/testcenter-rewrite/actions/runs/40037128795)
+reaches the complete matrix after successful security and fast-browser gates.
+Its console leaf `120700962068` exposes an outdated full-record expectation:
+an accepted timer interruption changes Test state and therefore advances both
+server-owned Original Test timestamps, exactly to the interruption receipt time.
+The existing assertion expected those newly added fields to remain unchanged.
+
+The full-record check now explicitly expects `hasTestState=true`,
+`lastTestStateAt=acceptedAt` and `lastTestModifiedAt=acceptedAt`, retaining the
+exact preceding opening time and every other field comparison. A separate
+assertion requires real opening evidence. No metadata field is dropped, and no
+application effect, retry, deadline or input changes. The complete headed local
+console journey passes through held continuations, terminal overlaps and final
+reload/early-error cases with owned teardown. Full hosted acceptance for the
+corrected tree remains to be established.
+
 ## Qualified material-bound offline browser runtime (2026-10-24)
 
 The main workflow now selects format 3. It preserves both actual hosted image
