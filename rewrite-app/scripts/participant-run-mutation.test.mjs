@@ -316,7 +316,7 @@ for (const kind of kinds) test(`${kind}: participant runtime transitions, progre
         }));
         if (action === 'return') await assert.rejects(first.participantRuntime.returnToStarter({ testRunId: f.id, currentUnitKey: 'unit', expectedStatus: 'running' }), error => error.errorCode === 'starter_exit_state_changed');
         else { const result = await first.participantRuntime.resumeSession({ participantSessionId: f.id, bookletKey: 'owned' }); assert.equal(result.status, 'paused'); assert.equal(result.pauseSource, 'monitor');
-          expected={...expected,run:{...expected.run,controllerEntry:{active:true,revision:1},originalResultState:{lastOpenedAt:result.originalResultState.lastOpenedAt},stateRevision:expected.run.stateRevision+1}}; }
+          expected={...expected,run:{...expected.run,controllerEntry:{active:true,revision:1},originalResultState:{lastOpenedAt:result.originalResultState.lastOpenedAt,lastTestModifiedAt:result.originalResultState.lastOpenedAt},stateRevision:expected.run.stateRevision+1}}; }
         assert.deepEqual(await snapshot(f), expected);
       }
     });

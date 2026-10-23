@@ -44,7 +44,7 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
   await t.test('activation changes parent status and entry evidence, is idempotent and returns detached current fields',async()=>{
    await reset({participantCode:'owned new code',groupKey:'owned changed group'});const before=await snapshot();
    const result=await repository.activateParticipantController(input);assert.equal(result.activated,true);
-   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:1},originalResultState:{lastOpenedAt:timestamp},stateRevision:1});
+   assert.deepEqual(result.participantSession,{...before.session,status:'launched'});assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:1},originalResultState:{lastOpenedAt:timestamp,lastTestModifiedAt:timestamp},stateRevision:1});
    result.participantSession.groupKey='caller mutation';
    const retry=await repository.activateParticipantController(input);assert.equal(retry.activated,false);assert.equal(retry.participantSession.groupKey,before.session.groupKey);
    if(kind!=='memory')assert.deepEqual(await (await create()).getParticipantSessionById(key),retry.participantSession);
@@ -55,7 +55,7 @@ for(const kind of kinds) test(`${kind}: activate a controller against its curren
    await repository.saveTestRun(sibling);const before=await snapshot();
    const result=await repository.activateParticipantController(input);assert.equal(result.entryChanged,true);assert.equal(result.activated,false);
    assert.deepEqual(result.testRun.controllerEntry,{active:true,revision:4});
-   assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:4},originalResultState:{lastOpenedAt:timestamp},stateRevision:(before.run.stateRevision??0)+1});
+   assert.deepEqual((await snapshot()).run,{...before.run,controllerEntry:{active:true,revision:4},originalResultState:{lastOpenedAt:timestamp,lastTestModifiedAt:timestamp},stateRevision:(before.run.stateRevision??0)+1});
    assert.deepEqual(await repository.getTestRunById(sibling.testRunId),sibling);
    result.testRun.controllerEntry.revision=900;
    const retry=await repository.activateParticipantController(input);assert.equal(retry.entryChanged,false);assert.deepEqual(retry.testRun.controllerEntry,{active:true,revision:4});

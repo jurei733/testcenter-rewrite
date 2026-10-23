@@ -1137,6 +1137,8 @@ export type ParticipantProgressDelivery = {
 export type OriginalTestResultState = {
   lastOpenedAt?: string | null;
   lastTestStateAt?: string | null;
+  /** Source tests.timestamp_server also advances on lock/open without nonempty state. */
+  lastTestModifiedAt?: string | null;
   hasTestState?: boolean;
 };
 
@@ -1438,6 +1440,7 @@ export type ParticipantRunCommandEffect = {
   /** Server timestamps only; never taken from a participant packet's clock. */
   originalResultOpenedAt?: string;
   originalResultTestStateAt?: string;
+  originalResultModifiedAt?: string;
   testLogs: ParticipantTestLog[];
   activityEvents: WorkspaceActivityEvent[];
   participantSession?: ParticipantSession;

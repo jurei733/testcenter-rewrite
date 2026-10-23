@@ -1,5 +1,20 @@
 # Optional Original UI
 
+### Test-row clock and saved Test state stay distinct (2026-10-23)
+
+Actual unmodified production Source Oracle 40018466023 passes 29 HTTP groups,
+including monitor lock/relock/unlock on an empty Test. These operations move the
+Test-row result time without adding nonempty Test state or Unit rows; Unit-only
+state/log writes do not move it. The additional pinned public receipt and reports
+are in `test-fixtures/original-testcenter/source-workspace-results/lock-clock`.
+The Rewrite's optional metadata now records the general Test-row clock separately
+from saved-state evidence, across all four stores and atomic command/mutation
+paths. Source result-group time uses Unix seconds; response-part client timestamps
+use milliseconds. Native Results/Tests projections, selected-Test deletion, four
+native downloads and all eight broad visual comparisons remain incomplete. The
+formal ledger remains **27 done / 22 partial**.
+
+
 ### Qualified Original result lifecycle (2026-10-23)
 
 [Source run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342)

@@ -23306,9 +23306,11 @@ try {
     "A cohort go-to must resolve the selected block to each run's own first visible unit."
   );
   await page.unroute(monitorBatchCommandsRoute);
-  if (await page.locator("#clearMonitorBatchSelectionButton").isEnabled()) {
-    await page.locator("#clearMonitorBatchSelectionButton").click();
-  }
+  // Successful batch commands remove their accepted runs asynchronously. Assert
+  // that postcondition instead of racing a redundant Clear Selection click.
+  await page.locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" }).waitFor();
+  assert.equal(await page.locator("#clearMonitorBatchSelectionButton").isDisabled(), true);
   while (monitorSpeciesRouteOperations.size > 0) {
     await Promise.all([...monitorSpeciesRouteOperations]);
   }
