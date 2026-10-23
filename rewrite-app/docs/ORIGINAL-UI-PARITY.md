@@ -1,5 +1,44 @@
 # Optional Original UI
 
+### Actual Original workspace backend Oracle (2026-10-23)
+
+[Run 39988533872](https://github.com/jurei733/testcenter-rewrite/actions/runs/39988533872)
+builds the unmodified pinned Original `eedae41840cbe90e5547c0211da818bdf620f5aa`
+with its own production Dockerfile, initializes an owned PostgreSQL/Redis/data
+volume and exercises the real Apache HTTP entrypoint. Test mode is disabled;
+real administrator sign-in, workspace grants and self-service password changes
+establish the accounts. No Source production file or permission middleware is
+patched. Docker resources are retired at the end.
+
+All nine bounded groups pass: actual readiness/version, explicit workspace
+membership even for Superadmins, real RO/RW access and foreign-scope rejection,
+XSD-validated multipart Syscheck upload, complete multi-Check CSV/JSON export,
+version-aware statistics, rejected RO deletion, exact selected RW deletion and
+revocation against an existing signed-in token. The Source exports all **505**
+reports when unfiltered and **504** when two Checks are selected, confirming the
+truncation/selection correction in the Rewrite. CSV keeps its BOM and omits the
+unselected Check's column. Source filesystem enumeration order is observed;
+this is not a cross-system byte/order-equivalence proof.
+
+The independently downloaded public receipt artifact `12516367594` has ZIP
+SHA256 `924d20ce71f00413be8eb1a29ed4ae5d0b7d44e4555dc00c2102fe492d6cf497`.
+It records Source version 19.0.0 and image
+`sha256:a8cc9c5a6a2c151fc188bc5e9e50d23cca524928ab46b8c1ecdd4faf6ab60bce`.
+The PHP 8.3.36/extension inventory is informational CLI metadata from that image;
+the behavior above is tested over Apache HTTP. Receipts contain no raw tokens,
+passwords, report payloads or private save-key bytes.
+
+This establishes a bounded executable Source baseline, not full backend
+permission equivalence. Source requires an explicit workspace grant even for a
+Superadmin and uses 404 for an unassigned workspace. The Rewrite's canonical
+platform administrator still has inherited workspace access; a native Source
+permission projection requires its own implementation/qualification. Source
+statistics concatenate OS/browser names with their versions; the current Rewrite
+statistics need that native projection. Source raw JSON also retains a submitted
+save-key field; the Rewrite's private-key boundary remains intact. These observed
+differences and full four-tab/report/results/Test-Session deletion pages remain
+open. No broad visual or backend row closes.
+
 ### Current workspace files and stable participant tests (2026-10-23)
 
 Native uploads now make ready Booklets and Syschecks available without an

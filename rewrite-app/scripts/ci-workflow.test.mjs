@@ -109,6 +109,13 @@ test('workspace file catalog HTTP authorization and projection qualify in unit a
   assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
   assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
 });
+test('complete selected Systemcheck exports qualify in unit and real PostgreSQL groups',()=>{
+ const suite='scripts/system-check-report-selection.test.mjs';
+ assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
+ assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+ assert.equal(scripts['test:system-check-reports'],'npm run build:core && npm run test:system-check-reports:built');
+ assert.equal(scripts['test:system-check-reports:built'],'node --test '+suite);
+});
 test('live Source files and their atomic first publication qualify in local and real PostgreSQL gates',()=>{
  for(const suite of ['scripts/workspace-file-publication.test.mjs','scripts/workspace-file-live-runtime.test.mjs']){
   assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
@@ -345,7 +352,7 @@ test("administration reference requires real browser paint and layout negative c
   assert.equal(control.if, "matrix.family == 'administration' || matrix.family == 'directory'");
   assert.equal(control.run, "xvfb-run --auto-servernum npm run test:browser-capture:built");
   assert.equal(control.env.UI_SMOKE_ARTIFACT_DIR, "${{ runner.temp }}/original-captures");
-  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs");
+  assert.equal(scripts["test:browser-capture:built"], "node --test --test-concurrency=1 scripts/stable-viewport-capture.test.mjs scripts/original-sample-diagnostics.test.mjs scripts/finite-animation-ready.test.mjs");
 });
 test("isolated console shards retain each of the eight prior checks without a long serial prefix", () => {
   const names=["ui-controller-timer","ui-console-debug","ui-participant-console","ui-participant-command-completion","ui-participant-native-routes"];
@@ -398,6 +405,13 @@ test('Compose JSON readiness keeps its absolute request/body deadline and real s
   assert.ok(source.includes('const pollJson = url => pollSmokeJson(url, {fetcher: fetch,'));
   assert.ok(source.includes("console.log('compose_json_phase='+JSON.stringify(phase))"));
   assert.ok(scripts['test:ci-policy'].split(/\s+/).includes('scripts/poll-smoke-json.test.mjs'));
+});
+test('settings wait for current finite effects and keep actual Chromium cancellation and failure controls mandatory',()=>{
+ const source=read('./original-application-settings-smoke.mjs');
+ assert.ok(source.includes('await waitForFiniteDocumentAnimations(page)'));
+ assert.ok(!source.includes('.map(a=>a.finished)'));
+ assert.ok(scripts['test:browser-capture:built'].split(/\s+/).includes('scripts/finite-animation-ready.test.mjs'));
+ assert.ok(workflow.jobs['browser-system-qualification'].steps.some(step=>step.run==='xvfb-run --auto-servernum npm run test:browser-capture:built'));
 });
 test('the Original sample retains scoped input/message/save evidence without widening credential or store uploads',()=>{
   const step=workflow.jobs['verify-memory-sqlite'].steps.find(step=>step.name==='Retain Original sample transport diagnostics');

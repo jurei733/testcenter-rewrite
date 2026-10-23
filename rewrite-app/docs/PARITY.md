@@ -1,5 +1,39 @@
 # Testcenter parity checklist
 
+### Complete selected Systemcheck report exports (2026-10-23)
+
+The next native workspace pages need Source's multi-Check report download.
+The preceding implementation exports only the list's default 100 reports and
+ignores additional selected Check IDs. A stored 505-report regression reproduces
+both errors before the correction. CSV and JSON exports now read every selected
+record without injecting a list page; an explicit limit still applies after
+selection. Ordinary lists retain their default 100 and explicit 1–500 bounds.
+
+Repeated HTTP `checkId` parameters form a deduplicated, case-insensitive union
+across CSV, JSON, negotiated exports, lists and statistics. At the application
+port, an omitted `checkIds` means all permitted workspace reports, while an
+explicit empty array means none. Malformed selectors fail; all-blank repeated
+HTTP selections return 400 instead of broadening to all reports. The historical
+single blank query remains an omitted filter. Unselected reports cannot add
+private columns to a selected CSV.
+
+Qualification passes **3,836 unit/frontend cases** (121 / 324 / 1,361 / 2,030),
+**173 complete API integrations each in Memory, File and SQLite**, and the full
+**1,949-case PostgreSQL group**, without failures/skips/cancellations. New
+all-store cases include 505 stored reports, 504 selected reports, duplicate and
+empty selections, post-filter limits, exact stored-data preservation and durable
+reopen. Protected HTTP additionally covers negotiated formats, RO export,
+unauthenticated rejection, foreign-workspace denial and rejected RO deletion.
+Owned PostgreSQL schemas/cluster are retired. Build/typecheck pass; production
+entry remains **468.39 kB** under the unchanged 470 kB budget. Focused iteration
+uses `npm run test:system-check-reports`, with a fresh core build.
+
+This supplies the report-export prerequisite for the native workspace pages;
+it does not implement the other three pages, full four-tab navigation or selected
+Test-Session deletion. The separate actual Source HTTP Oracle and animation
+qualification are detailed at the top of `CI.md` and `ORIGINAL-UI-PARITY.md`.
+Formal status remains **29 done / 20 partial; all eight broad visual rows open**.
+
 ### Additional Booklet monitor details before start (2026-10-23)
 
 The monitor summary already counts every assigned Booklet, but its detail lookup

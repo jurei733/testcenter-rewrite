@@ -3889,6 +3889,22 @@ const decodeRouteGroup = (value: string | undefined): string | null =>
 const readOptionalQueryValue = (url: URL, key: string): string | undefined =>
   url.searchParams.get(key)?.trim() || undefined;
 
+const parseSystemCheckReportQuery = (
+  url: URL,
+  response: ServerResponse
+): { ok: true; checkId?: string; checkIds?: string[] } | { ok: false } => {
+  const supplied = url.searchParams.getAll("checkId");
+  const checkIds = [...new Set(supplied.map(value => value.trim()).filter(Boolean))];
+  // Preserve the historical single blank filter, but never let an explicit
+  // multi-selection of blank IDs turn into a workspace-wide export.
+  if (supplied.length > 1 && checkIds.length === 0) {
+    sendError(response, 400, "system_check_report_check_ids_invalid",
+      "A selected system-check filter must contain a nonempty check ID.");
+    return { ok: false };
+  }
+  return checkIds.length > 1 ? { ok: true, checkIds } : { ok: true, checkId: checkIds[0] };
+};
+
 const parseGroupKeyQuery = (
   url: URL,
   response: ServerResponse
@@ -8462,7 +8478,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const selectedChecks = parseSystemCheckReportQuery(url, response);
+        if (!selectedChecks.ok) return;
         const limitValue = url.searchParams.get("limit")?.trim();
         const limit = limitValue ? Number.parseInt(limitValue, 10) : undefined;
         if (
@@ -8484,7 +8501,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             await services.workspaceAdminRead.exportSystemCheckReportsCsv({
               tenantKey,
               workspaceKey,
-              checkId,
+              checkId: selectedChecks.checkId,
+              checkIds: selectedChecks.checkIds,
               limit
             });
           sendCsv(
@@ -8500,7 +8518,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             await services.workspaceAdminRead.exportSystemCheckReportsJson({
               tenantKey,
               workspaceKey,
-              checkId,
+              checkId: selectedChecks.checkId,
+              checkIds: selectedChecks.checkIds,
               limit
             });
           sendAsset(
@@ -8521,7 +8540,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await services.workspaceAdminRead.listSystemCheckReports({
             tenantKey,
             workspaceKey,
-            checkId,
+            checkId: selectedChecks.checkId,
+            checkIds: selectedChecks.checkIds,
             limit
           });
         sendJson<ListSystemCheckReportsResponse>(response, 200, { items });
@@ -8544,12 +8564,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const selectedChecks = parseSystemCheckReportQuery(url, response);
+        if (!selectedChecks.ok) return;
         const items =
           await services.workspaceAdminRead.getSystemCheckReportStatistics({
             tenantKey,
             workspaceKey,
-            checkId
+            checkId: selectedChecks.checkId,
+            checkIds: selectedChecks.checkIds
           });
         sendJson<GetSystemCheckReportStatisticsResponse>(response, 200, { items });
         return;
