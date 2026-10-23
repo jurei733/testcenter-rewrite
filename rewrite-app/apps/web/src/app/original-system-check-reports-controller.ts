@@ -4,6 +4,7 @@ import type {SystemCheckReportStatistics,WorkspaceOverview} from '@testcenter-re
 import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from './original-workspace-files-controller';
 
 type Owner={epoch:number;token:string;tenantKey:string;workspaceKey:string};
+type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'>;
 const errorText=(error:unknown):string=>error && typeof error==='object' && 'message' in error && typeof error.message==='string'
  ? error.message : 'Die Berichte konnten nicht verarbeitet werden.';
 
@@ -20,7 +21,7 @@ export class OriginalSystemCheckReportsController {
  private owner:Owner|null=null;
  private destroyed=false;
  constructor(private readonly transport:OriginalWorkspaceFilesTransport,
-  private readonly current:()=>OriginalWorkspaceFilesScope,private readonly changed:()=>void){}
+  private readonly current:()=>Scope,private readonly changed:()=>void){}
  private owns(owner:Owner):boolean {
   const scope=this.current();return !this.destroyed && this.owner===owner && this.epoch===owner.epoch &&
    !!owner.token && owner.token===scope.token && owner.tenantKey===scope.tenantKey && owner.workspaceKey===scope.workspaceKey;
@@ -30,13 +31,6 @@ export class OriginalSystemCheckReportsController {
   if(!this.owns(owner))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');
   const result=await this.transport<T>(method,this.path(owner,route),body,owner.token);
   if(!this.owns(owner))throw Error('Die Anmeldung oder der Arbeitsbereich hat sich geändert.');return result;
- }
- get canWrite():boolean {
-  if(!this.owner || !this.owns(this.owner) || !this.overview)return false;
-  const {tenant,workspace}=this.overview;
-  return this.current().roles.some(role=>role.role==='platform_admin' ||
-   role.role==='tenant_admin' && role.tenantId===tenant.tenantId ||
-   role.role==='workspace_admin' && role.tenantId===tenant.tenantId && role.workspaceId===workspace.workspaceId && role.accessMode==='read_write');
  }
  get allSelected():boolean {return this.rows.length>0 && this.selected.size===this.rows.length;}
  check(id:string,checked:boolean):void {
@@ -83,28 +77,31 @@ export class OriginalSystemCheckReportsController {
   finally{if(this.owns(owner)){this.busy=false;this.changed();}}
  }
  captureDeletion():{ids:string[];current:()=>boolean;confirm:()=>Promise<boolean>}|null {
-  const owner=this.owner;if(!owner || !this.owns(owner) || !this.canWrite || this.busy)return null;
+  const owner=this.owner;if(!owner || !this.owns(owner) || !this.overview || this.busy)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   let used=false;
   return {ids:[...ids],current:()=>this.owns(owner),confirm:async()=>{
-   if(used || !this.owns(owner) || !this.canWrite || this.busy)return false;used=true;
-   this.busy=true;this.problem='';this.notice='';this.changed();let deleted=0,completed=false;
+   if(used || !this.owns(owner) || this.busy)return false;used=true;
+   this.busy=true;this.problem='';this.notice='';this.changed();let deleted=0,accepted=0,completed=false;
    try{
     // The protected API accepts at most 100 Check IDs per request. Capture all
     // selected IDs once and retain their exact owner across every batch.
     for(let offset=0;offset<ids.length;offset+=100){
-     if(!this.owns(owner) || !this.canWrite)throw Error('Die Berechtigung zum Löschen hat sich geändert.');
+     // Source offers this confirmation to every authorized report reader.
+     // The protected API decides each write, including RO/revoked grants.
      const result=await this.request<DeleteSystemCheckReportsResponse>(owner,'DELETE',productionApiRoutes.workspace.deleteSystemCheckReports,
       {checkIds:ids.slice(offset,offset+100),confirmation:owner.workspaceKey});
-     deleted+=result.deletion.deletedCount;
+     accepted++;deleted+=result.deletion.deletedCount;
     }
     completed=true;
    }catch(error){if(this.owns(owner))this.problem=errorText(error);}
    finally{
     if(this.owns(owner)){
-     if(deleted || completed)this.notice=`${deleted} Berichte erfolgreich gelöscht.`;
-     this.rows=[];this.selected=new Set();this.changed();
-     try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=this.problem || errorText(error);}
+     if(accepted || completed){
+      this.notice=`${deleted} Berichte erfolgreich gelöscht.`;
+      this.rows=[];this.selected=new Set();this.changed();
+      try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=this.problem || errorText(error);}
+     }
      if(this.owns(owner)){this.busy=false;this.changed();}
     }
    }

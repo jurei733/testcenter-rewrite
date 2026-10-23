@@ -32,9 +32,13 @@ journeys, native uploads/downloads/deletion and file-bundle recovery still pass.
 Two more Original pages are missing: **Ergebnisse/Antworten** and **Tests
 löschen**. No unimplemented tabs are exposed. The full four-tab geometry,
 responsive header/table pixels, submitted/error/pending states, and native
-Source permission projection remain open. In particular, disabled RO deletion
-is an intentional UI restriction on the existing protected API; it is not proof
-of identical Source button state. All eight broad visual rows remain open.
+Source permission projection remain open. The earlier RO-disabled report button
+was a temporary fidelity gap: Source enables it for any selection. The correction
+now offers the same confirmation and lets the unchanged protected API reject RO
+with 403. The actual browser verifies all 505 stored reports and workspace audit
+records are unchanged, and both selected Checks remain available for export.
+This does not establish identical Source error rendering or paired pixels. All
+eight broad visual rows remain open.
 
 ### Actual Original workspace backend Oracle (2026-10-23)
 

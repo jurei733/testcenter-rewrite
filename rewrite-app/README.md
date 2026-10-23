@@ -3,7 +3,9 @@
 The Original workspace now exposes the implemented **Dateien** and
 **Systemcheck Berichte** tabs. Reports show complete counts and OS/browser
 versions, select multiple Checks, download their complete CSV, and confirm
-selected deletion. Read-only users can export but cannot delete. Requests,
+selected deletion. Following the Original, read-only users can open the same
+confirmation; the protected API rejects deletion with 403 and preserves the
+report table/selection for export. Requests,
 confirmations and downloads belong to the exact signed-in workspace; changing
 tabs drops report selection. `?tab=syscheck` restores the report tab on reload.
 The two other Original tabs, results/answers and individual test deletion, are

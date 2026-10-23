@@ -119,7 +119,18 @@ try{
  const readonly=await browser.newContext({viewport:{width:1280,height:844}});let release;
  try{
   page=await open(readonly,'owned-reports-reader');await select(page,'Alpha Ω');await select(page,'Beta');
-  assert.equal(await page.locator('[data-cy="delete-systemcheck-reports"]').isDisabled(),true);
+  assert.equal(await page.locator('[data-cy="delete-systemcheck-reports"]').isEnabled(),true);
+  await page.screenshot({path:join(artifacts,'readonly-selected.png'),fullPage:true});
+  const beforeReports=await api(scope+'/exports/system-check-reports.json'),beforeAudit=await api(scope+'/activity-events?limit=500');
+  const refused=page.waitForResponse(response=>response.url()===base+scope+'/system-check-reports' && response.request().method()==='DELETE');
+  await page.locator('[data-cy="delete-systemcheck-reports"]').click();await waitForMaterialDialog(page);
+  await page.locator('[data-cy="dialog-content"]').getByText('Es werden alle Berichte für diese 2 Systemchecks gelöscht. Fortsetzen?',{exact:true}).waitFor();
+  await page.locator('[data-cy="dialog-confirm"]').click();const refusal=await refused;
+  assert.equal(refusal.status(),403);await surface(page).waitFor();await page.locator('#originalSystemCheckReports [role="alert"]').waitFor();
+  assert.equal(await page.locator('mat-row').count(),3);assert.equal(await page.locator('[data-cy="systemcheck-checkbox"] input:checked').count(),2);
+  assert.deepEqual(await api(scope+'/exports/system-check-reports.json'),beforeReports);
+  assert.deepEqual(await api(scope+'/activity-events?limit=500'),beforeAudit);
+  await page.screenshot({path:join(artifacts,'readonly-refused.png'),fullPage:true});
   const downloaded=page.waitForEvent('download');await page.locator('[data-cy="download-button"]').click();const download=await downloaded;
   const file=join(artifacts,'readonly.csv');await download.saveAs(file);assert.deepEqual(await readFile(file),expected);
   const ro=(await api('/api/v1/admin/auth/sign-in',{username:'owned-reports-reader',password:'Changed-native-reports-9!'})).sessionToken;

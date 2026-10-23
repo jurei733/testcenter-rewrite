@@ -15,20 +15,27 @@ This matches the previously executed production Apache Source Oracle's versions.
 
 Selection, downloads and single-use deletion confirmations own the exact login
 and workspace. Logout, scope replacement and component destruction reject late
-data/downloads. Revoked write permission blocks subsequent deletion requests.
+data/downloads. The protected API authorizes every deletion batch; a refusal
+stops subsequent batches.
 More than 100 selected Checks use bounded requests with captured IDs; a failed
 batch stops subsequent writes, retains confirmed counts, and reloads real server
-statistics. Read-only users can export; deletion is disabled and the protected
-HTTP API independently refuses it. Tab changes discard selection. Report code
+statistics. Matching the actual Source template, read-only users can open the
+same selected-Check confirmation. Its protected DELETE returns 403, preserving
+all report rows, selected IDs and workspace audit records. A rejected first
+request does not refetch/clear the unchanged table; users can still export it.
+Tab changes discard selection. Report code
 is deferred and has an explicit missing-bundle error/reload state.
 
-Local qualification: **3,854 unit/frontend cases** (121 / 324 / 1,361 / 2,048),
+Local qualification: **3,855 unit/frontend cases** (121 / 324 / 1,361 / 2,049),
 **173 complete API integrations each for Memory/File/SQLite**, and **1,950
 complete PostgreSQL cases**, all without failures/skips/cancellations. The
 focused suite has **25** cases, including exact version labels and missing-field
-separators in all stores and authenticated HTTP. Fifteen controller cases
-exercise ownership, RO scope, failure/retry, exact CSV bytes, 205-Check deletion
-and partial failure. Typecheck and production pass; entry remains **468.39 kB**
+separators in all stores and authenticated HTTP. Sixteen controller cases
+exercise ownership, authoritative RO/revoked-grant denial, failure/retry, exact
+CSV bytes, 205-Check deletion, partial failure and concurrent zero-count writes.
+The final frontend/selection group and complete report/Verona/native-navigation
+journeys qualify this frontend-only correction; unchanged core/API/PostgreSQL
+results are retained, rather than implying they were rerun for a template change. Typecheck and production pass; entry remains **468.39 kB**
 under the unchanged 470 kB limit. Owned PostgreSQL schema/cluster are retired.
 Full old native file and new report browser journeys pass independently.
 

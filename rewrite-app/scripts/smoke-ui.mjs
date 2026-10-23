@@ -16106,6 +16106,17 @@ try {
             }
           });
           window.ownedSharedParameterClicks = [];
+          window.ownedSharedParameterInputs = [];
+          for (const type of ["pointerdown", "pointerup", "pointercancel", "click"]) {
+            document.addEventListener(type, event => {
+              if (window.ownedSharedParameterInputs.length < 32) {
+                window.ownedSharedParameterInputs.push({
+                  type, trusted: event.isTrusted, target: event.target?.id ?? "",
+                  definition: activeDefinition, time: performance.now()
+                });
+              }
+            }, true);
+          }
           document.querySelector("#sharedParameterPublish").addEventListener("click", event => {
             window.ownedSharedParameterClicks.push({trusted:event.isTrusted,definition:activeDefinition});
             const firstUnit = activeDefinition === "publish-blue";
@@ -16292,8 +16303,15 @@ try {
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
     const button=sharedParameterFrame.locator("#sharedParameterPublish");
     await button.click();
-    const witness=await button.evaluate(element=>element.ownerDocument.defaultView.ownedSharedParameterClicks);
-    assert.equal(witness.filter(event=>event.definition===definition).length,1,"Publish must receive exactly one actual native click in the current Player.");
+    const snapshot=await button.evaluate(element=>({
+      clicks:element.ownerDocument.defaultView.ownedSharedParameterClicks,
+      inputs:element.ownerDocument.defaultView.ownedSharedParameterInputs,
+      definition:element.ownerDocument.querySelector("#sharedParameterDefinition")?.textContent,
+      frameTimeOrigin:element.ownerDocument.defaultView.performance.timeOrigin
+    }));
+    const witness=snapshot.clicks;
+    assert.equal(witness.filter(event=>event.definition===definition).length,1,
+      "Publish must receive exactly one actual native click in the current Player. Native input snapshot: "+JSON.stringify(snapshot));
     assert.deepEqual(witness.at(-1),{trusted:true,definition});
     console.log(`shared_parameter_native_input=${definition}:trusted-once`);
   };

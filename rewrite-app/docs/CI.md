@@ -1,5 +1,47 @@
 # CI iteration and complete acceptance
 
+## Source report denial and native input diagnostics (2026-10-23)
+
+The native Syscheck report button now follows the actual Source template for
+RO readers too: selection enables confirmation, and the protected API refuses
+the confirmed request with 403. No backend permission check changes. The browser
+proves exact preservation of all 505 reports, selected Check IDs and workspace
+audit records, then exports the same complete 504-report CSV. A first rejected
+request retains the unchanged table; an accepted batch followed by refusal
+reloads actual results, including a zero-count concurrent deletion.
+
+The final frontend/state plus selection/statistics/HTTP group passes **2,049
+cases**, including **16 controller cases**; policy passes **234** with its one
+explicit Linux-only GNU-timeout skip on macOS. A fresh Angular production build
+and the entire report journey pass. Unchanged core/API/store qualification from
+the preceding native report publication remains valid for those unchanged files.
+
+The complete original Verona prefix also passes separately on Linux in
+[run 39995283724](https://github.com/jurei733/testcenter-rewrite/actions/runs/39995283724).
+Its source stays SHA256-bound to
+`3e7013202716cb0dee80a6f69578fd3b1cf557a5a3abb674dd8a866949178cf2`;
+all assertions/full prefix/stop boundary remain, and the owned diagnostic copy
+is retired. Independently downloaded artifact `12519677848` verifies ZIP SHA256
+`ed2fa4ca7df7fe768a27e6e8aaa049d3890805047e3af3e058e6ba620d8f94af`.
+It contains package/browser setup, complete native input log and original sample
+trace. Both Publish actions have exactly one trusted click; persisted/reloaded
+shared parameters and the requested native-player stop boundary pass.
+
+The preceding full probe `39994173184` times out in direct APT installation
+before starting the browser. The corrected probe uses the already-verified
+browser package producer and its established HTTPS mirror preference. Setup
+logs are retained from before browser startup. It does not relax package
+signatures, alter the test deadline or substitute a mocked runtime.
+
+These successful runs do **not** explain or fix the earlier full-flow missing
+click in `39990402820`. Regular smoke now passively records at most 32 native
+pointer/click events inside its owned shared-parameter fixture. The existing
+single post-click evaluation includes the current definition, frame time origin
+and event snapshot if the strict one-trusted-click assertion fails. No extra
+pre-click await, synthetic input, second click, retry, deadline increase or
+qualifying assertion is introduced/removed. The actual complete local Verona
+and subsequent eight native navigation cases exercise this diagnostic change.
+
 ## Native report qualification and open Verona input failure (2026-10-23)
 
 `smoke:ui:original-workspace-files:built` now runs the complete existing file
