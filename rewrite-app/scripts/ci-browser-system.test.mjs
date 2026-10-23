@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp,rm,writeFile,symlink,mkdir} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,writeFile,symlink,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import test from 'node:test';
-import {commandFailure,lockedBrowserDependencies,nativeContext,parseInventory,validateManifest,verifyArtifact} from './ci-browser-system.mjs';
+import {commandFailure,lockedBrowserDependencies,nativeContext,parseInventory,stageAptCache,validateManifest,verifyArtifact} from './ci-browser-system.mjs';
 
 const hash=body=>createHash('sha256').update(body).digest('hex');
 test('package-manager status remains fatal without exposing raw configuration or credential-bearing errors',()=>{
@@ -21,8 +21,8 @@ const fixture=()=>{
   const context={commit:'a'.repeat(40),runId:'123',runAttempt:'1',imageOS:'ubuntu24',imageVersion:'20261019.1.0',
     lockSha256:'b'.repeat(64),nativeDepsSha256:'c'.repeat(64),nodeMajor:'22',platform:'linux',arch:'x64',requested:['libbase','owned-font']};
   const before=rows('libbase\t1.0\tamd64\tii ');
-  const entry={file:sha256+'.deb',bytes:bytes.length,sha256,name:'owned-font',version:'2:1.9+dfsg-1',arch:'all'};
-  return {bytes,context,before,entry,manifest:{version:1,context:structuredClone(context),beforeInventory:before,fontInventorySha256:'d'.repeat(64),
+  const entry={file:sha256+'.deb',cacheFileName:'owned-font_2%3a1.9+dfsg-1_all.deb',bytes:bytes.length,sha256,name:'owned-font',version:'2:1.9+dfsg-1',arch:'all'};
+  return {bytes,context,before,entry,manifest:{version:2,context:structuredClone(context),beforeInventory:before,fontInventorySha256:'d'.repeat(64),
     afterInventory:rows('libbase\t1.0\tamd64\tii ','owned-font\t2:1.9+dfsg-1\tall\tii '),packages:[entry]}};
 };
 test('the browser dependency list comes from this lockfile installation and contains no command arguments',()=>{
@@ -49,15 +49,18 @@ test('empty snapshots are valid only when every requested package was already in
 test('an already installed package upgrade must have its exact matching authenticated artifact',()=>{
   const f=fixture();f.manifest.afterInventory=rows('libbase\t1.1\tamd64\tii ','owned-font\t2:1.9+dfsg-1\tall\tii ');
   assert.throws(()=>validateManifest(f.manifest,f.context,f.before),/unrepresented/);
-  f.manifest.packages.push({...f.entry,name:'libbase',version:'1.1',arch:'amd64',file:'d'.repeat(64)+'.deb',sha256:'d'.repeat(64)});
+  f.manifest.packages.push({...f.entry,name:'libbase',version:'1.1',arch:'amd64',cacheFileName:'libbase_1.1_amd64.deb',file:'d'.repeat(64)+'.deb',sha256:'d'.repeat(64)});
   assert.equal(validateManifest(f.manifest,f.context,f.before).files.length,2);
 });
 const invalid=[
-  ['version',f=>{f.manifest.version=2;}],
+  ['version',f=>{f.manifest.version=1;}],
   ['font inventory',f=>{f.manifest.fontInventorySha256='invalid';}],
   ['stale base',f=>{f.before=rows('libbase\t1.1\tamd64\tii ');}],
   ['package path',f=>{f.manifest.packages[0].file='../owned.deb';}],
   ['absolute package path',f=>{f.manifest.packages[0].file='/owned.deb';}],
+  ['APT cache traversal',f=>{f.manifest.packages[0].cacheFileName='../owned.deb';}],
+  ['APT cache absolute path',f=>{f.manifest.packages[0].cacheFileName='/owned.deb';}],
+  ['APT cache duplicate',f=>{f.manifest.packages.push({...f.entry,name:'another',file:'e'.repeat(64)+'.deb',sha256:'e'.repeat(64)});}],
   ['bad digest',f=>{f.manifest.packages[0].sha256='x'.repeat(64);}],
   ['duplicate filename',f=>{f.manifest.packages.push({...f.entry,name:'different'});}],
   ['duplicate identity',f=>{f.manifest.packages.push({...f.entry,file:'d'.repeat(64)+'.deb',sha256:'d'.repeat(64)});}],
@@ -95,6 +98,23 @@ test('every exact package byte and Debian identity is verified before returning 
     await assert.rejects(verifyArtifact(directory,f.context,f.before,()=>({...f.entry,name:'foreign'})),/metadata mismatch/);
     await writeFile(join(directory,f.entry.file),Buffer.alloc(f.bytes.length));
     await assert.rejects(verifyArtifact(directory,f.context,f.before,()=>assert.fail('Corrupt bytes must fail before metadata inspection.')),/digest\/size mismatch/);
+  });
+});
+test('the private APT cache uses the actual producer filename and retains verified bytes without another download',async()=>{
+  await withArtifact(async(f,directory)=>{
+    const verified=await verifyArtifact(directory,f.context,f.before,()=>f.entry),cache=join(directory,'owned-cache');await mkdir(cache);
+    await stageAptCache(verified,cache);
+    assert.deepEqual(await readFile(join(cache,'owned-font_2%3a1.9+dfsg-1_all.deb')),f.bytes);
+    await assert.rejects(stageAptCache(verified,cache),/new empty directory/);
+    assert.deepEqual(await readFile(join(cache,f.entry.cacheFileName)),f.bytes);
+  });
+});
+test('cache staging detects changed source bytes and never follows a linked cache directory',async()=>{
+  await withArtifact(async(f,directory)=>{
+    const verified=await verifyArtifact(directory,f.context,f.before,()=>f.entry),cache=join(directory,'owned-cache'),link=join(directory,'linked-cache');await mkdir(cache);
+    await symlink(cache,link);await assert.rejects(stageAptCache(verified,link),/new empty directory/);
+    await writeFile(join(directory,f.entry.file),Buffer.alloc(f.bytes.length));
+    await assert.rejects(stageAptCache(verified,cache),/Staged APT cache digest\/size mismatch/);
   });
 });
 for(const target of ['package','manifest','directory'])test('symlinks are rejected before package inspection: '+target,async()=>{
