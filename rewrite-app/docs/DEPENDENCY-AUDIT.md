@@ -28,8 +28,18 @@ the removed `npm ci` takes **8.48 seconds**, after approximately **2.9 seconds**
 npm cache lookup/download/extraction. The new owned lockfile-only controls take
 **0.62 seconds** with the vulnerable lock and **0.52 seconds** with the patched
 lock. This compares different environments and isolates work eliminated; it is
-not a measured total hosted-job speedup. The next hosted run must qualify the
-actual revised job.
+not a measured total hosted-job speedup. The isolated hosted qualification below executes the actual revised job.
+
+
+[Isolated Linux run 40027715625](https://github.com/jurei733/testcenter-rewrite/actions/runs/40027715625)
+now passes the exact revised dependency job copied from the main workflow. Its
+actual Node/npm versions are **22.23.3 / 10.9.9**. The audit reports **zero
+vulnerabilities** in approximately **0.91 seconds**; the entire observed job takes
+**nine seconds**, compared with **21 seconds** for the failing predecessor job.
+These are individual hosted observations, including distinct runner allocation
+and dependency findings, not a guaranteed percentage reduction for future jobs.
+No npm cache or application installation occurs. This qualifies the revised audit
+job only; the full new-head pipeline still has to pass independently.
 
 ## Targeted security patch, 2026-10-23
 

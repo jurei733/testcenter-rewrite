@@ -9,8 +9,11 @@ restoration and package installation. Owned temporary-workspace controls with no
 `NODE_ENV=production`. Targeted Angular CLI 21.2.28 / Zod 4.6.6 and compatible
 ip-address 10.7.4 updates clear all three current findings after a clean install.
 See [audit scope, exact evidence and timing limits](DEPENDENCY-AUDIT.md).
-The actual predecessor audit failed correctly; this local fix does not make that
-run green or establish complete hosted acceptance.
+The actual predecessor audit failed correctly. The exact revised job now passes
+[isolated Linux run 40027715625](https://github.com/jurei733/testcenter-rewrite/actions/runs/40027715625):
+zero vulnerabilities, about 0.91 seconds for audit and nine seconds for the job
+(previous job: 21 seconds). This is an individual hosted observation and does not
+make the predecessor run green or establish complete hosted acceptance.
 
 
 ### Focused group-snapshot feedback (2026-10-23)
