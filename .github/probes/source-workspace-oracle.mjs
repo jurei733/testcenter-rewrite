@@ -10,6 +10,7 @@ const request=async(method,path,{token,body,status=200,accept='application/json'
  const response=await fetch(base+path,{method,headers:{accept,...(token?{AuthToken:token}:{}),...(body!==undefined&&!(body instanceof FormData)?{'content-type':'application/json'}:{})},
   ...(body===undefined?{}:{body:body instanceof FormData?body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000)});
  const bytes=Buffer.from(await response.arrayBuffer());
+ if(response.status!==status && method==='POST' && path.endsWith('/file'))console.error('owned_upload_diagnostic='+bytes.toString('utf8'));
  assert.equal(response.status,status,method+' '+path+' returned '+response.status);
  let value=null;if(bytes.length){const text=bytes.toString('utf8');try{value=JSON.parse(text);}catch{value=text;}}
  return {value,bytes,headers:response.headers};
@@ -82,15 +83,17 @@ try{
  // Exercise the native result/test lifecycle through unchanged production
  // routes. No direct SQL, fabricated token or test-mode shortcut seeds data.
  const xml=(type,repo,version,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${repo}/${version}">${body}</${type}>`;
+ const player='<!doctype html><html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-oracle-player',version:'6.0.4',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Oracle player'}],description:[{lang:'de',value:'Owned API Oracle module'}]})+'</script><main>Owned API fixture</main></html>';
  const files=[
-  ['unit-one.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-oracle-player">Owned definition</Definition>')],
-  ['unit-two.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT2</Id><Label>Owned second unit</Label></Metadata><Definition player="owned-oracle-player">Owned second definition</Definition>')],
+  ['player.html',player,'text/html'],
+  ['unit-one.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT</Id><Label>Owned unit</Label></Metadata><Definition player="owned-oracle-player@6.0.4">Owned definition</Definition>')],
+  ['unit-two.xml',xml('Unit','unit-xml','17.6','<Metadata><Id>ORACLE.UNIT2</Id><Label>Owned second unit</Label></Metadata><Definition player="owned-oracle-player@6.0.4">Owned second definition</Definition>')],
   ['booklet-one.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.A</Id><Label>Owned booklet A</Label></Metadata><Units><Unit id="ORACLE.UNIT"/></Units>')],
   ['booklet-two.xml',xml('Booklet','testcenter-booklet-xml','18.0','<Metadata><Id>ORACLE.BOOK.B</Id><Label>Owned booklet B</Label></Metadata><Units><Unit id="ORACLE.UNIT"/><Unit id="ORACLE.UNIT2"/></Units>')],
   ['people.xml',xml('Testtakers','testcenter-testtaker-xml','18.0','<Metadata/><Group id="ORACLE.GROUP" label="Owned source group"><Login name="owned-source-participant" pw="owned-source-participant-secret" mode="run-hot-return"><Booklet>ORACLE.BOOK.A</Booklet><Booklet>ORACLE.BOOK.B</Booklet></Login></Group>')]
  ];
- for(const [name,document]of files){
-  const form=new FormData();form.append('fileforvo[]',new Blob([document],{type:'application/xml'}),name);
+ for(const [name,document,type='application/xml']of files){
+  const form=new FormData();form.append('fileforvo[]',new Blob([document],{type}),name);
   await request('POST',root+'/file',{token:users.RW.token,body:form,status:201});
  }
  check('native result fixture uses actual XSD-validated roster and two Booklets');
