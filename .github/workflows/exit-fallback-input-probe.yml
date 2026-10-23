@@ -1,0 +1,51 @@
+name: Full native exit fallback input reproduction
+on:
+  push:
+    branches: [codex/exit-fallback-input-probe-20261023]
+permissions:
+  contents: read
+concurrency:
+  group: native-exit-fallback-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: rewrite-app
+    env:
+      CI: 'true'
+      UI_SMOKE_ARTIFACT_DIR: ${{ github.workspace }}/rewrite-app/probe-exit-diagnostics
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rewrite-runtime
+      - run: npm run build
+      - name: Prepare native packages through the verified producer
+        env:
+          CI_BROWSER_SYSTEM_DIR: ${{ runner.temp }}/native-exit-browser-system
+        shell: bash
+        run: |
+          mkdir -p "$UI_SMOKE_ARTIFACT_DIR"
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 5m node scripts/ci-browser-system.mjs pack 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/package-setup.log"
+      - name: Install locked native Chromium for isolated reproduction
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 5m npx --no-install playwright install chromium 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/browser-setup.log"
+      - name: Reproduce full unchanged exit journey with passive native diagnostics
+        shell: bash
+        run: |
+          mkdir -p "$UI_SMOKE_ARTIFACT_DIR"
+          set -o pipefail
+          timeout --signal=TERM --kill-after=15s 15m xvfb-run --auto-servernum node scripts/probe-native-exit-fallback.mjs 2>&1 | tee "$UI_SMOKE_ARTIFACT_DIR/native-input.log"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: native-exit-fallback-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/rewrite-app/probe-exit-diagnostics/
+          if-no-files-found: error
+          retention-days: 1
