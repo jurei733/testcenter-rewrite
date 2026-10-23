@@ -59,6 +59,7 @@ import type {
   Element as XmlElement
 } from "@xmldom/xmldom";
 import { formatOriginalReportCsv, formatOriginalParticipantLogEntry } from "./original-report-csv.js";
+import { selectOriginalSavedUnitKeys, originalReviewUnitEventTypes } from "./original-saved-unit-projection.js";
 import type {
   OriginalXmlRoot, OriginalXmlSchemaValidator, XmlSchemaProfile
 } from "./original-xml-schema.js";
@@ -1437,9 +1438,11 @@ export type FirstSliceRepository = ParticipantAccessRepository & {
     workspaceId: string;
     auditEvent: AdminAuditEvent;
   }): Promise<WorkspaceAggregateDeletionCounts | null>;
+  /** Omitted kinds return all scoped events; an explicit empty list returns none. */
   listWorkspaceActivityEventsByWorkspace(
     tenantId: string,
-    workspaceId: string
+    workspaceId: string,
+    eventTypes?: readonly string[]
   ): Promise<WorkspaceActivityEvent[]>;
   saveWorkspaceActivityEvent(
     activityEvent: WorkspaceActivityEvent
@@ -15954,7 +15957,7 @@ type OriginalResponseReportRow = {
     ts: number;
     responseType: string;
   }>;
-  laststate: string;
+  laststate: string | null;
 };
 
 type OriginalLogReportRow = {
@@ -16025,6 +16028,8 @@ const buildOriginalResponseReportRows = (input: {
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+  activityEvents: WorkspaceActivityEvent[];
   groupKeys: string[];
 }): OriginalResponseReportRow[] => {
   const sessionsById = new Map(
@@ -16034,6 +16039,7 @@ const buildOriginalResponseReportRows = (input: {
     input.contentReleases.map(release => [release.contentReleaseId, release])
   );
   const groupKeys = new Set(input.groupKeys);
+  const savedUnits = selectOriginalSavedUnitKeys(input);
 
   return input.testRuns
     .flatMap(rawTestRun => {
@@ -16044,21 +16050,22 @@ const buildOriginalResponseReportRows = (input: {
       }
       const responseTimestamp = Date.parse(testRun.updatedAt);
       const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
-      return Object.entries(testRun.unitResponses).map(([unitKey, response]) => {
+      return [...(savedUnits.get(testRun.testRunId) ?? [])].map(unitKey => {
+        const response = Object.hasOwn(testRun.unitResponses, unitKey) ? testRun.unitResponses[unitKey] : undefined;
         const unit = resolveOriginalReportUnit({
           contentReleasesById,
           testRun,
           unitKey
         });
-        const veronaResponse = parseVeronaUnitResponse(response);
+        const veronaResponse = response === undefined ? null : parseVeronaUnitResponse(response);
         const responseType = String(
           veronaResponse?.unitState.unitStateDataType ?? ""
         );
-        const responses = veronaResponse?.unitState.dataParts
-          ? Object.entries(veronaResponse.unitState.dataParts).map(
+        const responses = veronaResponse
+          ? Object.entries(veronaResponse.unitState.dataParts ?? {}).map(
               ([id, content]) => ({ id, content, ts: timestamp, responseType })
             )
-          : [{ id: "all", content: response, ts: timestamp, responseType: "" }];
+          : response === undefined ? [] : [{ id: "all", content: response, ts: timestamp, responseType: "" }];
         const lastState = veronaResponse
           ? Object.fromEntries(
               Object.entries(veronaResponse.unitState).filter(
@@ -16077,7 +16084,7 @@ const buildOriginalResponseReportRows = (input: {
           laststate:
             lastState && Object.keys(lastState).length > 0
               ? JSON.stringify(lastState)
-              : ""
+              : response === undefined ? null : ""
         };
       });
     })
@@ -16254,6 +16261,7 @@ const createOriginalResultArchive = (input: {
   testRuns: TestRun[];
   reviews: WorkspaceReview[];
   testLogs: ParticipantTestLog[];
+  activityEvents: WorkspaceActivityEvent[];
   contentReleases: ContentRelease[];
 }): WorkspaceOriginalResultArchive => {
   const responseRows = input.groupKeys.length ? buildOriginalResponseReportRows(input) : [];
@@ -30585,7 +30593,8 @@ export const createFirstSliceServices = (
           testRuns,
           reviews,
           testLogs,
-          contentReleases
+          contentReleases,
+          activityEvents
         ] = await Promise.all([
           repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
@@ -30610,7 +30619,8 @@ export const createFirstSliceServices = (
           repository.listContentReleasesByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
-          )
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(workspace.tenantId, workspace.workspaceId, originalReviewUnitEventTypes)
         ]);
         const groupKeys = selectedGroupKeys ?? Array.from(
           new Set(participantSessions.map(session => session.groupKey))
@@ -30625,7 +30635,8 @@ export const createFirstSliceServices = (
           testRuns,
           reviews,
           testLogs,
-          contentReleases
+          contentReleases,
+          activityEvents
         });
       },
       async getContentReleaseActivationReadiness(input) {

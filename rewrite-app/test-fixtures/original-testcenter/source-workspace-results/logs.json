@@ -6,7 +6,7 @@
     "bookletname": "ORACLE.BOOK.B",
     "unitname": "ORACLE.UNIT",
     "originalUnitId": "ORACLE.UNIT",
-    "timestamp": 1792779873344,
+    "timestamp": 1792780782760,
     "logentry": "PRESENTATION_PROGRESS = some"
   },
   {
@@ -16,7 +16,7 @@
     "bookletname": "ORACLE.BOOK.B",
     "unitname": "ORACLE.UNIT2",
     "originalUnitId": "ORACLE.UNIT2",
-    "timestamp": 1792779873409,
+    "timestamp": 1792780782815,
     "logentry": "PRESENTATION_PROGRESS = some"
   },
   {
@@ -26,7 +26,7 @@
     "bookletname": "ORACLE.BOOK.B",
     "unitname": "ORACLE.UNIT2",
     "originalUnitId": "ORACLE.UNIT2",
-    "timestamp": 1792779873441,
+    "timestamp": 1792780782845,
     "logentry": "OWNED = \"second log-only unit\""
   },
   {
@@ -36,7 +36,7 @@
     "bookletname": "ORACLE.BOOK.B",
     "unitname": "",
     "originalUnitId": "",
-    "timestamp": 1792779873209,
+    "timestamp": 1792780782656,
     "logentry": "CURRENT_UNIT_ID : \"ORACLE.UNIT2\""
   }
 ]

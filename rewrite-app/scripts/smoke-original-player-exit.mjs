@@ -51,6 +51,15 @@ async function observeExitCase(context,page,key) {
   if(traceFailures) await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   await page.addInitScript(()=>{
     const events=[];window.__ownedExitInputEvents=events;
+    const all=[];window.__ownedExitAllNativeEvents=all;
+    const record=event=>{
+      const target=event.target instanceof Element?event.target:null;
+      all.push({type:event.type,id:target?.id??'',tag:target?.tagName??'',trusted:event.isTrusted,
+        x:event.clientX,y:event.clientY,at:performance.now(),focused:document.hasFocus(),visibility:document.visibilityState,
+        active:document.activeElement?.id??'',targetText:target?.textContent?.trim().slice(0,100)??''});
+      if(all.length>100)all.shift();
+    };
+    for(const type of ['pointerdown','pointerup','pointercancel','click','focus','blur'])window.addEventListener(type,record,true);
     for(const type of ["pointerdown","pointerup","click","keydown","keyup"]) window.addEventListener(type,event=>{
       const target=event.target instanceof Element?event.target.closest("button,a,mat-dialog-container"):null;
       if(!target || !/participantApplicationLogo|participantStandaloneLogo|participantConfirmation|mat-mdc-dialog/.test(target.id))return;
@@ -470,7 +479,7 @@ try {
     if(activePage && !activePage.isClosed()) snapshot=await activePage.evaluate(()=>({
       url:location.href,documentFocused:document.hasFocus(),visibility:document.visibilityState,
       fallback:document.querySelector(".participant-confirmation-dialog")?.outerHTML,
-      inputEvents:window.__ownedExitInputEvents??[],
+      allNativeEvents:window.__ownedExitAllNativeEvents,inputEvents:window.__ownedExitInputEvents??[],
       activeElement:document.activeElement?.id,
       dialogs:[...document.querySelectorAll("mat-dialog-container")].map(n=>({text:n.textContent,html:n.outerHTML})),
       runId:document.querySelector("#participantRouteRunId")?.textContent,

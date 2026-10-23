@@ -1,28 +1,28 @@
 {
   "sourceCommit": "eedae41840cbe90e5547c0211da818bdf620f5aa",
   "sourceVersion": "19.0.0",
-  "probeCommit": "7332a12cc381aa5be1b5b6d74f15c20ee042f3e9",
-  "probeTree": "47d5656f8b1540de691e050c246785d676c5ae73",
-  "runId": 40002774875,
-  "jobId": 120582886243,
-  "runUrl": "https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875",
-  "artifactId": 12523415444,
-  "artifactZipSha256": "58a912a8a701b0094ef8c98b16b99de2614e51f462167dcfa3ecb9251a4e7902",
+  "probeCommit": "8e7d7bb26af02009e396c08999eb7a799619c890",
+  "probeTree": "62ddc5167ac2eba92577834de481b2ac9541379f",
+  "runId": 40004889342,
+  "jobId": 120590165227,
+  "runUrl": "https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342",
+  "artifactId": 12524041027,
+  "artifactZipSha256": "6af6c76d91850874958aebc430b7484922085dfbb05d2803befd69ea955ed002",
   "transport": "unchanged production Apache HTTP; real admin/person authentication, PostgreSQL and XSD validation; TestMode false",
   "qualification": "Source only. Does not establish Rewrite endpoint, four-store, browser, permission or visual equivalence.",
-  "checks": 26,
+  "checks": 27,
   "files": {
-    "image-id.txt": "9e77b71bd11f147aa5bb5179aa342c3f511d72b56126234934b942adb997b940",
-    "logs.csv": "6f4ed5b2780e782e7b1941d3ad8c37bbf4f624dae663b1480cae66ececa800d6",
-    "logs.json": "ee61e9f5e05525eed42f4e253d6e3ca5939d3d11986e55c24ffceee65a3c8bf8",
+    "image-id.txt": "5ad6195dacaf5bdc5733c522cdd6c541ae229dfbcfe8fa79609015466eb14e7b",
+    "logs.csv": "7a29f13cadfb0f84da4cde8188a49746ede0effaf6230a7789b823ac1e0ed99e",
+    "logs.json": "c4a1a249904db025318193467b1826b4f6395501234f464d61fce7800b4eb1ca",
     "php-runtime.json": "fca1dc262958b1174afeb539bb90729861d794370bb2797489ba4b4756a654cc",
-    "receipt.json": "3b3d3a6aefba0ccc78e2038f4db38a4652efa8f0b1e4ed585da455bc9bf6733f",
-    "responses.csv": "7d6b47395dc72370ed288a8f0a4c1adf9bedcc2be6dc43332f86f0e6c1876c17",
-    "responses.json": "5387944fad14016c8656c820180f0a0ab0cbcf3ea55ec5c365dea36aa79710ae",
-    "reviews-enhanced.csv": "dad2bd04de70a38b2d1057a5884c4bfb8d9d7de880b8de0a182145b77b92e7cb",
-    "reviews-enhanced.json": "05693be4cf84b9e9d8fbe067a4df39ab27b46d38784763ee90b1ed616ce03f6e",
-    "reviews-legacy.csv": "fc7cc00919967cd09075be538978db5567679e4fb9e7592b02c7065a46ae053f",
-    "reviews-legacy.json": "b420bbc2a37ae24a79d668f4f85e20686b1ca1586e17edfb22fcea17469c9404"
+    "receipt.json": "c6e2750dc2a549377fbe3100c54bbf7c0691218435b15f5d523be507f2524c1a",
+    "responses.csv": "af1f61d16e9a5266eef55d979afadc2d110b5d764a570669ae35f35a9e35dba4",
+    "responses.json": "908d3592e7492310398cacdabfde803ddd7b86dfac8cfcf77c3f03818fc005c8",
+    "reviews-enhanced.csv": "d292054e310693087231f6e5e086738d0c4a44f0a3368629fe54c4f34eec53d4",
+    "reviews-enhanced.json": "72f28ba42778484c49dfbb3eb3f9acc21f258f6758a891f9100ce1a781d55623",
+    "reviews-legacy.csv": "4e77c320efaab090f6d1a5d8952515e28576a459b2e85862b0121cdb96b6c2c8",
+    "reviews-legacy.json": "b348a8e602f6d89cdfefd245bf0da4fe6b4a987d26cae13f823a0b2329aa8502"
   },
   "sourceFiles": {
     "backend/src/dao/AdminDAO.class.php": "5a1c44e92edf8b738861e42aed9c254325533b726e33dfdea470b4c7b4bc59e2",
@@ -35,5 +35,10 @@
     "backend/src/workspace/ResponseReportOutput.php": "0c88a1742d3e321cccb4c62c6fc34ca1627faa9b9e2763227310dc2dd1187466",
     "backend/src/workspace/LogReportOutput.php": "cfcb2fd3418195fdac8bc6b7dcfeafeb53da36745c7fa1f37194e9fbf9da8b86",
     "backend/src/workspace/ReviewReportOutput.php": "d1f39523e236b0f2265da3a1892775f1bd5977fdc50da4c2091afab48282ba59"
-  }
+  },
+  "version": 1,
+  "captureStage": "Selected report CSV/JSON pairs are captured before the final Unit review deletion control.",
+  "probeScriptPath": ".github/probes/source-workspace-oracle.mjs",
+  "probeScriptGitBlobSha": "9360dfbdc93a424975534190e91aecc5ff5a0d2a",
+  "probeScriptSha256": "6345c2c61b0ffef795a29ed30a8a9bb32704c5b1e6e07c49dc9b712558361596"
 }

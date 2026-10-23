@@ -1,5 +1,83 @@
 # CI iteration and complete acceptance
 
+## Current local export/isolation qualification (2026-10-23)
+
+Complete local qualification passes **3,866 unit/frontend cases**
+(121 / 324 / 1,372 / 2,049), **173 full API cases each in Memory/File/SQLite**,
+and **1,971 full PostgreSQL cases**, with no application test failures/skips.
+The corrected PG run uses its owned temporary schema against the same reused
+local database that exposed the prior failure. Generated test/sentinel schemas
+are absent afterward; the owned PG cluster is stopped. The final focused archive
+path passes **34 cases**, including real HTTP and all four stores.
+
+CI policy passes **242 cases**, with its one explicit GNU-timeout-only macOS
+skip and zero failures. Complete CI typechecking and a fresh Angular production
+build pass. Initial entry stays **468.39 kB** under the unchanged 470 kB limit.
+Source report bytes, receipt and provenance hashes are checked in the archive
+regression. The actual current headed player-exit smoke also passes all **44**
+journeys (38 Original / six Rewrite) and closes its owned browser/API. The native
+input recorder remains diagnostic; these successful repeats do not establish a
+fix for the earlier missing click. Full new-head Linux/89-job acceptance is still required; predecessor
+`dd8505f4` remains failed at the native exit fallback and acceptance.
+
+## Repeatable isolated PostgreSQL qualification (2026-10-23)
+
+The complete PostgreSQL starter now gives each invocation a generated owned
+schema, passes that schema through the existing connection options and removes
+it only after its child finishes. Existing socket, credentials and other options
+are preserved; the configured database and its other schemas remain intact.
+Both callback failure and success attempt schema cleanup and pool close; cleanup
+failures retain the original error. Child exit status and the complete serial
+test inventory are retained. No production schema/migration behavior changes.
+
+This follows a real local failure: invoking the previous starter against a
+reused owned database produces **1,954 passes / 10 failures**, starting with
+bootstrap returning 409 because previous administrator state already exists.
+The failed run is retained rather than relabeled green. Six local controls
+cover connection-option preservation, generated-name bounds, exact status,
+creation/child/cleanup failure and independent invocations. An actual PostgreSQL
+control creates data inside two temporary scopes, exercises success/failure,
+checks those schemas are absent afterward and proves separate owned sentinel
+bytes survive. Controls remain required in policy and the full real PG group.
+The subsequent full run uses the new isolated starter against that same
+previously used database; its actual result is recorded with qualification.
+
+## Unanswered Unit exports and focused iteration (2026-10-23)
+
+The Original archive now includes saved state-only and comment-only Unit rows.
+The pre-fix regression fails in Memory, File and SQLite: missing data parts are
+exported as an opaque answer, and review-only Units are absent. The correction
+keeps empty response arrays, intentional empty legacy answers, null comment-only
+state and the exact stored Run. Scoped persisted review evidence retains a Unit
+following comment deletion/reopen; arbitrary logs are excluded. The SQL-backed
+read filters event types before decoding details, preserving existing unfiltered
+callers. File storage retains its normal whole-snapshot read.
+
+`npm run test:original-results` performs a fresh core build and the complete
+archive regression, including actual protected HTTP and verified Source report
+fixtures. It needs no Angular/browser build. `FIRST_SLICE_STORE=postgres` with
+an owned database adds the actual PostgreSQL cases. This focused path supplements
+the unchanged mandatory unit/PostgreSQL gates and complete 89-job acceptance.
+No timing comparison or overall acceleration is inferred from its small scope.
+
+The corrected isolated exit diagnostic passes the **entire unchanged** headed
+player-exit journey in [run 40004885960](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004885960).
+Its owned copy adds only bounded native/focus observations and retains the full
+prefix, original assertions and deadlines. The original test stays SHA256
+`3e793afd93b817395f449bfabcb47dd439be208024487f92483a11457ffb1435` and the
+owned copy/API retire. Independently downloaded artifact `12524350606` verifies
+ZIP SHA256 `53c00694feb60f9ce877ab1d9022904a5cddd2a07b36bfff3012298205cfb370`.
+The fallback records one trusted Stay click and one trusted Continue click;
+all existing later Rewrite cases pass too. This does **not** identify or fix the
+earlier missing click. Regular smoke gains the same at-most-100 all-target
+pointer/focus observations in its existing initialization and failure snapshot;
+no additional pre-click await, retry, synthetic event or longer bound is added.
+
+The first isolated exit probe `40003773131` fails before browser launch because
+its workflow invokes the wrong diagnostic filename. The corrected workflow names
+the exact file and validates Source SHA/insertion boundaries before building.
+This is a probe-launch correction, not an application runtime correction.
+
 ## Current complete-head exit fallback failure (2026-10-23)
 
 [Run 39999128704](https://github.com/jurei733/testcenter-rewrite/actions/runs/39999128704)
@@ -25,8 +103,8 @@ journey is used for diagnosis; a pass alone will not prove a fix.
 
 ## Executable Original result lifecycle baseline (2026-10-23)
 
-The isolated production Source probe now passes **26 real HTTP groups** in
-[run 40002774875](https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875).
+The isolated production Source probe now passes **27 real HTTP groups** in
+[run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342).
 It qualifies created/opened/stateful Test inclusion, saved state-and-log Units
 without answers, aggregate counts, RO refusal and selected-Test deletion with
 unchanged identity/other-Booklet data. The extension retains four actual selected

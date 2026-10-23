@@ -458,11 +458,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.adminAuditEvents.set(input.auditEvent.adminAuditEventId, input.auditEvent);
       return counts;
     },
-    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId, eventTypes) {
       return Array.from(state.workspaceActivityEvents.values()).filter(
         activityEvent =>
           activityEvent.tenantId === tenantId &&
-          activityEvent.workspaceId === workspaceId
+          activityEvent.workspaceId === workspaceId &&
+          (eventTypes === undefined || eventTypes.includes(activityEvent.eventType))
       );
     },
     async saveWorkspaceActivityEvent(activityEvent) {

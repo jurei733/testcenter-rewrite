@@ -21,16 +21,16 @@
       "name": "complete selected and unfiltered native exports exceed 500 reports",
       "unfiltered": 505,
       "selected": 504,
-      "csvSha256": "874cae4252368c4d8bb6e7036de6b0fb732ddddbc4d98ee3d25d032a6bbebe90",
+      "csvSha256": "679ee7e7cac2a3e05f0515638012e1658b1e4f55fbfbe2a258c58c251a8dcb3d",
       "selectedFirstTitles": [
-        "owned-source-report-389",
-        "owned-source-report-225",
-        "owned-source-report-434"
+        "owned-source-report-253",
+        "owned-source-report-368",
+        "owned-source-report-407"
       ],
       "selectedLastTitles": [
-        "owned-source-report-422",
-        "owned-source-report-71",
-        "owned-source-report-388"
+        "owned-source-report-332",
+        "owned-source-report-29",
+        "owned-source-report-330"
       ],
       "rawReportCarriesKeyPhrase": true
     },
@@ -90,30 +90,33 @@
     {
       "name": "actual selected responses CSV and JSON contracts",
       "rows": 2,
-      "csvSha256": "7d6b47395dc72370ed288a8f0a4c1adf9bedcc2be6dc43332f86f0e6c1876c17",
+      "csvSha256": "af1f61d16e9a5266eef55d979afadc2d110b5d764a570669ae35f35a9e35dba4",
       "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"responses\";\"laststate\"",
       "unknownGroupBytes": 0
     },
     {
       "name": "actual selected logs CSV and JSON contracts",
       "rows": 4,
-      "csvSha256": "6f4ed5b2780e782e7b1941d3ad8c37bbf4f624dae663b1480cae66ececa800d6",
+      "csvSha256": "7a29f13cadfb0f84da4cde8188a49746ede0effaf6230a7789b823ac1e0ed99e",
       "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"originalUnitId\";\"timestamp\";\"logentry\"",
       "unknownGroupBytes": 0
     },
     {
       "name": "actual selected reviews-legacy CSV and JSON contracts",
       "rows": 2,
-      "csvSha256": "fc7cc00919967cd09075be538978db5567679e4fb9e7592b02c7065a46ae053f",
+      "csvSha256": "4e77c320efaab090f6d1a5d8952515e28576a459b2e85862b0121cdb96b6c2c8",
       "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category: accuracy\";\"category: quality\";\"reviewtime\";\"entry\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\"",
       "unknownGroupBytes": 0
     },
     {
       "name": "actual selected reviews-enhanced CSV and JSON contracts",
       "rows": 2,
-      "csvSha256": "dad2bd04de70a38b2d1057a5884c4bfb8d9d7de880b8de0a182145b77b92e7cb",
+      "csvSha256": "d292054e310693087231f6e5e086738d0c4a44f0a3368629fe54c4f34eec53d4",
       "header": "\"groupname\";\"loginname\";\"code\";\"bookletname\";\"unitname\";\"priority\";\"category_accuracy\";\"category_quality\";\"reviewtime\";\"page\";\"pagelabel\";\"originalUnitId\";\"userAgent\";\"reviewer\";\"entry\";\"unitlabel\";\"bookletlabel\"",
       "unknownGroupBytes": 0
+    },
+    {
+      "name": "deleting a Unit review retains the saved unanswered Unit, its response export and group counts"
     },
     {
       "name": "revocation is enforced against the existing signed-in token"

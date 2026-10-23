@@ -2,14 +2,14 @@
 
 ### Qualified Original result lifecycle (2026-10-23)
 
-[Source run 40002774875](https://github.com/jurei733/testcenter-rewrite/actions/runs/40002774875)
-passes all **26** real HTTP groups against unchanged pinned Original
+[Source run 40004889342](https://github.com/jurei733/testcenter-rewrite/actions/runs/40004889342)
+passes all **27** real HTTP groups against unchanged pinned Original
 `eedae41840cbe90e5547c0211da818bdf620f5aa`, with production Apache,
 PostgreSQL/Redis, actual XSD uploads and administrator/person authentication.
 Test mode stays disabled; no SQL seeding, fabricated token or production patch
 is used. Source diff verification passes and owned containers/volumes retire.
-The independently downloaded artifact `12523415444` verifies ZIP SHA256
-`58a912a8a701b0094ef8c98b16b99de2614e51f462167dcfa3ecb9251a4e7902`.
+The independently downloaded artifact `12524041027` verifies ZIP SHA256
+`6af6c76d91850874958aebc430b7484922085dfbb05d2803befd69ea955ed002`.
 The public receipt, runtime metadata and exact source-file hashes are retained in
 [test-fixtures/original-testcenter/source-workspace-results/manifest.json](../test-fixtures/original-testcenter/source-workspace-results/manifest.json).
 
@@ -34,10 +34,11 @@ The native Results and Tests pages must preserve these distinct rules:
   controller's 404 path. This is actual middleware behavior, not an auth bypass.
 
 The extended fixture also proves a Unit review initializes a saved Unit without
-answers or nonempty Test state. Actual response reports include both state-only
+answers or nonempty Test state. Deleting that review retains the saved Unit,
+its response report and group counts. Actual response reports include both state-only
 and review-only Units with `responses: []`; a review-only Unit has null laststate.
-Four real selected CSV/JSON pairs are retained: responses, logs, legacy reviews
-and enhanced reviews. All CSVs preserve the UTF-8 BOM and semicolon dialect;
+Four real selected CSV/JSON pairs are retained before the final review deletion
+control: responses, logs, legacy reviews and enhanced reviews. All CSVs preserve the UTF-8 BOM and semicolon dialect;
 an unknown group yields zero bytes. Legacy reviews use `category: NAME` with
 `X`/null and omit reviewer/labels. Enhanced reviews use boolean `category_NAME`,
 retain reviewer and resolve actual Unit/Booklet labels. Review text preserves
@@ -45,12 +46,35 @@ Unicode, embedded newline, quote and semicolon. These are authored fixture data,
 not private participant records. Source review times use the configured Europe/
 Berlin display time; the current Rewrite UTC conversion needs native alignment.
 
+The Rewrite archive correction now projects current review Units and exact
+scoped server review journal entries alongside captured Unit response keys.
+Thus a comment-only Unit remains exported after the comment is deleted and the
+store is reopened. A captured Verona state without `dataParts` produces an empty
+response array, while an intentional empty legacy answer remains an `all` entry.
+Comment-only rows retain null `laststate`. Arbitrary Unit logs do not create
+report rows. Only matching tenant/workspace/Run/session review evidence qualifies;
+Booklet-level comments, unknown events and foreign/mismatched identities do not.
+Reading the archive leaves the exact stored Run and answers untouched.
+
+The archive requests only the three review event types at the store boundary;
+SQL filters them before decoding event details. File storage retains its existing
+whole-snapshot read. Omitted event kinds
+retain existing complete scoped reads; an explicit empty list reads no events.
+These corrections improve the existing canonical ZIP, **not the missing native
+Results table or its four individual downloads**. Native Unit state key/time
+projection and initialization without any response or review evidence remain
+separate work. Source review display times and current-file label semantics also
+still need their native projection.
+
 These are Source requirements, **not qualified Rewrite parity**. The Rewrite's
 canonical group summary currently counts all Runs and Unit response keys;
 reusing it unchanged would contradict this Oracle. Native opened-Test and saved
 Unit projection, exact test-time semantics, all four selected CSV actions and
 selected-Test deletion still require implementation/qualification. All eight
-broad visual rows and the 29 done / 20 partial count remain unchanged.
+broad visual rows remain open. This Source27 audit reopens the previously done
+Result group administration and Original result report archive rows: the current
+formal ledger is **27 done / 22 partial**. Older counts below are historical
+checkpoints, superseded by this audit.
 
 ### Native report page and remaining workspace tabs (2026-10-23)
 

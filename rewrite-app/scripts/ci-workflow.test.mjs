@@ -109,6 +109,19 @@ test('workspace file catalog HTTP authorization and projection qualify in unit a
   assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
   assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
 });
+test('PostgreSQL test namespace controls are required locally and on the real PostgreSQL runner',()=>{
+ const suite='scripts/postgres-test-scope.test.mjs';
+ assert.ok(scripts['test:ci-policy'].split(/\s+/).includes(suite));
+ const runner=read('./run-postgres-integration.mjs');
+ assert.ok(runner.includes(JSON.stringify(suite)));assert.ok(runner.includes('withPostgresTestScope(connectionString,'));
+});
+test('Original result export iteration retains the complete archive suite in unit and PostgreSQL gates',()=>{
+ const suite='scripts/original-result-archive.test.mjs';
+ assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
+ assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+ assert.equal(scripts['test:original-results'],'npm run build:core && npm run test:original-results:built');
+ assert.equal(scripts['test:original-results:built'],'node --test '+suite);
+});
 test('complete selected Systemcheck exports qualify in unit and real PostgreSQL groups',()=>{
  const suite='scripts/system-check-report-selection.test.mjs';
  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
