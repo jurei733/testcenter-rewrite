@@ -137,8 +137,12 @@ export class OriginalWorkspaceFilesController {
           if(!this.canWrite){this.cancelPendingUploads();return;}
           const result=await this.request<UploadWorkspaceFileResponse>(owner,'POST',productionApiRoutes.workspace.uploadWorkspaceFile,
             {fileName:file.name,mediaType:file.type||'application/octet-stream',sourceDocument});
-          row.status=result.importJob?.status==='failed'?'error':'completed';
-          row.message=result.importJob?.status==='failed'?'Import fehlgeschlagen.':result.replacedSourcePackageId?'Datei aktualisiert.':'Datei hochgeladen.';
+          const availability=result.workspaceAvailability?.status;
+          row.status=result.importJob?.status==='failed' || availability==='failed' || availability==='conflict'?'error':'completed';
+          row.message=result.importJob?.status==='failed'?'Import fehlgeschlagen.':
+            availability==='failed'?'Datei gespeichert. Die Bereitstellung für Teilnehmende ist fehlgeschlagen.':
+            availability==='conflict'?'Datei gespeichert. Gleichzeitige Änderungen haben die Bereitstellung verhindert.':
+            result.replacedSourcePackageId?'Datei aktualisiert.':'Datei hochgeladen.';
         } catch(error) {
           if(!this.owns(owner))return;
           row.status='error';row.message=problemText(error,'Hochladen fehlgeschlagen.');

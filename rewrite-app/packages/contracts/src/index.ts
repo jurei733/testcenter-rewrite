@@ -1,3 +1,4 @@
+import type {WorkspaceFileAvailability} from "@testcenter-rewrite-app/domain";
 import type {
   WorkspaceFileCatalog,
   AdminAuditEvent,
@@ -436,6 +437,7 @@ export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
 
 export type UploadWorkspaceFileRequest = {fileName: string; mediaType: string; sourceDocument: string};
 export type UploadWorkspaceFileResponse = {
+  workspaceAvailability?: WorkspaceFileAvailability;
   sourcePackage: SourcePackage; replacedSourcePackageId: string | null;
   importJob: ImportJob | null; stagedContentRelease: ContentRelease | null;
   participantRosterImport?: ReplaceSourcePackageResponse['participantRosterImport'];
@@ -445,7 +447,7 @@ export type ReplaceWorkspaceFileRequest = {
   mediaType: string;
   sourceDocument: NonNullable<CreateSourcePackageRequest['sourceDocument']>;
 };
-export type ReplaceWorkspaceFileResponse = Omit<ReplaceSourcePackageResponse, 'importJob'> & {importJob: ImportJob | null};
+export type ReplaceWorkspaceFileResponse = Omit<ReplaceSourcePackageResponse, 'importJob'> & {importJob: ImportJob | null; workspaceAvailability?: WorkspaceFileAvailability};
 
 export type ActivateContentReleaseRequest = {
   activatedByActorId: string;

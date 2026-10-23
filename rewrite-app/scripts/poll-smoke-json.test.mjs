@@ -25,6 +25,18 @@ async function ownedServer(handler, action) {
   try {await action('http://127.0.0.1:'+server.address().port);}
   finally {server.closeAllConnections();await new Promise(done=>server.close(done));}
 }
+test('a real stalled first connection is aborted and a later healthy response succeeds within the original total deadline',async()=>{
+  let attempts=0,closed=0;
+  await ownedServer((request,response)=>{
+    if(++attempts===1){request.on('close',()=>closed++);return;}
+    response.setHeader('content-type','application/json');response.end('{"ready":true}');
+  },async url=>{
+    const phases=[];
+    assert.deepEqual(await pollSmokeJson(url,{timeoutMs:1500,attemptTimeoutMs:50,intervalMs:0,onPhase:value=>phases.push(value)}),{ready:true});
+    assert.equal(attempts,2);assert.ok(phases.some(value=>value.phase==='retry' && value.attempt===1));
+  });
+  assert.equal(closed,1);
+});
 for (const held of ['headers','body']) test(`the absolute deadline aborts a real HTTP response held at ${held}`, () => {
   let requests=0;
   return ownedServer((request,response)=>{

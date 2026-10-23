@@ -842,10 +842,20 @@ export type ContentReleaseSummary = Omit<ContentRelease, "runtimeSnapshot"> & {
 };
 
 export type ContentReleaseRuntimeSnapshot = {
+  /** Fixed origin for live Source-file resolution; the stored artifact stays immutable. */
+  workspaceFilePublication?: {revision:string;sourcePackageId:string};
   bookletEntries: ContentReleaseBookletEntry[];
   playerEntries?: ContentReleasePlayerEntry[];
   resourceEntries?: ContentReleaseResourceEntry[];
   systemCheckEntries?: SourcePackageSystemCheckEntry[];
+};
+
+export type WorkspaceFileAvailability = {
+  status: 'available' | 'not_ready' | 'conflict' | 'failed';
+  revision: string;
+  contentReleaseId: string | null;
+  importJobId: string | null;
+  diagnostics: ImportJobDiagnostic[];
 };
 
 export type SystemCheckChoice = {

@@ -74,6 +74,22 @@ try {
    assert.equal(uploads[2].importJob.status,'completed');assert.ok(JSON.stringify(uploads[2].stagedContentRelease.runtimeSnapshot).includes('private-unit-bytes'));
    assert.equal(uploads[2].stagedContentRelease.runtimeSnapshot.playerEntries.find(value=>value.playerKey==='native-files-player@6.0.4')?.html,player);
    assert.equal(uploads[4].importJob.status,'completed');assert.ok(uploads[4].participantRosterImport);
+   // These are native uploads with the real Original XSD validator. No
+   // operator activation is needed before a protected participant can run.
+   assert.equal(uploads[2].workspaceAvailability?.status,'available');
+   const identity=await api('/api/v1/participant/auth/sign-in',{tenantKey:'demo-tenant',workspaceKey:key,
+    loginKey:key+'-participant',password:'private-participant-password'},'POST',200,'');
+   const participantToken=identity.sessionToken,sessionId=identity.participantSession.participantSessionId;
+   const entered=await api('/api/v1/participant/starter:launch',{participantSessionId:sessionId,bookletKey:'NATIVE.BOOK'},'POST',200,participantToken);
+   const currentPath='/api/v1/participant/sessions/'+sessionId+'/current-state?includeBookletAssets=true';
+   const original=(await api(currentPath,undefined,'GET',200,participantToken)).currentRunState;
+   assert.equal(original.currentUnit.unitDefinition,'private-unit-bytes');
+   assert.equal(original.testRun.testRunId,entered.testRun.testRunId);
+   await api(currentPath,undefined,'GET',401,'');
+   await api('/api/v1/participant/test-runs/'+entered.testRun.testRunId+'/save-progress',{
+    status:'paused',unitResponse:' Exact live-file answer Ω\n '},'POST',200,participantToken);
+   const saved=(await api(currentPath,undefined,'GET',200,participantToken)).currentRunState;
+   await api('/api/v1/participant/sessions/'+sessionId+'/resources/Testtakers/people.xml',undefined,'GET',404,participantToken);
    assert.equal(await page.locator('#originalWorkspaceFiles mat-row').count(),6);
    for(const label of ['Teilnehmerlisten','Testhefte','Systemcheck-Definitionen','Units','Ressourcen'])await page.locator('mat-panel-title').getByText(label,{exact:true}).waitFor();
    const unitRow=page.locator('mat-row').filter({has:page.locator('[data-cy="files-checkbox-NATIVE.UNIT"]')});
@@ -95,6 +111,10 @@ try {
    await page.locator('[data-cy="close-upload-report"]').click();assert.deepEqual(await api(scope+'/files'),before);
    const changed=Buffer.concat([Buffer.from([255,254]),Buffer.from('<?xml version="1.0" encoding="UTF-16"?>'+unitSource.replace('private-unit-bytes','new-private-unit-bytes'),'utf16le')]);
    const overwritten=await upload(page,scope,[{name:'shared.xml',type:'application/xml',bytes:changed}]);assert.equal(overwritten[0].replacedSourcePackageId,uploads[1].sourcePackage.sourcePackageId);
+   const updated=(await api(currentPath,undefined,'GET',200,participantToken)).currentRunState;
+   assert.equal(updated.currentUnit.unitDefinition,'new-private-unit-bytes');
+   assert.equal(updated.testRun.testRunId,saved.testRun.testRunId);
+   assert.deepEqual(updated.testRun.unitResponses,saved.testRun.unitResponses);
    await page.locator('[data-cy="close-upload-report"]').click();assert.equal((await api(scope+'/files')).totalCount,6);
    const unused=await upload(page,scope,[{name:'unused.txt',type:'text/plain',bytes:Buffer.from('unused')}]);await page.locator('[data-cy="close-upload-report"]').click();
    await page.locator('[data-cy="files-checkbox-NATIVE.UNIT"] input').check();await page.locator('[data-cy="files-checkbox-UNUSED.TXT"] input').check();

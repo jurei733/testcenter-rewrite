@@ -94,6 +94,15 @@ test('exact Source 1,000-file boundary computes sizes; 1,001 files remain fully 
   assert.equal(above.dependencySizesCalculated, false);
   assert.ok(above.items.every(item => item.totalSizeBytes === null && item.dependencies.length === 0));
 });
+test('runtime dependency resolution remains complete above the file-view size threshold',()=>{
+  const inputs=Array.from({length:1000},(_,i)=>file('resource-'+i,'Resource',1,null));
+  inputs.push(file('unit','Unit',10,xml('Unit','U','<Definition player="missing-player@1.0.0"/>')));
+  inputs.push(file('booklet','Booklet',10,xml('Booklet','B','<Units><Unit id="U"/></Units>')));
+  assert.equal(buildWorkspaceFileCatalog(inputs).dependencySizesCalculated,false);
+  const runtime=buildWorkspaceFileCatalog(inputs,{requireDependencies:true});
+  assert.deepEqual(byId(runtime,'booklet').dependencies.map(value=>value.sourcePackageId),['unit']);
+  assert.deepEqual(byId(runtime,'unit').unresolvedReferences.map(value=>value.reference),['missing-player-1.0']);
+});
 
 test('rejected, malformed and entity-declaring documents remain listable and cannot load external data', () => {
   const catalog = buildWorkspaceFileCatalog([

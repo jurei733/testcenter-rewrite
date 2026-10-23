@@ -153,6 +153,12 @@ test('workspace file catalog HTTP authorization and projection qualify in unit a
   assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
   assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
 });
+test('live Source files and their atomic first publication qualify in local and real PostgreSQL gates',()=>{
+ for(const suite of ['scripts/workspace-file-publication.test.mjs','scripts/workspace-file-live-runtime.test.mjs']){
+  assert.ok(scripts['test:unit:built'].split(/\s+/).includes(suite));
+  assert.ok(read('./run-postgres-integration.mjs').includes(JSON.stringify(suite)));
+ }
+});
 test('native tab failures retain only scoped public metadata without private scratch stores or body dumps', () => {
   const upload = workflow.jobs['verify-memory-sqlite'].steps.find(step => step.name === 'Retain scoped native tab failure evidence');
   assert.equal(upload.if, "(failure() || cancelled()) && matrix.check == 'ui-participant-native-routes'");

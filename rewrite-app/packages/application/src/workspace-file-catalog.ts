@@ -174,7 +174,7 @@ function inspect(input: WorkspaceCatalogInput): {
 /** Lightweight complete current-file read model. Import status and validation
  * are not rewritten by this projection. Unresolved/ambiguous edges stay explicit.
  */
-export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[]): WorkspaceFileCatalog {
+export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[], options: {requireDependencies?: boolean} = {}): WorkspaceFileCatalog {
   const inspected = inputs.map(input => ({ input, ...inspect(input) }));
   const index = new Map<string, Set<number>>();
   const key = (type: WorkspaceFileType, value: string) => JSON.stringify([type, sourceUpper(value)]);
@@ -186,7 +186,7 @@ export function buildWorkspaceFileCatalog(inputs: WorkspaceCatalogInput[]): Work
       const values = index.get(id) ?? new Set<number>(); values.add(at); index.set(id, values);
     }
   }
-  const dependencySizesCalculated = inputs.length <= 1000;
+  const dependencySizesCalculated = options.requireDependencies === true || inputs.length <= 1000;
   const items: WorkspaceCatalogFile[] = inspected.map(({ input, metadata, references }) => ({
     sourcePackageId: input.sourcePackageId, fileName: input.fileName, fileType: input.fileType,
     status: input.status, uploadedAt: input.uploadedAt, fileSizeBytes: input.fileSizeBytes,

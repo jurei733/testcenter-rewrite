@@ -82,6 +82,13 @@ test('failed real import is an upload error rather than a success report',async(
  await f.controller.connect();await f.controller.upload([{name:'bad.xml',type:'application/xml',read:async()=>'<bad/>'}]);
  assert.equal(f.controller.uploads[0].status,'error');assert.equal(f.controller.uploads[0].message,'Import fehlgeschlagen.');
 });
+for(const status of ['failed','conflict'])test('a saved file with unavailable runtime is reported truthfully: '+status,async()=>{
+ const f=fixture(call=>call.method==='POST'?{importJob:null,workspaceAvailability:{status,diagnostics:[{message:'private raw compilation body'}]}}:normal(call));
+ await f.controller.connect();await f.controller.upload([{name:'owned.xml',type:'application/xml',read:async()=>'<Unit/>'}]);
+ assert.equal(f.controller.uploads[0].status,'error');assert.match(f.controller.uploads[0].message,/Datei gespeichert/);
+ assert.match(f.controller.uploads[0].message,/Bereitstellung/);assert.ok(!JSON.stringify(f.controller.uploads).includes('private raw'));
+ assert.equal(f.controller.files.length,1);assert.equal(f.controller.problem,'');
+});
 test('selection, reverse dependency highlighting and sort retain source-package identities despite identical basenames',async()=>{
  const rows=[file('UNIT','Unit/shared.xml'),file('BOOK','Booklet/shared.xml','Booklet',[{sourcePackageId:'UNIT',fileName:'Unit/shared.xml',relationship:'containsUnit'}]),
   file('UNRELATED','Booklet/unrelated.xml','Booklet',[{sourcePackageId:'OTHER',fileName:'Unit/shared.xml',relationship:'containsUnit'}])];
