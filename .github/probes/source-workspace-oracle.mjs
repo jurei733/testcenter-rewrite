@@ -122,15 +122,17 @@ try{
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
  assert.deepEqual(await sessions(),[]);
  check('opening a Booklet counts a zero-Unit result while empty test state stays absent from deletion listing');
+ // The unmodified TimeStamp helper returns Unix seconds and writes whole-second SQL times.
+ // Cross that actual precision boundary; do not weaken the strict changed-time assertions.
  const openedTime=(await groups())[0].lastChange;
  assert.ok(Number.isSafeInteger(openedTime)&&openedTime>0);
- await new Promise(done=>setTimeout(done,25));await setLock(true);
+ await new Promise(done=>setTimeout(done,1100));await setLock(true);
  const lockedTime=(await groups())[0].lastChange;assert.ok(lockedTime>openedTime);
  assert.deepEqual(await sessions(),[]);
- await new Promise(done=>setTimeout(done,25));await setLock(true);
+ await new Promise(done=>setTimeout(done,1100));await setLock(true);
  const relockedTime=(await groups())[0].lastChange;assert.ok(relockedTime>lockedTime);
  assert.deepEqual(await sessions(),[]);
- await new Promise(done=>setTimeout(done,25));await setLock(false);
+ await new Promise(done=>setTimeout(done,1100));await setLock(false);
  const unlockedTime=(await groups())[0].lastChange;assert.ok(unlockedTime>relockedTime);
  assert.deepEqual(await sessions(),[]);
  assert.deepEqual(groupProjection(await groups()),[{groupName:'ORACLE.GROUP',bookletsStarted:1,min:0,max:0,total:0,average:0}]);
