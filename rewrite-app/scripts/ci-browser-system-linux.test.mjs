@@ -5,7 +5,7 @@ import {mkdtemp,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {verifyArtifact} from './ci-browser-system.mjs';
+import {stageAptCache,verifyArtifact} from './ci-browser-system.mjs';
 
 assert.equal(process.platform,'linux','Run native Debian archive qualification in its Linux workflow job.');
 const digest=body=>createHash('sha256').update(body).digest('hex');
@@ -45,5 +45,24 @@ test('the native package identity must agree with both the manifest and the expe
   await ownedArtifact(async f=>{
     f.entry.version='9.9';f.manifest.afterInventory=f.manifest.afterInventory.replace('2:1.9+dfsg-1','9.9');await f.save();
     await assert.rejects(verifyArtifact(f.directory,f.context,f.before),/metadata mismatch/);
+  });
+});
+test('real APT rejects an empty offline cache and accepts its verified native basename without installing a fixture package',async()=>{
+  await ownedArtifact(async f=>{
+    const cache=join(f.root,'cache'),parts=join(f.root,'parts'),lists=join(f.root,'lists'),status=join(f.root,'status');
+    for(const path of [cache,parts,lists])await mkdir(path);await writeFile(status,'');
+    const options=['-o','Dir::State::status='+status,'-o','Dir::State::extended_states='+join(f.root,'extended'),
+      '-o','Dir::State::lists='+lists,'-o','Dir::Etc::sourcelist=/dev/null','-o','Dir::Etc::sourceparts='+parts,
+      '-o','Dir::Cache::archives='+cache,'-o','Dir::Cache::pkgcache=','-o','Dir::Cache::srcpkgcache=',
+      '-o','Dir::Log='+f.root,'-o','APT::Get::AllowUnauthenticated=false',
+      'install','-y','--no-remove','--no-install-recommends','--download-only','--no-download',join(f.directory,f.entry.file)];
+    assert.throws(()=>execFileSync('/usr/bin/apt-get',options,{stdio:'pipe'}),error=>error.status===100);
+    // The first APT pass creates its owned lock/partial entries. Use a fresh
+    // directory for production staging's deliberately empty-cache invariant.
+    const staged=join(f.root,'staged');await mkdir(staged);
+    const verified=await verifyArtifact(f.directory,f.context,f.before);await stageAptCache(verified,staged);
+    const actual=options.map(value=>value==='Dir::Cache::archives='+cache?'Dir::Cache::archives='+staged:value);
+    execFileSync('/usr/bin/apt-get',actual,{stdio:'pipe'});
+    assert.equal(await readFile(status,'utf8'),'','The native regression control must never install its synthetic package.');
   });
 });
