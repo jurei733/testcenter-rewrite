@@ -93,3 +93,11 @@ separates `offlineInstallMs` from `materialCaptureMs` in reporting; the isolated
 consumer totals (20.3–46.6 seconds, plus a 25.3-second selected rerun) include
 both operations. Admission predicates are unchanged. The full main workflow
 must still qualify the final published tree and all application journeys.
+
+The first complete workflow's independent offline qualification
+[job 120696035371](https://github.com/jurei733/testcenter-rewrite/actions/runs/40036035411/job/120696035371)
+also passes the actual final runtime and all 15 Linux capture controls. Its new
+reporting measures **6.216 seconds** for offline installation, **17.987 seconds**
+for material verification and **24.591 seconds** total restore. That whole run
+separately fails its newly reported body-parser security finding; this successful
+leaf does not establish complete acceptance.

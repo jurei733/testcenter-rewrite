@@ -1,0 +1,117 @@
+{
+  "success": true,
+  "capturedAt": "2026-10-23T22:51:04.424623+00:00",
+  "node": "v22.23.3",
+  "npm": "10.9.9",
+  "failingHostedRun": 40036035411,
+  "failingHostedJob": 120695611357,
+  "predecessor": "43422e1267051d465a838305268a41a5a9281aea",
+  "command": "npm audit --package-lock-only --include=dev --include=optional --audit-level=high --json",
+  "results": [
+    {
+      "stage": "before",
+      "exitCode": 1,
+      "durationMs": 1082,
+      "nodeModulesCreated": false,
+      "nodeEnv": "production",
+      "lockSha256": "b47490d7f43e687f91c0eacdcfd8f14ae1c5af386221a0d0f275585619b5490a",
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 1,
+        "critical": 0,
+        "total": 1
+      },
+      "advisories": {
+        "body-parser": {
+          "name": "body-parser",
+          "severity": "high",
+          "isDirect": false,
+          "via": [
+            {
+              "source": 1243074,
+              "name": "body-parser",
+              "dependency": "body-parser",
+              "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
+              "url": "https://github.com/advisories/GHSA-27r3-jxmh-p828",
+              "severity": "high",
+              "cwe": [
+                "CWE-248"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=2.0.0 <2.4.0"
+            }
+          ],
+          "effects": [],
+          "range": "2.0.0 - 2.3.0",
+          "nodes": [
+            "node_modules/body-parser"
+          ],
+          "fixAvailable": true
+        }
+      }
+    },
+    {
+      "stage": "after",
+      "exitCode": 0,
+      "durationMs": 799,
+      "nodeModulesCreated": false,
+      "nodeEnv": "production",
+      "lockSha256": "da95e3fca6ff3289ad83876878eb9294c5f793016d0e62ac73acdf71d42466c8",
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "advisories": {}
+    }
+  ],
+  "scope": "Owned manifests/lockfiles only, no installation; live registry findings at capture time.",
+  "lockChangedPackages": {
+    "body-parser": [
+      "2.3.0",
+      "2.4.0"
+    ],
+    "iconv-lite": [
+      "0.7.2",
+      "0.7.3"
+    ],
+    "qs": [
+      "6.16.0",
+      "6.16.1"
+    ]
+  },
+  "localQualification": {
+    "cleanNpmCi": true,
+    "unitGroups": [
+      121,
+      324,
+      1438,
+      2049
+    ],
+    "unitTotal": 3932,
+    "typecheckCI": "passed",
+    "freshProductionBuild": "passed",
+    "initialEntryKB": 468.39,
+    "unchangedErrorBudgetKB": 470,
+    "ciPolicy": {
+      "pass": 264,
+      "skipped": 1,
+      "fail": 0,
+      "skip": "GNU-timeout-only control on macOS"
+    },
+    "headedParticipantEntry": {
+      "passed": true,
+      "stopAfter": "participant-entry-completed-session-reentry",
+      "store": "sqlite",
+      "ownedTeardownComplete": true
+    }
+  }
+}
